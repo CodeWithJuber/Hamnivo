@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/ccbdb48be7e7/current/diagram-sources/02-handoff.json",
+  "output": "/workspace/scratch/ccbdb48be7e7/current/diagram-sources/02-handoff.html",
+  "specification": {
+    "sha256": "15e601810dcd3da06b0be18319edb843301e313b3fa1b3222ef64a8868cf071b",
+    "bytes": 4179
+  },
+  "artifact": {
+    "sha256": "c2b7e6f9d9439925f5cb6d6d942dd9ffa9df199c057690f3e2f9aaa337abccaf",
+    "bytes": 808015
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

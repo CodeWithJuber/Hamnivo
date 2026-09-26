@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "04 \u00b7 Buying, payment and order integrity",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1290,
+      610
+    ]
+  },
+  "components": [
+    {
+      "id": "quote",
+      "type": "database",
+      "label": "Trusted quote",
+      "sublabel": "Items + total + version",
+      "pos": [
+        30,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "approval",
+      "type": "security",
+      "label": "Customer approval",
+      "sublabel": "Bounded exact consent",
+      "pos": [
+        360,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "execute",
+      "type": "backend",
+      "label": "Payment executor",
+      "sublabel": "Policy + idempotency",
+      "pos": [
+        690,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "provider",
+      "type": "external",
+      "label": "Merchant / PSP",
+      "sublabel": "Hosted payment UI",
+      "pos": [
+        1020,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "changed",
+      "type": "security",
+      "label": "Changed or expired",
+      "sublabel": "Requote + new consent",
+      "pos": [
+        360,
+        55
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "humanreview",
+      "type": "frontend",
+      "label": "Human review",
+      "sublabel": "Exceptions + disputes",
+      "pos": [
+        690,
+        55
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "ledger",
+      "type": "database",
+      "label": "Operation ledger",
+      "sublabel": "Amounts + provider IDs",
+      "pos": [
+        690,
+        435
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "reconcile",
+      "type": "backend",
+      "label": "Reconciliation",
+      "sublabel": "Signed webhook + poll",
+      "pos": [
+        1020,
+        435
+      ],
+      "size": [
+        180,
+        78
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "quote-to-approval",
+      "from": "quote",
+      "to": "approval",
+      "variant": "default",
+      "label": "review"
+    },
+    {
+      "id": "approval-to-execute",
+      "from": "approval",
+      "to": "execute",
+      "variant": "default",
+      "label": "bound grant"
+    },
+    {
+      "id": "execute-to-provider",
+      "from": "execute",
+      "to": "provider",
+      "variant": "default",
+      "label": "tokenized call"
+    },
+    {
+      "id": "changed-to-approval",
+      "from": "changed",
+      "to": "approval",
+      "variant": "default",
+      "label": "reapprove",
+      "labelAt": [
+        450,
+        190
+      ]
+    },
+    {
+      "id": "humanreview-to-execute",
+      "from": "humanreview",
+      "to": "execute",
+      "variant": "default",
+      "label": "scoped approval",
+      "labelAt": [
+        780,
+        190
+      ]
+    },
+    {
+      "id": "provider-to-reconcile",
+      "from": "provider",
+      "to": "reconcile",
+      "variant": "default",
+      "label": "verified event",
+      "labelAt": [
+        1110,
+        380
+      ]
+    },
+    {
+      "id": "reconcile-to-ledger",
+      "from": "reconcile",
+      "to": "ledger",
+      "variant": "default",
+      "label": "dedupe + commit"
+    },
+    {
+      "id": "execute-to-ledger",
+      "from": "execute",
+      "to": "ledger",
+      "variant": "default",
+      "label": "operation ID",
+      "labelAt": [
+        780,
+        380
+      ]
+    }
+  ],
+  "boundaries": [],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Merchant and buyer modes",
+      "items": [
+        "Each agent has an explicit represented principal.",
+        "Cart, payment, order and fulfillment states differ."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Payment boundary",
+      "items": [
+        "Raw card details never enter model context.",
+        "A model score cannot authorize a purchase."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Unknown is not failed",
+      "items": [
+        "Timeout: reconcile the original operation.",
+        "Refunds and subscriptions keep separate lifecycles."
+      ]
+    }
+  ]
+}

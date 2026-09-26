@@ -1,0 +1,685 @@
+{
+  "product": "Hamnivo",
+  "type": "static-ui-ux-design-kit",
+  "generated_at_utc": "2026-09-26T21:01:37+00:00",
+  "visual_board_count": 28,
+  "state_specification_row_count": 168,
+  "brand_asset_count": 8,
+  "partial_draft": false,
+  "additional_documents": [
+    "Design-System.md",
+    "Visual-Review-Notes.md",
+    "build_kit.py",
+    "build_state_specs.py"
+  ],
+  "gallery_modes": {
+    "standalone": "Self-contained HTML with original image data embedded.",
+    "zip": "Offline HTML with relative paths to unchanged originals in screenshots/ and brand-assets/."
+  },
+  "images": [
+    {
+      "id": "01",
+      "title": "Workspace setup",
+      "group": "onboarding",
+      "description": "Create a workspace, connect the website widget and invite a team with recoverable setup steps.",
+      "states": [
+        "new-workspace",
+        "workspace-details",
+        "install-method-selected",
+        "connection-verified",
+        "verification-failed-retry"
+      ],
+      "filename": "01-workspace-setup.png",
+      "sha256": "87d1809789427bf34043dff0586fc84e86c11e7ad1b34ec4888c51708b9cd613",
+      "bytes": 1295047,
+      "width": 1487,
+      "height": 1058
+    },
+    {
+      "id": "02",
+      "title": "Sign-in and account recovery",
+      "group": "sign-in/security",
+      "description": "Sign in, verify identity and recover access without exposing account or security details.",
+      "states": [
+        "sign-in",
+        "passkey",
+        "sso-redirect",
+        "mfa-code",
+        "invalid-code",
+        "account-recovery",
+        "session-expired"
+      ],
+      "filename": "02-sign-in-and-account-recovery.png",
+      "sha256": "bc9d7c9f84b68041144eef7ba3b6e036b0dc191364ca9505ee3336acd96b6eaa",
+      "bytes": 1146229,
+      "width": 1512,
+      "height": 1040
+    },
+    {
+      "id": "03",
+      "title": "Workspace overview",
+      "group": "workspace overview",
+      "description": "Understand current workload, pending actions and workspace health at a glance.",
+      "states": [
+        "overview-populated",
+        "first-run-empty",
+        "service-degraded",
+        "filter-updated",
+        "attention-item-open"
+      ],
+      "filename": "03-workspace-overview.png",
+      "sha256": "9893313dafc59b1114f5a1dc10188760fd7c3d55c9fa9f5e0d3d76c937724a6c",
+      "bytes": 1174543,
+      "width": 1487,
+      "height": 1058
+    },
+    {
+      "id": "04",
+      "title": "Widget appearance editor",
+      "group": "widget branding",
+      "description": "Configure the customer widget and inspect its appearance before publishing changes.",
+      "states": [
+        "appearance-editing",
+        "live-preview",
+        "mobile-preview",
+        "invalid-contrast",
+        "unsaved-changes",
+        "published"
+      ],
+      "filename": "04-widget-appearance-editor.png",
+      "sha256": "6f7a4f5acb65d11b4874d825a4b1bbb7dc84017262593fbca1cdf38a25ac4704",
+      "bytes": 1251302,
+      "width": 1487,
+      "height": 1058
+    },
+    {
+      "id": "05",
+      "title": "Customer conversation widget",
+      "group": "customer widget",
+      "description": "Start a customer conversation, exchange messages and understand who is responding.",
+      "states": [
+        "launcher-expanded",
+        "greeting",
+        "ai-reply-streaming",
+        "citations-expanded",
+        "attachment-preview",
+        "message-sent"
+      ],
+      "filename": "05-customer-conversation-widget.png",
+      "sha256": "4687872fcd3372411c926a1cc315b32ce4285ee48cdfad10b8f1265632110ac9",
+      "bytes": 1182559,
+      "width": 1512,
+      "height": 1040
+    },
+    {
+      "id": "06",
+      "title": "Message delivery and offline recovery",
+      "group": "widget delivery/offline",
+      "description": "Keep message delivery understandable during reconnects, failures and offline periods.",
+      "states": [
+        "sending",
+        "offline-queued",
+        "reconnecting",
+        "send-failed",
+        "retry-preserves-draft",
+        "team-offline",
+        "email-followup"
+      ],
+      "filename": "06-message-delivery-and-offline-recovery.png",
+      "sha256": "053a114ffe92ae76ca43ddb54a481f6e9b0d0b4c9e3752026737749416f3a1af",
+      "bytes": 1368281,
+      "width": 1415,
+      "height": 1112
+    },
+    {
+      "id": "07",
+      "title": "Mobile, multilingual and RTL experience",
+      "group": "mobile + RTL",
+      "description": "Follow a conversation on mobile across languages, translations and right-to-left layouts.",
+      "states": [
+        "mobile-agent-inbox",
+        "rtl-arabic-customer",
+        "translation-visible",
+        "original-message",
+        "language-switch",
+        "large-text"
+      ],
+      "filename": "07-mobile-multilingual-and-rtl-experience.png",
+      "sha256": "58a779573a681d47351ed8fd1bf8ca718d7461e2c812ea1cb2fb89124aed4b11",
+      "bytes": 1299878,
+      "width": 1415,
+      "height": 1111
+    },
+    {
+      "id": "08",
+      "title": "Shared agent inbox",
+      "group": "shared agent inbox",
+      "description": "Triage conversations, compare workload and assign the next owner from a shared inbox.",
+      "states": [
+        "unassigned-queue",
+        "assigned-to-me",
+        "bulk-selection",
+        "saved-filter",
+        "empty-filter",
+        "keyboard-search"
+      ],
+      "filename": "08-shared-agent-inbox.png",
+      "sha256": "030c185d2116462a91b7160acfc2fdf7a1f89b210eb3dc38d3486f3139289d67",
+      "bytes": 1264701,
+      "width": 1487,
+      "height": 1058
+    },
+    {
+      "id": "09",
+      "title": "Agent conversation workspace",
+      "group": "conversation workspace",
+      "description": "Support a customer with conversation context, internal collaboration and explicit actions.",
+      "states": [
+        "active-conversation",
+        "internal-note",
+        "ai-draft",
+        "attachment",
+        "customer-context",
+        "concurrent-agent-edit",
+        "resolve"
+      ],
+      "filename": "09-agent-conversation-workspace.png",
+      "sha256": "fb43333c3e966d4620237a9c0ff1937baf4245fcb4980e105c49fade90c812b5",
+      "bytes": 1333336,
+      "width": 1487,
+      "height": 1058
+    },
+    {
+      "id": "10",
+      "title": "Human and AI handoff",
+      "group": "human–AI handoff",
+      "description": "Transfer responsibility between people and AI while keeping ownership and customer expectations clear.",
+      "states": [
+        "ai-active",
+        "human-requested",
+        "waiting-in-queue",
+        "human-joined",
+        "ai-paused",
+        "specialist-invited",
+        "resume-ai-approved"
+      ],
+      "filename": "10-human-and-ai-handoff.png",
+      "sha256": "b35908ec0ed889bd576f634c388dad43eedc8ac1ae16bc12db545a456c847d0d",
+      "bytes": 1480067,
+      "width": 1536,
+      "height": 1024
+    },
+    {
+      "id": "11",
+      "title": "Agent configuration studio",
+      "group": "agent studio",
+      "description": "Configure an AI agent, inspect its instructions and test behavior before activation.",
+      "states": [
+        "agent-draft",
+        "persona-edit",
+        "tool-scope",
+        "test-playground",
+        "validation-failed",
+        "version-published",
+        "rollback-available"
+      ],
+      "filename": "11-agent-configuration-studio.png",
+      "sha256": "806677d5d9f65126833b71c281c552e46cc58a2bf0b1cffedbfc585651508526",
+      "bytes": 1516180,
+      "width": 1470,
+      "height": 1070
+    },
+    {
+      "id": "12",
+      "title": "Typed decision rules",
+      "group": "Jev decisions",
+      "description": "Review typed decision rules, outcomes and the conditions that require human attention.",
+      "states": [
+        "decision-rule-edit",
+        "typed-output",
+        "advisory-result",
+        "deterministic-policy-check",
+        "provider-timeout",
+        "fallback-to-human",
+        "simulation"
+      ],
+      "filename": "12-typed-decision-rules.png",
+      "sha256": "b46f798c1fbd8c1e5b31a0a046e268ef3372da1ab2bd7069f42f2ea268082d20",
+      "bytes": 1425298,
+      "width": 1469,
+      "height": 1071
+    },
+    {
+      "id": "13",
+      "title": "Agent permissions and tools",
+      "group": "guardrails/tools",
+      "description": "Grant scoped tool access and handle restricted or approval-dependent agent actions.",
+      "states": [
+        "tool-permission-matrix",
+        "approval-required",
+        "blocked-action",
+        "credential-expired",
+        "safe-retry",
+        "audit-detail"
+      ],
+      "filename": "13-agent-permissions-and-tools.png",
+      "sha256": "578379c0c3df6e3d2199e7cc3b03a855a87876c3a0f25231ad99cfabf8a32e7a",
+      "bytes": 1421894,
+      "width": 1469,
+      "height": 1071
+    },
+    {
+      "id": "14",
+      "title": "Knowledge sources and citations",
+      "group": "knowledge",
+      "description": "Manage knowledge sources, ingestion status and evidence used in customer answers.",
+      "states": [
+        "sources-indexed",
+        "source-processing",
+        "source-failed",
+        "article-preview",
+        "citation-preview",
+        "stale-source",
+        "source-paused"
+      ],
+      "filename": "14-knowledge-sources-and-citations.png",
+      "sha256": "59bb1547245b0b3a141f322b448810ee53a04c6ded17eeae2bfc5c21d0b73a19",
+      "bytes": 1278657,
+      "width": 1469,
+      "height": 1071
+    },
+    {
+      "id": "15",
+      "title": "Memory and customer preferences",
+      "group": "memory",
+      "description": "Inspect remembered preferences, correct stale facts and manage memory consent.",
+      "states": [
+        "memory-list",
+        "provenance-inspect",
+        "correction-request",
+        "memory-corrected",
+        "conflict-review",
+        "delete-confirm",
+        "deletion-propagating"
+      ],
+      "filename": "15-memory-and-customer-preferences.png",
+      "sha256": "637e43d57e0b846a337ad19208e2878e5a49f99d991a98856447d4738398e986",
+      "bytes": 1281356,
+      "width": 1469,
+      "height": 1071
+    },
+    {
+      "id": "16",
+      "title": "Learning review and controlled releases",
+      "group": "learning/releases",
+      "description": "Evaluate a learning candidate and control promotion, monitoring and rollback.",
+      "states": [
+        "improvement-candidate",
+        "evaluation-pending",
+        "evaluation-failed",
+        "shadow-mode",
+        "canary-release",
+        "approved-promotion",
+        "rollback"
+      ],
+      "filename": "16-learning-review-and-controlled-releases.png",
+      "sha256": "894491439a81df4813a8be0d0393746e5a67dc06829e6a1be3a70bf6b2f68908",
+      "bytes": 1372511,
+      "width": 1469,
+      "height": 1071
+    },
+    {
+      "id": "17",
+      "title": "Integrations and installation",
+      "group": "integrations/SDK",
+      "description": "Connect applications and install the widget through clear, verifiable setup paths.",
+      "states": [
+        "integration-catalog",
+        "connected",
+        "oauth-permission-review",
+        "sdk-install",
+        "connection-test-failed",
+        "reconnect",
+        "disconnect"
+      ],
+      "filename": "17-integrations-and-installation.png",
+      "sha256": "855429d6cd0d5e87d9a4a18c9a8730ae23a2b67d7c3918425ad37b623afdcbda",
+      "bytes": 1395696,
+      "width": 1468,
+      "height": 1071
+    },
+    {
+      "id": "18",
+      "title": "Migration and import review",
+      "group": "migration",
+      "description": "Map imported data, inspect validation issues and review a migration before completion.",
+      "states": [
+        "migration-source-selected",
+        "file-upload",
+        "mapping",
+        "dry-run",
+        "duplicate-detected",
+        "partial-failure",
+        "resumable-import",
+        "completed"
+      ],
+      "filename": "18-migration-and-import-review.png",
+      "sha256": "42ed53b0d4600bc06eb6337ca0c06304ef7766ad0bce54ac12262f9088079b36",
+      "bytes": 1511086,
+      "width": 1470,
+      "height": 1070
+    },
+    {
+      "id": "19",
+      "title": "API keys and webhook delivery",
+      "group": "API/webhooks",
+      "description": "Manage API credentials and inspect webhook delivery, retries and failures.",
+      "states": [
+        "api-key-created-once",
+        "scoped-key",
+        "webhook-configured",
+        "signature-verification",
+        "delivery-failed",
+        "replay-preview",
+        "replay-success",
+        "rate-limit"
+      ],
+      "filename": "19-api-keys-and-webhook-delivery.png",
+      "sha256": "f4c6fe5471e72af773b083871a38fd3b27727659d72c8ae7c284f2eefff986fc",
+      "bytes": 1383666,
+      "width": 1467,
+      "height": 1072
+    },
+    {
+      "id": "20",
+      "title": "Conversational order and checkout",
+      "group": "commerce/checkout",
+      "description": "Review an order inside chat, approve its exact terms and follow checkout status.",
+      "states": [
+        "product-selection",
+        "cart-review",
+        "exact-quote",
+        "customer-approval",
+        "hosted-checkout",
+        "payment-pending",
+        "payment-confirmed"
+      ],
+      "filename": "20-conversational-order-and-checkout.png",
+      "sha256": "9bea7e66a1d8246d6106837b158135fe9ad9965531ef7ae99f703b50e3777352",
+      "bytes": 1325253,
+      "width": 1466,
+      "height": 1073
+    },
+    {
+      "id": "21",
+      "title": "Order support and refund approval",
+      "group": "orders/refunds",
+      "description": "Support an existing order and route sensitive refund actions through explicit approval.",
+      "states": [
+        "order-detail",
+        "payment-reconciliation",
+        "refund-request",
+        "partial-refund",
+        "approval-required",
+        "refund-pending",
+        "refund-failed",
+        "refund-confirmed"
+      ],
+      "filename": "21-order-support-and-refund-approval.png",
+      "sha256": "a047aa8d148647bb869a515020c0a24598f3d84247ee3b20a95b7ba93a2d7137",
+      "bytes": 1514269,
+      "width": 1470,
+      "height": 1070
+    },
+    {
+      "id": "22",
+      "title": "Team roles and access",
+      "group": "team/RBAC",
+      "description": "Invite teammates, assign roles and understand effective permissions.",
+      "states": [
+        "team-directory",
+        "invite-member",
+        "pending-invite",
+        "role-edit",
+        "limited-access",
+        "last-owner-protection",
+        "member-suspended"
+      ],
+      "filename": "22-team-roles-and-access.png",
+      "sha256": "97a7c3363dc597b4a5486fdcb6a74cb6f1313eb61dc8f0639d8f7e1cac3dcc77",
+      "bytes": 1388143,
+      "width": 1467,
+      "height": 1072
+    },
+    {
+      "id": "23",
+      "title": "Reports and workspace usage",
+      "group": "analytics/billing",
+      "description": "Read conversation reports and understand workspace usage, limits and billing context.",
+      "states": [
+        "report-populated",
+        "date-filter",
+        "small-sample",
+        "no-data",
+        "export-processing",
+        "usage-budget",
+        "invoice-detail",
+        "payment-method-failed"
+      ],
+      "filename": "23-reports-and-workspace-usage.png",
+      "sha256": "cece71f78b232474cc44a8486ce99767d0c8a91573742da08c9cb45686def0a7",
+      "bytes": 1437523,
+      "width": 1468,
+      "height": 1071
+    },
+    {
+      "id": "24",
+      "title": "Shared components and recovery states",
+      "group": "global component/accessibility states",
+      "description": "Inspect shared control patterns, validation, empty states and recovery behavior.",
+      "states": [
+        "button-focus",
+        "disabled-with-reason",
+        "form-validation",
+        "loading-skeleton",
+        "empty-state",
+        "toast-undo",
+        "confirmation-dialog",
+        "drawer",
+        "keyboard-navigation",
+        "high-contrast",
+        "reduced-motion"
+      ],
+      "filename": "24-shared-components-and-recovery-states.png",
+      "sha256": "f2ad6be8fceb0d86062276de68e679862f630936af2fa18d588315bddb216beb",
+      "bytes": 1420246,
+      "width": 1469,
+      "height": 1071
+    },
+    {
+      "id": "25",
+      "title": "NLP cache policy and inspection",
+      "group": "NLP caching",
+      "description": "Configure NLP caching, inspect cache decisions and control invalidation and scope.",
+      "states": [
+        "exact-cache-hit",
+        "semantic-cache-eligible",
+        "tenant-scope",
+        "knowledge-version-scope",
+        "permission-scope",
+        "personal-data-bypass",
+        "commerce-bypass",
+        "invalidation-preview",
+        "cache-cleared"
+      ],
+      "filename": "25-nlp-cache-policy-and-inspection.png",
+      "sha256": "210d6d08d0ac0bec89855fb1545f7feccd552abc547f88578464f5780942782c",
+      "bytes": 1407726,
+      "width": 1487,
+      "height": 1058
+    },
+    {
+      "id": "26",
+      "title": "Platform administration and tenant access",
+      "group": "platform superadmin",
+      "description": "Inspect tenants, platform health and controlled administrative access.",
+      "states": [
+        "tenant-directory",
+        "service-health",
+        "tenant-suspended",
+        "support-access-request",
+        "grant-time-limited",
+        "access-denied",
+        "secret-masked",
+        "key-rotation"
+      ],
+      "filename": "26-platform-administration-and-tenant-access.png",
+      "sha256": "9d8a1cc79aa1a11ddd943c5f99542ad5f00a97a5fa610f7c32c8fa1ada001f04",
+      "bytes": 1355645,
+      "width": 1487,
+      "height": 1058
+    },
+    {
+      "id": "27",
+      "title": "Voice and video support",
+      "group": "voice/video support",
+      "description": "Handle voice and video support with clear consent, session controls and recovery.",
+      "states": [
+        "microphone-permission",
+        "call-connecting",
+        "voice-live",
+        "captions-visible",
+        "mute",
+        "camera-off",
+        "interrupted-reply",
+        "network-degraded",
+        "text-fallback",
+        "call-ended"
+      ],
+      "filename": "27-voice-and-video-support.png",
+      "sha256": "2baf4c91e81fe40ae11e0304c49734494702385821a850e12411041476d14374",
+      "bytes": 1367946,
+      "width": 1487,
+      "height": 1058
+    },
+    {
+      "id": "28",
+      "title": "Workflow builder and extension permissions",
+      "group": "workflows/plugins/hooks",
+      "description": "Build a workflow, inspect execution state and review plugin or hook permissions.",
+      "states": [
+        "workflow-draft",
+        "trigger-edit",
+        "branch-condition",
+        "test-run",
+        "tool-approval",
+        "plugin-scope-review",
+        "hook-failure",
+        "published-version",
+        "rollback"
+      ],
+      "filename": "28-workflow-builder-and-extension-permissions.png",
+      "sha256": "3a43751b5a88e63ef730baedbf73023d48c2c3a3fb91694293bb9873a5c3ff4b",
+      "bytes": 1534743,
+      "width": 1487,
+      "height": 1058
+    },
+    {
+      "id": "hero",
+      "title": "Website hero",
+      "group": "Brand asset",
+      "description": "Connected conversations",
+      "states": [],
+      "filename": "hamnivo-hero.png",
+      "sha256": "7c4e57d463c45f07d254d020c771f1fa3c688539d0a794376a42edbda4c87730",
+      "bytes": 1519953,
+      "width": 1536,
+      "height": 1024
+    },
+    {
+      "id": "teamwork",
+      "title": "Human + AI teamwork",
+      "group": "Brand asset",
+      "description": "Coordinated participants",
+      "states": [],
+      "filename": "hamnivo-teamwork.png",
+      "sha256": "6da754d2b4023091ca58c1c39f007d27364824e373f9f31f6c60c56f615d8f2a",
+      "bytes": 985563,
+      "width": 1254,
+      "height": 1254
+    },
+    {
+      "id": "memory",
+      "title": "Agent memory",
+      "group": "Brand asset",
+      "description": "Context and correction",
+      "states": [],
+      "filename": "hamnivo-memory.png",
+      "sha256": "275d504321f445df178830c7b0df4184551e06f3379375c87e218c0f3b2b6e1e",
+      "bytes": 777542,
+      "width": 1254,
+      "height": 1254
+    },
+    {
+      "id": "integrations",
+      "title": "Integrations & APIs",
+      "group": "Brand asset",
+      "description": "Connected applications",
+      "states": [],
+      "filename": "hamnivo-integrations.png",
+      "sha256": "d239502978be949ee376eb840343a1dcac9b82fe2436ba226fc24205dc1ad439",
+      "bytes": 878740,
+      "width": 1254,
+      "height": 1254
+    },
+    {
+      "id": "multilingual",
+      "title": "Multilingual conversations",
+      "group": "Brand asset",
+      "description": "English, Hindi, Arabic and Urdu",
+      "states": [],
+      "filename": "hamnivo-multilingual.png",
+      "sha256": "0e2dad4ab3a508c9d59d242d2fe5028214c3c25cfae762cd493975ee52ab08c8",
+      "bytes": 782830,
+      "width": 1254,
+      "height": 1254
+    },
+    {
+      "id": "commerce",
+      "title": "Order approval & checkout",
+      "group": "Brand asset",
+      "description": "Review before confirmation",
+      "states": [],
+      "filename": "hamnivo-commerce.png",
+      "sha256": "979fb3a97d49d9731493c17eadf12d2b47877168d20b4ed8a8b27592e26fe6b5",
+      "bytes": 899145,
+      "width": 1254,
+      "height": 1254
+    },
+    {
+      "id": "logo",
+      "title": "Hamnivo logo",
+      "group": "Brand asset",
+      "description": "Ink, ivory and coral",
+      "states": [],
+      "filename": "hamnivo-logo.png",
+      "sha256": "125864842e14f6bbef47a54815451a3b75c762292b1d09b0ca30a929e3a63e0a",
+      "bytes": 853784,
+      "width": 1774,
+      "height": 887
+    },
+    {
+      "id": "icon",
+      "title": "Hamnivo icon",
+      "group": "Brand asset",
+      "description": "Standalone brand mark",
+      "states": [],
+      "filename": "hamnivo-icon.png",
+      "sha256": "b3738a91d3f45bd26ed6ce2b7ac22c70a35ac48a5f204b3cefd81c1f31965cf5",
+      "bytes": 366669,
+      "width": 1254,
+      "height": 1254
+    }
+  ],
+  "integrity": "Every packaged PNG is an unchanged byte copy of its supplied original; SHA-256 hashes record the delivered originals."
+}

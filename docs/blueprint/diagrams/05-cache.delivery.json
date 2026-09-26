@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/ccbdb48be7e7/current/diagram-sources/05-cache.json",
+  "output": "/workspace/scratch/ccbdb48be7e7/current/diagram-sources/05-cache.html",
+  "specification": {
+    "sha256": "86019f2a6d4b941a848f75991da52a805b31bf15d3a47c7f8d6a96202fdce797",
+    "bytes": 3874
+  },
+  "artifact": {
+    "sha256": "ed17fa18386011c38458d7e7c6da7bb460cc4f936cb2cce17b31e143cd4a1309",
+    "bytes": 807693
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

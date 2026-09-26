@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+coverage/
+storybook-static/
+.astro/
+.turbo/
+*.tsbuildinfo
+*.log
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
+blob-report/
+routeTree.gen.ts
+.DS_Store
+# Full-resolution design originals are kept outside git (see docs/design/README.md)
+docs/design/.originals/
+.data/

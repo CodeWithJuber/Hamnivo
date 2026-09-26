@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "02 \u00b7 Human + AI participation and handoff",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1290,
+      610
+    ]
+  },
+  "components": [
+    {
+      "id": "request",
+      "type": "frontend",
+      "label": "Customer message",
+      "sublabel": "Public conversation",
+      "pos": [
+        30,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "route",
+      "type": "security",
+      "label": "Routing decision",
+      "sublabel": "Rules + Jev signal",
+      "pos": [
+        360,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "owner",
+      "type": "backend",
+      "label": "Current case owner",
+      "sublabel": "One public AI lease",
+      "pos": [
+        690,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "publish",
+      "type": "frontend",
+      "label": "Authorized reply",
+      "sublabel": "Epoch + grant recheck",
+      "pos": [
+        1020,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "human",
+      "type": "frontend",
+      "label": "Human request",
+      "sublabel": "Deterministic override",
+      "pos": [
+        360,
+        55
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "takeover",
+      "type": "security",
+      "label": "Human takeover",
+      "sublabel": "Epoch increment",
+      "pos": [
+        690,
+        55
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "specialists",
+      "type": "backend",
+      "label": "AI specialists",
+      "sublabel": "Bounded parallel tasks",
+      "pos": [
+        690,
+        435
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "findings",
+      "type": "database",
+      "label": "Private findings",
+      "sublabel": "Evidence + uncertainty",
+      "pos": [
+        1020,
+        435
+      ],
+      "size": [
+        180,
+        78
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "request-to-route",
+      "from": "request",
+      "to": "route",
+      "variant": "default",
+      "label": "new event"
+    },
+    {
+      "id": "route-to-owner",
+      "from": "route",
+      "to": "owner",
+      "variant": "default",
+      "label": "assign"
+    },
+    {
+      "id": "owner-to-publish",
+      "from": "owner",
+      "to": "publish",
+      "variant": "default",
+      "label": "public send"
+    },
+    {
+      "id": "human-to-route",
+      "from": "human",
+      "to": "route",
+      "variant": "default",
+      "label": "must hand off",
+      "labelAt": [
+        450,
+        190
+      ]
+    },
+    {
+      "id": "takeover-to-owner",
+      "from": "takeover",
+      "to": "owner",
+      "variant": "default",
+      "label": "fence AI",
+      "labelAt": [
+        780,
+        190
+      ]
+    },
+    {
+      "id": "owner-to-specialists",
+      "from": "owner",
+      "to": "specialists",
+      "variant": "default",
+      "label": "delegate",
+      "labelAt": [
+        780,
+        380
+      ]
+    },
+    {
+      "id": "specialists-to-findings",
+      "from": "specialists",
+      "to": "findings",
+      "variant": "default",
+      "label": "typed result"
+    },
+    {
+      "id": "findings-to-publish",
+      "from": "findings",
+      "to": "publish",
+      "variant": "default",
+      "label": "owner review"
+    }
+  ],
+  "boundaries": [],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Who can join",
+      "items": [
+        "Human, primary AI and scoped specialists.",
+        "Invited guests see only approved history."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Takeover behavior",
+      "items": [
+        "Old AI lease cannot publish or dispatch new actions.",
+        "Already dispatched actions must be reconciled."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Unavailable or uncertain",
+      "items": [
+        "No Jev response means explicit fallback.",
+        "No human available means an honest queue state."
+      ]
+    }
+  ]
+}

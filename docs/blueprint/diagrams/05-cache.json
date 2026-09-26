@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "05 \u00b7 Caching with tenant isolation",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1290,
+      610
+    ]
+  },
+  "components": [
+    {
+      "id": "input",
+      "type": "security",
+      "label": "Authorized request",
+      "sublabel": "Identity + permissions",
+      "pos": [
+        30,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "key",
+      "type": "security",
+      "label": "Cache eligibility",
+      "sublabel": "Exact scope + versions",
+      "pos": [
+        360,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "Valkey cache",
+      "sublabel": "Bounded TTL + quotas",
+      "pos": [
+        690,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "answer",
+      "type": "backend",
+      "label": "Validated result",
+      "sublabel": "Freshness + policy",
+      "pos": [
+        1020,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "bypass",
+      "type": "external",
+      "label": "Live-only operations",
+      "sublabel": "Orders / pay / refunds",
+      "pos": [
+        360,
+        55
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "miss",
+      "type": "backend",
+      "label": "Cache miss",
+      "sublabel": "Source + model call",
+      "pos": [
+        690,
+        55
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "artifacts",
+      "type": "database",
+      "label": "Safe cached artifacts",
+      "sublabel": "Embeddings / retrieval",
+      "pos": [
+        690,
+        435
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "invalidate",
+      "type": "messagebus",
+      "label": "Invalidation events",
+      "sublabel": "Outbox + tombstones",
+      "pos": [
+        1020,
+        435
+      ],
+      "size": [
+        180,
+        78
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "input-to-key",
+      "from": "input",
+      "to": "key",
+      "variant": "default",
+      "label": "evaluate"
+    },
+    {
+      "id": "key-to-cache",
+      "from": "key",
+      "to": "cache",
+      "variant": "default",
+      "label": "scoped lookup"
+    },
+    {
+      "id": "cache-to-answer",
+      "from": "cache",
+      "to": "answer",
+      "variant": "default",
+      "label": "exact hit"
+    },
+    {
+      "id": "key-to-bypass",
+      "from": "key",
+      "to": "bypass",
+      "variant": "default",
+      "label": "no reuse"
+    },
+    {
+      "id": "cache-to-miss",
+      "from": "cache",
+      "to": "miss",
+      "variant": "default",
+      "label": "miss / stale"
+    },
+    {
+      "id": "artifacts-to-cache",
+      "from": "artifacts",
+      "to": "cache",
+      "variant": "default",
+      "label": "typed entries"
+    },
+    {
+      "id": "invalidate-to-cache",
+      "from": "invalidate",
+      "to": "cache",
+      "variant": "default",
+      "label": "evict versions"
+    }
+  ],
+  "boundaries": [],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Useful reuse",
+      "items": [
+        "Exact answers, embeddings, retrieval, translations.",
+        "Semantic response reuse: approved public FAQ only."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Scope is mandatory",
+      "items": [
+        "Tenant, grants, locale and versions enter keys.",
+        "Never share personal or privileged cached answers."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Freshness and failure",
+      "items": [
+        "Correctness survives cache outage and eviction.",
+        "Invalidation covers source, policy and user deletion."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,233 @@
+﻿ID,Module,Feature,Priority,Release wave,Work package,Acceptance behavior,Suggested owner,Dependencies,Status
+W01,Customer experience,One-script installation,P0,C,WP05,Install on plain HTML without a framework dependency,Frontend,WP02; WP03; WP04,Proposed - not implemented
+W02,Customer experience,Layout modes,P0,C,WP05,Bubble/dock and inline panel; fullscreen on narrow screens,Frontend,WP02; WP03; WP04,Proposed - not implemented
+W03,Customer experience,Brand theme,P0,C,WP05,"Logo, colors, radius, typography, position; accessible contrast validation",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W04,Customer experience,Clear responder identity,P0,C,WP05,"Customer can distinguish AI, human and system notices",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W05,Customer experience,Conversation history,P0,C,WP05,Resume authorized history with pagination and unread markers,Frontend,WP02; WP03; WP04,Proposed - not implemented
+W06,Customer experience,Delivery states,P0,C,WP05,"Distinguish local queued, server accepted, delivered and read where supported",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W07,Customer experience,Reconnect and draft preservation,P0,C,WP05,Recover missed persisted messages; preserve drafts without duplicates,Frontend,WP02; WP03; WP04,Proposed - not implemented
+W08,Customer experience,Rich content,P0,C,WP05,"Sanitized text, links, markdown, code and safe structured cards",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W09,Customer experience,Attachments,P0,C,WP04,"Quarantined image/document upload, fail-closed scanning, limits and rejection recovery",Frontend,WP02; WP03,Proposed - not implemented
+W10,Customer experience,Human handoff,P0,C,WP08,Request human help without repeating the conversation,Frontend,WP06; WP07,Proposed - not implemented
+W11,Customer experience,Offline support,P0,C,WP05,"Business hours, honest availability and contact/follow-up path",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W12,Customer experience,Identity lifecycle,P0,C,WP03,"Anonymous start, verified sign-in, logout/reset and safe account switching",Frontend,WP02,Proposed - not implemented
+W13,Customer experience,Locale and RTL,P0,C,WP20,"Language selector, localized errors and bidirectional text isolation",Frontend,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+W14,Customer experience,Accessibility controls,P0,C,WP05,"Keyboard, screen readers, reduced motion, zoom and useful live status",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W15,Customer experience,Feedback and reopen,P0,C,WP05,"Rating/comment, visible resolution and ability to reopen",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W16,Customer experience,Structured task and approval cards,P1,C,WP05,"Forms, action preview, approval expiry and verified result receipt",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W17,Customer experience,Search/help home,P1,C,WP05,Suggested topics and knowledge search with immediate route to conversation,Frontend,WP02; WP03; WP04,Proposed - not implemented
+W18,Customer experience,Verified cross-device continuation,P1,C,WP05,Resume by authenticated account or expiring verified link,Frontend,WP02; WP03; WP04,Proposed - not implemented
+W19,Customer experience,Proactive assistance,P1,C,WP05,"Triggered by approved events, with quiet hours and frequency caps",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W20,Customer experience,"Voice, video and co-browsing",P2,A,WP05,"Explicit consent, permissions, fallbacks and recording indicators",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W21,Customer experience,Group conversations,P1,C,WP18,"Explicit participants, join/remove permissions and history visibility rules",Frontend,WP02; WP03; WP04; WP06,Proposed - not implemented
+W22,Customer experience,Threads and reactions,P2,A,WP05,Stable parent references; unsupported channels render an understandable fallback,Frontend,WP02; WP03; WP04,Proposed - not implemented
+W23,Customer experience,Message edits and deletion,P1,C,WP05,"Defined sender/time permissions, revision history and retention-aware redaction",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W24,Customer experience,Extended content types,P2,A,WP05,"Audio/video, location, polls and cards with explicit channel capability negotiation",Frontend,WP02; WP03; WP04,Proposed - not implemented
+W25,Customer experience,Notification preferences,P1,C,WP05,"Per-user preferences, quiet hours, mute and privacy-safe previews",Frontend,WP02; WP03; WP04,Proposed - not implemented
+H01,Human agent workspace,Shared inbox,P0,C,WP06,"Mine, unassigned, team, waiting, snoozed and resolved views",Frontend and backend,WP03; WP04,Proposed - not implemented
+H02,Human agent workspace,Assignment and routing,P0,C,WP06,Manual assignment plus simple round-robin with capacity checks,Frontend and backend,WP03; WP04,Proposed - not implemented
+H03,Human agent workspace,Internal notes,P0,C,WP06,Text-labeled private mode that cannot be mistaken for a public reply,Frontend and backend,WP03; WP04,Proposed - not implemented
+H04,Human agent workspace,Tags and custom fields,P0,C,WP06,Validated tenant-defined classification and filtering,Frontend and backend,WP03; WP04,Proposed - not implemented
+H05,Human agent workspace,Saved replies,P0,C,WP06,"Variables, preview and permission-scoped shared templates",Frontend and backend,WP03; WP04,Proposed - not implemented
+H06,Human agent workspace,Customer context,P0,C,WP06,"Verified identity, history and allowed attributes in a collapsible drawer",Frontend and backend,WP03; WP04,Proposed - not implemented
+H07,Human agent workspace,Search,P0,C,WP06,Scope-aware conversation/customer search with pagination,Frontend and backend,WP03; WP04,Proposed - not implemented
+H08,Human agent workspace,Ownership and collisions,P0,C,WP06,Atomic takeover; warn on simultaneous human activity; prevent stale AI send,Frontend and backend,WP03; WP04,Proposed - not implemented
+H09,Human agent workspace,Drafts and failed sends,P0,C,WP06,Preserve unsent content when changing cases or losing connection,Frontend and backend,WP03; WP04,Proposed - not implemented
+H10,Human agent workspace,"Resolve, reopen and snooze",P0,C,WP06,Explicit status transitions with audit events,Frontend and backend,WP03; WP04,Proposed - not implemented
+H11,Human agent workspace,AI copilot,P0,C,WP08,"Source-backed draft, summary and next-step suggestions, always editable",Frontend and backend,WP06; WP07,Proposed - not implemented
+H12,Human agent workspace,SLA and escalation,P1,C,WP06,"Calendars, deadlines, pause conditions and escalation ownership",Frontend and backend,WP03; WP04,Proposed - not implemented
+H13,Human agent workspace,Translation,P1,C,WP20,"Original remains available; dates, names and identifiers preserved",Frontend and backend,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+H14,Human agent workspace,Supervisor review,P1,C,WP06,"Coaching/QA, escalation help and permissioned takeover",Frontend and backend,WP03; WP04,Proposed - not implemented
+H15,Human agent workspace,Bulk operations,P1,C,WP06,"Scope preview, count, partial-failure report and safe undo where available",Frontend and backend,WP03; WP04,Proposed - not implemented
+H16,Human agent workspace,Skill-based routing,P1,C,WP06,"Language, availability, skill, workload and priority policies",Frontend and backend,WP03; WP04,Proposed - not implemented
+H17,Human agent workspace,Merge/split and linked cases,P1,C,WP06,"Preserve author, timestamps, notes and source references",Frontend and backend,WP03; WP04,Proposed - not implemented
+H18,Human agent workspace,Workforce forecasting,P2,A,WP06,Data-derived demand/capacity estimates with uncertainty,Frontend and backend,WP03; WP04,Proposed - not implemented
+A01,Administration,Guided onboarding,P0,C,WP14,"Workspace, brand, knowledge, handoff team, test, install and publish",Full-stack and security,WP03; WP08,Proposed - not implemented
+A02,Administration,Members and role presets,P0,F,WP03,"Invitations, scoped grants, privileged MFA, session revocation and owner recovery",Full-stack and security,WP02,Proposed - not implemented
+A03,Administration,Sub-admin delegation,P0,F,WP03,Team/inbox/brand limits enforced through every backend interface,Full-stack and security,WP02,Proposed - not implemented
+A04,Administration,Multi-brand settings,P0,C,WP14,Distinct widget config and domain allowlist per brand,Full-stack and security,WP03; WP08,Proposed - not implemented
+A05,Administration,Basic business hours,P0,C,WP14,Timezone-aware availability and holidays,Full-stack and security,WP03; WP08,Proposed - not implemented
+A06,Administration,Secrets and API credentials,P0,F,WP03,"Server-only storage, masked values, rotation and revocation",Full-stack and security,WP02,Proposed - not implemented
+A07,Administration,Draft/publish configuration,P0,C,WP14,Saved is not live; immutable published versions and rollback,Full-stack and security,WP03; WP08,Proposed - not implemented
+A08,Administration,Usage limits,P0,C,WP14,Tenant and agent request/tool/token budgets with alerts,Full-stack and security,WP03; WP08,Proposed - not implemented
+A09,Administration,Audit trail,P0,C,WP14,"Actor, action, scope, time, outcome and configuration version",Full-stack and security,WP03; WP08,Proposed - not implemented
+A10,Administration,Retention and exports,P0,C,WP14,Configurable retention policy and documented customer data export,Full-stack and security,WP03; WP08,Proposed - not implemented
+A11,Administration,Channel setup,P0,C,WP14,"Credentials, verification, health and clear reconnect instructions",Full-stack and security,WP03; WP08,Proposed - not implemented
+A12,Administration,Custom role builder,P1,C,WP14,"Action/scope matrix, permission diff and escalation prevention",Full-stack and security,WP03; WP08,Proposed - not implemented
+A13,Administration,Enterprise identity,P1,C,WP14,Enterprise federation/SSO through supported identity integration; privileged MFA is already P0,Full-stack and security,WP03; WP08,Proposed - not implemented
+A14,Administration,Provisioning and access reviews,P2,A,WP14,"SCIM, scheduled reviews and expiring contractor access",Full-stack and security,WP03; WP08,Proposed - not implemented
+A15,Administration,Plans and entitlements,P1,C,WP14,"Seat, volume and feature entitlements independent of authorization",Full-stack and security,WP03; WP08,Proposed - not implemented
+A16,Administration,Billing lifecycle,P1,C,WP14,"Usage ledger, invoices, grace period and tenant-access recovery",Full-stack and security,WP03; WP08,Proposed - not implemented
+A17,Administration,Platform operations console,P0,C,WP14,"Tenant lifecycle, service health, abuse controls and incident actions",Full-stack and security,WP03; WP08,Proposed - not implemented
+A18,Administration,Tenant support grants,P1,C,WP14,"Scoped, expiring and auditable access for support operators",Full-stack and security,WP03; WP08,Proposed - not implemented
+A19,Administration,Residency and dedicated deployments,P2,A,WP14,Region routing and documented isolation tier,Full-stack and security,WP03; WP08,Proposed - not implemented
+A20,Administration,Agency/reseller controls,P2,A,WP14,Delegated tenant management without cross-client data access,Full-stack and security,WP03; WP08,Proposed - not implemented
+G01,AI and knowledge,Agent profiles,P0,C,WP08,"Purpose, supported intents, tone, language and escalation policy",AI/backend,WP06; WP07,Proposed - not implemented
+G02,AI and knowledge,Provider adapter,P0,C,WP08,At least two tested providers; model capability and error normalization,AI/backend,WP06; WP07,Proposed - not implemented
+G03,AI and knowledge,Assist and answer modes,P0,C,WP08,Internal drafts or grounded customer answers; no implicit write tools,AI/backend,WP06; WP07,Proposed - not implemented
+G04,AI and knowledge,Approved knowledge sources,P0,C,WP07,"Documents/URLs, ownership, visibility, versions and freshness",AI/backend,WP03; WP04,Proposed - not implemented
+G05,AI and knowledge,Retrieval with access controls,P0,C,WP07,Tenant/customer scope filters apply before retrieved text is exposed,AI/backend,WP03; WP04,Proposed - not implemented
+G06,AI and knowledge,Source citations,P0,C,WP07,"Link answers to actual retrieved evidence, not invented references",AI/backend,WP03; WP04,Proposed - not implemented
+G07,AI and knowledge,Tool registry,P0,C,WP08,"Input/output schema, required scopes, risk label and time limits",AI/backend,WP06; WP07,Proposed - not implemented
+G08,AI and knowledge,Tool authorization gateway,P0,C,WP08,"Recheck identity, resource ownership and current permission at execution",AI/backend,WP06; WP07,Proposed - not implemented
+G09,AI and knowledge,Bounded execution,P0,C,WP08,"Step, token, time, concurrency and cost limits with a graceful exit",AI/backend,WP06; WP07,Proposed - not implemented
+G10,AI and knowledge,Handoff packet,P0,C,WP08,"Goal, verified facts, attempts, pending tasks and current state",AI/backend,WP06; WP07,Proposed - not implemented
+G11,AI and knowledge,Simulation/replay tests,P0,C,WP08,Draft versions run against frozen cases before publication,AI/backend,WP06; WP07,Proposed - not implemented
+G12,AI and knowledge,Runtime telemetry,P0,C,WP08,"Model/tool latency, outcomes, versions, failures and cost estimates",AI/backend,WP06; WP07,Proposed - not implemented
+G13,AI and knowledge,Action approvals,P1,C,WP11,Review exact action and resource; authorized approver; expiry/revalidation,AI/backend,WP03; WP08,Proposed - not implemented
+G14,AI and knowledge,Action receipts,P1,C,WP11,Completed only after verified external result; unknown outcome is explicit,AI/backend,WP03; WP08,Proposed - not implemented
+G15,AI and knowledge,Limited autopilot,P1,C,WP11,Only approved low-risk operations within configured scope and caps,AI/backend,WP03; WP08,Proposed - not implemented
+G16,AI and knowledge,Durable case workflows,P1,C,WP15,"Approval waits, escalation timers, retries and restart recovery",AI/backend,WP11,Proposed - not implemented
+G17,AI and knowledge,Knowledge ingestion pipeline,P0,C,WP07,"Quarantine/scan, resource-limited parsing, sanitization, indexing and progress",AI/backend,WP03; WP04,Proposed - not implemented
+G18,AI and knowledge,Knowledge editorial workflow,P1,C,WP07,Review proposed fixes; publish version; support rollback and expiry,AI/backend,WP03; WP04,Proposed - not implemented
+G19,AI and knowledge,Customer memory,P1,L,WP21,"Source, purpose, expiry, consent where applicable and view/delete controls",AI/backend,WP03; WP07; WP18,Proposed - not implemented
+G20,AI and knowledge,Outcome learning queue,P1,L,WP23,Propose improvements from resolved cases; no automatic model-weight training,AI/backend,WP11; WP17; WP20; WP21,Proposed - not implemented
+G21,AI and knowledge,Visual automation builder,P1,C,WP15,Limited validated blocks; simulation; loop checks; versioned publishing,AI/backend,WP11,Proposed - not implemented
+G22,AI and knowledge,Multi-agent specialists,P1,C,WP19,"Named responsibilities, finite handoffs, shared case state and total budget",AI/backend,WP08; WP11; WP18,Proposed - not implemented
+G23,AI and knowledge,Long-running promises,P1,L,WP21,"Reminder/follow-up task with owner, deadline and escalation",AI/backend,WP03; WP07; WP18,Proposed - not implemented
+G24,AI and knowledge,Customer-facing generative UI,P1,C,WP05,Schema-validated cards from a known component registry,AI/backend,WP02; WP03; WP04,Proposed - not implemented
+J01,Jev TypeSafe,Jev decision adapter,P0,C,WP17,Official server SDK behind a provider-independent typed interface,AI/backend and QA,WP02; WP03; WP08,Proposed - not implemented
+J02,Jev TypeSafe,Intent and team routing,P0,C,WP17,Shadow evaluation first; route only to currently permitted destinations,AI/backend and QA,WP02; WP03; WP08,Proposed - not implemented
+J03,Jev TypeSafe,Skill and evidence ranking,P1,C,WP17,Rank authorized candidates with a none/unknown path,AI/backend and QA,WP02; WP03; WP08,Proposed - not implemented
+J04,Jev TypeSafe,Escalation advisory,P0,C,WP17,Detect possible handoff need; explicit human requests remain directly actionable,AI/backend and QA,WP02; WP03; WP08,Proposed - not implemented
+J05,Jev TypeSafe,Threshold and rubric editor,P1,C,WP17,"Versioned questions, per-task/language evaluation and publish controls",AI/backend and QA,WP02; WP03; WP08,Proposed - not implemented
+J06,Jev TypeSafe,Provider fallback,P0,C,WP17,"Total deadline, cancellation, circuit breaker and abstain/unavailable states",AI/backend and QA,WP02; WP03; WP08,Proposed - not implemented
+J07,Jev TypeSafe,Decision audit and cost,P0,C,WP17,"Model version, rubric version, scores, latency, token use and final policy outcome",AI/backend and QA,WP02; WP03; WP08,Proposed - not implemented
+J08,Jev TypeSafe,Jev versus baseline experiments,P1,C,WP17,"Compare routing quality, abstention, language behavior, latency and total cost",AI/backend and QA,WP02; WP03; WP08,Proposed - not implemented
+D01,Developer integrations,Public REST API,P0,F,WP02,"Versioned resources, OpenAPI, pagination and consistent errors",Integrations,WP01,Proposed - not implemented
+D02,Developer integrations,Headless JS/TS client,P0,C,WP10,"Framework-free session, messages, uploads, streams and reconnect",Integrations,WP04; WP05,Proposed - not implemented
+D03,Developer integrations,React UI adapter,P0,C,WP10,Product state mapped into composable UI primitives,Integrations,WP04; WP05,Proposed - not implemented
+D04,Developer integrations,Framework wrappers,P1,C,WP10,Angular/Vue examples and thin wrappers using the same SDK,Integrations,WP04; WP05,Proposed - not implemented
+D05,Developer integrations,CMS integrations,P1,C,WP10,WordPress installer first; Shopify/custom CMS recipes after verification,Integrations,WP04; WP05,Proposed - not implemented
+D06,Developer integrations,Webhooks,P0,C,WP12,"Signed events, retries, delivery log, replay and deduplication contract",Integrations,WP02; WP03; WP11,Proposed - not implemented
+D07,Developer integrations,Extension manifest,P1,C,WP12,"Version, permissions, domains, hook subscriptions and compatibility range",Integrations,WP02; WP03; WP11,Proposed - not implemented
+D08,Developer integrations,UI extension slots,P1,C,WP12,"Scoped agent-sidebar cards, toolbar actions and approved message renderers",Integrations,WP02; WP03; WP11,Proposed - not implemented
+D09,Developer integrations,Server hooks,P1,C,WP12,Bounded policy hooks; async side effects; explicit failure behavior,Integrations,WP02; WP03; WP11,Proposed - not implemented
+D10,Developer integrations,MCP adapter,P1,C,WP12,Supported transport/auth/version documented; reviewed tool allowlist,Integrations,WP02; WP03; WP11,Proposed - not implemented
+D11,Developer integrations,AG-UI adapter,P2,A,WP12,Map external agent events into product messages and authorized actions,Integrations,WP02; WP03; WP11,Proposed - not implemented
+D12,Developer integrations,A2A adapter,P2,A,WP12,"External specialist delegation with identity, limits and audit",Integrations,WP02; WP03; WP11,Proposed - not implemented
+D13,Developer integrations,Email channel,P1,C,WP13,"Threading, bounces, loops, verification and attachment handling",Integrations,WP04; WP12,Proposed - not implemented
+D14,Developer integrations,WhatsApp/social connectors,P2,A,WP12,"Official provider APIs, channel policy and per-channel feature fallback",Integrations,WP02; WP03; WP11,Proposed - not implemented
+D15,Developer integrations,Native app packages,P2,A,WP12,WebView bridge first; native renderers only after demand validation,Integrations,WP02; WP03; WP11,Proposed - not implemented
+M01,Migration,Migration preflight,P0,C,WP09,"Permissions, schema sample, supported fields and known source limits",Integrations and QA,WP02; WP03; WP04,Proposed - not implemented
+M02,Migration,Universal import/export,P0,C,WP09,"NDJSON/JSON schema, attachments manifest and raw source references",Integrations and QA,WP02; WP03; WP04,Proposed - not implemented
+M03,Migration,tawk.to import,P0,C,WP09,Test real JSON export samples; REST import only where access is approved,Integrations and QA,WP02; WP03; WP04,Proposed - not implemented
+M04,Migration,Chatwoot migration adapter,P1,C,WP09,"Paginated messages/contacts, files and scoped server credentials",Integrations and QA,WP02; WP03; WP04,Proposed - not implemented
+M05,Migration,Intercom/Zendesk import,P1,C,WP09,Separate connectors; truncation and incomplete exports surfaced,Integrations and QA,WP02; WP03; WP04,Proposed - not implemented
+M06,Migration,Crisp/other adapters,P2,A,WP09,Capability-specific adapters without universal completeness claims,Integrations and QA,WP02; WP03; WP04,Proposed - not implemented
+M07,Migration,Resumable migration jobs,P0,C,WP09,"Checkpoints, source ID deduplication and bounded retries",Integrations and QA,WP02; WP03; WP04,Proposed - not implemented
+M08,Migration,Reconciliation and cutover,P0,C,WP09,"Counts, unsupported fields, quarantine, sample review and rollback",Integrations and QA,WP02; WP03; WP04,Proposed - not implemented
+O01,Operations,Metrics and alerts,P0,C,WP16,"Availability, latency, errors, queue age, provider health and tenant quotas",Reliability and QA,All packages included in the selected release,Proposed - not implemented
+O02,Operations,Backups and recovery,P0,C,WP16,"Encrypted backups, tested restore, RPO/RTO targets and runbooks",Reliability and QA,All packages included in the selected release,Proposed - not implemented
+O03,Operations,CI/CD and versioning,P0,F,WP16,"Contract tests, security scans, migrations, release notes and rollback",Reliability and QA,All packages included in the selected release,Proposed - not implemented
+O04,Operations,Product analytics,P1,C,WP16,"Resolution, reopen rate, SLA, satisfaction and cost per resolved case",Reliability and QA,All packages included in the selected release,Proposed - not implemented
+O05,Operations,Self-hosted distribution,P1,C,WP16,"Versioned containers, environment reference, upgrade/backup guide",Reliability and QA,All packages included in the selected release,Proposed - not implemented
+O06,Operations,Marketplace and partner certification,P2,A,WP16,"Publisher review, revocation, compatibility and incident response",Reliability and QA,All packages included in the selected release,Proposed - not implemented
+R01,Collaboration,Participant registry,P0,C,WP18,"Membership distinguishes human, AI, guest and external task principal",Backend + frontend,WP02; WP03; WP04; WP06,Proposed - not implemented
+R02,Collaboration,AI specialist invitation,P0,C,WP18,Invite only an allowed published specialist with an explicit task,Backend + frontend,WP02; WP03; WP04; WP06,Proposed - not implemented
+R03,Collaboration,History grants,P0,C,WP18,"Joiner receives only permitted full, recent, selected or summarized history",Backend + frontend,WP02; WP03; WP04; WP06,Proposed - not implemented
+R04,Collaboration,Three conversation lanes,P0,C,WP18,"Customer, staff and agent-work content have independent server authorization",Backend + frontend,WP02; WP03; WP04; WP06,Proposed - not implemented
+R05,Collaboration,Public response ownership,P0,C,WP19,One automated speaker lease with expiry and fencing epoch,Backend + frontend,WP08; WP11; WP18,Proposed - not implemented
+R06,Collaboration,Human takeover fencing,P0,C,WP19,Stale public sends and undispatched actions are rejected after takeover,Backend + frontend,WP08; WP11; WP18,Proposed - not implemented
+R07,Collaboration,In-flight action reconciliation,P0,Q,WP19,Takeover shows dispatched operations and reconciles their actual outcomes,Backend + frontend,WP08; WP11; WP18,Proposed - not implemented
+R08,Collaboration,Bounded parallel specialists,P1,C,WP19,"Typed findings, task budgets and bounded conflict resolution",Backend + frontend,WP08; WP11; WP18,Proposed - not implemented
+R09,Collaboration,Pause remove replace agents,P0,C,WP18,"Grants, streams and scheduled work reflect removal",Backend + frontend,WP02; WP03; WP04; WP06,Proposed - not implemented
+R10,Collaboration,Guest invitation,P1,A,WP18,Expiring verified invitation previews precisely which history is shared,Backend + frontend,WP02; WP03; WP04; WP06,Proposed - not implemented
+R11,Collaboration,Review versus takeover,P0,C,WP19,Approval of one action does not transfer the whole conversation,Backend + frontend,WP08; WP11; WP18,Proposed - not implemented
+R12,Collaboration,Human unavailable state,P0,C,WP19,Durable waiting or ticket state never silently weakens mandatory review,Backend + frontend,WP08; WP11; WP18,Proposed - not implemented
+R13,Collaboration,Specialist result provenance,P0,C,WP19,"Findings retain author, evidence and uncertainty; votes do not certify truth",Backend + frontend,WP08; WP11; WP18,Proposed - not implemented
+R14,Collaboration,External agent gateway,P1,A,WP19,Authenticated bounded A2A tasks enforce audience and context scope,Backend + frontend,WP08; WP11; WP18,Proposed - not implemented
+R15,Collaboration,Participant activity UX,P1,C,WP18,"Visible AI role, current owner and useful progress without private reasoning",Backend + frontend,WP02; WP03; WP04; WP06,Proposed - not implemented
+R16,Collaboration,Collaboration replay suite,P0,C,WP25,"Join, takeover, restart and concurrent action races have repeatable fixtures",Backend + frontend,Shipping portions of WP18-WP24; WP26 for caching,Proposed - not implemented
+L01,Memory and learning,Canonical typed memory,P0,L,WP21,"Product-owned records distinguish observations, claims, procedures and outcomes",AI/backend + QA,WP03; WP07; WP18,Proposed - not implemented
+L02,Memory and learning,Memory scope and provenance,P0,L,WP21,"Tenant, subject, purpose, source and permissions validated on read and write",AI/backend + QA,WP03; WP07; WP18,Proposed - not implemented
+L03,Memory and learning,Temporal corrections,P0,L,WP21,Supersession and validity select current facts while exposing conflicts,AI/backend + QA,WP03; WP07; WP18,Proposed - not implemented
+L04,Memory and learning,Memory controls,P0,L,WP21,"User can inspect, correct, forget and configure retention",AI/backend + QA,WP03; WP07; WP18,Proposed - not implemented
+L05,Memory and learning,Deletion propagation,P0,L,WP21,"Indexes, caches, datasets and restored serving paths honor deletions",AI/backend + QA,WP03; WP07; WP18,Proposed - not implemented
+L06,Memory and learning,Commitment memory,P1,L,WP21,Follow-up promises create owned scheduled tasks with deadlines,AI/backend + QA,WP03; WP07; WP18,Proposed - not implemented
+L07,Memory and learning,Independent memory-write policy,P0,L,WP21,Untrusted text cannot grant authority or change sensitive policy fields,AI/backend + QA,WP03; WP07; WP18,Proposed - not implemented
+L08,Memory and learning,Learning consent scopes,P0,L,WP23,"Personal memory, tenant improvement, global contribution and training are separate",AI/backend + QA,WP11; WP17; WP20; WP21,Proposed - not implemented
+L09,Memory and learning,Outcome-linked examples,P0,L,WP23,Verified receipts support labels; agent self-reports do not prove completion,AI/backend + QA,WP11; WP17; WP20; WP21,Proposed - not implemented
+L10,Memory and learning,Dataset lineage and holdouts,P0,L,WP23,Deduplication and customer/time splits expose contamination,AI/backend + QA,WP11; WP17; WP20; WP21,Proposed - not implemented
+L11,Memory and learning,Procedural skill registry,P1,L,WP23,"Skills carry prerequisites, exclusions, versions, tests and rollback",AI/backend + QA,WP11; WP17; WP20; WP21,Proposed - not implemented
+L12,Memory and learning,Co-model shadow mode,P1,L,WP23,Proposals evaluated asynchronously without production mutation credentials,AI/backend + QA,WP11; WP17; WP20; WP21,Proposed - not implemented
+L13,Memory and learning,Offline prompt optimizer,P1,L,WP23,DSPy or alternative produces scoped candidates against frozen baselines,AI/backend + QA,WP11; WP17; WP20; WP21,Proposed - not implemented
+L14,Memory and learning,Candidate promotion,P0,L,WP23,"Evaluation, shadow, canary and policy gates precede scoped activation",AI/backend + QA,WP11; WP17; WP20; WP21,Proposed - not implemented
+L15,Memory and learning,Drift and forgetting checks,P0,L,WP23,Language and older-task regressions can block or roll back candidates,AI/backend + QA,WP11; WP17; WP20; WP21,Proposed - not implemented
+L16,Memory and learning,Owned-model training,P2,Research,WP23,"Licensed data, explicit training job and fresh held-out outcomes required",AI/backend + QA,WP11; WP17; WP20; WP21,Proposed - not implemented
+L17,Memory and learning,Code evolution sandbox,P2,Research,WP23,"Generated code changes use branch, CI, review and controlled deployment",AI/backend + QA,WP11; WP17; WP20; WP21,Proposed - not implemented
+L18,Memory and learning,Memory and poisoning suite,P0,L,WP25,"Correction, abstention, deletion and malicious-memory tests check actual retrieval",AI/backend + QA,Shipping portions of WP18-WP24; WP26 for caching,Proposed - not implemented
+C01,Commerce,Merchant connection registry,P0,Q,WP22,Tenant-bound server credentials and explicit provider capability manifest,Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C02,Commerce,Catalog and comparison,P0,Q,WP22,"Variants, freshness, source, currency and merchant identity are explicit",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C03,Commerce,Cart and exact quote,P0,Q,WP22,"Versioned items, tax, shipping, discounts and expiry use exact numeric arithmetic",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C04,Commerce,Trusted approval card,P0,Q,WP22,"Structured merchant, amount, recurrence and delivery values bind approval",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C05,Commerce,Hosted checkout,P0,Q,WP22,"No card or payment token reaches model context, memory or logs",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C06,Commerce,Payment challenge resume,P0,Q,WP22,Known purchase resumes after customer challenge without duplicate charge,Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C07,Commerce,Operation ledger,P0,Q,WP22,Durable business IDs survive provider idempotency retention windows,Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C08,Commerce,Webhook verification and inbox,P0,Q,WP22,"Signature, account mapping, durable receipt and deduplication precede processing",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C09,Commerce,Unknown payment reconciliation,P0,Q,WP22,Timeout remains unknown until provider state is recovered,Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C10,Commerce,Order and fulfillment lifecycle,P0,Q,WP22,"Paid, provisioned and shipped states remain distinct",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C11,Commerce,Cancellation and returns,P1,A,WP22,"Provider capability, policy and already-fulfilled quantities determine options",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C12,Commerce,Refund workflow,P0,Q,WP22,"Eligibility, exact amount, approval and verified refund receipt",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C13,Commerce,Partial order accounting,P1,A,WP22,"Partial payment, fulfillment, return and refund quantities reconcile",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C14,Commerce,Subscription changes,P1,A,WP22,Proration and renewal terms previewed; entitlement follows provider-backed policy,Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C15,Commerce,Buyer delegation,P2,A,WP22,"Mandate binds merchant, action, exact limits, expiry and revocation",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C16,Commerce,Concurrent spending budgets,P0,A,WP22,Atomic reservations prevent multiple agents exceeding the same mandate,Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C17,Commerce,Commerce protocol adapters,P2,A,WP22,"ACP, UCP and AP2 support is versioned and counterparty-tested",Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C18,Commerce,Merchant provisioning adapter,P1,Q,WP22,WHMCS or chosen merchant operations have distinct provisioning permission,Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C19,Commerce,Finance exception dashboard,P0,Q,WP22,Unknown and failed operations show evidence and next safe action,Integrations + backend,WP11; WP15; WP18,Proposed - not implemented
+C20,Commerce,Commerce recovery suite,P0,Q,WP25,"Duplicate, timeout, stale quote and takeover cases verify final financial state",Integrations + backend,Shipping portions of WP18-WP24; WP26 for caching,Proposed - not implemented
+X01,Harness and security,Workload identity,P0,F,WP03,Server-authenticated principal replaces environment-marker trust,Backend/security,WP02,Proposed - not implemented
+X02,Harness and security,Tool precondition checks,P0,C,WP19,"Execution rechecks scope, revision, epoch, approval and budget",Backend/security,WP08; WP11; WP18,Proposed - not implemented
+X03,Harness and security,Resource and fan-out limits,P0,C,WP19,"Time, cost, steps, nesting and concurrency have enforced ceilings",Backend/security,WP08; WP11; WP18,Proposed - not implemented
+X04,Harness and security,Secret broker,P0,F,WP03,Scoped short-lived credentials stay outside agent prompts,Backend/security,WP02,Proposed - not implemented
+X05,Harness and security,Network egress policy,P0,C,WP19,"Destination, redirect and DNS checks prevent unauthorized internal fetches",Backend/security,WP08; WP11; WP18,Proposed - not implemented
+X06,Harness and security,Inter-agent authenticity,P0,A,WP19,"Sender, recipient audience and task binding are verified",Backend/security,WP08; WP11; WP18,Proposed - not implemented
+X07,Harness and security,Plugin isolation,P0,A,WP19,Third-party arbitrary code runs outside the trusted API process,Backend/security,WP08; WP11; WP18,Proposed - not implemented
+X08,Harness and security,Scoped kill switches,P0,C,WP19,Stop agent or tool actions while human messaging remains usable,Backend/security,WP08; WP11; WP18,Proposed - not implemented
+X09,Harness and security,Source-aware context,P0,C,WP19,Retrieved content and tool outputs remain attributed untrusted inputs,Backend/security,WP08; WP11; WP18,Proposed - not implemented
+X10,Harness and security,Receipt-based completion,P0,Q,WP19,Consequential completion requires an authoritative outcome,Backend/security,WP08; WP11; WP18,Proposed - not implemented
+X11,Harness and security,Privacy-safe trace records,P0,C,WP19,Versions and receipts are inspectable without secrets or hidden reasoning,Backend/security,WP08; WP11; WP18,Proposed - not implemented
+X12,Harness and security,Prompt and memory injection tests,P0,L,WP25,Benign success and attack effects measured separately,Backend/security,Shipping portions of WP18-WP24; WP26 for caching,Proposed - not implemented
+X13,Harness and security,Crash and replay tests,P0,Q,WP25,Restart or repeated delivery cannot duplicate tested business effects,Backend/security,Shipping portions of WP18-WP24; WP26 for caching,Proposed - not implemented
+X14,Harness and security,Policy release controls,P0,C,WP25,Model proposals cannot silently alter permissions or approval policy,Backend/security,Shipping portions of WP18-WP24; WP26 for caching,Proposed - not implemented
+U01,Language and behavior,Language preference model,P0,C,WP20,"UI locale, reply language, script, style and timezone are independent",Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U02,Language and behavior,Hinglish and Roman Urdu,P0,C,WP20,Mixed language and transliteration cases preserve intent and identifiers,Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U03,Language and behavior,Per-participant translations,P1,C,WP20,Original remains accessible and translations are visibly labelled,Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U04,Language and behavior,RTL interaction,P0,C,WP20,Arabic and Urdu with Latin IDs have correct direction and copy behavior,Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U05,Language and behavior,Localized complete flows,P0,C,WP20,"Validation, emails, receipts, admin forms and accessibility labels are localized",Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U06,Language and behavior,Locale-safe numbers and dates,P0,Q,WP20,"Ambiguous amounts, dates, currency and timezone require resolution",Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U07,Language and behavior,Language-capable routing,P0,C,WP20,Specialist language capability or reviewed translation path is checked,Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U08,Language and behavior,Accessible multilingual composer,P0,C,WP20,"Keyboard, screen readers, shaping and IME composition work",Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U09,Language and behavior,Honest AI identity,P0,C,WP20,Warm stable profile never claims invented human identity or verification,Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U10,Language and behavior,Configurable communication style,P1,C,WP20,Direct or gentle wording retains identical facts and entitlements,Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U11,Language and behavior,Respectful correction,P0,C,WP20,Agent corrects false assumptions and admits uncertainty or error,Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U12,Language and behavior,Anti-sycophancy suite,P0,C,WP25,"Opposite beliefs, praise and pressure cannot substitute for evidence",Frontend + native-language QA,Shipping portions of WP18-WP24; WP26 for caching,Proposed - not implemented
+U13,Language and behavior,Fairness pair evaluation,P0,C,WP25,Irrelevant demographic and language swaps preserve eligibility,Frontend + native-language QA,Shipping portions of WP18-WP24; WP26 for caching,Proposed - not implemented
+U14,Language and behavior,Native-language adjudication,P0,C,WP20,Reviewed domain scenarios measure meaning and tone per supported slice,Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U15,Language and behavior,Commercial transparency,P0,Q,WP20,"Merchant role, total cost and recurring terms are clear; no fake scarcity",Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+U16,Language and behavior,Voice language evaluation,P2,Research,WP20,Accented and code-switched speech has separate transcript and action checks,Frontend + native-language QA,WP05; WP06; WP07; WP08; WP17 (routing slice),Proposed - not implemented
+E01,Extensibility and research,Domain ownership contracts,P0,F,WP02,Modules expose commands and events instead of cross-module writes,Tech lead/integrations,WP01,Proposed - not implemented
+E02,Extensibility and research,Provider capability negotiation,P0,Q,WP12,Unsupported operations fail predictably with a user recovery path,Tech lead/integrations,WP02; WP03; WP11,Proposed - not implemented
+E03,Extensibility and research,Runtime-independent ports,P0,C,WP19,Model and orchestration vendors do not own product tenancy or transcript schema,Tech lead/integrations,WP08; WP11; WP18,Proposed - not implemented
+E04,Extensibility and research,Event and schema compatibility,P0,F,WP02,Runtime validation and migration rules cover older consumers,Tech lead/integrations,WP01,Proposed - not implemented
+E05,Extensibility and research,Plugin permission diffs,P0,A,WP12,Expanded permissions require authorized review on upgrade,Tech lead/integrations,WP02; WP03; WP11,Proposed - not implemented
+E06,Extensibility and research,Adapter contract fixtures,P0,C,WP12,Providers must pass shared behavior plus provider-specific capability tests,Tech lead/integrations,WP02; WP03; WP11,Proposed - not implemented
+E07,Extensibility and research,Hikmah reuse adapter,P1,L,WP24,Selected modules become supported packages or a scoped service,Tech lead/integrations,WP02; WP03; WP17; WP21 (memory adapter slice),Proposed - not implemented
+E08,Extensibility and research,Jev contract reconciliation,P0,C,WP17,Current keyed-map API shapes replace incompatible array assumptions,Tech lead/integrations,WP02; WP03; WP08,Proposed - not implemented
+E09,Extensibility and research,License and dataset inventory,P0,F,WP01,Exact versions and distribution obligations recorded before reuse,Tech lead/integrations,None; kickoff inputs,Proposed - not implemented
+E10,Extensibility and research,Research evidence registry,P1,L,WP24,"Implementation, proposal, benchmark and historical finding remain distinguishable",Tech lead/integrations,WP02; WP03; WP17; WP21 (memory adapter slice),Proposed - not implemented
+E11,Extensibility and research,Semantic co-model experiments,P2,Research,WP24,Meaning representation tested against simpler multilingual baselines,Tech lead/integrations,WP02; WP03; WP17; WP21 (memory adapter slice),Proposed - not implemented
+E12,Extensibility and research,Workflow authority boundary,P0,Q,WP15,Durable business lifecycle and bounded agent execution have one owner each,Tech lead/integrations,WP11,Proposed - not implemented
+K01,NLP and AI caching,Exact cache policy,P0,C,WP26,Only eligible validated outputs cached under complete scoped keys,AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
+K02,NLP and AI caching,Embedding cache,P1,C,WP26,"Content hash, model version and preprocessing version bind vectors",AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
+K03,NLP and AI caching,Retrieval cache,P1,C,WP26,Current ACL and knowledge revision checked before context reuse,AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
+K04,NLP and AI caching,Translation and NLP cache,P1,C,WP26,"Language, script, glossary and model versions preserve exact source meaning",AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
+K05,NLP and AI caching,Semantic FAQ cache,P1,A,WP26,"Near-neighbor candidates require intent, entity, polarity and freshness validation",AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
+K06,NLP and AI caching,Sensitive and live-data exclusions,P0,Q,WP26,"Payments, approvals and dynamic order state never reuse stale answer authority",AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
+K07,NLP and AI caching,Versioned invalidation,P0,C,WP26,"Knowledge, policy, prompt, identity and permission changes invalidate reuse",AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
+K08,NLP and AI caching,Singleflight and outage fallback,P1,C,WP26,Concurrent misses bounded; cache outage cannot block human messaging,AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
+K09,NLP and AI caching,Cache privacy and deletion,P0,L,WP26,"Tenant namespace, encryption and purge follow data lifecycle",AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
+K10,NLP and AI caching,Cache observability,P1,C,WP26,"Valid hits, false hits, staleness, latency and net cost measured by language",AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
+K11,NLP and AI caching,Cache poisoning and fairness suite,P0,A,WP25,"Negation, currency, tenant, role and language changes cannot cause unsafe reuse",AI/backend + reliability,Shipping portions of WP18-WP24; WP26 for caching,Proposed - not implemented
+K12,NLP and AI caching,Pluggable cache adapter,P0,C,WP26,Valkey baseline and optional semantic implementation share product policy boundary,AI/backend + reliability,WP02; WP03; WP07; WP20,Proposed - not implemented
