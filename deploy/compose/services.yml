@@ -1,0 +1,50 @@
+# Infrastructure for running Hamnivo on your own machine or server.
+#   hamnivo-db  PostgreSQL 18 + pgvector (Hamnivo's own database; Chatwoot keeps its own)
+#   valkey      queues (BullMQ), cache and realtime signals
+#
+# Start:  pnpm services:up      (reads .env.local; create it once with: bash scripts/setup/env.sh)
+# Stop:   pnpm services:down    (data stays in the named volumes)
+# Ports bind to 127.0.0.1 by default; set HAMNIVO_DB_BIND / HAMNIVO_VALKEY_BIND to change that.
+name: hamnivo
+
+services:
+  hamnivo-db:
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${HAMNIVO_DB_SUPERUSER_PASSWORD:?run bash scripts/setup/env.sh first}
+      HAMNIVO_DB_OWNER_PASSWORD: ${HAMNIVO_DB_OWNER_PASSWORD:?run bash scripts/setup/env.sh first}
+      HAMNIVO_DB_APP_PASSWORD: ${HAMNIVO_DB_APP_PASSWORD:?run bash scripts/setup/env.sh first}
+      HAMNIVO_DB_PLATFORM_PASSWORD: ${HAMNIVO_DB_PLATFORM_PASSWORD:?run bash scripts/setup/env.sh first}
+      HAMNIVO_DB_SQL_DIR: /hamnivo-db-init
+    volumes:
+      # PostgreSQL 18 images keep data under /var/lib/postgresql/18/docker.
+      - hamnivo-db:/var/lib/postgresql
+      - ../postgres:/hamnivo-db-init:ro
+      - ../postgres/init.sh:/docker-entrypoint-initdb.d/10-hamnivo.sh:ro
+    ports:
+      - '${HAMNIVO_DB_BIND:-127.0.0.1}:${HAMNIVO_DB_PORT:-5432}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U postgres -d hamnivo']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    # BullMQ requires noeviction; append-only persistence keeps queued jobs across restarts.
+    command: ['valkey-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    volumes:
+      - valkey-data:/data
+    ports:
+      - '${HAMNIVO_VALKEY_BIND:-127.0.0.1}:${HAMNIVO_VALKEY_PORT:-6379}:6379'
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  hamnivo-db:
+  valkey-data:

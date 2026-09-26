@@ -172,7 +172,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 |---|---|---|---|---|---|
 | O01 | Metrics and alerts | P0 | C | planned |  |
 | O02 | Backups and recovery | P0 | C | planned |  |
-| O03 | CI/CD and versioning | P0 | F | in-progress | `.github/workflows/ci.yml` — Lint, typecheck, unit, integration matrix and a11y audit wired; contract tests and release/rollback pending. |
+| O03 | CI/CD and versioning | P0 | F | in-progress | `scripts/ci/local.sh`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `docs/adr/0007-self-hosted-verification.md` — Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence/status checks, accessibility audit) run with pnpm ci:local; release and rollback automation pending. |
 | O04 | Product analytics | P1 | C | planned |  |
 | O05 | Self-hosted distribution | P1 | C | planned |  |
 | O06 | Marketplace and partner certification | P2 | A | planned |  |
@@ -298,7 +298,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | E06 | Adapter contract fixtures | P0 | C | planned |  |
 | E07 | Hikmah reuse adapter | P1 | L | planned |  |
 | E08 | Jev contract reconciliation | P0 | C | planned |  |
-| E09 | License and dataset inventory | P0 | F | implemented | `scripts/licenses/inventory.ts`, `docs/licenses.md`, `.github/workflows/ci.yml` — Inventory generated from the lockfile; CI fails on stale inventory or unreviewed licences. |
+| E09 | License and dataset inventory | P0 | F | implemented | `scripts/licenses/inventory.ts`, `docs/licenses.md`, `scripts/ci/local.sh` — Inventory generated from the lockfile; the local check pipeline fails on a stale inventory or unreviewed licences. |
 | E10 | Research evidence registry | P1 | L | planned |  |
 | E11 | Semantic co-model experiments | P2 | Research | planned |  |
 | E12 | Workflow authority boundary | P0 | Q | planned |  |
