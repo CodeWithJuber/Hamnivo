@@ -1,1 +1,64 @@
-{}
+{
+  "E09": {
+    "status": "implemented",
+    "evidence": ["scripts/licenses/inventory.ts", "docs/licenses.md", ".github/workflows/ci.yml"],
+    "note": "Inventory generated from the lockfile; CI fails on stale inventory or unreviewed licences."
+  },
+  "O03": {
+    "status": "in-progress",
+    "evidence": [".github/workflows/ci.yml"],
+    "note": "Lint, typecheck, unit, integration matrix and a11y audit wired; contract tests and release/rollback pending."
+  },
+  "W03": {
+    "status": "in-progress",
+    "evidence": ["packages/brand/src/contrast.ts", "packages/brand/test/contrast.test.ts"],
+    "note": "Contrast validation implemented; widget studio UI pending."
+  },
+  "HNV-24-01": {
+    "status": "implemented",
+    "evidence": [
+      "packages/ui/src/components/button.tsx",
+      "packages/ui/src/stories/controls.stories.tsx",
+      "packages/ui/test/components.test.tsx"
+    ]
+  },
+  "HNV-24-02": {
+    "status": "implemented",
+    "evidence": [
+      "packages/ui/src/components/reasoned-action.tsx",
+      "packages/ui/src/components/form-error-summary.tsx",
+      "packages/ui/src/stories/forms.stories.tsx",
+      "packages/ui/test/components.test.tsx"
+    ]
+  },
+  "HNV-24-03": {
+    "status": "implemented",
+    "evidence": [
+      "packages/ui/src/components/async-states.tsx",
+      "packages/ui/src/stories/async.stories.tsx",
+      "packages/ui/test/components.test.tsx"
+    ]
+  },
+  "HNV-24-04": {
+    "status": "implemented",
+    "evidence": [
+      "packages/ui/src/components/alert-dialog.tsx",
+      "packages/ui/src/stories/overlays.stories.tsx",
+      "packages/ui/test/overlays.test.tsx"
+    ]
+  },
+  "HNV-24-05": {
+    "status": "implemented",
+    "evidence": [
+      "packages/ui/src/components/async-states.tsx",
+      "packages/ui/src/components/unsaved-changes-dialog.tsx",
+      "packages/ui/src/stories/global-error.stories.tsx",
+      "packages/ui/test/overlays.test.tsx"
+    ]
+  },
+  "HNV-24-06": {
+    "status": "partial",
+    "evidence": ["packages/ui/scripts/a11y-audit.ts", "packages/ui/src/components/live-region.tsx"],
+    "note": "Automated axe audit passes for every story in light/dark × LTR/RTL; manual screen-reader, 200% zoom and keyboard reviews are still required."
+  }
+}

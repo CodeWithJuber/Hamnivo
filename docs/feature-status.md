@@ -7,9 +7,9 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 232
+**Blueprint features (232):** planned: 229 · in-progress: 2 · implemented: 1
 
-**Design states (168):** planned: 168
+**Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
 ## Blueprint features
 
@@ -19,7 +19,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 |---|---|---|---|---|---|
 | W01 | One-script installation | P0 | C | planned |  |
 | W02 | Layout modes | P0 | C | planned |  |
-| W03 | Brand theme | P0 | C | planned |  |
+| W03 | Brand theme | P0 | C | in-progress | `packages/brand/src/contrast.ts`, `packages/brand/test/contrast.test.ts` — Contrast validation implemented; widget studio UI pending. |
 | W04 | Clear responder identity | P0 | C | planned |  |
 | W05 | Conversation history | P0 | C | planned |  |
 | W06 | Delivery states | P0 | C | planned |  |
@@ -172,7 +172,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 |---|---|---|---|---|---|
 | O01 | Metrics and alerts | P0 | C | planned |  |
 | O02 | Backups and recovery | P0 | C | planned |  |
-| O03 | CI/CD and versioning | P0 | F | planned |  |
+| O03 | CI/CD and versioning | P0 | F | in-progress | `.github/workflows/ci.yml` — Lint, typecheck, unit, integration matrix and a11y audit wired; contract tests and release/rollback pending. |
 | O04 | Product analytics | P1 | C | planned |  |
 | O05 | Self-hosted distribution | P1 | C | planned |  |
 | O06 | Marketplace and partner certification | P2 | A | planned |  |
@@ -298,7 +298,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | E06 | Adapter contract fixtures | P0 | C | planned |  |
 | E07 | Hikmah reuse adapter | P1 | L | planned |  |
 | E08 | Jev contract reconciliation | P0 | C | planned |  |
-| E09 | License and dataset inventory | P0 | F | planned |  |
+| E09 | License and dataset inventory | P0 | F | implemented | `scripts/licenses/inventory.ts`, `docs/licenses.md`, `.github/workflows/ci.yml` — Inventory generated from the lockfile; CI fails on stale inventory or unreviewed licences. |
 | E10 | Research evidence registry | P1 | L | planned |  |
 | E11 | Semantic co-model experiments | P2 | Research | planned |  |
 | E12 | Workflow authority boundary | P0 | Q | planned |  |
@@ -579,12 +579,12 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-24-01 | Components | Hover, focus-visible and pressed | planned |  |
-| HNV-24-02 | Forms | Disabled, read-only and invalid | planned |  |
-| HNV-24-03 | Async content | Loading, empty and skeleton | planned |  |
-| HNV-24-04 | Dialog and menu | Open, focus trapped and dismissed | planned |  |
-| HNV-24-05 | Global error | Recoverable, offline and unsaved navigation | planned |  |
-| HNV-24-06 | Accessible alternatives | Screen reader, zoom and reduced motion | planned |  |
+| HNV-24-01 | Components | Hover, focus-visible and pressed | implemented | `packages/ui/src/components/button.tsx`, `packages/ui/src/stories/controls.stories.tsx`, `packages/ui/test/components.test.tsx` |
+| HNV-24-02 | Forms | Disabled, read-only and invalid | implemented | `packages/ui/src/components/reasoned-action.tsx`, `packages/ui/src/components/form-error-summary.tsx`, `packages/ui/src/stories/forms.stories.tsx`, `packages/ui/test/components.test.tsx` |
+| HNV-24-03 | Async content | Loading, empty and skeleton | implemented | `packages/ui/src/components/async-states.tsx`, `packages/ui/src/stories/async.stories.tsx`, `packages/ui/test/components.test.tsx` |
+| HNV-24-04 | Dialog and menu | Open, focus trapped and dismissed | implemented | `packages/ui/src/components/alert-dialog.tsx`, `packages/ui/src/stories/overlays.stories.tsx`, `packages/ui/test/overlays.test.tsx` |
+| HNV-24-05 | Global error | Recoverable, offline and unsaved navigation | implemented | `packages/ui/src/components/async-states.tsx`, `packages/ui/src/components/unsaved-changes-dialog.tsx`, `packages/ui/src/stories/global-error.stories.tsx`, `packages/ui/test/overlays.test.tsx` |
+| HNV-24-06 | Accessible alternatives | Screen reader, zoom and reduced motion | partial | `packages/ui/scripts/a11y-audit.ts`, `packages/ui/src/components/live-region.tsx` — Automated axe audit passes for every story in light/dark × LTR/RTL; manual screen-reader, 200% zoom and keyboard reviews are still required. |
 
 ### 25 · NLP and semantic cache policy
 
