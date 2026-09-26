@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 229 · in-progress: 2 · implemented: 1
+**Blueprint features (232):** planned: 227 · in-progress: 4 · implemented: 1
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -137,7 +137,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| D01 | Public REST API | P0 | F | planned |  |
+| D01 | Public REST API | P0 | F | in-progress | `packages/contracts/src/routes.ts`, `packages/contracts/src/errors.ts`, `packages/contracts/openapi/hamnivo.v1.json`, `packages/contracts/scripts/openapi.ts` — OpenAPI 3.1 generated from Zod with RFC 9457 errors and cursor pagination; widget routes defined, staff/admin/server routes follow with their modules. |
 | D02 | Headless JS/TS client | P0 | C | planned |  |
 | D03 | React UI adapter | P0 | C | planned |  |
 | D04 | Framework wrappers | P1 | C | planned |  |
@@ -293,7 +293,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | E01 | Domain ownership contracts | P0 | F | planned |  |
 | E02 | Provider capability negotiation | P0 | Q | planned |  |
 | E03 | Runtime-independent ports | P0 | C | planned |  |
-| E04 | Event and schema compatibility | P0 | F | planned |  |
+| E04 | Event and schema compatibility | P0 | F | in-progress | `packages/contracts/src/events.ts`, `packages/contracts/src/parts.ts`, `packages/contracts/fixtures/v1/future-minor-version.json`, `packages/contracts/test/contracts.test.ts`, `docs/contracts/compatibility.md` — Forward-compatible parsing and fixtures in place; client SDK compatibility tests follow with packages/client. |
 | E05 | Plugin permission diffs | P0 | A | planned |  |
 | E06 | Adapter contract fixtures | P0 | C | planned |  |
 | E07 | Hikmah reuse adapter | P1 | L | planned |  |

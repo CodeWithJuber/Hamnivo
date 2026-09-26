@@ -59,6 +59,27 @@
   "HNV-24-06": {
     "status": "partial",
     "evidence": ["packages/ui/scripts/a11y-audit.ts", "packages/ui/src/components/live-region.tsx"],
-    "note": "Automated axe audit passes for every story in light/dark × LTR/RTL; manual screen-reader, 200% zoom and keyboard reviews are still required."
+    "note": "Automated axe audit passes for every story in light/dark \u00d7 LTR/RTL; manual screen-reader, 200% zoom and keyboard reviews are still required."
+  },
+  "D01": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/contracts/src/routes.ts",
+      "packages/contracts/src/errors.ts",
+      "packages/contracts/openapi/hamnivo.v1.json",
+      "packages/contracts/scripts/openapi.ts"
+    ],
+    "note": "OpenAPI 3.1 generated from Zod with RFC 9457 errors and cursor pagination; widget routes defined, staff/admin/server routes follow with their modules."
+  },
+  "E04": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/contracts/src/events.ts",
+      "packages/contracts/src/parts.ts",
+      "packages/contracts/fixtures/v1/future-minor-version.json",
+      "packages/contracts/test/contracts.test.ts",
+      "docs/contracts/compatibility.md"
+    ],
+    "note": "Forward-compatible parsing and fixtures in place; client SDK compatibility tests follow with packages/client."
   }
 }

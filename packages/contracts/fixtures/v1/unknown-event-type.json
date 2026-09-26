@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.4",
+  "eventId": "evt_01j9zk7w3xq8r4t2v6m5n1p0cq",
+  "type": "reaction.added",
+  "conversationId": "conv_01j9zk7w3xq8r4t2v6m5n1p0ce",
+  "sequence": 45,
+  "occurredAt": "2026-09-26T19:03:00Z",
+  "correlationId": null,
+  "lane": "customer",
+  "data": { "messageId": "msg_01j9zk7w3xq8r4t2v6m5n1p0cg", "emoji": "👍" }
+}

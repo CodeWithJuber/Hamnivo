@@ -20,7 +20,8 @@
       "!docs/blueprint",
       "!packages/chatwoot/swagger",
       "!**/migrations/meta",
-      "!packages/brand/assets"
+      "!packages/brand/assets",
+      "!packages/contracts/openapi"
     ]
   },
   "formatter": {
