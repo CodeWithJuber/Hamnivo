@@ -1,0 +1,38 @@
+{
+  "name": "hamnivo",
+  "private": true,
+  "description": "Hamnivo \u2014 conversations, people and agents in one place.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run test",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:int": "turbo run test:int --concurrency=1",
+    "test:e2e": "turbo run test:e2e --concurrency=1",
+    "dev:services": "bash scripts/dev/up.sh",
+    "dev:services:down": "bash scripts/dev/down.sh",
+    "knip": "knip",
+    "changeset": "changeset",
+    "status": "tsx scripts/feature-status/generate.ts",
+    "licenses": "tsx scripts/licenses/inventory.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@changesets/cli": "3.0.3",
+    "@types/node": "24.19.0",
+    "knip": "6.38.0",
+    "tsx": "4.23.15",
+    "turbo": "2.11.4",
+    "typescript": "6.0.3",
+    "vitest": "5.0.2"
+  }
+}

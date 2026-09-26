@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint, typecheck, unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Feature status matrix is current
+        run: pnpm exec tsx scripts/feature-status/generate.ts --check
+      - name: License inventory is current and reviewed
+        run: pnpm exec tsx scripts/licenses/inventory.ts --check
+
+  integration:
+    name: Integration (PostgreSQL ${{ matrix.postgres }})
+    runs-on: ubuntu-24.04
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
+    services:
+      postgres:
+        image: pgvector/pgvector:pg${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+      valkey:
+        image: valkey/valkey:8-alpine
+        ports: ['6379:6379']
+    env:
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create Hamnivo roles and databases
+        run: bash scripts/ci/prepare-postgres.sh
+      - run: pnpm test:int
+        env:
+          DATABASE_URL: postgres://hamnivo_app:hamnivo_app_dev@127.0.0.1:5432/hamnivo
+          DATABASE_OWNER_URL: postgres://hamnivo_owner:hamnivo_owner_dev@127.0.0.1:5432/hamnivo
+          REDIS_URL: redis://127.0.0.1:6379

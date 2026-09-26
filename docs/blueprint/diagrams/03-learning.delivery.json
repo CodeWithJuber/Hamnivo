@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/ccbdb48be7e7/current/diagram-sources/03-learning.json",
+  "output": "/workspace/scratch/ccbdb48be7e7/current/diagram-sources/03-learning.html",
+  "specification": {
+    "sha256": "3d8332ec3535fe558a2d5fed01c540b23b47a7b489aef35cee546876b5b927f8",
+    "bytes": 4020
+  },
+  "artifact": {
+    "sha256": "44689fb79412bb78b4ca2370cac883fdfafe29660e09e34c622d9cde2d32544f",
+    "bytes": 806801
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

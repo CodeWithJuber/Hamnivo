@@ -1,0 +1,485 @@
+[
+  {
+    "id": "01",
+    "slug": "onboarding",
+    "title": "Workspace setup",
+    "group": "onboarding",
+    "prompt": "Design the first-run owner experience, titled “Welcome to Hamnivo”. A narrow three-step progress rail reads Workspace, Connect, Invite. Show Connect selected, with completed Workspace carrying a small check. This is step 2 of 3, not an endless setup wizard. The main panel says “Connect your first website” with a short sentence explaining that the customer widget appears after installation. Workspace is “Northline Studio”, with a discreet Demo badge. Three large but compact selectable rows: Website snippet, Package install, Help from a teammate. Select Website snippet. Beneath them place a labeled Website URL field with https://northline.example, a compact three-line JavaScript code block containing a fictional PUBLIC_DEMO_ID, a Copy snippet action and a “Where does this go?” disclosure. The key action is an ink “Verify installation” button. Include Back and “Finish later” links. A right-side preview occupying only one-third of the workspace shows the customer widget greeting and the brand icon. Avoid a huge illustration or empty hero area.\nUse three focused state crops: successful check with “Widget detected” and “Continue to invite”; failed verification with “We couldn’t find the widget” and concrete checks for domain and code placement plus Retry; and invitation entry with “Invite teammates”, email input, role selector, Add another, and Send invites. Make invitation optional. Indicate that a role can be changed later. The core UX communicates progress, one next action, reversible setup, and an easy exit without discarding completed steps.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "new-workspace",
+      "workspace-details",
+      "install-method-selected",
+      "connection-verified",
+      "verification-failed-retry"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "02",
+    "slug": "signin-security",
+    "title": "Sign-in and account recovery",
+    "group": "sign-in/security",
+    "prompt": "Create the authentication and recovery screen family. The main viewport is an intentionally restrained sign-in page with the Hamnivo logo in the top left, a thin footer containing Help and Privacy, and a centered compact card. Title “Sign in to your workspace”. Put a prominent ink “Continue with passkey” button first, an email field prefilled with amina@northline.example, then “Continue with email”. Beneath a quiet divider add “Continue with your company SSO”. Show “Use another workspace” as a text link and “Northline Studio” as the current workspace chip. This is a functional sign-in screen; do not fill the remainder with charts, testimonials or invented security claims. A small side illustration can use the H mark only, with ample but deliberate breathing room.\nThree supporting crops cover practical recovery. First: a six-digit verification code panel, with code entry, “Code expired. Request a new code.”, Resend code and Back; never display an actual secret. Second: “Recover access” with options “Use a recovery code” and “Contact your workspace admin”, plus an explanation that changes may take review. Third: an in-app session-expired dialog above a muted inbox, “Your session ended”, a Sign in again action and “Your unsent draft is saved on this device.” Include a small device/session list row with This device, Last active now, and a Revoke action on another session. No authentication method should appear selected implicitly without a user action.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "sign-in",
+      "passkey",
+      "sso-redirect",
+      "mfa-code",
+      "invalid-code",
+      "account-recovery",
+      "session-expired"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "03",
+    "slug": "workspace-overview",
+    "title": "Workspace overview",
+    "group": "workspace overview",
+    "prompt": "Show the owner’s everyday workspace overview for Northline Studio, with a small Demo data label. Persistent left navigation contains Overview, Inbox, Agents, Knowledge, Integrations, Reports, and Settings; put Learning inside Agents rather than crowding the main rail. The header has workspace switcher, global search, Help, notifications and an avatar. Page title “Overview”, date filter “27 Sep 2026”, compact team filter “All teams”. Under the heading use four small useful counters, not oversized metric billboards: Open 24, Waiting for team 6, Needs review 3, Median first reply 4m. Label them “Demo activity”. The dominant content is a “Needs attention” list with an overdue customer conversation, an agent configuration awaiting approval, and a payment confirmation requiring reconciliation. Each row has priority, owner and a clear Open button. Beside it, show a compact team availability panel with Amina available, Rayan busy, and Support AI active. Beneath, show a recent activity timeline and “Finish your setup: 3 of 4 complete” with the one remaining task, Add a knowledge source.\nState crops: first-run overview with a helpful empty inbox and the next two actions Connect website and Invite teammate; a degraded messaging provider banner with “Messages are queued” and View status; and an opened attention drawer with clear item context and one action. The dashboard should guide real work without exposing implementation detail to operators. The primary content remains dense enough to be useful while every row has readable hierarchy and touch-friendly actions.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "overview-populated",
+      "first-run-empty",
+      "service-degraded",
+      "filter-updated",
+      "attention-item-open"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "04",
+    "slug": "widget-branding",
+    "title": "Widget appearance editor",
+    "group": "widget branding",
+    "prompt": "Render the workspace admin’s widget appearance editor. Maintain Hamnivo’s global shell. Header: “Customer widget”, tabs Appearance, Content, Behavior, Install. Appearance is selected. A compact editor column on the left occupies approximately 40 percent; a live website preview occupies the right 60 percent. Editor sections include Brand, Launcher, Conversation and Accessibility. Under Brand, show an uploaded Hamnivo mark thumbnail, workspace display name “Northline Support”, light background color chip, ink action color chip, and coral accent chip. Use labeled fields, not unlabeled color swatches. Launcher choices are “Icon”, “Text + icon” and “Custom”; choose Icon, position Bottom right, spacing 24 px. Greeting is “How can we help today?” and supporting line “Ask a question or talk to the team.” Include an avatar visibility toggle, system/light/dark theme selection, and desktop/mobile preview switch.\nThe preview shows a plausible fictional online store page with a widget open; keep surrounding content very muted so the editor remains clear. A sticky action bar reads “Unsaved changes”, Reset and ink Publish. Add “Last published 26 Sep 2026” below the title.\nThree state callouts: color validation explaining “This text color is difficult to read” with a darker accessible suggestion and Apply; unsaved-changes exit dialog with Keep editing and Discard changes; successful publication toast “Widget appearance published” with Undo. A mobile preview crop can be included inside the main preview pane, using the same widget. Editing should visibly update the preview without implying changes are live until Publish is used.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "appearance-editing",
+      "live-preview",
+      "mobile-preview",
+      "invalid-contrast",
+      "unsaved-changes",
+      "published"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "05",
+    "slug": "customer-widget",
+    "title": "Customer conversation widget",
+    "group": "customer widget",
+    "prompt": "Create three customer-facing widget states at readable mobile scale, each showing only the product interface without phone hardware. Exterior labels: “Start a conversation”, “Get a useful answer”, “Send a file”. The customer is browsing Northline Studio’s fictional service website.\nFirst viewport: expanded widget home with H icon, “Northline Support”, subtle availability status and a close control. Greeting “Hi, how can we help?” A prominent input-like action says “Ask a question”. Offer only three compact intent buttons: Track an order, Account help, Talk to the team. A small Recent conversation entry is optional and contains no unnecessary personal data. Footer has language selector English and an unobtrusive “Powered by Hamnivo”.\nSecond viewport: ongoing chat. Header identifies “Support AI · AI assistant”. User asks “Can I change my delivery address?” Reply says “You can update it before dispatch. I can check the order status first.” Display a concise source chip “Delivery help” and a real “Talk to a person” action in the conversation menu. Under the answer show quick replies “Check my order” and “Read policy”. A subtle streaming cursor may appear in the unfinished final sentence, with a Stop control. No simulated thinking transcript or fabricated confidence percentage.\nThird viewport: composer with a file preview “order-note.pdf”, file size 240 KB and Remove action before sending. Show a private-information hint only where relevant: “Please don’t include payment card details.” Composer supports text, attach and send. The selected attachment has a visible upload progress status and Cancel; keep the customer’s unsent text intact. Match header height, bubble spacing, timestamps and composer position across all three screens.\n\nLandscape design board, approximately 1400 × 1100, with three adjacent mobile product viewports designed for 390 × 844. No phone hardware. Each viewport has a clear exterior state label and large readable UI. Keep the same navigation, typography, spacing and button grammar across the three states.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "launcher-expanded",
+      "greeting",
+      "ai-reply-streaming",
+      "citations-expanded",
+      "attachment-preview",
+      "message-sent"
+    ],
+    "surface": "mobile"
+  },
+  {
+    "id": "06",
+    "slug": "widget-delivery-offline",
+    "title": "Message delivery and offline recovery",
+    "group": "widget delivery/offline",
+    "prompt": "Create three mobile customer conversation views with exterior labels “Connection lost”, “Retry delivery”, and “Team is offline”. Each screen shares exactly the same chat header, bubbles and composer design as the main widget, making the state differences easy to compare.\nFirst view: header “Northline Support”, a calm amber-tinted banner “You’re offline. We’ll send when you reconnect.” Show the customer’s latest message “Please check order NL-1048” with a small clock and Queued label. The message remains readable and there is no fake delivered check. Composer remains usable, with local draft “I can share the receipt too”. A compact “Trying to reconnect…” status appears in the banner. Avoid alarming full-screen error art.\nSecond view: restored connection, but one attachment message failed. Beneath that specific bubble show “Couldn’t send this file” with Retry and Remove actions; the surrounding conversation is still available. The text draft is preserved. Include an upload retry progress ring in one small row. A successful earlier message uses a modest Delivered label, not an ambiguous double check with unexplained color. A collapsed “Message details” entry gives sent time only when asked.\nThird view: team is outside working hours. Explain “The team is offline. Leave your question and we’ll reply by email.” Show next availability “Monday, 9:00 AM · Dubai time” as a demo configuration rather than a service promise. Offer AI help now and a small follow-up form containing email, message, consent checkbox for conversation updates, and Send message. After submission, show a compact in-place acknowledgment with Edit email and Back to chat. Errors always have a next action and never erase the customer’s work.\n\nLandscape design board, approximately 1400 × 1100, with three adjacent mobile product viewports designed for 390 × 844. No phone hardware. Each viewport has a clear exterior state label and large readable UI. Keep the same navigation, typography, spacing and button grammar across the three states.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "sending",
+      "offline-queued",
+      "reconnecting",
+      "send-failed",
+      "retry-preserves-draft",
+      "team-offline",
+      "email-followup"
+    ],
+    "surface": "mobile"
+  },
+  {
+    "id": "07",
+    "slug": "mobile-rtl",
+    "title": "Mobile, multilingual and RTL experience",
+    "group": "mobile + RTL",
+    "prompt": "Show three mobile screens demonstrating actual responsive UX and readable language support. Exterior labels: “Agent on mobile”, “Arabic customer chat”, “Translation with original”. Keep the language examples short and carefully typeset.\nFirst screen: mobile agent inbox. Top bar uses H icon, Inbox heading, search and avatar. Filters are an intentionally horizontally scrollable row: Assigned to me, Unassigned, Waiting. Conversation list rows show initials, short name, latest snippet, elapsed time, unread count and a modest priority dot. Select a message from Sara about order NL-1048. Bottom navigation has Inbox, Activity, Knowledge and Profile, each with an icon and text. A small presence control reads Available.\nSecond screen: fully right-to-left Arabic customer chat. Mirror navigation placement, bubble alignment and composer actions appropriately, but keep the order number NL-1048 readable left-to-right. Header reads “دعم نورثلاين”. Greeting is “مرحباً، كيف يمكننا مساعدتك؟”. Customer asks “أريد متابعة طلبي”. Assistant replies “يسعدني مساعدتك. ما رقم الطلب؟”. Use clear Arabic typography rather than Latin-shaped placeholder marks. Language menu entry is “العربية”. Include a person-request action “التحدث مع الفريق”. Do not mirror universally directional media controls incorrectly.\nThird screen: an English-speaking agent sees a translated Arabic message. A small label says “Translated from Arabic”; show the English text “I want to track my order” followed by a disclosure “Show original”. Expand it to display “أريد متابعة طلبي”. Composer language choice reads “Reply in Arabic” with a translation preview before send. Include “Translation may need review” only as a subtle contextual hint, not a blocking warning. All three views must remain usable with generous tap targets and realistic mobile density.\n\nLandscape design board, approximately 1400 × 1100, with three adjacent mobile product viewports designed for 390 × 844. No phone hardware. Each viewport has a clear exterior state label and large readable UI. Keep the same navigation, typography, spacing and button grammar across the three states.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "mobile-agent-inbox",
+      "rtl-arabic-customer",
+      "translation-visible",
+      "original-message",
+      "language-switch",
+      "large-text"
+    ],
+    "surface": "mobile"
+  },
+  {
+    "id": "08",
+    "slug": "shared-inbox",
+    "title": "Shared agent inbox",
+    "group": "shared agent inbox",
+    "prompt": "Design the shared inbox for a support agent starting a shift. Persistent global navigation remains consistent but Inbox is active. Use a compact inbox secondary sidebar with My conversations 8, Unassigned 6, All open 24, Waiting 5, Closed, and saved views. Team selector reads Support. The main content is a spacious yet efficient conversation table, not an oversized kanban. Top controls: Search conversations, saved filter “Priority follow-up”, Filter, and a small New conversation button. Columns include Customer, Latest message, Status, Assignee, Channel and Updated. Show seven plausible fictional rows: Sara N. “Can I change the address?”, Omar A. “Payment completed but order pending”, Lina R. “Thanks, that worked”, and others. Include website, email and messaging channel glyphs without external branded marks. Distinguish unread rows through weight and a dot, never color alone.\nThe selected row reveals a right-side compact preview pane with the last two messages, customer context, and Open conversation. Presence and workload indicators should be discreet. A bottom status says “6 unassigned conversations” with Assign next as a single strong action. No huge dashboard metrics.\nState callouts: bulk select three rows with Assign, Change status and More; a saved-filter empty state explaining “No conversations match these filters” with Clear filters; and command search results for “Sara” with keyboard-friendly selection. Keep the original selection visible during bulk mode. Sorting and active filter chips are understandable, removable, and never concealed behind an unlabeled icon. The UX should support efficient scanning, assignment, and quick keyboard navigation while remaining clear to a first-time operator.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "unassigned-queue",
+      "assigned-to-me",
+      "bulk-selection",
+      "saved-filter",
+      "empty-filter",
+      "keyboard-search"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "09",
+    "slug": "conversation-workspace",
+    "title": "Agent conversation workspace",
+    "group": "conversation workspace",
+    "prompt": "Render a working agent conversation workspace in a three-column layout. A narrow list on the left contains recent conversations; the center is the primary conversation; a restrained right drawer contains customer and order context. Header shows “Sara N.”, Open status, assigned agent Amina and a Takeover or assignment menu. The center timeline contains customer message “Can I update the address on order NL-1048?”, a Support AI reply that offered to check status, and Amina’s human response. Sender identities explicitly distinguish AI assistant, team member and customer. Show timestamps only where useful, not on every line.\nThe customer drawer contains email masked as s•••@example.com, language English, local time 12:41 AM, and order NL-1048 with status Preparing. Buttons are View order and Add note. A small activity tab contains auditable events, not private reasoning. The bottom composer has Reply and Internal note tabs, text “I’ve checked your order. It hasn’t been dispatched yet.”, attachment control, a saved reply selector and an ink Send button. An AI suggestion card above the composer provides a short draft with Insert, Edit and Dismiss, clearly not auto-sent.\nThree state crops: Internal note mode tinted softly with “Only your team can see this” and Post note; collision notice “Rayan is also viewing this conversation” without taking over the draft; and Resolve dialog with optional reason and “Send reply and resolve”. Preserve the customer transcript while actions occur. A useful but nonintrusive suggested next action may read “Confirm the new address with Sara.” The visual hierarchy should keep reading and composing at the center, with peripheral detail available without overwhelming the operator.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "active-conversation",
+      "internal-note",
+      "ai-draft",
+      "attachment",
+      "customer-context",
+      "concurrent-agent-edit",
+      "resolve"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "10",
+    "slug": "human-ai-handoff",
+    "title": "Human and AI handoff",
+    "group": "human–AI handoff",
+    "prompt": "Show a conversation being handed from AI to a human with explicit, understandable control. Main desktop screenshot uses the agent conversation workspace. The conversation header shows Sara N., “Human requested”, and assignment queue Support. A compact participant strip displays Sara · Customer, Support AI · Paused, Amina · Joining. Customer message reads “Please let me talk to a person.” The next public system message says “I’ve asked the team to join. Your conversation will stay here.” No artificial wait-time promise. The agent gets a concise handoff summary card: Request: change delivery address; Verified: order NL-1048 is preparing; Needs confirmation: new address; Actions taken: status checked only. Include Open full conversation. This is a summary of recorded facts, never hidden reasoning.\nThe right panel “Conversation control” states “Public replies: Amina” and “AI assistance: Draft suggestions only”. A secondary Invite specialist button opens choices Billing assistant and Shipping assistant; these remain private helpers unless explicitly granted customer-facing access. The main action is “Join and take over”. Below it make the relevant context scope clear: “Share this conversation from the last customer request”.\nState crops: customer widget after a human joins with “Amina joined the conversation” and a human avatar; participant invitation dialog with role, visibility and history scope; and “Resume AI replies?” confirmation that requires an explicit action and explains which agent will speak. An activity line “AI reply cancelled when Amina took over” shows a safe takeover outcome. Make the human request a direct handoff path, not something an AI confidence score can veto. Use calm status colors and strong labels.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "ai-active",
+      "human-requested",
+      "waiting-in-queue",
+      "human-joined",
+      "ai-paused",
+      "specialist-invited",
+      "resume-ai-approved"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "11",
+    "slug": "agent-studio",
+    "title": "Agent configuration studio",
+    "group": "agent studio",
+    "prompt": "Create the admin’s Agent Studio for configuring “Support AI”. Use top tabs Overview, Behavior, Knowledge, Tools, Test and Versions. Behavior is active. Main panel title “How Support AI should respond”, with compact form sections Role, Tone, Scope and Handoff. Role text: “Help customers with product questions and order updates.” Tone uses three plain-language choices Friendly, Concise and Clear, with a short response preview. A labeled instruction area shows a few short sentences, not an enormous code editor. Scope has checked capabilities Answer product questions and Check order status; unchecked capability Issue refunds. Handoff rules include Customer requests a person, Account identity cannot be verified and Action requires approval. These are human-readable rows with Edit controls.\nRight-hand test panel occupies about 35 percent of the workspace. Header “Try a conversation”, scenario dropdown “Address change”, user input “Can I update my delivery address?” and an AI test response with citation chip. Show an action status “Would check order status” clearly labeled Simulation. Footer buttons Save draft and Publish version. Top status is “Draft · Based on v3”. Include a small version comparison link.\nState crops: validation error “Choose at least one support queue for handoff” next to the missing field; a tool scope editor granting Read order status while leaving Change order disabled; and version publication confirmation “Version 4 published” with View changes and Roll back. The UI should make configuration easy for a nontechnical admin, with Advanced settings collapsed. Do not equate a custom prompt with a safety guarantee. Test outputs and production conversation state must be visibly separate.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "agent-draft",
+      "persona-edit",
+      "tool-scope",
+      "test-playground",
+      "validation-failed",
+      "version-published",
+      "rollback-available"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "12",
+    "slug": "jev-decisions",
+    "title": "Typed decision rules",
+    "group": "Jev decisions",
+    "prompt": "Design an admin screen titled “Decision rules” with a clear subtitle “Classify requests and suggest the next step”. Within a selected rule “Human handoff”, show provider “Jev” in a small configuration chip and status Connected; never present the provider as ultimate authority. The main layout has a simple decision form on the left and a simulation panel on the right. Fields: Question “Does this request need a human?”, result type Choice, allowed choices Continue with AI, Ask for clarification, Route to human. Inputs are visibly limited to Recent customer messages, Current conversation status and Approved account context. Include a “Data shared” disclosure and a destination queue Support.\nBelow the form show a distinct “Policy checks” section with rows “Customer asks for a person → Always route”, “Payment dispute → Route to Billing”, and “Decision unavailable → Ask a human”. These deterministic rules take precedence. Avoid code-centric design in this basic view. Advanced JSON schema can be a collapsed disclosure.\nSimulation panel contains fictional customer input “I want a real person to help with this payment.” Result card displays “Suggested: Route to human”, a short reason “Customer requested a person”, and a separate verified policy result “Required by workspace policy”. Primary action Test rule; secondary Save draft.\nState crops: typed result validation error with “Unexpected choice returned; fallback used”; provider timeout with “Decision service unavailable — routed to Support”; and an audit record showing input scope, result, policy applied, time and reviewer without secrets or hidden reasoning. Use a restrained coral accent for the selected path, not a flashy flowchart. The interface should make the distinction between a suggestion and permission obvious.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "decision-rule-edit",
+      "typed-output",
+      "advisory-result",
+      "deterministic-policy-check",
+      "provider-timeout",
+      "fallback-to-human",
+      "simulation"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "13",
+    "slug": "guardrails-tools",
+    "title": "Agent permissions and tools",
+    "group": "guardrails/tools",
+    "prompt": "Build a clear agent permissions screen for workspace admins. Page heading “Tools and permissions”, selected agent Support AI, status Published v4. Main content is a compact capability table grouped by Customer data, Orders and External tools. Rows: Search help center · Allowed; Read order status · Allowed; Change delivery address · Approval required; Issue refund · Disabled; Open arbitrary URL · Restricted domains. Columns show Tool, Data scope, Permission and Last checked. Each permission uses an icon plus text, never color alone. The most important row is Change delivery address, selected to open an inspector drawer.\nThe drawer explains “Approval required before a change is sent”, displays approved domains orders.northline.example, credential status “Connected · Expires in 2 days”, and a masked credential reference rather than any secret. Add controls for Allow read-only checks, Approval group Support leads, and Maximum scope This order only. Primary Save changes. Use small explanatory tooltips only where terms need definition.\nThree state crops: a human approval card with order NL-1048, old and new address represented as fictional abbreviated details, Approve and Reject, with expiry shown; blocked action “Refund permission is not enabled” with Request access rather than a retry that bypasses policy; and expired credential banner “Reconnect the order service” with Reconnect and “Pending actions have not been sent”. Include an auditable activity row “Address update approved by Amina · 12:39 AM”. The screen should communicate exact action scope, who can approve, and what happened. Do not use shields or green checkmarks to imply the entire product is unconditionally secure.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "tool-permission-matrix",
+      "approval-required",
+      "blocked-action",
+      "credential-expired",
+      "safe-retry",
+      "audit-detail"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "14",
+    "slug": "knowledge-sources",
+    "title": "Knowledge sources and citations",
+    "group": "knowledge",
+    "prompt": "Show the admin’s Knowledge area with heading “Knowledge sources”, search, Add source and a compact source health filter. Main list includes Website help center · 48 pages · Synced 20 minutes ago; Returns policy.pdf · 6 pages · Ready; Shipping guide · Processing 12 of 20 pages; and Old pricing page · Needs review. Use plausible demonstration counts rather than performance claims. Columns Source, Visibility, Status, Updated and More. Visibility chips distinguish Public answers from Team only. The selected Returns policy.pdf opens a right preview with a source excerpt “Address changes are available before dispatch”, document page number, last sync timestamp and “Used by Support AI”. Under the excerpt show a customer-safe answer preview with a citation linking to the specific source. This is a clear editorial workflow, not a vector database dashboard.\nAdd a compact source creation menu with Website, File upload and Manual article. Include a small link “Review answer gaps” below the source list. Selecting an old source reveals a visible “Review before using” control and pause action. A header count “4 sources” is sufficient; avoid giant storage charts.\nThree state crops: import progress with Pause and “You can leave this page”; failed website sync with a concrete “Page requires sign-in” message, Retry and Edit URL; and empty knowledge area with “Add your first trusted source” plus three source buttons. A small permissions callout demonstrates that Team only content is excluded from customer answers. Source history and citation preview should be easy to inspect without exposing embeddings or raw prompt internals to the administrator.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "sources-indexed",
+      "source-processing",
+      "source-failed",
+      "article-preview",
+      "citation-preview",
+      "stale-source",
+      "source-paused"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "15",
+    "slug": "memory-controls",
+    "title": "Memory and customer preferences",
+    "group": "memory",
+    "prompt": "Create an admin and agent memory review screen centered on trust and useful control. Heading “Customer memory”, customer Sara N., a search field and two tabs Preferences and Conversation facts. Preferences is active. A compact list shows “Preferred language: English”, “Contact preference: Email”, and “Delivery note: Call at reception”. Each entry has a purpose label, source, last confirmed date and visibility. The current entry is Delivery note, selected to open a detail drawer. Show source “Customer message · 24 Sep 2026”, recorded by Support AI, scope “This customer”, expires “After this order”, and a link to the original visible message. Do not show speculative sensitive attributes or a magical human personality profile.\nThe detail drawer has Edit, Mark outdated and Delete actions. A small correction form changes “Call at reception” to “Leave with reception only after confirmation”, with a field “Reason for correction”. Primary Save correction. A narrow banner explains “Only approved preferences are used in customer replies.” Distinguish workspace knowledge from a customer’s own data. A tab for “Agent working notes” can remain unselected and clearly internal.\nThree focused crops: conflicting preference card “A newer message may replace this note” with Compare and Confirm; delete confirmation specifying the single memory and “Remove from future use”; and deletion status “Removed from active use. Connected indexes are updating.” Keep a small audit trail rather than pretending all copies disappear instantly. Include “Ask customer to confirm” as a practical alternative to guessing. The interface should demonstrate memory provenance, correction, expiry and scope without exposing private internal reasoning.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "memory-list",
+      "provenance-inspect",
+      "correction-request",
+      "memory-corrected",
+      "conflict-review",
+      "delete-confirm",
+      "deletion-propagating"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "16",
+    "slug": "learning-releases",
+    "title": "Learning review and controlled releases",
+    "group": "learning/releases",
+    "prompt": "Design the workspace owner’s “Learning and improvements” screen. Explain the feature in one short line: “Review changes learned from approved feedback before they reach customers.” The dominant panel is an improvement queue with three cards or rows: Better delivery-address answers, Clearer Arabic handoff greeting, and Updated refund policy citation. Each has source Feedback review, candidate version, owner and state. Select Better delivery-address answers to reveal a detailed side-by-side comparison: current response says “Contact support”; candidate response says “I can check whether the order has shipped, then ask the team to confirm the change.” Both cite the same approved policy. Do not show a fictional IQ score or claim the model rewrote itself.\nA clear release progression uses compact horizontal steps within the content width: Candidate, Evaluation, Shadow, Limited release, Published. Evaluation is complete, Shadow is selected. A results table shows demonstration scenario counts and specific checks: Human requests handed off 20/20, Unsupported actions blocked 12/12, Citation accuracy 18/20. Mark “Demo evaluation” explicitly, and highlight the citation failures for review. Main action Review failed cases; secondary Start limited release is disabled until the required review is complete.\nState crops: failed evaluation with a concrete example and Return to draft; limited release setup with traffic 5%, observation period and owner approval; and rollback dialog “Restore version 4” explaining active conversations retain their recorded history. Show an activity log with the approving person and version. The UX supports supervised improvement, measurable evidence and reversible release; it must never imply customer conversations automatically retrain production weights without governance.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "improvement-candidate",
+      "evaluation-pending",
+      "evaluation-failed",
+      "shadow-mode",
+      "canary-release",
+      "approved-promotion",
+      "rollback"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "17",
+    "slug": "integrations-sdk",
+    "title": "Integrations and installation",
+    "group": "integrations/SDK",
+    "prompt": "Build the Integrations page for a workspace admin or developer. Main heading “Connect your tools”, search “Search integrations”, compact category chips Channels, Commerce, CRM, Developer and All. Use a restrained grid of six practical integration cards: Website widget, Email inbox, Store orders, CRM, Custom API and Webhooks. Show generic original icons rather than borrowed vendor trademarks. Cards display Connected, Setup needed or Not connected, and a short purpose sentence. Website widget and Store orders are Connected. A selected Website widget card opens an installation side panel, avoiding a separate sprawling page.\nThe panel has tabs JavaScript, React and REST. JavaScript is active with a small copyable installation snippet containing only PUBLIC_DEMO_ID and https://api.example. Beneath, fields for allowed website domain northline.example, widget placement, and environment Test. A Test connection button produces a readable status. A compact block “What this connection can access” lists Send customer messages and Read widget configuration, explicitly excluding unrelated account data. Link View setup guide and Copy install code.\nThree state crops: connection permission review with checkboxes for needed scopes and Connect; a failed test “Domain is not on the allowed list” with Add domain and Retry; and a disconnected commerce connector showing “Order tools paused” plus Reconnect. Include a disconnect confirmation that names exactly the affected functions and preserves imported conversation history. A developer should find installation details quickly, while a nontechnical admin can connect a standard integration through the same simple visual language. Keep any code compact and legible; do not make the whole product resemble an IDE.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "integration-catalog",
+      "connected",
+      "oauth-permission-review",
+      "sdk-install",
+      "connection-test-failed",
+      "reconnect",
+      "disconnect"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "18",
+    "slug": "migration-import",
+    "title": "Migration and import review",
+    "group": "migration",
+    "prompt": "Create the migration wizard for moving from an existing chat provider into Hamnivo. The main screenshot is step 3 “Review sample”, with a compact stepper Source, Map fields, Review sample, Import. Source selected is “Export file” with filename support-export-demo.zip. Workspace Northline Studio is visible at the top. The primary panel contains a source-to-destination mapping table: conversation_id to Conversation ID, customer_email to Customer email, created_at to Created time, assigned_agent to Teammate, attachments to Attachments. Required fields carry text indicators. A right preview shows a single imported fictional conversation from Sara with two messages and a PDF attachment; date and sender identity are preserved.\nUnder the mapping table place a dry-run summary: 240 conversations ready, 8 duplicates, 3 records need review. Mark these as sample results. Duplicates have a clear policy selector Skip existing, with an explanation that originals remain. Primary action “Run import”; secondary “Download review report”. Include a small permissions note identifying which workspace receives the records. No claim of universal one-click migration.\nThree supporting crops: validation error on a missing date column with a mapping selector; resumable import progress “156 of 240 conversations imported” with Pause and “You can close this page”; and a completed-with-issues summary showing imported, skipped and failed counts plus Download errors and Retry failed records. A clear “Import history” link enables audit without destructive rollback promises. The UX should demonstrate safe preview, explicit mapping, duplicate handling, long-running job status, and recovery from partial failure. Preserve the import configuration and never encourage starting a duplicate job just to recover from a timeout.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "migration-source-selected",
+      "file-upload",
+      "mapping",
+      "dry-run",
+      "duplicate-detected",
+      "partial-failure",
+      "resumable-import",
+      "completed"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "19",
+    "slug": "api-webhooks",
+    "title": "API keys and webhook delivery",
+    "group": "API/webhooks",
+    "prompt": "Design a Developer settings page with tabs API keys, Webhooks and Event log. Webhooks is selected. Main heading “Webhooks”, button Add endpoint. A table lists https://hooks.northline.example/support with status Active, subscribed events conversation.created and message.sent, latest delivery 12:38 AM; another endpoint has Attention needed. Selecting an endpoint opens a detail drawer with URL, environment Test, subscribed events, signing secret shown only as masked dots, and Rotate secret. Delivery history shows one 200 response and one 503 response with event ID, sent time, attempt number and View details. The selected failed delivery has an easy-to-read payload preview limited to event name, conversation ID and timestamp; do not expose personal message bodies or production credentials.\nIn the main header include concise developer affordances API reference and SDK examples. A separate compact API key section crop uses “Create key”, name “Website integration”, permission checkboxes Read conversations and Send messages, and expiry selector 30 days. Explicit scopes make access comprehensible.\nThree state callouts: one-time key reveal with a fake placeholder beginning demo_key_, Copy and “Store this securely; it won’t be shown again”; webhook replay confirmation showing the exact event, destination and “Replay this delivery” with a warning that receivers should deduplicate; and a rate-limit response example with “Try again in 20 seconds” and request ID. Add signature validation status Verified to a successful delivery. The purpose is a dependable integration control panel with observable failures and targeted recovery, not a screen overflowing with raw JSON or fake logs.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "api-key-created-once",
+      "scoped-key",
+      "webhook-configured",
+      "signature-verification",
+      "delivery-failed",
+      "replay-preview",
+      "replay-success",
+      "rate-limit"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "20",
+    "slug": "commerce-checkout",
+    "title": "Conversational order and checkout",
+    "group": "commerce/checkout",
+    "prompt": "Create three customer mobile screens for a conversational purchase, labeled outside the viewports “Choose”, “Review and approve”, and “Checkout status”. This is a fictional Northline store order, not an actual payment request. Use English and prices in AED consistently.\nFirst screen: customer chat asks “I need a notebook and a pen set.” Support AI responds with two compact product cards: Everyday Notebook, AED 35; Black Pen Set, AED 15. Each has a simple original product thumbnail, quantity stepper and Add. Beneath, a mini-cart bar “2 items · AED 50” has Review order. Avoid upsell clutter or pressure tactics.\nSecond screen: an order review card embedded in chat. Lines: Everyday Notebook ×1 AED 35, Black Pen Set ×1 AED 15, Delivery AED 10, Total AED 60. A clear “Quote valid until 1:00 AM” uses a demo time; delivery address is fictional and abbreviated “Sara N. · Al Noor Street, Dubai”. Actions Edit items, Edit delivery and ink “Approve and continue to payment”. Below, explain that the customer will confirm payment on the store’s checkout page. The AI never claims approval on the customer’s behalf. A separate checkbox is unnecessary unless it represents a specific real requirement.\nThird screen: checkout return status “Payment confirmation pending”, with order NL-1048, total AED 60 and a neutral progress indicator. Text “We’re waiting for confirmation from the payment service.” Actions Check status and Contact team. In a compact lower designer state inset show final confirmed state “Payment confirmed” with receipt link and View order; do not show both pending and paid as simultaneous product states. No card numbers, pretend processor guarantees or agent-controlled card entry. Keep the product action flow explicit and reversible before approval.\n\nLandscape design board, approximately 1400 × 1100, with three adjacent mobile product viewports designed for 390 × 844. No phone hardware. Each viewport has a clear exterior state label and large readable UI. Keep the same navigation, typography, spacing and button grammar across the three states.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "product-selection",
+      "cart-review",
+      "exact-quote",
+      "customer-approval",
+      "hosted-checkout",
+      "payment-pending",
+      "payment-confirmed"
+    ],
+    "surface": "mobile"
+  },
+  {
+    "id": "21",
+    "slug": "orders-refunds",
+    "title": "Order support and refund approval",
+    "group": "orders/refunds",
+    "prompt": "Render an agent-facing order support screen opened from Sara’s conversation. Use a slim conversation strip on the left and a dominant order detail panel. Heading “Order NL-1048”, status Preparing, customer Sara N., placed 27 Sep 2026. Main summary lists two items, delivery charge and total AED 60, payment status Confirmed, and a compact order timeline. The action row contains Edit delivery, Request refund and Open store record. The selected Request refund opens a drawer with exact amount AED 15, item Black Pen Set, reason “Customer no longer needs this item”, and a note “Approval required from a support lead”. Primary button “Submit for approval”. The amount should never be guessed by an AI or changed silently.\nThe conversation remains visible with Sara asking “Can I remove the pen set?” and a human agent draft explaining the next step. A small tool status reads “Order information refreshed just now.” Keep customer address masked unless directly needed.\nThree supporting state crops: approval review with amount, currency, order ID, Approve refund and Reject; pending refund after submission with provider reference and “Awaiting confirmation”, disabling duplicate submission; and failed refund showing the concrete “Payment service temporarily unavailable”, Check status and Escalate, with a clear “No confirmed refund yet” label. Include a success line “Refund confirmed · AED 15” in the outcome crop and a receipt link. A payment reconciliation exception can appear as a compact row “Payment received, order update pending” with Review. The design should make money movement, permission, asynchronous status and duplicate prevention visible without overwhelming the support agent.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "order-detail",
+      "payment-reconciliation",
+      "refund-request",
+      "partial-refund",
+      "approval-required",
+      "refund-pending",
+      "refund-failed",
+      "refund-confirmed"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "22",
+    "slug": "team-rbac",
+    "title": "Team roles and access",
+    "group": "team/RBAC",
+    "prompt": "Create a workspace settings screen titled “Team and access”. Maintain the same left navigation and account header. Show tabs Members, Roles, Teams and Audit. Members is active. A clear member table lists Amina · Owner · Active; Rayan · Admin · Active; Noor · Agent · Active; and dana@northline.example · Agent · Invite pending. Each row includes team membership, last active and an action menu. Top actions Search members and Invite teammate. A subtle seat summary reads “3 active members” without invented subscription restrictions. Role chips have text and small icons.\nA selected custom role “Support lead” opens an access drawer. Group permissions by Conversations, Agents, Knowledge, Orders and Workspace settings. Allow Manage assigned conversations, Review AI drafts and Approve address changes. Keep Refund approval unchecked with a separate value threshold field disabled until enabled. Show scope “Support team only”. A concise preview “What this role can do” uses plain sentences, and a link provides the full permission matrix. Avoid a wall of 100 toggles as the first view.\nThree state crops: invitation dialog with email, role and team, Send invite; limited-access screen with “You don’t have access to payment settings” plus Request access and Back to inbox; and protection dialog “Assign another owner before removing this owner”. A pending invitation menu has Resend and Revoke. A suspend-member action should explain that access ends while conversation history remains attributed. Include a small audit record showing Amina changed Noor’s role with time. The UX must distinguish owner, admin, team lead and agent capabilities without assuming every administrator can access every customer or billing record.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "team-directory",
+      "invite-member",
+      "pending-invite",
+      "role-edit",
+      "limited-access",
+      "last-owner-protection",
+      "member-suspended"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "23",
+    "slug": "analytics-billing",
+    "title": "Reports and workspace usage",
+    "group": "analytics/billing",
+    "prompt": "Create the workspace owner’s Reports screen with tabs Service quality, Team activity, AI usage and Billing. Service quality is selected. Header date range “20–27 Sep 2026”, team All teams, channel All channels, and Export. A narrow “Demo data” label makes clear these are illustrative values. Use four compact summary cells: Conversations 240, Human handoffs 52, Resolved 186, Customer feedback 4.3/5 from 28 responses. Avoid framing these as actual Hamnivo performance claims. The main chart is a simple daily conversations line with a clearly labeled axis; beneath it a table compares queue Support, Billing and Sales with conversation counts, median first response, handoff rate and feedback sample count. Highlight low sample counts with neutral text “Small sample”, not misleading red performance alarms.\nA right-side compact card “Workspace usage” shows example conversation usage 240 of 1,000 and AI budget AED 42 of AED 100 with a Manage budget action. Explain the budget behavior as “Pause optional AI tasks at the limit”, with an editable control. No fictional real pricing plan promises. The Billing tab preview is a small state crop with invoice INV-DEMO-09, date, amount and Download.\nOther supporting crops: empty report state “No activity in this date range” with Reset dates; export progress “Preparing your CSV” with notification option; and payment-method issue “Subscription payment needs attention” with Update payment method. The original report remains accessible. Charts have text labels and clear legends; don’t use color alone. Reporting should help assess service quality and cost with visible denominators, filters and limitations.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "report-populated",
+      "date-filter",
+      "small-sample",
+      "no-data",
+      "export-processing",
+      "usage-budget",
+      "invoice-detail",
+      "payment-method-failed"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "24",
+    "slug": "components-accessibility",
+    "title": "Shared components and recovery states",
+    "group": "global component/accessibility states",
+    "prompt": "Create a coherent design-system state sheet for Hamnivo, not a marketing poster. Use a neat three-column grid of focused component specimens with clear small labels, generous enough to read but without massive blank space. Top title “Hamnivo · Interaction states”. The first column demonstrates forms: labeled email field with default, focused and error examples; inline validation “Enter a valid email address”; select menu open on Role with Owner, Admin and Agent; and a checkbox with explicit checked, unchecked and mixed states. Show an ink primary button Send, outline secondary Cancel, destructive Delete, and a disabled Publish button accompanied by “Choose a handoff queue first”. Include a clear high-contrast keyboard focus ring.\nThe second column demonstrates work states: a compact conversation-list loading skeleton; a useful empty state “No assigned conversations” with View unassigned; a connection error card “Unable to load conversations” with Retry; a successful toast “Assignment updated” with Undo; and an inline progress state “Importing 156 of 240” with Pause. Loading placeholders should preserve layout, and errors should not replace unrelated content.\nThe third column demonstrates overlays and accessibility: a confirm dialog “Discard unsent reply?” with Keep editing and Discard; a right drawer with visible heading and Close button; a tooltip attached to one icon with its accessible text; and a small mobile-sized control strip with comfortable tap targets. Add a restrained “Accessibility notes” annotation listing Keyboard focus visible, Labels stay visible, Status uses text and icon, Reduced motion supported, and RTL mirrored where appropriate. Do not imply compliance certification from a visual alone. Use original simple line icons, consistent border radius, 8px rhythm, and enough contrast to make the states legible. This board closes the same product system rather than introducing new visual directions.\n\nLandscape design board, approximately 1920 × 1400. One dominant detailed desktop viewport designed for 1440 × 1024, plus two or three focused smaller state crops neatly below it. Keep full-size text in the main viewport legible; state crops show only the changed region, not duplicated entire screens.\n\nUse the supplied Hamnivo mark faithfully. Render an original polished product mockup, not a photograph or device mockup. Apply the same coherent ivory #F6F3EC, ink #192A30 and restrained coral #E45136 system as the other boards. Ink primary buttons; coral only for small meaningful accents. Readable high-contrast body copy, native controls, precise 8px spacing, subtle borders, no decorative gradients. All names, conversations and values below are fictional demonstration data. State callouts are designer annotations outside the product viewport, with compact labels. Do not show hidden reasoning or chain-of-thought; only concise action status and auditable outcomes.",
+    "states": [
+      "button-focus",
+      "disabled-with-reason",
+      "form-validation",
+      "loading-skeleton",
+      "empty-state",
+      "toast-undo",
+      "confirmation-dialog",
+      "drawer",
+      "keyboard-navigation",
+      "high-contrast",
+      "reduced-motion"
+    ],
+    "surface": "desktop"
+  },
+  {
+    "id": "25",
+    "slug": "nlp-cache-policy",
+    "title": "NLP cache policy and inspection",
+    "group": "NLP caching",
+    "surface": "desktop",
+    "states": [
+      "exact-cache-hit",
+      "semantic-cache-eligible",
+      "tenant-scope",
+      "knowledge-version-scope",
+      "permission-scope",
+      "personal-data-bypass",
+      "commerce-bypass",
+      "invalidation-preview",
+      "cache-cleared"
+    ],
+    "prompt": "Create the admin's “Answer caching” screen inside Agents → Performance. Explain in plain language: “Reuse approved answers when the request and its allowed context match.” Main panel has three rows: Exact answer cache · Enabled; Semantic FAQ cache · Review required; Personal and live order answers · Always bypass. A small scope card explicitly lists Workspace Northline Studio, Audience Public visitors, Knowledge version 12, Permission set Public answers, and Language English. These are mandatory matching boundaries, not optional decorative tags. No cross-tenant sharing control is offered.\nSelect Semantic FAQ cache to open a compact editor. Eligible content: Approved public FAQs. Excluded content: Personal information, Account-specific answers, Prices and stock, Payments, Order actions. A response must use current approved source versions; a similarity match alone is not sufficient. Add a clear validity setting “Expire after 1 hour” and a link to advanced matching rules. Right-side inspection panel tests the query “How can I contact the team?” against an approved public help answer. Status: “Eligible — exact match”. Show the source, language, scope and expiry, with “Reused answer” marked explicitly.\nThree state crops: an order question “Has order NL-1048 shipped?” receives “Cache bypassed — live order lookup required”; a source edit invalidation preview lists 12 affected cached answers with Clear affected answers; and a stale answer inspection says “Not reused — knowledge version changed” with Generate fresh answer. Put a small demo activity table below with Hit, Miss and Bypass counts, not giant cost-saving claims. Distinguish response reuse from permission to perform an action. No cached entry may replay a purchase, refund, or any side effect.\n\nOne coherent Hamnivo design system: supplied H logo, ivory #F6F3EC, ink #192A30, restrained coral #E45136, ink primary buttons, accessible contrast, original simple line icons, precise 8px spacing and native controls. All people and values are fictional demo data. Render one dominant readable desktop viewport designed for 1440 × 1024 on an approximately 1920 × 1400 board, with three focused state crops neatly below. State labels are exterior designer annotations. Never display hidden reasoning, production secrets or invented certification claims."
+  },
+  {
+    "id": "26",
+    "slug": "platform-superadmin",
+    "title": "Platform administration and tenant access",
+    "group": "platform superadmin",
+    "surface": "desktop",
+    "states": [
+      "tenant-directory",
+      "service-health",
+      "tenant-suspended",
+      "support-access-request",
+      "grant-time-limited",
+      "access-denied",
+      "secret-masked",
+      "key-rotation"
+    ],
+    "prompt": "Design a distinct platform operations console titled “Hamnivo Platform”, separate from the Northline workspace shell. The same visual system remains, but the persistent header has a clear Platform admin badge and an unmistakable Return to workspace action. Main navigation: Tenants, Service health, Support access, Security, Audit. The tenant directory lists Northline Studio · Active · UAE region; Cedar Demo · Trial · EU region; and Harbor Sample · Paused. These are fictional demo tenants. Columns show tenant name, lifecycle state, region and last service check, avoiding unnecessary customer data. Selecting Northline opens operational metadata: workspace ID, created date, configured service region, enabled modules and connector health. Do not display its conversations by default.\nA compact global service status area shows Messaging Healthy, Decision provider Degraded and Imports Healthy. The degraded provider has a useful note “Fallback policies active” plus View incident. A support access panel shows “No customer-content access granted” with Request temporary access. The request dialog names the tenant, reason, scope “Read selected conversation”, duration 30 minutes, and the workspace approver. Primary Send request. It never makes platform-admin status equivalent to unrestricted tenant data access.\nThree state crops: approved time-limited grant with a visible expiry timer and End session; denied request with “Workspace owner declined” and no bypass control; and a secret rotation panel showing only masked key suffix ••••3A9F, last rotated time and Rotate credential. Include an audit event recording access start, actor, tenant and scope. Operational maintenance should be possible while customer-content access remains explicit, narrow and auditable. Keep high-impact tenant suspension behind a clear confirmation describing the service effect.\n\nOne coherent Hamnivo design system: supplied H logo, ivory #F6F3EC, ink #192A30, restrained coral #E45136, ink primary buttons, accessible contrast, original simple line icons, precise 8px spacing and native controls. All people and values are fictional demo data. Render one dominant readable desktop viewport designed for 1440 × 1024 on an approximately 1920 × 1400 board, with three focused state crops neatly below. State labels are exterior designer annotations. Never display hidden reasoning, production secrets or invented certification claims."
+  },
+  {
+    "id": "27",
+    "slug": "voice-video-support",
+    "title": "Voice and video support",
+    "group": "voice/video support",
+    "surface": "desktop",
+    "states": [
+      "microphone-permission",
+      "call-connecting",
+      "voice-live",
+      "captions-visible",
+      "mute",
+      "camera-off",
+      "interrupted-reply",
+      "network-degraded",
+      "text-fallback",
+      "call-ended"
+    ],
+    "prompt": "Create a voice-support and optional video session screen for a customer and human agent. Main desktop viewport shows an open customer conversation with a call panel docked above the transcript, not a full-screen decorative call center. Header “Voice support · Amina”, elapsed time 02:14, visible human identity, and connection status Connected. The main call area has a simple avatar, a subtle audio-level meter, and captions “I can help update the delivery address.” The optional video tile is camera-off with a clear label, not a fabricated live person photograph. Primary controls are Mute microphone, Turn camera on, Captions, and End call. Use readable labels with the icons. A compact button “Continue by text” remains available.\nA right panel shows the ongoing text transcript with speaker labels Amina and Sara. Captions are explicitly temporary live captions, with a short consent setting “Save transcript to this conversation” shown as a controlled choice. Before the call, a permissions dialog asks for microphone access and offers Test microphone; if recording is enabled in a demo state, the UI must show a conspicuous Recording indicator and the relevant consent rather than recording silently.\nThree state crops: permission denied with “Microphone access is blocked” and Open browser settings / Use text; weak connection with “Audio may pause”, Turn off video and Continue by text; and AI voice interrupted by the customer with a clear “Listening” state and a stopped assistant audio waveform. The final call summary crop can show Duration, Participants and Return to conversation without inventing an automatic transcript if permission was not granted. Make mute, camera and caption states visually and textually unambiguous. Never simulate emotional surveillance or promise perfect transcription.\n\nOne coherent Hamnivo design system: supplied H logo, ivory #F6F3EC, ink #192A30, restrained coral #E45136, ink primary buttons, accessible contrast, original simple line icons, precise 8px spacing and native controls. All people and values are fictional demo data. Render one dominant readable desktop viewport designed for 1440 × 1024 on an approximately 1920 × 1400 board, with three focused state crops neatly below. State labels are exterior designer annotations. Never display hidden reasoning, production secrets or invented certification claims."
+  },
+  {
+    "id": "28",
+    "slug": "workflows-plugins",
+    "title": "Workflow builder and extension permissions",
+    "group": "workflows/plugins/hooks",
+    "surface": "desktop",
+    "states": [
+      "workflow-draft",
+      "trigger-edit",
+      "branch-condition",
+      "test-run",
+      "tool-approval",
+      "plugin-scope-review",
+      "hook-failure",
+      "published-version",
+      "rollback"
+    ],
+    "prompt": "Design a simple workflow editor for the admin titled “After-hours support”. Use a small readable vertical flow in the main workspace with only five nodes: Customer message received → Check working hours → Outside hours branch → Offer AI help → Create follow-up request. The alternative Inside hours branch routes to Assign support queue, positioned compactly rather than extending into a huge canvas. Every node has an icon, clear label and one-line summary. Top controls Test workflow, Save draft and Publish, with status Draft based on v2. A narrow left panel holds reusable steps Message, Condition, Assign, Tool action and Webhook; no sprawling developer toolbox.\nSelecting Create follow-up request opens a right inspector with destination queue Support, required fields Email and Customer question, and failure behavior “Keep the conversation open and notify the team”. An extension section shows plugin “CRM follow-up connector”, publisher Workspace custom, permissions Create follow-up only, and environment Test. Plugin permissions are granted per capability; no broad “Trust everything” switch. Hooks appear as a compact event mapping “conversation.handoff → create_follow_up” with a readable description and a View schema link.\nThree state crops: test run with each completed node checked and a final Result card “Follow-up created in test mode”; failed webhook step with a concrete 503 response, Retry this step and Open event log, preserving prior completed steps; and publish review comparing v2 to v3 with added Email requirement, approver, Publish version and Cancel. Include a rollback action in the version history with an explicit target version. Keep customer-visible messages separate from internal actions. The workflow editor should make triggers, conditions, permissions, failure handling and version changes easy to follow without requiring the admin to read code.\n\nOne coherent Hamnivo design system: supplied H logo, ivory #F6F3EC, ink #192A30, restrained coral #E45136, ink primary buttons, accessible contrast, original simple line icons, precise 8px spacing and native controls. All people and values are fictional demo data. Render one dominant readable desktop viewport designed for 1440 × 1024 on an approximately 1920 × 1400 board, with three focused state crops neatly below. State labels are exterior designer annotations. Never display hidden reasoning, production secrets or invented certification claims."
+  }
+]

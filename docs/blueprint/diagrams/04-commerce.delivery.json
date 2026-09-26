@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/ccbdb48be7e7/current/diagram-sources/04-commerce.json",
+  "output": "/workspace/scratch/ccbdb48be7e7/current/diagram-sources/04-commerce.html",
+  "specification": {
+    "sha256": "8acf739e1be260a4b1b4bf3270497b59c090aef311044f79aa18a9af7124bced",
+    "bytes": 4306
+  },
+  "artifact": {
+    "sha256": "3be1a725853382e5d63bec9caaeca8925d7f4a4d1d6c695a045fd53ad5c8aa98",
+    "bytes": 808358
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

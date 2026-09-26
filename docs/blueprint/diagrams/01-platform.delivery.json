@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/ccbdb48be7e7/current/diagram-sources/01-platform.json",
+  "output": "/workspace/scratch/ccbdb48be7e7/current/diagram-sources/01-platform.html",
+  "specification": {
+    "sha256": "7537cc208e9c5c028258e9517232dfadf8d13f9e62210a5e6edbee8455486b33",
+    "bytes": 4005
+  },
+  "artifact": {
+    "sha256": "24c5615b5ecfd178f7c645f8125d53b5fec528b211c599b877ad3b8ccc74e49c",
+    "bytes": 807757
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "01 \u00b7 Proposed platform boundaries",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1290,
+      610
+    ]
+  },
+  "components": [
+    {
+      "id": "clients",
+      "type": "frontend",
+      "label": "Customer surfaces",
+      "sublabel": "Widget / web / mobile",
+      "pos": [
+        30,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "security",
+      "label": "Identity gateway",
+      "sublabel": "Tenant + lane grants",
+      "pos": [
+        360,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "conversation",
+      "type": "backend",
+      "label": "Conversation core",
+      "sublabel": "Members + owner epoch",
+      "pos": [
+        690,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "records",
+      "type": "database",
+      "label": "Durable records",
+      "sublabel": "PostgreSQL + outbox",
+      "pos": [
+        1020,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "staff",
+      "type": "frontend",
+      "label": "Staff workspace",
+      "sublabel": "Human ownership",
+      "pos": [
+        360,
+        55
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "jev",
+      "type": "external",
+      "label": "Jev / TypeSafe",
+      "sublabel": "Advisory decisions",
+      "pos": [
+        690,
+        55
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "harness",
+      "type": "security",
+      "label": "Agent harness",
+      "sublabel": "Budgets + policy gates",
+      "pos": [
+        690,
+        435
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "connectors",
+      "type": "external",
+      "label": "Provider adapters",
+      "sublabel": "Models / tools / stores",
+      "pos": [
+        1020,
+        435
+      ],
+      "size": [
+        180,
+        78
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "clients-to-gateway",
+      "from": "clients",
+      "to": "gateway",
+      "variant": "default",
+      "label": "HTTPS"
+    },
+    {
+      "id": "gateway-to-conversation",
+      "from": "gateway",
+      "to": "conversation",
+      "variant": "default",
+      "label": "authorize"
+    },
+    {
+      "id": "conversation-to-records",
+      "from": "conversation",
+      "to": "records",
+      "variant": "default",
+      "label": "commit"
+    },
+    {
+      "id": "staff-to-gateway",
+      "from": "staff",
+      "to": "gateway",
+      "variant": "default",
+      "label": "OIDC",
+      "labelAt": [
+        450,
+        190
+      ]
+    },
+    {
+      "id": "conversation-to-jev",
+      "from": "conversation",
+      "to": "jev",
+      "variant": "default",
+      "label": "classify"
+    },
+    {
+      "id": "conversation-to-harness",
+      "from": "conversation",
+      "to": "harness",
+      "variant": "default",
+      "label": "task grant",
+      "labelAt": [
+        780,
+        380
+      ]
+    },
+    {
+      "id": "harness-to-connectors",
+      "from": "harness",
+      "to": "connectors",
+      "variant": "default",
+      "label": "scoped calls"
+    }
+  ],
+  "boundaries": [],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Shared conversation",
+      "items": [
+        "Public, staff and agent-work lanes are separate.",
+        "Membership does not grant unrestricted memory."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Enforced authority",
+      "items": [
+        "Jev suggests; server policy decides.",
+        "Every publication checks the current owner epoch."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Replaceable components",
+      "items": [
+        "Versioned ports wrap external providers.",
+        "Database + receipts preserve business truth."
+      ]
+    }
+  ]
+}

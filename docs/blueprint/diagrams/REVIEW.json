@@ -1,0 +1,30 @@
+{
+  "title": "Rifqo \u00b7 Platform Blueprint",
+  "status": "proposed",
+  "date": "2026-09-26",
+  "archify": {
+    "version": "2.17.0-dev.1",
+    "commit": "9e35d2b0b39b155553ba9fcfe0b4f2a5198dd993",
+    "license": "MIT"
+  },
+  "artifact_validation": {
+    "diagrams": 5,
+    "checks_per_diagram": 9,
+    "composition_errors": 0,
+    "composition_warnings": 0,
+    "correction_rounds": 1
+  },
+  "wrapper_verification": {
+    "json_parses": true,
+    "embedded_artifacts_match_delivered_bytes": true,
+    "script_syntax_valid": true
+  },
+  "automated_browser_evidence": "skipped: local Chrome/Chromium unavailable",
+  "cloud_browser": "file URL rejected by browser policy; no workaround attempted",
+  "interactive_visual_review": "not completed",
+  "supplementary_static_geometry_review": "Five extracted light-theme SVG raster previews inspected; no text clipping or route crossings observed. This does not test HTML responsiveness, interactions, browser typography or dark theme.",
+  "wrapper": {
+    "file": "Agentic-Chat-Architecture-Diagrams.html",
+    "sha256": "bf200879547b3fe9ffaefd974e58540b10554ae7c9d0a954781eb81efa7ace46"
+  }
+}

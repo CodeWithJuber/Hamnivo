@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "03 \u00b7 Memory and governed learning",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1290,
+      610
+    ]
+  },
+  "components": [
+    {
+      "id": "outcomes",
+      "type": "database",
+      "label": "Verified outcomes",
+      "sublabel": "Receipts + corrections",
+      "pos": [
+        30,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "candidate",
+      "type": "backend",
+      "label": "Candidate lessons",
+      "sublabel": "Consent + provenance",
+      "pos": [
+        360,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "evaluate",
+      "type": "security",
+      "label": "Offline evaluation",
+      "sublabel": "Fresh holdout + slices",
+      "pos": [
+        690,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "release",
+      "type": "backend",
+      "label": "Versioned promotion",
+      "sublabel": "Review + canary",
+      "pos": [
+        1020,
+        245
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "memory",
+      "type": "database",
+      "label": "Memory records",
+      "sublabel": "Scoped SQL + retrieval",
+      "pos": [
+        360,
+        55
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "reject",
+      "type": "security",
+      "label": "Reject or revise",
+      "sublabel": "Safety / quality failure",
+      "pos": [
+        690,
+        55
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "shadow",
+      "type": "backend",
+      "label": "Co-model shadow",
+      "sublabel": "No production authority",
+      "pos": [
+        690,
+        435
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "rollback",
+      "type": "database",
+      "label": "Rollback registry",
+      "sublabel": "Previous safe version",
+      "pos": [
+        1020,
+        435
+      ],
+      "size": [
+        180,
+        78
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "outcomes-to-candidate",
+      "from": "outcomes",
+      "to": "candidate",
+      "variant": "default",
+      "label": "curate"
+    },
+    {
+      "id": "candidate-to-evaluate",
+      "from": "candidate",
+      "to": "evaluate",
+      "variant": "default",
+      "label": "frozen dataset"
+    },
+    {
+      "id": "evaluate-to-release",
+      "from": "evaluate",
+      "to": "release",
+      "variant": "default",
+      "label": "passed gates"
+    },
+    {
+      "id": "candidate-to-memory",
+      "from": "candidate",
+      "to": "memory",
+      "variant": "default",
+      "label": "approved fact"
+    },
+    {
+      "id": "evaluate-to-reject",
+      "from": "evaluate",
+      "to": "reject",
+      "variant": "default",
+      "label": "failed gate"
+    },
+    {
+      "id": "shadow-to-evaluate",
+      "from": "shadow",
+      "to": "evaluate",
+      "variant": "default",
+      "label": "compare"
+    },
+    {
+      "id": "release-to-rollback",
+      "from": "release",
+      "to": "rollback",
+      "variant": "default",
+      "label": "version + receipt",
+      "labelAt": [
+        1110,
+        380
+      ]
+    }
+  ],
+  "boundaries": [],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Memory is not model training",
+      "items": [
+        "Working, episodic and durable facts stay distinct.",
+        "Correction and deletion propagate to caches."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "No self-granted authority",
+      "items": [
+        "Agent reflections are candidate observations.",
+        "External outcomes determine success labels."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Controlled improvement",
+      "items": [
+        "Prompts, skills and co-models are separate versions.",
+        "Weight training remains an optional research track."
+      ]
+    }
+  ]
+}
