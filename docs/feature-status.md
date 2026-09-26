@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 227 · in-progress: 4 · implemented: 1
+**Blueprint features (232):** planned: 224 · in-progress: 7 · implemented: 1
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -75,10 +75,10 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | A03 | Sub-admin delegation | P0 | F | planned |  |
 | A04 | Multi-brand settings | P0 | C | planned |  |
 | A05 | Basic business hours | P0 | C | planned |  |
-| A06 | Secrets and API credentials | P0 | F | planned |  |
+| A06 | Secrets and API credentials | P0 | F | in-progress | `packages/db/src/schema/identity.ts`, `packages/db/src/resolvers.ts`, `packages/db/test/resolvers.int.test.ts`, `scripts/setup/env.sh` — Envelope-encrypted secret storage, hashed API keys with prefix lookup and generated installation secrets; the secret broker, masking UI and rotation flows follow with the gateway. |
 | A07 | Draft/publish configuration | P0 | C | planned |  |
 | A08 | Usage limits | P0 | C | planned |  |
-| A09 | Audit trail | P0 | C | planned |  |
+| A09 | Audit trail | P0 | C | in-progress | `packages/db/src/audit.ts`, `packages/db/src/schema/audit.ts`, `packages/db/migrations/20260926232017_security.sql`, `packages/db/test/audit.int.test.ts` — Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection and transactional appends; search, export and Studio views pending. |
 | A10 | Retention and exports | P0 | C | planned |  |
 | A11 | Channel setup | P0 | C | planned |  |
 | A12 | Custom role builder | P1 | C | planned |  |
@@ -174,7 +174,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | O02 | Backups and recovery | P0 | C | planned |  |
 | O03 | CI/CD and versioning | P0 | F | in-progress | `scripts/ci/local.sh`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `docs/adr/0007-self-hosted-verification.md` — Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence/status checks, accessibility audit) run with pnpm ci:local; release and rollback automation pending. |
 | O04 | Product analytics | P1 | C | planned |  |
-| O05 | Self-hosted distribution | P1 | C | planned |  |
+| O05 | Self-hosted distribution | P1 | C | in-progress | `deploy/compose/services.yml`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `.env.example` — Self-hosted infrastructure (PostgreSQL 18 + pgvector, Valkey), generated secrets, environment reference and server guide; versioned application containers follow with the gateway. |
 | O06 | Marketplace and partner certification | P2 | A | planned |  |
 
 ### Collaboration

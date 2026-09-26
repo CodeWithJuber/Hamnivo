@@ -10,7 +10,7 @@ this repository. This guide grows with the product. Each milestone adds its serv
 | Checks (lint, types, unit, integration on PostgreSQL 16 and 18, accessibility) | ready | `pnpm ci:local` |
 | Infrastructure (PostgreSQL 18 + pgvector, Valkey) | ready | `pnpm services:up` |
 | Design system (Storybook) | ready | `pnpm --filter @hamnivo/ui storybook` |
-| Database schema and migrations | in progress (M3) | `pnpm db:migrate` once it lands |
+| Database schema, row-level security and audit log | ready | `pnpm db:migrate` |
 | Gateway, worker, widget, Studio, website, Chatwoot | not yet built | added by later milestones, with a production compose file and TLS proxy |
 
 ## 1. Server requirements
@@ -71,6 +71,15 @@ The database creates four roles:
 To reach the services from another machine, set `HAMNIVO_DB_BIND=0.0.0.0` in `.env.local` and
 restrict access with a firewall. For the application alone, keep the default.
 
+### Apply the database schema
+
+```bash
+pnpm db:migrate       # idempotent: applies only pending migrations, all-or-nothing
+```
+
+Every table has row-level security enabled and forced. The application role only sees the tenant
+bound to its current transaction. See `packages/db/README.md` for the details.
+
 ## 5. Run the checks
 
 ```bash
@@ -106,12 +115,12 @@ git pull
 pnpm install
 bash scripts/setup/env.sh   # adds any new secrets without touching existing ones
 pnpm services:up            # also re-applies database roles
+pnpm db:migrate
 pnpm ci:local
 ```
 
 ## Coming with the next milestones
 
-- `pnpm db:migrate` (M3). Applies the schema, row-level security and audit partitions.
 - Gateway and worker (M4). Adds `deploy/compose/hamnivo.yml` with the API, the background worker
   and Caddy for automatic HTTPS. DNS needs `api.`, `app.` and `chat.` records pointing at the server.
 - Chatwoot CE v4.18.0 (M5). Runs in the same compose project with its own database, plus a

@@ -86,5 +86,35 @@
       "docs/contracts/compatibility.md"
     ],
     "note": "Forward-compatible parsing and fixtures in place; client SDK compatibility tests follow with packages/client."
+  },
+  "A09": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/db/src/audit.ts",
+      "packages/db/src/schema/audit.ts",
+      "packages/db/migrations/20260926232017_security.sql",
+      "packages/db/test/audit.int.test.ts"
+    ],
+    "note": "Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection and transactional appends; search, export and Studio views pending."
+  },
+  "A06": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/db/src/schema/identity.ts",
+      "packages/db/src/resolvers.ts",
+      "packages/db/test/resolvers.int.test.ts",
+      "scripts/setup/env.sh"
+    ],
+    "note": "Envelope-encrypted secret storage, hashed API keys with prefix lookup and generated installation secrets; the secret broker, masking UI and rotation flows follow with the gateway."
+  },
+  "O05": {
+    "status": "in-progress",
+    "evidence": [
+      "deploy/compose/services.yml",
+      "deploy/postgres/init.sh",
+      "docs/self-hosting.md",
+      ".env.example"
+    ],
+    "note": "Self-hosted infrastructure (PostgreSQL 18 + pgvector, Valkey), generated secrets, environment reference and server guide; versioned application containers follow with the gateway."
   }
 }

@@ -53,6 +53,7 @@ your own machine or server — there is no hosted CI. The full guide is
 pnpm install
 bash scripts/setup/env.sh   # .env.local with generated passwords and secrets (never commit it)
 pnpm services:up            # PostgreSQL 18 + pgvector and Valkey via Docker Compose
+pnpm db:migrate             # schema, row-level security, audit partitions
 pnpm ci:local               # every check: lint, types, unit, integration (PG 16 + 18), accessibility
 ```
 

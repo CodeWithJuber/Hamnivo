@@ -29,6 +29,8 @@ SELECT format('ALTER ROLE hamnivo_platform PASSWORD %L', :'platform_password') \
 
 -- The owner hands function ownership to hamnivo_resolver and uses SET ROLE in tests.
 GRANT hamnivo_app, hamnivo_platform, hamnivo_resolver TO hamnivo_owner;
+-- Lets the owner end stale sessions when it drops databases it owns (test clones, restores).
+GRANT pg_signal_backend TO hamnivo_owner;
 
 SELECT format('CREATE DATABASE %I OWNER hamnivo_owner', d)
 FROM unnest(string_to_array(:'databases', ',')) AS d

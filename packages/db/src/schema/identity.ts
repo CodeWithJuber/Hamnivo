@@ -1,0 +1,360 @@
+import { sql } from 'drizzle-orm';
+import {
+  boolean,
+  check,
+  foreignKey,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  unique,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import {
+  bytea,
+  citext,
+  createdAt,
+  id,
+  platformRead,
+  tenantIsolation,
+  tstz,
+  updatedAt,
+} from './helpers.js';
+import { brands, tenantId } from './tenancy.js';
+
+/** Envelope-encrypted secrets (AES-256-GCM data key wrapped by the key-encryption key). */
+export const secrets = pgTable(
+  'secrets',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    kind: text('kind').notNull(),
+    label: text('label').notNull(),
+    ciphertext: bytea('ciphertext').notNull(),
+    iv: bytea('iv').notNull(),
+    wrappedKey: bytea('wrapped_key').notNull(),
+    kekVersion: integer('kek_version').notNull(),
+    createdAt: createdAt(),
+    rotatedAt: tstz('rotated_at'),
+    revokedAt: tstz('revoked_at'),
+    lastUsedAt: tstz('last_used_at'),
+  },
+  (t) => [unique('secrets_tenant_id_id_key').on(t.tenantId, t.id), tenantIsolation()],
+);
+
+/** Keys that verify tenant-signed identity assertions for a brand (W13). */
+export const brandIdentityKeys = pgTable(
+  'brand_identity_keys',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    brandId: uuid('brand_id').notNull(),
+    kid: text('kid').notNull(),
+    alg: text('alg', { enum: ['ES256', 'EdDSA', 'RS256', 'HS256'] }).notNull(),
+    publicJwk: jsonb('public_jwk'),
+    secretId: uuid('secret_id'),
+    status: text('status', { enum: ['active', 'retiring', 'revoked'] })
+      .notNull()
+      .default('active'),
+    createdAt: createdAt(),
+    retiredAt: tstz('retired_at'),
+  },
+  (t) => [
+    unique('brand_identity_keys_tenant_id_id_key').on(t.tenantId, t.id),
+    uniqueIndex('brand_identity_keys_kid_key').on(t.tenantId, t.brandId, t.kid),
+    foreignKey({
+      name: 'brand_identity_keys_brand_fk',
+      columns: [t.tenantId, t.brandId],
+      foreignColumns: [brands.tenantId, brands.id],
+    }),
+    foreignKey({
+      name: 'brand_identity_keys_secret_fk',
+      columns: [t.tenantId, t.secretId],
+      foreignColumns: [secrets.tenantId, secrets.id],
+    }),
+    check(
+      'brand_identity_keys_material_ck',
+      sql`(${t.alg} = 'HS256' and ${t.secretId} is not null) or (${t.alg} <> 'HS256' and ${t.publicJwk} is not null)`,
+    ),
+    tenantIsolation(),
+  ],
+);
+
+export const staffMembers = pgTable(
+  'staff_members',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    /** Better Auth user id; one person can be staff in several tenants. */
+    authUserId: text('auth_user_id').notNull(),
+    displayName: text('display_name').notNull(),
+    email: citext('email').notNull(),
+    status: text('status', { enum: ['invited', 'active', 'suspended', 'removed'] })
+      .notNull()
+      .default('invited'),
+    mfaRequired: boolean('mfa_required').notNull().default(false),
+    lastActiveAt: tstz('last_active_at'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('staff_members_tenant_id_id_key').on(t.tenantId, t.id),
+    uniqueIndex('staff_members_auth_user_key').on(t.tenantId, t.authUserId),
+    index('staff_members_auth_user_idx').on(t.authUserId),
+    tenantIsolation(),
+  ],
+);
+
+export const roleDefinitions = pgTable(
+  'role_definitions',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    key: text('key').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    permissions: text('permissions').array().notNull(),
+    isPreset: boolean('is_preset').notNull().default(false),
+    version: integer('version').notNull().default(1),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('role_definitions_tenant_id_id_key').on(t.tenantId, t.id),
+    uniqueIndex('role_definitions_key_key').on(t.tenantId, t.key),
+    tenantIsolation(),
+  ],
+);
+
+export const serviceAccounts = pgTable(
+  'service_accounts',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    name: text('name').notNull(),
+    description: text('description'),
+    status: text('status', { enum: ['active', 'disabled'] })
+      .notNull()
+      .default('active'),
+    createdBy: uuid('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique('service_accounts_tenant_id_id_key').on(t.tenantId, t.id),
+    foreignKey({
+      name: 'service_accounts_created_by_fk',
+      columns: [t.tenantId, t.createdBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    tenantIsolation(),
+  ],
+);
+
+export const GRANT_SCOPES = ['tenant', 'workspace', 'brand', 'team', 'inbox'] as const;
+
+/** A role granted to one principal (staff member or service account) at one scope. */
+export const grants = pgTable(
+  'grants',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    staffMemberId: uuid('staff_member_id'),
+    serviceAccountId: uuid('service_account_id'),
+    roleId: uuid('role_id').notNull(),
+    scopeType: text('scope_type', { enum: GRANT_SCOPES }).notNull(),
+    scopeId: uuid('scope_id'),
+    delegatedBy: uuid('delegated_by'),
+    reason: text('reason'),
+    expiresAt: tstz('expires_at'),
+    revokedAt: tstz('revoked_at'),
+    revokedBy: uuid('revoked_by'),
+    version: integer('version').notNull().default(1),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('grants_tenant_id_id_key').on(t.tenantId, t.id),
+    foreignKey({
+      name: 'grants_staff_fk',
+      columns: [t.tenantId, t.staffMemberId],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    foreignKey({
+      name: 'grants_service_account_fk',
+      columns: [t.tenantId, t.serviceAccountId],
+      foreignColumns: [serviceAccounts.tenantId, serviceAccounts.id],
+    }),
+    foreignKey({
+      name: 'grants_role_fk',
+      columns: [t.tenantId, t.roleId],
+      foreignColumns: [roleDefinitions.tenantId, roleDefinitions.id],
+    }),
+    foreignKey({
+      name: 'grants_delegated_by_fk',
+      columns: [t.tenantId, t.delegatedBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    check('grants_principal_ck', sql`num_nonnulls(${t.staffMemberId}, ${t.serviceAccountId}) = 1`),
+    check('grants_scope_ck', sql`(${t.scopeType} = 'tenant') = (${t.scopeId} is null)`),
+    index('grants_staff_active_idx')
+      .on(t.tenantId, t.staffMemberId)
+      .where(sql`${t.revokedAt} is null`),
+    tenantIsolation(),
+  ],
+);
+
+export const apiKeys = pgTable(
+  'api_keys',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    serviceAccountId: uuid('service_account_id').notNull(),
+    /** Public lookup part of the key, e.g. `hv_live_8f3k2m1q`. */
+    prefix: text('prefix').notNull(),
+    /** HMAC-SHA256 of the secret part with the server pepper; the secret is shown once. */
+    secretHash: bytea('secret_hash').notNull(),
+    scopes: text('scopes').array().notNull(),
+    lastUsedAt: tstz('last_used_at'),
+    expiresAt: tstz('expires_at'),
+    revokedAt: tstz('revoked_at'),
+    createdBy: uuid('created_by'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('api_keys_tenant_id_id_key').on(t.tenantId, t.id),
+    uniqueIndex('api_keys_prefix_key').on(t.prefix),
+    foreignKey({
+      name: 'api_keys_service_account_fk',
+      columns: [t.tenantId, t.serviceAccountId],
+      foreignColumns: [serviceAccounts.tenantId, serviceAccounts.id],
+    }),
+    tenantIsolation(),
+  ],
+);
+
+/** Time-boxed access for platform support staff, approved by the tenant (A15). */
+export const supportGrants = pgTable(
+  'support_grants',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    platformUserId: text('platform_user_id').notNull(),
+    approvedBy: uuid('approved_by'),
+    scopes: text('scopes').array().notNull(),
+    reason: text('reason').notNull(),
+    startsAt: tstz('starts_at').notNull().defaultNow(),
+    expiresAt: tstz('expires_at').notNull(),
+    revokedAt: tstz('revoked_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('support_grants_tenant_id_id_key').on(t.tenantId, t.id),
+    foreignKey({
+      name: 'support_grants_approved_by_fk',
+      columns: [t.tenantId, t.approvedBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    check('support_grants_window_ck', sql`${t.expiresAt} > ${t.startsAt}`),
+    tenantIsolation(),
+    platformRead(),
+  ],
+);
+
+/** A customer as seen by one brand: anonymous, or verified through a tenant-signed assertion. */
+export const customerPrincipals = pgTable(
+  'customer_principals',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    brandId: uuid('brand_id').notNull(),
+    kind: text('kind', { enum: ['anonymous', 'verified'] }).notNull(),
+    /** The tenant's user id from a verified assertion (`sub`). */
+    externalSubject: text('external_subject'),
+    displayName: text('display_name'),
+    /** Only from assertions with email_verified=true; never self-reported. */
+    email: citext('email'),
+    emailVerifiedAt: tstz('email_verified_at'),
+    locale: text('locale'),
+    createdAt: createdAt(),
+    lastSeenAt: tstz('last_seen_at'),
+  },
+  (t) => [
+    unique('customer_principals_tenant_id_id_key').on(t.tenantId, t.id),
+    uniqueIndex('customer_principals_subject_key')
+      .on(t.tenantId, t.brandId, t.externalSubject)
+      .where(sql`${t.externalSubject} is not null`),
+    foreignKey({
+      name: 'customer_principals_brand_fk',
+      columns: [t.tenantId, t.brandId],
+      foreignColumns: [brands.tenantId, brands.id],
+    }),
+    check(
+      'customer_principals_kind_ck',
+      sql`(${t.kind} = 'verified') = (${t.externalSubject} is not null)`,
+    ),
+    tenantIsolation(),
+  ],
+);
+
+/**
+ * Widget sessions with rotating refresh tokens. Presenting the previous token again (reuse)
+ * revokes the session; the refresh token itself is never stored, only its hash.
+ */
+export const widgetSessions = pgTable(
+  'widget_sessions',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    brandId: uuid('brand_id').notNull(),
+    principalId: uuid('principal_id').notNull(),
+    refreshHash: bytea('refresh_hash').notNull(),
+    previousRefreshHash: bytea('previous_refresh_hash'),
+    generation: integer('generation').notNull().default(0),
+    hostOrigin: text('host_origin').notNull(),
+    createdAt: createdAt(),
+    lastUsedAt: tstz('last_used_at').notNull().defaultNow(),
+    expiresAt: tstz('expires_at').notNull(),
+    revokedAt: tstz('revoked_at'),
+    revokeReason: text('revoke_reason'),
+  },
+  (t) => [
+    unique('widget_sessions_tenant_id_id_key').on(t.tenantId, t.id),
+    foreignKey({
+      name: 'widget_sessions_brand_fk',
+      columns: [t.tenantId, t.brandId],
+      foreignColumns: [brands.tenantId, brands.id],
+    }),
+    foreignKey({
+      name: 'widget_sessions_principal_fk',
+      columns: [t.tenantId, t.principalId],
+      foreignColumns: [customerPrincipals.tenantId, customerPrincipals.id],
+    }),
+    index('widget_sessions_principal_idx').on(t.tenantId, t.principalId),
+    tenantIsolation(),
+  ],
+);
+
+/** Replay cache for identity assertion `jti` values until they expire. */
+export const identityNonces = pgTable(
+  'identity_nonces',
+  {
+    tenantId: tenantId(),
+    brandId: uuid('brand_id').notNull(),
+    jti: text('jti').notNull(),
+    expiresAt: tstz('expires_at').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ name: 'identity_nonces_pkey', columns: [t.tenantId, t.brandId, t.jti] }),
+    foreignKey({
+      name: 'identity_nonces_brand_fk',
+      columns: [t.tenantId, t.brandId],
+      foreignColumns: [brands.tenantId, brands.id],
+    }),
+    index('identity_nonces_expires_idx').on(t.expiresAt),
+    tenantIsolation(),
+  ],
+);
