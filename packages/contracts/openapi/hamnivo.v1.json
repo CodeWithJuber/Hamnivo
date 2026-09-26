@@ -1,0 +1,4507 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Hamnivo API",
+    "version": "1.0.0",
+    "description": "Public API for Hamnivo. Every request is authorized against the caller's tenant, scope and resource; identifiers are never authorization by themselves. Errors use RFC 9457 problem details.",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.hamnivo.example",
+      "description": "Replace with your deployment"
+    }
+  ],
+  "paths": {
+    "/v1/widget/sessions": {
+      "post": {
+        "operationId": "createWidgetSession",
+        "summary": "Start or resume a widget session for this browser",
+        "tags": [
+          "Widget"
+        ],
+        "security": [],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWidgetSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetSession"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/sessions/refresh": {
+      "post": {
+        "operationId": "refreshWidgetSession",
+        "summary": "Rotate the refresh token and issue a new access token",
+        "tags": [
+          "Widget"
+        ],
+        "security": [],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshWidgetSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session refreshed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetSession"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/identity": {
+      "post": {
+        "operationId": "identifyWidgetSession",
+        "summary": "Exchange a tenant-signed identity assertion for a verified customer session",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verified session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetSession"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/sessions/reset": {
+      "post": {
+        "operationId": "resetWidgetSession",
+        "summary": "End this session and remove the identity from this browser (logout)",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Session ended"
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations": {
+      "get": {
+        "operationId": "listMyConversations",
+        "summary": "List the signed-in customer's own conversations",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Conversations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CustomerConversation"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "startConversation",
+        "summary": "Start a new conversation",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Retry-safe key bound to the request body hash; reuse with a different body returns 409",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartConversationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Conversation started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerConversation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}": {
+      "get": {
+        "operationId": "getConversation",
+        "summary": "Get one of my conversations",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerConversation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}/messages": {
+      "get": {
+        "operationId": "listMessages",
+        "summary": "Page through customer-visible messages, newest first",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 30,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "sendMessage",
+        "summary": "Send a message; retries with the same clientMessageId are deduplicated",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted after the conversation authority committed it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendMessageResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}/read": {
+      "post": {
+        "operationId": "markRead",
+        "summary": "Report that messages up to a sequence were displayed to the customer",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadReceiptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded"
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}/handoff": {
+      "post": {
+        "operationId": "requestHandoff",
+        "summary": "Ask for a person. Always honoured; availability is reported honestly",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Handoff created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}/reopen": {
+      "post": {
+        "operationId": "reopenConversation",
+        "summary": "Reopen a resolved conversation, keeping its history",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reopened",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerConversation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}/feedback": {
+      "post": {
+        "operationId": "submitFeedback",
+        "summary": "Rate a resolved conversation",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Feedback stored"
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}/uploads": {
+      "post": {
+        "operationId": "uploadAttachment",
+        "summary": "Upload a file into quarantine; it becomes available only after scanning",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Upload received",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentPart"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}/events": {
+      "get": {
+        "operationId": "streamEvents",
+        "summary": "Server-Sent Events stream; resume with Last-Event-ID (the last seen sequence)",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event stream (text/event-stream); data is a HamnivoEvent or a stream control frame",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/HamnivoEvent"
+                    },
+                    {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "control": {
+                              "type": "string",
+                              "const": "heartbeat"
+                            },
+                            "at": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                              "description": "RFC 3339 timestamp"
+                            }
+                          },
+                          "required": [
+                            "control",
+                            "at"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "control": {
+                              "type": "string",
+                              "const": "resync_required"
+                            },
+                            "reason": {
+                              "type": "string",
+                              "enum": [
+                                "cursor_expired",
+                                "gap_detected",
+                                "access_changed"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "control",
+                            "reason"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "control": {
+                              "type": "string",
+                              "const": "auth_expired"
+                            }
+                          },
+                          "required": [
+                            "control"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}/events/poll": {
+      "get": {
+        "operationId": "pollEvents",
+        "summary": "Long-poll fallback where streaming is blocked",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "waitSeconds",
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Events after the cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HamnivoEvent"
+                      }
+                    },
+                    "control": {
+                      "anyOf": [
+                        {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "control": {
+                                  "type": "string",
+                                  "const": "heartbeat"
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                                  "description": "RFC 3339 timestamp"
+                                }
+                              },
+                              "required": [
+                                "control",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "control": {
+                                  "type": "string",
+                                  "const": "resync_required"
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "cursor_expired",
+                                    "gap_detected",
+                                    "access_changed"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "control",
+                                "reason"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "control": {
+                                  "type": "string",
+                                  "const": "auth_expired"
+                                }
+                              },
+                              "required": [
+                                "control"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "events",
+                    "control"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateWidgetSessionRequest": {
+        "type": "object",
+        "properties": {
+          "widgetId": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "ar",
+              "hi",
+              "ur"
+            ]
+          },
+          "resumeToken": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "widgetId"
+        ]
+      },
+      "RefreshWidgetSessionRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "IdentifyRequest": {
+        "type": "object",
+        "properties": {
+          "assertion": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "assertion"
+        ]
+      },
+      "StartConversationRequest": {
+        "type": "object",
+        "properties": {
+          "clientMessageId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Client-generated UUID identifying one send attempt"
+          },
+          "firstMessage": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "context": {
+            "$ref": "#/components/schemas/PageContext"
+          }
+        }
+      },
+      "PageContext": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "pageType": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "references": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-zA-Z][a-zA-Z0-9_]{0,40}$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "properties": {
+          "clientMessageId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Client-generated UUID identifying one send attempt"
+          },
+          "parts": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/TextPart"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "attachment"
+                    },
+                    "uploadId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "uploadId"
+                  ]
+                }
+              ],
+              "type": "object"
+            }
+          },
+          "context": {
+            "$ref": "#/components/schemas/PageContext"
+          }
+        },
+        "required": [
+          "clientMessageId",
+          "parts"
+        ]
+      },
+      "TextPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "text"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "format": {
+            "default": "plain",
+            "type": "string",
+            "enum": [
+              "plain",
+              "markdown"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ]
+      },
+      "ReadReceiptRequest": {
+        "type": "object",
+        "properties": {
+          "upToSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "upToSequence"
+        ]
+      },
+      "HandoffRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "clientRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "clientRequestId"
+        ]
+      },
+      "FeedbackRequest": {
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "rating"
+        ]
+      },
+      "WidgetSession": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "principal": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "verified": {
+                "type": "boolean"
+              },
+              "displayName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "verified",
+              "displayName"
+            ],
+            "additionalProperties": false
+          },
+          "config": {
+            "$ref": "#/components/schemas/WidgetConfig"
+          },
+          "conversations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerConversation"
+            }
+          }
+        },
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "refreshToken",
+          "principal",
+          "config",
+          "conversations"
+        ],
+        "additionalProperties": false
+      },
+      "WidgetConfig": {
+        "type": "object",
+        "properties": {
+          "widgetId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "brand": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "logoUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "accent": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "onAccent": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "radius": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 24
+              },
+              "launcherPosition": {
+                "type": "string",
+                "enum": [
+                  "bottom-right",
+                  "bottom-left"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "logoUrl",
+              "accent",
+              "onAccent",
+              "radius",
+              "launcherPosition"
+            ],
+            "additionalProperties": false
+          },
+          "locales": {
+            "type": "object",
+            "properties": {
+              "default": {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "ar",
+                  "hi",
+                  "ur"
+                ]
+              },
+              "available": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "en",
+                    "ar",
+                    "hi",
+                    "ur"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "default",
+              "available"
+            ],
+            "additionalProperties": false
+          },
+          "copy": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "enum": [
+                "en",
+                "ar",
+                "hi",
+                "ur"
+              ]
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "greeting": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "aiDisclosure": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "offlineMessage": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "privacyNotice": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "greeting",
+                "aiDisclosure",
+                "offlineMessage",
+                "privacyNotice"
+              ],
+              "additionalProperties": false
+            },
+            "required": [
+              "en",
+              "ar",
+              "hi",
+              "ur"
+            ]
+          },
+          "availability": {
+            "type": "object",
+            "properties": {
+              "humanAvailable": {
+                "type": "boolean"
+              },
+              "nextOpenAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "timezone": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "humanAvailable",
+              "nextOpenAt",
+              "timezone"
+            ],
+            "additionalProperties": false
+          },
+          "features": {
+            "type": "object",
+            "properties": {
+              "attachments": {
+                "type": "boolean"
+              },
+              "helpCenter": {
+                "type": "boolean"
+              },
+              "csat": {
+                "type": "boolean"
+              },
+              "voice": {
+                "type": "boolean"
+              },
+              "identityRequiredForHistory": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "attachments",
+              "helpCenter",
+              "csat",
+              "voice",
+              "identityRequiredForHistory"
+            ],
+            "additionalProperties": false
+          },
+          "privacyPolicyUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attachmentLimits": {
+            "type": "object",
+            "properties": {
+              "maxBytes": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "allowedMimeTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "maxBytes",
+              "allowedMimeTypes"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "widgetId",
+          "version",
+          "brand",
+          "locales",
+          "copy",
+          "availability",
+          "features",
+          "privacyPolicyUrl",
+          "attachmentLimits"
+        ],
+        "additionalProperties": false
+      },
+      "CustomerConversation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "waiting_for_person",
+              "with_person",
+              "resolved"
+            ]
+          },
+          "responder": {
+            "type": "string",
+            "enum": [
+              "ai",
+              "person",
+              "none"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "unreadCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "lastMessagePreview": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "responder",
+          "createdAt",
+          "updatedAt",
+          "unreadCount",
+          "lastMessagePreview",
+          "latestSequence"
+        ],
+        "additionalProperties": false
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "URI identifying the problem type"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "AUTH_REQUIRED",
+              "SESSION_EXPIRED",
+              "REAUTH_REQUIRED",
+              "MFA_REQUIRED",
+              "SCOPE_DENIED",
+              "ORIGIN_NOT_ALLOWED",
+              "NOT_FOUND",
+              "VALIDATION_FAILED",
+              "IDEMPOTENCY_CONFLICT",
+              "VERSION_CONFLICT",
+              "RATE_LIMITED",
+              "QUOTA_EXCEEDED",
+              "IDENTITY_REQUIRED",
+              "ASSERTION_INVALID",
+              "ACTION_REQUIRES_APPROVAL",
+              "APPROVAL_EXPIRED",
+              "APPROVAL_MISMATCH",
+              "ACTION_OUTCOME_UNKNOWN",
+              "UPLOAD_REJECTED",
+              "UPLOAD_TOO_LARGE",
+              "PROVIDER_UNAVAILABLE",
+              "AUTHORITY_UNAVAILABLE",
+              "OWNERSHIP_CHANGED",
+              "CONVERSATION_CLOSED",
+              "RESYNC_REQUIRED",
+              "FEATURE_DISABLED",
+              "INTERNAL"
+            ]
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "retryAfter": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "retryable",
+          "requestId"
+        ],
+        "additionalProperties": false,
+        "description": "RFC 9457 problem details"
+      },
+      "MessagePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "olderCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latestSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "olderCursor",
+          "latestSequence"
+        ],
+        "additionalProperties": false
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "conversationId": {
+            "type": "string"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sender": {
+            "$ref": "#/components/schemas/Sender"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal"
+            ]
+          },
+          "parts": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessagePart"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "clientMessageId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                "description": "Client-generated UUID identifying one send attempt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "delivery": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "sending",
+                  "accepted",
+                  "delivered",
+                  "read",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "sequence",
+          "sender",
+          "visibility",
+          "parts",
+          "createdAt",
+          "clientMessageId",
+          "delivery",
+          "language"
+        ],
+        "additionalProperties": false
+      },
+      "Sender": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "human_agent",
+              "ai_agent",
+              "ai_specialist",
+              "guest",
+              "external_agent",
+              "system"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "roleLabel": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "avatarUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "kind",
+          "displayName"
+        ],
+        "additionalProperties": false
+      },
+      "MessagePart": {
+        "anyOf": [
+          {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TextPartOutput"
+              },
+              {
+                "$ref": "#/components/schemas/AttachmentPart"
+              },
+              {
+                "$ref": "#/components/schemas/SourcePart"
+              },
+              {
+                "$ref": "#/components/schemas/CardPart"
+              },
+              {
+                "$ref": "#/components/schemas/TaskUpdatePart"
+              },
+              {
+                "$ref": "#/components/schemas/ActionReceiptPart"
+              },
+              {
+                "$ref": "#/components/schemas/NoticePart"
+              }
+            ],
+            "type": "object",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "text": "#/components/schemas/TextPartOutput",
+                "attachment": "#/components/schemas/AttachmentPart",
+                "source": "#/components/schemas/SourcePart",
+                "card": "#/components/schemas/CardPart",
+                "task_update": "#/components/schemas/TaskUpdatePart",
+                "action_receipt": "#/components/schemas/ActionReceiptPart",
+                "notice": "#/components/schemas/NoticePart"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/UnknownPart"
+          }
+        ]
+      },
+      "AttachmentPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "attachment"
+          },
+          "uploadId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "mimeType": {
+            "type": "string",
+            "maxLength": 127
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "quarantined",
+              "scanning",
+              "available",
+              "rejected"
+            ]
+          },
+          "rejectionReason": {
+            "type": "string",
+            "enum": [
+              "type_not_allowed",
+              "too_large",
+              "malware_detected",
+              "scan_unavailable",
+              "unreadable"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "type",
+          "uploadId",
+          "name",
+          "mimeType",
+          "sizeBytes",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "SourcePart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "source"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "excerpt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 600
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "freshness": {
+            "type": "string",
+            "enum": [
+              "current",
+              "stale",
+              "expired"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "sourceId",
+          "title",
+          "url",
+          "version",
+          "excerpt",
+          "freshness"
+        ],
+        "additionalProperties": false
+      },
+      "CardPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "card"
+          },
+          "card": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QuoteCard"
+              },
+              {
+                "$ref": "#/components/schemas/ApprovalCard"
+              },
+              {
+                "$ref": "#/components/schemas/OrderStatusCard"
+              },
+              {
+                "$ref": "#/components/schemas/ChoicesCard"
+              },
+              {
+                "$ref": "#/components/schemas/FormCard"
+              },
+              {
+                "$ref": "#/components/schemas/ArticleCard"
+              },
+              {
+                "$ref": "#/components/schemas/ReceiptCard"
+              }
+            ],
+            "type": "object",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "quote": "#/components/schemas/QuoteCard",
+                "approval": "#/components/schemas/ApprovalCard",
+                "order_status": "#/components/schemas/OrderStatusCard",
+                "choices": "#/components/schemas/ChoicesCard",
+                "form": "#/components/schemas/FormCard",
+                "article": "#/components/schemas/ArticleCard",
+                "receipt": "#/components/schemas/ReceiptCard"
+              }
+            }
+          },
+          "fallbackText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "type",
+          "card",
+          "fallbackText"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteCard": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "quote"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "quoteId": {
+            "type": "string"
+          },
+          "quoteHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "merchant": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lineId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "variant": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "quantity": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "unitPriceMinor": {
+                  "type": "string",
+                  "pattern": "^-?(0|[1-9][0-9]{0,17})$",
+                  "description": "Integer amount in the currency minor unit, as a string",
+                  "example": "14900"
+                },
+                "totalMinor": {
+                  "type": "string",
+                  "pattern": "^-?(0|[1-9][0-9]{0,17})$",
+                  "description": "Integer amount in the currency minor unit, as a string",
+                  "example": "14900"
+                }
+              },
+              "required": [
+                "lineId",
+                "name",
+                "quantity",
+                "unitPriceMinor",
+                "totalMinor"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "subtotalMinor": {
+            "type": "string",
+            "pattern": "^-?(0|[1-9][0-9]{0,17})$",
+            "description": "Integer amount in the currency minor unit, as a string",
+            "example": "14900"
+          },
+          "discountMinor": {
+            "type": "string",
+            "pattern": "^-?(0|[1-9][0-9]{0,17})$",
+            "description": "Integer amount in the currency minor unit, as a string",
+            "example": "14900"
+          },
+          "taxMinor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(0|[1-9][0-9]{0,17})$",
+                "description": "Integer amount in the currency minor unit, as a string",
+                "example": "14900"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shippingMinor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^-?(0|[1-9][0-9]{0,17})$",
+                "description": "Integer amount in the currency minor unit, as a string",
+                "example": "14900"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "totalMinor": {
+            "type": "string",
+            "pattern": "^-?(0|[1-9][0-9]{0,17})$",
+            "description": "Integer amount in the currency minor unit, as a string",
+            "example": "14900"
+          },
+          "recurring": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "week",
+                      "month",
+                      "year"
+                    ]
+                  },
+                  "intervalCount": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "interval",
+                  "intervalCount"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "kind",
+          "version",
+          "quoteId",
+          "quoteHash",
+          "merchant",
+          "lines",
+          "currency",
+          "subtotalMinor",
+          "discountMinor",
+          "taxMinor",
+          "shippingMinor",
+          "totalMinor",
+          "recurring",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "ApprovalCard": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "approval"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "approvalId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "actionSummary": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "resource": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "id",
+              "label"
+            ],
+            "additionalProperties": false
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "field",
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "approver": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "staff"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "denied",
+              "expired",
+              "superseded"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "kind",
+          "version",
+          "approvalId",
+          "title",
+          "actionSummary",
+          "resource",
+          "changes",
+          "approver",
+          "status",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "OrderStatusCard": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "order_status"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "paymentState": {
+            "type": "string",
+            "enum": [
+              "not_started",
+              "pending",
+              "authorized",
+              "paid",
+              "failed",
+              "refunded",
+              "partially_refunded",
+              "unknown"
+            ]
+          },
+          "fulfillmentState": {
+            "type": "string",
+            "enum": [
+              "not_started",
+              "processing",
+              "partially_fulfilled",
+              "fulfilled",
+              "delayed",
+              "cancelled",
+              "unknown"
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "kind",
+          "version",
+          "orderId",
+          "reference",
+          "paymentState",
+          "fulfillmentState",
+          "summary",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ChoicesCard": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "choices"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "prompt": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "options": {
+            "minItems": 1,
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 80
+                }
+              },
+              "required": [
+                "value",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "allowFreeText": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "version",
+          "prompt",
+          "options",
+          "allowFreeText"
+        ],
+        "additionalProperties": false
+      },
+      "FormCard": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "form"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "formId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "fields": {
+            "minItems": 1,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,40}$"
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "email",
+                    "tel",
+                    "number",
+                    "textarea",
+                    "select"
+                  ]
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "maxLength": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 5000
+                }
+              },
+              "required": [
+                "name",
+                "label",
+                "kind",
+                "required"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "submitLabel": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "kind",
+          "version",
+          "formId",
+          "title",
+          "fields",
+          "submitLabel"
+        ],
+        "additionalProperties": false
+      },
+      "ArticleCard": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "article"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "version",
+          "sourceId",
+          "title",
+          "summary",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "ReceiptCard": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "receipt"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "receiptId": {
+            "type": "string"
+          },
+          "actionId": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "failed",
+              "unknown",
+              "cancelled"
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "kind",
+          "version",
+          "receiptId",
+          "actionId",
+          "outcome",
+          "summary",
+          "reference",
+          "occurredAt"
+        ],
+        "additionalProperties": false
+      },
+      "TaskUpdatePart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "task_update"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "waiting",
+              "done",
+              "blocked",
+              "cancelled"
+            ]
+          },
+          "dueAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "taskId",
+          "title",
+          "status",
+          "dueAt"
+        ],
+        "additionalProperties": false
+      },
+      "ActionReceiptPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "action_receipt"
+          },
+          "actionId": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "requested",
+              "awaiting_approval",
+              "approved",
+              "executing",
+              "completed",
+              "failed",
+              "unknown",
+              "cancelled"
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "type",
+          "actionId",
+          "outcome",
+          "summary",
+          "reference",
+          "occurredAt"
+        ],
+        "additionalProperties": false
+      },
+      "NoticePart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "notice"
+          },
+          "notice": {
+            "type": "string",
+            "enum": [
+              "handoff_requested",
+              "waiting_for_person",
+              "human_joined",
+              "human_left",
+              "ai_paused",
+              "ai_resumed",
+              "specialist_joined",
+              "resolved",
+              "reopened",
+              "team_offline",
+              "follow_up_scheduled"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "type",
+          "notice",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "UnknownPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "unknown"
+          },
+          "originalType": {
+            "type": "string"
+          },
+          "fallbackText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "originalType",
+          "fallbackText"
+        ],
+        "additionalProperties": false
+      },
+      "SendMessageResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/Message"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "duplicate"
+            ]
+          }
+        },
+        "required": [
+          "message",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "HandoffResponse": {
+        "type": "object",
+        "properties": {
+          "handoffId": {
+            "type": "string"
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "person_available",
+              "queued",
+              "offline"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "followUp": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "email",
+                      "this_chat"
+                    ]
+                  },
+                  "expectedBy": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                        "description": "RFC 3339 timestamp"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "channel",
+                  "expectedBy"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "handoffId",
+          "availability",
+          "message",
+          "followUp"
+        ],
+        "additionalProperties": false
+      },
+      "HamnivoEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "message.created"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "message.updated"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "message.redacted"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "deleted",
+                      "retention",
+                      "privacy_request"
+                    ]
+                  }
+                },
+                "required": [
+                  "messageId",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "message.delta"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "runId": {
+                    "type": "string"
+                  },
+                  "draftId": {
+                    "type": "string"
+                  },
+                  "index": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "textDelta": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "runId",
+                  "draftId",
+                  "index",
+                  "textDelta"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "message.draft_discarded"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "runId": {
+                    "type": "string"
+                  },
+                  "draftId": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "takeover",
+                      "cancelled",
+                      "failed",
+                      "superseded"
+                    ]
+                  }
+                },
+                "required": [
+                  "runId",
+                  "draftId",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "delivery.updated"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "sending",
+                      "accepted",
+                      "delivered",
+                      "read",
+                      "failed"
+                    ]
+                  }
+                },
+                "required": [
+                  "messageId",
+                  "state"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "conversation.updated"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "waiting_for_person",
+                      "with_person",
+                      "resolved"
+                    ]
+                  },
+                  "responder": {
+                    "type": "string",
+                    "enum": [
+                      "ai",
+                      "person",
+                      "none"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "responder"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "conversation.resolved"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "canReopen": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "canReopen"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "conversation.reopened"
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "participant.joined"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "participant": {
+                    "$ref": "#/components/schemas/Participant"
+                  }
+                },
+                "required": [
+                  "participant"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "participant.left"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "participantId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "participantId"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "typing"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "participantId": {
+                    "type": "string"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "typing": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "participantId",
+                  "displayName",
+                  "typing"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "activity"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "runId": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "started",
+                      "finished"
+                    ]
+                  }
+                },
+                "required": [
+                  "runId",
+                  "label",
+                  "state"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "handoff.requested"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "handoffId": {
+                    "type": "string"
+                  },
+                  "availability": {
+                    "type": "string",
+                    "enum": [
+                      "person_available",
+                      "queued",
+                      "offline"
+                    ]
+                  }
+                },
+                "required": [
+                  "handoffId",
+                  "availability"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "handoff.accepted"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "handoffId": {
+                    "type": "string"
+                  },
+                  "participant": {
+                    "$ref": "#/components/schemas/Participant"
+                  }
+                },
+                "required": [
+                  "handoffId",
+                  "participant"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "action.updated"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "actionId": {
+                    "type": "string"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "requested",
+                      "awaiting_approval",
+                      "approved",
+                      "executing",
+                      "completed",
+                      "failed",
+                      "unknown",
+                      "cancelled"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "actionId",
+                  "outcome",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "approval.requested"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "approvalId": {
+                    "type": "string"
+                  },
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  }
+                },
+                "required": [
+                  "approvalId",
+                  "messageId",
+                  "expiresAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "pattern": "^1\\.\\d+$"
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "conversationId": {
+                "type": "string"
+              },
+              "sequence": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              "correlationId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lane": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "agent_work"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "const": "approval.updated"
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "approvalId": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "denied",
+                      "expired",
+                      "superseded"
+                    ]
+                  }
+                },
+                "required": [
+                  "approvalId",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "eventId",
+              "conversationId",
+              "sequence",
+              "occurredAt",
+              "correlationId",
+              "lane",
+              "type",
+              "data"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "type": "object"
+      },
+      "Participant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "human_agent",
+              "ai_agent",
+              "ai_specialist",
+              "guest",
+              "external_agent",
+              "system"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "roleLabel": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "public",
+              "assist",
+              "background"
+            ]
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "leftAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "displayName",
+          "mode",
+          "joinedAt",
+          "leftAt"
+        ],
+        "additionalProperties": false
+      },
+      "TextPartOutput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "text"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "format": {
+            "default": "plain",
+            "type": "string",
+            "enum": [
+              "plain",
+              "markdown"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "text",
+          "format"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "widgetSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Widget access token"
+      },
+      "staffSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "hamnivo.session_token",
+        "description": "Hamnivo Studio session"
+      },
+      "apiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Scoped API key (hv_…)"
+      }
+    }
+  }
+}

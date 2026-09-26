@@ -13,17 +13,31 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "test:int": {
       "dependsOn": ["^build"],
       "outputs": [],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "DATABASE_OWNER_URL",
+        "DATABASE_PLATFORM_URL",
+        "REDIS_URL",
+        "HAMNIVO_*"
+      ]
     },
     "test:e2e": {
       "dependsOn": ["^build"],
       "outputs": ["test-results/**", "playwright-report/**"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "DATABASE_OWNER_URL",
+        "DATABASE_PLATFORM_URL",
+        "REDIS_URL",
+        "HAMNIVO_*"
+      ]
     },
     "dev": {
       "dependsOn": ["^build"],

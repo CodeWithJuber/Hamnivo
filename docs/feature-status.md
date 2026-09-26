@@ -7,9 +7,9 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 232
+**Blueprint features (232):** planned: 224 · in-progress: 7 · implemented: 1
 
-**Design states (168):** planned: 168
+**Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
 ## Blueprint features
 
@@ -19,7 +19,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 |---|---|---|---|---|---|
 | W01 | One-script installation | P0 | C | planned |  |
 | W02 | Layout modes | P0 | C | planned |  |
-| W03 | Brand theme | P0 | C | planned |  |
+| W03 | Brand theme | P0 | C | in-progress | `packages/brand/src/contrast.ts`, `packages/brand/test/contrast.test.ts` — Contrast validation implemented; widget studio UI pending. |
 | W04 | Clear responder identity | P0 | C | planned |  |
 | W05 | Conversation history | P0 | C | planned |  |
 | W06 | Delivery states | P0 | C | planned |  |
@@ -75,10 +75,10 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | A03 | Sub-admin delegation | P0 | F | planned |  |
 | A04 | Multi-brand settings | P0 | C | planned |  |
 | A05 | Basic business hours | P0 | C | planned |  |
-| A06 | Secrets and API credentials | P0 | F | planned |  |
+| A06 | Secrets and API credentials | P0 | F | in-progress | `packages/db/src/schema/identity.ts`, `packages/db/src/resolvers.ts`, `packages/db/test/resolvers.int.test.ts`, `scripts/setup/env.sh` — Envelope-encrypted secret storage, hashed API keys with prefix lookup and generated installation secrets; the secret broker, masking UI and rotation flows follow with the gateway. |
 | A07 | Draft/publish configuration | P0 | C | planned |  |
 | A08 | Usage limits | P0 | C | planned |  |
-| A09 | Audit trail | P0 | C | planned |  |
+| A09 | Audit trail | P0 | C | in-progress | `packages/db/src/audit.ts`, `packages/db/src/schema/audit.ts`, `packages/db/migrations/20260926232017_security.sql`, `packages/db/test/audit.int.test.ts` — Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection and transactional appends; search, export and Studio views pending. |
 | A10 | Retention and exports | P0 | C | planned |  |
 | A11 | Channel setup | P0 | C | planned |  |
 | A12 | Custom role builder | P1 | C | planned |  |
@@ -137,7 +137,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| D01 | Public REST API | P0 | F | planned |  |
+| D01 | Public REST API | P0 | F | in-progress | `packages/contracts/src/routes.ts`, `packages/contracts/src/errors.ts`, `packages/contracts/openapi/hamnivo.v1.json`, `packages/contracts/scripts/openapi.ts` — OpenAPI 3.1 generated from Zod with RFC 9457 errors and cursor pagination; widget routes defined, staff/admin/server routes follow with their modules. |
 | D02 | Headless JS/TS client | P0 | C | planned |  |
 | D03 | React UI adapter | P0 | C | planned |  |
 | D04 | Framework wrappers | P1 | C | planned |  |
@@ -172,9 +172,9 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 |---|---|---|---|---|---|
 | O01 | Metrics and alerts | P0 | C | planned |  |
 | O02 | Backups and recovery | P0 | C | planned |  |
-| O03 | CI/CD and versioning | P0 | F | planned |  |
+| O03 | CI/CD and versioning | P0 | F | in-progress | `scripts/ci/local.sh`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `docs/adr/0007-self-hosted-verification.md` — Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence/status checks, accessibility audit) run with pnpm ci:local; release and rollback automation pending. |
 | O04 | Product analytics | P1 | C | planned |  |
-| O05 | Self-hosted distribution | P1 | C | planned |  |
+| O05 | Self-hosted distribution | P1 | C | in-progress | `deploy/compose/services.yml`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `.env.example` — Self-hosted infrastructure (PostgreSQL 18 + pgvector, Valkey), generated secrets, environment reference and server guide; versioned application containers follow with the gateway. |
 | O06 | Marketplace and partner certification | P2 | A | planned |  |
 
 ### Collaboration
@@ -293,12 +293,12 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | E01 | Domain ownership contracts | P0 | F | planned |  |
 | E02 | Provider capability negotiation | P0 | Q | planned |  |
 | E03 | Runtime-independent ports | P0 | C | planned |  |
-| E04 | Event and schema compatibility | P0 | F | planned |  |
+| E04 | Event and schema compatibility | P0 | F | in-progress | `packages/contracts/src/events.ts`, `packages/contracts/src/parts.ts`, `packages/contracts/fixtures/v1/future-minor-version.json`, `packages/contracts/test/contracts.test.ts`, `docs/contracts/compatibility.md` — Forward-compatible parsing and fixtures in place; client SDK compatibility tests follow with packages/client. |
 | E05 | Plugin permission diffs | P0 | A | planned |  |
 | E06 | Adapter contract fixtures | P0 | C | planned |  |
 | E07 | Hikmah reuse adapter | P1 | L | planned |  |
 | E08 | Jev contract reconciliation | P0 | C | planned |  |
-| E09 | License and dataset inventory | P0 | F | planned |  |
+| E09 | License and dataset inventory | P0 | F | implemented | `scripts/licenses/inventory.ts`, `docs/licenses.md`, `scripts/ci/local.sh` — Inventory generated from the lockfile; the local check pipeline fails on a stale inventory or unreviewed licences. |
 | E10 | Research evidence registry | P1 | L | planned |  |
 | E11 | Semantic co-model experiments | P2 | Research | planned |  |
 | E12 | Workflow authority boundary | P0 | Q | planned |  |
@@ -579,12 +579,12 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-24-01 | Components | Hover, focus-visible and pressed | planned |  |
-| HNV-24-02 | Forms | Disabled, read-only and invalid | planned |  |
-| HNV-24-03 | Async content | Loading, empty and skeleton | planned |  |
-| HNV-24-04 | Dialog and menu | Open, focus trapped and dismissed | planned |  |
-| HNV-24-05 | Global error | Recoverable, offline and unsaved navigation | planned |  |
-| HNV-24-06 | Accessible alternatives | Screen reader, zoom and reduced motion | planned |  |
+| HNV-24-01 | Components | Hover, focus-visible and pressed | implemented | `packages/ui/src/components/button.tsx`, `packages/ui/src/stories/controls.stories.tsx`, `packages/ui/test/components.test.tsx` |
+| HNV-24-02 | Forms | Disabled, read-only and invalid | implemented | `packages/ui/src/components/reasoned-action.tsx`, `packages/ui/src/components/form-error-summary.tsx`, `packages/ui/src/stories/forms.stories.tsx`, `packages/ui/test/components.test.tsx` |
+| HNV-24-03 | Async content | Loading, empty and skeleton | implemented | `packages/ui/src/components/async-states.tsx`, `packages/ui/src/stories/async.stories.tsx`, `packages/ui/test/components.test.tsx` |
+| HNV-24-04 | Dialog and menu | Open, focus trapped and dismissed | implemented | `packages/ui/src/components/alert-dialog.tsx`, `packages/ui/src/stories/overlays.stories.tsx`, `packages/ui/test/overlays.test.tsx` |
+| HNV-24-05 | Global error | Recoverable, offline and unsaved navigation | implemented | `packages/ui/src/components/async-states.tsx`, `packages/ui/src/components/unsaved-changes-dialog.tsx`, `packages/ui/src/stories/global-error.stories.tsx`, `packages/ui/test/overlays.test.tsx` |
+| HNV-24-06 | Accessible alternatives | Screen reader, zoom and reduced motion | partial | `packages/ui/scripts/a11y-audit.ts`, `packages/ui/src/components/live-region.tsx` — Automated axe audit passes for every story in light/dark × LTR/RTL; manual screen-reader, 200% zoom and keyboard reviews are still required. |
 
 ### 25 · NLP and semantic cache policy
 

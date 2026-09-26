@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0",
+  "eventId": "evt_01j9zk7w3xq8r4t2v6m5n1p0cj",
+  "type": "message.created",
+  "conversationId": "conv_01j9zk7w3xq8r4t2v6m5n1p0ce",
+  "sequence": 43,
+  "occurredAt": "2026-09-26T19:01:00Z",
+  "correlationId": null,
+  "lane": "customer",
+  "data": {
+    "message": {
+      "id": "msg_01j9zk7w3xq8r4t2v6m5n1p0ck",
+      "conversationId": "conv_01j9zk7w3xq8r4t2v6m5n1p0ce",
+      "sequence": 43,
+      "sender": { "kind": "ai_agent", "displayName": "Hamnivo AI", "roleLabel": "AI assistant" },
+      "visibility": "public",
+      "parts": [
+        {
+          "type": "card",
+          "fallbackText": "Quote Q-2048: 2 × Hosting Pro, total AED 149.00, valid until 27 Sep 2026 19:00 UTC.",
+          "card": {
+            "kind": "quote",
+            "version": 1,
+            "quoteId": "quo_01j9zk7w3xq8r4t2v6m5n1p0cm",
+            "quoteHash": "4f1c9a2e0b7d3c6f8e5a1b2c3d4e5f60718293a4b5c6d7e8f9012a3b4c5d6e7f",
+            "merchant": { "id": "hostlelo", "name": "Hostlelo" },
+            "lines": [
+              {
+                "lineId": "l1",
+                "name": "Hosting Pro",
+                "quantity": 2,
+                "unitPriceMinor": "7450",
+                "totalMinor": "14900"
+              }
+            ],
+            "currency": "AED",
+            "subtotalMinor": "14900",
+            "discountMinor": "0",
+            "taxMinor": null,
+            "shippingMinor": null,
+            "totalMinor": "14900",
+            "recurring": { "interval": "month", "intervalCount": 1 },
+            "expiresAt": "2026-09-27T19:00:00Z"
+          }
+        }
+      ],
+      "createdAt": "2026-09-26T19:01:00Z",
+      "clientMessageId": null,
+      "delivery": null,
+      "language": "en"
+    }
+  }
+}

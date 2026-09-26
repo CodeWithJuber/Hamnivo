@@ -43,15 +43,18 @@ Design principles, carried into code and tests:
 - **Evidence before automation** — an action is complete only with an authoritative receipt; unknown stays unknown.
 - **Recovery before release** — drafts survive failures, sends are idempotent, takeovers fence stale AI output.
 
-## Quick start (development)
+## Quick start
 
-Requirements: Node ≥ 22.12 (24 LTS recommended), pnpm 10, PostgreSQL 16+ with pgvector, Redis/Valkey,
-and Docker for the local Chatwoot stack.
+Requirements: Node ≥ 22.12 (24 LTS recommended), pnpm 10, Docker and openssl. Everything runs on
+your own machine or server — there is no hosted CI. The full guide is
+[`docs/self-hosting.md`](docs/self-hosting.md).
 
 ```bash
 pnpm install
-pnpm dev:services     # PostgreSQL + pgvector, Redis, Docker daemon (Linux dev hosts)
-pnpm check            # lint + typecheck + unit tests
+bash scripts/setup/env.sh   # .env.local with generated passwords and secrets (never commit it)
+pnpm services:up            # PostgreSQL 18 + pgvector and Valkey via Docker Compose
+pnpm db:migrate             # schema, row-level security, audit partitions
+pnpm ci:local               # every check: lint, types, unit, integration (PG 16 + 18), accessibility
 ```
 
 Further guides live in [`docs/`](docs/). The product blueprint and the UI/UX design kit that this

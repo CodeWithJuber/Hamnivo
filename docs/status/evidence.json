@@ -1,1 +1,120 @@
-{}
+{
+  "E09": {
+    "status": "implemented",
+    "evidence": ["scripts/licenses/inventory.ts", "docs/licenses.md", "scripts/ci/local.sh"],
+    "note": "Inventory generated from the lockfile; the local check pipeline fails on a stale inventory or unreviewed licences."
+  },
+  "O03": {
+    "status": "in-progress",
+    "evidence": [
+      "scripts/ci/local.sh",
+      "deploy/postgres/init.sh",
+      "docs/self-hosting.md",
+      "docs/adr/0007-self-hosted-verification.md"
+    ],
+    "note": "Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence/status checks, accessibility audit) run with pnpm ci:local; release and rollback automation pending."
+  },
+  "W03": {
+    "status": "in-progress",
+    "evidence": ["packages/brand/src/contrast.ts", "packages/brand/test/contrast.test.ts"],
+    "note": "Contrast validation implemented; widget studio UI pending."
+  },
+  "HNV-24-01": {
+    "status": "implemented",
+    "evidence": [
+      "packages/ui/src/components/button.tsx",
+      "packages/ui/src/stories/controls.stories.tsx",
+      "packages/ui/test/components.test.tsx"
+    ]
+  },
+  "HNV-24-02": {
+    "status": "implemented",
+    "evidence": [
+      "packages/ui/src/components/reasoned-action.tsx",
+      "packages/ui/src/components/form-error-summary.tsx",
+      "packages/ui/src/stories/forms.stories.tsx",
+      "packages/ui/test/components.test.tsx"
+    ]
+  },
+  "HNV-24-03": {
+    "status": "implemented",
+    "evidence": [
+      "packages/ui/src/components/async-states.tsx",
+      "packages/ui/src/stories/async.stories.tsx",
+      "packages/ui/test/components.test.tsx"
+    ]
+  },
+  "HNV-24-04": {
+    "status": "implemented",
+    "evidence": [
+      "packages/ui/src/components/alert-dialog.tsx",
+      "packages/ui/src/stories/overlays.stories.tsx",
+      "packages/ui/test/overlays.test.tsx"
+    ]
+  },
+  "HNV-24-05": {
+    "status": "implemented",
+    "evidence": [
+      "packages/ui/src/components/async-states.tsx",
+      "packages/ui/src/components/unsaved-changes-dialog.tsx",
+      "packages/ui/src/stories/global-error.stories.tsx",
+      "packages/ui/test/overlays.test.tsx"
+    ]
+  },
+  "HNV-24-06": {
+    "status": "partial",
+    "evidence": ["packages/ui/scripts/a11y-audit.ts", "packages/ui/src/components/live-region.tsx"],
+    "note": "Automated axe audit passes for every story in light/dark \u00d7 LTR/RTL; manual screen-reader, 200% zoom and keyboard reviews are still required."
+  },
+  "D01": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/contracts/src/routes.ts",
+      "packages/contracts/src/errors.ts",
+      "packages/contracts/openapi/hamnivo.v1.json",
+      "packages/contracts/scripts/openapi.ts"
+    ],
+    "note": "OpenAPI 3.1 generated from Zod with RFC 9457 errors and cursor pagination; widget routes defined, staff/admin/server routes follow with their modules."
+  },
+  "E04": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/contracts/src/events.ts",
+      "packages/contracts/src/parts.ts",
+      "packages/contracts/fixtures/v1/future-minor-version.json",
+      "packages/contracts/test/contracts.test.ts",
+      "docs/contracts/compatibility.md"
+    ],
+    "note": "Forward-compatible parsing and fixtures in place; client SDK compatibility tests follow with packages/client."
+  },
+  "A09": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/db/src/audit.ts",
+      "packages/db/src/schema/audit.ts",
+      "packages/db/migrations/20260926232017_security.sql",
+      "packages/db/test/audit.int.test.ts"
+    ],
+    "note": "Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection and transactional appends; search, export and Studio views pending."
+  },
+  "A06": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/db/src/schema/identity.ts",
+      "packages/db/src/resolvers.ts",
+      "packages/db/test/resolvers.int.test.ts",
+      "scripts/setup/env.sh"
+    ],
+    "note": "Envelope-encrypted secret storage, hashed API keys with prefix lookup and generated installation secrets; the secret broker, masking UI and rotation flows follow with the gateway."
+  },
+  "O05": {
+    "status": "in-progress",
+    "evidence": [
+      "deploy/compose/services.yml",
+      "deploy/postgres/init.sh",
+      "docs/self-hosting.md",
+      ".env.example"
+    ],
+    "note": "Self-hosted infrastructure (PostgreSQL 18 + pgvector, Valkey), generated secrets, environment reference and server guide; versioned application containers follow with the gateway."
+  }
+}

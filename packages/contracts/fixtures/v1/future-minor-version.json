@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.3",
+  "eventId": "evt_01j9zk7w3xq8r4t2v6m5n1p0cn",
+  "type": "handoff.requested",
+  "conversationId": "conv_01j9zk7w3xq8r4t2v6m5n1p0ce",
+  "sequence": 44,
+  "occurredAt": "2026-09-26T19:02:00Z",
+  "correlationId": null,
+  "lane": "customer",
+  "futureEnvelopeField": { "anything": true },
+  "data": {
+    "handoffId": "hnd_01j9zk7w3xq8r4t2v6m5n1p0cp",
+    "availability": "queued",
+    "estimatedWaitBand": "long"
+  }
+}

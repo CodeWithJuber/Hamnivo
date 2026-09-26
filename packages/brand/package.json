@@ -1,0 +1,41 @@
+{
+  "name": "@hamnivo/brand",
+  "version": "0.1.0",
+  "description": "Hamnivo brand assets, design tokens and contrast utilities",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./tokens.css": "./assets/tokens.css",
+    "./theme.css": "./assets/theme.css",
+    "./assets/*": "./assets/*",
+    "./visuals/*": "./dist/visuals/*"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "source"
+  ],
+  "scripts": {
+    "build": "tsdown && tsx scripts/visuals.ts",
+    "assets": "tsx scripts/vectorize.ts && tsx scripts/icons.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx scripts/css.ts --check && vitest run",
+    "css": "tsx scripts/css.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "sharp": "0.35.4",
+    "svgo": "4.1.0",
+    "tsdown": "0.23.0",
+    "tsx": "4.23.15",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

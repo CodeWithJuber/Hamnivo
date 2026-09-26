@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790464791133,
+      "tag": "20260926231951_foundations",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790464793132,
+      "tag": "20260926231953_spine",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790464817627,
+      "tag": "20260926232017_security",
+      "breakpoints": true
+    }
+  ]
+}
