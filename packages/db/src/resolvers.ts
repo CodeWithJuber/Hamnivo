@@ -158,6 +158,17 @@ export async function resolveTenantSlug(
   return row ? { tenantId: row.tenant_id, tenantStatus: row.tenant_status } : null;
 }
 
+export async function resolveInvitation(
+  db: Db,
+  invitationId: string,
+): Promise<{ tenantId: string; status: string; expiresAt: Date } | null> {
+  const { rows } = await db.execute<{ tenant_id: string; status: string; expires_at: Date }>(
+    sql`select * from app.resolve_invitation(${invitationId}::uuid)`,
+  );
+  const row = rows[0];
+  return row ? { tenantId: row.tenant_id, status: row.status, expiresAt: row.expires_at } : null;
+}
+
 export interface ClaimedOutboxEvent {
   tenantId: string;
   id: string;

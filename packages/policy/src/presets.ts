@@ -1,0 +1,122 @@
+import { expandPatterns, type Permission } from './catalog.js';
+
+export interface RolePreset {
+  key: string;
+  name: string;
+  description: string;
+  patterns: readonly string[];
+}
+
+/** Built-in roles (A02). Tenants copy and adjust them as custom roles (A12). */
+export const ROLE_PRESETS = [
+  {
+    key: 'owner',
+    name: 'Owner',
+    description: 'Full control, including billing, security and support access',
+    patterns: ['*'],
+  },
+  {
+    key: 'admin',
+    name: 'Administrator',
+    description: 'Manages people, channels, AI and settings; no billing',
+    patterns: [
+      'conversations.*',
+      'inbox.*',
+      'teams.*',
+      'members.*',
+      'roles.*',
+      'grants.*',
+      'audit.*',
+      'brands.*',
+      'widget.*',
+      'agents.*',
+      'knowledge.*',
+      'tools.*',
+      'decisions.*',
+      'memory.*',
+      'commerce.*',
+      'analytics.*',
+      'api_keys.*',
+      'webhooks.*',
+      'integrations.*',
+      'secrets.*',
+      'extensions.*',
+      'migration.*',
+      'settings.*',
+      'security.*',
+    ],
+  },
+  {
+    key: 'supervisor',
+    name: 'Supervisor',
+    description: 'Leads a team: routing, takeovers, approvals and quality review',
+    patterns: [
+      'conversations.*',
+      'inbox.manage',
+      'members.read',
+      'grants.manage',
+      'audit.read',
+      'agents.read',
+      'knowledge.read',
+      'tools.approve',
+      'decisions.read',
+      'memory.read',
+      'commerce.read',
+      'analytics.read',
+    ],
+  },
+  {
+    key: 'agent',
+    name: 'Support agent',
+    description: 'Handles conversations and approves customer actions',
+    patterns: [
+      'conversations.read',
+      'conversations.reply',
+      'conversations.note',
+      'conversations.takeover',
+      'members.read',
+      'knowledge.read',
+      'tools.approve',
+      'commerce.read',
+    ],
+  },
+  {
+    key: 'knowledge_editor',
+    name: 'Knowledge editor',
+    description: 'Maintains the knowledge the AI answers from',
+    patterns: ['knowledge.*', 'agents.read', 'conversations.read'],
+  },
+  {
+    key: 'developer',
+    name: 'Developer',
+    description: 'Installs the widget and connects systems',
+    patterns: [
+      'widget.configure',
+      'api_keys.manage',
+      'webhooks.manage',
+      'integrations.manage',
+      'agents.read',
+      'members.read',
+    ],
+  },
+  {
+    key: 'analyst',
+    name: 'Analyst',
+    description: 'Read-only reporting',
+    patterns: ['analytics.read', 'conversations.read', 'decisions.read'],
+  },
+  {
+    key: 'billing',
+    name: 'Billing manager',
+    description: 'Plan, invoices and usage',
+    patterns: ['billing.manage', 'analytics.read'],
+  },
+] as const satisfies readonly RolePreset[];
+
+export type RolePresetKey = (typeof ROLE_PRESETS)[number]['key'];
+
+export function presetPermissions(key: RolePresetKey): Permission[] {
+  const preset = ROLE_PRESETS.find((p) => p.key === key);
+  if (!preset) throw new RangeError(`Unknown role preset: ${key}`);
+  return expandPatterns(preset.patterns);
+}

@@ -110,6 +110,15 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       roleId: ids.roleId,
       scopeType: 'tenant',
     });
+    await tx.insert(s.invitations).values({
+      tenantId,
+      email: `new.agent@${slug}.example`,
+      roleId: ids.roleId,
+      scopeType: 'tenant',
+      tokenHash: bytes(),
+      invitedBy: ids.staffMemberId,
+      expiresAt: inDays(7),
+    });
     await tx.insert(s.apiKeys).values({
       tenantId,
       serviceAccountId: ids.serviceAccountId,

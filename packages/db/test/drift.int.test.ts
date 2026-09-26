@@ -29,9 +29,9 @@ async function applySqlFile(db: Db, file: string) {
 
 async function catalog(db: Db) {
   const tables = sql`(select c.oid from pg_class c join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relispartition)`;
+    where n.nspname in ('public', 'auth') and c.relkind in ('r', 'p') and not c.relispartition)`;
   const columns = await db.execute<Record<string, unknown>>(sql`
-    select c.relname as table, a.attname as column, format_type(a.atttypid, a.atttypmod) as type,
+    select c.oid::regclass::text as table, a.attname as column, format_type(a.atttypid, a.atttypmod) as type,
            a.attnotnull as not_null, pg_get_expr(d.adbin, d.adrelid) as default
     from pg_attribute a
     join pg_class c on c.oid = a.attrelid
@@ -46,12 +46,12 @@ async function catalog(db: Db) {
            pg_get_indexdef(i.indexrelid) as def
     from pg_index i where i.indrelid in ${tables} order by 1, 2`);
   const policies = await db.execute<Record<string, unknown>>(sql`
-    select tablename as table, policyname as name, permissive, roles::text[] as roles, cmd, qual,
-           with_check
-    from pg_policies where schemaname = 'public' order by 1, 2`);
+    select schemaname || '.' || tablename as table, policyname as name, permissive,
+           roles::text[] as roles, cmd, qual, with_check
+    from pg_policies where schemaname in ('public', 'auth') order by 1, 2`);
   const rls = await db.execute<Record<string, unknown>>(sql`
-    select relname as table, relrowsecurity as enabled from pg_class where oid in ${tables}
-    order by 1`);
+    select oid::regclass::text as table, relrowsecurity as enabled from pg_class
+    where oid in ${tables} order by 1`);
   return {
     columns: columns.rows,
     constraints: constraints.rows,

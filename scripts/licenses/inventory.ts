@@ -42,11 +42,20 @@ interface Entry {
   homepage?: string;
 }
 
+/** Non-SPDX spellings some packages declare, mapped to their SPDX identifiers. */
+const ALIASES: Record<string, string> = {
+  'MIT License': 'MIT',
+  'The MIT License': 'MIT',
+  'Apache License 2.0': 'Apache-2.0',
+  'Apache 2.0': 'Apache-2.0',
+  'ISC License': 'ISC',
+};
+
 function classify(license: string): 'permissive' | 'weak-copyleft' | 'review' {
   const parts = license
     .replace(/[()]/g, '')
     .split(/\s+(?:OR|AND)\s+/i)
-    .map((p) => p.trim());
+    .map((p) => ALIASES[p.trim()] ?? p.trim());
   const isOr = /\sOR\s/i.test(license);
   const ok = (p: string) => PERMISSIVE.has(p);
   if (isOr ? parts.some(ok) : parts.every(ok)) return 'permissive';
