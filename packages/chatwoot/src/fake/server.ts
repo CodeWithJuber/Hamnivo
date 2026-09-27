@@ -143,6 +143,11 @@ export interface FakeChatwoot {
   /** Holds webhooks in the queue (a delayed Chatwoot) until `resumeDeliveries`. */
   pauseDeliveries(): void;
   resumeDeliveries(): void;
+  /**
+   * Processes matching requests normally (state changes, webhooks) but answers with the returned
+   * status instead, like a timeout after Chatwoot already committed. `null` clears it.
+   */
+  setResponseFault(fault: ((method: string, url: string) => number | null) | null): void;
   close(): Promise<void>;
 }
 
@@ -236,6 +241,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     [];
   let pumping: Promise<void> | null = null;
   let paused = false;
+  let responseFault: ((method: string, url: string) => number | null) | null = null;
 
   const app = Fastify({ logger: false });
   if (options.latencyMs) {
@@ -244,6 +250,12 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       await new Promise((resolve) => setTimeout(resolve, latency));
     });
   }
+  app.addHook('onSend', async (request, reply, payload) => {
+    const status = responseFault?.(request.method, request.url);
+    if (!status) return payload;
+    reply.code(status);
+    return JSON.stringify({ error: 'Gateway Timeout' });
+  });
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof HttpError) return reply.code(error.status).send(error.body);
     return reply.code(500).send({ status: 500, error: 'Internal Server Error' });
@@ -1228,6 +1240,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
     pauseDeliveries() {
       paused = true;
+    },
+    setResponseFault(fault) {
+      responseFault = fault;
     },
     resumeDeliveries() {
       paused = false;

@@ -7,14 +7,15 @@ this repository. This guide grows with the product. Each milestone adds its serv
 
 | Part | Status | How |
 |---|---|---|
-| Checks (lint, types, unit, integration on PostgreSQL 16 and 18, Chatwoot contract, accessibility) | ready | `pnpm ci:local` |
+| Checks (lint, types, unit, integration on PostgreSQL 16 and 18, Chatwoot contract, accessibility, widget journey in a browser) | ready | `pnpm ci:local` |
 | Infrastructure (PostgreSQL 18 + pgvector, Valkey) | ready | `pnpm services:up` |
 | Design system (Storybook) | ready | `pnpm --filter @hamnivo/ui storybook` |
 | Database schema, row-level security and audit log | ready | `pnpm db:migrate` |
 | Gateway API (staff sign-in, tenants, members, roles, grants, secrets, audit) and worker | ready | `pnpm api`, `pnpm worker` |
 | Chatwoot CE v4.18.0 (conversation authority) with the Hamnivo Platform App | ready | `pnpm chatwoot:up` |
-| Chat API: widget sessions, conversations, live stream, staff takeover | ready (API) | see "Connect a brand to Chatwoot" below |
-| Widget, Studio, website | not yet built | added by later milestones, with a production compose file and TLS proxy |
+| Chat API: widget sessions, conversations, live stream, staff takeover | ready | see "Connect a brand to Chatwoot" below |
+| Chat widget (Hamnivo Chat), its one-script loader and the JS client SDK | ready (first version) | see "Put the chat on a web page" below |
+| Studio, website | not yet built | added by later milestones, with a production compose file and TLS proxy |
 
 ## 1. Server requirements
 
@@ -41,7 +42,7 @@ cd Hamnivo
 git checkout claude/hamnivo-app-implementation-bhb7rg   # until the work is merged to main
 pnpm install
 
-# Browser for the accessibility audit (installs Chromium and its system libraries)
+# Browser for the accessibility audit and the widget journey (Chromium and its system libraries)
 pnpm --filter @hamnivo/ui exec playwright install --with-deps chromium
 ```
 
@@ -183,6 +184,43 @@ the reply comes from the offline `hamnivo-mock` model. The same conversation app
 (`http://127.0.0.1:3000`), where your staff can also answer. A person replying or taking over there
 takes the conversation from the AI.
 
+### Put the chat on a web page
+
+The widget is a static app, and the loader is one small script served next to it.
+
+1. Build them and serve them from one origin:
+
+   ```bash
+   pnpm build
+   cp packages/widget-loader/dist/loader.js apps/widget/dist/
+   pnpm --filter @hamnivo/widget preview    # serves apps/widget/dist on http://localhost:5174
+   ```
+
+2. `PUBLIC_WIDGET_ORIGIN` in `.env.local` must be the origin the widget is served from
+   (`http://localhost:5174` here). The gateway allows cross-origin widget calls only from that
+   origin, so restart `pnpm api` after changing it.
+
+3. Add the loader to any page on a website in the brand's `allowedOrigins`
+   (`http://localhost:8080` in the example above):
+
+   ```html
+   <script src="http://localhost:5174/loader.js" data-widget-id="wid_..."
+           data-api="http://localhost:4000" async></script>
+   ```
+
+   For example, save that line as `index.html` in an empty folder and run
+   `python3 -m http.server 8080` there.
+
+Open the page and click the chat button. The widget opens, and you can send a message, get the AI
+reply, ask for a person, and watch a staff reply from Chatwoot arrive live. Add
+`data-locale="ur"` or `"ar"` for right to left. The loader options and the JavaScript API are
+in `packages/widget-loader/README.md`. To build your own chat UI instead, see
+`packages/client/README.md`.
+
+On a server, serve `apps/widget/dist` (with `loader.js` copied in) as static files behind your TLS
+proxy (for example `https://chat.example.com`). Set `PUBLIC_WIDGET_ORIGIN` to that origin, and
+list each customer website in the brand's `allowedOrigins`.
+
 ## 5. Run the checks
 
 ```bash
@@ -190,6 +228,7 @@ pnpm ci:local                   # everything; about 8–12 minutes
 pnpm ci:local --quick           # lint, typecheck, unit tests, status and licence checks
 pnpm ci:local --skip-a11y       # everything except the Storybook accessibility audit
 pnpm ci:local --skip-chatwoot   # everything except the real-Chatwoot contract suite
+pnpm ci:local --skip-e2e        # everything except the widget journey in a browser
 PG_VERSIONS=18 pnpm ci:local
 ```
 
@@ -198,8 +237,14 @@ is never touched:
 
 - PostgreSQL 16 and 18 with Valkey, for the database and gateway tests.
 - A complete Chatwoot v4.18.0-ce on a random port, for the contract suite. The checks delete it
-  afterwards, volumes included. The summary is written to
-`test-results/ci-local.md`. Paste it into the pull request when you review a change.
+  afterwards, volumes included.
+- A fresh PostgreSQL 18 and Valkey for the widget journey. It builds everything, then starts the
+  gateway, the worker, a fake Chatwoot, the widget and a host page on another origin. Chromium
+  then chats through it: AI reply, staff takeover, offline resend, right to left, an axe audit,
+  and refusal on a website that is not allowed.
+
+The summary is written to `test-results/ci-local.md`. Paste it into the pull request when you
+review a change.
 
 To run the quick checks automatically before every `git push`:
 
@@ -232,6 +277,6 @@ pnpm ci:local
 - Production compose file (with the vertical slice, M6). Adds `deploy/compose/hamnivo.yml` with the
   API, the background worker, Chatwoot and Caddy for automatic HTTPS. DNS needs `api.`, `app.`,
   `chat.` and `support.` (Chatwoot) records pointing at the server.
-- Widget, Studio and website (M6 onward).
+- Studio and website (next rounds).
 - Backups and restore drill (ops round). Nightly `pg_dump` for both databases, volume snapshots
   and a scripted restore test.

@@ -5,6 +5,7 @@
 #   pnpm ci:local --quick            install, lint, typecheck, unit tests, status/licence checks
 #   pnpm ci:local --skip-a11y        skip the Storybook accessibility audit
 #   pnpm ci:local --skip-chatwoot    skip the contract suite against a real Chatwoot
+#   pnpm ci:local --skip-e2e         skip the widget journey in a real browser
 #   PG_VERSIONS=18 pnpm ci:local     run integration tests on one PostgreSQL major only
 #
 # Integration tests run against throwaway PostgreSQL (+pgvector), Valkey and Chatwoot containers
@@ -19,12 +20,14 @@ cd "$root"
 quick=0
 a11y=1
 chatwoot=1
+e2e=1
 for arg in "$@"; do
   case "$arg" in
     --quick) quick=1 ;;
     --skip-a11y) a11y=0 ;;
     --skip-chatwoot) chatwoot=0 ;;
-    -h | --help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --skip-e2e) e2e=0 ;;
+    -h | --help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -90,16 +93,18 @@ wait_for_postgres() {
   return 1
 }
 
-integration() {
-  local version="$1" su owner app platform pg valkey pg_port valkey_port
+# Starts a throwaway PostgreSQL (with pgvector and the Hamnivo roles) and Valkey with fresh random
+# passwords, and sets `service_env` (for `env`) and `service_pg` (the container to remove).
+throwaway_services() {
+  local version="$1" su owner app platform valkey pg_port valkey_port
   su="$(openssl rand -hex 16)"
   owner="$(openssl rand -hex 16)"
   app="$(openssl rand -hex 16)"
   platform="$(openssl rand -hex 16)"
-  pg="hamnivo-check-pg${version}-$$"
+  service_pg="hamnivo-check-pg${version}-$$-$RANDOM"
   valkey="hamnivo-check-valkey-$$"
 
-  docker run -d --rm --name "$pg" \
+  docker run -d --rm --name "$service_pg" \
     -e POSTGRES_PASSWORD="$su" \
     -e HAMNIVO_DB_OWNER_PASSWORD="$owner" \
     -e HAMNIVO_DB_APP_PASSWORD="$app" \
@@ -108,26 +113,42 @@ integration() {
     -v "$root/deploy/postgres:/hamnivo-db-init:ro" \
     -v "$root/deploy/postgres/init.sh:/docker-entrypoint-initdb.d/10-hamnivo.sh:ro" \
     -p 127.0.0.1::5432 "pgvector/pgvector:pg${version}" >/dev/null || return 1
-  containers+=("$pg")
+  containers+=("$service_pg")
   if ! docker ps --format '{{.Names}}' | grep -qx "$valkey"; then
     docker run -d --rm --name "$valkey" -p 127.0.0.1::6379 valkey/valkey:8-alpine \
       valkey-server --maxmemory-policy noeviction >/dev/null || return 1
     containers+=("$valkey")
   fi
   # errexit is suspended inside `if step ...`, so every fallible command returns explicitly.
-  wait_for_postgres "$pg" || return 1
-  pg_port="$(docker port "$pg" 5432/tcp | head -1 | awk -F: '{print $NF}')"
+  wait_for_postgres "$service_pg" || return 1
+  pg_port="$(docker port "$service_pg" 5432/tcp | head -1 | awk -F: '{print $NF}')"
   valkey_port="$(docker port "$valkey" 6379/tcp | head -1 | awk -F: '{print $NF}')"
+  service_env=(
+    DATABASE_URL="postgres://hamnivo_app:$app@127.0.0.1:$pg_port/hamnivo"
+    DATABASE_OWNER_URL="postgres://hamnivo_owner:$owner@127.0.0.1:$pg_port/hamnivo"
+    DATABASE_PLATFORM_URL="postgres://hamnivo_platform:$platform@127.0.0.1:$pg_port/hamnivo"
+    REDIS_URL="redis://127.0.0.1:$valkey_port"
+    HAMNIVO_PG_MAJOR="$version"
+  )
+}
 
-  env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN \
-    DATABASE_URL="postgres://hamnivo_app:$app@127.0.0.1:$pg_port/hamnivo" \
-    DATABASE_OWNER_URL="postgres://hamnivo_owner:$owner@127.0.0.1:$pg_port/hamnivo" \
-    DATABASE_PLATFORM_URL="postgres://hamnivo_platform:$platform@127.0.0.1:$pg_port/hamnivo" \
-    REDIS_URL="redis://127.0.0.1:$valkey_port" \
-    HAMNIVO_PG_MAJOR="$version" \
-    pnpm test:int
+integration() {
+  throwaway_services "$1" || return 1
+  env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN "${service_env[@]}" pnpm test:int
   local status=$?
-  docker rm -f "$pg" >/dev/null 2>&1 || true
+  docker rm -f "$service_pg" >/dev/null 2>&1 || true
+  return "$status"
+}
+
+# The customer journey in a real browser: host page → loader → widget → gateway and worker (built,
+# as separate processes) → fake Chatwoot, with an accessibility audit of the widget.
+widget_journey() {
+  throwaway_services 18 || return 1
+  pnpm build >/dev/null || return 1
+  env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN -u WIDGET_SIGNING_KEY "${service_env[@]}" \
+    pnpm --filter @hamnivo/widget test:e2e
+  local status=$?
+  docker rm -f "$service_pg" >/dev/null 2>&1 || true
   return "$status"
 }
 
@@ -175,6 +196,9 @@ if ((quick == 0)); then
     step "Build brand assets" pnpm --filter @hamnivo/brand build
     step "Build Storybook" pnpm --filter @hamnivo/ui build-storybook
     step "Accessibility audit (light/dark x LTR/RTL)" pnpm --filter @hamnivo/ui test:a11y
+  fi
+  if ((e2e == 1)); then
+    step "Widget journey in a browser (Playwright + axe)" widget_journey
   fi
 fi
 

@@ -95,6 +95,7 @@ export const SendMessageResponse = z
     status: z.enum(['accepted', 'duplicate']),
   })
   .meta({ id: 'SendMessageResponse' });
+export type SendMessageResponse = z.infer<typeof SendMessageResponse>;
 
 export const StartConversationRequest = z
   .object({
@@ -113,6 +114,7 @@ export const MessagePage = z
     latestSequence: z.int().nonnegative(),
   })
   .meta({ id: 'MessagePage' });
+export type MessagePage = z.infer<typeof MessagePage>;
 
 export const HandoffRequest = z
   .object({
@@ -134,6 +136,7 @@ export const HandoffResponse = z
       .nullable(),
   })
   .meta({ id: 'HandoffResponse' });
+export type HandoffResponse = z.infer<typeof HandoffResponse>;
 
 export const FeedbackRequest = z
   .object({

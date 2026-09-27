@@ -1,0 +1,23 @@
+@import "@hamnivo/ui/globals.css";
+
+/* Scan the widget's own sources for utilities as well. */
+@source "./";
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  @apply bg-bg;
+}
+:where([dir="rtl"]) body {
+  font-family: "Noto Sans Arabic", var(--font-sans, sans-serif);
+}
+:where(html[lang="ur"]) body {
+  font-family: "Noto Nastaliq Urdu", "Noto Sans Arabic", var(--font-sans, sans-serif);
+  line-height: 1.9;
+}
+:where(html[lang="hi"]) body {
+  font-family: "DM Sans Variable", "Noto Sans Devanagari", sans-serif;
+}

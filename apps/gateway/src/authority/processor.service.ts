@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
+import { enqueueOutbox } from '../outbox/outbox.js';
 import { retryDelayMs } from '../outbox/relay.service.js';
 import { APP_DB, CLOCK, type Clock, REDIS } from '../tokens.js';
 import { INBOX_SIGNAL } from './ingress.service.js';
@@ -197,16 +198,40 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     let clientMessageId: string | null = null;
     if (message.key?.startsWith('hv1:m:')) {
       const [ledger] = await tx
-        .update(schema.messageLedger)
-        .set({
-          state: 'committed',
-          authorityMessageId: authorityId,
-          committedAt: now,
-          updatedAt: now,
+        .select({
+          id: schema.messageLedger.id,
+          state: schema.messageLedger.state,
+          senderKind: schema.messageLedger.senderKind,
+          clientMessageId: schema.messageLedger.clientMessageId,
         })
-        .where(eq(schema.messageLedger.sourceKey, message.key))
-        .returning({ clientMessageId: schema.messageLedger.clientMessageId });
+        .from(schema.messageLedger)
+        .where(eq(schema.messageLedger.sourceKey, message.key));
       clientMessageId = ledger?.clientMessageId ?? null;
+      if (ledger && ledger.state !== 'committed') {
+        await tx
+          .update(schema.messageLedger)
+          .set({
+            state: 'committed',
+            authorityMessageId: authorityId,
+            committedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(schema.messageLedger.id, ledger.id));
+        // The webhook can confirm a customer message before the API request that sent it does.
+        // Whichever commits the message asks the AI for a reply, so it happens exactly once.
+        if (ledger.senderKind === 'customer' && control.ownerMode === 'AI_ACTIVE') {
+          await enqueueOutbox(tx, tenantId, {
+            topic: 'conversation.customer_message',
+            aggregateType: 'conversation',
+            aggregateId: control.id,
+            payload: {
+              conversationId: control.id,
+              ledgerId: ledger.id,
+              epoch: control.ownershipEpoch,
+            },
+          });
+        }
+      }
     } else if (message.key?.startsWith('hv1:p:')) {
       await tx
         .update(schema.publications)

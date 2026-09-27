@@ -78,7 +78,7 @@
   },
   "overrides": [
     {
-      "includes": ["**/scripts/**"],
+      "includes": ["**/scripts/**", "**/e2e/stack.ts"],
       "linter": {
         "rules": {
           "suspicious": {

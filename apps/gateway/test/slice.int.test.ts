@@ -217,6 +217,40 @@ describe('the vertical slice: widget → Chatwoot → webhook → journal → st
     ]);
   });
 
+  it('asks the AI once when a timed-out send is confirmed by the webhook, and the retry is a duplicate', async () => {
+    const started = await visitor.call('POST', '/v1/widget/conversations', {});
+    const id = started.body.id as string;
+    // Chatwoot stores the message and sends its webhooks, but the response never arrives.
+    slice.fake.setResponseFault((method, url) =>
+      method === 'POST' && url.endsWith('/messages') ? 504 : null,
+    );
+    const body = {
+      clientMessageId: randomUUID(),
+      parts: [{ type: 'text', text: 'Did my payment go through?' }],
+    };
+    const first = await visitor.call('POST', `/v1/widget/conversations/${id}/messages`, body);
+    slice.fake.setResponseFault(null);
+    expect(first.status).toBe(503);
+    expect(first.body).toMatchObject({ code: 'AUTHORITY_UNAVAILABLE', retryable: true });
+
+    // The webhook confirms the message, and that confirmation asks the AI for its reply.
+    await slice.drain();
+    let { messages } = await authorityState(alpha.tenantId, alpha.connection.id, id);
+    expect(messages.filter((m) => m.text === 'Did my payment go through?')).toHaveLength(1);
+    expect(messages.at(-1)?.sender.kind).toBe('bot');
+
+    const retry = await visitor.call('POST', `/v1/widget/conversations/${id}/messages`, body);
+    expect(retry.status).toBe(202);
+    expect(retry.body).toMatchObject({
+      status: 'duplicate',
+      message: { clientMessageId: body.clientMessageId },
+    });
+    await slice.drain();
+    ({ messages } = await authorityState(alpha.tenantId, alpha.connection.id, id));
+    expect(messages.filter((m) => m.text === 'Did my payment go through?')).toHaveLength(1);
+    expect(messages.filter((m) => m.sender.kind === 'bot')).toHaveLength(1);
+  });
+
   it('lets staff take over; a reply already in flight is fenced out and never published', async () => {
     const stream = visitor.stream(conversationId);
     await stream.ready;

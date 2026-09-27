@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 208 · in-progress: 22 · implemented: 2
+**Blueprint features (232):** planned: 200 · in-progress: 30 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -17,20 +17,20 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| W01 | One-script installation | P0 | C | planned |  |
+| W01 | One-script installation | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `packages/widget-loader/src/loader.ts`, `packages/widget-loader/test/size.test.ts` — One dependency-free script (1.7 KB gzip) adds an accessible launcher; the widget iframe is created only when opened (tested: nothing else loads before). Brand colours from the published config and CSP frame-ancestors per brand pending. |
 | W02 | Layout modes | P0 | C | planned |  |
 | W03 | Brand theme | P0 | C | in-progress | `packages/brand/src/contrast.ts`, `packages/brand/test/contrast.test.ts` — Contrast validation implemented; widget studio UI pending. |
-| W04 | Clear responder identity | P0 | C | planned |  |
-| W05 | Conversation history | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts` — Customer history from Chatwoot's customer view (private notes and activity excluded) with an opaque older-page cursor; unread markers and widget UI pending. |
-| W06 | Delivery states | P0 | C | in-progress | `apps/gateway/src/authority/outbound.service.ts`, `apps/gateway/test/slice.int.test.ts` — Server-side 'accepted' only after the authority committed the message; client-side queued/sending/failed states arrive with the widget SDK. |
-| W07 | Reconnect and draft preservation | P0 | C | in-progress | `apps/gateway/src/widget/events.service.ts`, `apps/gateway/src/authority/journal.service.ts`, `apps/gateway/test/slice.int.test.ts` — SSE replay from Last-Event-ID over a per-lane gapless journal, resync_required when the cursor expired, long-poll fallback and idempotent resends (tested); draft preservation is client-side and pending. |
+| W04 | Clear responder identity | P0 | C | in-progress | `apps/gateway/src/authority/views.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx` — Every message shows who wrote it with a text role label (AI assistant, Support agent); AI never uses a person's name or avatar (tested in the browser journey). |
+| W05 | Conversation history | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/useChat.ts` — Customer history from Chatwoot's customer view (private notes and activity excluded) with an older-page cursor, shown when the widget reopens; unread markers pending. |
+| W06 | Delivery states | P0 | C | in-progress | `apps/gateway/src/authority/outbound.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `packages/client/src/outbox.ts`, `packages/client/test/client.test.ts` — Queued, sending, accepted and failed (with retry) states in the widget, backed by the SDK outbox; 'accepted' only after the authority committed. Delivered/read states pending. |
+| W07 | Reconnect and draft preservation | P0 | C | in-progress | `apps/gateway/src/authority/journal.service.ts`, `apps/gateway/src/widget/events.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `packages/client/src/outbox.ts`, `packages/client/src/stream.ts`, `packages/client/test/client.test.ts` — Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. |
 | W08 | Rich content | P0 | C | planned |  |
 | W09 | Attachments | P0 | C | planned |  |
-| W10 | Human handoff | P0 | C | planned |  |
+| W10 | Human handoff | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/components/Chat.tsx` — 'Talk to a person' in the widget creates a durable waiting state and a private handoff note for staff, so the customer does not repeat themselves (tested); context summary by AI pending. |
 | W11 | Offline support | P0 | C | planned |  |
 | W12 | Identity lifecycle | P0 | C | in-progress | `apps/gateway/src/widget/sessions.service.ts`, `apps/gateway/src/widget/tokens.service.ts`, `apps/gateway/test/slice.int.test.ts` — Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending. |
-| W13 | Locale and RTL | P0 | C | planned |  |
-| W14 | Accessibility controls | P0 | C | planned |  |
+| W13 | Locale and RTL | P0 | C | in-progress | `apps/gateway/src/widget/copy.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/i18n.ts` — Language selector for English, Arabic, Hindi and Urdu with right-to-left layout for Arabic and Urdu (tested); translations pending native review. |
+| W14 | Accessibility controls | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `packages/widget-loader/src/loader.ts` — Keyboard operation, Escape to close with focus returned to the launcher, labelled controls, polite live announcements and an axe audit with no WCAG 2.2 AA violations (tested); manual screen-reader review pending. |
 | W15 | Feedback and reopen | P0 | C | planned |  |
 | W16 | Structured task and approval cards | P1 | C | planned |  |
 | W17 | Search/help home | P1 | C | planned |  |
@@ -138,8 +138,8 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
 | D01 | Public REST API | P0 | F | in-progress | `packages/contracts/src/routes.ts`, `packages/contracts/src/errors.ts`, `packages/contracts/openapi/hamnivo.v1.json`, `packages/contracts/scripts/openapi.ts`, `packages/contracts/src/admin-routes.ts`, `apps/gateway/src/common/idempotency.service.ts` — OpenAPI 3.1 from Zod (widget, identity and admin routes), RFC 9457 errors, Idempotency-Key replay/conflict, cursor pagination; server API keys and remaining resources follow. |
-| D02 | Headless JS/TS client | P0 | C | planned |  |
-| D03 | React UI adapter | P0 | C | planned |  |
+| D02 | Headless JS/TS client | P0 | C | in-progress | `packages/client/src/client.ts`, `packages/client/src/outbox.ts`, `packages/client/src/stream.ts`, `packages/client/test/client.test.ts` — Framework-free SDK: sessions with single-flight renewal, typed conversation calls, exactly-once send outbox and resumable streams (unit-tested with msw, used by the widget). |
+| D03 | React UI adapter | P0 | C | in-progress | `apps/widget/src/components/Chat.tsx`, `apps/widget/src/useChat.ts` — The widget maps SDK state into assistant-ui's external-store runtime; a published React package (@hamnivo/react) is pending. |
 | D04 | Framework wrappers | P1 | C | planned |  |
 | D05 | CMS integrations | P1 | C | planned |  |
 | D06 | Webhooks | P0 | C | planned |  |
@@ -272,7 +272,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | U01 | Language preference model | P0 | C | planned |  |
 | U02 | Hinglish and Roman Urdu | P0 | C | planned |  |
 | U03 | Per-participant translations | P1 | C | planned |  |
-| U04 | RTL interaction | P0 | C | planned |  |
+| U04 | RTL interaction | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `apps/widget/src/i18n.ts` — Document direction follows the language and message text uses dir=auto, so Arabic and Urdu read right to left while Latin order numbers keep their direction; bidi copy behaviour tests pending. |
 | U05 | Localized complete flows | P0 | C | planned |  |
 | U06 | Locale-safe numbers and dates | P0 | Q | planned |  |
 | U07 | Language-capable routing | P0 | C | planned |  |
