@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
 import { createMockModel } from '@hamnivo/adapters/models';
 import { fromPublicId, newPublicId, schema, withTenant } from '@hamnivo/db';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import { AuthorityRegistry } from '../src/authority/registry.js';
 import type { Client } from './harness.js';
@@ -507,6 +507,33 @@ describe('supervisor review and linked conversations (H14, H17)', () => {
         'conversation.reviewed',
       ]),
     );
+  });
+});
+
+describe('built-in roles', () => {
+  it('follow the current preset, so agents of older workspaces can resolve and tag too', async () => {
+    // A workspace created before agents could change status or tags stored the older list.
+    await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .update(schema.roleDefinitions)
+        .set({
+          permissions: [
+            'conversations.read',
+            'conversations.reply',
+            'conversations.note',
+            'conversations.takeover',
+            'members.read',
+          ],
+        })
+        .where(
+          and(eq(schema.roleDefinitions.key, 'agent'), eq(schema.roleDefinitions.isPreset, true)),
+        ),
+    );
+    const detail = await amina.client.get(inbox(d1));
+    expect(detail.body.permissions).toMatchObject({ status: true, tag: true, assign: false });
+    const roles = await desk.owner.get('/v1/admin/roles');
+    const agent = roles.body.items.find((r: { key: string }) => r.key === 'agent');
+    expect(agent.permissions).toEqual(expect.arrayContaining(['conversations.status']));
   });
 });
 
