@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "env": ["VITE_HAMNIVO_*"]
+    },
+    "test:e2e": {
+      "dependsOn": ["^build", "build"],
+      "passThroughEnv": ["PLAYWRIGHT_CHROMIUM_EXECUTABLE", "E2E_*"]
+    }
+  }
+}
