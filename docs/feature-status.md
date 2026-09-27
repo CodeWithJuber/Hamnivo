@@ -7,9 +7,9 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 174 · in-progress: 55 · implemented: 3
+**Blueprint features (232):** planned: 166 · in-progress: 58 · implemented: 8
 
-**Design states (168):** planned: 148 · in-progress: 9 · implemented: 10 · partial: 1
+**Design states (168):** planned: 142 · in-progress: 9 · implemented: 16 · partial: 1
 
 ## Blueprint features
 
@@ -113,7 +113,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | G16 | Durable case workflows | P1 | C | planned |  |
 | G17 | Knowledge ingestion pipeline | P0 | C | in-progress | `apps/gateway/src/knowledge/extract.ts`, `apps/gateway/src/knowledge/ingestion.service.ts`, `apps/gateway/src/knowledge/scanner.ts`, `apps/gateway/src/knowledge/text.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/gateway/test/knowledge.test.ts` — Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Parsing runs in-process (no sandbox) and URL sources are pending. |
 | G18 | Knowledge editorial workflow | P1 | C | planned |  |
-| G19 | Customer memory | P1 | L | planned |  |
+| G19 | Customer memory | P1 | L | implemented | `apps/gateway/src/memory/recall.service.ts`, `apps/gateway/src/memory/prompt.ts`, `apps/gateway/src/runtime/replies.service.ts`, `packages/domain/src/memory/recall.ts`, `packages/domain/test/memory-recall.test.ts`, `apps/gateway/test/memory.int.test.ts`, `apps/widget/e2e/memory.spec.ts` — Replies use only consented, current, in-scope memory of the conversation's own customer that allows AI use and is not under review, ranked by vectors and words within the agent's budget and fenced as data. Answers cite them as memories ([M1] becomes a memory part the widget shows as “based on what you told us before”), never as something said in the chat; turning memory off, outdated, expired and future values are never used (tested). |
 | G20 | Outcome learning queue | P1 | L | planned |  |
 | G21 | Visual automation builder | P1 | C | planned |  |
 | G22 | Multi-agent specialists | P1 | C | planned |  |
@@ -202,13 +202,13 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| L01 | Canonical typed memory | P0 | L | planned |  |
-| L02 | Memory scope and provenance | P0 | L | planned |  |
-| L03 | Temporal corrections | P0 | L | planned |  |
-| L04 | Memory controls | P0 | L | planned |  |
-| L05 | Deletion propagation | P0 | L | planned |  |
+| L01 | Canonical typed memory | P0 | L | implemented | `packages/domain/src/memory/envelope.ts`, `packages/domain/src/memory/slots.ts`, `packages/domain/src/memory/policy.ts`, `packages/domain/test/memory-policy.test.ts`, `packages/db/src/schema/memory.ts`, `apps/gateway/test/memory.int.test.ts` — Memory records use the typed envelope (kind, scope, source, evidence status, purposes, roles, sensitivity, retention, policy version) and a closed catalogue of slots; the write policy sets every governing field and claims stay unverified (tested). Only preference, observation and claim slots exist so far; procedure, commitment and outcome kinds have no slots yet. |
+| L02 | Memory scope and provenance | P0 | L | implemented | `packages/db/src/schema/memory.ts`, `packages/db/migrations/20260927084614_memory_security.sql`, `packages/db/test/memory.int.test.ts`, `apps/gateway/src/memory/customer-memory.service.ts`, `apps/gateway/src/memory/admin-memory.service.ts`, `apps/gateway/src/memory/recall.service.ts`, `apps/gateway/test/memory.int.test.ts` — Records are bound to tenant (RLS), brand and customer principal, with source messages, conversation, writer and write reason; reads check the customer, brand, purpose and role, and staff actions are authorized per brand with memory.read, manage, delete, erase and export and audited without content (tested, including other customers of the same brand, other tenants and staff without permission). |
+| L03 | Temporal corrections | P0 | L | implemented | `packages/domain/src/memory/temporal.ts`, `packages/domain/test/memory-temporal.test.ts`, `packages/domain/src/memory/policy.ts`, `packages/db/test/memory.int.test.ts`, `apps/gateway/test/memory.int.test.ts` — Corrections supersede and never overwrite: content is immutable (enforced by a trigger), each record has event and transaction time, one current value per slot, and older words cannot reopen a slot that changed since. A disagreeing value waits for review and neither is used until the customer or staff confirm; the history stays inspectable (tested). |
+| L04 | Memory controls | P0 | L | in-progress | `apps/gateway/src/memory/widget-memory.controller.ts`, `apps/widget/src/components/MemoryPanel.tsx`, `apps/widget/src/components/MemoryConsent.tsx`, `apps/widget/e2e/memory.spec.ts`, `apps/gateway/test/memory.int.test.ts`, `apps/console/src/pages/CustomerMemoryPage.tsx`, `apps/console/e2e/memory.spec.ts` — Customers agree or decline, see what is remembered with its source and expiry, correct, confirm, delete, forget everything and turn memory off in the widget; staff do the same in Studio within their grants (tested in the API and in browsers, including right to left). Retention is fixed per memory type; letting brands or customers configure it is pending. |
+| L05 | Deletion propagation | P0 | L | in-progress | `apps/gateway/src/memory/deletion.service.ts`, `apps/gateway/src/memory/fingerprints.ts`, `packages/domain/src/memory/tombstones.ts`, `packages/db/src/schema/memory.ts`, `packages/db/migrations/20260927084614_memory_security.sql`, `packages/db/test/memory.int.test.ts`, `apps/gateway/test/memory.int.test.ts` — A deletion removes records, their vectors and memory citations in answers and the realtime journal, leaves content-free tombstones (keyed fingerprints) and a receipt that completes only after caches are purged and nothing covered is left; retention expiry uses the same path. Replayed jobs and restored rows cannot bring memory back: the write policy and a database trigger refuse them, recall skips them and the tombstones are replayed daily (tested). Pending: learning datasets do not exist yet, and a restore to a point before a deletion must replay tombstones kept outside that backup (runbook for the operations lane). |
 | L06 | Commitment memory | P1 | L | planned |  |
-| L07 | Independent memory-write policy | P0 | L | planned |  |
+| L07 | Independent memory-write policy | P0 | L | implemented | `packages/domain/src/memory/envelope.ts`, `packages/domain/src/memory/slots.ts`, `packages/domain/src/memory/policy.ts`, `packages/domain/test/memory-policy.test.ts`, `packages/domain/src/memory/sensitive.ts`, `packages/domain/test/memory-sensitive.test.ts`, `apps/gateway/src/memory/extraction.service.ts`, `apps/gateway/test/memory.int.test.ts` — The model only proposes from the message that started the job; a pure, deterministic policy decides with an explanation that contains no content. It checks consent and its timing, the slot catalogue, sensitive categories (health, religion, ethnicity, sexual orientation, political views) and secrets (passwords, codes, card and account numbers) in English, Roman Urdu, Urdu, Hindi and Arabic, authority claims and instructions, provenance (quote must be in the customer message), confidence, identity for personal details, retention, tombstones and per-customer limits (tested, with mutation checks). |
 | L08 | Learning consent scopes | P0 | L | planned |  |
 | L09 | Outcome-linked examples | P0 | L | planned |  |
 | L10 | Dataset lineage and holdouts | P0 | L | planned |  |
@@ -315,7 +315,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | K06 | Sensitive and live-data exclusions | P0 | Q | planned |  |
 | K07 | Versioned invalidation | P0 | C | planned |  |
 | K08 | Singleflight and outage fallback | P1 | C | planned |  |
-| K09 | Cache privacy and deletion | P0 | L | planned |  |
+| K09 | Cache privacy and deletion | P0 | L | in-progress | `apps/gateway/src/memory/cache.ts`, `packages/domain/src/memory/recall.ts`, `apps/gateway/src/memory/widget-memory.controller.ts`, `apps/gateway/test/memory.int.test.ts` — Memory is never cached: recall reads the database each reply, runs record that any reply built with memory may not enter a shared cache, and memory endpoints send no-store. Each customer has a memory version and a cache namespace in Valkey that is bumped on every change and purged on deletion (tested). The general reply cache (K lane) must key per-customer entries with this version and respect the shared-cache rule when it lands. |
 | K10 | Cache observability | P1 | C | planned |  |
 | K11 | Cache poisoning and fairness suite | P0 | A | planned |  |
 | K12 | Pluggable cache adapter | P0 | C | planned |  |
@@ -480,12 +480,12 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-15-01 | Customer preferences | Memory consent choice | planned |  |
-| HNV-15-02 | Memory profile | Stored facts with provenance | planned |  |
-| HNV-15-03 | Memory review | Conflicting recollection | planned |  |
-| HNV-15-04 | Memory edit | Correction saved | planned |  |
-| HNV-15-05 | Memory deletion | Delete requested | planned |  |
-| HNV-15-06 | Memory recall | Unavailable or access denied | planned |  |
+| HNV-15-01 | Customer preferences | Memory consent choice | implemented | `apps/widget/src/components/MemoryConsent.tsx`, `apps/widget/e2e/memory.spec.ts` — The chat asks before remembering anything: what, why, what is never kept and for how long, with two equal answers and nothing preselected (tested with an accessibility audit, also in Urdu and Arabic). Translations await native review. |
+| HNV-15-02 | Memory profile | Stored facts with provenance | implemented | `apps/console/src/pages/CustomerMemoryPage.tsx`, `apps/console/e2e/memory.spec.ts`, `apps/console/src/pages/MemoryPage.tsx`, `apps/widget/src/components/MemoryPanel.tsx`, `apps/widget/e2e/memory.spec.ts` — Studio lists customers with memory and shows each memory with purpose, source message, who recorded it, scope, expiry and history; customers see theirs in the widget (tested, including right to left). |
+| HNV-15-03 | Memory review | Conflicting recollection | implemented | `apps/console/src/pages/CustomerMemoryPage.tsx`, `apps/console/e2e/memory.spec.ts`, `apps/widget/src/components/MemoryPanel.tsx`, `apps/widget/e2e/memory.spec.ts` — A newer, different value waits for review: Studio compares both and confirms the new one or keeps the current one with a reason (tested); the customer is asked to confirm it in the widget (tested). |
+| HNV-15-04 | Memory edit | Correction saved | implemented | `apps/console/src/pages/CustomerMemoryPage.tsx`, `apps/console/e2e/memory.spec.ts`, `apps/widget/src/components/MemoryPanel.tsx`, `apps/widget/e2e/memory.spec.ts` — Corrections by staff (with a reason) and by customers replace the value and keep the old one in the history (tested). |
+| HNV-15-05 | Memory deletion | Delete requested | implemented | `apps/console/src/pages/CustomerMemoryPage.tsx`, `apps/console/e2e/memory.spec.ts`, `apps/widget/src/components/MemoryPanel.tsx`, `apps/widget/e2e/memory.spec.ts` — Deleting says what is removed and what stays (audit record, chat history), then shows progress until indexes and caches are cleared; erasing a customer works the same way (tested). |
+| HNV-15-06 | Memory recall | Unavailable or access denied | implemented | `apps/console/src/pages/MemoryPage.tsx`, `apps/console/e2e/memory.spec.ts`, `apps/widget/src/components/MemoryPanel.tsx`, `apps/widget/e2e/memory.spec.ts` — Staff without memory.read see an access-denied state and no navigation entry (tested); the widget says when memory is unavailable and the chat keeps working (tested). |
 
 ### 16 · Learning, co-model and release governance
 
