@@ -310,6 +310,25 @@ export function authorityContract(
       expect((await authority.getState(ref)).status).toBe('open');
     });
 
+    it('routes a conversation to a team and clears it, leaving the assignee as it is', async () => {
+      const ref = state.conversationRef;
+      const admin = createChatwootClient({ baseUrl: t.baseUrl, token: account.integration.token });
+      const team = await call<{ id: number }>(
+        'createTeam',
+        admin.POST('/api/v1/accounts/{account_id}/teams', {
+          params: { path: { account_id: account.accountId } },
+          body: { name: `Billing ${randomUUID().slice(0, 8)}` } as never,
+        }) as never,
+      );
+      const before = await authority.getState(ref);
+      await authority.assignTeam(ref, String(team.id), { kind: 'integration' });
+      const routed = await authority.getState(ref);
+      expect(routed.teamRef).toBe(String(team.id));
+      expect(routed.owner).toEqual(before.owner);
+      await authority.assignTeam(ref, null, { kind: 'integration' });
+      expect((await authority.getState(ref)).teamRef).toBeNull();
+    });
+
     it('annotates conversations and signals typing', async () => {
       const ref = state.conversationRef;
       await authority.annotate(
