@@ -678,6 +678,18 @@ describe('unknown outcomes are reconciled, never repeated blindly (C07, C09, R07
         actor: 'customer',
       }),
     ]);
+    // The person who took over is told in a private note, in Chatwoot.
+    await settle();
+    const notes = (await authorityMessages(conversationId)).filter(
+      (m) => m.private && m.text.startsWith('Money in progress'),
+    );
+    expect(notes.map((m) => m.text)).toEqual([
+      [
+        'Money in progress in this conversation:',
+        '- Payment page for a new order, AED 45.00: outcome not known yet, being checked with the provider.',
+        'Do not take the payment or make the refund again. Hamnivo keeps checking and posts the outcome here.',
+      ].join('\n'),
+    ]);
 
     await makeChecksDue();
     await settle();

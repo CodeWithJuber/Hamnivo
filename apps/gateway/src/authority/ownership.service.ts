@@ -2,10 +2,12 @@ import { appendAudit, schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { OwnerMode } from '@hamnivo/db/schema';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import { inFlightNote } from '../commerce/in-flight.js';
 import { AppError } from '../common/app-error.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { CLOCK, type Clock } from '../tokens.js';
 import { type JournalEntry, JournalService } from './journal.service.js';
+import { uuidV5 } from './uuid.js';
 import { customerView } from './views.js';
 
 export type ControlRow = typeof schema.conversationControls.$inferSelect;
@@ -176,6 +178,22 @@ export class OwnershipService {
         origin: options.origin,
       },
     });
+    // Whoever takes over sees the money still in flight here (R07).
+    if (mode !== 'AI_ACTIVE') {
+      const note = await inFlightNote(tx, conversationId);
+      if (note) {
+        await enqueueOutbox(tx, tenantId, {
+          topic: 'conversation.note',
+          aggregateType: 'conversation',
+          aggregateId: conversationId,
+          payload: {
+            conversationId,
+            key: `hv1:n:${uuidV5(conversationId, `in-flight:${epoch}`)}`,
+            text: note,
+          },
+        });
+      }
+    }
     return { changed: true, control: updated, journal };
   }
 }
