@@ -93,6 +93,11 @@ export const cacheEntryIndex = pgTable(
     brandId: uuid('brand_id').notNull(),
     tier: text('tier', { enum: CACHE_TIER_NAMES }).notNull(),
     fingerprint: text('fingerprint').notNull(),
+    /**
+     * The same key without dependency versions: an earlier entry for the same question under
+     * older versions shares it, so a miss can say it is stale.
+     */
+    lookup: text('lookup').notNull(),
     dependencies: jsonb('dependencies').notNull().default({}),
     language: text('language'),
     audience: text('audience', { enum: ['public', 'staff'] }).notNull(),
@@ -109,6 +114,7 @@ export const cacheEntryIndex = pgTable(
     unique('cache_entry_index_tenant_id_id_key').on(t.tenantId, t.id),
     unique('cache_entry_index_fingerprint_key').on(t.tenantId, t.tier, t.fingerprint),
     index('cache_entry_index_brand_idx').on(t.tenantId, t.brandId, t.createdAt),
+    index('cache_entry_index_lookup_idx').on(t.tenantId, t.tier, t.lookup),
     index('cache_entry_index_dependencies_idx').using('gin', t.dependencies),
     foreignKey({
       name: 'cache_entry_index_brand_fk',

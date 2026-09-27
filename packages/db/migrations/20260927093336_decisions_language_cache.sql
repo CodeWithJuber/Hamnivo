@@ -15,6 +15,7 @@ CREATE TABLE "cache_entry_index" (
 	"brand_id" uuid NOT NULL,
 	"tier" text NOT NULL,
 	"fingerprint" text NOT NULL,
+	"lookup" text NOT NULL,
 	"dependencies" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"language" text,
 	"audience" text NOT NULL,
@@ -248,6 +249,7 @@ ALTER TABLE "routing_teams" ADD CONSTRAINT "routing_teams_created_by_fk" FOREIGN
 ALTER TABLE "language_preferences" ADD CONSTRAINT "language_preferences_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "language_preferences" ADD CONSTRAINT "language_preferences_principal_fk" FOREIGN KEY ("tenant_id","principal_id") REFERENCES "public"."customer_principals"("tenant_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "cache_entry_index_brand_idx" ON "cache_entry_index" USING btree ("tenant_id","brand_id","created_at");--> statement-breakpoint
+CREATE INDEX "cache_entry_index_lookup_idx" ON "cache_entry_index" USING btree ("tenant_id","tier","lookup");--> statement-breakpoint
 CREATE INDEX "cache_entry_index_dependencies_idx" ON "cache_entry_index" USING gin ("dependencies");--> statement-breakpoint
 CREATE INDEX "conversation_routes_team_idx" ON "conversation_routes" USING btree ("tenant_id","team_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "decision_records_trigger_key" ON "decision_records" USING btree ("tenant_id","conversation_id","task","trigger_ref") WHERE "decision_records"."conversation_id" is not null;--> statement-breakpoint

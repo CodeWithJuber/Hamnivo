@@ -135,6 +135,7 @@ export const CacheInvalidation = z
     dependencies: z.record(z.string(), z.int()),
   })
   .meta({ id: 'CacheInvalidation' });
+export type CacheInvalidation = z.infer<typeof CacheInvalidation>;
 
 /** How many cached answers depend on a source (the invalidation preview). */
 export const CacheImpact = z
@@ -144,6 +145,7 @@ export const CacheImpact = z
     entries: z.int().nonnegative(),
   })
   .meta({ id: 'CacheImpact' });
+export type CacheImpact = z.infer<typeof CacheImpact>;
 
 export const CacheMetricsRow = z
   .object({

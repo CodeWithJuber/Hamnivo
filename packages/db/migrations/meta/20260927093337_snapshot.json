@@ -1,6 +1,6 @@
 {
-  "id": "1de1821f-7eb5-4bbf-8fcc-5fc422423b40",
-  "prevId": "310b1cbe-0175-4891-98cb-39aaff4dd2b0",
+  "id": "37136566-22db-42f0-b878-de74a999ff20",
+  "prevId": "bc7192d6-c566-4d12-9db4-1d2c9735b208",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3463,6 +3463,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "lookup": {
+          "name": "lookup",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "dependencies": {
           "name": "dependencies",
           "type": "jsonb",
@@ -3552,6 +3558,33 @@
             },
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "cache_entry_index_lookup_idx": {
+          "name": "cache_entry_index_lookup_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "tier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lookup",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

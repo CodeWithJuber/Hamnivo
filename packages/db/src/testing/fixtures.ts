@@ -512,6 +512,7 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       brandId: ids.brandId,
       tier: 'exact_answer',
       fingerprint: randomBytes(32).toString('hex'),
+      lookup: randomBytes(32).toString('hex'),
       dependencies: { [`knowledge:source:${ids.knowledgeSourceId}`]: 1 },
       language: 'en',
       audience: 'public',

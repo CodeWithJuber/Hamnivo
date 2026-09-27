@@ -268,6 +268,7 @@ export const TestRubricResult = z
     }),
   })
   .meta({ id: 'TestRubricResult' });
+export type TestRubricResult = z.infer<typeof TestRubricResult>;
 
 const ExperimentSliceSchema = z
   .object({
