@@ -121,6 +121,7 @@ export const purchaseIntentMachine = define({
     'reconciled',
     'payment_succeeded',
     'payment_failed',
+    'dispatch_failed',
     'escalate',
   ],
   initial: 'draft',
@@ -137,12 +138,16 @@ export const purchaseIntentMachine = define({
     approved: {
       dispatch: 'executing',
       dispatch_unknown: 'unknown',
+      // The provider refused to open a payment page: nothing can have been charged.
+      dispatch_failed: 'failed',
       cancel: 'cancelled',
       escalate: 'needs_human',
     },
     executing: {
       payment_succeeded: 'completed',
       payment_failed: 'failed',
+      // The hosted page timed out unpaid.
+      expire: 'expired',
       cancel: 'cancelled',
       escalate: 'needs_human',
     },
@@ -151,6 +156,7 @@ export const purchaseIntentMachine = define({
       reconciled: 'executing',
       payment_succeeded: 'completed',
       payment_failed: 'failed',
+      dispatch_failed: 'failed',
       escalate: 'needs_human',
     },
     needs_human: {
