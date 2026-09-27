@@ -2,6 +2,7 @@ export * from './audit.js';
 export * from './auth.js';
 export * from './authority.js';
 export * from './commerce.js';
+export * from './customer-surface.js';
 export { appRole, platformRole } from './helpers.js';
 export * from './identity.js';
 export * from './inbox.js';

@@ -9,6 +9,8 @@ export * from './commerce.js';
 export * from './commerce-routes.js';
 export * from './common.js';
 export * from './conversations.js';
+export * from './customer-surface.js';
+export * from './customer-surface-routes.js';
 export * from './errors.js';
 export * from './events.js';
 export * from './ids.js';

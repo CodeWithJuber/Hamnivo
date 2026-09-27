@@ -75,6 +75,10 @@ export const PERMISSIONS = {
   'audit.export': { description: 'Export the audit log', scopes: TENANT, stepUp: true },
   'brands.manage': { description: 'Create brands and set allowed websites', scopes: WORKSPACE },
   'widget.configure': { description: 'Configure the chat widget', scopes: BRAND },
+  'widget.proactive': {
+    description: 'Choose when the chat invites website visitors to talk',
+    scopes: BRAND,
+  },
   'widget.identity_keys': {
     description: 'Register the keys that verify customer identity',
     scopes: BRAND,

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { SupportedLocale, Timestamp } from './common.js';
 import { CustomerConversation } from './conversations.js';
+import { ProactiveTriggerKind, WidgetLayoutMode } from './customer-surface.js';
 
 export const LauncherPosition = z.enum(['bottom-right', 'bottom-left']);
-export const WidgetMode = z.enum(['bubble', 'inline', 'fullscreen']);
+/** @deprecated Use WidgetLayoutMode. */
+export const WidgetMode = WidgetLayoutMode;
 
 /** Public widget configuration. Nothing here is secret; the widget ID is not a credential. */
 export const WidgetConfig = z
@@ -47,6 +49,31 @@ export const WidgetConfig = z
     attachmentLimits: z.object({
       maxBytes: z.int().positive(),
       allowedMimeTypes: z.array(z.string()),
+      /** Files one message may carry. */
+      maxFiles: z.int().positive(),
+    }),
+    /** How the brand places the chat on its website (W02); the loader may override it. */
+    layout: z.object({ mode: WidgetLayoutMode, position: LauncherPosition }),
+    /** The home screen before a conversation (W17). */
+    help: z.object({
+      /** Suggested questions per language, in the brand's words. */
+      suggestions: z.record(SupportedLocale, z.array(z.string().max(120))),
+      /** Whether the brand's public knowledge can be searched from the widget. */
+      search: z.boolean(),
+    }),
+    /** How long after sending a customer may delete a message (W23); 0 when they cannot. */
+    messageDeletion: z.object({ windowSeconds: z.int().nonnegative() }),
+    /** Whether verified customers are offered email notifications (W25). */
+    notifications: z.object({ email: z.boolean() }),
+    /** Proactive prompts the loader may show (W19), so the chat can open with the same words. */
+    proactive: z.object({
+      triggers: z.array(
+        z.object({
+          id: z.string(),
+          kind: ProactiveTriggerKind,
+          message: z.record(SupportedLocale, z.string().max(160)),
+        }),
+      ),
     }),
   })
   .meta({ id: 'WidgetConfig' });

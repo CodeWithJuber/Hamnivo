@@ -95,6 +95,16 @@ describe('catalog and presets', () => {
   });
 });
 
+describe('proactive prompt permission (W19)', () => {
+  it('is its own permission: administrators have it, developers and agents do not', () => {
+    expect(presetPermissions('admin')).toContain('widget.proactive');
+    expect(presetPermissions('developer')).toContain('widget.configure');
+    expect(presetPermissions('developer')).not.toContain('widget.proactive');
+    expect(presetPermissions('agent')).not.toContain('widget.proactive');
+    expect(presetPermissions('supervisor')).not.toContain('widget.proactive');
+  });
+});
+
 describe('customer memory permissions', () => {
   it('keeps memory with administrators and supervisors, not with every agent', () => {
     expect(presetPermissions('admin')).toEqual(

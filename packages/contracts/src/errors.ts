@@ -34,6 +34,7 @@ export const ErrorCode = z.enum([
   'QUOTE_EXPIRED',
   'CAPABILITY_UNSUPPORTED',
   'SEPARATE_APPROVER_REQUIRED',
+  'DELETE_WINDOW_CLOSED',
   'INTERNAL',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
@@ -99,6 +100,11 @@ export const ERROR_DEFAULTS: Record<
     status: 403,
     retryable: false,
     title: 'Someone other than the requester must approve this',
+  },
+  DELETE_WINDOW_CLOSED: {
+    status: 409,
+    retryable: false,
+    title: 'This message can no longer be deleted',
   },
   INTERNAL: { status: 500, retryable: true, title: 'Something went wrong on our side' },
 };

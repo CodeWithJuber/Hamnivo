@@ -176,6 +176,20 @@
       "when": 1790510515489,
       "tag": "20260927120155_commerce_security",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790516413946,
+      "tag": "20260927134013_customer_surface",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790516430501,
+      "tag": "20260927134030_customer_surface_security",
+      "breakpoints": true
     }
   ]
 }

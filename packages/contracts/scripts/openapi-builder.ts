@@ -83,6 +83,12 @@ export function buildOpenApi(
         required: true,
         content: { 'application/json': { schema: route.body } },
       };
+    if (route.rawBody)
+      operation.requestBody = {
+        required: true,
+        description: route.rawBody.description,
+        content: { [route.rawBody.contentType]: { schema: { type: 'string', format: 'binary' } } },
+      };
     const parameters: Record<string, unknown>[] = [];
     if (
       route.path.startsWith('/v1/admin/') ||
