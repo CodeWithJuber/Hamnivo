@@ -11,6 +11,7 @@ import {
   PERMISSION_KEYS,
   presetPermissions,
   ROLE_PRESETS,
+  rolePatterns,
   type ScopeHierarchy,
   type ServiceAccountPrincipal,
   type StaffPrincipal,
@@ -65,6 +66,32 @@ describe('catalog and presets', () => {
     expect(presetPermissions('admin')).not.toContain('billing.manage');
     expect(presetPermissions('agent')).not.toContain('billing.manage');
     expect(presetPermissions('agent')).toContain('conversations.takeover');
+  });
+
+  it('lets agents work their own queue while bulk changes and reviews stay with supervisors', () => {
+    const agent = presetPermissions('agent');
+    expect(agent).toEqual(expect.arrayContaining(['conversations.status', 'conversations.tag']));
+    expect(agent).not.toContain('conversations.bulk');
+    expect(agent).not.toContain('conversations.review');
+    expect(agent).not.toContain('conversations.assign');
+    expect(presetPermissions('supervisor')).toEqual(
+      expect.arrayContaining([
+        'conversations.bulk',
+        'conversations.review',
+        'conversations.assign',
+      ]),
+    );
+    expect(presetPermissions('analyst')).not.toContain('conversations.tag');
+  });
+
+  it('keeps built-in roles in step with the presets; custom roles keep what was saved', () => {
+    const stored = ['conversations.read', 'conversations.reply'];
+    expect(rolePatterns({ key: 'agent', isPreset: true, permissions: stored })).toEqual(
+      ROLE_PRESETS.find((p) => p.key === 'agent')?.patterns,
+    );
+    expect(rolePatterns({ key: 'agent', isPreset: false, permissions: stored })).toEqual(stored);
+    // A preset key that no longer exists keeps its stored list.
+    expect(rolePatterns({ key: 'retired', isPreset: true, permissions: stored })).toEqual(stored);
   });
 });
 

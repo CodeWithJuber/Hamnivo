@@ -7,9 +7,9 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 166 · in-progress: 58 · implemented: 8
+**Blueprint features (232):** planned: 152 · in-progress: 60 · implemented: 19 · partial: 1
 
-**Design states (168):** planned: 142 · in-progress: 9 · implemented: 16 · partial: 1
+**Design states (168):** planned: 129 · in-progress: 12 · implemented: 26 · partial: 1
 
 ## Blueprint features
 
@@ -47,23 +47,23 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| H01 | Shared inbox | P0 | C | planned |  |
-| H02 | Assignment and routing | P0 | C | planned |  |
-| H03 | Internal notes | P0 | C | planned |  |
-| H04 | Tags and custom fields | P0 | C | planned |  |
-| H05 | Saved replies | P0 | C | planned |  |
-| H06 | Customer context | P0 | C | planned |  |
-| H07 | Search | P0 | C | planned |  |
-| H08 | Ownership and collisions | P0 | C | in-progress | `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/authority/processor.service.ts`, `apps/gateway/src/conversations/staff-conversations.service.ts`, `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending. |
-| H09 | Drafts and failed sends | P0 | C | planned |  |
-| H10 | Resolve, reopen and snooze | P0 | C | planned |  |
-| H11 | AI copilot | P0 | C | planned |  |
+| H01 | Shared inbox | P0 | C | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/InboxPage.tsx`, `apps/gateway/src/inbox/access.ts`, `apps/gateway/src/inbox/inbox.controller.ts`, `apps/gateway/src/inbox/inbox.service.ts`, `apps/gateway/test/inbox.int.test.ts` — Queues for mine, waiting for a person, AI answering, my teams and all, with counts, keyset paging and filters by status (open or pending, snoozed, resolved), brand, channel, customer language and tag. Lists, counts, search and the staff stream all apply the same grant filter (workspace, brand, inbox or team): a conversation outside a person's grants is not found. Tested through the API and in the browser. |
+| H02 | Assignment and routing | P0 | C | in-progress | `apps/console/src/pages/inbox/ConversationPane.tsx`, `apps/gateway/src/authority/sync.service.ts`, `apps/gateway/src/inbox/assignment.service.ts`, `apps/gateway/src/inbox/teams.service.ts`, `apps/gateway/test/inbox-workspace.int.test.ts`, `apps/gateway/test/inbox.int.test.ts` — Manual routing: claim, assign to a colleague who may reply there, back to the queue, back to the AI, and team queues (teams belong to Hamnivo and are mirrored to Chatwoot with their members). Every owner change goes through the ownership epoch and is audited. Round-robin and capacity checks are not built yet. |
+| H03 | Internal notes | P0 | C | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/Composer.tsx`, `apps/console/src/pages/inbox/Timeline.tsx`, `apps/gateway/src/conversations/staff-conversations.service.ts`, `apps/gateway/src/inbox/messages.service.ts`, `apps/gateway/test/inbox.int.test.ts` — Internal notes are Chatwoot private notes written as the staff member. They never reach the customer's stream or history, or the AI's prompt (tested through the API and through the widget in the browser). Studio shows them with a lock, a text label and a dashed border, and writes them in a separate composer lane. |
+| H04 | Tags and custom fields | P0 | C | implemented | `apps/console/src/pages/inbox/ContextPanel.tsx`, `apps/gateway/src/inbox/annotations.service.ts`, `apps/gateway/src/inbox/projection.ts`, `apps/gateway/test/inbox-workspace.int.test.ts` — Only tags defined for the brand (Chatwoot labels) are accepted, and custom fields are checked against their definitions (text, number, list, date, link, checkbox); Chatwoot's other attributes are kept. Tags are copied into Hamnivo for queue filters. New tags and fields are still defined in Chatwoot. |
+| H05 | Saved replies | P0 | C | implemented | `apps/console/src/pages/inbox/Composer.tsx`, `apps/gateway/src/inbox/annotations.service.ts`, `apps/gateway/test/inbox-workspace.int.test.ts` — Chatwoot canned responses, searched as the staff member, with variables filled from verified facts only (an address nobody verified is never filled in) and missing variables listed. Adding one needs inbox.manage. Editing and deleting saved replies is still done in Chatwoot. |
+| H06 | Customer context | P0 | C | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/ContextPanel.tsx`, `apps/gateway/src/inbox/inbox.service.ts`, `apps/gateway/test/inbox-workspace.int.test.ts` — Verified or anonymous identity and what that means, a verified email apart from an address nobody verified, language, brand, Chatwoot contact attributes (Hamnivo's internal ones left out) and the other conversations the person can see. A third column on wide screens, a sheet otherwise. |
+| H07 | Search | P0 | C | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/InboxPage.tsx`, `apps/gateway/src/inbox/inbox.service.ts`, `apps/gateway/test/inbox-workspace.int.test.ts`, `packages/chatwoot/src/authority.ts` — Customers by name, email or conversation ID in Hamnivo, and message text (notes included) in Chatwoot as the staff member, in pages. Hits outside the person's grants are dropped, and Chatwoot accounts they cannot reach are not searched. |
+| H08 | Ownership and collisions | P0 | C | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/ConversationPane.tsx`, `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/authority/processor.service.ts`, `apps/gateway/src/conversations/staff-conversations.service.ts`, `apps/gateway/src/inbox/assignment.service.ts`, `apps/gateway/src/inbox/live.service.ts`, `apps/gateway/src/inbox/signals.service.ts`, `apps/gateway/test/inbox-workspace.int.test.ts`, `apps/gateway/test/inbox.int.test.ts`, `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — Atomic claim and takeover through the ownership epoch; an AI reply still being written when staff take over is fenced, and takeovers made inside Chatwoot are adopted (all tested). A reply from an out-of-date view (expected epoch) or over a colleague is refused and nothing is sent. Taking a conversation from a colleague needs conversations.assign; others ask for a transfer. Studio shows who else is viewing or typing, and ownership changes, live over the staff stream. |
+| H09 | Drafts and failed sends | P0 | C | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/Composer.tsx`, `apps/gateway/src/conversations/staff-conversations.service.ts`, `apps/gateway/src/inbox/drafts.service.ts`, `apps/gateway/test/inbox.int.test.ts` — Personal drafts per conversation and lane, with revisions: a save from an older revision is refused and shown as a choice. A copy stays in the browser while offline and is saved when the connection is back. A failed send is kept with its reason, and retrying it with the same message ID never posts twice (tested with a Chatwoot timeout after the message was stored). |
+| H10 | Resolve, reopen and snooze | P0 | C | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/ConversationPane.tsx`, `apps/gateway/src/inbox/status.service.ts`, `apps/gateway/test/inbox.int.test.ts` — Resolve, reopen and snooze (an hour, until tomorrow, until next week or a chosen time) in Chatwoot as the staff member; each change is audited and shown to the customer. Reopening makes the person the owner, as Chatwoot does. |
+| H11 | AI copilot | P0 | C | in-progress | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/Composer.tsx`, `apps/gateway/src/inbox/assist.service.ts`, `apps/gateway/test/inbox.int.test.ts` — Suggested replies from the brand's agent with the knowledge it cited, built from customer-visible messages only, recorded as a draft run and never sent on their own. Copy, edit, or Send as me through the ownership-checked send (audited). Conversation summaries and next-step suggestions are not built yet. |
 | H12 | SLA and escalation | P1 | C | planned |  |
-| H13 | Translation | P1 | C | planned |  |
-| H14 | Supervisor review | P1 | C | planned |  |
-| H15 | Bulk operations | P1 | C | planned |  |
+| H13 | Translation | P1 | C | in-progress | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/Timeline.tsx`, `apps/gateway/src/inbox/assist.service.ts`, `apps/gateway/test/inbox-workspace.int.test.ts` — A customer message can be translated into the staff member's language on demand through the brand's model, labelled as a machine translation under the unchanged original; the model is told to keep names, numbers and identifiers. Writing a reply in the customer's language is not built yet. |
+| H14 | Supervisor review | P1 | C | implemented | `apps/console/src/pages/inbox/ContextPanel.tsx`, `apps/gateway/src/inbox/assignment.service.ts`, `apps/gateway/src/inbox/collaboration.service.ts`, `apps/gateway/test/inbox-workspace.int.test.ts`, `apps/gateway/test/inbox.int.test.ts` — Supervisors (conversations.review) rate a conversation and leave a coaching note about its owner. Taking over from a colleague is limited to people with conversations.assign; anyone else can ask for a transfer, which reaches the owner as an internal note. |
+| H15 | Bulk operations | P1 | C | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/BulkBar.tsx`, `apps/gateway/src/inbox/bulk.service.ts`, `apps/gateway/test/inbox-workspace.int.test.ts` — Assign, team, status and tag changes for up to 50 conversations. A dry run says which ones the change would reach, each conversation is checked like a single change, and failures are listed with their reason and can be retried alone. There is no undo. |
 | H16 | Skill-based routing | P1 | C | planned |  |
-| H17 | Merge/split and linked cases | P1 | C | planned |  |
+| H17 | Merge/split and linked cases | P1 | C | partial | `apps/console/src/pages/inbox/ContextPanel.tsx`, `apps/gateway/src/inbox/collaboration.service.ts`, `apps/gateway/test/inbox-workspace.int.test.ts` — Conversations can be linked, with a note, and unlinked; both keep their own authors, times, notes and sources. Merging and splitting are left out on purpose: Chatwoot keeps the transcripts. |
 | H18 | Workforce forecasting | P2 | A | planned |  |
 
 ### Administration
@@ -396,30 +396,30 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | HNV-07-02 | Mobile chat | Keyboard open | planned |  |
 | HNV-07-03 | Arabic chat | RTL locale selected | planned |  |
 | HNV-07-04 | Language selector | Detected language uncertain | planned |  |
-| HNV-07-05 | Message translation | Translation shown with original | planned |  |
-| HNV-07-06 | Mobile navigation | Panel and gesture dismissal | planned |  |
+| HNV-07-05 | Message translation | Translation shown with original | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/Timeline.tsx` — Staff inbox: machine translation labelled, under the original, with hide and show; a failed translation leaves the original as it was. |
+| HNV-07-06 | Mobile navigation | Panel and gesture dismissal | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/ConversationPane.tsx` — Staff inbox on a phone: queue, conversation and details as steps; the details sheet has a visible close button, Esc closes it and focus returns; Back returns to the row. |
 
 ### 08 · Shared inbox and triage
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-08-01 | Inbox | Active queue | planned |  |
-| HNV-08-02 | Inbox | Unassigned urgent work | planned |  |
-| HNV-08-03 | Inbox | No results | planned |  |
-| HNV-08-04 | Inbox | Bulk selection | planned |  |
-| HNV-08-05 | Inbox | Concurrent assignment conflict | planned |  |
+| HNV-08-01 | Inbox | Active queue | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/InboxPage.tsx`, `apps/gateway/test/inbox.int.test.ts` |
+| HNV-08-02 | Inbox | Unassigned urgent work | in-progress | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/ConversationPane.tsx`, `apps/gateway/test/inbox.int.test.ts` — Atomic claim that shows the owner when someone else claimed first; the SLA status waits for H12. |
+| HNV-08-03 | Inbox | No results | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/InboxPage.tsx` |
+| HNV-08-04 | Inbox | Bulk selection | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/BulkBar.tsx`, `apps/gateway/test/inbox-workspace.int.test.ts` |
+| HNV-08-05 | Inbox | Concurrent assignment conflict | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/ConversationPane.tsx`, `apps/gateway/test/inbox.int.test.ts` |
 | HNV-08-06 | Inbox | SLA breach or backlog spike | planned |  |
 
 ### 09 · Conversation workspace and private lanes
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-09-01 | Agent conversation | Public reply compose | planned |  |
-| HNV-09-02 | Agent conversation | Internal note compose | planned |  |
+| HNV-09-01 | Agent conversation | Public reply compose | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/Composer.tsx` |
+| HNV-09-02 | Agent conversation | Internal note compose | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/Composer.tsx` |
 | HNV-09-03 | Participants | Join specialist | planned |  |
 | HNV-09-04 | Agent work | Specialists collaborate privately | planned |  |
-| HNV-09-05 | Public answer | Draft awaiting review | planned |  |
-| HNV-09-06 | Conversation | Human takeover during AI run | planned |  |
+| HNV-09-05 | Public answer | Draft awaiting review | in-progress | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/Composer.tsx`, `apps/gateway/test/inbox.int.test.ts` — On-demand suggestions with their sources, edit, dismiss or send as me. Drafts that an assist-mode agent prepares on its own are not shown yet. |
+| HNV-09-06 | Conversation | Human takeover during AI run | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/ConversationPane.tsx`, `apps/gateway/test/inbox.int.test.ts` |
 
 ### 10 · Human–AI handoff and routing
 
@@ -427,8 +427,8 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 |---|---|---|---|---|
 | HNV-10-01 | Widget handoff | Customer requests human | planned |  |
 | HNV-10-02 | Handoff queue | Waiting for acceptance | planned |  |
-| HNV-10-03 | Agent handoff | Context packet offered | planned |  |
-| HNV-10-04 | Conversation | Accepted and ownership transferred | planned |  |
+| HNV-10-03 | Agent handoff | Context packet offered | in-progress | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/Timeline.tsx` — Hamnivo's handoff summary is shown to staff as a staff-only card and the conversation can be claimed; rejecting with a capacity reason is not built yet. |
+| HNV-10-04 | Conversation | Accepted and ownership transferred | implemented | `apps/console/e2e/inbox.spec.ts`, `apps/console/src/pages/inbox/ConversationPane.tsx`, `apps/gateway/test/inbox.int.test.ts` |
 | HNV-10-05 | Handoff | No available human | planned |  |
 | HNV-10-06 | Handoff | Timed out or cancelled | planned |  |
 

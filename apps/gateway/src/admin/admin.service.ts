@@ -32,6 +32,7 @@ import {
   diffPermissions,
   expandPatterns,
   type Permission,
+  rolePatterns,
   type Scope,
   type StaffPrincipal,
   validatePatterns,
@@ -91,7 +92,7 @@ function roleView(row: typeof schema.roleDefinitions.$inferSelect): RoleT {
     key: row.key,
     name: row.name,
     description: row.description,
-    permissions: row.permissions,
+    permissions: rolePatterns(row),
     isPreset: row.isPreset,
     version: row.version,
   };
@@ -437,11 +438,12 @@ export class AdminService {
         .from(schema.staffMembers)
         .where(eq(schema.staffMembers.id, staffMemberId));
       if (!role || !member || member.status === 'removed') throw new AppError('NOT_FOUND');
-      assertApplicable(role.permissions, scope);
+      const permissions = rolePatterns(role);
+      assertApplicable(permissions, scope);
       const parents = await scopeParents(tx, scope);
       const problems = checkDelegation(
         principal,
-        { granteeStaffMemberId: staffMemberId, permissions: role.permissions, scope, expiresAt },
+        { granteeStaffMemberId: staffMemberId, permissions, scope, expiresAt },
         () => parents,
         this.clock(),
       );
@@ -540,13 +542,14 @@ export class AdminService {
         .from(schema.roleDefinitions)
         .where(eq(schema.roleDefinitions.id, roleId));
       if (!role) throw new AppError('NOT_FOUND');
-      assertApplicable(role.permissions, scope);
+      const permissions = rolePatterns(role);
+      assertApplicable(permissions, scope);
       const parents = await scopeParents(tx, scope);
       const problems = checkDelegation(
         principal,
         {
           granteeStaffMemberId: `invitation:${id}`,
-          permissions: role.permissions,
+          permissions,
           scope,
           expiresAt: grantExpiresAt,
         },

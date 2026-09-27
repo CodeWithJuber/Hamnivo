@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import type { StaffConversation, StaffMessageRequest } from '@hamnivo/contracts';
-import { type Db, fromPublicId, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo/db';
-import { authorize, type Permission, type StaffPrincipal } from '@hamnivo/policy';
-import { Inject, Injectable } from '@nestjs/common';
+import type { ErrorCode, StaffConversation, StaffMessageRequest } from '@hamnivo/contracts';
+import { appendAudit, schema, type TenantTx, toPublicId } from '@hamnivo/db';
+import type { Permission, StaffPrincipal } from '@hamnivo/policy';
+import { Injectable } from '@nestjs/common';
 import canonicalize from 'canonicalize';
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
@@ -17,9 +17,8 @@ import { AuthorityRegistry } from '../authority/registry.js';
 import { StaffLinksService } from '../authority/staff-links.service.js';
 import { customerView } from '../authority/views.js';
 import { AppError } from '../common/app-error.js';
-import type { AppConfig } from '../config.js';
-import { enforce } from '../identity/staff.guard.js';
-import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
+import { InboxAccess } from '../inbox/access.js';
+import { DraftsService } from '../inbox/drafts.service.js';
 
 function staffView(control: ControlRow): StaffConversation {
   const view = customerView(control.ownerMode, control.authorityStatus);
@@ -45,70 +44,44 @@ function staffView(control: ControlRow): StaffConversation {
   };
 }
 
-/** Staff actions on a conversation (H08 takeover, H06 replies and notes) under their own identity. */
+/** Another person (a colleague, or someone in Chatwoot's own interface) owns the conversation. */
+export function ownedByOther(control: ControlRow, staffMemberId: string): boolean {
+  return control.ownerMode === 'HUMAN_ACTIVE' && control.ownerStaffId !== staffMemberId;
+}
+
+/** Errors worth keeping a failed send for: the text is kept for a later retry. */
+const KEPT: ReadonlySet<ErrorCode> = new Set([
+  'AUTHORITY_UNAVAILABLE',
+  'OWNERSHIP_CHANGED',
+  'INTERNAL',
+  'RATE_LIMITED',
+]);
+
+/** Staff actions on a conversation (H08 takeover, H03 notes, replies) under their own identity. */
 @Injectable()
 export class StaffConversationsService {
   constructor(
-    @Inject(APP_DB) private readonly db: Db,
-    @Inject(CONFIG) private readonly config: AppConfig,
-    @Inject(CLOCK) private readonly clock: Clock,
+    private readonly access: InboxAccess,
     private readonly ownership: OwnershipService,
     private readonly journal: JournalService,
     private readonly outbound: OutboundMessagesService,
     private readonly registry: AuthorityRegistry,
     private readonly staffLinks: StaffLinksService,
+    private readonly drafts: DraftsService,
   ) {}
 
-  private tx<T>(principal: StaffPrincipal, work: (tx: TenantTx) => Promise<T>): Promise<T> {
-    return withTenant(
-      this.db,
-      { tenantId: principal.tenantId, actorId: toPublicId('staff', principal.staffMemberId) },
-      work,
-    );
-  }
-
-  /** Loads the conversation and checks the permission against its workspace, brand and inbox. */
+  /** Loads the conversation and checks the permission against its workspace, brand, inbox and team. */
   private async authorized(
     tx: TenantTx,
     principal: StaffPrincipal,
     publicId: string,
     permission: Permission,
   ): Promise<ControlRow> {
-    const [control] = await tx
-      .select()
-      .from(schema.conversationControls)
-      .where(eq(schema.conversationControls.id, fromPublicId('conversation', publicId)));
-    if (!control) throw new AppError('NOT_FOUND', { detail: 'Conversation not found.' });
-    const [brand] = control.brandId
-      ? await tx
-          .select({ workspaceId: schema.brands.workspaceId })
-          .from(schema.brands)
-          .where(eq(schema.brands.id, control.brandId))
-      : [];
-    const decision = authorize(
-      principal,
-      permission,
-      {
-        ...(brand ? { workspaceId: brand.workspaceId } : {}),
-        ...(control.brandId ? { brandId: control.brandId } : {}),
-        inboxId: control.inboxId,
-      },
-      { now: this.clock(), stepUpMaxAgeMs: this.config.STEP_UP_MAX_AGE_MINUTES * 60_000 },
-    );
-    if (
-      !decision.allowed &&
-      decision.reason !== 'mfa_required' &&
-      decision.reason !== 'step_up_required'
-    ) {
-      // Outside the caller's scope the conversation does not exist for them.
-      throw new AppError('NOT_FOUND', { detail: 'Conversation not found.' });
-    }
-    enforce(decision);
-    return control;
+    return (await this.access.authorized(tx, principal, publicId, permission)).control;
   }
 
   get(principal: StaffPrincipal, publicId: string): Promise<StaffConversation> {
-    return this.tx(principal, async (tx) =>
+    return this.access.tx(principal, async (tx) =>
       staffView(await this.authorized(tx, principal, publicId, 'conversations.read')),
     );
   }
@@ -121,23 +94,36 @@ export class StaffConversationsService {
     reason: 'staff_takeover' | 'return_to_ai' | 'staff_reply',
     expectedEpoch?: number,
   ): Promise<StaffConversation> {
-    const outcome = await this.tx(principal, async (tx) => {
-      const control = await this.authorized(tx, principal, publicId, permission);
-      const result = await this.ownership.transition(
+    const outcome = await this.access.tx(principal, async (tx) => {
+      const found = await this.access.authorized(tx, principal, publicId, permission);
+      // Taking a conversation from a colleague is a supervisor's call (H14): others ask for it.
+      if (reason === 'staff_takeover' && ownedByOther(found.control, principal.staffMemberId)) {
+        const decision = this.access.decide(principal, 'conversations.assign', found.resource);
+        if (!decision.allowed) {
+          throw new AppError('OWNERSHIP_CHANGED', {
+            detail:
+              'A colleague is handling this conversation. Ask them to hand it over, or ask a supervisor.',
+          });
+        }
+      }
+      return this.ownership.transition(
         tx,
         principal.tenantId,
-        control.id,
-        await target(tx, control),
+        found.control.id,
+        await target(tx, found.control),
         {
           origin: 'hamnivo',
           reason,
           actor: { type: 'staff', id: toPublicId('staff', principal.staffMemberId) },
+          actorStaffMemberId: principal.staffMemberId,
           ...(expectedEpoch !== undefined ? { expectedEpoch } : {}),
         },
       );
-      return result;
     });
     await this.journal.notify(principal.tenantId, outcome.control.id, outcome.journal);
+    if (outcome.changed && outcome.journal.length === 0) {
+      await this.journal.signalInbox(principal.tenantId, outcome.control.id);
+    }
     return staffView(outcome.control);
   }
 
@@ -187,7 +173,11 @@ export class StaffConversationsService {
     );
   }
 
-  /** Replies publicly (taking over first when needed) or writes an internal note, as yourself. */
+  /**
+   * Replies publicly (taking over first when the AI or the queue has it) or writes an internal
+   * note, as yourself. A public reply is refused when a colleague owns the conversation, or when
+   * the owner changed after the sender's view (`expectedEpoch`): a stale reply is never sent.
+   */
   async send(
     principal: StaffPrincipal,
     publicId: string,
@@ -195,38 +185,95 @@ export class StaffConversationsService {
   ) {
     const internal = input.visibility === 'internal';
     const permission: Permission = internal ? 'conversations.note' : 'conversations.reply';
-    const control = await this.tx(principal, (tx) =>
-      this.authorized(tx, principal, publicId, permission),
-    );
-    if (
-      !internal &&
-      !(control.ownerMode === 'HUMAN_ACTIVE' && control.ownerStaffId === principal.staffMemberId)
-    ) {
-      // A public human reply takes the conversation over, so the AI cannot answer in parallel.
-      await this.change(
-        principal,
-        publicId,
-        'conversations.takeover',
-        async () => ({ kind: 'staff', staffMemberId: principal.staffMemberId }),
-        'staff_reply',
-      );
-    }
-    const runtime = await this.registry.get(principal.tenantId, control.connectionId);
-    const externalUserId = await this.staffLinks.ensure(runtime, principal.staffMemberId);
-    const result = await this.outbound.send({
-      tenantId: principal.tenantId,
-      actorId: toPublicId('staff', principal.staffMemberId),
-      conversationId: control.id,
-      sender: { kind: 'staff', id: principal.staffMemberId },
-      clientMessageId: input.clientMessageId,
-      requestHash: createHash('sha256')
-        .update(canonicalize({ text: input.text, visibility: input.visibility }) ?? '')
-        .digest(),
-      author: { kind: 'staff', userRef: String(externalUserId) },
-      visibility: internal ? 'private' : 'public',
-      text: input.text,
-      load: (tx) => this.authorized(tx, principal, publicId, permission),
+    const lane = internal ? 'internal' : 'public';
+    const control = await this.access.tx(principal, async (tx) => {
+      const control = await this.authorized(tx, principal, publicId, permission);
+      if (!internal) {
+        if (input.expectedEpoch !== undefined && input.expectedEpoch !== control.ownershipEpoch) {
+          throw new AppError('OWNERSHIP_CHANGED', {
+            detail: 'Someone else changed who handles this conversation. Nothing was sent.',
+          });
+        }
+        if (ownedByOther(control, principal.staffMemberId)) {
+          throw new AppError('OWNERSHIP_CHANGED', {
+            detail:
+              'A colleague is handling this conversation. Take it over first. Nothing was sent.',
+          });
+        }
+      }
+      await this.drafts.startOutgoing(tx, {
+        tenantId: principal.tenantId,
+        conversationId: control.id,
+        staffMemberId: principal.staffMemberId,
+        lane,
+        clientMessageId: input.clientMessageId,
+        text: input.text,
+        clearDraft: input.clearDraft,
+      });
+      return control;
     });
-    return { messageId: result.message.id, status: result.status };
+    try {
+      if (
+        !internal &&
+        !(control.ownerMode === 'HUMAN_ACTIVE' && control.ownerStaffId === principal.staffMemberId)
+      ) {
+        // A public human reply takes the conversation over, so the AI cannot answer in parallel.
+        // The epoch seen above makes a claim by someone else in the meantime refuse this reply.
+        await this.change(
+          principal,
+          publicId,
+          'conversations.takeover',
+          async () => ({ kind: 'staff', staffMemberId: principal.staffMemberId }),
+          'staff_reply',
+          control.ownershipEpoch,
+        );
+      }
+      const runtime = await this.registry.get(principal.tenantId, control.connectionId);
+      const externalUserId = await this.staffLinks.ensure(runtime, principal.staffMemberId);
+      const result = await this.outbound.send({
+        tenantId: principal.tenantId,
+        actorId: toPublicId('staff', principal.staffMemberId),
+        conversationId: control.id,
+        sender: { kind: 'staff', id: principal.staffMemberId },
+        clientMessageId: input.clientMessageId,
+        requestHash: createHash('sha256')
+          .update(canonicalize({ text: input.text, visibility: input.visibility }) ?? '')
+          .digest(),
+        author: { kind: 'staff', userRef: String(externalUserId) },
+        visibility: internal ? 'private' : 'public',
+        text: input.text,
+        load: (tx) => this.authorized(tx, principal, publicId, permission),
+        // A reply that started from an AI suggestion is still the person's own; the audit says so.
+        ...(input.suggestionId
+          ? {
+              onCommitted: async (tx: TenantTx) => {
+                await appendAudit(tx, {
+                  actorType: 'staff',
+                  actorId: toPublicId('staff', principal.staffMemberId),
+                  action: 'conversation.copilot_reply_sent',
+                  targetType: 'conversation',
+                  targetId: publicId,
+                  outcome: 'success',
+                  data: { suggestionId: input.suggestionId, visibility: input.visibility },
+                });
+              },
+            }
+          : {}),
+      });
+      await this.drafts.finishOutgoing(principal, control.id, input.clientMessageId);
+      return { messageId: result.message.id, status: result.status };
+    } catch (error) {
+      const code = error instanceof AppError ? error.code : 'INTERNAL';
+      if (KEPT.has(code)) {
+        await this.drafts
+          .failOutgoing(principal, control.id, input.clientMessageId, code)
+          .catch(() => undefined);
+      } else {
+        await this.drafts
+          .finishOutgoing(principal, control.id, input.clientMessageId)
+          .catch(() => undefined);
+      }
+      throw error;
+    }
   }
 }
