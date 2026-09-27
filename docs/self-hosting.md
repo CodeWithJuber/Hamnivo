@@ -160,15 +160,31 @@ any computer. Replace `example.com` with your domain.
      -d '{"name":"My Company","slug":"my-company"}' $A/v1/tenants
    ```
 
-4. **Create a brand and connect it.** Follow the steps under "Connect a brand to Chatwoot and chat
-   through the API" in Part B, using `$A` instead of `http://localhost:4000` and `-H "origin: $O"`.
-   List your real websites in `allowedOrigins`, for example `["https://www.yourshop.com"]`. Only
-   those websites can show the chat, and the widget page refuses to be framed anywhere else.
+4. **Create a brand and connect it.** Use the company id (`tnt_…`) returned above:
+
+   ```bash
+   T=tnt_...
+   h=(-b jar -H "origin: $O" -H 'content-type: application/json' -H "x-hamnivo-tenant: $T")
+   ```
+
+   Then follow the steps under "Connect a brand to Chatwoot and chat through the API" in Part B,
+   with `$A` in place of `http://localhost:4000`. List your real websites in `allowedOrigins`, for
+   example `["https://www.yourshop.com"]`. Only those websites can show the chat, and the widget
+   page refuses to be framed anywhere else.
 
 5. **Publish the AI agent.** It answers with the offline `hamnivo-mock` model until you choose a
    real model and publish again.
 
-6. **Put the chat on your website** with the brand's widget ID:
+6. **Optional: verify signed-in customers.** Register a key for the brand, then have your backend
+   sign a short-lived identity assertion for each signed-in customer. The widget then shows
+   verified customers their own history. Registering a key needs two-step verification and a
+   recent sign-in:
+
+   ```bash
+   curl "${h[@]}" -d '{"alg":"HS256"}' $A/v1/admin/brands/brd_.../identity-keys   # secret shown once
+   ```
+
+7. **Put the chat on your website** with the brand's widget ID:
 
    ```html
    <script src="https://chat.example.com/loader.js" data-widget-id="wid_..."

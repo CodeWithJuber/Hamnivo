@@ -238,11 +238,13 @@
   "W12": {
     "status": "in-progress",
     "evidence": [
+      "apps/gateway/src/admin/identity-keys.service.ts",
       "apps/gateway/src/widget/sessions.service.ts",
       "apps/gateway/src/widget/tokens.service.ts",
+      "apps/gateway/test/identity-keys.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
-    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending."
+    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending. Brands register their verification keys through the admin API (ES256, EdDSA or RS256 public keys, or a generated HS256 secret shown once), with two-step verification and a recent sign-in; keys retire (still verifying) or are revoked at once (tested)."
   },
   "H08": {
     "status": "in-progress",

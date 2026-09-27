@@ -28,10 +28,17 @@ import {
   Brand,
   ConnectChatwootRequest,
   CreateBrandRequest,
+  CreatedIdentityKey,
+  CreateIdentityKeyRequest,
+  IdentityKey,
 } from './brands.js';
 import type { RouteDef } from './routes.js';
 
 const idParam = (description: string) => z.object({ id: z.string().meta({ description }) });
+const brandParams = z.object({ brandId: z.string().meta({ description: 'Brand ID (brd_…)' }) });
+const identityKeyParams = brandParams.extend({
+  kid: z.string().meta({ description: 'Key id' }),
+});
 
 /** Signed-in staff: who am I, which tenants, create a tenant, accept an invitation. */
 export const identityRoutes = {
@@ -289,6 +296,52 @@ export const adminRoutes = {
     body: CreateBrandRequest,
     idempotent: true,
     success: { status: 201, description: 'Brand created', schema: Brand },
+  },
+  listIdentityKeys: {
+    method: 'get',
+    path: '/v1/admin/brands/{brandId}/identity-keys',
+    operationId: 'listIdentityKeys',
+    summary: 'Keys that verify the brand’s customer identity assertions (widget.identity_keys)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    params: brandParams,
+    success: {
+      status: 200,
+      description: 'Identity keys',
+      schema: z.object({ items: z.array(IdentityKey) }),
+    },
+  },
+  createIdentityKey: {
+    method: 'post',
+    path: '/v1/admin/brands/{brandId}/identity-keys',
+    operationId: 'createIdentityKey',
+    summary:
+      'Register a public key, or generate an HS256 secret shown once (widget.identity_keys, two-step verification and a fresh sign-in)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    params: brandParams,
+    body: CreateIdentityKeyRequest,
+    success: { status: 201, description: 'Key registered', schema: CreatedIdentityKey },
+  },
+  retireIdentityKey: {
+    method: 'post',
+    path: '/v1/admin/brands/{brandId}/identity-keys/{kid}/retire',
+    operationId: 'retireIdentityKey',
+    summary: 'Mark a key as retiring: it still verifies while you switch to a new one',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    params: identityKeyParams,
+    success: { status: 200, description: 'Key retiring', schema: IdentityKey },
+  },
+  revokeIdentityKey: {
+    method: 'post',
+    path: '/v1/admin/brands/{brandId}/identity-keys/{kid}/revoke',
+    operationId: 'revokeIdentityKey',
+    summary: 'Revoke a key at once: assertions signed with it are refused from now on',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    params: identityKeyParams,
+    success: { status: 200, description: 'Key revoked', schema: IdentityKey },
   },
   listAuthorityConnections: {
     method: 'get',
