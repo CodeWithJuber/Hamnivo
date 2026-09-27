@@ -147,8 +147,9 @@ team.
   excluded data class (personal, identity, account, memory, live order, payment, approval and tool
   results are never cached), not personalized, no side effects, no personal data in the input,
   then every added exclusion rule. Writes also need complete, validated output.
-- `CacheExclusionRule` is the hook for other modules, such as commerce excluding live order
-  questions (K06).
+- `CacheExclusionRule` is the hook for other modules. A module names its own data classes
+  (`ModuleDataClass`, such as `commerce.order_status`) and its rule decides them: commerce's rule
+  uses `answerCacheDecision()`, so no answer built from commerce data is cached (K06).
 - `personalContext` on a request (for example `personal_memory`) vetoes shared entries. Requests
   with `scope: 'customer'` may be personalized: their envelope names the customer and their
   personal version (`subject`), so a memory change makes older entries unreachable.

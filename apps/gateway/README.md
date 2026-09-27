@@ -235,7 +235,7 @@ Late publication (R06):
   the locale and ask once. The choice and its source are recorded on the model step. Preferences
   keep choices and detected candidates, never message text.
 
-## Answer cache (K01, K02, K07, K08, K10, K12)
+## Answer cache (K01, K02, K06, K07, K08, K09, K10, K12)
 
 - **Store.** A dedicated Valkey connection with a key prefix (`CACHE_KEY_PREFIX`), a 150 ms
   timeout (`CACHE_TIMEOUT_MS`) and no offline queue, wrapped fail-open: a failure reads as
@@ -259,7 +259,13 @@ Late publication (R06):
   version (`MemoryCache.version()`) in the key. A memory change bumps the version, so their
   entries are no longer reachable; a deletion purges the namespace. The run's `answer_cache` step
   says whether an entry was `shared` or the customer's own (`scope`).
-- **Hooks for other modules.** `CacheExclusions.register(rule)` excludes requests (commerce, K06).
+- **Commerce data (K06).** Commerce registers its rule (`commerce.live_data`, deciding with
+  `answerCacheDecision()`) in both processes. A reply in a conversation that holds catalog, cart,
+  quote, payment, order or refund data is neither read from nor written to the cache, and a reply
+  whose receipt check read a payment or refund status (X10) is not stored. The run's
+  `answer_cache` step names the rule and the data classes.
+- **Hooks for other modules.** `CacheExclusions.register(rule)` excludes requests; a module names
+  its own data classes (`commerce.order_status`) and its rule decides them.
   `personalContext` on a cache request keeps a result out of shared entries. `PERSONAL_CACHE_SCOPE`
   places private entries (memory provides it; a scope that is missing, slow or not the
   customer's own means the entry is not cached). A store call must match the lookup's audience,

@@ -37,6 +37,12 @@ export const CACHE_DATA_CLASSES = [
 ] as const;
 export type CacheDataClass = (typeof CACHE_DATA_CLASSES)[number];
 
+/**
+ * A data class another module names and decides, such as `commerce.order_status` (K06). The
+ * built-in checks pass it through; the module's exclusion rule decides whether it may be cached.
+ */
+export type ModuleDataClass = `${string}.${string}`;
+
 /** Data classes that can never be served from a shared cache. */
 export const NEVER_CACHED: readonly CacheDataClass[] = [
   'personal',
@@ -171,8 +177,8 @@ export function cacheKey(envelope: CacheKeyEnvelope, hash: (material: string) =>
 
 export interface CacheRequest {
   tier: CacheTier;
-  /** What the computation reads. */
-  dataClasses: readonly CacheDataClass[];
+  /** What the computation reads: built-in classes and classes other modules name. */
+  dataClasses: readonly (CacheDataClass | ModuleDataClass)[];
   /** Customer or staff text the result depends on; checked for personal data, never stored. */
   texts?: readonly string[];
   /** The result depends on this conversation's history, a person's memory or identity. */
@@ -265,8 +271,10 @@ export function cacheEligibility(
     ...(detail ? { detail } : {}),
   });
   if (!policy.tiers[request.tier]?.enabled) return deny('tier_disabled', 'policy.tier');
+  const never: readonly string[] = NEVER_CACHED;
+  const excludedByBrand: readonly string[] = policy.excludedClasses;
   const excluded = request.dataClasses.find(
-    (c) => NEVER_CACHED.includes(c) || policy.excludedClasses.includes(c),
+    (c) => never.includes(c) || excludedByBrand.includes(c),
   );
   if (excluded) return deny('excluded_class', 'policy.data_class', excluded);
   const shared = request.scope !== 'customer';

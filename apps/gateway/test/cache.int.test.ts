@@ -814,6 +814,69 @@ describe('memory hooks in replies: customer memory stays with the customer (K09,
   });
 });
 
+describe('commerce data never enters or leaves the answer cache (K06)', () => {
+  const answer: CachedAnswer = {
+    text: 'Your order is on its way.',
+    sources: [],
+    refs: [],
+    provider: 'mock',
+    modelId: 'mock-1',
+    inputTokens: 10,
+    outputTokens: 8,
+    latencyMs: 5,
+  };
+
+  it('bypasses a conversation with commerce data and stores nothing a receipt check read', async () => {
+    const answers = slice.worker.get(AnswerCache);
+    const question = 'When will it arrive?';
+    const context: AnswerContext = {
+      tenantId: fromPublicId('tenant', alpha.tenantId),
+      brandId: fromPublicId('brand', alpha.brandId),
+      agentId: fromPublicId('agent', alpha.agentId),
+      agentVersionId: randomUUID(),
+      config: {
+        model: { provider: 'mock', modelId: 'mock-1' },
+        knowledgeSourceIds: [],
+        mode: 'answer',
+      } as unknown as AnswerContext['config'],
+      promptVersion: `commerce-${randomUUID()}`,
+      language: 'en',
+      history: [
+        {
+          ref: '1',
+          conversationRef: '1',
+          key: null,
+          direction: 'incoming',
+          private: false,
+          text: question,
+          contentAttributes: {},
+          sender: { kind: 'contact', ref: '1', name: null },
+          attachments: [],
+          createdAt: new Date(),
+        },
+      ],
+      question,
+    };
+    // A conversation that holds an order: the cache is neither read nor written (commerce's rule).
+    expect(await answers.lookup({ ...context, dataClasses: ['commerce.order_status'] })).toEqual({
+      kind: 'skip',
+      status: 'bypass',
+      reason: 'excluded_by_rule',
+      rule: 'commerce.live_data',
+      detail: 'commerce.order_status',
+    });
+    // A reply whose receipt check read the payment status is not stored.
+    const first = await answers.lookup(context);
+    if (first.kind !== 'fill') throw new Error(`expected a fill, got ${first.kind}`);
+    await first.fill(answer, { dataClasses: ['commerce.payment_status'] });
+    const again = await answers.lookup(context);
+    if (again.kind !== 'fill') throw new Error(`expected nothing stored, got ${again.kind}`);
+    // The same answer without commerce data is stored: the rule is what kept it out.
+    await again.fill(answer);
+    expect(await answers.lookup(context)).toMatchObject({ kind: 'hit', scope: 'shared' });
+  });
+});
+
 describe('cache outage (K08)', () => {
   it('answers without the cache when the store does not respond', async () => {
     const hanging: CacheStore = {

@@ -4,6 +4,7 @@ import {
   type AuthorityMessage,
   cacheDependency,
   cacheInputText,
+  type ModuleDataClass,
   type ReplyLanguage,
 } from '@hamnivo/domain';
 import { Inject, Injectable } from '@nestjs/common';
@@ -32,6 +33,19 @@ export interface AnswerContext {
   personalContext?: readonly string[];
   /** The customer principal the reply is for, when known. */
   subjectId?: string | null;
+  /**
+   * Data other modules say the reply may be built from, such as `commerce.order_status` when the
+   * conversation has an order (K06). Their exclusion rules decide; commerce's never caches.
+   */
+  dataClasses?: readonly ModuleDataClass[];
+}
+
+/** What the generation ended up using, passed when the answer is stored. */
+export interface AnswerUse {
+  /** Personal context such as `personal_memory`: any code keeps the answer out of shared entries. */
+  personalContext?: readonly string[];
+  /** Data read while answering, such as the payment status a receipt check read (X10, K06). */
+  dataClasses?: readonly ModuleDataClass[];
 }
 
 export interface CachedAnswer {
@@ -58,13 +72,21 @@ export type AnswerLookup =
       kind: 'fill';
       scope: AnswerScope;
       /**
-       * Stores the answer when it is still eligible. Pass the personal context the generation
-       * ended up using (for example memory recalled after the lookup): any code prevents storing.
+       * Stores the answer when it is still eligible. Pass what the generation ended up using (for
+       * example memory recalled after the lookup, or a payment status it read): it can prevent
+       * storing.
        */
-      fill: (answer: CachedAnswer, used?: { personalContext?: readonly string[] }) => Promise<void>;
+      fill: (answer: CachedAnswer, used?: AnswerUse) => Promise<void>;
       status: 'miss' | 'stale';
     }
-  | { kind: 'skip'; status: 'bypass' | 'unavailable'; reason: string | null };
+  | {
+      kind: 'skip';
+      status: 'bypass' | 'unavailable';
+      reason: string | null;
+      /** The rule that bypassed the cache, such as `commerce.live_data`, and what it named. */
+      rule?: string;
+      detail?: string | null;
+    };
 
 /**
  * The exact answer cache (K01) for AI replies. Only a customer's first message in a conversation
@@ -81,11 +103,7 @@ export class AnswerCache {
     private readonly cache: CacheService,
   ) {}
 
-  spec(
-    context: AnswerContext,
-    complete = false,
-    personalContext: readonly string[] = [],
-  ): CacheSpec {
+  spec(context: AnswerContext, complete = false, used: AnswerUse = {}): CacheSpec {
     const incoming = context.history.filter((m) => m.direction === 'incoming' && !m.private);
     const answered = context.history.some(
       (m) => m.direction === 'outgoing' && !m.private && m.text?.trim(),
@@ -94,7 +112,8 @@ export class AnswerCache {
     // Only the opening question of a conversation is generic enough to reuse: later turns depend
     // on the conversation, which is not part of the key.
     const opening = incoming.length === 1 && !answered && config.mode === 'answer';
-    const personal = [...(context.personalContext ?? []), ...personalContext];
+    const personal = [...(context.personalContext ?? []), ...(used.personalContext ?? [])];
+    const read = [...new Set([...(context.dataClasses ?? []), ...(used.dataClasses ?? [])])];
     // Built with personal context (memory): kept for this customer alone, never shared.
     const own = opening && personal.length > 0 && Boolean(context.subjectId);
     return {
@@ -117,8 +136,12 @@ export class AnswerCache {
       input: cacheInputText(context.question),
       request: {
         tier: 'exact_answer',
-        dataClasses:
-          config.knowledgeSourceIds.length > 0 ? ['general', 'public_knowledge'] : ['general'],
+        dataClasses: [
+          ...(config.knowledgeSourceIds.length > 0
+            ? (['general', 'public_knowledge'] as const)
+            : (['general'] as const)),
+          ...read,
+        ],
         texts: [context.question],
         personalized: !opening,
         personalContext: personal,
@@ -174,7 +197,13 @@ export class AnswerCache {
     const result: Lookup<CachedAnswer> = await this.cache.lookup<CachedAnswer>(spec);
     switch (result.status) {
       case 'bypass':
-        return { kind: 'skip', status: 'bypass', reason: result.reason };
+        return {
+          kind: 'skip',
+          status: 'bypass',
+          reason: result.reason,
+          rule: result.rule,
+          detail: result.detail,
+        };
       case 'unavailable':
         return { kind: 'skip', status: 'unavailable', reason: null };
       case 'hit': {
@@ -207,7 +236,7 @@ export class AnswerCache {
       scope,
       status: result.status,
       fill: async (answer, used) => {
-        await this.cache.put(this.spec(context, true, used?.personalContext), result, answer, {
+        await this.cache.put(this.spec(context, true, used), result, answer, {
           sources: answer.refs,
         });
       },

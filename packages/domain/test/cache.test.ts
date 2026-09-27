@@ -217,6 +217,25 @@ describe('cacheEligibility (K01, K06)', () => {
     expect(cacheEligibility(faq, enabled, { rules: [liveOrders] })).toEqual({ eligible: true });
   });
 
+  it('passes data classes other modules name to their rules (K06)', () => {
+    const commerce: CacheExclusionRule = {
+      id: 'commerce.live_data',
+      check: (request) =>
+        request.dataClasses.filter((c) => c.startsWith('commerce.')).join(',') || null,
+    };
+    const order: CacheRequest = {
+      ...faq,
+      dataClasses: ['public_knowledge', 'commerce.order_status'],
+    };
+    expect(cacheEligibility(order, enabled, { rules: [commerce] })).toEqual({
+      eligible: false,
+      reason: 'excluded_by_rule',
+      rule: 'commerce.live_data',
+      detail: 'commerce.order_status',
+    });
+    expect(cacheEligibility(faq, enabled, { rules: [commerce] })).toEqual({ eligible: true });
+  });
+
   it('stores only complete, validated output', () => {
     expect(cacheEligibility(faq, enabled, { forStore: true })).toMatchObject({
       reason: 'incomplete',

@@ -10,7 +10,12 @@ import {
   toPublicId,
   withTenant,
 } from '@hamnivo/db';
-import { type AuthorityMessage, detectHumanRequest, sharedCacheEligibility } from '@hamnivo/domain';
+import {
+  type AuthorityMessage,
+  detectHumanRequest,
+  type ModuleDataClass,
+  sharedCacheEligibility,
+} from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { generateText, isStepCount } from 'ai';
 import canonicalize from 'canonicalize';
@@ -28,6 +33,7 @@ import {
 } from '../authority/views.js';
 import { AnswerCache, type AnswerLookup } from '../cache/answers.js';
 import type { SourceRefRow } from '../cache/cache.service.js';
+import { claimedLiveData, conversationLiveData } from '../commerce/answer-cache.js';
 import { CLAIM_CORRECTION, checkReplyClaims } from '../commerce/claims.js';
 import { AppError } from '../common/app-error.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
@@ -76,6 +82,8 @@ interface Generated {
   refs: SourceRefRow[];
   /** Customer memories the reply relied on (G19). */
   memories: MemoryPartRef[];
+  /** Commerce data the reply's receipt check read (X10), which keeps it out of caches (K06). */
+  liveData: ModuleDataClass[];
 }
 
 /** Prompt options, and why the reply language was chosen (recorded with the model step). */
@@ -325,6 +333,8 @@ export class RepliesService {
     });
     const shared = sharedCacheEligibility({ memoryItems: memories.length });
     const personalContext = shared.eligible ? [] : [shared.reason];
+    // Commerce data the conversation holds (K06): a reply built from it is never cached.
+    const liveData = await this.tx(tenantId, (tx) => conversationLiveData(tx, control.id));
     const cached = await this.cachedAnswer(
       tenantId,
       run.id,
@@ -334,6 +344,7 @@ export class RepliesService {
       question,
       options,
       personalContext,
+      liveData,
     );
 
     let generated: Generated | null;
@@ -348,6 +359,7 @@ export class RepliesService {
         sources: cached.answer.sources,
         refs: cached.answer.refs,
         memories: cached.answer.memories ?? [],
+        liveData: [],
       };
     } else {
       try {
@@ -396,7 +408,7 @@ export class RepliesService {
             outputTokens: generated.outputTokens,
             latencyMs: generated.latencyMs,
           },
-          { personalContext },
+          { personalContext, dataClasses: generated.liveData },
         );
       }
     }
@@ -645,6 +657,7 @@ export class RepliesService {
     question: string,
     options: GenerateOptions,
     personalContext: string[],
+    liveData: ModuleDataClass[],
   ): Promise<AnswerLookup> {
     const brandId = context.control.brandId;
     if (!brandId || !options.language) {
@@ -663,6 +676,7 @@ export class RepliesService {
       question,
       personalContext,
       subjectId: context.control.principalId,
+      dataClasses: liveData,
     });
     // With answer caching off (the default) there is nothing worth recording.
     if (found.kind === 'skip' && found.reason === 'tier_disabled') return found;
@@ -677,7 +691,12 @@ export class RepliesService {
             ? { outcome: 'hit', fingerprint: found.fingerprint, scope: found.scope }
             : {
                 outcome: found.status,
-                ...(found.kind === 'skip' ? { reason: found.reason } : { scope: found.scope }),
+                ...(found.kind === 'skip'
+                  ? {
+                      reason: found.reason,
+                      ...(found.rule ? { rule: found.rule, detail: found.detail ?? null } : {}),
+                    }
+                  : { scope: found.scope }),
               },
       }),
     );
@@ -733,6 +752,7 @@ export class RepliesService {
         ...generated,
         text: remembered.text,
         memories: remembered.memories,
+        liveData: [],
         sources: cited.cited.map((p) => ({
           type: 'source',
           sourceId: toPublicId('document', p.documentId),
@@ -783,7 +803,7 @@ export class RepliesService {
         continue;
       }
       if (!result.text) throw new EmptyReplyError('The model returned no text.');
-      return result;
+      return { ...result, liveData: claimedLiveData(claims.claimed) };
     }
     return null;
   }
@@ -869,6 +889,7 @@ export class RepliesService {
           sources: [],
           refs: [],
           memories: [],
+          liveData: [],
         };
         await this.tx(tenantId, (tx) =>
           this.runs.step(tx, tenantId, runId, {
@@ -917,7 +938,7 @@ export class RepliesService {
     tenantId: string,
     runId: string,
     outcome: RunOutcome,
-    telemetry: Omit<Generated, 'text' | 'sources' | 'refs' | 'memories'>,
+    telemetry: Omit<Generated, 'text' | 'sources' | 'refs' | 'memories' | 'liveData'>,
   ) {
     await this.runs.finish(tx, runId, { outcome, ...telemetry });
     const now = this.clock();
