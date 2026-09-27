@@ -22,6 +22,7 @@ const resources = {
       language: 'Language',
       startError: 'The chat could not start. Please try again.',
       typing: 'The assistant is writing…',
+      sources: 'Sources',
     },
   },
   ar: {
@@ -43,6 +44,7 @@ const resources = {
       language: 'اللغة',
       startError: 'تعذّر بدء المحادثة. حاول مرة أخرى.',
       typing: 'المساعد يكتب…',
+      sources: 'المصادر',
     },
   },
   hi: {
@@ -64,6 +66,7 @@ const resources = {
       language: 'भाषा',
       startError: 'चैट शुरू नहीं हो सकी। कृपया फिर कोशिश करें।',
       typing: 'सहायक लिख रहा है…',
+      sources: 'स्रोत',
     },
   },
   ur: {
@@ -85,6 +88,7 @@ const resources = {
       language: 'زبان',
       startError: 'چیٹ شروع نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔',
       typing: 'اسسٹنٹ لکھ رہا ہے…',
+      sources: 'ذرائع',
     },
   },
 } as const;

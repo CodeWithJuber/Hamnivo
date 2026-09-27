@@ -209,6 +209,49 @@ curl "${h[@]}" -d '{"scope":"brand","targetId":"brd_...","reason":"Checking answ
 Conversations the AI held go to people with an internal note, and people keep chatting as usual.
 Clearing the switch (`POST /v1/admin/kill-switches/ksw_.../clear`) lets the AI answer again.
 
+### Give the AI your knowledge
+
+1. **Create a source.** Only `public` sources ground answers to customers. An `internal` source is
+   for staff and for assist mode.
+
+   ```bash
+   curl "${h[@]}" -d '{"brandId":"brd_...","name":"Help centre","reviewEveryDays":90}' \
+     http://localhost:4000/v1/admin/knowledge/sources
+   ```
+
+2. **Add documents.** Send text for plain text, Markdown or HTML, or `base64` for PDF and Word
+   files. Each document can be up to 5 MB.
+
+   ```bash
+   curl "${h[@]}" -d '{"title":"Returns","url":"https://shop.example/returns","content":
+     {"mediaType":"text/markdown","text":"# Returns\n\nYou can return unworn items within 30 days."}}' \
+     http://localhost:4000/v1/admin/knowledge/sources/ksrc_.../documents
+   ```
+
+   The worker processes each document in order:
+   1. It scans the upload. Malware, or a failure to scan, means refusal.
+   2. It checks the file really is the declared type.
+   3. It extracts the text, splits it into passages under their headings, and indexes them for
+      keyword and vector search.
+
+   A new version of a document replaces the old one only when it is ready.
+
+3. **Connect the knowledge to the agent.** Put the source IDs in the agent's `knowledgeSourceIds`,
+   save a draft and publish it. Answers then:
+   - cite passages as `[1]`;
+   - list the sources under the message in the chat;
+   - drop any citation that matches nothing retrieved.
+
+   Documents stop grounding answers when they are retired, past `validUntil`, or not reviewed
+   within their source's cycle (`POST /v1/admin/knowledge/documents/doc_.../review`).
+
+To preview what an answer would use, send `POST /v1/admin/knowledge/search` with
+`{"query":"…","brandId":"brd_…"}`.
+
+On a server, run ClamAV and set `CLAMAV_URL=tcp://clamav:3310`. Without it, uploads are checked only
+for the EICAR test file. `EMBEDDING_PROVIDER` selects the embedding model; the default offline
+`mock` matches shared words only, so use a real provider for meaning-based search.
+
 ### Put the chat on a web page
 
 The widget is a static app, and the loader is one small script served next to it.

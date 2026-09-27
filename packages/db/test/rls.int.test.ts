@@ -20,6 +20,25 @@ let tables: CatalogTable[];
 
 const tenantColumn = (table: string) => (table === 'tenants' ? 'id' : 'tenant_id');
 
+/** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
+async function writableColumns(table: string): Promise<string[]> {
+  const { rows } = await h.owner.execute<{ name: string }>(sql`
+    select attname as name from pg_attribute
+    where attrelid = ${table}::regclass and attnum > 0 and not attisdropped and attgenerated = ''
+    order by attnum`);
+  return rows.map((r) => r.name);
+}
+
+/** `insert into <table> (…) select … from json_populate_record(…)` for a row sample. */
+async function copyStatement(table: string, sample: unknown) {
+  const columns = sql.join(
+    (await writableColumns(table)).map((c) => sql.identifier(c)),
+    sql`, `,
+  );
+  const t = sql.identifier(table);
+  return sql`insert into ${t} (${columns}) select ${columns} from json_populate_record(null::${t}, ${JSON.stringify(sample)}::json)`;
+}
+
 async function count(tx: TenantTx, table: string, where?: ReturnType<typeof sql>) {
   const { rows } = await tx.execute<{ n: string }>(
     where
@@ -146,6 +165,10 @@ describe('two-tenant isolation', () => {
     'kill_switches',
     'runs',
     'run_steps',
+    'knowledge_sources',
+    'knowledge_documents',
+    'document_versions',
+    'knowledge_chunks',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -188,12 +211,9 @@ describe('two-tenant isolation', () => {
       return rows[0]?.row;
     });
     expect(sample).toBeDefined();
+    const copy = await copyStatement(table, sample);
     await expectPgError(
-      withTenant(h.app, { tenantId: a.tenantId }, (tx) =>
-        tx.execute(
-          sql`insert into ${t} select * from json_populate_record(null::${t}, ${JSON.stringify(sample)}::json)`,
-        ),
-      ),
+      withTenant(h.app, { tenantId: a.tenantId }, (tx) => tx.execute(copy)),
       '42501',
     );
 
@@ -212,12 +232,7 @@ describe('two-tenant isolation', () => {
     // Without a tenant, nothing is visible and nothing can be written.
     const { rows } = await h.app.execute<{ n: string }>(sql`select count(*) as n from ${t}`);
     expect(Number(rows[0]?.n)).toBe(0);
-    await expectPgError(
-      h.app.execute(
-        sql`insert into ${t} select * from json_populate_record(null::${t}, ${JSON.stringify(sample)}::json)`,
-      ),
-      '42501',
-    );
+    await expectPgError(h.app.execute(copy), '42501');
   });
 
   it('covers every tenant table in the isolation matrix', () => {
@@ -259,6 +274,10 @@ describe('two-tenant isolation', () => {
       'kill_switches',
       'runs',
       'run_steps',
+      'knowledge_sources',
+      'knowledge_documents',
+      'document_versions',
+      'knowledge_chunks',
       'audit_heads',
       'audit_events',
     ]);

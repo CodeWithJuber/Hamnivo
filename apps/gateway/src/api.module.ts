@@ -24,6 +24,10 @@ import { IdentityController } from './identity/identity.controller.js';
 import { PrincipalService } from './identity/principal.service.js';
 import { StaffGuard } from './identity/staff.guard.js';
 import { TenantsService } from './identity/tenants.service.js';
+import { EmbeddingFactory } from './knowledge/embeddings.js';
+import { KnowledgeController } from './knowledge/knowledge.controller.js';
+import { KnowledgeService } from './knowledge/knowledge.service.js';
+import { RetrievalService } from './knowledge/retrieval.service.js';
 import { HealthController } from './platform/health.controller.js';
 import type { Mailer } from './platform/mailer.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
@@ -69,6 +73,7 @@ export class ApiModule {
         ModelConnectionsController,
         KillSwitchesController,
         RunsController,
+        KnowledgeController,
       ],
       providers: [
         {
@@ -95,6 +100,9 @@ export class ApiModule {
         AgentsService,
         ModelConnectionsService,
         RunsService,
+        EmbeddingFactory,
+        RetrievalService,
+        KnowledgeService,
         WidgetTokens,
         WidgetSessionsService,
         AuthorityContactsService,

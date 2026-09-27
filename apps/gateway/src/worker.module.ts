@@ -7,6 +7,10 @@ import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
 import { AuthoritySyncService } from './authority/sync.service.js';
 import type { AppConfig } from './config.js';
+import { EmbeddingFactory } from './knowledge/embeddings.js';
+import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
+import { RetrievalService } from './knowledge/retrieval.service.js';
+import { type Scanner, scannerFromUrl } from './knowledge/scanner.js';
 import { OUTBOX_HANDLERS, type OutboxHandler, OutboxRelay } from './outbox/relay.service.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
 import { AgentsService } from './runtime/agents.service.js';
@@ -35,6 +39,8 @@ export interface WorkerOverrides extends PlatformOverrides {
   handlers?: Map<string, OutboxHandler>;
   /** Replaces every agent's model (tests); agents otherwise use their configured model. */
   model?: LanguageModel;
+  /** Replaces the upload scanner (tests); ClamAV or the EICAR check otherwise. */
+  scanner?: Scanner;
 }
 
 /**
@@ -61,16 +67,25 @@ export class WorkerModule {
         AgentsService,
         RunsService,
         AuthorityContactsService,
+        EmbeddingFactory,
+        RetrievalService,
+        { provide: SCANNER, useValue: overrides.scanner ?? scannerFromUrl(config.CLAMAV_URL) },
+        IngestionService,
         RepliesService,
         {
           provide: OUTBOX_HANDLERS,
-          inject: [AuthoritySyncService, RepliesService],
-          useFactory: (sync: AuthoritySyncService, replies: RepliesService) =>
+          inject: [AuthoritySyncService, RepliesService, IngestionService],
+          useFactory: (
+            sync: AuthoritySyncService,
+            replies: RepliesService,
+            ingestion: IngestionService,
+          ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
               ...defaultOutboxHandlers(),
               ['conversation.owner_changed', (event) => sync.applyOwnerChange(event)],
               ['conversation.customer_message', (event) => replies.onCustomerMessage(event)],
+              ['knowledge.ingest', (event) => ingestion.onIngest(event)],
             ]),
         },
         OutboxRelay,

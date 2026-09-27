@@ -29,7 +29,7 @@ import {
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
 import { AuthorityRegistry } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
-import { contractMessage } from '../authority/views.js';
+import { contractMessage, publicationFacts } from '../authority/views.js';
 import { AppError } from '../common/app-error.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
@@ -302,6 +302,7 @@ export class WidgetConversationsService {
     } catch (error) {
       throw authorityUnavailable(error, 'History could not be loaded. Please try again.');
     }
+    const facts = await this.tx(claims, (tx) => publicationFacts(tx, conversationId, messages));
     const before = query.before
       ? Number(Buffer.from(query.before, 'base64url').toString('utf8'))
       : Number.POSITIVE_INFINITY;
@@ -319,6 +320,7 @@ export class WidgetConversationsService {
           sequence: null,
           clientMessageId: context.clientIds.get(m.ref) ?? null,
           delivery: m.direction === 'incoming' ? 'accepted' : null,
+          ...(facts.has(m.ref) ? { facts: facts.get(m.ref) } : {}),
         }),
       ),
       olderCursor:

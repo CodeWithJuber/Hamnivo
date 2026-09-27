@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 192 · in-progress: 38 · implemented: 2
+**Blueprint features (232):** planned: 186 · in-progress: 44 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -20,11 +20,11 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | W01 | One-script installation | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `packages/widget-loader/src/loader.ts`, `packages/widget-loader/test/size.test.ts` — One dependency-free script (1.7 KB gzip) adds an accessible launcher; the widget iframe is created only when opened (tested: nothing else loads before). Brand colours from the published config and CSP frame-ancestors per brand pending. |
 | W02 | Layout modes | P0 | C | planned |  |
 | W03 | Brand theme | P0 | C | in-progress | `packages/brand/src/contrast.ts`, `packages/brand/test/contrast.test.ts` — Contrast validation implemented; widget studio UI pending. |
-| W04 | Clear responder identity | P0 | C | in-progress | `apps/gateway/src/authority/views.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx` — Every message shows who wrote it with a text role label (AI assistant, Support agent); AI never uses a person's name or avatar (tested in the browser journey). |
+| W04 | Clear responder identity | P0 | C | in-progress | `apps/gateway/src/authority/views.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx` — Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested). |
 | W05 | Conversation history | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/useChat.ts` — Customer history from Chatwoot's customer view (private notes and activity excluded) with an older-page cursor, shown when the widget reopens; unread markers pending. |
 | W06 | Delivery states | P0 | C | in-progress | `apps/gateway/src/authority/outbound.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `packages/client/src/outbox.ts`, `packages/client/test/client.test.ts` — Queued, sending, accepted and failed (with retry) states in the widget, backed by the SDK outbox; 'accepted' only after the authority committed. Delivered/read states pending. |
 | W07 | Reconnect and draft preservation | P0 | C | in-progress | `apps/gateway/src/authority/journal.service.ts`, `apps/gateway/src/widget/events.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `packages/client/src/outbox.ts`, `packages/client/src/stream.ts`, `packages/client/test/client.test.ts` — Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. |
-| W08 | Rich content | P0 | C | planned |  |
+| W08 | Rich content | P0 | C | in-progress | `apps/widget/src/components/Chat.tsx`, `apps/widget/src/markdown.ts` — Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers. Structured cards pending. |
 | W09 | Attachments | P0 | C | planned |  |
 | W10 | Human handoff | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/components/Chat.tsx` — 'Talk to a person' in the widget creates a durable waiting state and a private handoff note for staff, so the customer does not repeat themselves (tested); context summary by AI pending. |
 | W11 | Offline support | P0 | C | planned |  |
@@ -98,9 +98,9 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | G01 | Agent profiles | P0 | C | in-progress | `apps/gateway/src/runtime/agents.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/contracts/src/agents.ts`, `packages/db/src/schema/runtime.ts` — Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending. |
 | G02 | Provider adapter | P0 | C | in-progress | `apps/gateway/src/runtime/models.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/adapters/src/models/mock.ts`, `packages/adapters/test/mock.test.ts` — Agents choose a provider and model with tenant credentials (encrypted connections) or platform keys, checked at publication; fallback models on overload (tested with hamnivo-mock). Anthropic, OpenAI, Gemini and OpenAI-compatible adapters are being added. |
 | G03 | Assist and answer modes | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/agents.int.test.ts` — Answer mode replies to customers; assist mode writes suggestions only as internal notes and never answers customers (tested). Grounded answers from knowledge arrive with knowledge sources. |
-| G04 | Approved knowledge sources | P0 | C | planned |  |
-| G05 | Retrieval with access controls | P0 | C | planned |  |
-| G06 | Source citations | P0 | C | planned |  |
+| G04 | Approved knowledge sources | P0 | C | in-progress | `apps/gateway/src/knowledge/knowledge.service.ts`, `apps/gateway/test/knowledge.int.test.ts`, `packages/db/src/schema/knowledge.ts` — Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). URL crawling and Studio screens pending. |
+| G05 | Retrieval with access controls | P0 | C | in-progress | `apps/gateway/src/knowledge/retrieval.service.ts`, `apps/gateway/test/knowledge.int.test.ts` — Hybrid vector + keyword retrieval with eligibility filters applied before ranking: tenant (RLS), brand, agent's sources, audience (internal sources never reach customer answers), current ready version, expiry and review cycle (tested). Per-customer document scopes pending. |
+| G06 | Source citations | P0 | C | in-progress | `apps/gateway/src/authority/views.ts`, `apps/gateway/src/runtime/prompt.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/gateway/test/knowledge.test.ts`, `apps/widget/src/components/Chat.tsx` — Answers cite retrieved passages; citation numbers that match nothing retrieved are removed and the rest renumbered per document; sources travel as source parts from Hamnivo's publication record and the widget lists them (tested). Source-support QA rubric (Jev) pending. |
 | G07 | Tool registry | P0 | C | planned |  |
 | G08 | Tool authorization gateway | P0 | C | planned |  |
 | G09 | Bounded execution | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/contracts/src/agents.ts` — Per-agent ceilings on output tokens, time, steps and history; model failures are retried twice by the outbox, then the conversation goes to people with an honest note (tested). Cost and concurrency budgets pending. |
@@ -111,7 +111,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | G14 | Action receipts | P1 | C | planned |  |
 | G15 | Limited autopilot | P1 | C | planned |  |
 | G16 | Durable case workflows | P1 | C | planned |  |
-| G17 | Knowledge ingestion pipeline | P0 | C | planned |  |
+| G17 | Knowledge ingestion pipeline | P0 | C | in-progress | `apps/gateway/src/knowledge/extract.ts`, `apps/gateway/src/knowledge/ingestion.service.ts`, `apps/gateway/src/knowledge/scanner.ts`, `apps/gateway/src/knowledge/text.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/gateway/test/knowledge.test.ts` — Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). Parsing runs in-process (no sandbox) and URL sources are pending. |
 | G18 | Knowledge editorial workflow | P1 | C | planned |  |
 | G19 | Customer memory | P1 | L | planned |  |
 | G20 | Outcome learning queue | P1 | L | planned |  |
@@ -258,7 +258,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | X06 | Inter-agent authenticity | P0 | A | planned |  |
 | X07 | Plugin isolation | P0 | A | planned |  |
 | X08 | Scoped kill switches | P0 | C | in-progress | `apps/gateway/src/runtime/kill-switches.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/db/migrations/20260927021253_agents_runtime_security.sql` — Kill switches for the tenant, a brand or an agent stop AI replies at once; AI-held conversations go to people on their next message, new conversations start with people, and clearing restores AI replies (tested, mutation-checked). Switches are cleared, never deleted. Tool-level switches arrive with tools. |
-| X09 | Source-aware context | P0 | C | planned |  |
+| X09 | Source-aware context | P0 | C | in-progress | `apps/gateway/src/runtime/prompt.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/gateway/test/knowledge.test.ts` — Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool outputs arrive with tools. Injection resistance is not yet measured by an adversarial suite. |
 | X10 | Receipt-based completion | P0 | Q | planned |  |
 | X11 | Privacy-safe trace records | P0 | C | in-progress | `apps/gateway/src/runtime/runs.service.ts`, `apps/gateway/test/agents.int.test.ts` — Run and step records hold versions, counts, hashes and error kinds but no prompt or reply text (tested); staff read them through the API with analytics.read. |
 | X12 | Prompt and memory injection tests | P0 | L | planned |  |

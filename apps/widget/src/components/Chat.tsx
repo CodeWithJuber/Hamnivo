@@ -13,7 +13,15 @@ import { ParticipantBadge, type ParticipantKind } from '@hamnivo/ui/components/p
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LANGUAGE_NAMES, LOCALES, type Locale } from '../i18n.js';
+import { renderMarkdown } from '../markdown.js';
 import type { ChatState } from '../useChat.js';
+
+interface Source {
+  id: string;
+  title: string;
+  url: string | null;
+  excerpt: string | null;
+}
 
 interface Custom {
   kind: ParticipantKind;
@@ -21,13 +29,20 @@ interface Custom {
   role: string;
   state: 'accepted' | OutgoingMessage['state'];
   clientMessageId?: string;
+  /** Knowledge an AI answer cites, numbered as in its text (G06). */
+  sources?: Source[];
 }
 
 const textOf = (m: Message) =>
   m.parts
-    .map((p) => ('text' in p && typeof p.text === 'string' ? p.text : ''))
+    .map((p) => (p.type === 'text' ? p.text : ''))
     .join('\n')
     .trim();
+
+const sourcesOf = (m: Message): Source[] =>
+  m.parts.flatMap((p) =>
+    p.type === 'source' ? [{ id: p.sourceId, title: p.title, url: p.url, excerpt: p.excerpt }] : [],
+  );
 
 function toThread(
   messages: Message[],
@@ -49,6 +64,7 @@ function toThread(
           name: m.sender.kind === 'customer' ? you : m.sender.displayName,
           role: m.sender.roleLabel ?? '',
           state: 'accepted',
+          sources: sourcesOf(m),
         } satisfies Custom,
       },
     };
@@ -108,18 +124,47 @@ function Bubble({
           roleLabel={custom.role ?? ''}
         />
       ) : null}
-      <div
-        dir="auto"
-        className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-[15px] leading-relaxed ${
-          mine
-            ? 'bg-primary text-primary-foreground'
-            : custom.kind === 'system'
-              ? 'bg-transparent text-text-muted text-sm'
-              : 'border border-border bg-surface text-text'
-        }`}
-      >
-        {text}
-      </div>
+      {mine || custom.kind === 'system' ? (
+        <div
+          dir="auto"
+          className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-[15px] leading-relaxed ${
+            mine ? 'bg-primary text-primary-foreground' : 'bg-transparent text-text-muted text-sm'
+          }`}
+        >
+          {text}
+        </div>
+      ) : (
+        <div
+          dir="auto"
+          className="hv-markdown max-w-[85%] break-words rounded-2xl border border-border bg-surface px-3 py-2 text-[15px] leading-relaxed text-text"
+          // Sanitized by renderMarkdown: a short allow-list of tags and http(s) links only.
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized above
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }}
+        />
+      )}
+      {custom.sources?.length ? (
+        <div className="max-w-[85%] text-xs text-text-muted" data-testid="sources">
+          <p className="font-medium">{t('sources')}</p>
+          <ol className="list-decimal ps-5">
+            {custom.sources.map((source) => (
+              <li key={source.id} dir="auto">
+                {source.url ? (
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="text-link underline underline-offset-2"
+                  >
+                    {source.title}
+                  </a>
+                ) : (
+                  source.title
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
       {mine && custom.state !== 'accepted' ? (
         <p
           className="flex items-center gap-2 text-xs text-text-muted"

@@ -1,6 +1,62 @@
-import type { DeliveryState, Message, Sender } from '@hamnivo/contracts';
+import type { DeliveryState, Message, Sender, SourcePart } from '@hamnivo/contracts';
+import { schema, type TenantTx } from '@hamnivo/db';
 import type { OwnerMode } from '@hamnivo/db/schema';
 import type { AuthorityMessage } from '@hamnivo/domain';
+import { and, eq, inArray, or } from 'drizzle-orm';
+import type { z } from 'zod';
+
+export type SourceRef = z.infer<typeof SourcePart>;
+
+/** What Hamnivo recorded about an AI answer it published. */
+export interface PublicationFacts {
+  sources: SourceRef[];
+  /** The agent's display name at the time (a role such as "AI assistant"). */
+  displayName?: string;
+}
+
+/**
+ * Facts about AI answers Hamnivo published in a conversation, by authority message id. They come
+ * from Hamnivo's own records, so nothing written into the authority by others can pose as a
+ * citation or an agent's name. (Chatwoot's customer view does not return message keys, so the
+ * match is on the message id that was recorded when the answer was posted.)
+ */
+export async function publicationFacts(
+  tx: TenantTx,
+  conversationId: string,
+  messages: Pick<AuthorityMessage, 'ref' | 'key'>[],
+): Promise<Map<string, PublicationFacts>> {
+  const refs = [...new Set(messages.map((m) => Number(m.ref)).filter(Number.isSafeInteger))];
+  const keys = [...new Set(messages.map((m) => m.key).filter((k) => k?.startsWith('hv1:p:')))];
+  if (refs.length === 0 && keys.length === 0) return new Map();
+  const rows = await tx
+    .select({
+      key: schema.publications.sourceKey,
+      authorityId: schema.publications.authorityMessageId,
+      detail: schema.publications.detail,
+    })
+    .from(schema.publications)
+    .where(
+      and(
+        eq(schema.publications.conversationId, conversationId),
+        or(
+          refs.length ? inArray(schema.publications.authorityMessageId, refs) : undefined,
+          keys.length ? inArray(schema.publications.sourceKey, keys as string[]) : undefined,
+        ),
+      ),
+    );
+  const found = new Map<string, PublicationFacts>();
+  for (const row of rows) {
+    const detail = (row.detail ?? {}) as { sources?: SourceRef[]; displayName?: string };
+    const facts: PublicationFacts = {
+      sources: detail.sources ?? [],
+      ...(detail.displayName ? { displayName: detail.displayName } : {}),
+    };
+    const byKey = messages.find((m) => m.key === row.key);
+    const ref = byKey?.ref ?? (row.authorityId === null ? null : String(row.authorityId));
+    if (ref) found.set(ref, facts);
+  }
+  return found;
+}
 
 export type CustomerStatus = 'open' | 'waiting_for_person' | 'with_person' | 'resolved';
 export type Responder = 'ai' | 'person' | 'none';
@@ -54,13 +110,19 @@ export function contractMessage(input: {
   sequence: number | null;
   clientMessageId: string | null;
   delivery: DeliveryState | null;
+  /** What Hamnivo recorded when it published this AI answer (never taken from the authority). */
+  facts?: PublicationFacts;
 }): Message {
+  const sender = senderOf(input.message);
+  if (sender.kind === 'ai_agent' && input.facts?.displayName) {
+    sender.displayName = input.facts.displayName;
+  }
   const text = input.message.text?.trim();
   return {
     id: input.id,
     conversationId: input.conversationId,
     sequence: input.sequence,
-    sender: senderOf(input.message),
+    sender,
     visibility: input.message.private ? 'internal' : 'public',
     parts: [
       {
@@ -68,6 +130,7 @@ export function contractMessage(input: {
         text: text || (input.message.attachments.length > 0 ? '[attachment]' : '[empty message]'),
         format: 'plain',
       },
+      ...(input.facts?.sources ?? []),
     ],
     createdAt: input.message.createdAt.toISOString(),
     clientMessageId: input.clientMessageId,

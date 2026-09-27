@@ -33,7 +33,10 @@ const PERMISSIVE = new Set([
 const WEAK_COPYLEFT = new Set(['MPL-2.0', 'LGPL-3.0-or-later', 'LGPL-2.1-or-later', 'EPL-2.0']);
 
 /** Reviewed exceptions: package → reason. Keep this list short and explicit. */
-const REVIEWED: Record<string, string> = {};
+const REVIEWED: Record<string, string> = {
+  // package.json says "BSD"; the LICENSE file is the two-clause BSD text. Used by mammoth (DOCX).
+  duck: 'BSD-2-Clause (LICENSE file)',
+};
 
 interface Entry {
   name: string;

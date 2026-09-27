@@ -1,4 +1,5 @@
 import { randomBytes, randomInt } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { appendAudit } from '../audit.js';
 import type { Db } from '../client.js';
 import { newId, toPublicId } from '../ids.js';
@@ -54,6 +55,9 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     conversationId: newId(),
     sessionId: newId(),
     modelSecretId: newId(),
+    knowledgeSourceId: newId(),
+    documentId: newId(),
+    documentVersionId: newId(),
     agentId: newId(),
     agentVersionId: newId(),
     runId: newId(),
@@ -326,6 +330,45 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       version: 2,
       state: 'draft',
       config: { displayName: 'Assistant', model: { provider: 'mock', modelId: 'hamnivo-mock' } },
+    });
+    await tx.insert(s.knowledgeSources).values({
+      id: ids.knowledgeSourceId,
+      tenantId,
+      workspaceId: ids.workspaceId,
+      brandId: ids.brandId,
+      name: 'Help centre',
+    });
+    await tx.insert(s.knowledgeDocuments).values({
+      id: ids.documentId,
+      tenantId,
+      sourceId: ids.knowledgeSourceId,
+      title: 'Returns',
+    });
+    await tx.insert(s.documentVersions).values({
+      id: ids.documentVersionId,
+      tenantId,
+      documentId: ids.documentId,
+      version: 1,
+      state: 'ready',
+      mediaType: 'text/markdown',
+      byteSize: 40,
+      contentHash: bytes(),
+      text: 'You can return items within 30 days.',
+      readyAt: new Date(),
+    });
+    await tx
+      .update(s.knowledgeDocuments)
+      .set({ currentVersionId: ids.documentVersionId })
+      .where(eq(s.knowledgeDocuments.id, ids.documentId));
+    await tx.insert(s.knowledgeChunks).values({
+      tenantId,
+      versionId: ids.documentVersionId,
+      documentId: ids.documentId,
+      sourceId: ids.knowledgeSourceId,
+      seq: 0,
+      heading: 'Returns',
+      text: 'You can return items within 30 days.',
+      tokens: 9,
     });
     await tx.insert(s.killSwitches).values({
       tenantId,

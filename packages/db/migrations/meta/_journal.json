@@ -85,6 +85,20 @@
       "when": 1790475173366,
       "tag": "20260927021253_agents_runtime_security",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790476486368,
+      "tag": "20260927023446_knowledge",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790476487610,
+      "tag": "20260927023447_knowledge_security",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@ import type { AgentConfig, ModelChoice } from '@hamnivo/contracts';
 import {
   type ClaimedOutboxEvent,
   type Db,
+  fromPublicId,
   schema,
   type TenantTx,
   toPublicId,
@@ -17,8 +18,9 @@ import { type JournalEntry, JournalService } from '../authority/journal.service.
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
 import { AuthorityRegistry, type ConnectionRuntime } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
-import { contractMessage } from '../authority/views.js';
+import { contractMessage, type PublicationFacts, type SourceRef } from '../authority/views.js';
 import { AppError } from '../common/app-error.js';
+import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
 import { type ActiveAgent, AgentsService } from './agents.service.js';
@@ -26,7 +28,7 @@ import { type AiHandoffReason, HANDOFF_NOTES } from './handoff-notes.js';
 import { checkHonesty } from './honesty.js';
 import { KillSwitchesService } from './kill-switches.service.js';
 import { ModelFactory, ModelUnavailableError } from './models.js';
-import { historyMessages, systemPrompt } from './prompt.js';
+import { applyCitations, historyMessages, systemPrompt } from './prompt.js';
 import { type RunOutcome, RunsService } from './runs.service.js';
 
 interface CustomerMessageEvent {
@@ -49,6 +51,19 @@ interface Generated {
   inputTokens: number | null;
   outputTokens: number | null;
   latencyMs: number;
+  /** Knowledge the reply cites, in citation order. */
+  sources: SourceRef[];
+}
+
+/** Passages retrieved per run. */
+const PASSAGES = 5;
+
+/** The start of a passage, cut at a word boundary, for the customer to recognise the source. */
+function excerptOf(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= 280) return flat;
+  const cut = flat.slice(0, 280);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), 200))}…`;
 }
 
 /** Why a reply was not published, recorded on the publication for review. */
@@ -106,6 +121,7 @@ export class RepliesService {
     private readonly runs: RunsService,
     private readonly models: ModelFactory,
     private readonly contacts: AuthorityContactsService,
+    private readonly retrieval: RetrievalService,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -175,7 +191,11 @@ export class RepliesService {
     if (publication) {
       const posted = await runtime.authority.findByKey(ref, sourceKey, publication.createdAt);
       if (posted) {
-        await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted);
+        const stored = (publication.detail ?? {}) as Partial<PublicationFacts>;
+        await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted, {
+          sources: stored.sources ?? [],
+          ...(stored.displayName ? { displayName: stored.displayName } : {}),
+        });
         await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'replied' }));
         return;
       }
@@ -221,6 +241,10 @@ export class RepliesService {
       latencyMs: generated.latencyMs,
     };
 
+    const facts: PublicationFacts = {
+      sources: generated.sources,
+      displayName: agent.config.displayName,
+    };
     const reserved = await this.tx(tenantId, async (tx) => {
       const locked = await this.ownership.lock(tx, payload.conversationId);
       const reason = this.fenced(locked, payload.epoch);
@@ -233,7 +257,7 @@ export class RepliesService {
           sourceKey,
           contentHash: sha256(reply),
           state: reason ? 'aborted' : 'reserved',
-          detail: reason ? { reason, currentEpoch: locked.ownershipEpoch } : {},
+          detail: reason ? { reason, currentEpoch: locked.ownershipEpoch } : facts,
         })
         .onConflictDoUpdate({
           target: schema.publications.sourceKey,
@@ -243,7 +267,7 @@ export class RepliesService {
                 detail: { reason, currentEpoch: locked.ownershipEpoch },
                 updatedAt: this.clock(),
               }
-            : { updatedAt: this.clock() },
+            : { updatedAt: this.clock(), detail: facts },
         })
         .returning();
       if (reason) await this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry });
@@ -285,7 +309,7 @@ export class RepliesService {
       );
       throw error;
     }
-    await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted);
+    await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted, facts);
     await this.tx(tenantId, (tx) =>
       this.finishWithUsage(tx, tenantId, run.id, 'replied', telemetry),
     );
@@ -342,7 +366,19 @@ export class RepliesService {
       key,
       author: { kind: 'bot', botRef: String(bot.externalBotId) },
       visibility: 'private',
-      text: `AI suggestion (not sent to the customer):\n\n${generated.text}`,
+      text: [
+        `AI suggestion (not sent to the customer):\n\n${generated.text}`,
+        ...(generated.sources.length
+          ? [
+              `Sources:\n${generated.sources
+                .map(
+                  (source, i) =>
+                    `[${i + 1}] ${source.title}${source.url ? ` (${source.url})` : ''}`,
+                )
+                .join('\n')}`,
+            ]
+          : []),
+      ].join('\n\n'),
     });
     await this.tx(tenantId, (tx) =>
       this.finishWithUsage(tx, tenantId, run.id, 'drafted', {
@@ -410,14 +446,29 @@ export class RepliesService {
     const config: AgentConfig = agent.config;
     const messages = historyMessages(history, config.limits.historyMessages);
     const assist = config.mode === 'assist';
+    const passages = await this.retrieve(tenantId, runId, context, config, history);
     const base =
-      systemPrompt(config, context.brandName) +
+      systemPrompt(config, context.brandName, passages) +
       (assist
         ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
         : '');
     for (const correction of [null, CORRECTION]) {
       const system = correction ? `${base}\n\n${correction}` : base;
-      const result = await this.callModels(tenantId, runId, config, system, messages, view);
+      const generated = await this.callModels(tenantId, runId, config, system, messages, view);
+      const cited = applyCitations(generated.text, passages, (p) => p.documentId);
+      const result: Generated = {
+        ...generated,
+        text: cited.text,
+        sources: cited.cited.map((p) => ({
+          type: 'source',
+          sourceId: toPublicId('document', p.documentId),
+          title: p.title.slice(0, 300),
+          url: p.url,
+          version: `v${p.version}`,
+          excerpt: excerptOf(p.text),
+          freshness: 'current',
+        })),
+      };
       const verdict = checkHonesty(result.text);
       await this.tx(tenantId, (tx) =>
         this.runs.step(tx, tenantId, runId, {
@@ -434,6 +485,53 @@ export class RepliesService {
       }
     }
     return null;
+  }
+
+  /**
+   * Passages from the agent's knowledge for the customer's latest words (G05). Customer answers
+   * draw only on public sources; assist mode may use internal ones.
+   */
+  private async retrieve(
+    tenantId: string,
+    runId: string,
+    context: Context,
+    config: AgentConfig,
+    history: AuthorityMessage[],
+  ): Promise<Passage[]> {
+    const brandId = context.control.brandId;
+    if (config.knowledgeSourceIds.length === 0 || !brandId) return [];
+    const query = history
+      .filter((m) => m.direction === 'incoming' && !m.private && m.text?.trim())
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .slice(-2)
+      .map((m) => (m.text ?? '').trim())
+      .join('\n')
+      .slice(-1000);
+    if (!query) return [];
+    const started = Date.now();
+    const passages = await this.tx(tenantId, (tx) =>
+      this.retrieval.search(tx, {
+        brandId,
+        sourceIds: config.knowledgeSourceIds.map((id) => fromPublicId('source', id)),
+        audience: config.mode === 'assist' ? 'staff' : 'customer',
+        query,
+        limit: PASSAGES,
+      }),
+    );
+    await this.tx(tenantId, (tx) =>
+      this.runs.step(tx, tenantId, runId, {
+        kind: 'retrieval',
+        name: 'knowledge',
+        status: 'ok',
+        latencyMs: Date.now() - started,
+        inputHash: sha256(query),
+        detail: {
+          passages: passages.length,
+          documents: [...new Set(passages.map((p) => toPublicId('document', p.documentId)))],
+        },
+      }),
+    );
+    return passages;
   }
 
   private async callModels(
@@ -467,6 +565,7 @@ export class RepliesService {
           inputTokens: result.usage.inputTokens ?? null,
           outputTokens: result.usage.outputTokens ?? null,
           latencyMs: Date.now() - started,
+          sources: [],
         };
         await this.tx(tenantId, (tx) =>
           this.runs.step(tx, tenantId, runId, {
@@ -511,7 +610,7 @@ export class RepliesService {
     tenantId: string,
     runId: string,
     outcome: RunOutcome,
-    telemetry: Omit<Generated, 'text'>,
+    telemetry: Omit<Generated, 'text' | 'sources'>,
   ) {
     await this.runs.finish(tx, runId, { outcome, ...telemetry });
     const now = this.clock();
@@ -604,6 +703,7 @@ export class RepliesService {
     conversationId: string,
     sourceKey: string,
     posted: AuthorityMessage,
+    facts: PublicationFacts,
   ): Promise<void> {
     const authorityId = Number(posted.ref);
     const entries: JournalEntry[] = await this.tx(tenantId, async (tx) => {
@@ -630,6 +730,7 @@ export class RepliesService {
               sequence: null,
               clientMessageId: null,
               delivery: null,
+              facts,
             }),
           },
           authorityCreatedAt: posted.createdAt,

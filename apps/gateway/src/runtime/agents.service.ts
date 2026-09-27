@@ -21,7 +21,7 @@ import {
 import { authorize, type Permission, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
 import canonicalize from 'canonicalize';
-import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { AppError } from '../common/app-error.js';
 import { isUniqueViolation } from '../common/pg-error.js';
@@ -366,6 +366,24 @@ export class AgentsService {
           });
         }
         throw error;
+      }
+      if (config.knowledgeSourceIds.length > 0) {
+        const ids = config.knowledgeSourceIds.map((id) => fromPublicId('source', id));
+        const sources = await tx
+          .select()
+          .from(schema.knowledgeSources)
+          .where(inArray(schema.knowledgeSources.id, ids));
+        const usable = new Set(
+          sources
+            .filter((s) => s.brandId === row.brandId && s.status !== 'retired')
+            .map((s) => s.id),
+        );
+        if (ids.some((id) => !usable.has(id))) {
+          throw new AppError('VALIDATION_FAILED', {
+            detail: 'Some knowledge sources are missing, retired or belong to another brand.',
+            fields: [{ path: 'config.knowledgeSourceIds', message: 'Unknown or unusable source' }],
+          });
+        }
       }
       const now = this.clock();
       // The live version retires first: at most one version is published at a time.

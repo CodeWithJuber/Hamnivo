@@ -60,6 +60,12 @@ const EnvSchema = z.object({
   OPENAI_COMPATIBLE_BASE_URL: z.url().optional(),
   OPENAI_COMPATIBLE_API_KEY: z.string().min(1).optional(),
 
+  /** Embeddings for knowledge search; `mock` is deterministic and offline. */
+  EMBEDDING_PROVIDER: z.enum(['mock', 'openai', 'google', 'openai-compatible']).default('mock'),
+  EMBEDDING_MODEL: z.string().min(1).default('hamnivo-embed'),
+  /** ClamAV daemon for uploads (tcp://host:3310). Without it only the EICAR test file is caught. */
+  CLAMAV_URL: z.url().optional(),
+
   /** Bearer token for GET /metrics; the endpoint is disabled without it. */
   METRICS_TOKEN: z.string().min(16).optional(),
   API_DOCS: bool.default(true),

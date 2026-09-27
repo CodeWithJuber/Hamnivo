@@ -79,6 +79,37 @@ How a customer message is handled:
 `test/agents.int.test.ts` covers these paths over HTTP. A mutation check confirms the tests catch a
 missing kill-switch check and a disabled honesty guard.
 
+## Knowledge (M8)
+
+| Area | Where |
+|---|---|
+| Sources (owner, public or internal, review cycle), documents and versions (G04) | `src/knowledge/knowledge.*` |
+| Ingestion (G17): scan, then type check, parse, sanitize, chunk, embed and index | `src/knowledge/ingestion.service.ts`, `extract.ts`, `text.ts`, `scanner.ts` |
+| Hybrid retrieval with eligibility filters applied before ranking (G05) | `src/knowledge/retrieval.service.ts` |
+| Passages fenced as data; citations checked against what was retrieved (G06, X09) | `src/runtime/prompt.ts`, `replies.service.ts` |
+
+- **Scanning.** ClamAV scans uploads over INSTREAM when `CLAMAV_URL` is set; otherwise only the
+  EICAR test file is caught. A scan that cannot run refuses the upload.
+- **Parsing limits.**
+  - Text must be valid UTF-8.
+  - A PDF must really be a PDF, of 500 pages at most (unpdf).
+  - A Word file must really be DOCX (mammoth).
+  - HTML loses its scripts, styles and navigation, and headings become Markdown.
+  - Parsing stops after 30 seconds.
+- **Search.**
+  - Retrieval fuses vector similarity (pgvector HNSW, cosine) and word matches (`simple`
+    tsvector, so Arabic, Urdu, Hindi and English all work) by reciprocal rank.
+  - Only the current ready version of an active document is eligible. It must also be in an active
+    source of the brand, visible to the audience, not expired, and reviewed within its cycle.
+- **Sources in answers.**
+  - Sources are stored with the publication record.
+  - The widget shows them from there, matched by message ID, never from content in Chatwoot.
+  - The agent's display name comes from the same record.
+
+`test/knowledge.int.test.ts` covers ingestion of Markdown, HTML and PDF, refusals, version
+replacement, visibility and freshness rules, Urdu and Hindi search, cited answers and tenant
+isolation. `test/knowledge.test.ts` covers the parsers, the ClamAV client, chunking and citations.
+
 ## Security rules enforced here
 
 - **Delegation ceiling (A03).** Grants and invitations may only hand out permissions the grantor

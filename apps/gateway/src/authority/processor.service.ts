@@ -25,7 +25,7 @@ import { INBOX_SIGNAL } from './ingress.service.js';
 import { type JournalEntry, JournalService } from './journal.service.js';
 import { type ControlRow, OwnershipService, type OwnerTarget } from './ownership.service.js';
 import { authorityMessageUuid } from './uuid.js';
-import { contractMessage, laneOf } from './views.js';
+import { contractMessage, laneOf, publicationFacts } from './views.js';
 
 const BATCH = 50;
 const LEASE_SECONDS = 60;
@@ -247,6 +247,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     const entries: JournalEntry[] = [];
     const lane = laneOf(message);
     if (lane) {
+      const facts = (await publicationFacts(tx, control.id, [message])).get(message.ref);
       const view = contractMessage({
         message,
         id: toPublicId('message', authorityMessageUuid(connectionId, message.ref)),
@@ -254,6 +255,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
         sequence: null,
         clientMessageId,
         delivery: message.direction === 'incoming' ? 'accepted' : null,
+        ...(facts ? { facts } : {}),
       });
       if (type === 'message.created') {
         if (!(await this.journal.hasMessage(tx, control.id, lane, authorityId))) {

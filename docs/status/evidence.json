@@ -291,10 +291,11 @@
     "status": "in-progress",
     "evidence": [
       "apps/gateway/src/authority/views.ts",
+      "apps/gateway/test/knowledge.int.test.ts",
       "apps/widget/e2e/journey.spec.ts",
       "apps/widget/src/components/Chat.tsx"
     ],
-    "note": "Every message shows who wrote it with a text role label (AI assistant, Support agent); AI never uses a person's name or avatar (tested in the browser journey)."
+    "note": "Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested)."
   },
   "W10": {
     "status": "in-progress",
@@ -419,5 +420,59 @@
       "packages/db/test/agents.int.test.ts"
     ],
     "note": "Saved drafts are not live; publishing freezes a version with its configuration hash (a database trigger rejects changes), one version is live at a time, and publishing an earlier version is the rollback (tested). Studio screens pending."
+  },
+  "G04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/knowledge/knowledge.service.ts",
+      "apps/gateway/test/knowledge.int.test.ts",
+      "packages/db/src/schema/knowledge.ts"
+    ],
+    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). URL crawling and Studio screens pending."
+  },
+  "G05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/knowledge/retrieval.service.ts",
+      "apps/gateway/test/knowledge.int.test.ts"
+    ],
+    "note": "Hybrid vector + keyword retrieval with eligibility filters applied before ranking: tenant (RLS), brand, agent's sources, audience (internal sources never reach customer answers), current ready version, expiry and review cycle (tested). Per-customer document scopes pending."
+  },
+  "G06": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/authority/views.ts",
+      "apps/gateway/src/runtime/prompt.ts",
+      "apps/gateway/test/knowledge.int.test.ts",
+      "apps/gateway/test/knowledge.test.ts",
+      "apps/widget/src/components/Chat.tsx"
+    ],
+    "note": "Answers cite retrieved passages; citation numbers that match nothing retrieved are removed and the rest renumbered per document; sources travel as source parts from Hamnivo's publication record and the widget lists them (tested). Source-support QA rubric (Jev) pending."
+  },
+  "G17": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/knowledge/extract.ts",
+      "apps/gateway/src/knowledge/ingestion.service.ts",
+      "apps/gateway/src/knowledge/scanner.ts",
+      "apps/gateway/src/knowledge/text.ts",
+      "apps/gateway/test/knowledge.int.test.ts",
+      "apps/gateway/test/knowledge.test.ts"
+    ],
+    "note": "Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). Parsing runs in-process (no sandbox) and URL sources are pending."
+  },
+  "X09": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/prompt.ts",
+      "apps/gateway/test/knowledge.int.test.ts",
+      "apps/gateway/test/knowledge.test.ts"
+    ],
+    "note": "Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool outputs arrive with tools. Injection resistance is not yet measured by an adversarial suite."
+  },
+  "W08": {
+    "status": "in-progress",
+    "evidence": ["apps/widget/src/components/Chat.tsx", "apps/widget/src/markdown.ts"],
+    "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers. Structured cards pending."
   }
 }

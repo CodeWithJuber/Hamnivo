@@ -55,6 +55,8 @@ export const AgentConfig = z
     /** Tried in order when the main model is overloaded or unavailable, never after partial output. */
     fallbackModels: z.array(ModelChoice).max(2).default([]),
     limits: AgentLimits.prefault({}),
+    /** Knowledge the agent answers from. Customer answers use only public sources (G05). */
+    knowledgeSourceIds: z.array(typeId('source')).max(20).default([]),
   })
   .meta({ id: 'AgentConfig' });
 export type AgentConfig = z.output<typeof AgentConfig>;
