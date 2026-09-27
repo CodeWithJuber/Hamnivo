@@ -907,6 +907,7 @@ export const ur: Translation = {
       none: 'کچھ نہیں ملا',
       noneHint: 'صرف وہی گفتگوئیں تلاش ہوتی ہیں جو آپ دیکھ سکتے ہیں۔',
       clear: 'تلاش صاف کریں',
+      more: 'مزید پیغامات دکھائیں',
     },
     filters: {
       button: 'فلٹر',

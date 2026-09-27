@@ -889,6 +889,7 @@ export const hi: Translation = {
       none: 'कुछ नहीं मिला',
       noneHint: 'सिर्फ़ वही बातचीत खोजी जाती हैं जिन्हें आप देख सकते हैं।',
       clear: 'खोज साफ़ करें',
+      more: 'और संदेश दिखाएँ',
     },
     filters: {
       button: 'फ़िल्टर',

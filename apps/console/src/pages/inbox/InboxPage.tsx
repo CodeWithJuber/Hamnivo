@@ -325,7 +325,18 @@ function activeFilters(search: InboxSearch) {
 
 function SearchResults({ q }: { q: string }) {
   const { t } = useTranslation();
-  const result = useInboxSearch(q);
+  const search = useInboxSearch(q);
+  const merged = useMemo(
+    () =>
+      search.data
+        ? {
+            conversations: search.data.pages[0]?.conversations ?? [],
+            messages: search.data.pages.flatMap((page) => page.messages),
+          }
+        : undefined,
+    [search.data],
+  );
+  const result = { ...search, data: merged };
   const navigate = useNavigate();
   const clear = () =>
     void navigate({
@@ -421,6 +432,17 @@ function SearchResults({ q }: { q: string }) {
                     </li>
                   ))}
                 </ul>
+                {search.hasNextPage ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="self-start"
+                    busy={search.isFetchingNextPage}
+                    onClick={() => void search.fetchNextPage()}
+                  >
+                    {t('inbox.search.more')}
+                  </Button>
+                ) : null}
               </section>
             ) : null}
           </div>

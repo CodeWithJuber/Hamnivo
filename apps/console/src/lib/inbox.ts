@@ -116,16 +116,19 @@ export function useInboxList(search: InboxSearch, pageSize = 25) {
   });
 }
 
+/** Search pages: customers come with the first page; later pages add older message hits. */
 export function useInboxSearch(q: string) {
   const { tenantId, can } = useTenant();
   const term = q.trim();
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: [tenantId, ...inboxKeys.search(term)],
-    queryFn: ({ signal }) =>
-      api<SearchResult>(`/v1/inbox/search?${new URLSearchParams({ q: term })}`, {
-        tenant: tenantId,
-        signal,
-      }),
+    queryFn: ({ pageParam, signal }) => {
+      const query = new URLSearchParams({ q: term });
+      if (pageParam) query.set('cursor', pageParam);
+      return api<SearchResult>(`/v1/inbox/search?${query}`, { tenant: tenantId, signal });
+    },
+    initialPageParam: '',
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
     meta: { studio: true },
     enabled: can('conversations.read') && term.length >= 2,
   });

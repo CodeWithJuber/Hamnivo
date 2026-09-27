@@ -215,7 +215,7 @@ test('HNV-08-05 HNV-09-06 · a colleague’s takeover and typing show up live, a
   await expect(pane.locator('[data-kind="note"]')).toContainText('I spoke to this customer');
 });
 
-test('HNV-07-03 · Arabic: the inbox reads right to left and passes axe', async ({
+test('HNV-07-03 HNV-07-05 · Arabic: the inbox reads right to left, translations sit under the original, axe passes', async ({
   page,
   context,
 }) => {
@@ -225,6 +225,11 @@ test('HNV-07-03 · Arabic: the inbox reads right to left and passes axe', async 
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1, name: 'صندوق الوارد' })).toBeVisible();
   await expect(page.getByTestId('composer')).toContainText('ملاحظة داخلية');
+  // A machine translation into the interface language, labelled, with the original kept.
+  const customer = page.locator('[data-sender="customer"]').first();
+  await customer.getByTestId('translate').click();
+  await expect(customer.getByTestId('translation')).toContainText('ترجمة آلية');
+  await expect(customer).toContainText('Can I change my delivery address?');
   expect(await audit(page, 'inbox (ar)')).toEqual([]);
   const extra = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -392,6 +397,24 @@ test('HNV-08-03 HNV-08-04 · filters that match nothing, then a checked bulk cha
   await expect(page.locator('[data-slot="announcer-polite"]')).toHaveText('Done: 2. Failed: 0.');
   await expect(bar).toHaveCount(0);
   await expect(page.getByTestId('inbox-row')).toHaveCount(1);
+});
+
+test('H07 · search finds customers and message text, notes included, and opens the conversation', async ({
+  page,
+  context,
+}) => {
+  await workspace.staff.signIn(context);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, '/inbox');
+  await page.getByTestId('inbox-search').fill('HM-2048');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page).toHaveURL(/q=HM-2048/);
+  const results = page.getByTestId('search-results');
+  await expect(results.getByTestId('search-message')).toHaveCount(2);
+  await expect(results).toContainText('Internal note');
+  expect(await audit(page, 'inbox search')).toEqual([]);
+  await results.getByTestId('search-message').first().click();
+  await expect(page.getByTestId('conversation-pane')).toBeVisible();
 });
 
 test('screenshots for visual review: inbox and conversation, English and Arabic, desktop and phone', async ({

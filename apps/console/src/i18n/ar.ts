@@ -884,6 +884,7 @@ export const ar: Translation = {
       none: 'لم يُعثر على شيء',
       noneHint: 'البحث يشمل المحادثات التي يمكنك رؤيتها فقط.',
       clear: 'مسح البحث',
+      more: 'عرض المزيد من الرسائل',
     },
     filters: {
       button: 'عوامل التصفية',

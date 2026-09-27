@@ -893,6 +893,7 @@ export const en = {
       none: 'Nothing found',
       noneHint: 'Only conversations you can see are searched.',
       clear: 'Clear search',
+      more: 'Show more messages',
     },
     filters: {
       button: 'Filters',
