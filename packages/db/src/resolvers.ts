@@ -303,10 +303,7 @@ export interface ExpiredMemorySubject {
 }
 
 /** Customers with memory past its retention, across tenants (deleted by the worker per tenant). */
-export async function expiredMemorySubjects(
-  db: Db,
-  limit = 200,
-): Promise<ExpiredMemorySubject[]> {
+export async function expiredMemorySubjects(db: Db, limit = 200): Promise<ExpiredMemorySubject[]> {
   const { rows } = await db.execute<{ tenant_id: string; subject_id: string; brand_id: string }>(
     sql`select * from app.expired_memory_subjects(${limit}::int)`,
   );

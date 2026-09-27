@@ -120,7 +120,10 @@ describe('memory records', () => {
     // History cannot become current again.
     await expectPgError(
       inA((tx) =>
-        tx.update(schema.memoryRecords).set({ status: 'active' }).where(eq(schema.memoryRecords.id, id)),
+        tx
+          .update(schema.memoryRecords)
+          .set({ status: 'active' })
+          .where(eq(schema.memoryRecords.id, id)),
       ),
       '23514',
     );
@@ -174,7 +177,9 @@ describe('deletion tombstones', () => {
     const id = newId();
     await inA((tx) => tombstone(tx, a, { type: 'memory_record', id, observedAt: hourAgo() }));
     await expectPgError(
-      inA((tx) => tx.insert(schema.memoryRecords).values(record(a, { id, key: 'product_interest' }))),
+      inA((tx) =>
+        tx.insert(schema.memoryRecords).values(record(a, { id, key: 'product_interest' })),
+      ),
       '23514',
     );
   });
@@ -205,22 +210,33 @@ describe('deletion tombstones', () => {
     );
     const later = new Date(erasedAt.getTime() + 1000);
     await withTenant(h.app, { tenantId: b.tenantId }, (tx) =>
-      tx.insert(schema.memoryRecords).values(record(subject, { observedAt: later, validFrom: later })),
+      tx
+        .insert(schema.memoryRecords)
+        .values(record(subject, { observedAt: later, validFrom: later })),
     );
   });
 
   it('are append-only, and deletion receipts are never deleted', async () => {
-    await expectPgError(inA((tx) => tx.execute(sql`delete from deletion_tombstones`)), '42501');
+    await expectPgError(
+      inA((tx) => tx.execute(sql`delete from deletion_tombstones`)),
+      '42501',
+    );
     await expectPgError(
       inA((tx) => tx.execute(sql`update deletion_tombstones set memory_key = null`)),
       '42501',
     );
-    await expectPgError(inA((tx) => tx.execute(sql`delete from learning_consents`)), '42501');
+    await expectPgError(
+      inA((tx) => tx.execute(sql`delete from learning_consents`)),
+      '42501',
+    );
     await expectPgError(
       inA((tx) => tx.execute(sql`update learning_consents set state = 'granted'`)),
       '42501',
     );
-    await expectPgError(inA((tx) => tx.execute(sql`delete from memory_deletions`)), '42501');
+    await expectPgError(
+      inA((tx) => tx.execute(sql`delete from memory_deletions`)),
+      '42501',
+    );
   });
 
   it('are replayed after a restore brings deleted memory back', async () => {
