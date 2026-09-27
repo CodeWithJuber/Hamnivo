@@ -39,6 +39,13 @@ export type AddDocumentRequest = z.input<typeof C.AddDocumentRequest>;
 export type DocumentContent = AddDocumentRequest['content'];
 export type KnowledgeVisibility = z.infer<typeof C.KnowledgeVisibility>;
 
+export type MemoryItem = C.MemoryItem;
+export type MemoryDeletionReceipt = C.MemoryDeletionReceipt;
+export type MemoryChange = C.MemoryChange;
+export type MemoryCustomerSummary = C.MemoryCustomerSummary;
+export type MemoryCustomerDetail = C.MemoryCustomerDetail;
+export type MemoryExport = C.MemoryExport;
+
 export type Problem = C.Problem;
 export type ErrorCode = C.ErrorCode;
 

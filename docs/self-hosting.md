@@ -308,13 +308,26 @@ A restore:
 
 1. checks the checksums;
 2. stops the applications;
-3. replaces both databases and the files;
-4. starts everything again. Migrations run first, so a backup from an older version works with
-   newer code.
+3. saves customers' memory consent and memory deletions from the current database;
+4. restores the Hamnivo database beside the current one and runs pending migrations, so a backup
+   from an older version works with newer code;
+5. adds the consent and deletions saved in step 3, and deletes again any memory they cover;
+6. only then replaces the current database, so a restore that fails leaves it as it was;
+7. replaces the Chatwoot database and the files, and starts everything again.
 
-It refuses a backup made with other secrets, unless you move your `.env` away first. On a new
-server, clone the code (A3), copy the backup folder over and run the same command. It installs the
-backup's `.env` and builds what it needs.
+Customers' privacy choices are the one thing a restore does not take back. Someone who withdrew
+consent or had their memory deleted after the backup keeps that choice, and the memory stays
+deleted. Deletions that were still running finish once the worker starts.
+
+It refuses a backup made with other secrets, unless you move your `.env` away first. While it
+runs, it needs free disk space for a second copy of the Hamnivo database. If the current database
+cannot be read, it stops without changing anything; `--ignore-current-database` restores without
+the consent and deletions described above.
+
+On a new server, clone the code (A3), copy the backup folder over and run the same command. It
+installs the backup's `.env` and builds what it needs. A new server has no current database, so
+consent and deletions made after the backup are lost with the old server. To move servers, take a
+fresh backup on the old one just before.
 
 Test a restore now and then on a spare server. `scripts/ci/production-smoke.sh` runs a backup and
 restore drill in its checks.

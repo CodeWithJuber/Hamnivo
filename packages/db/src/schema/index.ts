@@ -4,6 +4,7 @@ export * from './authority.js';
 export { appRole, platformRole } from './helpers.js';
 export * from './identity.js';
 export * from './knowledge.js';
+export * from './memory.js';
 export * from './platform.js';
 export * from './runtime.js';
 export * from './tenancy.js';

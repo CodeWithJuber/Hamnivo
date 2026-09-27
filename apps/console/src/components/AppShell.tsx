@@ -14,6 +14,7 @@ import {
   ActivityIcon,
   BookOpenIcon,
   BotIcon,
+  BrainIcon,
   BuildingIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
@@ -42,6 +43,7 @@ type NavPath =
   | '/brands'
   | '/agents'
   | '/knowledge'
+  | '/memory'
   | '/models'
   | '/runs'
   | '/stop-ai'
@@ -67,6 +69,7 @@ function useNavItems(): NavItem[] {
       icon: BookOpenIcon,
       permission: 'knowledge.read',
     },
+    { to: '/memory', label: t('nav.memory'), icon: BrainIcon, permission: 'memory.read' },
     {
       to: '/models',
       label: t('nav.models'),

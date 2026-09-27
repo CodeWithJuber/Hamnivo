@@ -43,6 +43,19 @@ export const SourcePart = z
   })
   .meta({ id: 'SourcePart' });
 
+/**
+ * A remembered preference an AI answer relied on (G19). It names the memory, never its value:
+ * the customer opens "what we remember" to see or change it. Removed when the memory is deleted.
+ */
+export const MemoryPart = z
+  .object({
+    type: z.literal('memory'),
+    memoryId: z.string(),
+    /** The memory slot, such as `preferred_language`; clients show their own label for it. */
+    key: z.string().max(60),
+  })
+  .meta({ id: 'MemoryPart' });
+
 export const CardPart = z
   .object({
     type: z.literal('card'),
@@ -114,6 +127,7 @@ export const KnownPart = z.discriminatedUnion('type', [
   TextPart,
   AttachmentPart,
   SourcePart,
+  MemoryPart,
   CardPart,
   TaskUpdatePart,
   ActionReceiptPart,
@@ -127,6 +141,7 @@ const KNOWN_PART_TYPES = new Set([
   'text',
   'attachment',
   'source',
+  'memory',
   'card',
   'task_update',
   'action_receipt',
@@ -168,6 +183,8 @@ function partToPlainText(part: MessagePart): string {
       return `[${part.name}]`;
     case 'source':
       return part.url ? `${part.title} (${part.url})` : part.title;
+    case 'memory':
+      return '';
     case 'task_update':
       return part.title;
     case 'action_receipt':
