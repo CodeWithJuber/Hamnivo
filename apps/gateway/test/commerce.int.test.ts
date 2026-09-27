@@ -681,7 +681,7 @@ describe('unknown outcomes are reconciled, never repeated blindly (C07, C09, R07
     // The person who took over is told in a private note, in Chatwoot.
     await settle();
     const notes = (await authorityMessages(conversationId)).filter(
-      (m) => m.private && m.text.startsWith('Money in progress'),
+      (m) => m.private && (m.text ?? '').startsWith('Money in progress'),
     );
     expect(notes.map((m) => m.text)).toEqual([
       [
@@ -1455,21 +1455,45 @@ describe('Stripe adapter through the fake Stripe server (C05, C08)', () => {
     const east = await connectedTenant(slice, 'east');
     const eastTenant = fromPublicId('tenant', east.tenantId);
     const eastAdmin = await mfaClient(east.owner, 'east-owner@example.com');
+    // Stripe makes the webhook secret when an endpoint is added for this connection's URL, so the
+    // connection is created first and the secret is added afterwards.
     const created = await eastAdmin.post('/v1/admin/commerce/merchants', {
       brandId: east.brand.id,
       provider: 'stripe',
       displayName: 'East Stationers',
       currencies: ['AED'],
       apiKey: fakeStripe.apiKey,
-      webhookSecret: 'whsec_east_fake_0123456789abcdef',
     });
     expect(created.status, JSON.stringify(created.body)).toBe(201);
-    expect(created.body.credentials.apiKey).toBe(`••••${fakeStripe.apiKey.slice(-4)}`);
-    expect(JSON.stringify(created.body)).not.toContain(fakeStripe.apiKey);
-    fakeStripe.webhookEndpoints.push({
-      url: created.body.webhookUrl,
-      secret: 'whsec_east_fake_0123456789abcdef',
+    expect(created.body.credentials).toEqual({
+      apiKey: `••••${fakeStripe.apiKey.slice(-4)}`,
+      webhookSecret: null,
     });
+    expect(JSON.stringify(created.body)).not.toContain(fakeStripe.apiKey);
+    const secret = 'whsec_east_fake_0123456789abcdef';
+    const probe = store.signed(
+      {
+        id: 'evt_probe',
+        type: 'checkout.session.expired',
+        created: 0,
+        livemode: false,
+        data: { object: {} },
+      },
+      secret,
+    );
+    const early = await fetch(created.body.webhookUrl, {
+      method: 'POST',
+      headers: probe.headers,
+      body: probe.rawBody.toString('utf8'),
+    });
+    expect(early.status).toBe(401);
+    expect(await early.text()).toContain('Webhook signing is not set up for this shop.');
+    fakeStripe.webhookEndpoints.push({ url: created.body.webhookUrl, secret });
+    const withSecret = await eastAdmin.patch(`/v1/admin/commerce/merchants/${created.body.id}`, {
+      webhookSecret: secret,
+    });
+    expect(withSecret.status, JSON.stringify(withSecret.body)).toBe(200);
+    expect(withSecret.body.credentials.webhookSecret).toBe('••••cdef');
 
     const visitor = new Visitor(slice.baseUrl, east.brand.widgetId, east.hostOrigin);
     await visitor.open();

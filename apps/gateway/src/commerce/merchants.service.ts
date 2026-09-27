@@ -119,14 +119,12 @@ export class MerchantsService {
       if (input.provider === 'mock' && !this.providers.mockAllowed()) {
         throw new AppError('FEATURE_DISABLED', { detail: 'Demo shops are turned off here.' });
       }
-      if (input.provider === 'stripe' && (!input.apiKey || !input.webhookSecret)) {
+      // The webhook secret may come later: Stripe makes it when the endpoint is added for this
+      // connection's webhookUrl. Until then deliveries are refused and payments are confirmed
+      // by asking Stripe.
+      if (input.provider === 'stripe' && !input.apiKey) {
         throw new AppError('VALIDATION_FAILED', {
-          fields: [
-            ...(input.apiKey ? [] : [{ path: 'apiKey', message: 'Required for Stripe' }]),
-            ...(input.webhookSecret
-              ? []
-              : [{ path: 'webhookSecret', message: 'Required for Stripe' }]),
-          ],
+          fields: [{ path: 'apiKey', message: 'Required for Stripe' }],
         });
       }
       const [active] = await tx
