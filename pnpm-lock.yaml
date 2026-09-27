@@ -449,6 +449,9 @@ importers:
       '@typesafe-ai/sdk':
         specifier: 0.6.0
         version: 0.6.0
+      stripe:
+        specifier: 22.6.2
+        version: 22.6.2(@types/node@24.19.0)
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -637,9 +640,18 @@ importers:
       '@date-fns/tz':
         specifier: 1.5.0
         version: 1.5.0
+      '@noble/hashes':
+        specifier: 2.4.0
+        version: 2.4.0
+      canonicalize:
+        specifier: 5.1.0
+        version: 5.1.0
       date-fns:
         specifier: 4.4.0
         version: 4.4.0
+      decimal.js:
+        specifier: 10.6.0
+        version: 10.6.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -7043,6 +7055,15 @@ packages:
   strip-json-comments@5.0.3:
     resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
     engines: {node: '>=14.16'}
+
+  stripe@22.6.2:
+    resolution: {integrity: sha512-PwRE2scocvXqDKPiskMa5vRJEAEkq46W69XyUYmAwrNSLr675lQnfqLwnsndAWizwgihOWw/irLmoFRo3ez7ew==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/node': '>=18'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   strnum@2.4.2:
     resolution: {integrity: sha512-rDG3Ah4TV0k1hWvLSzkZtMmLN9+eS+h3knq4MP6A42Y3Yh5qGNnOUs1jJkoSr8FG5dsL28c7KgkIBzSEykqtuw==}
@@ -13794,6 +13815,10 @@ snapshots:
   strip-indent@4.1.1: {}
 
   strip-json-comments@5.0.3: {}
+
+  stripe@22.6.2(@types/node@24.19.0):
+    optionalDependencies:
+      '@types/node': 24.19.0
 
   strnum@2.4.2:
     dependencies:
