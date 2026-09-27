@@ -42,6 +42,13 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
   lists active and earlier stops, and lets the AI answer again.
 - **Runs.** A table of outcome, version, model, tokens, time taken and start time, with filters.
   A side sheet shows one run's steps. No message text is shown.
+- **Decision rules** (board 12). Routing mode (shadow by default), teams with their topics and
+  languages, the rubric editor (provider and pinned Jev version, time limit, topics with keywords,
+  what Jev may see, a threshold per language), a panel to try a message, recent decisions with
+  human review, and Jev compared with the fixed rules.
+- **Answer caching** (board 25). What is cached per tier and for how long, a question inspector,
+  stored answers by fingerprint and sources, stopping reuse after a correction, and use and health
+  per day, tier and language. Questions and answers are never listed.
 - **Account security.** Turn two-factor authentication on or off, and add passkeys.
 
 Every screen has loading, empty, error and permission-denied states. Status is never shown by
@@ -49,7 +56,8 @@ colour alone. Studio works from the keyboard, returns focus after dialogs, and a
 
 ## Languages
 
-English is the source language. Arabic, Hindi and Urdu are complete but await review by native
+`pnpm --filter @hamnivo/console test` checks that every locale has every key, the same
+placeholders and no empty text. English is the source language. Arabic, Hindi and Urdu are complete but await review by native
 speakers; the interface says so in each of them. Arabic and Urdu use right-to-left layout. Pick a
 language in the header, or add `?lang=ar` (or `hi`, `ur`) to a link.
 
@@ -115,6 +123,8 @@ pnpm --filter @hamnivo/console test:e2e
   - a Markdown upload that becomes ready, and a search preview;
   - stopping the AI for a brand, then resuming;
   - runs after a widget conversation, with the run's steps;
+  - a routing rubric edited, published and tried in Arabic, with shadow decisions (`e2e/decisions.spec.ts`);
+  - answer caching turned on, inspected, reused and stopped in Urdu;
   - axe (WCAG 2.2 A and AA) on every main screen in English and Arabic;
   - no sideways scrolling from 320 to 1920 px.
 - The last test saves screenshots for review in `e2e/screenshots/` (not in git).

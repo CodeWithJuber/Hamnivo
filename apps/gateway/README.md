@@ -161,6 +161,60 @@ Late publication (R06):
   configuration's `availability`, and the answer to "talk to a person": queued, or offline with
   the time people are back. Without hours, the widget never claims someone is available.
 
+## Team routing decisions (J02, J05, J08)
+
+- **Routing teams** (`/v1/admin/brands/{brandId}/routing/teams`, `PATCH /v1/admin/routing-teams/{teamId}`):
+  the topics a team handles, the languages its people answer in and those served through a
+  reviewed translation path, whether it accepts conversations, and the Chatwoot team it maps to.
+  Reading needs `decisions.read`; changing needs `inbox.manage`.
+- **Rubric** (`/v1/admin/brands/{brandId}/decisions/team-routing`, `…/draft`, `…/publish`,
+  `…/mode`, `…/test`): versioned topics with baseline keywords, the inputs shared with the
+  provider (recent customer messages with personal data redacted, conversation status), a
+  threshold per language slice and the provider (`none`, `mock` or `jev` with a pinned version).
+  Changing needs `decisions.manage`; every change is audited.
+- **When it runs.** The outbox topic `conversation.route` runs on a conversation's first customer
+  message and on every hand-off. Jev decides within the rubric's deadline (1.5 s on the chat path)
+  behind the circuit breaker; the deterministic baseline decides when Jev abstains, fails, is
+  too slow or is not sure enough for the language. A request for a person is never overridden.
+- **Modes.** Brands start in `shadow`: both decisions are recorded, the baseline's is final and no
+  team is assigned. `live` assigns the Chatwoot team of the final decision (only accepting teams).
+  Routing picks a team, never an owner.
+- **Records** (`…/records`, `/v1/admin/decisions/{decisionId}`, `…/review`) keep labels, versions,
+  latency and tokens, never customer text; confidence only when the provider gave one.
+  `…/experiment` compares Jev with the baseline per language from shadow and live records.
+
+## Reply language (U01, U07)
+
+- `GET /v1/widget/language` and `POST /v1/widget/language` (widget session): interface locale,
+  explicit reply language (`en`, `ar`, `hi`, `ur`, `hi-Latn`, `ur-Latn`), style, and closing the
+  language question. POST because the widget's cross-origin surface allows GET and POST only.
+- Replies follow the explicit choice, then the words of the latest message, then the interface
+  locale. Words that fit Hinglish and Roman Urdu equally keep the language in use, suggest one from
+  the locale and ask once. The choice and its source are recorded on the model step. Preferences
+  keep choices and detected candidates, never message text.
+
+## Answer cache (K01, K02, K07, K08, K10, K12)
+
+- **Store.** A dedicated Valkey connection with a key prefix (`CACHE_KEY_PREFIX`), a 150 ms
+  timeout (`CACHE_TIMEOUT_MS`) and no offline queue, wrapped fail-open: a failure reads as
+  unavailable, the cache is skipped for 30 s and work is done fresh.
+- **Exact answers.** Only a conversation's first message, public, complete, with no personal data,
+  personal context or excluded class is stored. Keys bind tenant, brand, audience, language, model,
+  prompt version, dependency versions and a per-tenant HMAC of the question. Hits are rechecked
+  against the current knowledge. Off until a brand turns it on.
+- **Query embeddings** for knowledge search are cached under the text, model, dimensions and
+  preprocessing version, and coalesced per process.
+- **Invalidation.** Database triggers bump dependency versions with knowledge, source, agent and
+  brand changes; policy changes and `POST …/cache/invalidate` bump the tier. Stale entries are
+  reported, then removed.
+- **Studio** (`/v1/admin/brands/{brandId}/cache/policy`, `inspect`, `entries`, `impact`,
+  `invalidate`, `metrics`): reading needs `knowledge.read`, changing `knowledge.manage`; changes
+  are audited. Metrics are counts only; health comes from a live probe of the store.
+- **Hooks for other modules.** `CacheExclusions.register(rule)` excludes requests (commerce, K06).
+  `personalContext` on a cache request (for example `personal_memory`) keeps a result out of
+  shared entries. Entries private to one customer need a `PERSONAL_CACHE_SCOPE` provider that
+  returns the customer's namespace and personal version (memory); without it they are never cached.
+
 ## Widget framing
 
 `GET /v1/widget/frame-policy?widgetId=wid_…` names the websites that may frame a brand's widget

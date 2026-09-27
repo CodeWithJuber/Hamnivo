@@ -7,9 +7,9 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 174 · in-progress: 55 · implemented: 3
+**Blueprint features (232):** planned: 156 · in-progress: 61 · implemented: 10 · implemented-live-unverified: 1 · partial: 4
 
-**Design states (168):** planned: 148 · in-progress: 9 · implemented: 10 · partial: 1
+**Design states (168):** planned: 135 · in-progress: 9 · implemented: 23 · partial: 1
 
 ## Blueprint features
 
@@ -124,14 +124,14 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| J01 | Jev decision adapter | P0 | C | in-progress | `packages/adapters/src/jev/provider.ts`, `packages/adapters/test/jev/contract.test.ts`, `packages/domain/src/decisions.ts` — Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). Not yet called by the gateway; no live Jev call has run. |
-| J02 | Intent and team routing | P0 | C | planned |  |
+| J01 | Jev decision adapter | P0 | C | in-progress | `packages/adapters/src/jev/provider.ts`, `packages/adapters/test/jev/contract.test.ts`, `packages/domain/src/decisions.ts` — Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). The gateway calls it for team routing (tested against a fake Jev); no live Jev call has run. |
+| J02 | Intent and team routing | P0 | C | implemented-live-unverified | `apps/gateway/src/decisions/routing.service.ts`, `packages/domain/src/routing.ts`, `packages/domain/test/routing.test.ts`, `apps/gateway/test/routing.int.test.ts`, `apps/console/e2e/decisions.spec.ts` — Routing runs on the first customer message and on every hand-off. Brands start in shadow mode: Jev and the deterministic baseline are both recorded and only the baseline is applied (no team assignment from Jev). Live mode applies Jev when it is sure enough per language, otherwise the baseline, within a 1.5 s deadline behind the circuit breaker. Explicit requests for a person are never overridden. Only accepting teams are chosen; live routing assigns the Chatwoot team. Tested against a fake Jev and the fake Chatwoot; no live Jev call has run. |
 | J03 | Skill and evidence ranking | P1 | C | planned |  |
 | J04 | Escalation advisory | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/domain/src/human-request.ts`, `packages/domain/test/human-request.test.ts` — A typed request for a person (English, Hinglish, Roman Urdu, Arabic, Hindi, Urdu, with negation and look-alikes) hands the conversation to people before any model or decision provider runs (tested end to end); Jev escalation advice for other cases is pending. |
-| J05 | Threshold and rubric editor | P1 | C | planned |  |
-| J06 | Provider fallback | P0 | C | in-progress | `packages/adapters/src/jev/breaker.ts`, `packages/adapters/src/jev/provider.ts`, `packages/adapters/test/jev/resilience.test.ts` — Total deadline, caller cancellation (also when the transport ignores it), no retries, circuit breaker with half-open probe, and decided/abstained/unavailable/invalid results (tested). The fallback chain in the gateway is pending. |
-| J07 | Decision audit and cost | P0 | C | in-progress | `packages/adapters/src/jev/provider.ts`, `packages/domain/src/decisions.ts` — Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested); persisting decision records and cost is pending. |
-| J08 | Jev versus baseline experiments | P1 | C | planned |  |
+| J05 | Threshold and rubric editor | P1 | C | implemented | `apps/gateway/src/decisions/rubrics.service.ts`, `packages/contracts/src/decisions.ts`, `apps/gateway/test/routing.int.test.ts`, `apps/console/src/pages/DecisionsPage.tsx`, `apps/console/e2e/decisions.spec.ts` — Versioned rubric per brand (draft, publish), pinned Jev version, deadline, topics with baseline keywords, inputs shared with Jev (personal data redacted) and a threshold per language slice (no threshold means Jev abstains there). Studio editor with server validation on the fields, publish confirmation and a test panel. Arabic, Hindi and Urdu text is pending native review. |
+| J06 | Provider fallback | P0 | C | in-progress | `packages/adapters/src/jev/breaker.ts`, `packages/adapters/src/jev/provider.ts`, `packages/adapters/test/jev/resilience.test.ts` — Total deadline, caller cancellation (also when the transport ignores it), no retries, circuit breaker with half-open probe, and decided/abstained/unavailable/invalid results (tested). In the gateway, routing falls back to the deterministic baseline on abstained, unavailable or invalid results within the 1.5 s deadline (tested). |
+| J07 | Decision audit and cost | P0 | C | in-progress | `packages/adapters/src/jev/provider.ts`, `packages/domain/src/decisions.ts`, `apps/gateway/src/decisions/routing.service.ts`, `apps/gateway/test/routing.int.test.ts` — Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested). Routing decisions are persisted as decision records (status, confidence only when given, latency, tokens, shadow or live, policy version) and shown in Studio; cost is kept as tokens. |
+| J08 | Jev versus baseline experiments | P1 | C | partial | `apps/gateway/src/decisions/rubrics.service.ts`, `packages/domain/src/routing.ts`, `packages/domain/test/routing.test.ts`, `apps/gateway/test/routing.int.test.ts`, `apps/console/src/pages/DecisionsPage.tsx` — Jev versus baseline from shadow and live records: agreement, accuracy against human reviews, abstained, unavailable and invalid counts, latency p50/p95 and tokens, overall and per language. Cost is reported as tokens; prices per token are not applied yet. |
 
 ### Developer integrations
 
@@ -269,20 +269,20 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| U01 | Language preference model | P0 | C | planned |  |
+| U01 | Language preference model | P0 | C | partial | `packages/domain/src/language.ts`, `packages/domain/test/language.test.ts`, `apps/gateway/src/language/language.service.ts`, `apps/gateway/test/language.int.test.ts`, `apps/widget/e2e/composer.spec.ts` — Interface locale, explicit reply language (BCP 47, including hi-Latn and ur-Latn), detected language with an ask-once rule for Hinglish/Roman Urdu ambiguity, and style are kept separately per customer; replies follow the explicit choice, then the words, then the locale. Hinglish and Roman Urdu are never treated as English. Messages are not stored. Timezone is not part of the model yet. |
 | U02 | Hinglish and Roman Urdu | P0 | C | in-progress | `apps/gateway/test/agents.int.test.ts`, `packages/domain/src/human-request.ts`, `packages/domain/test/fixtures/human-requests.json` — Hinglish and Roman Urdu requests for a person are detected across spellings, transliterations and negation (74 fixture cases) and act end to end; identifiers pass through unchanged. Native-speaker review pending. |
 | U03 | Per-participant translations | P1 | C | planned |  |
-| U04 | RTL interaction | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `apps/widget/src/i18n.ts` — Document direction follows the language and message text uses dir=auto, so Arabic and Urdu read right to left while Latin order numbers keep their direction; bidi copy behaviour tests pending. |
-| U05 | Localized complete flows | P0 | C | planned |  |
+| U04 | RTL interaction | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `apps/widget/src/i18n.ts`, `apps/widget/e2e/composer.spec.ts`, `apps/widget/src/components/BidiText.tsx` — Document direction follows the language; each message and the message box read in their own direction by letter majority, and Latin order numbers, amounts, emails and links are isolated left to right, also in Markdown answers. Copying gives back the exact text (browser-tested in Urdu with axe). |
+| U05 | Localized complete flows | P0 | C | in-progress | `apps/widget/test/i18n.test.ts`, `apps/console/test/i18n.test.ts`, `apps/console/src/i18n/decisions.ts`, `apps/console/src/i18n/caching.ts` — Key-coverage tests for the widget and Studio: every key in all four locales, the same placeholders, no empty or copied English text. New screens are complete in all four locales. Server validation messages, emails and receipts are not localized yet. Arabic, Hindi and Urdu text is pending native review. |
 | U06 | Locale-safe numbers and dates | P0 | Q | planned |  |
-| U07 | Language-capable routing | P0 | C | planned |  |
-| U08 | Accessible multilingual composer | P0 | C | planned |  |
+| U07 | Language-capable routing | P0 | C | implemented | `packages/domain/src/routing.ts`, `packages/domain/test/routing.test.ts`, `apps/gateway/test/routing.int.test.ts` — Teams list the languages they answer in and those they serve through a reviewed translation path. Routing prefers a team that speaks the customer's language, then a translation path, then a language gap (recorded as the language match), and treats Hinglish and Roman Urdu as alternatives when the words fit both. Staff can be ranked by language the same way. |
+| U08 | Accessible multilingual composer | P0 | C | implemented | `apps/widget/src/components/Chat.tsx`, `apps/widget/src/components/BidiText.tsx`, `apps/widget/src/markdown.ts`, `apps/widget/e2e/composer.spec.ts` — Enter sends and Shift+Enter adds a line; an Enter that confirms an input method composition never sends (isComposing, composition events and Safari's key code 229). The box and each message read in their own direction by letter majority; order numbers, amounts, emails and links are isolated left to right, also in Markdown answers, and copy back unchanged. Browser-tested with axe in Urdu; the tests were mutation-checked. |
 | U09 | Honest AI identity | P0 | C | in-progress | `apps/gateway/src/runtime/honesty.ts`, `apps/gateway/src/runtime/prompt.ts`, `apps/gateway/test/agents.int.test.ts`, `apps/gateway/test/runtime.test.ts` — Non-removable prompt rules plus an output guard for claims of being human in English, Hinglish, Roman Urdu, Hindi, Urdu and Arabic: regenerate once, otherwise publish nothing and hand over (tested, mutation-checked). Native-speaker review of the phrase lists pending. |
-| U10 | Configurable communication style | P1 | C | planned |  |
-| U11 | Respectful correction | P0 | C | planned |  |
-| U12 | Anti-sycophancy suite | P0 | C | planned |  |
-| U13 | Fairness pair evaluation | P0 | C | planned |  |
-| U14 | Native-language adjudication | P0 | C | planned |  |
+| U10 | Configurable communication style | P1 | C | in-progress | `packages/domain/src/language.ts`, `packages/domain/test/language.test.ts`, `apps/gateway/src/runtime/prompt.ts` — Style (concise, conversational or formal; gentle or direct) is stored per customer and turned into prompt lines that change wording only. There is no widget control yet and facts-preserved-across-styles is not evaluated yet. |
+| U11 | Respectful correction | P0 | C | in-progress | `packages/domain/src/reply-rules.ts`, `apps/gateway/src/runtime/prompt.ts`, `packages/evals/src/sycophancy.ts`, `packages/evals/test/sycophancy.test.ts` — Non-removable reply rules: correct false assumptions politely with what the information shows, admit uncertainty and earlier errors, never agree to be agreeable. The same rules drive the offline evaluation; results with a real model are pending. |
+| U12 | Anti-sycophancy suite | P0 | C | in-progress | `packages/evals/src/sycophancy.ts`, `packages/evals/corpus/sycophancy.json`, `packages/evals/src/cli.ts`, `packages/evals/test/sycophancy.test.ts` — Offline harness, starter corpus (12 scenarios in six language slices, each neutral and under five kinds of pressure), metrics with Wilson intervals and a CLI. CI runs a subset with a faithful and a sycophantic reference (the second is caught) and the mock model. Results with a real model and native review of the corpus are pending. |
+| U13 | Fairness pair evaluation | P0 | C | in-progress | `packages/evals/src/fairness.ts`, `packages/evals/corpus/fairness.json`, `packages/evals/test/fairness.test.ts` — Fairness groups swap names, gender markers, politeness, script and language and check the product's own routing baseline, hand-off detection and personal data check; name, gender and politeness swaps are gated at 100% in CI. Finding: a Roman Urdu request for a person using "banday" is not detected. Reply-level pairs with a model and native review are pending. |
+| U14 | Native-language adjudication | P0 | C | in-progress | `packages/evals/src/adjudication.ts`, `packages/evals/corpus/adjudication.json`, `packages/evals/test/adjudication.test.ts` — Six scenarios in six slices: the product's reply language choice and the stated facts are checked automatically, and review packets (JSON plus a sheet per slice) wait for native speakers; meaning and tone rates come only from their reviews. All packets are pending native review. |
 | U15 | Commercial transparency | P0 | Q | planned |  |
 | U16 | Voice language evaluation | P2 | Research | planned |  |
 
@@ -307,18 +307,18 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| K01 | Exact cache policy | P0 | C | planned |  |
-| K02 | Embedding cache | P1 | C | planned |  |
+| K01 | Exact cache policy | P0 | C | implemented | `packages/domain/src/cache.ts`, `packages/domain/test/cache.test.ts`, `apps/gateway/src/cache/cache.service.ts`, `apps/gateway/src/cache/answers.ts`, `apps/gateway/test/cache.int.test.ts`, `apps/console/e2e/decisions.spec.ts` — Exact answer cache, off until a brand turns it on. Only a first, public, complete answer without personal data, personal context or excluded classes is stored; keys bind tenant, brand, audience, language, model, prompt version, every dependency version and a per-tenant HMAC of the question, and hits are rechecked against the current knowledge. Never crosses tenants or brands (tested, mutation-checked). The index keeps fingerprints and references only. |
+| K02 | Embedding cache | P1 | C | implemented | `apps/gateway/src/cache/vectors.ts`, `apps/gateway/src/knowledge/retrieval.service.ts`, `apps/gateway/test/cache.int.test.ts` — Query embeddings for knowledge search are cached under the exact text, the embedding model, its dimensions and the preprocessing version; queries with personal data are not cached. |
 | K03 | Retrieval cache | P1 | C | planned |  |
 | K04 | Translation and NLP cache | P1 | C | planned |  |
 | K05 | Semantic FAQ cache | P1 | A | planned |  |
 | K06 | Sensitive and live-data exclusions | P0 | Q | planned |  |
-| K07 | Versioned invalidation | P0 | C | planned |  |
-| K08 | Singleflight and outage fallback | P1 | C | planned |  |
+| K07 | Versioned invalidation | P0 | C | implemented | `packages/db/migrations/20260927093337_decisions_language_cache_security.sql`, `apps/gateway/src/cache/admin.service.ts`, `apps/gateway/test/cache.int.test.ts`, `packages/db/test/decisions.int.test.ts` — Database triggers bump dependency versions in the same transaction as knowledge, source, agent and brand changes; policy changes and manual invalidation bump the tier. Old keys stop being read at once, stale entries are reported, and cleanup of stored copies reports failures separately. |
+| K08 | Singleflight and outage fallback | P1 | C | partial | `packages/adapters/src/cache/store.ts`, `packages/adapters/src/cache/singleflight.ts`, `apps/gateway/src/cache/store.ts`, `apps/gateway/test/cache.int.test.ts` — A store that fails or times out (150 ms) reads as unavailable, is skipped for 30 s and answers are computed fresh; human messaging never waits on the cache (tested with a hanging store). Concurrent misses are coalesced per process for embeddings; answers are not coalesced yet. |
 | K09 | Cache privacy and deletion | P0 | L | planned |  |
-| K10 | Cache observability | P1 | C | planned |  |
+| K10 | Cache observability | P1 | C | partial | `apps/gateway/src/cache/cache.service.ts`, `apps/gateway/src/cache/admin.service.ts`, `apps/gateway/test/cache.int.test.ts`, `apps/console/src/pages/CachingPage.tsx` — Daily counts per brand, tier and language: hits, misses, bypasses, stale, stores, errors, saved tokens, saved time and lookup time, with no content; store health from a live probe. False hits are counted only as rechecks that failed; cost in money is not computed. |
 | K11 | Cache poisoning and fairness suite | P0 | A | planned |  |
-| K12 | Pluggable cache adapter | P0 | C | planned |  |
+| K12 | Pluggable cache adapter | P0 | C | implemented | `packages/adapters/src/cache/store.ts`, `packages/adapters/test/cache/store.test.ts`, `apps/gateway/src/cache/store.ts` — One small store interface with Valkey (prefixed, dedicated connection, short timeouts) and bounded in-memory implementations, a fail-open wrapper and singleflight; policy stays in the domain. |
 
 ## Design states (UX state matrix)
 
@@ -395,7 +395,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | HNV-07-01 | Mobile chat | Small-screen default | planned |  |
 | HNV-07-02 | Mobile chat | Keyboard open | planned |  |
 | HNV-07-03 | Arabic chat | RTL locale selected | planned |  |
-| HNV-07-04 | Language selector | Detected language uncertain | planned |  |
+| HNV-07-04 | Language selector | Detected language uncertain | implemented | `apps/widget/src/components/Chat.tsx`, `apps/widget/src/useReplyLanguage.ts`, `apps/gateway/test/language.int.test.ts`, `apps/widget/e2e/composer.spec.ts` — The widget asks once which language replies should use when the words fit Hinglish and Roman Urdu (suggestion from the interface locale first); the choice or "not now" is saved on the server and the message stays as sent. Browser-tested in Urdu with axe. Arabic, Hindi and Urdu text is pending native review. |
 | HNV-07-05 | Message translation | Translation shown with original | planned |  |
 | HNV-07-06 | Mobile navigation | Panel and gesture dismissal | planned |  |
 
@@ -447,12 +447,12 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-12-01 | Decision policy | Typed question configured | planned |  |
-| HNV-12-02 | Decision test | Complete typed result | planned |  |
-| HNV-12-03 | Decision run | Abstention or insufficient evidence | planned |  |
-| HNV-12-04 | Decision run | Invalid response schema | planned |  |
-| HNV-12-05 | Decision run | Provider timeout/unavailable | planned |  |
-| HNV-12-06 | Decision review | Human correction | planned |  |
+| HNV-12-01 | Decision policy | Typed question configured | implemented | `apps/console/src/pages/DecisionsPage.tsx`, `apps/gateway/test/routing.int.test.ts`, `apps/console/e2e/decisions.spec.ts` — Rubric draft with topics, allowed outputs (plus "other"), inputs and per-language thresholds; malformed keys and unpinned Jev versions are refused before anything goes live. Arabic, Hindi and Urdu text is pending native review. |
+| HNV-12-02 | Decision test | Complete typed result | implemented | `apps/console/src/pages/DecisionsPage.tsx`, `apps/gateway/test/routing.int.test.ts`, `apps/console/e2e/decisions.spec.ts` — The test panel shows the typed result, the policy interpretation (explicit request, redacted inputs), the topic and team used and the request id; it can be run again with another message. |
+| HNV-12-03 | Decision run | Abstention or insufficient evidence | implemented | `apps/console/src/pages/DecisionsPage.tsx`, `apps/gateway/test/routing.int.test.ts`, `apps/console/e2e/decisions.spec.ts` — Abstention is labelled as "not sure"; the baseline decides and no confidence is shown unless the provider gave one. |
+| HNV-12-04 | Decision run | Invalid response schema | implemented | `apps/console/src/pages/DecisionsPage.tsx`, `apps/gateway/src/decisions/routing.service.ts`, `apps/gateway/test/routing.int.test.ts` — An answer that fails the contract is recorded as invalid with a diagnostic reason for administrators and never enters business state; the baseline decides. |
+| HNV-12-05 | Decision run | Provider timeout/unavailable | implemented | `apps/console/src/pages/DecisionsPage.tsx`, `apps/gateway/src/decisions/routing.service.ts`, `apps/gateway/test/routing.int.test.ts` — A deadline or open circuit is recorded as unavailable and the baseline route continues at once; requests for a person are never blocked. |
+| HNV-12-06 | Decision review | Human correction | implemented | `apps/console/src/pages/DecisionsPage.tsx`, `apps/gateway/src/decisions/rubrics.service.ts`, `apps/gateway/test/routing.int.test.ts` — Reviewers record the correct topic, a reason and a separate consent to use the label in evaluations; reviews are audited and feed the comparison. |
 
 ### 13 · Guardrails, tools and action approvals
 
@@ -590,12 +590,12 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-25-01 | Cache policy | Tier configuration | planned |  |
-| HNV-25-02 | Cache inspector | Eligible hit | planned |  |
-| HNV-25-03 | Cache inspector | Miss or low similarity | planned |  |
-| HNV-25-04 | Cache inspector | Mandatory bypass | planned |  |
-| HNV-25-05 | Cache invalidation | Correction propagation | planned |  |
-| HNV-25-06 | Cache operations | Outage or quality regression | planned |  |
+| HNV-25-01 | Cache policy | Tier configuration | implemented | `apps/console/src/pages/CachingPage.tsx`, `apps/gateway/src/cache/admin.service.ts`, `apps/gateway/test/cache.int.test.ts`, `apps/console/e2e/decisions.spec.ts` — Tiers with their time to keep, versioned per brand; personal, identity, account, memory, live order, payment, approval and tool data are never cached whatever the settings. Arabic, Hindi and Urdu text is pending native review. |
+| HNV-25-02 | Cache inspector | Eligible hit | implemented | `apps/console/src/pages/CachingPage.tsx`, `apps/gateway/test/cache.int.test.ts`, `apps/console/e2e/decisions.spec.ts` — The inspector shows tier, fingerprint, knowledge versions, language, a preview of the public answer and the expiry, without counting or changing anything. |
+| HNV-25-03 | Cache inspector | Miss or low similarity | implemented | `apps/console/src/pages/CachingPage.tsx`, `apps/gateway/test/cache.int.test.ts`, `apps/console/e2e/decisions.spec.ts` — A miss says why (not stored yet, or out of date) and the answer is computed fresh; admission happens only for complete, still eligible answers. |
+| HNV-25-04 | Cache inspector | Mandatory bypass | implemented | `apps/console/src/pages/CachingPage.tsx`, `packages/domain/src/cache.ts`, `apps/gateway/test/cache.int.test.ts`, `apps/console/e2e/decisions.spec.ts` — Personal data, later turns, personal context and excluded requests (the commerce hook) bypass with a reason code; nothing of them is stored or logged. |
+| HNV-25-05 | Cache invalidation | Correction propagation | implemented | `apps/console/src/pages/CachingPage.tsx`, `apps/gateway/src/cache/admin.service.ts`, `apps/gateway/test/cache.int.test.ts`, `apps/console/e2e/decisions.spec.ts` — Invalidation shows the affected entries, stops reads at once by bumping versions, marks entries no longer used and reports copies that could not be removed yet. |
+| HNV-25-06 | Cache operations | Outage or quality regression | implemented | `apps/console/src/pages/CachingPage.tsx`, `apps/gateway/src/cache/store.ts`, `apps/gateway/test/cache.int.test.ts` — When the store is down, answers are computed fresh and Studio shows the degraded state, recent failures and the error counts; a tier can be turned off from the policy. |
 
 ### 26 · Platform super-admin operations
 

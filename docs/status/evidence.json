@@ -389,9 +389,11 @@
     "evidence": [
       "apps/widget/e2e/journey.spec.ts",
       "apps/widget/src/components/Chat.tsx",
-      "apps/widget/src/i18n.ts"
+      "apps/widget/src/i18n.ts",
+      "apps/widget/e2e/composer.spec.ts",
+      "apps/widget/src/components/BidiText.tsx"
     ],
-    "note": "Document direction follows the language and message text uses dir=auto, so Arabic and Urdu read right to left while Latin order numbers keep their direction; bidi copy behaviour tests pending."
+    "note": "Document direction follows the language; each message and the message box read in their own direction by letter majority, and Latin order numbers, amounts, emails and links are isolated left to right, also in Markdown answers. Copying gives back the exact text (browser-tested in Urdu with axe)."
   },
   "G01": {
     "status": "in-progress",
@@ -527,7 +529,7 @@
       "packages/adapters/test/jev/contract.test.ts",
       "packages/domain/src/decisions.ts"
     ],
-    "note": "Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). Not yet called by the gateway; no live Jev call has run."
+    "note": "Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). The gateway calls it for team routing (tested against a fake Jev); no live Jev call has run."
   },
   "J04": {
     "status": "in-progress",
@@ -546,12 +548,17 @@
       "packages/adapters/src/jev/provider.ts",
       "packages/adapters/test/jev/resilience.test.ts"
     ],
-    "note": "Total deadline, caller cancellation (also when the transport ignores it), no retries, circuit breaker with half-open probe, and decided/abstained/unavailable/invalid results (tested). The fallback chain in the gateway is pending."
+    "note": "Total deadline, caller cancellation (also when the transport ignores it), no retries, circuit breaker with half-open probe, and decided/abstained/unavailable/invalid results (tested). In the gateway, routing falls back to the deterministic baseline on abstained, unavailable or invalid results within the 1.5 s deadline (tested)."
   },
   "J07": {
     "status": "in-progress",
-    "evidence": ["packages/adapters/src/jev/provider.ts", "packages/domain/src/decisions.ts"],
-    "note": "Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested); persisting decision records and cost is pending."
+    "evidence": [
+      "packages/adapters/src/jev/provider.ts",
+      "packages/domain/src/decisions.ts",
+      "apps/gateway/src/decisions/routing.service.ts",
+      "apps/gateway/test/routing.int.test.ts"
+    ],
+    "note": "Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested). Routing decisions are persisted as decision records (status, confidence only when given, latency, tokens, shadow or live, policy version) and shown in Studio; cost is kept as tokens."
   },
   "E08": {
     "status": "in-progress",
@@ -708,5 +715,306 @@
     "status": "in-progress",
     "evidence": ["examples/wordpress/hamnivo-chat.php", "examples/wordpress/README.md"],
     "note": "A WordPress plugin adds the chat loader and signs assertions for signed-in WordPress users. It passes php -l but is not yet tested against a real WordPress installation."
+  },
+  "J02": {
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "apps/gateway/src/decisions/routing.service.ts",
+      "packages/domain/src/routing.ts",
+      "packages/domain/test/routing.test.ts",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Routing runs on the first customer message and on every hand-off. Brands start in shadow mode: Jev and the deterministic baseline are both recorded and only the baseline is applied (no team assignment from Jev). Live mode applies Jev when it is sure enough per language, otherwise the baseline, within a 1.5 s deadline behind the circuit breaker. Explicit requests for a person are never overridden. Only accepting teams are chosen; live routing assigns the Chatwoot team. Tested against a fake Jev and the fake Chatwoot; no live Jev call has run."
+  },
+  "J05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/decisions/rubrics.service.ts",
+      "packages/contracts/src/decisions.ts",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Versioned rubric per brand (draft, publish), pinned Jev version, deadline, topics with baseline keywords, inputs shared with Jev (personal data redacted) and a threshold per language slice (no threshold means Jev abstains there). Studio editor with server validation on the fields, publish confirmation and a test panel. Arabic, Hindi and Urdu text is pending native review."
+  },
+  "J08": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/decisions/rubrics.service.ts",
+      "packages/domain/src/routing.ts",
+      "packages/domain/test/routing.test.ts",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/src/pages/DecisionsPage.tsx"
+    ],
+    "note": "Jev versus baseline from shadow and live records: agreement, accuracy against human reviews, abstained, unavailable and invalid counts, latency p50/p95 and tokens, overall and per language. Cost is reported as tokens; prices per token are not applied yet."
+  },
+  "U01": {
+    "status": "partial",
+    "evidence": [
+      "packages/domain/src/language.ts",
+      "packages/domain/test/language.test.ts",
+      "apps/gateway/src/language/language.service.ts",
+      "apps/gateway/test/language.int.test.ts",
+      "apps/widget/e2e/composer.spec.ts"
+    ],
+    "note": "Interface locale, explicit reply language (BCP 47, including hi-Latn and ur-Latn), detected language with an ask-once rule for Hinglish/Roman Urdu ambiguity, and style are kept separately per customer; replies follow the explicit choice, then the words, then the locale. Hinglish and Roman Urdu are never treated as English. Messages are not stored. Timezone is not part of the model yet."
+  },
+  "HNV-07-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/useReplyLanguage.ts",
+      "apps/gateway/test/language.int.test.ts",
+      "apps/widget/e2e/composer.spec.ts"
+    ],
+    "note": "The widget asks once which language replies should use when the words fit Hinglish and Roman Urdu (suggestion from the interface locale first); the choice or \"not now\" is saved on the server and the message stays as sent. Browser-tested in Urdu with axe. Arabic, Hindi and Urdu text is pending native review."
+  },
+  "U05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/widget/test/i18n.test.ts",
+      "apps/console/test/i18n.test.ts",
+      "apps/console/src/i18n/decisions.ts",
+      "apps/console/src/i18n/caching.ts"
+    ],
+    "note": "Key-coverage tests for the widget and Studio: every key in all four locales, the same placeholders, no empty or copied English text. New screens are complete in all four locales. Server validation messages, emails and receipts are not localized yet. Arabic, Hindi and Urdu text is pending native review."
+  },
+  "U07": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/routing.ts",
+      "packages/domain/test/routing.test.ts",
+      "apps/gateway/test/routing.int.test.ts"
+    ],
+    "note": "Teams list the languages they answer in and those they serve through a reviewed translation path. Routing prefers a team that speaks the customer's language, then a translation path, then a language gap (recorded as the language match), and treats Hinglish and Roman Urdu as alternatives when the words fit both. Staff can be ranked by language the same way."
+  },
+  "U08": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/components/BidiText.tsx",
+      "apps/widget/src/markdown.ts",
+      "apps/widget/e2e/composer.spec.ts"
+    ],
+    "note": "Enter sends and Shift+Enter adds a line; an Enter that confirms an input method composition never sends (isComposing, composition events and Safari's key code 229). The box and each message read in their own direction by letter majority; order numbers, amounts, emails and links are isolated left to right, also in Markdown answers, and copy back unchanged. Browser-tested with axe in Urdu; the tests were mutation-checked."
+  },
+  "U10": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/domain/src/language.ts",
+      "packages/domain/test/language.test.ts",
+      "apps/gateway/src/runtime/prompt.ts"
+    ],
+    "note": "Style (concise, conversational or formal; gentle or direct) is stored per customer and turned into prompt lines that change wording only. There is no widget control yet and facts-preserved-across-styles is not evaluated yet."
+  },
+  "U11": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/domain/src/reply-rules.ts",
+      "apps/gateway/src/runtime/prompt.ts",
+      "packages/evals/src/sycophancy.ts",
+      "packages/evals/test/sycophancy.test.ts"
+    ],
+    "note": "Non-removable reply rules: correct false assumptions politely with what the information shows, admit uncertainty and earlier errors, never agree to be agreeable. The same rules drive the offline evaluation; results with a real model are pending."
+  },
+  "U12": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/evals/src/sycophancy.ts",
+      "packages/evals/corpus/sycophancy.json",
+      "packages/evals/src/cli.ts",
+      "packages/evals/test/sycophancy.test.ts"
+    ],
+    "note": "Offline harness, starter corpus (12 scenarios in six language slices, each neutral and under five kinds of pressure), metrics with Wilson intervals and a CLI. CI runs a subset with a faithful and a sycophantic reference (the second is caught) and the mock model. Results with a real model and native review of the corpus are pending."
+  },
+  "U13": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/evals/src/fairness.ts",
+      "packages/evals/corpus/fairness.json",
+      "packages/evals/test/fairness.test.ts"
+    ],
+    "note": "Fairness groups swap names, gender markers, politeness, script and language and check the product's own routing baseline, hand-off detection and personal data check; name, gender and politeness swaps are gated at 100% in CI. Finding: a Roman Urdu request for a person using \"banday\" is not detected. Reply-level pairs with a model and native review are pending."
+  },
+  "U14": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/evals/src/adjudication.ts",
+      "packages/evals/corpus/adjudication.json",
+      "packages/evals/test/adjudication.test.ts"
+    ],
+    "note": "Six scenarios in six slices: the product's reply language choice and the stated facts are checked automatically, and review packets (JSON plus a sheet per slice) wait for native speakers; meaning and tone rates come only from their reviews. All packets are pending native review."
+  },
+  "K01": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/cache.ts",
+      "packages/domain/test/cache.test.ts",
+      "apps/gateway/src/cache/cache.service.ts",
+      "apps/gateway/src/cache/answers.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Exact answer cache, off until a brand turns it on. Only a first, public, complete answer without personal data, personal context or excluded classes is stored; keys bind tenant, brand, audience, language, model, prompt version, every dependency version and a per-tenant HMAC of the question, and hits are rechecked against the current knowledge. Never crosses tenants or brands (tested, mutation-checked). The index keeps fingerprints and references only."
+  },
+  "K02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/cache/vectors.ts",
+      "apps/gateway/src/knowledge/retrieval.service.ts",
+      "apps/gateway/test/cache.int.test.ts"
+    ],
+    "note": "Query embeddings for knowledge search are cached under the exact text, the embedding model, its dimensions and the preprocessing version; queries with personal data are not cached."
+  },
+  "K07": {
+    "status": "implemented",
+    "evidence": [
+      "packages/db/migrations/20260927093337_decisions_language_cache_security.sql",
+      "apps/gateway/src/cache/admin.service.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "packages/db/test/decisions.int.test.ts"
+    ],
+    "note": "Database triggers bump dependency versions in the same transaction as knowledge, source, agent and brand changes; policy changes and manual invalidation bump the tier. Old keys stop being read at once, stale entries are reported, and cleanup of stored copies reports failures separately."
+  },
+  "K08": {
+    "status": "partial",
+    "evidence": [
+      "packages/adapters/src/cache/store.ts",
+      "packages/adapters/src/cache/singleflight.ts",
+      "apps/gateway/src/cache/store.ts",
+      "apps/gateway/test/cache.int.test.ts"
+    ],
+    "note": "A store that fails or times out (150 ms) reads as unavailable, is skipped for 30 s and answers are computed fresh; human messaging never waits on the cache (tested with a hanging store). Concurrent misses are coalesced per process for embeddings; answers are not coalesced yet."
+  },
+  "K10": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/cache/cache.service.ts",
+      "apps/gateway/src/cache/admin.service.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/src/pages/CachingPage.tsx"
+    ],
+    "note": "Daily counts per brand, tier and language: hits, misses, bypasses, stale, stores, errors, saved tokens, saved time and lookup time, with no content; store health from a live probe. False hits are counted only as rechecks that failed; cost in money is not computed."
+  },
+  "K12": {
+    "status": "implemented",
+    "evidence": [
+      "packages/adapters/src/cache/store.ts",
+      "packages/adapters/test/cache/store.test.ts",
+      "apps/gateway/src/cache/store.ts"
+    ],
+    "note": "One small store interface with Valkey (prefixed, dedicated connection, short timeouts) and bounded in-memory implementations, a fail-open wrapper and singleflight; policy stays in the domain."
+  },
+  "HNV-12-01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Rubric draft with topics, allowed outputs (plus \"other\"), inputs and per-language thresholds; malformed keys and unpinned Jev versions are refused before anything goes live. Arabic, Hindi and Urdu text is pending native review."
+  },
+  "HNV-12-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "The test panel shows the typed result, the policy interpretation (explicit request, redacted inputs), the topic and team used and the request id; it can be run again with another message."
+  },
+  "HNV-12-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Abstention is labelled as \"not sure\"; the baseline decides and no confidence is shown unless the provider gave one."
+  },
+  "HNV-12-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/src/decisions/routing.service.ts",
+      "apps/gateway/test/routing.int.test.ts"
+    ],
+    "note": "An answer that fails the contract is recorded as invalid with a diagnostic reason for administrators and never enters business state; the baseline decides."
+  },
+  "HNV-12-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/src/decisions/routing.service.ts",
+      "apps/gateway/test/routing.int.test.ts"
+    ],
+    "note": "A deadline or open circuit is recorded as unavailable and the baseline route continues at once; requests for a person are never blocked."
+  },
+  "HNV-12-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/src/decisions/rubrics.service.ts",
+      "apps/gateway/test/routing.int.test.ts"
+    ],
+    "note": "Reviewers record the correct topic, a reason and a separate consent to use the label in evaluations; reviews are audited and feed the comparison."
+  },
+  "HNV-25-01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "apps/gateway/src/cache/admin.service.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Tiers with their time to keep, versioned per brand; personal, identity, account, memory, live order, payment, approval and tool data are never cached whatever the settings. Arabic, Hindi and Urdu text is pending native review."
+  },
+  "HNV-25-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "The inspector shows tier, fingerprint, knowledge versions, language, a preview of the public answer and the expiry, without counting or changing anything."
+  },
+  "HNV-25-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "A miss says why (not stored yet, or out of date) and the answer is computed fresh; admission happens only for complete, still eligible answers."
+  },
+  "HNV-25-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "packages/domain/src/cache.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Personal data, later turns, personal context and excluded requests (the commerce hook) bypass with a reason code; nothing of them is stored or logged."
+  },
+  "HNV-25-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "apps/gateway/src/cache/admin.service.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Invalidation shows the affected entries, stops reads at once by bumping versions, marks entries no longer used and reports copies that could not be removed yet."
+  },
+  "HNV-25-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "apps/gateway/src/cache/store.ts",
+      "apps/gateway/test/cache.int.test.ts"
+    ],
+    "note": "When the store is down, answers are computed fresh and Studio shows the degraded state, recent failures and the error counts; a tier can be turned off from the policy."
   }
 }

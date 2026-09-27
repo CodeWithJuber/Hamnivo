@@ -145,7 +145,17 @@ team.
   then every added exclusion rule. Writes also need complete, validated output.
 - `CacheExclusionRule` is the hook for other modules, such as commerce excluding live order
   questions (K06).
+- `personalContext` on a request (for example `personal_memory`) vetoes shared entries. Requests
+  with `scope: 'customer'` may be personalized: their envelope names the customer and their
+  personal version (`subject`), so a memory change makes older entries unreachable.
 - Answers are off by default (`DEFAULT_CACHE_POLICY`); exact NLP and embeddings are on.
+
+## Reply rules (`src/reply-rules.ts`)
+
+`CUSTOMER_REPLY_RULES` are the lines every customer-facing reply follows whatever the business's
+instructions say: honest AI identity, only given facts, polite correction instead of agreement,
+admitting uncertainty and errors, and a person on request. The gateway puts them first in the
+system prompt and `@hamnivo/evals` evaluates with the same lines.
 
 ## Personal data (`src/privacy.ts`)
 
