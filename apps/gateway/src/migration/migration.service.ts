@@ -24,11 +24,13 @@ import {
 import {
   chatwootDescriptor,
   importMessageKey,
+  intercomDescriptor,
   isZip,
   PackageError,
   packageDescriptor,
   redact,
   tawkDescriptor,
+  zendeskDescriptor,
 } from '@hamnivo/migration-sdk';
 import { authorize, type Permission, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
@@ -174,6 +176,8 @@ export class MigrationService {
   sources(): MigrationSourceInfo[] {
     return [
       { ...tawkDescriptor, available: true },
+      { ...zendeskDescriptor, available: true },
+      { ...intercomDescriptor, available: true },
       { ...packageDescriptor, available: true },
       { ...chatwootDescriptor, available: true },
     ].map((d) => ({

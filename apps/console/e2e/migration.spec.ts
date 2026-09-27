@@ -22,6 +22,20 @@ function tawkExport(file: string): string {
   return file;
 }
 
+/**
+ * The SDK's Zendesk fixtures in one NDJSON file named as Zendesk names it: tickets (one over 1 MB,
+ * without its comments), the error line for it, and the users export.
+ */
+function zendeskExport(file: string): string {
+  const folder = new URL('../../../packages/migration-sdk/test/fixtures/zendesk/', import.meta.url);
+  const lines = readdirSync(folder)
+    .filter((name) => !name.startsWith('organizations'))
+    .sort()
+    .map((name) => readFileSync(new URL(name, folder), 'utf8'));
+  writeFileSync(file, lines.join(''));
+  return file;
+}
+
 interface Job {
   id: string;
   state: string;
@@ -248,6 +262,68 @@ test('HNV-18-01 · another Chatwoot as the source: the token is never shown, an 
   await expect(dialog).toBeVisible();
   const jobs = await workspace.staff.call<{ items: unknown[] }>('GET', '/v1/admin/migrations');
   expect(jobs.items).toEqual([]);
+});
+
+test('HNV-18-01 HNV-18-02 · a Zendesk export: the check lists the ticket Zendesk cut short and the known limits, in English and Arabic', async ({
+  page,
+  context,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  const workspace = await seedWorkspace({ connect: true });
+  await workspace.staff.signIn(context);
+  await page.goto('/migration');
+  await page.getByTestId('new-import').click();
+  const dialog = page.getByRole('dialog', { name: 'Start an import' });
+  await dialog.getByRole('radio', { name: 'Zendesk' }).click();
+  await expect(dialog).toContainText('Add the users export to the same ZIP to import names.');
+  await dialog
+    .getByLabel('Export file')
+    .setInputFiles(zendeskExport(testInfo.outputPath('export-2026-09-20-0930-5512.json')));
+  await dialog.getByRole('button', { name: 'Upload and check' }).click();
+  await expect(dialog).toBeHidden();
+  await jobState(page, 'ready');
+  const counts = page.getByTestId('preflight-counts');
+  await expect(counts.locator('[data-count="conversations"]')).toContainText('3');
+  await expect(counts.locator('[data-count="internalNotes"]')).toContainText('1');
+  await expect(page.getByTestId('preflight-truncated')).toContainText(
+    'Some conversations are incomplete in this export.',
+  );
+  await expect(
+    page.getByTestId('preflight-issues').locator('[data-issue="truncated"]'),
+  ).toContainText('Cut short in the export');
+  await expect(page.getByTestId('preflight-limits')).toContainText(
+    'Zendesk leaves out the comments of tickets over 1 MB.',
+  );
+  const fields = page.getByTestId('preflight-fields');
+  await expect(fields.locator('tr[data-field="ticket.comments[].public"]')).toContainText(
+    'Private or public',
+  );
+  // The many fields Zendesk exports that are not imported are counted, and listed on request.
+  const ip = fields.locator('tr[data-field="ticket.comments[].metadata.system.ip_address"]');
+  await expect(ip).toHaveCount(0);
+  const toggle = page.getByTestId('preflight-fields-toggle');
+  await expect(toggle).toHaveText(/^Show \d+ fields that are not imported$/);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.click();
+  await expect(ip).toContainText('Not imported');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(await audit(page, 'zendesk preflight (en)')).toEqual([]);
+
+  const id = new URL(page.url()).searchParams.get('job');
+  await page.goto(`/migration?job=${id}&lang=ar`);
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByTestId('preflight-limits')).toContainText(
+    'لا يصدّر Zendesk تعليقات التذاكر التي يزيد حجمها على 1 ميغابايت.',
+  );
+  expect(await audit(page, 'zendesk preflight (ar)')).toEqual([]);
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    const extra = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(extra, `${width}px`).toBeLessThanOrEqual(1);
+  }
+  await shoot(page, 'zendesk-preflight-ar');
 });
 
 test('HNV-18-06 · rolling back in Arabic removes what the import created', async ({

@@ -178,7 +178,7 @@ export function helpdeskPackage(
 export async function upload(
   owner: Client,
   brandId: string,
-  source: 'tawk.to' | 'hamnivo',
+  source: 'tawk.to' | 'hamnivo' | 'zendesk' | 'intercom',
   name: string,
   bytes: Uint8Array,
 ) {

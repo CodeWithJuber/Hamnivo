@@ -18,7 +18,7 @@ export const migrationEn = {
     empty: {
       title: 'No imports yet',
       description:
-        'Upload an export from tawk.to or a Hamnivo package. You see what it holds before anything is imported.',
+        'Upload an export from tawk.to, Zendesk, Intercom or Hamnivo, or connect another Chatwoot. You see what it holds before anything is imported.',
     },
     columns: {
       file: 'File',
@@ -79,6 +79,9 @@ export const migrationEn = {
     source: 'Where the export comes from',
     sourceHints: {
       'tawk.to': 'The ZIP or JSON files from “Export chats” in tawk.to.',
+      zendesk:
+        'The ZIP of the full JSON export in Zendesk. Add the users export to the same ZIP to import names.',
+      intercom: 'Conversations as the Intercom API returns them, in JSON or NDJSON files.',
       hamnivo: 'A package exported from Hamnivo, or made in the Hamnivo format.',
       chatwoot: 'Another Chatwoot account, read with an access token of one of its users.',
     },
@@ -161,7 +164,7 @@ export const migrationEn = {
     declared: 'The export says it holds {{conversations}} conversations and {{messages}} messages.',
     truncated: 'Part of the export is missing',
     truncatedHint:
-      'Some conversations hold fewer messages than the export says. You can import what is here, or export again first.',
+      'Some conversations are incomplete in this export. They are listed below. You can import what is here, or export again first.',
     detected: 'This file looks like an export from {{source}}. Start again and choose {{source}}.',
     checks: {
       title: 'Before importing',
@@ -232,6 +235,8 @@ export const migrationEn = {
       },
       required: 'Required',
       records: '{{count}} records',
+      showUnsupported: 'Show {{fields}} fields that are not imported',
+      hideUnsupported: 'Hide fields that are not imported',
       same: 'Kept as it is',
       none: '—',
       targets: {
@@ -260,6 +265,10 @@ export const migrationEn = {
         'attachment.file': 'File',
         'contact.attribute': 'Person detail',
         'contact.identifier': 'Identifier',
+        'conversation.subject': 'Subject',
+        'conversation.channel': 'Channel',
+        'message.source_id': 'Message ID',
+        'message.formatting': 'Formatting',
       },
     },
     missing: {
@@ -288,6 +297,26 @@ export const migrationEn = {
           'Emails and phone numbers are kept as not verified; people are never matched by them.',
         chatwoot_token_once:
           'The token is used once to read the account, then deleted from Hamnivo. Revoke it in Chatwoot afterwards.',
+        zendesk_large_tickets:
+          'Zendesk leaves out the comments of tickets over 1 MB. Those tickets are listed as incomplete and are not imported.',
+        zendesk_users_export:
+          'Add the users export to the same ZIP. It gives names and tells customers from teammates. Without it, comments by unknown people are not imported.',
+        zendesk_attachment_links:
+          'Exports hold links to files, not the files. Files are listed as not imported.',
+        zendesk_history: 'Ticket history, side conversations and custom fields are not imported.',
+        zendesk_unverified_contacts:
+          'Emails and phone numbers are kept as not verified; people are never matched by them.',
+        intercom_api_format:
+          'Intercom has no export file with message text. Upload conversations as its API returns them.',
+        intercom_parts_cap:
+          'Intercom’s API gives at most the latest 500 parts of a conversation. Longer conversations are imported without their oldest parts and listed as incomplete.',
+        intercom_events: 'Assignments, state changes and other events are not imported.',
+        intercom_plain_text:
+          'Messages are imported as plain text. Formatting and inline images are left out.',
+        intercom_attachment_links:
+          'Conversations hold links to files, not the files. Files are listed as not imported.',
+        intercom_unverified_contacts:
+          'Emails and phone numbers are kept as not verified; people are never matched by them.',
         package_links_only: 'Files listed only as links are not imported.',
       },
     },

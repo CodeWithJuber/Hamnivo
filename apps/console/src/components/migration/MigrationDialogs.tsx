@@ -25,8 +25,11 @@ import { ActionError } from '../States';
 
 type NewSource = ImportSource | 'chatwoot';
 
+/** Every source Studio can start an import from, in the order they are offered. */
+const NEW_SOURCES: readonly NewSource[] = ['tawk.to', 'zendesk', 'intercom', 'hamnivo', 'chatwoot'];
+
 const isNewSource = (system: string): system is NewSource =>
-  system === 'tawk.to' || system === 'hamnivo' || system === 'chatwoot';
+  (NEW_SOURCES as readonly string[]).includes(system);
 
 type CreateBody =
   | { brandId: string; source: ImportSource; file: { name: string; base64: string } }
@@ -37,8 +40,8 @@ type CreateBody =
     };
 
 /**
- * Step 1 (HNV-18-01): the brand to import into and the source: an export file (tawk.to or a
- * Hamnivo package), or another Chatwoot account read with an access token (M04).
+ * Step 1 (HNV-18-01): the brand to import into and the source: an export file (tawk.to, Zendesk,
+ * Intercom or a Hamnivo package), or another Chatwoot account read with an access token (M04).
  */
 export function NewImportDialog({
   open,
@@ -163,14 +166,12 @@ export function NewImportDialog({
     ? Object.entries(errors).map(([field, message]) => ({ fieldId: `import-${field}`, message }))
     : [];
   const busy = reading || create.isPending;
-  // The sources this server can import from (all three until the list has loaded).
+  // The sources this server can import from (all of them until the list has loaded).
   const systems = (sources.data?.items ?? [])
     .filter((s) => s.available)
     .map((s) => s.system)
     .filter(isNewSource);
-  const choices = (
-    systems.length > 0 ? systems : (['tawk.to', 'hamnivo', 'chatwoot'] as const)
-  ).map((system) => ({
+  const choices = (systems.length > 0 ? systems : NEW_SOURCES).map((system) => ({
     value: system,
     label: t(`migration.sources.${system}`),
     hint: t(`migration.upload.sourceHints.${system}`),

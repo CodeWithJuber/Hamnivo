@@ -15,7 +15,7 @@ export const migrationHi: MigrationTranslation = {
     empty: {
       title: 'अभी कोई आयात नहीं',
       description:
-        'tawk.to का एक्सपोर्ट या Hamnivo पैकेज अपलोड करें। कुछ भी आयात होने से पहले आप देखेंगे कि उसमें क्या है।',
+        'tawk.to, Zendesk, Intercom या Hamnivo का एक्सपोर्ट अपलोड करें, या दूसरा Chatwoot जोड़ें। कुछ भी आयात होने से पहले आप देखेंगे कि उसमें क्या है।',
     },
     columns: {
       file: 'फ़ाइल',
@@ -76,6 +76,9 @@ export const migrationHi: MigrationTranslation = {
     source: 'एक्सपोर्ट कहाँ से है',
     sourceHints: {
       'tawk.to': 'tawk.to में “Export chats” से मिली ZIP या JSON फ़ाइलें।',
+      zendesk:
+        'Zendesk के पूरे JSON एक्सपोर्ट की ZIP। नाम आयात करने के लिए उपयोगकर्ताओं का एक्सपोर्ट उसी ZIP में जोड़ें।',
+      intercom: 'बातचीत उसी रूप में जैसे Intercom API देता है, JSON या NDJSON फ़ाइलों में।',
       hamnivo: 'Hamnivo से निर्यात किया गया या Hamnivo फ़ॉर्मेट में बना पैकेज।',
       chatwoot: 'दूसरा Chatwoot खाता, उसके किसी उपयोगकर्ता के एक्सेस टोकन से पढ़ा जाता है।',
     },
@@ -155,7 +158,7 @@ export const migrationHi: MigrationTranslation = {
     declared: 'एक्सपोर्ट के अनुसार इसमें {{conversations}} बातचीत और {{messages}} संदेश हैं।',
     truncated: 'एक्सपोर्ट का कुछ हिस्सा गायब है',
     truncatedHint:
-      'कुछ बातचीत में एक्सपोर्ट में लिखे से कम संदेश हैं। जो है उसे आयात करें, या पहले फिर से एक्सपोर्ट करें।',
+      'इस एक्सपोर्ट में कुछ बातचीत अधूरी हैं। वे नीचे दी गई हैं। जो है उसे आयात करें, या पहले फिर से एक्सपोर्ट करें।',
     detected: 'यह फ़ाइल {{source}} का एक्सपोर्ट लगती है। फिर से शुरू करें और {{source}} चुनें।',
     checks: {
       title: 'आयात से पहले',
@@ -225,6 +228,8 @@ export const migrationHi: MigrationTranslation = {
       },
       required: 'ज़रूरी',
       records: '{{count}} रिकॉर्ड',
+      showUnsupported: 'आयात न होने वाले {{fields}} फ़ील्ड दिखाएँ',
+      hideUnsupported: 'आयात न होने वाले फ़ील्ड छिपाएँ',
       same: 'जैसा है वैसा रहता है',
       none: '—',
       targets: {
@@ -253,6 +258,10 @@ export const migrationHi: MigrationTranslation = {
         'attachment.file': 'फ़ाइल',
         'contact.attribute': 'व्यक्ति की जानकारी',
         'contact.identifier': 'पहचानकर्ता',
+        'conversation.subject': 'विषय',
+        'conversation.channel': 'चैनल',
+        'message.source_id': 'संदेश ID',
+        'message.formatting': 'फ़ॉर्मैटिंग',
       },
     },
     missing: {
@@ -281,6 +290,25 @@ export const migrationHi: MigrationTranslation = {
           'ईमेल और फ़ोन नंबर असत्यापित के रूप में रखे जाते हैं; लोगों को इनसे कभी नहीं मिलाया जाता।',
         chatwoot_token_once:
           'टोकन खाता पढ़ने के लिए एक बार इस्तेमाल होता है, फिर Hamnivo से मिटा दिया जाता है। बाद में इसे Chatwoot में रद्द करें।',
+        zendesk_large_tickets:
+          'Zendesk 1 MB से बड़े टिकटों की टिप्पणियाँ एक्सपोर्ट नहीं करता। ऐसे टिकट अधूरे के रूप में दिखते हैं और आयात नहीं होते।',
+        zendesk_users_export:
+          'उपयोगकर्ताओं का एक्सपोर्ट उसी ZIP में जोड़ें। उससे नाम मिलते हैं और ग्राहक व टीम के सदस्य अलग पहचाने जाते हैं। उसके बिना अनजान लोगों की टिप्पणियाँ आयात नहीं होतीं।',
+        zendesk_attachment_links:
+          'एक्सपोर्ट में फ़ाइलों के लिंक होते हैं, फ़ाइलें नहीं। फ़ाइलें आयात न होने वाली सूची में दिखती हैं।',
+        zendesk_history: 'टिकट का इतिहास, साइड बातचीत और कस्टम फ़ील्ड आयात नहीं होते।',
+        zendesk_unverified_contacts:
+          'ईमेल और फ़ोन नंबर असत्यापित के रूप में रखे जाते हैं; लोगों को इनसे कभी नहीं मिलाया जाता।',
+        intercom_api_format:
+          'Intercom में संदेशों के टेक्स्ट वाली कोई एक्सपोर्ट फ़ाइल नहीं है। बातचीत उसी रूप में अपलोड करें जैसे उसका API देता है।',
+        intercom_parts_cap:
+          'Intercom का API किसी बातचीत के ज़्यादा से ज़्यादा आख़िरी 500 हिस्से देता है। लंबी बातचीत सबसे पुराने हिस्सों के बिना आयात होती है और अधूरी के रूप में दिखती है।',
+        intercom_events: 'असाइनमेंट, स्थिति बदलना और दूसरी घटनाएँ आयात नहीं होतीं।',
+        intercom_plain_text: 'संदेश सादे टेक्स्ट के रूप में आयात होते हैं। फ़ॉर्मैटिंग और अंदर लगी तस्वीरें छूट जाती हैं।',
+        intercom_attachment_links:
+          'बातचीत में फ़ाइलों के लिंक होते हैं, फ़ाइलें नहीं। फ़ाइलें आयात न होने वाली सूची में दिखती हैं।',
+        intercom_unverified_contacts:
+          'ईमेल और फ़ोन नंबर असत्यापित के रूप में रखे जाते हैं; लोगों को इनसे कभी नहीं मिलाया जाता।',
         package_links_only: 'सिर्फ़ लिंक के रूप में दी गई फ़ाइलें आयात नहीं होतीं।',
       },
     },

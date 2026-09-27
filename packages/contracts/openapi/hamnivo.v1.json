@@ -10690,7 +10690,9 @@
                 "type": "string",
                 "enum": [
                   "tawk.to",
-                  "hamnivo"
+                  "hamnivo",
+                  "zendesk",
+                  "intercom"
                 ]
               },
               "file": {

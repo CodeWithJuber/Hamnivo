@@ -15,7 +15,8 @@ export type MigrationReport = NonNullable<MigrationJob['report']>;
 export type MigrationItem = C.MigrationItem;
 export type MigrationSample = C.MigrationSample;
 export type MigrationSourceInfo = C.MigrationSourceInfo;
-export type ImportSource = 'tawk.to' | 'hamnivo';
+/** Sources imported from an uploaded export file. */
+export type ImportSource = 'tawk.to' | 'zendesk' | 'intercom' | 'hamnivo';
 
 /** Largest export as one upload, the same as MIGRATION_MAX_BYTES in @hamnivo/contracts. */
 export const MIGRATION_MAX_BYTES = 20 * 1024 * 1024;

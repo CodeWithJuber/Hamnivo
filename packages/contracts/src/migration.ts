@@ -50,10 +50,13 @@ export const MigrationSourceInfo = z
   .meta({ id: 'MigrationSourceInfo' });
 export type MigrationSourceInfo = z.infer<typeof MigrationSourceInfo>;
 
-/** An uploaded export (tawk.to files or a Hamnivo package). */
+/**
+ * An uploaded export: tawk.to files, a Hamnivo package, a Zendesk full JSON export or Intercom
+ * conversations in its API format.
+ */
 const FileMigration = z.object({
   brandId: typeId('brand'),
-  source: z.enum(['tawk.to', 'hamnivo']),
+  source: z.enum(['tawk.to', 'hamnivo', 'zendesk', 'intercom']),
   file: z.object({
     name: z.string().trim().min(1).max(200),
     base64: z

@@ -1,3 +1,4 @@
+import { Button } from '@hamnivo/ui/components/button';
 import { StatusBadge } from '@hamnivo/ui/components/status-badge';
 import {
   Table,
@@ -8,6 +9,7 @@ import {
   TableRow,
 } from '@hamnivo/ui/components/table';
 import type { TFunction } from 'i18next';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../lib/format';
 import type { MigrationPreflight, MigrationSourceInfo } from '../../lib/migration';
@@ -44,6 +46,17 @@ const LIMITS = [
   'tawk_tickets',
   'tawk_no_notes',
   'tawk_unverified_email',
+  'zendesk_large_tickets',
+  'zendesk_users_export',
+  'zendesk_attachment_links',
+  'zendesk_history',
+  'zendesk_unverified_contacts',
+  'intercom_api_format',
+  'intercom_parts_cap',
+  'intercom_events',
+  'intercom_plain_text',
+  'intercom_attachment_links',
+  'intercom_unverified_contacts',
   'package_links_only',
   'chatwoot_snapshot_cap',
   'chatwoot_agent_scope',
@@ -96,6 +109,9 @@ function targetText(t: TFunction, target: string | null): string {
 /** Paths are compared without array markers: `messages[].time` and `messages.time` are the same. */
 const bare = (path: string) => path.replaceAll('[]', '');
 
+/** Beyond this many, fields that are not imported are listed behind a button. */
+const NOT_IMPORTED_SHOWN = 10;
+
 /** What the export holds, the destination checks, the fields and the known limits (M01). */
 export function PreflightReport({
   preflight,
@@ -117,6 +133,15 @@ export function PreflightReport({
     ['attachmentFiles', preflight.counts.attachmentFiles],
   ] as const;
   const sourceName = t(`migration.sources.${preflight.source.system}`);
+  // Exports such as Zendesk's carry many fields Hamnivo does not import: they are counted and
+  // listed on request, so the fields that are imported stay easy to review.
+  const [allFields, setAllFields] = useState(false);
+  const fieldsId = useId();
+  const notImported = preflight.fields.filter((f) => f.status === 'unsupported').length;
+  const folded = notImported > NOT_IMPORTED_SHOWN && !allFields;
+  const fields = folded
+    ? preflight.fields.filter((f) => f.status !== 'unsupported')
+    : preflight.fields;
 
   return (
     <div className="flex flex-col gap-6" data-testid="preflight">
@@ -196,7 +221,7 @@ export function PreflightReport({
             {t('migration.preflight.fields.description')}
           </p>
         </div>
-        <Table data-testid="preflight-fields">
+        <Table data-testid="preflight-fields" id={fieldsId}>
           <TableHeader>
             <TableRow>
               <TableHead className="text-start">
@@ -214,7 +239,7 @@ export function PreflightReport({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {preflight.fields.map((field) => (
+            {fields.map((field) => (
               <TableRow key={field.path} data-field={field.path} data-field-status={field.status}>
                 <TableCell>
                   <bdi dir="ltr" className="font-mono text-xs">
@@ -249,6 +274,23 @@ export function PreflightReport({
             ))}
           </TableBody>
         </Table>
+        {notImported > NOT_IMPORTED_SHOWN ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="self-start"
+            aria-expanded={allFields}
+            aria-controls={fieldsId}
+            data-testid="preflight-fields-toggle"
+            onClick={() => setAllFields((shown) => !shown)}
+          >
+            {allFields
+              ? t('migration.preflight.fields.hideUnsupported')
+              : t('migration.preflight.fields.showUnsupported', {
+                  fields: formatNumber(notImported),
+                })}
+          </Button>
+        ) : null}
       </div>
 
       {preflight.limits.length > 0 ? (

@@ -15,7 +15,7 @@ export const migrationUr: MigrationTranslation = {
     empty: {
       title: 'ابھی کوئی درآمد نہیں',
       description:
-        'tawk.to کی ایکسپورٹ یا Hamnivo پیکج اپ لوڈ کریں۔ کچھ بھی درآمد ہونے سے پہلے آپ دیکھیں گے کہ اس میں کیا ہے۔',
+        'tawk.to، Zendesk، Intercom یا Hamnivo کی ایکسپورٹ اپ لوڈ کریں، یا کوئی دوسرا Chatwoot جوڑیں۔ کچھ بھی درآمد ہونے سے پہلے آپ دیکھیں گے کہ اس میں کیا ہے۔',
     },
     columns: {
       file: 'فائل',
@@ -76,6 +76,9 @@ export const migrationUr: MigrationTranslation = {
     source: 'ایکسپورٹ کہاں سے ہے',
     sourceHints: {
       'tawk.to': 'tawk.to میں “Export chats” سے ملنے والی ZIP یا JSON فائلیں۔',
+      zendesk:
+        'Zendesk کی مکمل JSON ایکسپورٹ کی ZIP۔ نام درآمد کرنے کے لیے صارفین کی ایکسپورٹ اسی ZIP میں شامل کریں۔',
+      intercom: 'گفتگو اسی شکل میں جیسے Intercom API دیتی ہے، JSON یا NDJSON فائلوں میں۔',
       hamnivo: 'Hamnivo سے برآمد کیا گیا یا Hamnivo فارمیٹ میں بنا پیکج۔',
       chatwoot: 'کوئی دوسرا Chatwoot اکاؤنٹ، اس کے کسی صارف کے رسائی ٹوکن سے پڑھا جاتا ہے۔',
     },
@@ -158,7 +161,7 @@ export const migrationUr: MigrationTranslation = {
     declared: 'ایکسپورٹ کے مطابق اس میں {{conversations}} گفتگو اور {{messages}} پیغامات ہیں۔',
     truncated: 'ایکسپورٹ کا کچھ حصہ غائب ہے',
     truncatedHint:
-      'کچھ گفتگو میں ایکسپورٹ میں لکھے سے کم پیغامات ہیں۔ جو موجود ہے اسے درآمد کریں، یا پہلے دوبارہ ایکسپورٹ کریں۔',
+      'اس ایکسپورٹ میں کچھ گفتگو نامکمل ہیں۔ وہ نیچے دی گئی ہیں۔ جو موجود ہے اسے درآمد کریں، یا پہلے دوبارہ ایکسپورٹ کریں۔',
     detected: 'یہ فائل {{source}} کی ایکسپورٹ لگتی ہے۔ دوبارہ شروع کریں اور {{source}} منتخب کریں۔',
     checks: {
       title: 'درآمد سے پہلے',
@@ -230,6 +233,8 @@ export const migrationUr: MigrationTranslation = {
       },
       required: 'ضروری',
       records: '{{count}} ریکارڈ',
+      showUnsupported: 'درآمد نہ ہونے والے {{fields}} فیلڈز دکھائیں',
+      hideUnsupported: 'درآمد نہ ہونے والے فیلڈز چھپائیں',
       same: 'جیسا ہے ویسا رہتا ہے',
       none: '—',
       targets: {
@@ -258,6 +263,10 @@ export const migrationUr: MigrationTranslation = {
         'attachment.file': 'فائل',
         'contact.attribute': 'شخص کی تفصیل',
         'contact.identifier': 'شناخت کنندہ',
+        'conversation.subject': 'موضوع',
+        'conversation.channel': 'چینل',
+        'message.source_id': 'پیغام ID',
+        'message.formatting': 'فارمیٹنگ',
       },
     },
     missing: {
@@ -286,6 +295,26 @@ export const migrationUr: MigrationTranslation = {
           'ای میلز اور فون نمبر غیر تصدیق شدہ کے طور پر رکھے جاتے ہیں؛ لوگوں کو ان سے کبھی نہیں ملایا جاتا۔',
         chatwoot_token_once:
           'ٹوکن اکاؤنٹ پڑھنے کے لیے ایک بار استعمال ہوتا ہے، پھر Hamnivo سے مٹا دیا جاتا ہے۔ بعد میں اسے Chatwoot میں منسوخ کریں۔',
+        zendesk_large_tickets:
+          'Zendesk ان ٹکٹس کے تبصرے ایکسپورٹ نہیں کرتا جو 1 MB سے بڑے ہوں۔ ایسے ٹکٹس نامکمل کے طور پر دکھائے جاتے ہیں اور درآمد نہیں ہوتے۔',
+        zendesk_users_export:
+          'صارفین کی ایکسپورٹ اسی ZIP میں شامل کریں۔ اس سے نام ملتے ہیں اور گاہکوں اور ٹیم کے ارکان میں فرق ہوتا ہے۔ اس کے بغیر نامعلوم لوگوں کے تبصرے درآمد نہیں ہوتے۔',
+        zendesk_attachment_links:
+          'ایکسپورٹ میں فائلوں کے لنک ہوتے ہیں، فائلیں نہیں۔ فائلیں درآمد نہ ہونے والی فہرست میں دکھائی جاتی ہیں۔',
+        zendesk_history: 'ٹکٹ کی تاریخ، سائیڈ گفتگو اور حسبِ ضرورت فیلڈز درآمد نہیں ہوتے۔',
+        zendesk_unverified_contacts:
+          'ای میلز اور فون نمبر غیر تصدیق شدہ کے طور پر رکھے جاتے ہیں؛ لوگوں کو ان سے کبھی نہیں ملایا جاتا۔',
+        intercom_api_format:
+          'Intercom میں پیغامات کے متن والی کوئی ایکسپورٹ فائل نہیں۔ گفتگو اسی شکل میں اپ لوڈ کریں جیسے اس کی API دیتی ہے۔',
+        intercom_parts_cap:
+          'Intercom کی API کسی گفتگو کے زیادہ سے زیادہ آخری 500 حصے دیتی ہے۔ لمبی گفتگو سب سے پرانے حصوں کے بغیر درآمد ہوتی ہے اور نامکمل کے طور پر دکھائی جاتی ہے۔',
+        intercom_events: 'اسائنمنٹ، حالت کی تبدیلیاں اور دوسرے واقعات درآمد نہیں ہوتے۔',
+        intercom_plain_text:
+          'پیغامات سادہ متن کے طور پر درآمد ہوتے ہیں۔ فارمیٹنگ اور اندر لگی تصاویر شامل نہیں ہوتیں۔',
+        intercom_attachment_links:
+          'گفتگو میں فائلوں کے لنک ہوتے ہیں، فائلیں نہیں۔ فائلیں درآمد نہ ہونے والی فہرست میں دکھائی جاتی ہیں۔',
+        intercom_unverified_contacts:
+          'ای میلز اور فون نمبر غیر تصدیق شدہ کے طور پر رکھے جاتے ہیں؛ لوگوں کو ان سے کبھی نہیں ملایا جاتا۔',
         package_links_only: 'صرف لنک کے طور پر دی گئی فائلیں درآمد نہیں ہوتیں۔',
       },
     },

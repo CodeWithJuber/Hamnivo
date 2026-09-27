@@ -13,7 +13,8 @@ export const migrationAr: MigrationTranslation = {
     title: 'عمليات الاستيراد والتصدير',
     empty: {
       title: 'لا توجد عمليات استيراد بعد',
-      description: 'ارفع ملف تصدير من tawk.to أو حزمة Hamnivo. سترى محتواه قبل استيراد أي شيء.',
+      description:
+        'ارفع ملف تصدير من tawk.to أو Zendesk أو Intercom أو Hamnivo، أو اربط حساب Chatwoot آخر. سترى محتواه قبل استيراد أي شيء.',
     },
     columns: {
       file: 'الملف',
@@ -74,6 +75,9 @@ export const migrationAr: MigrationTranslation = {
     source: 'مصدر ملف التصدير',
     sourceHints: {
       'tawk.to': 'ملفات ZIP أو JSON من «تصدير المحادثات» في tawk.to.',
+      zendesk:
+        'ملف ZIP من تصدير JSON الكامل في Zendesk. أضف تصدير المستخدمين إلى ملف ZIP نفسه لاستيراد الأسماء.',
+      intercom: 'المحادثات كما تعيدها واجهة Intercom البرمجية، في ملفات JSON أو NDJSON.',
       hamnivo: 'حزمة مُصدَّرة من Hamnivo أو مُعدّة بصيغة Hamnivo.',
       chatwoot: 'حساب Chatwoot آخر، يُقرأ برمز وصول أحد مستخدميه.',
     },
@@ -155,7 +159,7 @@ export const migrationAr: MigrationTranslation = {
     declared: 'يذكر ملف التصدير أنه يحتوي على {{conversations}} محادثة و{{messages}} رسالة.',
     truncated: 'جزء من ملف التصدير مفقود',
     truncatedHint:
-      'بعض المحادثات فيها رسائل أقل مما يذكره ملف التصدير. يمكنك استيراد الموجود، أو التصدير مرة أخرى أولًا.',
+      'بعض المحادثات غير مكتملة في هذا التصدير، وهي مذكورة أدناه. يمكنك استيراد الموجود، أو التصدير مرة أخرى أولًا.',
     detected: 'يبدو هذا الملف تصديرًا من {{source}}. ابدأ من جديد واختر {{source}}.',
     checks: {
       title: 'قبل الاستيراد',
@@ -225,6 +229,8 @@ export const migrationAr: MigrationTranslation = {
       },
       required: 'مطلوب',
       records: '{{count}} سجل',
+      showUnsupported: 'عرض {{fields}} حقلًا لا تُستورد',
+      hideUnsupported: 'إخفاء الحقول التي لا تُستورد',
       same: 'يبقى كما هو',
       none: '—',
       targets: {
@@ -253,6 +259,10 @@ export const migrationAr: MigrationTranslation = {
         'attachment.file': 'الملف',
         'contact.attribute': 'تفصيل الشخص',
         'contact.identifier': 'المعرّف',
+        'conversation.subject': 'الموضوع',
+        'conversation.channel': 'القناة',
+        'message.source_id': 'معرّف الرسالة',
+        'message.formatting': 'التنسيق',
       },
     },
     missing: {
@@ -281,6 +291,25 @@ export const migrationAr: MigrationTranslation = {
           'تُحفظ عناوين البريد وأرقام الهاتف كغير موثّقة، ولا يُطابَق بها الأشخاص أبدًا.',
         chatwoot_token_once:
           'يُستخدم الرمز مرة واحدة لقراءة الحساب ثم يُحذف من Hamnivo. ألغِه في Chatwoot بعد ذلك.',
+        zendesk_large_tickets:
+          'لا يصدّر Zendesk تعليقات التذاكر التي يزيد حجمها على 1 ميغابايت. تُذكر هذه التذاكر على أنها غير مكتملة ولا تُستورد.',
+        zendesk_users_export:
+          'أضف تصدير المستخدمين إلى ملف ZIP نفسه، فهو يعطي الأسماء ويميّز العملاء من أعضاء الفريق. بدونه لا تُستورد تعليقات الأشخاص غير المعروفين.',
+        zendesk_attachment_links:
+          'تحتوي ملفات التصدير على روابط للملفات، لا على الملفات نفسها. تُذكر الملفات على أنها لم تُستورد.',
+        zendesk_history: 'لا يُستورد سجل التذكرة ولا المحادثات الجانبية ولا الحقول المخصصة.',
+        zendesk_unverified_contacts:
+          'تُحفظ عناوين البريد وأرقام الهاتف كغير موثّقة، ولا يُطابَق بها الأشخاص أبدًا.',
+        intercom_api_format:
+          'لا يوفّر Intercom ملف تصدير فيه نص الرسائل. ارفع المحادثات كما تعيدها واجهته البرمجية.',
+        intercom_parts_cap:
+          'تعيد واجهة Intercom البرمجية آخر 500 جزء من المحادثة على الأكثر. تُستورد المحادثات الأطول دون أقدم أجزائها، وتُذكر على أنها غير مكتملة.',
+        intercom_events: 'لا تُستورد عمليات الإسناد وتغييرات الحالة والأحداث الأخرى.',
+        intercom_plain_text: 'تُستورد الرسائل نصًا عاديًا، دون التنسيق والصور المضمّنة.',
+        intercom_attachment_links:
+          'تحتوي المحادثات على روابط للملفات، لا على الملفات نفسها. تُذكر الملفات على أنها لم تُستورد.',
+        intercom_unverified_contacts:
+          'تُحفظ عناوين البريد وأرقام الهاتف كغير موثّقة، ولا يُطابَق بها الأشخاص أبدًا.',
         package_links_only: 'لا تُستورد الملفات المذكورة كروابط فقط.',
       },
     },
