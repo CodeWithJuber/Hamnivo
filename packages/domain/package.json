@@ -1,0 +1,29 @@
+{
+  "name": "@hamnivo/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hamnivo domain types and ports: the conversation authority and decision ports, and pure domain rules such as explicit human-request detection",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "0.23.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -10,7 +10,7 @@ import type { AddressInfo } from 'node:net';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AxeBuilder } from '@axe-core/playwright';
-import { chromium } from 'playwright';
+import { chromium, type Page } from 'playwright';
 
 const root = fileURLToPath(new URL('../storybook-static/', import.meta.url));
 if (!existsSync(join(root, 'index.json'))) {
@@ -59,13 +59,31 @@ const variants = [
   { theme: 'dark', direction: 'rtl' },
 ] as const;
 
+/** One axe run; waits and tries again while another run in the page is still going. */
+async function analyze(page: Page) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await new AxeBuilder({ page })
+        .include('#storybook-root')
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
+        // Stories render fragments, not whole pages.
+        .disableRules(['region', 'landmark-one-main', 'page-has-heading-one'])
+        .analyze();
+    } catch (error) {
+      if (attempt >= 10 || !String(error).includes('Axe is already running')) throw error;
+      await page.waitForTimeout(200);
+    }
+  }
+}
+
 let failures = 0;
 for (const story of stories) {
   for (const variant of variants) {
     // axe-core/playwright requires pages created from an explicit browser context.
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
-    const url = `${base}/iframe.html?id=${story.id}&viewMode=story&globals=theme:${variant.theme};direction:${variant.direction}`;
+    // a11y.manual stops the addon's own axe run after render, which would race with this one.
+    const url = `${base}/iframe.html?id=${story.id}&viewMode=story&globals=theme:${variant.theme};direction:${variant.direction};a11y.manual:!true`;
     await page.goto(url);
     await page.waitForSelector('#storybook-root > *', { timeout: 15_000 });
     await page.waitForFunction(
@@ -74,12 +92,7 @@ for (const story of stories) {
         document.documentElement.dir === v.direction,
       variant,
     );
-    const result = await new AxeBuilder({ page })
-      .include('#storybook-root')
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
-      // Stories render fragments, not whole pages.
-      .disableRules(['region', 'landmark-one-main', 'page-has-heading-one'])
-      .analyze();
+    const result = await analyze(page);
     for (const violation of result.violations) {
       failures++;
       const targets = violation.nodes

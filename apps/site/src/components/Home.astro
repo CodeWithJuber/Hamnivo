@@ -1,0 +1,50 @@
+---
+import { featureIds } from '../content/features';
+import { dictionaries, type Locale, localeInfo } from '../i18n';
+import Base from '../layouts/Base.astro';
+import { liveDemo } from '../lib/demo';
+import Demo from './Demo.astro';
+import FeatureSection from './FeatureSection.astro';
+import Footer from './Footer.astro';
+import Header from './Header.astro';
+import Hero from './Hero.astro';
+import SelfHost from './SelfHost.astro';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const widget = dictionaries[locale].widget;
+const rtl = localeInfo[locale].dir === 'rtl';
+---
+
+<Base locale={locale}>
+  <Header locale={locale} />
+  <main id="main" tabindex="-1" class="outline-none">
+    <Hero locale={locale} />
+    {featureIds.map((id, i) => <FeatureSection id={id} locale={locale} flip={i % 2 === 1} />)}
+    <Demo locale={locale} demo={liveDemo} />
+    <SelfHost locale={locale} />
+  </main>
+  <Footer locale={locale} />
+  {
+    liveDemo && (
+      <script
+        is:inline
+        async
+        src={liveDemo.loaderSrc}
+        data-widget-id={liveDemo.widgetId}
+        data-api={liveDemo.api}
+        data-locale={locale}
+        data-position={rtl ? 'bottom-left' : 'bottom-right'}
+        data-label={widget.label}
+        data-close-label={widget.closeLabel}
+        data-title={widget.title}
+      ></script>
+    )
+  }
+  <script>
+    import '../scripts/enhance';
+  </script>
+</Base>

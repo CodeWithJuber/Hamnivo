@@ -158,6 +158,17 @@ export async function resolveTenantSlug(
   return row ? { tenantId: row.tenant_id, tenantStatus: row.tenant_status } : null;
 }
 
+export async function resolveInvitation(
+  db: Db,
+  invitationId: string,
+): Promise<{ tenantId: string; status: string; expiresAt: Date } | null> {
+  const { rows } = await db.execute<{ tenant_id: string; status: string; expires_at: Date }>(
+    sql`select * from app.resolve_invitation(${invitationId}::uuid)`,
+  );
+  const row = rows[0];
+  return row ? { tenantId: row.tenant_id, status: row.status, expiresAt: row.expires_at } : null;
+}
+
 export interface ClaimedOutboxEvent {
   tenantId: string;
   id: string;
@@ -199,7 +210,41 @@ export async function claimOutbox(
   }));
 }
 
-/** Deletes expired journal entries, identity nonces and idempotency keys (per-table batch). */
+export interface ClaimedInboxEvent {
+  tenantId: string;
+  id: string;
+  connectionId: string;
+  attempts: number;
+}
+
+/**
+ * Leases up to `limit` due integration-inbox events across tenants for `leaseSeconds`. Each event
+ * is then processed (and marked processed) inside withTenant(); an unfinished lease simply expires.
+ */
+export async function claimIntegrationInbox(
+  db: Db,
+  options: { limit: number; leaseSeconds: number },
+): Promise<ClaimedInboxEvent[]> {
+  const { rows } = await db.execute<{
+    tenant_id: string;
+    id: string;
+    connection_id: string;
+    attempts: number;
+  }>(
+    sql`select * from app.claim_integration_inbox(${options.limit}::int, ${options.leaseSeconds}::int)`,
+  );
+  return rows.map((row) => ({
+    tenantId: row.tenant_id,
+    id: row.id,
+    connectionId: row.connection_id,
+    attempts: row.attempts,
+  }));
+}
+
+/**
+ * Deletes expired journal entries, identity nonces and idempotency keys, and integration-inbox
+ * events processed more than seven days ago (per-table batch).
+ */
 export async function purgeExpired(db: Db, batch = 5000): Promise<Record<string, number>> {
   const { rows } = await db.execute<{ relation: string; deleted: string }>(
     sql`select * from app.purge_expired(${batch}::int)`,

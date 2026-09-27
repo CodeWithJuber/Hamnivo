@@ -1,0 +1,206 @@
+{
+  "description": "Explicit requests for a person (requested: true) and look-alikes that are not (requested: false), by language slice. `why` explains each negative. Reused by evaluation later.",
+  "cases": [
+    { "language": "en", "requested": true, "text": "I want to talk to a human" },
+    { "language": "en", "requested": true, "text": "Can I speak with a real person?" },
+    { "language": "en", "requested": true, "text": "Please connect me to an agent" },
+    { "language": "en", "requested": true, "text": "human please" },
+    { "language": "en", "requested": true, "text": "AGENT!!!" },
+    { "language": "en", "requested": true, "text": "no bot, human please" },
+    { "language": "en", "requested": true, "text": "no bot human please" },
+    {
+      "language": "en",
+      "requested": true,
+      "text": "I'd like to speak to a customer service representative."
+    },
+    { "language": "en", "requested": true, "text": "Let me talk to your manager" },
+    { "language": "en", "requested": true, "text": "Transfer me to a live agent now" },
+    { "language": "en", "requested": true, "text": "Is there a human I can talk to?" },
+    {
+      "language": "en",
+      "requested": true,
+      "text": "This is not working. Can I talk to someone?"
+    },
+    { "language": "hinglish", "requested": true, "text": "mujhe agent chahiye" },
+    { "language": "hinglish", "requested": true, "text": "human se baat karao" },
+    { "language": "hinglish", "requested": true, "text": "agent se baat karni hai" },
+    { "language": "hinglish", "requested": true, "text": "agent se baat" },
+    {
+      "language": "hinglish",
+      "requested": true,
+      "text": "Customer care se baat karwa do please"
+    },
+    { "language": "hinglish", "requested": true, "text": "koi real person se baat ho sakti hai?" },
+    { "language": "roman-urdu", "requested": true, "text": "kisi insaan se baat karni hai" },
+    { "language": "roman-urdu", "requested": true, "text": "bande se baat karwao" },
+    { "language": "roman-urdu", "requested": true, "text": "insan chahiye" },
+    { "language": "roman-urdu", "requested": true, "text": "bot nahi, insaan chahiye" },
+    { "language": "roman-urdu", "requested": true, "text": "insaaan sy bat krni h" },
+    {
+      "language": "roman-urdu",
+      "requested": true,
+      "text": "Mujhe kisi insaan se baat karni hai, shukriya"
+    },
+    { "language": "ar", "requested": true, "text": "أريد التحدث مع موظف" },
+    { "language": "ar", "requested": true, "text": "موظف من فضلك" },
+    { "language": "ar", "requested": true, "text": "مـــوظـــف مِنْ فَضْلِكَ" },
+    { "language": "ar", "requested": true, "text": "حولني إلى موظف خدمة العملاء" },
+    { "language": "ar", "requested": true, "text": "لا أريد روبوت، أريد موظف" },
+    { "language": "ar", "requested": true, "text": "أبي أكلم موظف" },
+    { "language": "ar", "requested": true, "text": "عايز أكلم حد من خدمه العملاء" },
+    { "language": "hi", "requested": true, "text": "मुझे इंसान से बात करनी है" },
+    { "language": "hi", "requested": true, "text": "मुझे इन्सान चाहिए" },
+    { "language": "hi", "requested": true, "text": "किसी एजेंट से बात करवाइए" },
+    { "language": "hi", "requested": true, "text": "बॉट नहीं, इंसान चाहिए" },
+    { "language": "hi", "requested": true, "text": "कस्टमर केयर से बात करवा दो" },
+    { "language": "ur", "requested": true, "text": "مجھے کسی انسان سے بات کرنی ہے" },
+    { "language": "ur", "requested": true, "text": "ایجنٹ سے بات کروائیں" },
+    { "language": "ur", "requested": true, "text": "مجهے انسان چاہئے" },
+    { "language": "ur", "requested": true, "text": "بوٹ نہیں، انسان چاہیے" },
+    { "language": "ur", "requested": true, "text": "کسی بندے سے بات کرا دیں" },
+    { "language": "ur", "requested": true, "text": "مجهے انسان سے بات كرني هے" },
+
+    { "language": "en", "requested": false, "why": "negation", "text": "I don't want a human" },
+    {
+      "language": "en",
+      "requested": false,
+      "why": "negation",
+      "text": "I do not want to speak with a person"
+    },
+    {
+      "language": "en",
+      "requested": false,
+      "why": "negation",
+      "text": "No need to transfer me to an agent, thanks"
+    },
+    { "language": "en", "requested": false, "why": "negation", "text": "no human please" },
+    { "language": "en", "requested": false, "why": "identity question", "text": "Are you human?" },
+    {
+      "language": "en",
+      "requested": false,
+      "why": "identity question",
+      "text": "Am I talking to a bot or a human?"
+    },
+    {
+      "language": "en",
+      "requested": false,
+      "why": "human resources",
+      "text": "Please forward this to the human resources department"
+    },
+    {
+      "language": "en",
+      "requested": false,
+      "why": "agent as a courier",
+      "text": "Agent number 5 delivered my order"
+    },
+    {
+      "language": "en",
+      "requested": false,
+      "why": "report, not a request",
+      "text": "The agent I spoke to yesterday was very helpful"
+    },
+    {
+      "language": "en",
+      "requested": false,
+      "why": "human rights",
+      "text": "Human rights matter to us"
+    },
+    {
+      "language": "hinglish",
+      "requested": false,
+      "why": "negation",
+      "text": "mujhe agent nahi chahiye"
+    },
+    {
+      "language": "hinglish",
+      "requested": false,
+      "why": "negation",
+      "text": "human se baat nahi karni"
+    },
+    {
+      "language": "hinglish",
+      "requested": false,
+      "why": "identity question",
+      "text": "kya aap human ho?"
+    },
+    {
+      "language": "hinglish",
+      "requested": false,
+      "why": "agent as a courier",
+      "text": "agent ne mera order deliver kar diya"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "negation",
+      "text": "insaan nahi chahiye"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "negation",
+      "text": "mujhe kisi insaan se baat nahi karni"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "identity question",
+      "text": "kya aap insaan hain?"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "identity question",
+      "text": "kya main insaan se baat kar raha hoon?"
+    },
+    { "language": "ar", "requested": false, "why": "negation", "text": "لا أريد موظف" },
+    { "language": "ar", "requested": false, "why": "negation", "text": "لا أريد التحدث مع أحد" },
+    { "language": "ar", "requested": false, "why": "identity question", "text": "هل أنت إنسان؟" },
+    {
+      "language": "ar",
+      "requested": false,
+      "why": "identity question",
+      "text": "هل أتحدث مع إنسان؟"
+    },
+    {
+      "language": "ar",
+      "requested": false,
+      "why": "agent as a courier",
+      "text": "الوكيل رقم 5 وصّل طلبي"
+    },
+    {
+      "language": "ar",
+      "requested": false,
+      "why": "human resources",
+      "text": "قسم الموارد البشرية مغلق اليوم"
+    },
+    { "language": "hi", "requested": false, "why": "negation", "text": "मुझे इंसान नहीं चाहिए" },
+    { "language": "hi", "requested": false, "why": "negation", "text": "मुझे किसी से बात नहीं करनी" },
+    { "language": "hi", "requested": false, "why": "identity question", "text": "क्या आप इंसान हैं?" },
+    {
+      "language": "hi",
+      "requested": false,
+      "why": "agent as a courier",
+      "text": "एजेंट नंबर 5 ने मेरा ऑर्डर पहुंचाया"
+    },
+    { "language": "ur", "requested": false, "why": "negation", "text": "مجھے انسان نہیں چاہیے" },
+    {
+      "language": "ur",
+      "requested": false,
+      "why": "negation",
+      "text": "مجھے کسی سے بات نہیں کرنی"
+    },
+    {
+      "language": "ur",
+      "requested": false,
+      "why": "identity question",
+      "text": "کیا آپ انسان ہیں؟"
+    },
+    {
+      "language": "ur",
+      "requested": false,
+      "why": "agent as a courier",
+      "text": "ایجنٹ نمبر 5 نے میرا آرڈر پہنچایا"
+    }
+  ]
+}

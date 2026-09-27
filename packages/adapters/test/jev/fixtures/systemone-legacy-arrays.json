@@ -1,0 +1,9 @@
+{
+  "model": "jev-1.13.0",
+  "answers": [
+    { "name": "intent", "type": "choice", "choice": "delivery", "confidence": 0.82 },
+    { "name": "evidence", "type": "score", "score": 1.6, "confidence": 0.71 },
+    { "name": "needsHuman", "type": "noul", "noul": 0.12 }
+  ],
+  "usage": { "input_tokens": 212, "output_tokens": 9 }
+}

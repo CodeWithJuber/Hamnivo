@@ -58,6 +58,11 @@ export const CreateWidgetSessionRequest = z
     locale: SupportedLocale.optional(),
     /** Refresh token from a previous session on this device (resumes the anonymous principal). */
     resumeToken: z.string().max(512).optional(),
+    /**
+     * Origin of the page embedding the widget, as the loader saw it. Checked against the brand's
+     * allowed websites. The browser enforces embedding itself with CSP frame-ancestors.
+     */
+    hostOrigin: z.url().max(300).optional(),
   })
   .meta({ id: 'CreateWidgetSessionRequest' });
 
@@ -80,6 +85,19 @@ export const WidgetSession = z
   })
   .meta({ id: 'WidgetSession' });
 export type WidgetSession = z.infer<typeof WidgetSession>;
+
+/**
+ * Which websites may show this widget in a frame. The TLS proxy in front of the widget sends it as
+ * the page's CSP `frame-ancestors`, so other websites cannot embed a brand's chat.
+ */
+export const WidgetFramePolicy = z
+  .object({
+    widgetId: z.string(),
+    /** CSP source expressions: the brand's allowed websites, or local pages when none are set. */
+    frameAncestors: z.array(z.string()).min(1),
+  })
+  .meta({ id: 'WidgetFramePolicy' });
+export type WidgetFramePolicy = z.infer<typeof WidgetFramePolicy>;
 
 export const RefreshWidgetSessionRequest = z
   .object({ refreshToken: z.string().max(512) })

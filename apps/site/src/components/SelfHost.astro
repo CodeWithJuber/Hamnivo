@@ -1,0 +1,64 @@
+---
+import { quickstartCommands } from '../content/quickstart';
+import { dictionaries, type Locale } from '../i18n';
+import { links } from '../lib/links';
+import CodeBlock from './CodeBlock.astro';
+import RichText from './RichText.astro';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = dictionaries[locale];
+---
+
+<section id="self-host" aria-labelledby="self-host-title" class="pb-16 sm:pb-20 lg:pb-24">
+  <div class="page-container">
+    <div class="max-w-2xl">
+      <p class="eyebrow">{t.selfHost.eyebrow}</p>
+      <h2 id="self-host-title" class="heading-2 mt-3">{t.selfHost.title}</h2>
+      <p class="lead mt-4">{t.selfHost.lead}</p>
+    </div>
+    {/* role="list" keeps list semantics in Safari, which drops them when markers are hidden. */}
+    <ol role="list" class="mt-10 grid gap-6 lg:grid-cols-2">
+      {
+        t.selfHost.steps.map((step, i) => {
+          const command = quickstartCommands[i];
+          return (
+            <li class="flex min-w-0 flex-col rounded-xl border border-border bg-surface p-5 sm:p-6">
+              <div class="flex items-center gap-3">
+                <span
+                  class="flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-brand font-semibold"
+                  aria-hidden="true"
+                >
+                  {i + 1}
+                </span>
+                <h3 class="heading-3">{step.title}</h3>
+              </div>
+              <p class="mt-3 text-text-secondary">
+                <RichText text={step.body} />
+              </p>
+              {command && (
+                <div class="mt-auto pt-4">
+                  <CodeBlock
+                    id={`step-${i + 1}-commands`}
+                    code={command}
+                    label={t.code.terminal}
+                    strings={t.code}
+                  />
+                </div>
+              )}
+            </li>
+          );
+        })
+      }
+    </ol>
+    <div class="mt-8 flex flex-col gap-2">
+      <p>
+        <a class="site-link font-semibold" href={links.selfHosting}>{t.selfHost.guideLink}</a>
+      </p>
+      <p class="text-base text-text-muted">{t.selfHost.note}</p>
+    </div>
+  </div>
+</section>

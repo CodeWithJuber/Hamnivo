@@ -1,0 +1,84 @@
+# Chatwoot CE v4.18.0: Hamnivo's conversation authority (ADR 0001), with its own database.
+#
+# Start:  pnpm chatwoot:up     (prepares the database, creates a super admin and a Platform App
+#                              token, and writes CHATWOOT_URL / CHATWOOT_PLATFORM_TOKEN to .env.local)
+# Stop:   pnpm chatwoot:down   (data stays in the named volumes)
+# Chatwoot is reachable on 127.0.0.1:${CHATWOOT_PORT}; in production put it behind the TLS proxy.
+name: hamnivo-chatwoot
+
+x-chatwoot: &chatwoot
+  image: chatwoot/chatwoot:v4.18.0-ce
+  restart: unless-stopped
+  environment: &chatwoot-env
+    RAILS_ENV: production
+    NODE_ENV: production
+    INSTALLATION_ENV: docker
+    SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE:?run bash scripts/setup/env.sh first}
+    FRONTEND_URL: ${CHATWOOT_URL:-http://127.0.0.1:3000}
+    ENABLE_ACCOUNT_SIGNUP: 'false'
+    FORCE_SSL: 'false'
+    POSTGRES_HOST: chatwoot-db
+    POSTGRES_PORT: '5432'
+    POSTGRES_DATABASE: chatwoot
+    POSTGRES_USERNAME: postgres
+    POSTGRES_PASSWORD: ${CHATWOOT_DB_PASSWORD:?run bash scripts/setup/env.sh first}
+    REDIS_URL: redis://chatwoot-redis:6379
+    RAILS_LOG_TO_STDOUT: 'true'
+    LOG_LEVEL: warn
+    ACTIVE_STORAGE_SERVICE: local
+    # Webhooks go to the Hamnivo gateway on this machine (development). In production the gateway
+    # has a public HTTPS URL and this stays false, keeping Chatwoot's SSRF protection intact.
+    SAFE_FETCH_ALLOW_PRIVATE_NETWORK: ${CHATWOOT_ALLOW_PRIVATE_WEBHOOKS:-true}
+  volumes:
+    - chatwoot-storage:/app/storage
+  extra_hosts:
+    - 'host.docker.internal:host-gateway'
+  depends_on:
+    chatwoot-db:
+      condition: service_healthy
+    chatwoot-redis:
+      condition: service_healthy
+
+services:
+  chatwoot-db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chatwoot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${CHATWOOT_DB_PASSWORD:?run bash scripts/setup/env.sh first}
+    volumes:
+      - chatwoot-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d chatwoot']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  chatwoot-redis:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ['valkey-server', '--appendonly', 'yes']
+    volumes:
+      - chatwoot-redis:/data
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  chatwoot-web:
+    <<: *chatwoot
+    entrypoint: docker/entrypoints/rails.sh
+    command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
+    ports:
+      - '${CHATWOOT_BIND:-127.0.0.1}:${CHATWOOT_PORT:-3000}:3000'
+
+  chatwoot-sidekiq:
+    <<: *chatwoot
+    command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
+
+volumes:
+  chatwoot-db:
+  chatwoot-redis:
+  chatwoot-storage:

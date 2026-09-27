@@ -78,7 +78,7 @@
   },
   "overrides": [
     {
-      "includes": ["**/scripts/**"],
+      "includes": ["**/scripts/**", "**/e2e/stack.ts"],
       "linter": {
         "rules": {
           "suspicious": {
@@ -104,6 +104,26 @@
         "rules": {
           "complexity": {
             "noImportantStyles": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/test/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.module.ts"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noStaticOnlyClass": "off"
           }
         }
       }

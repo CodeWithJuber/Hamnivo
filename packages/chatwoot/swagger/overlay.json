@@ -1,0 +1,96 @@
+{
+  "$comment": "Hamnivo overlay for Chatwoot v4.18.0: fields and endpoints present in the Chatwoot source (verified against a running v4.18.0-ce) but missing from its swagger.",
+  "components": {
+    "schemas": {
+      "conversation_message_create_payload": {
+        "properties": {
+          "source_id": { "type": "string", "description": "Client-supplied external id, stored and echoed in webhooks (Hamnivo idempotency key)." },
+          "echo_id": { "type": "string", "description": "Client echo id (not persisted)." },
+          "sender_type": { "type": "string", "enum": ["AgentBot"], "description": "Post as an agent bot of this account." },
+          "sender_id": { "type": "integer", "description": "Agent bot id when sender_type is AgentBot." },
+          "external_created_at": { "type": "integer", "description": "Original creation time (Unix seconds) for imported history." }
+        }
+      },
+      "hamnivo_user_token": {
+        "type": "object",
+        "properties": {
+          "access_token": { "type": "string" },
+          "expiry": { "type": ["string", "null"] },
+          "user": { "type": "object" }
+        },
+        "required": ["access_token"]
+      },
+      "hamnivo_dashboard_app_create": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": { "type": { "type": "string", "enum": ["frame"] }, "url": { "type": "string" } },
+              "required": ["type", "url"]
+            }
+          }
+        },
+        "required": ["title", "content"]
+      },
+      "hamnivo_dashboard_app": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "title": { "type": "string" },
+          "content": { "type": "array", "items": { "type": "object" } }
+        },
+        "required": ["id", "title"]
+      }
+    }
+  },
+  "paths": {
+    "/platform/api/v1/users/{id}/token": {
+      "post": {
+        "operationId": "hamnivo-create-user-token",
+        "summary": "Create or fetch an API access token for a platform-managed user",
+        "tags": ["Users"],
+        "security": [{ "platformAppApiKey": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": {
+            "description": "Token",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/hamnivo_user_token" } } }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/dashboard_apps": {
+      "get": {
+        "operationId": "hamnivo-list-dashboard-apps",
+        "summary": "List dashboard apps",
+        "tags": ["Dashboard Apps"],
+        "parameters": [{ "name": "account_id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": {
+            "description": "Dashboard apps",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/hamnivo_dashboard_app" } } } }
+          }
+        }
+      },
+      "post": {
+        "operationId": "hamnivo-create-dashboard-app",
+        "summary": "Create a dashboard app",
+        "tags": ["Dashboard Apps"],
+        "parameters": [{ "name": "account_id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/hamnivo_dashboard_app_create" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/hamnivo_dashboard_app" } } }
+          }
+        }
+      }
+    }
+  }
+}

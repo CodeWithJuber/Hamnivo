@@ -18,3 +18,10 @@ routeTree.gen.ts
 # Full-resolution design originals are kept outside git (see docs/design/README.md)
 docs/design/.originals/
 .data/
+
+# Agent worktrees (parallel work lanes)
+.claude/worktrees/
+
+# Production settings and backups on a server (deploy/production)
+deploy/production/chatwoot.env
+deploy/production/backups/

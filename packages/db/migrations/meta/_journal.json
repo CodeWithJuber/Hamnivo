@@ -22,6 +22,83 @@
       "when": 1790464817627,
       "tag": "20260926232017_security",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790465973224,
+      "tag": "20260926233933_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790465974216,
+      "tag": "20260926233934_auth_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790466128942,
+      "tag": "20260926234208_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790466129996,
+      "tag": "20260926234209_invitations_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790466525574,
+      "tag": "20260926234845_secret_hint",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790470470735,
+      "tag": "20260927005430_authority_runtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790470471806,
+      "tag": "20260927005431_authority_runtime_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790475172161,
+      "tag": "20260927021252_agents_runtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790475173366,
+      "tag": "20260927021253_agents_runtime_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790476486368,
+      "tag": "20260927023446_knowledge",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790476487610,
+      "tag": "20260927023447_knowledge_security",
+      "breakpoints": true
     }
   ]
 }

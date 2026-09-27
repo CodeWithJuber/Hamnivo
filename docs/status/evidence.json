@@ -7,12 +7,13 @@
   "O03": {
     "status": "in-progress",
     "evidence": [
-      "scripts/ci/local.sh",
       "deploy/postgres/init.sh",
+      "docs/adr/0007-self-hosted-verification.md",
       "docs/self-hosting.md",
-      "docs/adr/0007-self-hosted-verification.md"
+      "scripts/ci/local.sh",
+      "scripts/ci/production-smoke.sh"
     ],
-    "note": "Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence/status checks, accessibility audit) run with pnpm ci:local; release and rollback automation pending."
+    "note": "Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence and status checks, Chatwoot contract, accessibility, browser journeys) run with pnpm ci:local; --with-production also builds the images and checks the deployment. Versioned releases and rollback are pending."
   },
   "W03": {
     "status": "in-progress",
@@ -64,7 +65,7 @@
   "HNV-24-06": {
     "status": "partial",
     "evidence": ["packages/ui/scripts/a11y-audit.ts", "packages/ui/src/components/live-region.tsx"],
-    "note": "Automated axe audit passes for every story in light/dark \u00d7 LTR/RTL; manual screen-reader, 200% zoom and keyboard reviews are still required."
+    "note": "Automated axe audit passes for every story in light/dark × LTR/RTL; manual screen-reader, 200% zoom and keyboard reviews are still required."
   },
   "D01": {
     "status": "in-progress",
@@ -72,9 +73,11 @@
       "packages/contracts/src/routes.ts",
       "packages/contracts/src/errors.ts",
       "packages/contracts/openapi/hamnivo.v1.json",
-      "packages/contracts/scripts/openapi.ts"
+      "packages/contracts/scripts/openapi.ts",
+      "packages/contracts/src/admin-routes.ts",
+      "apps/gateway/src/common/idempotency.service.ts"
     ],
-    "note": "OpenAPI 3.1 generated from Zod with RFC 9457 errors and cursor pagination; widget routes defined, staff/admin/server routes follow with their modules."
+    "note": "OpenAPI 3.1 from Zod (widget, identity and admin routes), RFC 9457 errors, Idempotency-Key replay/conflict, cursor pagination; server API keys and remaining resources follow."
   },
   "E04": {
     "status": "in-progress",
@@ -93,28 +96,462 @@
       "packages/db/src/audit.ts",
       "packages/db/src/schema/audit.ts",
       "packages/db/migrations/20260926232017_security.sql",
-      "packages/db/test/audit.int.test.ts"
+      "packages/db/test/audit.int.test.ts",
+      "apps/gateway/src/audit/audit.controller.ts",
+      "apps/gateway/test/admin.int.test.ts"
     ],
-    "note": "Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection and transactional appends; search, export and Studio views pending."
+    "note": "Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection, list/filter/verify API and events for every administrative change; export and Studio views pending."
   },
   "A06": {
     "status": "in-progress",
     "evidence": [
-      "packages/db/src/schema/identity.ts",
-      "packages/db/src/resolvers.ts",
-      "packages/db/test/resolvers.int.test.ts",
-      "scripts/setup/env.sh"
+      "apps/gateway/src/secrets/envelope.ts",
+      "apps/gateway/src/secrets/secret-broker.service.ts",
+      "apps/gateway/test/secrets.int.test.ts",
+      "packages/db/src/schema/identity.ts"
     ],
-    "note": "Envelope-encrypted secret storage, hashed API keys with prefix lookup and generated installation secrets; the secret broker, masking UI and rotation flows follow with the gateway."
+    "note": "Write-only, masked, envelope-encrypted secrets with rotation, revocation, KEK rotation and MFA + fresh sign-in; API keys for service accounts pending."
   },
   "O05": {
     "status": "in-progress",
     "evidence": [
+      ".env.example",
       "deploy/compose/services.yml",
+      "deploy/docker/Dockerfile",
       "deploy/postgres/init.sh",
+      "deploy/production/Caddyfile",
+      "deploy/production/compose.yml",
+      "deploy/production/hamnivo.sh",
       "docs/self-hosting.md",
-      ".env.example"
+      "scripts/ci/production-smoke.sh"
     ],
-    "note": "Self-hosted infrastructure (PostgreSQL 18 + pgvector, Valkey), generated secrets, environment reference and server guide; versioned application containers follow with the gateway."
+    "note": "One-server production stack: gateway and edge images built from source, compose file with PostgreSQL 18 + pgvector, Valkey, Chatwoot 4.18.0-ce, ClamAV and Caddy (automatic HTTPS, HTTP to HTTPS, HTTP/3); only the edge publishes ports. hamnivo.sh sets up generated secrets and runs up, status, logs, backup, restore and update. The smoke test deploys it with Caddy's internal CA and checks sign-up, a real Chatwoot connection, an AI reply over the stream, the website and a backup and restore (tested). Let's Encrypt issuance needs public DNS and was not exercised here; Studio joins the stack when it ships."
+  },
+  "A02": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/policy/src/presets.ts",
+      "apps/gateway/src/admin/admin.service.ts",
+      "apps/gateway/test/admin.int.test.ts"
+    ],
+    "note": "Invitations (verified-email acceptance), scoped grants and eight role presets through the admin API with integration tests; Studio screens pending."
+  },
+  "A03": {
+    "status": "implemented",
+    "evidence": [
+      "packages/policy/src/delegation.ts",
+      "packages/policy/test/policy.test.ts",
+      "apps/gateway/src/admin/admin.service.ts",
+      "apps/gateway/test/admin.int.test.ts"
+    ],
+    "note": "Delegation ceiling (own permissions, own scope, own expiry, no self-grants) enforced for grants, invitations and custom roles; interfaces added later (SCIM) must reuse checkDelegation."
+  },
+  "X01": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/identity/principal.service.ts",
+      "apps/gateway/src/identity/staff.guard.ts",
+      "apps/gateway/test/identity.int.test.ts"
+    ],
+    "note": "Staff principals come from server-verified sessions and per-request grant loading; service-account and workload identities pending."
+  },
+  "X04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/authority/registry.ts",
+      "apps/gateway/src/secrets/secret-broker.service.ts",
+      "apps/gateway/test/secrets.int.test.ts"
+    ],
+    "note": "Secret broker reveals credentials only to server code inside the owning tenant; scoped short-lived credentials for tools and agents pending."
+  },
+  "O01": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/platform/metrics.ts",
+      "apps/gateway/src/platform/health.controller.ts",
+      "apps/gateway/test/identity.int.test.ts"
+    ],
+    "note": "Prometheus metrics (request latency by route template, process metrics) behind a bearer token (tested: hidden without it, served with it) and liveness/readiness checks; alert rules and dashboards pending."
+  },
+  "A11": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/authority/connections.service.ts",
+      "apps/gateway/test/slice.int.test.ts",
+      "deploy/compose/chatwoot.yml",
+      "packages/chatwoot/src/provisioning.ts",
+      "packages/chatwoot/test/contract/suite.ts",
+      "scripts/chatwoot/up.sh"
+    ],
+    "note": "Admin API connects a brand to Chatwoot: account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed webhooks and Copilot dashboard app; every credential stored with the secret broker (tested end to end against the fake, provisioning also against real Chatwoot v4.18.0-ce). Health checks, reconnect instructions and the Studio screen pending."
+  },
+  "E06": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/adapters/test/jev/contract.test.ts",
+      "packages/adapters/test/models/contract.test.ts",
+      "packages/adapters/test/models/contract.ts",
+      "packages/chatwoot/src/fake/server.ts",
+      "packages/chatwoot/test/contract/fake.test.ts",
+      "packages/chatwoot/test/contract/real.int.test.ts",
+      "packages/chatwoot/test/contract/suite.ts",
+      "packages/domain/src/authority.ts"
+    ],
+    "note": "One shared behaviour suite runs against every model provider (generate, stream, wire format, key placement, 401/429/5xx/529/abort) with provider-specific capability tests, and the Jev adapter has its own wire contract fixtures. Fixtures come from public API docs, not recorded traffic."
+  },
+  "W05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/conversations.service.ts",
+      "apps/gateway/test/slice.int.test.ts",
+      "apps/widget/src/useChat.ts"
+    ],
+    "note": "Customer history from Chatwoot's customer view (private notes and activity excluded) with an older-page cursor, shown when the widget reopens; unread markers pending."
+  },
+  "W06": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/authority/outbound.service.ts",
+      "apps/gateway/test/slice.int.test.ts",
+      "apps/widget/e2e/journey.spec.ts",
+      "apps/widget/src/components/Chat.tsx",
+      "packages/client/src/outbox.ts",
+      "packages/client/test/client.test.ts"
+    ],
+    "note": "Queued, sending, accepted and failed (with retry) states in the widget, backed by the SDK outbox; 'accepted' only after the authority committed. Delivered/read states pending."
+  },
+  "W07": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/authority/journal.service.ts",
+      "apps/gateway/src/widget/events.service.ts",
+      "apps/gateway/test/slice.int.test.ts",
+      "apps/widget/e2e/journey.spec.ts",
+      "packages/client/src/outbox.ts",
+      "packages/client/src/stream.ts",
+      "packages/client/test/client.test.ts"
+    ],
+    "note": "Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending."
+  },
+  "W12": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/sessions.service.ts",
+      "apps/gateway/src/widget/tokens.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending."
+  },
+  "H08": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/authority/ownership.service.ts",
+      "apps/gateway/src/conversations/staff-conversations.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending."
+  },
+  "R05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/src/authority/ownership.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "One public AI speaker per conversation fenced by the ownership epoch; the lease with expiry (columns present) is not used yet."
+  },
+  "R06": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, and by a Chatwoot pre-flight owner check (mutation-tested). Undispatched tool actions follow with the tool gateway."
+  },
+  "R12": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/conversations.service.ts",
+      "apps/gateway/src/widget/copy.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note and honest availability ('queued'); business hours and follow-up channels pending."
+  },
+  "G02": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/models.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/adapters/src/models/capabilities.ts",
+      "packages/adapters/src/models/errors.ts",
+      "packages/adapters/src/models/fallback.ts",
+      "packages/adapters/src/models/mock.ts",
+      "packages/adapters/src/models/registry.ts",
+      "packages/adapters/test/mock.test.ts",
+      "packages/adapters/test/models/contract.test.ts"
+    ],
+    "note": "Anthropic, OpenAI, Google Gemini and OpenAI-compatible adapters (AI SDK 7) plus deterministic mocks, a sourced capability table and error normalization; agents use them with tenant or platform keys, checked at publication, with fallback models on overload (tested against provider fixtures and with the mock end to end). No live provider call has run in the checks."
+  },
+  "W01": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/sessions.service.ts",
+      "apps/gateway/test/slice.int.test.ts",
+      "apps/widget/e2e/journey.spec.ts",
+      "deploy/production/Caddyfile",
+      "packages/widget-loader/src/loader.ts",
+      "packages/widget-loader/test/size.test.ts",
+      "scripts/ci/production-smoke.ts"
+    ],
+    "note": "One dependency-free script (1.7 KB gzip) adds an accessible launcher; the widget iframe is created only when opened (tested: nothing else loads before). In production the widget page carries CSP frame-ancestors from the brand's allowed websites (GET /v1/widget/frame-policy; tested through Caddy, including a spoofed header and an unknown widget). Brand colours from the published config are pending."
+  },
+  "W04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/authority/views.ts",
+      "apps/gateway/test/knowledge.int.test.ts",
+      "apps/widget/e2e/journey.spec.ts",
+      "apps/widget/src/components/Chat.tsx"
+    ],
+    "note": "Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested)."
+  },
+  "W10": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/conversations.service.ts",
+      "apps/gateway/test/slice.int.test.ts",
+      "apps/widget/src/components/Chat.tsx"
+    ],
+    "note": "'Talk to a person' in the widget creates a durable waiting state and a private handoff note for staff, so the customer does not repeat themselves (tested); context summary by AI pending."
+  },
+  "W13": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/copy.ts",
+      "apps/widget/e2e/journey.spec.ts",
+      "apps/widget/src/i18n.ts"
+    ],
+    "note": "Language selector for English, Arabic, Hindi and Urdu with right-to-left layout for Arabic and Urdu (tested); translations pending native review."
+  },
+  "W14": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/widget/e2e/journey.spec.ts",
+      "apps/widget/src/components/Chat.tsx",
+      "packages/widget-loader/src/loader.ts"
+    ],
+    "note": "Keyboard operation, Escape to close with focus returned to the launcher, labelled controls, polite live announcements and an axe audit with no WCAG 2.2 AA violations (tested); manual screen-reader review pending."
+  },
+  "D02": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/client/src/client.ts",
+      "packages/client/src/outbox.ts",
+      "packages/client/src/stream.ts",
+      "packages/client/test/client.test.ts"
+    ],
+    "note": "Framework-free SDK: sessions with single-flight renewal, typed conversation calls, exactly-once send outbox and resumable streams (unit-tested with msw, used by the widget)."
+  },
+  "D03": {
+    "status": "in-progress",
+    "evidence": ["apps/widget/src/components/Chat.tsx", "apps/widget/src/useChat.ts"],
+    "note": "The widget maps SDK state into assistant-ui's external-store runtime; a published React package (@hamnivo/react) is pending."
+  },
+  "U04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/widget/e2e/journey.spec.ts",
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/i18n.ts"
+    ],
+    "note": "Document direction follows the language and message text uses dir=auto, so Arabic and Urdu read right to left while Latin order numbers keep their direction; bidi copy behaviour tests pending."
+  },
+  "G01": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/agents.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/contracts/src/agents.ts",
+      "packages/db/src/schema/runtime.ts"
+    ],
+    "note": "Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending."
+  },
+  "G03": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/agents.int.test.ts"
+    ],
+    "note": "Answer mode replies to customers; assist mode writes suggestions only as internal notes and never answers customers (tested). Grounded answers from knowledge arrive with knowledge sources."
+  },
+  "G09": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/contracts/src/agents.ts"
+    ],
+    "note": "Per-agent ceilings on output tokens, time, steps and history; model failures are retried twice by the outbox, then the conversation goes to people with an honest note (tested). Cost and concurrency budgets pending."
+  },
+  "G12": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/runs.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/db/src/schema/runtime.ts"
+    ],
+    "note": "Each run records agent version, provider, model, tokens, latency, outcome, error kind and per-step records; token usage goes to the usage ledger (tested). Cost estimates and dashboards pending."
+  },
+  "X08": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/kill-switches.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/db/migrations/20260927021253_agents_runtime_security.sql"
+    ],
+    "note": "Kill switches for the tenant, a brand or an agent stop AI replies at once; AI-held conversations go to people on their next message, new conversations start with people, and clearing restores AI replies (tested, mutation-checked). Switches are cleared, never deleted. Tool-level switches arrive with tools."
+  },
+  "X11": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/runs.service.ts",
+      "apps/gateway/test/agents.int.test.ts"
+    ],
+    "note": "Run and step records hold versions, counts, hashes and error kinds but no prompt or reply text (tested); staff read them through the API with analytics.read."
+  },
+  "U09": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/honesty.ts",
+      "apps/gateway/src/runtime/prompt.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "apps/gateway/test/runtime.test.ts"
+    ],
+    "note": "Non-removable prompt rules plus an output guard for claims of being human in English, Hinglish, Roman Urdu, Hindi, Urdu and Arabic: regenerate once, otherwise publish nothing and hand over (tested, mutation-checked). Native-speaker review of the phrase lists pending."
+  },
+  "A07": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/agents.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/db/migrations/20260927021253_agents_runtime_security.sql",
+      "packages/db/test/agents.int.test.ts"
+    ],
+    "note": "Saved drafts are not live; publishing freezes a version with its configuration hash (a database trigger rejects changes), one version is live at a time, and publishing an earlier version is the rollback (tested). Studio screens pending."
+  },
+  "G04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/knowledge/knowledge.service.ts",
+      "apps/gateway/test/knowledge.int.test.ts",
+      "packages/db/src/schema/knowledge.ts"
+    ],
+    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). URL crawling and Studio screens pending."
+  },
+  "G05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/knowledge/retrieval.service.ts",
+      "apps/gateway/test/knowledge.int.test.ts"
+    ],
+    "note": "Hybrid vector + keyword retrieval with eligibility filters applied before ranking: tenant (RLS), brand, agent's sources, audience (internal sources never reach customer answers), current ready version, expiry and review cycle (tested). Per-customer document scopes pending."
+  },
+  "G06": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/authority/views.ts",
+      "apps/gateway/src/runtime/prompt.ts",
+      "apps/gateway/test/knowledge.int.test.ts",
+      "apps/gateway/test/knowledge.test.ts",
+      "apps/widget/src/components/Chat.tsx"
+    ],
+    "note": "Answers cite retrieved passages; citation numbers that match nothing retrieved are removed and the rest renumbered per document; sources travel as source parts from Hamnivo's publication record and the widget lists them (tested). Source-support QA rubric (Jev) pending."
+  },
+  "G17": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/knowledge/extract.ts",
+      "apps/gateway/src/knowledge/ingestion.service.ts",
+      "apps/gateway/src/knowledge/scanner.ts",
+      "apps/gateway/src/knowledge/text.ts",
+      "apps/gateway/test/knowledge.int.test.ts",
+      "apps/gateway/test/knowledge.test.ts"
+    ],
+    "note": "Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Parsing runs in-process (no sandbox) and URL sources are pending."
+  },
+  "X09": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/prompt.ts",
+      "apps/gateway/test/knowledge.int.test.ts",
+      "apps/gateway/test/knowledge.test.ts"
+    ],
+    "note": "Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool outputs arrive with tools. Injection resistance is not yet measured by an adversarial suite."
+  },
+  "W08": {
+    "status": "in-progress",
+    "evidence": ["apps/widget/src/components/Chat.tsx", "apps/widget/src/markdown.ts"],
+    "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers. Structured cards pending."
+  },
+  "J01": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/adapters/src/jev/provider.ts",
+      "packages/adapters/test/jev/contract.test.ts",
+      "packages/domain/src/decisions.ts"
+    ],
+    "note": "Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). Not yet called by the gateway; no live Jev call has run."
+  },
+  "J04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/domain/src/human-request.ts",
+      "packages/domain/test/human-request.test.ts"
+    ],
+    "note": "A typed request for a person (English, Hinglish, Roman Urdu, Arabic, Hindi, Urdu, with negation and look-alikes) hands the conversation to people before any model or decision provider runs (tested end to end); Jev escalation advice for other cases is pending."
+  },
+  "J06": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/adapters/src/jev/breaker.ts",
+      "packages/adapters/src/jev/provider.ts",
+      "packages/adapters/test/jev/resilience.test.ts"
+    ],
+    "note": "Total deadline, caller cancellation (also when the transport ignores it), no retries, circuit breaker with half-open probe, and decided/abstained/unavailable/invalid results (tested). The fallback chain in the gateway is pending."
+  },
+  "J07": {
+    "status": "in-progress",
+    "evidence": ["packages/adapters/src/jev/provider.ts", "packages/domain/src/decisions.ts"],
+    "note": "Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested); persisting decision records and cost is pending."
+  },
+  "E08": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/adapters/src/jev/wire.ts",
+      "packages/adapters/test/jev/contract.test.ts",
+      "packages/adapters/test/jev/fixtures/systemone-request.json"
+    ],
+    "note": "Requests and answers use the current keyed-map shapes, checked against an exact fixture; array-shaped answers from the older client are rejected. Proven against the SDK and fixtures, not the live API."
+  },
+  "U02": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/domain/src/human-request.ts",
+      "packages/domain/test/fixtures/human-requests.json"
+    ],
+    "note": "Hinglish and Roman Urdu requests for a person are detected across spellings, transliterations and negation (74 fixture cases) and act end to end; identifiers pass through unchanged. Native-speaker review pending."
+  },
+  "O02": {
+    "status": "in-progress",
+    "evidence": [
+      "deploy/production/hamnivo.sh",
+      "scripts/ci/production-smoke.sh",
+      "scripts/ci/production-smoke.ts",
+      "docs/self-hosting.md"
+    ],
+    "note": "hamnivo.sh backup dumps both databases (pg_dump), Chatwoot files, certificates and settings with checksums and keeps the newest N; restore checks the checksums, refuses a backup made with other secrets, replaces data and files, then runs pending migrations. The production smoke test runs a drill (tested: a brand made after the backup is gone and the conversation history is back). Point-in-time recovery, off-site copies and a deletion replay after restore are pending."
   }
 }

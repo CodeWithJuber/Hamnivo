@@ -33,6 +33,8 @@ export const secrets = pgTable(
     tenantId: tenantId(),
     kind: text('kind').notNull(),
     label: text('label').notNull(),
+    /** Last characters of the value for recognition in lists (e.g. `9f3a`); never more. */
+    hint: text('hint').notNull().default(''),
     ciphertext: bytea('ciphertext').notNull(),
     iv: bytea('iv').notNull(),
     wrappedKey: bytea('wrapped_key').notNull(),
@@ -231,6 +233,57 @@ export const apiKeys = pgTable(
       columns: [t.tenantId, t.serviceAccountId],
       foreignColumns: [serviceAccounts.tenantId, serviceAccounts.id],
     }),
+    tenantIsolation(),
+  ],
+);
+
+/**
+ * Invitations to join a tenant with a role at a scope. The link carries `inv_<id>.<secret>`;
+ * only the secret's hash is stored. Acceptance requires a signed-in person whose email address
+ * was verified by a server-side challenge and matches the invitation.
+ */
+export const invitations = pgTable(
+  'invitations',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    email: citext('email').notNull(),
+    roleId: uuid('role_id').notNull(),
+    scopeType: text('scope_type', { enum: GRANT_SCOPES }).notNull(),
+    scopeId: uuid('scope_id'),
+    /** Expiry of the grant created on acceptance (null = no expiry). */
+    grantExpiresAt: tstz('grant_expires_at'),
+    tokenHash: bytea('token_hash').notNull(),
+    invitedBy: uuid('invited_by').notNull(),
+    status: text('status', { enum: ['pending', 'accepted', 'revoked'] })
+      .notNull()
+      .default('pending'),
+    expiresAt: tstz('expires_at').notNull(),
+    acceptedAt: tstz('accepted_at'),
+    acceptedStaffMemberId: uuid('accepted_staff_member_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('invitations_tenant_id_id_key').on(t.tenantId, t.id),
+    index('invitations_pending_email_idx')
+      .on(t.tenantId, t.email)
+      .where(sql`${t.status} = 'pending'`),
+    foreignKey({
+      name: 'invitations_role_fk',
+      columns: [t.tenantId, t.roleId],
+      foreignColumns: [roleDefinitions.tenantId, roleDefinitions.id],
+    }),
+    foreignKey({
+      name: 'invitations_invited_by_fk',
+      columns: [t.tenantId, t.invitedBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    foreignKey({
+      name: 'invitations_accepted_staff_fk',
+      columns: [t.tenantId, t.acceptedStaffMemberId],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    check('invitations_scope_ck', sql`(${t.scopeType} = 'tenant') = (${t.scopeId} is null)`),
     tenantIsolation(),
   ],
 );

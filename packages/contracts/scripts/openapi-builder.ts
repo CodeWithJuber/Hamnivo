@@ -18,6 +18,13 @@ const securitySchemes = {
     description: 'Hamnivo Studio session',
   },
   apiKey: { type: 'http', scheme: 'bearer', description: 'Scoped API key (hv_…)' },
+  chatwootSignature: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-Chatwoot-Signature',
+    description:
+      'sha256=HMAC-SHA256(secret, "{X-Chatwoot-Timestamp}.{raw body}") with the secret of the account, inbox or bot webhook',
+  },
 } as const;
 
 const securityFor: Record<RouteDef['auth'], Record<string, string[]>[] | undefined> = {
@@ -25,7 +32,7 @@ const securityFor: Record<RouteDef['auth'], Record<string, string[]>[] | undefin
   widget_session: [{ widgetSession: [] }],
   staff_session: [{ staffSession: [] }],
   api_key: [{ apiKey: [] }],
-  integration_signature: [],
+  integration_signature: [{ chatwootSignature: [] }],
 };
 
 /** Builds the OpenAPI 3.1 document from route definitions (contract-first; no running server). */
@@ -68,18 +75,27 @@ export function buildOpenApi(
         required: true,
         content: { 'application/json': { schema: route.body } },
       };
-    if (route.idempotent) {
-      operation.parameters = [
-        {
-          in: 'header',
-          name: 'Idempotency-Key',
-          required: false,
-          description:
-            'Retry-safe key bound to the request body hash; reuse with a different body returns 409',
-          schema: { type: 'string', maxLength: 255 },
-        },
-      ];
+    const parameters: Record<string, unknown>[] = [];
+    if (route.path.startsWith('/v1/admin/') || route.path.startsWith('/v1/conversations/')) {
+      parameters.push({
+        in: 'header',
+        name: 'X-Hamnivo-Tenant',
+        required: true,
+        description: 'Tenant the request acts in (tnt_…); the caller must be an active member',
+        schema: { type: 'string' },
+      });
     }
+    if (route.idempotent) {
+      parameters.push({
+        in: 'header',
+        name: 'Idempotency-Key',
+        required: false,
+        description:
+          'Retry-safe key bound to the request body hash; reuse with a different body returns 409',
+        schema: { type: 'string', maxLength: 255 },
+      });
+    }
+    if (parameters.length > 0) operation.parameters = parameters;
     paths[route.path] ??= {};
     (paths[route.path] as Record<string, Operation>)[route.method] = operation;
   }

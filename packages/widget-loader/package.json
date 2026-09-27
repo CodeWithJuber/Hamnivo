@@ -1,0 +1,25 @@
+{
+  "name": "@hamnivo/widget-loader",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tiny, dependency-free script that adds the Hamnivo chat launcher to a website and opens the widget iframe on demand",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./loader.js": "./dist/loader.js"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "tsdown && vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "0.23.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

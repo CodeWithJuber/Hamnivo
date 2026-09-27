@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 224 · in-progress: 7 · implemented: 1
+**Blueprint features (232):** planned: 179 · in-progress: 51 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -17,20 +17,20 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| W01 | One-script installation | P0 | C | planned |  |
+| W01 | One-script installation | P0 | C | in-progress | `apps/gateway/src/widget/sessions.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `deploy/production/Caddyfile`, `packages/widget-loader/src/loader.ts`, `packages/widget-loader/test/size.test.ts`, `scripts/ci/production-smoke.ts` — One dependency-free script (1.7 KB gzip) adds an accessible launcher; the widget iframe is created only when opened (tested: nothing else loads before). In production the widget page carries CSP frame-ancestors from the brand's allowed websites (GET /v1/widget/frame-policy; tested through Caddy, including a spoofed header and an unknown widget). Brand colours from the published config are pending. |
 | W02 | Layout modes | P0 | C | planned |  |
 | W03 | Brand theme | P0 | C | in-progress | `packages/brand/src/contrast.ts`, `packages/brand/test/contrast.test.ts` — Contrast validation implemented; widget studio UI pending. |
-| W04 | Clear responder identity | P0 | C | planned |  |
-| W05 | Conversation history | P0 | C | planned |  |
-| W06 | Delivery states | P0 | C | planned |  |
-| W07 | Reconnect and draft preservation | P0 | C | planned |  |
-| W08 | Rich content | P0 | C | planned |  |
+| W04 | Clear responder identity | P0 | C | in-progress | `apps/gateway/src/authority/views.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx` — Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested). |
+| W05 | Conversation history | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/useChat.ts` — Customer history from Chatwoot's customer view (private notes and activity excluded) with an older-page cursor, shown when the widget reopens; unread markers pending. |
+| W06 | Delivery states | P0 | C | in-progress | `apps/gateway/src/authority/outbound.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `packages/client/src/outbox.ts`, `packages/client/test/client.test.ts` — Queued, sending, accepted and failed (with retry) states in the widget, backed by the SDK outbox; 'accepted' only after the authority committed. Delivered/read states pending. |
+| W07 | Reconnect and draft preservation | P0 | C | in-progress | `apps/gateway/src/authority/journal.service.ts`, `apps/gateway/src/widget/events.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `packages/client/src/outbox.ts`, `packages/client/src/stream.ts`, `packages/client/test/client.test.ts` — Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. |
+| W08 | Rich content | P0 | C | in-progress | `apps/widget/src/components/Chat.tsx`, `apps/widget/src/markdown.ts` — Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers. Structured cards pending. |
 | W09 | Attachments | P0 | C | planned |  |
-| W10 | Human handoff | P0 | C | planned |  |
+| W10 | Human handoff | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/components/Chat.tsx` — 'Talk to a person' in the widget creates a durable waiting state and a private handoff note for staff, so the customer does not repeat themselves (tested); context summary by AI pending. |
 | W11 | Offline support | P0 | C | planned |  |
-| W12 | Identity lifecycle | P0 | C | planned |  |
-| W13 | Locale and RTL | P0 | C | planned |  |
-| W14 | Accessibility controls | P0 | C | planned |  |
+| W12 | Identity lifecycle | P0 | C | in-progress | `apps/gateway/src/widget/sessions.service.ts`, `apps/gateway/src/widget/tokens.service.ts`, `apps/gateway/test/slice.int.test.ts` — Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending. |
+| W13 | Locale and RTL | P0 | C | in-progress | `apps/gateway/src/widget/copy.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/i18n.ts` — Language selector for English, Arabic, Hindi and Urdu with right-to-left layout for Arabic and Urdu (tested); translations pending native review. |
+| W14 | Accessibility controls | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `packages/widget-loader/src/loader.ts` — Keyboard operation, Escape to close with focus returned to the launcher, labelled controls, polite live announcements and an axe audit with no WCAG 2.2 AA violations (tested); manual screen-reader review pending. |
 | W15 | Feedback and reopen | P0 | C | planned |  |
 | W16 | Structured task and approval cards | P1 | C | planned |  |
 | W17 | Search/help home | P1 | C | planned |  |
@@ -54,7 +54,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | H05 | Saved replies | P0 | C | planned |  |
 | H06 | Customer context | P0 | C | planned |  |
 | H07 | Search | P0 | C | planned |  |
-| H08 | Ownership and collisions | P0 | C | planned |  |
+| H08 | Ownership and collisions | P0 | C | in-progress | `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/conversations/staff-conversations.service.ts`, `apps/gateway/test/slice.int.test.ts` — Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending. |
 | H09 | Drafts and failed sends | P0 | C | planned |  |
 | H10 | Resolve, reopen and snooze | P0 | C | planned |  |
 | H11 | AI copilot | P0 | C | planned |  |
@@ -71,16 +71,16 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
 | A01 | Guided onboarding | P0 | C | planned |  |
-| A02 | Members and role presets | P0 | F | planned |  |
-| A03 | Sub-admin delegation | P0 | F | planned |  |
+| A02 | Members and role presets | P0 | F | in-progress | `packages/policy/src/presets.ts`, `apps/gateway/src/admin/admin.service.ts`, `apps/gateway/test/admin.int.test.ts` — Invitations (verified-email acceptance), scoped grants and eight role presets through the admin API with integration tests; Studio screens pending. |
+| A03 | Sub-admin delegation | P0 | F | implemented | `packages/policy/src/delegation.ts`, `packages/policy/test/policy.test.ts`, `apps/gateway/src/admin/admin.service.ts`, `apps/gateway/test/admin.int.test.ts` — Delegation ceiling (own permissions, own scope, own expiry, no self-grants) enforced for grants, invitations and custom roles; interfaces added later (SCIM) must reuse checkDelegation. |
 | A04 | Multi-brand settings | P0 | C | planned |  |
 | A05 | Basic business hours | P0 | C | planned |  |
-| A06 | Secrets and API credentials | P0 | F | in-progress | `packages/db/src/schema/identity.ts`, `packages/db/src/resolvers.ts`, `packages/db/test/resolvers.int.test.ts`, `scripts/setup/env.sh` — Envelope-encrypted secret storage, hashed API keys with prefix lookup and generated installation secrets; the secret broker, masking UI and rotation flows follow with the gateway. |
-| A07 | Draft/publish configuration | P0 | C | planned |  |
+| A06 | Secrets and API credentials | P0 | F | in-progress | `apps/gateway/src/secrets/envelope.ts`, `apps/gateway/src/secrets/secret-broker.service.ts`, `apps/gateway/test/secrets.int.test.ts`, `packages/db/src/schema/identity.ts` — Write-only, masked, envelope-encrypted secrets with rotation, revocation, KEK rotation and MFA + fresh sign-in; API keys for service accounts pending. |
+| A07 | Draft/publish configuration | P0 | C | in-progress | `apps/gateway/src/runtime/agents.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/db/migrations/20260927021253_agents_runtime_security.sql`, `packages/db/test/agents.int.test.ts` — Saved drafts are not live; publishing freezes a version with its configuration hash (a database trigger rejects changes), one version is live at a time, and publishing an earlier version is the rollback (tested). Studio screens pending. |
 | A08 | Usage limits | P0 | C | planned |  |
-| A09 | Audit trail | P0 | C | in-progress | `packages/db/src/audit.ts`, `packages/db/src/schema/audit.ts`, `packages/db/migrations/20260926232017_security.sql`, `packages/db/test/audit.int.test.ts` — Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection and transactional appends; search, export and Studio views pending. |
+| A09 | Audit trail | P0 | C | in-progress | `packages/db/src/audit.ts`, `packages/db/src/schema/audit.ts`, `packages/db/migrations/20260926232017_security.sql`, `packages/db/test/audit.int.test.ts`, `apps/gateway/src/audit/audit.controller.ts`, `apps/gateway/test/admin.int.test.ts` — Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection, list/filter/verify API and events for every administrative change; export and Studio views pending. |
 | A10 | Retention and exports | P0 | C | planned |  |
-| A11 | Channel setup | P0 | C | planned |  |
+| A11 | Channel setup | P0 | C | in-progress | `apps/gateway/src/authority/connections.service.ts`, `apps/gateway/test/slice.int.test.ts`, `deploy/compose/chatwoot.yml`, `packages/chatwoot/src/provisioning.ts`, `packages/chatwoot/test/contract/suite.ts`, `scripts/chatwoot/up.sh` — Admin API connects a brand to Chatwoot: account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed webhooks and Copilot dashboard app; every credential stored with the secret broker (tested end to end against the fake, provisioning also against real Chatwoot v4.18.0-ce). Health checks, reconnect instructions and the Studio screen pending. |
 | A12 | Custom role builder | P1 | C | planned |  |
 | A13 | Enterprise identity | P1 | C | planned |  |
 | A14 | Provisioning and access reviews | P2 | A | planned |  |
@@ -95,23 +95,23 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| G01 | Agent profiles | P0 | C | planned |  |
-| G02 | Provider adapter | P0 | C | planned |  |
-| G03 | Assist and answer modes | P0 | C | planned |  |
-| G04 | Approved knowledge sources | P0 | C | planned |  |
-| G05 | Retrieval with access controls | P0 | C | planned |  |
-| G06 | Source citations | P0 | C | planned |  |
+| G01 | Agent profiles | P0 | C | in-progress | `apps/gateway/src/runtime/agents.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/contracts/src/agents.ts`, `packages/db/src/schema/runtime.ts` — Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending. |
+| G02 | Provider adapter | P0 | C | in-progress | `apps/gateway/src/runtime/models.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/adapters/src/models/capabilities.ts`, `packages/adapters/src/models/errors.ts`, `packages/adapters/src/models/fallback.ts`, `packages/adapters/src/models/mock.ts`, `packages/adapters/src/models/registry.ts`, `packages/adapters/test/mock.test.ts`, `packages/adapters/test/models/contract.test.ts` — Anthropic, OpenAI, Google Gemini and OpenAI-compatible adapters (AI SDK 7) plus deterministic mocks, a sourced capability table and error normalization; agents use them with tenant or platform keys, checked at publication, with fallback models on overload (tested against provider fixtures and with the mock end to end). No live provider call has run in the checks. |
+| G03 | Assist and answer modes | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/agents.int.test.ts` — Answer mode replies to customers; assist mode writes suggestions only as internal notes and never answers customers (tested). Grounded answers from knowledge arrive with knowledge sources. |
+| G04 | Approved knowledge sources | P0 | C | in-progress | `apps/gateway/src/knowledge/knowledge.service.ts`, `apps/gateway/test/knowledge.int.test.ts`, `packages/db/src/schema/knowledge.ts` — Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). URL crawling and Studio screens pending. |
+| G05 | Retrieval with access controls | P0 | C | in-progress | `apps/gateway/src/knowledge/retrieval.service.ts`, `apps/gateway/test/knowledge.int.test.ts` — Hybrid vector + keyword retrieval with eligibility filters applied before ranking: tenant (RLS), brand, agent's sources, audience (internal sources never reach customer answers), current ready version, expiry and review cycle (tested). Per-customer document scopes pending. |
+| G06 | Source citations | P0 | C | in-progress | `apps/gateway/src/authority/views.ts`, `apps/gateway/src/runtime/prompt.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/gateway/test/knowledge.test.ts`, `apps/widget/src/components/Chat.tsx` — Answers cite retrieved passages; citation numbers that match nothing retrieved are removed and the rest renumbered per document; sources travel as source parts from Hamnivo's publication record and the widget lists them (tested). Source-support QA rubric (Jev) pending. |
 | G07 | Tool registry | P0 | C | planned |  |
 | G08 | Tool authorization gateway | P0 | C | planned |  |
-| G09 | Bounded execution | P0 | C | planned |  |
+| G09 | Bounded execution | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/contracts/src/agents.ts` — Per-agent ceilings on output tokens, time, steps and history; model failures are retried twice by the outbox, then the conversation goes to people with an honest note (tested). Cost and concurrency budgets pending. |
 | G10 | Handoff packet | P0 | C | planned |  |
 | G11 | Simulation/replay tests | P0 | C | planned |  |
-| G12 | Runtime telemetry | P0 | C | planned |  |
+| G12 | Runtime telemetry | P0 | C | in-progress | `apps/gateway/src/runtime/runs.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/db/src/schema/runtime.ts` — Each run records agent version, provider, model, tokens, latency, outcome, error kind and per-step records; token usage goes to the usage ledger (tested). Cost estimates and dashboards pending. |
 | G13 | Action approvals | P1 | C | planned |  |
 | G14 | Action receipts | P1 | C | planned |  |
 | G15 | Limited autopilot | P1 | C | planned |  |
 | G16 | Durable case workflows | P1 | C | planned |  |
-| G17 | Knowledge ingestion pipeline | P0 | C | planned |  |
+| G17 | Knowledge ingestion pipeline | P0 | C | in-progress | `apps/gateway/src/knowledge/extract.ts`, `apps/gateway/src/knowledge/ingestion.service.ts`, `apps/gateway/src/knowledge/scanner.ts`, `apps/gateway/src/knowledge/text.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/gateway/test/knowledge.test.ts` — Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Parsing runs in-process (no sandbox) and URL sources are pending. |
 | G18 | Knowledge editorial workflow | P1 | C | planned |  |
 | G19 | Customer memory | P1 | L | planned |  |
 | G20 | Outcome learning queue | P1 | L | planned |  |
@@ -124,22 +124,22 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| J01 | Jev decision adapter | P0 | C | planned |  |
+| J01 | Jev decision adapter | P0 | C | in-progress | `packages/adapters/src/jev/provider.ts`, `packages/adapters/test/jev/contract.test.ts`, `packages/domain/src/decisions.ts` — Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). Not yet called by the gateway; no live Jev call has run. |
 | J02 | Intent and team routing | P0 | C | planned |  |
 | J03 | Skill and evidence ranking | P1 | C | planned |  |
-| J04 | Escalation advisory | P0 | C | planned |  |
+| J04 | Escalation advisory | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/domain/src/human-request.ts`, `packages/domain/test/human-request.test.ts` — A typed request for a person (English, Hinglish, Roman Urdu, Arabic, Hindi, Urdu, with negation and look-alikes) hands the conversation to people before any model or decision provider runs (tested end to end); Jev escalation advice for other cases is pending. |
 | J05 | Threshold and rubric editor | P1 | C | planned |  |
-| J06 | Provider fallback | P0 | C | planned |  |
-| J07 | Decision audit and cost | P0 | C | planned |  |
+| J06 | Provider fallback | P0 | C | in-progress | `packages/adapters/src/jev/breaker.ts`, `packages/adapters/src/jev/provider.ts`, `packages/adapters/test/jev/resilience.test.ts` — Total deadline, caller cancellation (also when the transport ignores it), no retries, circuit breaker with half-open probe, and decided/abstained/unavailable/invalid results (tested). The fallback chain in the gateway is pending. |
+| J07 | Decision audit and cost | P0 | C | in-progress | `packages/adapters/src/jev/provider.ts`, `packages/domain/src/decisions.ts` — Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested); persisting decision records and cost is pending. |
 | J08 | Jev versus baseline experiments | P1 | C | planned |  |
 
 ### Developer integrations
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| D01 | Public REST API | P0 | F | in-progress | `packages/contracts/src/routes.ts`, `packages/contracts/src/errors.ts`, `packages/contracts/openapi/hamnivo.v1.json`, `packages/contracts/scripts/openapi.ts` — OpenAPI 3.1 generated from Zod with RFC 9457 errors and cursor pagination; widget routes defined, staff/admin/server routes follow with their modules. |
-| D02 | Headless JS/TS client | P0 | C | planned |  |
-| D03 | React UI adapter | P0 | C | planned |  |
+| D01 | Public REST API | P0 | F | in-progress | `packages/contracts/src/routes.ts`, `packages/contracts/src/errors.ts`, `packages/contracts/openapi/hamnivo.v1.json`, `packages/contracts/scripts/openapi.ts`, `packages/contracts/src/admin-routes.ts`, `apps/gateway/src/common/idempotency.service.ts` — OpenAPI 3.1 from Zod (widget, identity and admin routes), RFC 9457 errors, Idempotency-Key replay/conflict, cursor pagination; server API keys and remaining resources follow. |
+| D02 | Headless JS/TS client | P0 | C | in-progress | `packages/client/src/client.ts`, `packages/client/src/outbox.ts`, `packages/client/src/stream.ts`, `packages/client/test/client.test.ts` — Framework-free SDK: sessions with single-flight renewal, typed conversation calls, exactly-once send outbox and resumable streams (unit-tested with msw, used by the widget). |
+| D03 | React UI adapter | P0 | C | in-progress | `apps/widget/src/components/Chat.tsx`, `apps/widget/src/useChat.ts` — The widget maps SDK state into assistant-ui's external-store runtime; a published React package (@hamnivo/react) is pending. |
 | D04 | Framework wrappers | P1 | C | planned |  |
 | D05 | CMS integrations | P1 | C | planned |  |
 | D06 | Webhooks | P0 | C | planned |  |
@@ -170,11 +170,11 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| O01 | Metrics and alerts | P0 | C | planned |  |
-| O02 | Backups and recovery | P0 | C | planned |  |
-| O03 | CI/CD and versioning | P0 | F | in-progress | `scripts/ci/local.sh`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `docs/adr/0007-self-hosted-verification.md` — Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence/status checks, accessibility audit) run with pnpm ci:local; release and rollback automation pending. |
+| O01 | Metrics and alerts | P0 | C | in-progress | `apps/gateway/src/platform/metrics.ts`, `apps/gateway/src/platform/health.controller.ts`, `apps/gateway/test/identity.int.test.ts` — Prometheus metrics (request latency by route template, process metrics) behind a bearer token (tested: hidden without it, served with it) and liveness/readiness checks; alert rules and dashboards pending. |
+| O02 | Backups and recovery | P0 | C | in-progress | `deploy/production/hamnivo.sh`, `scripts/ci/production-smoke.sh`, `scripts/ci/production-smoke.ts`, `docs/self-hosting.md` — hamnivo.sh backup dumps both databases (pg_dump), Chatwoot files, certificates and settings with checksums and keeps the newest N; restore checks the checksums, refuses a backup made with other secrets, replaces data and files, then runs pending migrations. The production smoke test runs a drill (tested: a brand made after the backup is gone and the conversation history is back). Point-in-time recovery, off-site copies and a deletion replay after restore are pending. |
+| O03 | CI/CD and versioning | P0 | F | in-progress | `deploy/postgres/init.sh`, `docs/adr/0007-self-hosted-verification.md`, `docs/self-hosting.md`, `scripts/ci/local.sh`, `scripts/ci/production-smoke.sh` — Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence and status checks, Chatwoot contract, accessibility, browser journeys) run with pnpm ci:local; --with-production also builds the images and checks the deployment. Versioned releases and rollback are pending. |
 | O04 | Product analytics | P1 | C | planned |  |
-| O05 | Self-hosted distribution | P1 | C | in-progress | `deploy/compose/services.yml`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `.env.example` — Self-hosted infrastructure (PostgreSQL 18 + pgvector, Valkey), generated secrets, environment reference and server guide; versioned application containers follow with the gateway. |
+| O05 | Self-hosted distribution | P1 | C | in-progress | `.env.example`, `deploy/compose/services.yml`, `deploy/docker/Dockerfile`, `deploy/postgres/init.sh`, `deploy/production/Caddyfile`, `deploy/production/compose.yml`, `deploy/production/hamnivo.sh`, `docs/self-hosting.md`, `scripts/ci/production-smoke.sh` — One-server production stack: gateway and edge images built from source, compose file with PostgreSQL 18 + pgvector, Valkey, Chatwoot 4.18.0-ce, ClamAV and Caddy (automatic HTTPS, HTTP to HTTPS, HTTP/3); only the edge publishes ports. hamnivo.sh sets up generated secrets and runs up, status, logs, backup, restore and update. The smoke test deploys it with Caddy's internal CA and checks sign-up, a real Chatwoot connection, an AI reply over the stream, the website and a backup and restore (tested). Let's Encrypt issuance needs public DNS and was not exercised here; Studio joins the stack when it ships. |
 | O06 | Marketplace and partner certification | P2 | A | planned |  |
 
 ### Collaboration
@@ -185,14 +185,14 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | R02 | AI specialist invitation | P0 | C | planned |  |
 | R03 | History grants | P0 | C | planned |  |
 | R04 | Three conversation lanes | P0 | C | planned |  |
-| R05 | Public response ownership | P0 | C | planned |  |
-| R06 | Human takeover fencing | P0 | C | planned |  |
+| R05 | Public response ownership | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/test/slice.int.test.ts` — One public AI speaker per conversation fenced by the ownership epoch; the lease with expiry (columns present) is not used yet. |
+| R06 | Human takeover fencing | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/slice.int.test.ts` — Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, and by a Chatwoot pre-flight owner check (mutation-tested). Undispatched tool actions follow with the tool gateway. |
 | R07 | In-flight action reconciliation | P0 | Q | planned |  |
 | R08 | Bounded parallel specialists | P1 | C | planned |  |
 | R09 | Pause remove replace agents | P0 | C | planned |  |
 | R10 | Guest invitation | P1 | A | planned |  |
 | R11 | Review versus takeover | P0 | C | planned |  |
-| R12 | Human unavailable state | P0 | C | planned |  |
+| R12 | Human unavailable state | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/src/widget/copy.ts`, `apps/gateway/test/slice.int.test.ts` — 'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note and honest availability ('queued'); business hours and follow-up channels pending. |
 | R13 | Specialist result provenance | P0 | C | planned |  |
 | R14 | External agent gateway | P1 | A | planned |  |
 | R15 | Participant activity UX | P1 | C | planned |  |
@@ -250,17 +250,17 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| X01 | Workload identity | P0 | F | planned |  |
+| X01 | Workload identity | P0 | F | in-progress | `apps/gateway/src/identity/principal.service.ts`, `apps/gateway/src/identity/staff.guard.ts`, `apps/gateway/test/identity.int.test.ts` — Staff principals come from server-verified sessions and per-request grant loading; service-account and workload identities pending. |
 | X02 | Tool precondition checks | P0 | C | planned |  |
 | X03 | Resource and fan-out limits | P0 | C | planned |  |
-| X04 | Secret broker | P0 | F | planned |  |
+| X04 | Secret broker | P0 | F | in-progress | `apps/gateway/src/authority/registry.ts`, `apps/gateway/src/secrets/secret-broker.service.ts`, `apps/gateway/test/secrets.int.test.ts` — Secret broker reveals credentials only to server code inside the owning tenant; scoped short-lived credentials for tools and agents pending. |
 | X05 | Network egress policy | P0 | C | planned |  |
 | X06 | Inter-agent authenticity | P0 | A | planned |  |
 | X07 | Plugin isolation | P0 | A | planned |  |
-| X08 | Scoped kill switches | P0 | C | planned |  |
-| X09 | Source-aware context | P0 | C | planned |  |
+| X08 | Scoped kill switches | P0 | C | in-progress | `apps/gateway/src/runtime/kill-switches.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/db/migrations/20260927021253_agents_runtime_security.sql` — Kill switches for the tenant, a brand or an agent stop AI replies at once; AI-held conversations go to people on their next message, new conversations start with people, and clearing restores AI replies (tested, mutation-checked). Switches are cleared, never deleted. Tool-level switches arrive with tools. |
+| X09 | Source-aware context | P0 | C | in-progress | `apps/gateway/src/runtime/prompt.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/gateway/test/knowledge.test.ts` — Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool outputs arrive with tools. Injection resistance is not yet measured by an adversarial suite. |
 | X10 | Receipt-based completion | P0 | Q | planned |  |
-| X11 | Privacy-safe trace records | P0 | C | planned |  |
+| X11 | Privacy-safe trace records | P0 | C | in-progress | `apps/gateway/src/runtime/runs.service.ts`, `apps/gateway/test/agents.int.test.ts` — Run and step records hold versions, counts, hashes and error kinds but no prompt or reply text (tested); staff read them through the API with analytics.read. |
 | X12 | Prompt and memory injection tests | P0 | L | planned |  |
 | X13 | Crash and replay tests | P0 | Q | planned |  |
 | X14 | Policy release controls | P0 | C | planned |  |
@@ -270,14 +270,14 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
 | U01 | Language preference model | P0 | C | planned |  |
-| U02 | Hinglish and Roman Urdu | P0 | C | planned |  |
+| U02 | Hinglish and Roman Urdu | P0 | C | in-progress | `apps/gateway/test/agents.int.test.ts`, `packages/domain/src/human-request.ts`, `packages/domain/test/fixtures/human-requests.json` — Hinglish and Roman Urdu requests for a person are detected across spellings, transliterations and negation (74 fixture cases) and act end to end; identifiers pass through unchanged. Native-speaker review pending. |
 | U03 | Per-participant translations | P1 | C | planned |  |
-| U04 | RTL interaction | P0 | C | planned |  |
+| U04 | RTL interaction | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `apps/widget/src/i18n.ts` — Document direction follows the language and message text uses dir=auto, so Arabic and Urdu read right to left while Latin order numbers keep their direction; bidi copy behaviour tests pending. |
 | U05 | Localized complete flows | P0 | C | planned |  |
 | U06 | Locale-safe numbers and dates | P0 | Q | planned |  |
 | U07 | Language-capable routing | P0 | C | planned |  |
 | U08 | Accessible multilingual composer | P0 | C | planned |  |
-| U09 | Honest AI identity | P0 | C | planned |  |
+| U09 | Honest AI identity | P0 | C | in-progress | `apps/gateway/src/runtime/honesty.ts`, `apps/gateway/src/runtime/prompt.ts`, `apps/gateway/test/agents.int.test.ts`, `apps/gateway/test/runtime.test.ts` — Non-removable prompt rules plus an output guard for claims of being human in English, Hinglish, Roman Urdu, Hindi, Urdu and Arabic: regenerate once, otherwise publish nothing and hand over (tested, mutation-checked). Native-speaker review of the phrase lists pending. |
 | U10 | Configurable communication style | P1 | C | planned |  |
 | U11 | Respectful correction | P0 | C | planned |  |
 | U12 | Anti-sycophancy suite | P0 | C | planned |  |
@@ -295,9 +295,9 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | E03 | Runtime-independent ports | P0 | C | planned |  |
 | E04 | Event and schema compatibility | P0 | F | in-progress | `packages/contracts/src/events.ts`, `packages/contracts/src/parts.ts`, `packages/contracts/fixtures/v1/future-minor-version.json`, `packages/contracts/test/contracts.test.ts`, `docs/contracts/compatibility.md` — Forward-compatible parsing and fixtures in place; client SDK compatibility tests follow with packages/client. |
 | E05 | Plugin permission diffs | P0 | A | planned |  |
-| E06 | Adapter contract fixtures | P0 | C | planned |  |
+| E06 | Adapter contract fixtures | P0 | C | in-progress | `packages/adapters/test/jev/contract.test.ts`, `packages/adapters/test/models/contract.test.ts`, `packages/adapters/test/models/contract.ts`, `packages/chatwoot/src/fake/server.ts`, `packages/chatwoot/test/contract/fake.test.ts`, `packages/chatwoot/test/contract/real.int.test.ts`, `packages/chatwoot/test/contract/suite.ts`, `packages/domain/src/authority.ts` — One shared behaviour suite runs against every model provider (generate, stream, wire format, key placement, 401/429/5xx/529/abort) with provider-specific capability tests, and the Jev adapter has its own wire contract fixtures. Fixtures come from public API docs, not recorded traffic. |
 | E07 | Hikmah reuse adapter | P1 | L | planned |  |
-| E08 | Jev contract reconciliation | P0 | C | planned |  |
+| E08 | Jev contract reconciliation | P0 | C | in-progress | `packages/adapters/src/jev/wire.ts`, `packages/adapters/test/jev/contract.test.ts`, `packages/adapters/test/jev/fixtures/systemone-request.json` — Requests and answers use the current keyed-map shapes, checked against an exact fixture; array-shaped answers from the older client are rejected. Proven against the SDK and fixtures, not the live API. |
 | E09 | License and dataset inventory | P0 | F | implemented | `scripts/licenses/inventory.ts`, `docs/licenses.md`, `scripts/ci/local.sh` — Inventory generated from the lockfile; the local check pipeline fails on a stale inventory or unreviewed licences. |
 | E10 | Research evidence registry | P1 | L | planned |  |
 | E11 | Semantic co-model experiments | P2 | Research | planned |  |

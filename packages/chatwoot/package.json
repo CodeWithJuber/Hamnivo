@@ -1,0 +1,42 @@
+{
+  "name": "@hamnivo/chatwoot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chatwoot CE v4.18.0 connector: typed clients, conversation-authority adapter, webhook verification, provisioning and a fake server for tests",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./fake": {
+      "types": "./dist/fake/index.d.ts",
+      "import": "./dist/fake/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "generate": "tsx scripts/generate.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx scripts/generate.ts --check && vitest run",
+    "test:int": "vitest run --config vitest.int.config.ts"
+  },
+  "dependencies": {
+    "@hamnivo/domain": "workspace:*",
+    "fastify": "5.12.5",
+    "openapi-fetch": "0.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "openapi-typescript": "7.13.0",
+    "tsdown": "0.23.0",
+    "tsx": "4.23.15",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

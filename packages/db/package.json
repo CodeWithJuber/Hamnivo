@@ -32,7 +32,8 @@
     "db:generate": "drizzle-kit generate",
     "db:custom": "drizzle-kit generate --custom",
     "db:check": "drizzle-kit check",
-    "db:migrate": "tsx scripts/migrate.ts"
+    "db:migrate": "tsx scripts/migrate.ts",
+    "auth:schema": "auth generate --config scripts/better-auth.schema.config.ts --output /tmp/hamnivo-auth-schema.ts --yes"
   },
   "dependencies": {
     "@hamnivo/contracts": "workspace:*",
@@ -43,8 +44,12 @@
     "uuidv7": "1.2.1"
   },
   "devDependencies": {
+    "@better-auth/drizzle-adapter": "1.7.6",
+    "@better-auth/passkey": "1.7.6",
+    "@better-auth/sso": "1.7.6",
     "@types/node": "catalog:",
     "@types/pg": "8.23.1",
+    "better-auth": "1.7.6",
     "drizzle-kit": "0.31.11",
     "tsdown": "0.23.0",
     "tsx": "4.23.15",

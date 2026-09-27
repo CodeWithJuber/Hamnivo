@@ -12,6 +12,15 @@ afterAll(async () => {
   await h?.close();
 });
 
+describe('staff authentication tables', () => {
+  it('are usable by the application role only', async () => {
+    const { rows } = await h.app.execute<{ n: string }>(sql`select count(*) as n from auth.user`);
+    expect(Number(rows[0]?.n)).toBe(0);
+    await expectPgError(h.platform.execute(sql`select * from auth.user`), '42501');
+    await expectPgError(h.platform.execute(sql`select * from auth.session`), '42501');
+  });
+});
+
 describe('database roles', () => {
   it('keeps the application and platform roles unprivileged', async () => {
     const { rows } = await h.owner.execute<{
@@ -80,11 +89,13 @@ describe('database roles', () => {
     const definers = rows.filter((r) => r.secdef);
     expect(definers.map((r) => r.fn).sort()).toEqual(
       [
+        'app.claim_integration_inbox(integer,integer)',
         'app.claim_outbox(integer,integer)',
         'app.ensure_audit_partitions(integer)',
         'app.purge_expired(integer)',
         'app.resolve_api_key(text)',
         'app.resolve_authority_connection(uuid)',
+        'app.resolve_invitation(uuid)',
         'app.resolve_staff_memberships(text)',
         'app.resolve_tenant_slug(text)',
         'app.resolve_widget(text)',

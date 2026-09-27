@@ -1,0 +1,1792 @@
+[
+  {
+    "source": "account",
+    "event": "contact_created",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "avatar": "",
+      "custom_attributes": {},
+      "email": null,
+      "id": 1,
+      "identifier": "hv:brand:customer-1",
+      "name": "Ayesha",
+      "phone_number": null,
+      "thumbnail": "",
+      "blocked": false,
+      "event": "contact_created"
+    }
+  },
+  {
+    "source": "bot",
+    "event": "message_created",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "content_attributes": {
+        "hv": {
+          "v": 1
+        }
+      },
+      "content_type": "text",
+      "content": "Assalamu alaikum, I need help",
+      "conversation": {
+        "additional_attributes": {},
+        "can_reply": true,
+        "channel": "Channel::Api",
+        "contact_inbox": {
+          "id": 1,
+          "contact_id": 1,
+          "inbox_id": 1,
+          "source_id": "00000000-0000-4000-8000-000000000000",
+          "created_at": "2026-09-27T00:18:14.099Z",
+          "updated_at": "2026-09-27T00:18:14.099Z",
+          "hmac_verified": false,
+          "pubsub_token": "redacted"
+        },
+        "id": 1,
+        "inbox_id": 1,
+        "messages": [
+          {
+            "id": 1,
+            "content": "Assalamu alaikum, I need help",
+            "account_id": 1,
+            "inbox_id": 1,
+            "conversation_id": 1,
+            "message_type": 0,
+            "created_at": 1790468294,
+            "updated_at": "2026-09-27T00:18:14.250Z",
+            "private": false,
+            "status": "sent",
+            "source_id": "hv1:m:probe-1",
+            "content_type": "text",
+            "content_attributes": {
+              "hv": {
+                "v": 1
+              }
+            },
+            "sender_type": "Contact",
+            "sender_id": 1,
+            "external_source_ids": {},
+            "additional_attributes": {},
+            "processed_message_content": "Assalamu alaikum, I need help",
+            "sentiment": {},
+            "conversation": {
+              "assignee_id": null,
+              "unread_count": 1,
+              "last_activity_at": 1790468294,
+              "contact_inbox": {
+                "source_id": "00000000-0000-4000-8000-000000000000"
+              }
+            },
+            "sender": {
+              "additional_attributes": {},
+              "custom_attributes": {},
+              "email": null,
+              "id": 1,
+              "identifier": "hv:brand:customer-1",
+              "name": "Ayesha",
+              "phone_number": null,
+              "thumbnail": "",
+              "blocked": false,
+              "type": "contact"
+            }
+          }
+        ],
+        "labels": [],
+        "meta": {
+          "sender": {
+            "additional_attributes": {},
+            "custom_attributes": {},
+            "email": null,
+            "id": 1,
+            "identifier": "hv:brand:customer-1",
+            "name": "Ayesha",
+            "phone_number": null,
+            "thumbnail": "",
+            "blocked": false,
+            "type": "contact"
+          },
+          "assignee": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          },
+          "assignee_type": "AgentBot",
+          "team": null,
+          "hmac_verified": false
+        },
+        "status": "pending",
+        "custom_attributes": {},
+        "snoozed_until": null,
+        "unread_count": 1,
+        "first_reply_created_at": null,
+        "priority": null,
+        "waiting_since": 1790468294,
+        "agent_last_seen_at": 0,
+        "contact_last_seen_at": 0,
+        "last_activity_at": 1790468294,
+        "timestamp": 1790468294,
+        "created_at": 1790468294,
+        "updated_at": 1790468294.2541237,
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        }
+      },
+      "created_at": "2026-09-27T00:18:14.250Z",
+      "id": 1,
+      "inbox": {
+        "id": 1,
+        "name": "Hamnivo Web"
+      },
+      "message_type": "incoming",
+      "private": false,
+      "sender": {
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        },
+        "additional_attributes": {},
+        "avatar": "",
+        "custom_attributes": {},
+        "email": null,
+        "id": 1,
+        "identifier": "hv:brand:customer-1",
+        "name": "Ayesha",
+        "phone_number": null,
+        "thumbnail": "",
+        "blocked": false
+      },
+      "source_id": "hv1:m:probe-1",
+      "event": "message_created"
+    }
+  },
+  {
+    "source": "bot",
+    "event": "message_created",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "content_attributes": {},
+      "content_type": "text",
+      "content": "Wa alaikum assalam! How can I help?",
+      "conversation": {
+        "additional_attributes": {},
+        "can_reply": true,
+        "channel": "Channel::Api",
+        "contact_inbox": {
+          "id": 1,
+          "contact_id": 1,
+          "inbox_id": 1,
+          "source_id": "00000000-0000-4000-8000-000000000000",
+          "created_at": "2026-09-27T00:18:14.099Z",
+          "updated_at": "2026-09-27T00:18:14.099Z",
+          "hmac_verified": false,
+          "pubsub_token": "redacted"
+        },
+        "id": 1,
+        "inbox_id": 1,
+        "messages": [
+          {
+            "id": 2,
+            "content": "Wa alaikum assalam! How can I help?",
+            "account_id": 1,
+            "inbox_id": 1,
+            "conversation_id": 1,
+            "message_type": 1,
+            "created_at": 1790468294,
+            "updated_at": "2026-09-27T00:18:14.340Z",
+            "private": false,
+            "status": "sent",
+            "source_id": "hv1:p:probe-2",
+            "content_type": "text",
+            "content_attributes": {},
+            "sender_type": "AgentBot",
+            "sender_id": 1,
+            "external_source_ids": {},
+            "additional_attributes": {},
+            "processed_message_content": "Wa alaikum assalam! How can I help?",
+            "sentiment": {},
+            "conversation": {
+              "assignee_id": null,
+              "unread_count": 1,
+              "last_activity_at": 1790468294,
+              "contact_inbox": {
+                "source_id": "00000000-0000-4000-8000-000000000000"
+              }
+            },
+            "sender": {
+              "id": 1,
+              "name": "Hamnivo AI",
+              "avatar_url": "",
+              "type": "agent_bot"
+            }
+          }
+        ],
+        "labels": [],
+        "meta": {
+          "sender": {
+            "additional_attributes": {},
+            "custom_attributes": {},
+            "email": null,
+            "id": 1,
+            "identifier": "hv:brand:customer-1",
+            "name": "Ayesha",
+            "phone_number": null,
+            "thumbnail": "",
+            "blocked": false,
+            "type": "contact"
+          },
+          "assignee": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          },
+          "assignee_type": "AgentBot",
+          "team": null,
+          "hmac_verified": false
+        },
+        "status": "pending",
+        "custom_attributes": {},
+        "snoozed_until": null,
+        "unread_count": 1,
+        "first_reply_created_at": null,
+        "priority": null,
+        "waiting_since": 1790468294,
+        "agent_last_seen_at": 0,
+        "contact_last_seen_at": 0,
+        "last_activity_at": 1790468294,
+        "timestamp": 1790468294,
+        "created_at": 1790468294,
+        "updated_at": 1790468294.3444514,
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        }
+      },
+      "created_at": "2026-09-27T00:18:14.340Z",
+      "id": 2,
+      "inbox": {
+        "id": 1,
+        "name": "Hamnivo Web"
+      },
+      "message_type": "outgoing",
+      "private": false,
+      "sender": {
+        "id": 1,
+        "name": "Hamnivo AI",
+        "type": "agent_bot"
+      },
+      "source_id": "hv1:p:probe-2",
+      "event": "message_created"
+    }
+  },
+  {
+    "source": "bot",
+    "event": "conversation_updated",
+    "payload": {
+      "additional_attributes": {},
+      "can_reply": true,
+      "channel": "Channel::Api",
+      "contact_inbox": {
+        "id": 1,
+        "contact_id": 1,
+        "inbox_id": 1,
+        "source_id": "00000000-0000-4000-8000-000000000000",
+        "created_at": "2026-09-27T00:18:14.099Z",
+        "updated_at": "2026-09-27T00:18:14.099Z",
+        "hmac_verified": false,
+        "pubsub_token": "redacted"
+      },
+      "id": 1,
+      "inbox_id": 1,
+      "messages": [
+        {
+          "id": 2,
+          "content": "Wa alaikum assalam! How can I help?",
+          "account_id": 1,
+          "inbox_id": 1,
+          "conversation_id": 1,
+          "message_type": 1,
+          "created_at": 1790468294,
+          "updated_at": "2026-09-27T00:18:14.340Z",
+          "private": false,
+          "status": "sent",
+          "source_id": "hv1:p:probe-2",
+          "content_type": "text",
+          "content_attributes": {},
+          "sender_type": "AgentBot",
+          "sender_id": 1,
+          "external_source_ids": {},
+          "additional_attributes": {},
+          "processed_message_content": "Wa alaikum assalam! How can I help?",
+          "sentiment": {},
+          "conversation": {
+            "assignee_id": null,
+            "unread_count": 1,
+            "last_activity_at": 1790468294,
+            "contact_inbox": {
+              "source_id": "00000000-0000-4000-8000-000000000000"
+            }
+          },
+          "sender": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          }
+        }
+      ],
+      "labels": [],
+      "meta": {
+        "sender": {
+          "additional_attributes": {},
+          "custom_attributes": {},
+          "email": null,
+          "id": 1,
+          "identifier": "hv:brand:customer-1",
+          "name": "Ayesha",
+          "phone_number": null,
+          "thumbnail": "",
+          "blocked": false,
+          "type": "contact"
+        },
+        "assignee": {
+          "id": 1,
+          "name": "Hamnivo AI",
+          "avatar_url": "",
+          "type": "agent_bot"
+        },
+        "assignee_type": "AgentBot",
+        "team": null,
+        "hmac_verified": false
+      },
+      "status": "pending",
+      "custom_attributes": {},
+      "snoozed_until": null,
+      "unread_count": 1,
+      "first_reply_created_at": null,
+      "priority": null,
+      "waiting_since": 0,
+      "agent_last_seen_at": 0,
+      "contact_last_seen_at": 0,
+      "last_activity_at": 1790468294,
+      "timestamp": 1790468294,
+      "created_at": 1790468294,
+      "updated_at": 1790468294.3875787,
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "event": "conversation_updated",
+      "changed_attributes": [
+        {
+          "updated_at": {
+            "previous_value": "2026-09-27T00:18:14.344Z",
+            "current_value": "2026-09-27T00:18:14.387Z"
+          }
+        },
+        {
+          "waiting_since": {
+            "previous_value": "2026-09-27T00:18:14.154Z",
+            "current_value": null
+          }
+        },
+        {
+          "cached_label_list": {
+            "previous_value": null,
+            "current_value": ""
+          }
+        }
+      ]
+    }
+  },
+  {
+    "source": "bot",
+    "event": "message_created",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "content_attributes": {},
+      "content_type": "text",
+      "content": "Internal: VIP customer",
+      "conversation": {
+        "additional_attributes": {},
+        "can_reply": true,
+        "channel": "Channel::Api",
+        "contact_inbox": {
+          "id": 1,
+          "contact_id": 1,
+          "inbox_id": 1,
+          "source_id": "00000000-0000-4000-8000-000000000000",
+          "created_at": "2026-09-27T00:18:14.099Z",
+          "updated_at": "2026-09-27T00:18:14.099Z",
+          "hmac_verified": false,
+          "pubsub_token": "redacted"
+        },
+        "id": 1,
+        "inbox_id": 1,
+        "messages": [
+          {
+            "id": 2,
+            "content": "Wa alaikum assalam! How can I help?",
+            "account_id": 1,
+            "inbox_id": 1,
+            "conversation_id": 1,
+            "message_type": 1,
+            "created_at": 1790468294,
+            "updated_at": "2026-09-27T00:18:14.340Z",
+            "private": false,
+            "status": "sent",
+            "source_id": "hv1:p:probe-2",
+            "content_type": "text",
+            "content_attributes": {},
+            "sender_type": "AgentBot",
+            "sender_id": 1,
+            "external_source_ids": {},
+            "additional_attributes": {},
+            "processed_message_content": "Wa alaikum assalam! How can I help?",
+            "sentiment": {},
+            "conversation": {
+              "assignee_id": null,
+              "unread_count": 1,
+              "last_activity_at": 1790468294,
+              "contact_inbox": {
+                "source_id": "00000000-0000-4000-8000-000000000000"
+              }
+            },
+            "sender": {
+              "id": 1,
+              "name": "Hamnivo AI",
+              "avatar_url": "",
+              "type": "agent_bot"
+            }
+          }
+        ],
+        "labels": [],
+        "meta": {
+          "sender": {
+            "additional_attributes": {},
+            "custom_attributes": {},
+            "email": null,
+            "id": 1,
+            "identifier": "hv:brand:customer-1",
+            "name": "Ayesha",
+            "phone_number": null,
+            "thumbnail": "",
+            "blocked": false,
+            "type": "contact"
+          },
+          "assignee": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          },
+          "assignee_type": "AgentBot",
+          "team": null,
+          "hmac_verified": false
+        },
+        "status": "pending",
+        "custom_attributes": {},
+        "snoozed_until": null,
+        "unread_count": 1,
+        "first_reply_created_at": null,
+        "priority": null,
+        "waiting_since": 0,
+        "agent_last_seen_at": 0,
+        "contact_last_seen_at": 0,
+        "last_activity_at": 1790468294,
+        "timestamp": 1790468294,
+        "created_at": 1790468294,
+        "updated_at": 1790468294.4489336,
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        }
+      },
+      "created_at": "2026-09-27T00:18:14.445Z",
+      "id": 3,
+      "inbox": {
+        "id": 1,
+        "name": "Hamnivo Web"
+      },
+      "message_type": "outgoing",
+      "private": true,
+      "sender": {
+        "id": 2,
+        "name": "Hamnivo Integration",
+        "email": "hv-integration-1790468293533@hamnivo.local",
+        "type": "user"
+      },
+      "source_id": "hv1:n:probe-3",
+      "event": "message_created"
+    }
+  },
+  {
+    "source": "account",
+    "event": "contact_updated",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "avatar": "",
+      "custom_attributes": {},
+      "email": null,
+      "id": 1,
+      "identifier": "hv:brand:customer-1",
+      "name": "Ayesha",
+      "phone_number": null,
+      "thumbnail": "",
+      "blocked": false,
+      "event": "contact_updated",
+      "changed_attributes": [
+        {
+          "updated_at": {
+            "previous_value": "2026-09-27T00:18:14.081Z",
+            "current_value": "2026-09-27T00:18:14.307Z"
+          }
+        },
+        {
+          "last_activity_at": {
+            "previous_value": null,
+            "current_value": "2026-09-27T00:18:14.300Z"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "source": "account",
+    "event": "conversation_updated",
+    "payload": {
+      "additional_attributes": {},
+      "can_reply": true,
+      "channel": "Channel::Api",
+      "contact_inbox": {
+        "id": 1,
+        "contact_id": 1,
+        "inbox_id": 1,
+        "source_id": "00000000-0000-4000-8000-000000000000",
+        "created_at": "2026-09-27T00:18:14.099Z",
+        "updated_at": "2026-09-27T00:18:14.099Z",
+        "hmac_verified": false,
+        "pubsub_token": "redacted"
+      },
+      "id": 1,
+      "inbox_id": 1,
+      "messages": [
+        {
+          "id": 2,
+          "content": "Wa alaikum assalam! How can I help?",
+          "account_id": 1,
+          "inbox_id": 1,
+          "conversation_id": 1,
+          "message_type": 1,
+          "created_at": 1790468294,
+          "updated_at": "2026-09-27T00:18:14.340Z",
+          "private": false,
+          "status": "sent",
+          "source_id": "hv1:p:probe-2",
+          "content_type": "text",
+          "content_attributes": {},
+          "sender_type": "AgentBot",
+          "sender_id": 1,
+          "external_source_ids": {},
+          "additional_attributes": {},
+          "processed_message_content": "Wa alaikum assalam! How can I help?",
+          "sentiment": {},
+          "conversation": {
+            "assignee_id": null,
+            "unread_count": 1,
+            "last_activity_at": 1790468294,
+            "contact_inbox": {
+              "source_id": "00000000-0000-4000-8000-000000000000"
+            }
+          },
+          "sender": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          }
+        }
+      ],
+      "labels": [],
+      "meta": {
+        "sender": {
+          "additional_attributes": {},
+          "custom_attributes": {},
+          "email": null,
+          "id": 1,
+          "identifier": "hv:brand:customer-1",
+          "name": "Ayesha",
+          "phone_number": null,
+          "thumbnail": "",
+          "blocked": false,
+          "type": "contact"
+        },
+        "assignee": {
+          "id": 1,
+          "name": "Hamnivo AI",
+          "avatar_url": "",
+          "type": "agent_bot"
+        },
+        "assignee_type": "AgentBot",
+        "team": null,
+        "hmac_verified": false
+      },
+      "status": "pending",
+      "custom_attributes": {},
+      "snoozed_until": null,
+      "unread_count": 1,
+      "first_reply_created_at": null,
+      "priority": null,
+      "waiting_since": 0,
+      "agent_last_seen_at": 0,
+      "contact_last_seen_at": 0,
+      "last_activity_at": 1790468294,
+      "timestamp": 1790468294,
+      "created_at": 1790468294,
+      "updated_at": 1790468294.387578,
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "event": "conversation_updated",
+      "changed_attributes": [
+        {
+          "updated_at": {
+            "previous_value": "2026-09-27T00:18:14.344Z",
+            "current_value": "2026-09-27T00:18:14.387Z"
+          }
+        },
+        {
+          "waiting_since": {
+            "previous_value": "2026-09-27T00:18:14.154Z",
+            "current_value": null
+          }
+        },
+        {
+          "cached_label_list": {
+            "previous_value": null,
+            "current_value": ""
+          }
+        }
+      ]
+    }
+  },
+  {
+    "source": "inbox",
+    "event": "conversation_updated",
+    "payload": {
+      "additional_attributes": {},
+      "can_reply": true,
+      "channel": "Channel::Api",
+      "contact_inbox": {
+        "id": 1,
+        "contact_id": 1,
+        "inbox_id": 1,
+        "source_id": "00000000-0000-4000-8000-000000000000",
+        "created_at": "2026-09-27T00:18:14.099Z",
+        "updated_at": "2026-09-27T00:18:14.099Z",
+        "hmac_verified": false,
+        "pubsub_token": "redacted"
+      },
+      "id": 1,
+      "inbox_id": 1,
+      "messages": [
+        {
+          "id": 2,
+          "content": "Wa alaikum assalam! How can I help?",
+          "account_id": 1,
+          "inbox_id": 1,
+          "conversation_id": 1,
+          "message_type": 1,
+          "created_at": 1790468294,
+          "updated_at": "2026-09-27T00:18:14.340Z",
+          "private": false,
+          "status": "sent",
+          "source_id": "hv1:p:probe-2",
+          "content_type": "text",
+          "content_attributes": {},
+          "sender_type": "AgentBot",
+          "sender_id": 1,
+          "external_source_ids": {},
+          "additional_attributes": {},
+          "processed_message_content": "Wa alaikum assalam! How can I help?",
+          "sentiment": {},
+          "conversation": {
+            "assignee_id": null,
+            "unread_count": 1,
+            "last_activity_at": 1790468294,
+            "contact_inbox": {
+              "source_id": "00000000-0000-4000-8000-000000000000"
+            }
+          },
+          "sender": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          }
+        }
+      ],
+      "labels": [],
+      "meta": {
+        "sender": {
+          "additional_attributes": {},
+          "custom_attributes": {},
+          "email": null,
+          "id": 1,
+          "identifier": "hv:brand:customer-1",
+          "name": "Ayesha",
+          "phone_number": null,
+          "thumbnail": "",
+          "blocked": false,
+          "type": "contact"
+        },
+        "assignee": {
+          "id": 1,
+          "name": "Hamnivo AI",
+          "avatar_url": "",
+          "type": "agent_bot"
+        },
+        "assignee_type": "AgentBot",
+        "team": null,
+        "hmac_verified": false
+      },
+      "status": "pending",
+      "custom_attributes": {},
+      "snoozed_until": null,
+      "unread_count": 1,
+      "first_reply_created_at": null,
+      "priority": null,
+      "waiting_since": 0,
+      "agent_last_seen_at": 0,
+      "contact_last_seen_at": 0,
+      "last_activity_at": 1790468294,
+      "timestamp": 1790468294,
+      "created_at": 1790468294,
+      "updated_at": 1790468294.387578,
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "event": "conversation_updated",
+      "changed_attributes": [
+        {
+          "updated_at": {
+            "previous_value": "2026-09-27T00:18:14.344Z",
+            "current_value": "2026-09-27T00:18:14.387Z"
+          }
+        },
+        {
+          "waiting_since": {
+            "previous_value": "2026-09-27T00:18:14.154Z",
+            "current_value": null
+          }
+        },
+        {
+          "cached_label_list": {
+            "previous_value": null,
+            "current_value": ""
+          }
+        }
+      ]
+    }
+  },
+  {
+    "source": "account",
+    "event": "conversation_created",
+    "payload": {
+      "additional_attributes": {},
+      "can_reply": true,
+      "channel": "Channel::Api",
+      "contact_inbox": {
+        "id": 1,
+        "contact_id": 1,
+        "inbox_id": 1,
+        "source_id": "00000000-0000-4000-8000-000000000000",
+        "created_at": "2026-09-27T00:18:14.099Z",
+        "updated_at": "2026-09-27T00:18:14.099Z",
+        "hmac_verified": false,
+        "pubsub_token": "redacted"
+      },
+      "id": 1,
+      "inbox_id": 1,
+      "messages": [
+        {
+          "id": 2,
+          "content": "Wa alaikum assalam! How can I help?",
+          "account_id": 1,
+          "inbox_id": 1,
+          "conversation_id": 1,
+          "message_type": 1,
+          "created_at": 1790468294,
+          "updated_at": "2026-09-27T00:18:14.340Z",
+          "private": false,
+          "status": "sent",
+          "source_id": "hv1:p:probe-2",
+          "content_type": "text",
+          "content_attributes": {},
+          "sender_type": "AgentBot",
+          "sender_id": 1,
+          "external_source_ids": {},
+          "additional_attributes": {},
+          "processed_message_content": "Wa alaikum assalam! How can I help?",
+          "sentiment": {},
+          "conversation": {
+            "assignee_id": null,
+            "unread_count": 1,
+            "last_activity_at": 1790468294,
+            "contact_inbox": {
+              "source_id": "00000000-0000-4000-8000-000000000000"
+            }
+          },
+          "sender": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          }
+        }
+      ],
+      "labels": [],
+      "meta": {
+        "sender": {
+          "additional_attributes": {},
+          "custom_attributes": {},
+          "email": null,
+          "id": 1,
+          "identifier": "hv:brand:customer-1",
+          "name": "Ayesha",
+          "phone_number": null,
+          "thumbnail": "",
+          "blocked": false,
+          "type": "contact"
+        },
+        "assignee": {
+          "id": 1,
+          "name": "Hamnivo AI",
+          "avatar_url": "",
+          "type": "agent_bot"
+        },
+        "assignee_type": "AgentBot",
+        "team": null,
+        "hmac_verified": false
+      },
+      "status": "pending",
+      "custom_attributes": {},
+      "snoozed_until": null,
+      "unread_count": 1,
+      "first_reply_created_at": null,
+      "priority": null,
+      "waiting_since": 1790468294,
+      "agent_last_seen_at": 0,
+      "contact_last_seen_at": 0,
+      "last_activity_at": 1790468294,
+      "timestamp": 1790468294,
+      "created_at": 1790468294,
+      "updated_at": 1790468294.254123,
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "event": "conversation_created"
+    }
+  },
+  {
+    "source": "inbox",
+    "event": "conversation_created",
+    "payload": {
+      "additional_attributes": {},
+      "can_reply": true,
+      "channel": "Channel::Api",
+      "contact_inbox": {
+        "id": 1,
+        "contact_id": 1,
+        "inbox_id": 1,
+        "source_id": "00000000-0000-4000-8000-000000000000",
+        "created_at": "2026-09-27T00:18:14.099Z",
+        "updated_at": "2026-09-27T00:18:14.099Z",
+        "hmac_verified": false,
+        "pubsub_token": "redacted"
+      },
+      "id": 1,
+      "inbox_id": 1,
+      "messages": [
+        {
+          "id": 2,
+          "content": "Wa alaikum assalam! How can I help?",
+          "account_id": 1,
+          "inbox_id": 1,
+          "conversation_id": 1,
+          "message_type": 1,
+          "created_at": 1790468294,
+          "updated_at": "2026-09-27T00:18:14.340Z",
+          "private": false,
+          "status": "sent",
+          "source_id": "hv1:p:probe-2",
+          "content_type": "text",
+          "content_attributes": {},
+          "sender_type": "AgentBot",
+          "sender_id": 1,
+          "external_source_ids": {},
+          "additional_attributes": {},
+          "processed_message_content": "Wa alaikum assalam! How can I help?",
+          "sentiment": {},
+          "conversation": {
+            "assignee_id": null,
+            "unread_count": 1,
+            "last_activity_at": 1790468294,
+            "contact_inbox": {
+              "source_id": "00000000-0000-4000-8000-000000000000"
+            }
+          },
+          "sender": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          }
+        }
+      ],
+      "labels": [],
+      "meta": {
+        "sender": {
+          "additional_attributes": {},
+          "custom_attributes": {},
+          "email": null,
+          "id": 1,
+          "identifier": "hv:brand:customer-1",
+          "name": "Ayesha",
+          "phone_number": null,
+          "thumbnail": "",
+          "blocked": false,
+          "type": "contact"
+        },
+        "assignee": {
+          "id": 1,
+          "name": "Hamnivo AI",
+          "avatar_url": "",
+          "type": "agent_bot"
+        },
+        "assignee_type": "AgentBot",
+        "team": null,
+        "hmac_verified": false
+      },
+      "status": "pending",
+      "custom_attributes": {},
+      "snoozed_until": null,
+      "unread_count": 1,
+      "first_reply_created_at": null,
+      "priority": null,
+      "waiting_since": 1790468294,
+      "agent_last_seen_at": 0,
+      "contact_last_seen_at": 0,
+      "last_activity_at": 1790468294,
+      "timestamp": 1790468294,
+      "created_at": 1790468294,
+      "updated_at": 1790468294.254123,
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "event": "conversation_created"
+    }
+  },
+  {
+    "source": "inbox",
+    "event": "message_created",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "content_attributes": {},
+      "content_type": "text",
+      "content": "Internal: VIP customer",
+      "conversation": {
+        "additional_attributes": {},
+        "can_reply": true,
+        "channel": "Channel::Api",
+        "contact_inbox": {
+          "id": 1,
+          "contact_id": 1,
+          "inbox_id": 1,
+          "source_id": "00000000-0000-4000-8000-000000000000",
+          "created_at": "2026-09-27T00:18:14.099Z",
+          "updated_at": "2026-09-27T00:18:14.099Z",
+          "hmac_verified": false,
+          "pubsub_token": "redacted"
+        },
+        "id": 1,
+        "inbox_id": 1,
+        "messages": [
+          {
+            "id": 2,
+            "content": "Wa alaikum assalam! How can I help?",
+            "account_id": 1,
+            "inbox_id": 1,
+            "conversation_id": 1,
+            "message_type": 1,
+            "created_at": 1790468294,
+            "updated_at": "2026-09-27T00:18:14.340Z",
+            "private": false,
+            "status": "sent",
+            "source_id": "hv1:p:probe-2",
+            "content_type": "text",
+            "content_attributes": {},
+            "sender_type": "AgentBot",
+            "sender_id": 1,
+            "external_source_ids": {},
+            "additional_attributes": {},
+            "processed_message_content": "Wa alaikum assalam! How can I help?",
+            "sentiment": {},
+            "conversation": {
+              "assignee_id": null,
+              "unread_count": 1,
+              "last_activity_at": 1790468294,
+              "contact_inbox": {
+                "source_id": "00000000-0000-4000-8000-000000000000"
+              }
+            },
+            "sender": {
+              "id": 1,
+              "name": "Hamnivo AI",
+              "avatar_url": "",
+              "type": "agent_bot"
+            }
+          }
+        ],
+        "labels": [],
+        "meta": {
+          "sender": {
+            "additional_attributes": {},
+            "custom_attributes": {},
+            "email": null,
+            "id": 1,
+            "identifier": "hv:brand:customer-1",
+            "name": "Ayesha",
+            "phone_number": null,
+            "thumbnail": "",
+            "blocked": false,
+            "type": "contact"
+          },
+          "assignee": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          },
+          "assignee_type": "AgentBot",
+          "team": null,
+          "hmac_verified": false
+        },
+        "status": "pending",
+        "custom_attributes": {},
+        "snoozed_until": null,
+        "unread_count": 1,
+        "first_reply_created_at": null,
+        "priority": null,
+        "waiting_since": 0,
+        "agent_last_seen_at": 0,
+        "contact_last_seen_at": 0,
+        "last_activity_at": 1790468294,
+        "timestamp": 1790468294,
+        "created_at": 1790468294,
+        "updated_at": 1790468294.4489331,
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        }
+      },
+      "created_at": "2026-09-27T00:18:14.445Z",
+      "id": 3,
+      "inbox": {
+        "id": 1,
+        "name": "Hamnivo Web"
+      },
+      "message_type": "outgoing",
+      "private": true,
+      "sender": {
+        "id": 2,
+        "name": "Hamnivo Integration",
+        "email": "hv-integration-1790468293533@hamnivo.local",
+        "type": "user"
+      },
+      "source_id": "hv1:n:probe-3",
+      "event": "message_created"
+    }
+  },
+  {
+    "source": "account",
+    "event": "message_created",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "content_attributes": {},
+      "content_type": "text",
+      "content": "Internal: VIP customer",
+      "conversation": {
+        "additional_attributes": {},
+        "can_reply": true,
+        "channel": "Channel::Api",
+        "contact_inbox": {
+          "id": 1,
+          "contact_id": 1,
+          "inbox_id": 1,
+          "source_id": "00000000-0000-4000-8000-000000000000",
+          "created_at": "2026-09-27T00:18:14.099Z",
+          "updated_at": "2026-09-27T00:18:14.099Z",
+          "hmac_verified": false,
+          "pubsub_token": "redacted"
+        },
+        "id": 1,
+        "inbox_id": 1,
+        "messages": [
+          {
+            "id": 2,
+            "content": "Wa alaikum assalam! How can I help?",
+            "account_id": 1,
+            "inbox_id": 1,
+            "conversation_id": 1,
+            "message_type": 1,
+            "created_at": 1790468294,
+            "updated_at": "2026-09-27T00:18:14.340Z",
+            "private": false,
+            "status": "sent",
+            "source_id": "hv1:p:probe-2",
+            "content_type": "text",
+            "content_attributes": {},
+            "sender_type": "AgentBot",
+            "sender_id": 1,
+            "external_source_ids": {},
+            "additional_attributes": {},
+            "processed_message_content": "Wa alaikum assalam! How can I help?",
+            "sentiment": {},
+            "conversation": {
+              "assignee_id": null,
+              "unread_count": 1,
+              "last_activity_at": 1790468294,
+              "contact_inbox": {
+                "source_id": "00000000-0000-4000-8000-000000000000"
+              }
+            },
+            "sender": {
+              "id": 1,
+              "name": "Hamnivo AI",
+              "avatar_url": "",
+              "type": "agent_bot"
+            }
+          }
+        ],
+        "labels": [],
+        "meta": {
+          "sender": {
+            "additional_attributes": {},
+            "custom_attributes": {},
+            "email": null,
+            "id": 1,
+            "identifier": "hv:brand:customer-1",
+            "name": "Ayesha",
+            "phone_number": null,
+            "thumbnail": "",
+            "blocked": false,
+            "type": "contact"
+          },
+          "assignee": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          },
+          "assignee_type": "AgentBot",
+          "team": null,
+          "hmac_verified": false
+        },
+        "status": "pending",
+        "custom_attributes": {},
+        "snoozed_until": null,
+        "unread_count": 1,
+        "first_reply_created_at": null,
+        "priority": null,
+        "waiting_since": 0,
+        "agent_last_seen_at": 0,
+        "contact_last_seen_at": 0,
+        "last_activity_at": 1790468294,
+        "timestamp": 1790468294,
+        "created_at": 1790468294,
+        "updated_at": 1790468294.4489331,
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        }
+      },
+      "created_at": "2026-09-27T00:18:14.445Z",
+      "id": 3,
+      "inbox": {
+        "id": 1,
+        "name": "Hamnivo Web"
+      },
+      "message_type": "outgoing",
+      "private": true,
+      "sender": {
+        "id": 2,
+        "name": "Hamnivo Integration",
+        "email": "hv-integration-1790468293533@hamnivo.local",
+        "type": "user"
+      },
+      "source_id": "hv1:n:probe-3",
+      "event": "message_created"
+    }
+  },
+  {
+    "source": "account",
+    "event": "message_created",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "content_attributes": {},
+      "content_type": "text",
+      "content": "Wa alaikum assalam! How can I help?",
+      "conversation": {
+        "additional_attributes": {},
+        "can_reply": true,
+        "channel": "Channel::Api",
+        "contact_inbox": {
+          "id": 1,
+          "contact_id": 1,
+          "inbox_id": 1,
+          "source_id": "00000000-0000-4000-8000-000000000000",
+          "created_at": "2026-09-27T00:18:14.099Z",
+          "updated_at": "2026-09-27T00:18:14.099Z",
+          "hmac_verified": false,
+          "pubsub_token": "redacted"
+        },
+        "id": 1,
+        "inbox_id": 1,
+        "messages": [
+          {
+            "id": 2,
+            "content": "Wa alaikum assalam! How can I help?",
+            "account_id": 1,
+            "inbox_id": 1,
+            "conversation_id": 1,
+            "message_type": 1,
+            "created_at": 1790468294,
+            "updated_at": "2026-09-27T00:18:14.340Z",
+            "private": false,
+            "status": "sent",
+            "source_id": "hv1:p:probe-2",
+            "content_type": "text",
+            "content_attributes": {},
+            "sender_type": "AgentBot",
+            "sender_id": 1,
+            "external_source_ids": {},
+            "additional_attributes": {},
+            "processed_message_content": "Wa alaikum assalam! How can I help?",
+            "sentiment": {},
+            "conversation": {
+              "assignee_id": null,
+              "unread_count": 1,
+              "last_activity_at": 1790468294,
+              "contact_inbox": {
+                "source_id": "00000000-0000-4000-8000-000000000000"
+              }
+            },
+            "sender": {
+              "id": 1,
+              "name": "Hamnivo AI",
+              "avatar_url": "",
+              "type": "agent_bot"
+            }
+          }
+        ],
+        "labels": [],
+        "meta": {
+          "sender": {
+            "additional_attributes": {},
+            "custom_attributes": {},
+            "email": null,
+            "id": 1,
+            "identifier": "hv:brand:customer-1",
+            "name": "Ayesha",
+            "phone_number": null,
+            "thumbnail": "",
+            "blocked": false,
+            "type": "contact"
+          },
+          "assignee": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          },
+          "assignee_type": "AgentBot",
+          "team": null,
+          "hmac_verified": false
+        },
+        "status": "pending",
+        "custom_attributes": {},
+        "snoozed_until": null,
+        "unread_count": 1,
+        "first_reply_created_at": null,
+        "priority": null,
+        "waiting_since": 0,
+        "agent_last_seen_at": 0,
+        "contact_last_seen_at": 0,
+        "last_activity_at": 1790468294,
+        "timestamp": 1790468294,
+        "created_at": 1790468294,
+        "updated_at": 1790468294.4489331,
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        }
+      },
+      "created_at": "2026-09-27T00:18:14.340Z",
+      "id": 2,
+      "inbox": {
+        "id": 1,
+        "name": "Hamnivo Web"
+      },
+      "message_type": "outgoing",
+      "private": false,
+      "sender": {
+        "id": 1,
+        "name": "Hamnivo AI",
+        "type": "agent_bot"
+      },
+      "source_id": "hv1:p:probe-2",
+      "event": "message_created"
+    }
+  },
+  {
+    "source": "account",
+    "event": "message_created",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "content_attributes": {
+        "hv": {
+          "v": 1
+        }
+      },
+      "content_type": "text",
+      "content": "Assalamu alaikum, I need help",
+      "conversation": {
+        "additional_attributes": {},
+        "can_reply": true,
+        "channel": "Channel::Api",
+        "contact_inbox": {
+          "id": 1,
+          "contact_id": 1,
+          "inbox_id": 1,
+          "source_id": "00000000-0000-4000-8000-000000000000",
+          "created_at": "2026-09-27T00:18:14.099Z",
+          "updated_at": "2026-09-27T00:18:14.099Z",
+          "hmac_verified": false,
+          "pubsub_token": "redacted"
+        },
+        "id": 1,
+        "inbox_id": 1,
+        "messages": [
+          {
+            "id": 2,
+            "content": "Wa alaikum assalam! How can I help?",
+            "account_id": 1,
+            "inbox_id": 1,
+            "conversation_id": 1,
+            "message_type": 1,
+            "created_at": 1790468294,
+            "updated_at": "2026-09-27T00:18:14.340Z",
+            "private": false,
+            "status": "sent",
+            "source_id": "hv1:p:probe-2",
+            "content_type": "text",
+            "content_attributes": {},
+            "sender_type": "AgentBot",
+            "sender_id": 1,
+            "external_source_ids": {},
+            "additional_attributes": {},
+            "processed_message_content": "Wa alaikum assalam! How can I help?",
+            "sentiment": {},
+            "conversation": {
+              "assignee_id": null,
+              "unread_count": 1,
+              "last_activity_at": 1790468294,
+              "contact_inbox": {
+                "source_id": "00000000-0000-4000-8000-000000000000"
+              }
+            },
+            "sender": {
+              "id": 1,
+              "name": "Hamnivo AI",
+              "avatar_url": "",
+              "type": "agent_bot"
+            }
+          }
+        ],
+        "labels": [],
+        "meta": {
+          "sender": {
+            "additional_attributes": {},
+            "custom_attributes": {},
+            "email": null,
+            "id": 1,
+            "identifier": "hv:brand:customer-1",
+            "name": "Ayesha",
+            "phone_number": null,
+            "thumbnail": "",
+            "blocked": false,
+            "type": "contact"
+          },
+          "assignee": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          },
+          "assignee_type": "AgentBot",
+          "team": null,
+          "hmac_verified": false
+        },
+        "status": "pending",
+        "custom_attributes": {},
+        "snoozed_until": null,
+        "unread_count": 1,
+        "first_reply_created_at": null,
+        "priority": null,
+        "waiting_since": 0,
+        "agent_last_seen_at": 0,
+        "contact_last_seen_at": 0,
+        "last_activity_at": 1790468294,
+        "timestamp": 1790468294,
+        "created_at": 1790468294,
+        "updated_at": 1790468294.4489331,
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        }
+      },
+      "created_at": "2026-09-27T00:18:14.250Z",
+      "id": 1,
+      "inbox": {
+        "id": 1,
+        "name": "Hamnivo Web"
+      },
+      "message_type": "incoming",
+      "private": false,
+      "sender": {
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        },
+        "additional_attributes": {},
+        "avatar": "",
+        "custom_attributes": {},
+        "email": null,
+        "id": 1,
+        "identifier": "hv:brand:customer-1",
+        "name": "Ayesha",
+        "phone_number": null,
+        "thumbnail": "",
+        "blocked": false
+      },
+      "source_id": "hv1:m:probe-1",
+      "event": "message_created"
+    }
+  },
+  {
+    "source": "inbox",
+    "event": "message_created",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "content_attributes": {},
+      "content_type": "text",
+      "content": "Wa alaikum assalam! How can I help?",
+      "conversation": {
+        "additional_attributes": {},
+        "can_reply": true,
+        "channel": "Channel::Api",
+        "contact_inbox": {
+          "id": 1,
+          "contact_id": 1,
+          "inbox_id": 1,
+          "source_id": "00000000-0000-4000-8000-000000000000",
+          "created_at": "2026-09-27T00:18:14.099Z",
+          "updated_at": "2026-09-27T00:18:14.099Z",
+          "hmac_verified": false,
+          "pubsub_token": "redacted"
+        },
+        "id": 1,
+        "inbox_id": 1,
+        "messages": [
+          {
+            "id": 2,
+            "content": "Wa alaikum assalam! How can I help?",
+            "account_id": 1,
+            "inbox_id": 1,
+            "conversation_id": 1,
+            "message_type": 1,
+            "created_at": 1790468294,
+            "updated_at": "2026-09-27T00:18:14.340Z",
+            "private": false,
+            "status": "sent",
+            "source_id": "hv1:p:probe-2",
+            "content_type": "text",
+            "content_attributes": {},
+            "sender_type": "AgentBot",
+            "sender_id": 1,
+            "external_source_ids": {},
+            "additional_attributes": {},
+            "processed_message_content": "Wa alaikum assalam! How can I help?",
+            "sentiment": {},
+            "conversation": {
+              "assignee_id": null,
+              "unread_count": 1,
+              "last_activity_at": 1790468294,
+              "contact_inbox": {
+                "source_id": "00000000-0000-4000-8000-000000000000"
+              }
+            },
+            "sender": {
+              "id": 1,
+              "name": "Hamnivo AI",
+              "avatar_url": "",
+              "type": "agent_bot"
+            }
+          }
+        ],
+        "labels": [],
+        "meta": {
+          "sender": {
+            "additional_attributes": {},
+            "custom_attributes": {},
+            "email": null,
+            "id": 1,
+            "identifier": "hv:brand:customer-1",
+            "name": "Ayesha",
+            "phone_number": null,
+            "thumbnail": "",
+            "blocked": false,
+            "type": "contact"
+          },
+          "assignee": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          },
+          "assignee_type": "AgentBot",
+          "team": null,
+          "hmac_verified": false
+        },
+        "status": "pending",
+        "custom_attributes": {},
+        "snoozed_until": null,
+        "unread_count": 1,
+        "first_reply_created_at": null,
+        "priority": null,
+        "waiting_since": 0,
+        "agent_last_seen_at": 0,
+        "contact_last_seen_at": 0,
+        "last_activity_at": 1790468294,
+        "timestamp": 1790468294,
+        "created_at": 1790468294,
+        "updated_at": 1790468294.4489331,
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        }
+      },
+      "created_at": "2026-09-27T00:18:14.340Z",
+      "id": 2,
+      "inbox": {
+        "id": 1,
+        "name": "Hamnivo Web"
+      },
+      "message_type": "outgoing",
+      "private": false,
+      "sender": {
+        "id": 1,
+        "name": "Hamnivo AI",
+        "type": "agent_bot"
+      },
+      "source_id": "hv1:p:probe-2",
+      "event": "message_created"
+    }
+  },
+  {
+    "source": "inbox",
+    "event": "message_created",
+    "payload": {
+      "account": {
+        "id": 1,
+        "name": "Fixture Account"
+      },
+      "additional_attributes": {},
+      "content_attributes": {
+        "hv": {
+          "v": 1
+        }
+      },
+      "content_type": "text",
+      "content": "Assalamu alaikum, I need help",
+      "conversation": {
+        "additional_attributes": {},
+        "can_reply": true,
+        "channel": "Channel::Api",
+        "contact_inbox": {
+          "id": 1,
+          "contact_id": 1,
+          "inbox_id": 1,
+          "source_id": "00000000-0000-4000-8000-000000000000",
+          "created_at": "2026-09-27T00:18:14.099Z",
+          "updated_at": "2026-09-27T00:18:14.099Z",
+          "hmac_verified": false,
+          "pubsub_token": "redacted"
+        },
+        "id": 1,
+        "inbox_id": 1,
+        "messages": [
+          {
+            "id": 2,
+            "content": "Wa alaikum assalam! How can I help?",
+            "account_id": 1,
+            "inbox_id": 1,
+            "conversation_id": 1,
+            "message_type": 1,
+            "created_at": 1790468294,
+            "updated_at": "2026-09-27T00:18:14.340Z",
+            "private": false,
+            "status": "sent",
+            "source_id": "hv1:p:probe-2",
+            "content_type": "text",
+            "content_attributes": {},
+            "sender_type": "AgentBot",
+            "sender_id": 1,
+            "external_source_ids": {},
+            "additional_attributes": {},
+            "processed_message_content": "Wa alaikum assalam! How can I help?",
+            "sentiment": {},
+            "conversation": {
+              "assignee_id": null,
+              "unread_count": 1,
+              "last_activity_at": 1790468294,
+              "contact_inbox": {
+                "source_id": "00000000-0000-4000-8000-000000000000"
+              }
+            },
+            "sender": {
+              "id": 1,
+              "name": "Hamnivo AI",
+              "avatar_url": "",
+              "type": "agent_bot"
+            }
+          }
+        ],
+        "labels": [],
+        "meta": {
+          "sender": {
+            "additional_attributes": {},
+            "custom_attributes": {},
+            "email": null,
+            "id": 1,
+            "identifier": "hv:brand:customer-1",
+            "name": "Ayesha",
+            "phone_number": null,
+            "thumbnail": "",
+            "blocked": false,
+            "type": "contact"
+          },
+          "assignee": {
+            "id": 1,
+            "name": "Hamnivo AI",
+            "avatar_url": "",
+            "type": "agent_bot"
+          },
+          "assignee_type": "AgentBot",
+          "team": null,
+          "hmac_verified": false
+        },
+        "status": "pending",
+        "custom_attributes": {},
+        "snoozed_until": null,
+        "unread_count": 1,
+        "first_reply_created_at": null,
+        "priority": null,
+        "waiting_since": 0,
+        "agent_last_seen_at": 0,
+        "contact_last_seen_at": 0,
+        "last_activity_at": 1790468294,
+        "timestamp": 1790468294,
+        "created_at": 1790468294,
+        "updated_at": 1790468294.4489331,
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        }
+      },
+      "created_at": "2026-09-27T00:18:14.250Z",
+      "id": 1,
+      "inbox": {
+        "id": 1,
+        "name": "Hamnivo Web"
+      },
+      "message_type": "incoming",
+      "private": false,
+      "sender": {
+        "account": {
+          "id": 1,
+          "name": "Fixture Account"
+        },
+        "additional_attributes": {},
+        "avatar": "",
+        "custom_attributes": {},
+        "email": null,
+        "id": 1,
+        "identifier": "hv:brand:customer-1",
+        "name": "Ayesha",
+        "phone_number": null,
+        "thumbnail": "",
+        "blocked": false
+      },
+      "source_id": "hv1:m:probe-1",
+      "event": "message_created"
+    }
+  }
+]

@@ -57,6 +57,16 @@ pnpm db:migrate             # schema, row-level security, audit partitions
 pnpm ci:local               # every check: lint, types, unit, integration (PG 16 + 18), accessibility
 ```
 
+To run Hamnivo in production on your own server, with HTTPS and backups:
+
+```bash
+./deploy/production/hamnivo.sh setup --domain example.com --email you@example.com
+./deploy/production/hamnivo.sh up
+```
+
+The steps, from DNS records to backups and updates, are in Part A of
+[`docs/self-hosting.md`](docs/self-hosting.md).
+
 Further guides live in [`docs/`](docs/). The product blueprint and the UI/UX design kit that this
 implementation follows are in [`docs/blueprint/`](docs/blueprint/) and [`docs/design/`](docs/design/).
 

@@ -1,0 +1,32 @@
+{
+  "state": {
+    "message": "Order HV-10293 pay ho gaya, delivery nahi mili. شکریہ",
+    "orderRef": "HV-10293",
+    "orderStatus": "paid"
+  },
+  "questions": {
+    "intent": {
+      "type": "choice",
+      "instructions": "What is the customer asking about?",
+      "criteria": {
+        "billing": "Payments, refunds and invoices",
+        "delivery": "Shipping and delivery",
+        "other": null
+      }
+    },
+    "evidence": {
+      "type": "score",
+      "instructions": "How well do the order notes support an answer?",
+      "criteria": ["No support", "Partial support", "Full support"]
+    },
+    "needsHuman": {
+      "type": "noul",
+      "instructions": "The customer needs a person to resolve this.",
+      "criteria": {
+        "true": "Only a person can resolve it",
+        "false": "The assistant can continue"
+      }
+    }
+  },
+  "model": "jev-1.13.0"
+}

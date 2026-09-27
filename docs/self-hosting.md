@@ -1,23 +1,289 @@
 # Running Hamnivo on your own server
 
 Hamnivo has no hosted CI. You run every check and host every service yourself, with the scripts in
-this repository. This guide grows with the product. Each milestone adds its services and steps here.
+this repository.
+
+- **Part A** puts Hamnivo in production on one server, with HTTPS and backups.
+- **Part B** is for development: running the services one by one and running the checks.
 
 ## What you can run today
 
 | Part | Status | How |
 |---|---|---|
-| Checks (lint, types, unit, integration on PostgreSQL 16 and 18, accessibility) | ready | `pnpm ci:local` |
-| Infrastructure (PostgreSQL 18 + pgvector, Valkey) | ready | `pnpm services:up` |
+| Production on one server: every service, automatic HTTPS, backups and restore | ready | Part A: `deploy/production/hamnivo.sh` |
+| Checks (lint, types, unit, integration on PostgreSQL 16 and 18, Chatwoot contract, accessibility, widget journey and website in a browser) | ready | `pnpm ci:local` |
+| Production smoke test (the real deployment on this machine, then a backup and restore drill) | ready | `bash scripts/ci/production-smoke.sh` |
+| Infrastructure for development (PostgreSQL 18 + pgvector, Valkey) | ready | `pnpm services:up` |
 | Design system (Storybook) | ready | `pnpm --filter @hamnivo/ui storybook` |
 | Database schema, row-level security and audit log | ready | `pnpm db:migrate` |
-| Gateway, worker, widget, Studio, website, Chatwoot | not yet built | added by later milestones, with a production compose file and TLS proxy |
+| Gateway API (staff sign-in, tenants, members, roles, grants, secrets, audit) and worker | ready | `pnpm api`, `pnpm worker` |
+| Chatwoot CE v4.18.0 (conversation authority) with the Hamnivo Platform App | ready | `pnpm chatwoot:up` |
+| Chat API: widget sessions, conversations, live stream, staff takeover | ready | see "Connect a brand to Chatwoot" below |
+| Chat widget (Hamnivo Chat), its one-script loader and the JS client SDK | ready (first version) | see "Put the chat on a web page" below |
+| Public website (EN/AR/HI/UR, static) | ready | see "The public website" below |
+| AI agents: real models (Anthropic, OpenAI, Gemini, OpenAI-compatible), knowledge, kill switches | ready (API) | see "Connect a brand to Chatwoot" below |
+| Studio (staff console) | being built | until it ships, set things up through the API (A6) |
+
+# Part A: Host Hamnivo on your server
+
+## A1. What you need
+
+- **A server** with Ubuntu 24.04 LTS (or another recent Linux), 4 vCPU, 8 GB of memory and 40 GB
+  of SSD. Add 2 GB of memory for virus scanning of uploads (ClamAV, on by default).
+- **A domain** you control, for example `example.com`.
+- **DNS records** (A, and AAAA if the server has IPv6) pointing at the server for these names:
+
+  | Name | Serves |
+  |---|---|
+  | `api.example.com` | the API |
+  | `chat.example.com` | the chat widget and its loader script |
+  | `support.example.com` | Chatwoot, where staff can also answer |
+  | `app.example.com` | Studio, the staff console, when it ships |
+  | `example.com` and `www.example.com` | the public website |
+
+  A wildcard record `*.example.com` covers the first four.
+- **Open ports:** 80 and 443 over TCP, and 443 over UDP (HTTP/3). Caddy, the web server in the
+  stack, uses port 80 to get certificates from Let's Encrypt, then redirects it to HTTPS.
+- **Email (recommended):** an SMTP account for sign-in and invitation emails.
+
+## A2. Install Docker, git and openssl
+
+```bash
+sudo apt-get update && sudo apt-get install -y git openssl
+curl -fsSL https://get.docker.com | sudo sh        # Docker Engine and the compose plugin
+sudo usermod -aG docker "$USER"                      # log out and back in afterwards
+```
+
+A firewall that allows only SSH and the web ports:
+
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 80,443/tcp
+sudo ufw allow 443/udp
+sudo ufw enable
+```
+
+Only the web server publishes ports. The databases, Valkey, the API and Chatwoot are reachable only
+inside Docker's network.
+
+## A3. Get the code
+
+```bash
+sudo mkdir -p /opt/hamnivo && sudo chown "$USER" /opt/hamnivo
+git clone https://github.com/CodeWithJuber/Hamnivo.git /opt/hamnivo
+cd /opt/hamnivo
+git checkout claude/hamnivo-app-implementation-bhb7rg   # until the work is merged to main
+```
+
+## A4. Configure
+
+```bash
+./deploy/production/hamnivo.sh setup --domain example.com --email you@example.com
+```
+
+This writes `deploy/production/.env`:
+
+- the public names, derived from the domain;
+- the email address that Let's Encrypt uses for certificate notices;
+- every password and key, generated.
+
+Running `setup` again only adds settings that are missing. It never changes a password or key.
+
+`.env` holds every secret. Keep it private: it is readable only by you and never goes into git or
+an image. Keep a copy somewhere safe, because without it the secrets stored in the database cannot
+be decrypted. Backups include it (A7).
+
+Then edit `deploy/production/.env` for:
+
+- **Email:** `SMTP_URL`, for example `smtps://user:password@smtp.example.com:465`, and `MAIL_FROM`.
+  Without them, sign-in emails are written to the API log (`hamnivo.sh logs api`), where you can
+  copy the links.
+- **AI models (optional):** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`,
+  or `OPENAI_COMPATIBLE_BASE_URL` for a local model. Each company can also store its own keys
+  later. `EMBEDDING_PROVIDER` chooses the model for knowledge search.
+- **Other names:** change `HAMNIVO_*_HOST`, then run `setup` again to update the addresses derived
+  from them.
+- **Chatwoot's email:** copy `deploy/production/chatwoot.env.example` to `chatwoot.env` in the
+  same folder and fill it in.
+
+`deploy/production/env.example` explains every setting.
+
+## A5. Start
+
+```bash
+./deploy/production/hamnivo.sh up
+```
+
+The first run takes 10 to 20 minutes. It does the following:
+
+1. **Builds the two images from this code:**
+   - `hamnivo/gateway`: the API, the worker and database migrations;
+   - `hamnivo/edge`: Caddy, with the widget and the website.
+2. **Starts PostgreSQL** (with pgvector) and creates the database roles.
+3. **Applies the database migrations.**
+4. **Prepares Chatwoot's database and starts Chatwoot.**
+5. **Starts the API, the worker, Valkey and ClamAV.**
+6. **Gets certificates** for every name from Let's Encrypt.
+7. **Creates the Chatwoot super admin and the Hamnivo Platform App.** It stores the app's token in
+   `.env`.
+
+When it finishes, it prints the addresses. Check the services at any time:
+
+```bash
+./deploy/production/hamnivo.sh status
+./deploy/production/hamnivo.sh logs api worker     # follow the logs (Ctrl+C to stop)
+```
+
+## A6. First steps
+
+Studio, the staff console, will do all of this in the browser. Until it ships, use the API from
+any computer. Replace `example.com` with your domain.
+
+1. **Create your account.**
+
+   ```bash
+   A=https://api.example.com; O=https://app.example.com
+   curl -c jar -H "origin: $O" -H 'content-type: application/json' \
+     -d '{"name":"Your Name","email":"you@example.com","password":"a long passphrase here"}' \
+     $A/api/auth/sign-up/email
+   ```
+
+2. **Confirm your email.** Open the link in the email. Without SMTP, the link is in
+   `hamnivo.sh logs api`.
+
+3. **Sign in and create your company.**
+
+   ```bash
+   curl -c jar -b jar -H "origin: $O" -H 'content-type: application/json' \
+     -d '{"email":"you@example.com","password":"a long passphrase here"}' $A/api/auth/sign-in/email
+   curl -b jar -H "origin: $O" -H 'content-type: application/json' \
+     -d '{"name":"My Company","slug":"my-company"}' $A/v1/tenants
+   ```
+
+4. **Create a brand and connect it.** Follow the steps under "Connect a brand to Chatwoot and chat
+   through the API" in Part B, using `$A` instead of `http://localhost:4000` and `-H "origin: $O"`.
+   List your real websites in `allowedOrigins`, for example `["https://www.yourshop.com"]`. Only
+   those websites can show the chat, and the widget page refuses to be framed anywhere else.
+
+5. **Publish the AI agent.** It answers with the offline `hamnivo-mock` model until you choose a
+   real model and publish again.
+
+6. **Put the chat on your website** with the brand's widget ID:
+
+   ```html
+   <script src="https://chat.example.com/loader.js" data-widget-id="wid_..."
+           data-api="https://api.example.com" async></script>
+   ```
+
+Staff can answer in Chatwoot at `https://support.example.com`. The super admin email and password
+are in `.env` (`CHATWOOT_ADMIN_EMAIL` and `CHATWOOT_ADMIN_PASSWORD`). The interactive API reference
+is at `https://api.example.com/docs`; set `API_DOCS=false` to hide it.
+
+## A7. Everyday operations
+
+| Task | Command |
+|---|---|
+| See services and health | `./deploy/production/hamnivo.sh status` |
+| Follow logs | `./deploy/production/hamnivo.sh logs [service…]` |
+| Back up now | `./deploy/production/hamnivo.sh backup` |
+| Restore a backup | `./deploy/production/hamnivo.sh restore deploy/production/backups/<time>` |
+| Update to the latest code | `./deploy/production/hamnivo.sh update` |
+| Apply changed settings | `./deploy/production/hamnivo.sh up` |
+| Stop everything | `./deploy/production/hamnivo.sh down` (data stays in Docker volumes) |
+| Any compose command | `./deploy/production/hamnivo.sh compose <command>` |
+
+### Backups
+
+A backup is a folder under `deploy/production/backups/` named after the time (UTC). It holds:
+
+- both databases (`pg_dump`);
+- Chatwoot's uploaded files;
+- the certificates;
+- a copy of `.env`;
+- checksums of every file.
+
+The newest 14 backups are kept (`--keep N` changes that). `--no-secrets` leaves out `.env`, if you
+store it separately. Backups contain personal data and secrets: encrypt them and copy them off the
+server, for example with [restic](https://restic.net).
+
+Back up every night at 03:15:
+
+```bash
+( crontab -l 2>/dev/null; echo '15 3 * * * /opt/hamnivo/deploy/production/hamnivo.sh backup >> /var/log/hamnivo-backup.log 2>&1' ) | crontab -
+```
+
+The two databases are dumped one after the other, a few seconds apart. Messages written in those
+seconds can be missing from one of them.
+
+### Restore
+
+```bash
+./deploy/production/hamnivo.sh restore deploy/production/backups/20260927T031500Z
+```
+
+A restore:
+
+1. checks the checksums;
+2. stops the applications;
+3. replaces both databases and the files;
+4. starts everything again. Migrations run first, so a backup from an older version works with
+   newer code.
+
+It refuses a backup made with other secrets, unless you move your `.env` away first. On a new
+server, clone the code (A3), copy the backup folder over and run the same command. It installs the
+backup's `.env` and builds what it needs.
+
+Test a restore now and then on a spare server. `scripts/ci/production-smoke.sh` runs a backup and
+restore drill in its checks.
+
+### Updates
+
+```bash
+./deploy/production/hamnivo.sh update
+```
+
+This backs up first, pulls the code, adds any new settings to `.env`, rebuilds the images and
+restarts. Database migrations run before the new API starts. The chat is unavailable for about a
+minute while containers restart.
+
+## A8. Security checklist
+
+- Only ports 80 and 443 are open (A2), and SSH uses keys, not passwords.
+- `deploy/production/.env` is private (mode 600) and backed up securely.
+- Backups are encrypted and stored off the server.
+- `REQUIRE_EMAIL_VERIFICATION` stays `true`, and SMTP is configured.
+- Each brand lists only its real websites in `allowedOrigins`.
+- `CHATWOOT_ALLOW_PRIVATE_WEBHOOKS` stays `false`, so Chatwoot cannot call private addresses.
+- The operating system updates itself (`sudo apt-get install unattended-upgrades`), and you run
+  `hamnivo.sh update` for Hamnivo.
+- To collect metrics, set `METRICS_TOKEN` and scrape `https://api.example.com/metrics` with it.
+
+## A9. Troubleshooting
+
+- **No certificate / browser warning:**
+  - Check that every name resolves to the server (`dig +short api.example.com`).
+  - Check that ports 80 and 443 are open.
+  - Read `hamnivo.sh logs edge`.
+  - Let's Encrypt limits failed attempts, so fix DNS first, then run `hamnivo.sh up`.
+- **The first start is slow:** Chatwoot prepares its database (2 to 3 minutes), and ClamAV
+  downloads its virus signatures (a few minutes). Uploads wait for ClamAV and are scanned when it
+  is ready.
+- **The chat does not open on a website:** the website's exact origin (scheme, name and port) must
+  be in the brand's `allowedOrigins`.
+- **No emails:** set `SMTP_URL` and run `hamnivo.sh up`. Until then, links are in the API log.
+- **Out of memory:** remove `scan` from `COMPOSE_PROFILES` and empty `CLAMAV_URL` to run without
+  ClamAV, or add memory.
+- **Building behind a proxy that inspects TLS:** set `HAMNIVO_BUILD_CA=/path/to/proxy-ca.pem`
+  before `hamnivo.sh up`.
+
+# Part B: Develop and run the checks
 
 ## 1. Server requirements
 
 - **OS:** Ubuntu 24.04 LTS or any recent Linux with Docker. macOS works for development.
-- **Checks and development:** 2 vCPU, 4 GB RAM, 20 GB free disk.
-- **Full stack with Chatwoot, later:** 4 vCPU, 8 GB RAM, 40 GB SSD, and a domain name you control.
+- **Checks and development:** 2 vCPU, 6 GB RAM, 25 GB free disk. The Chatwoot stage of the checks
+  starts a complete Chatwoot (web, background jobs, database) for a few minutes.
+- **Production:** see A1.
 
 ## 2. One-time setup
 
@@ -37,7 +303,7 @@ cd Hamnivo
 git checkout claude/hamnivo-app-implementation-bhb7rg   # until the work is merged to main
 pnpm install
 
-# Browser for the accessibility audit (installs Chromium and its system libraries)
+# Browser for the accessibility audit and the widget journey (Chromium and its system libraries)
 pnpm --filter @hamnivo/ui exec playwright install --with-deps chromium
 ```
 
@@ -80,18 +346,252 @@ pnpm db:migrate       # idempotent: applies only pending migrations, all-or-noth
 Every table has row-level security enabled and forced. The application role only sees the tenant
 bound to its current transaction. See `packages/db/README.md` for the details.
 
+### Run the API and the worker
+
+```bash
+pnpm api       # builds and starts the gateway on http://localhost:4000 (reads .env.local)
+pnpm worker    # outbox relay and scheduled maintenance, in a second terminal
+```
+
+- Interactive API reference: `http://localhost:4000/docs`.
+- OpenAPI document: `http://localhost:4000/v1/openapi.json`.
+- Health checks: `/health/live` and `/health/ready` (database and Valkey).
+- Without `SMTP_URL`, verification and invitation emails are printed to the API log, so you can
+  open the links directly. On a server, set `SMTP_URL` (for example `smtps://user:pass@smtp.example.com:465`).
+
+### Start Chatwoot
+
+Chatwoot CE v4.18.0 owns conversations, messages and private notes. Hamnivo talks to it through its
+APIs and signed webhooks (ADR 0001).
+
+```bash
+pnpm chatwoot:up      # first run about 2 minutes; http://127.0.0.1:3000
+pnpm chatwoot:down    # stop; data stays in Docker volumes (add --volumes to delete it)
+```
+
+What `chatwoot:up` does:
+
+1. It starts Chatwoot's own PostgreSQL 16 (with pgvector) and Valkey.
+2. It creates or migrates the Chatwoot schema.
+3. It starts the web and background-job processes.
+4. It creates a super admin and the "Hamnivo" Platform App.
+5. It writes the Platform App token to `.env.local` as `CHATWOOT_PLATFORM_TOKEN`.
+
+The super admin email and password are in `.env.local` (`CHATWOOT_ADMIN_*`). Keep the Platform
+token secret. Anyone holding it can create accounts and users.
+
+Check the connector against your Chatwoot at any time:
+
+```bash
+set -a; . ./.env.local; set +a
+pnpm --filter @hamnivo/chatwoot test:int
+```
+
+This runs the same contract suite the checks use. Each run creates a small test account in the
+Chatwoot you point it at. Chatwoot delivers webhooks to `host.docker.internal`, which is this
+machine. For that reason the development stack allows webhooks to private addresses
+(`CHATWOOT_ALLOW_PRIVATE_WEBHOOKS=true`). In production the gateway has a public HTTPS address, so
+set it to `false` and keep Chatwoot's SSRF protection on.
+
+First steps with the API, before the Studio exists:
+
+```bash
+curl -c jar -H 'origin: http://localhost:5173' -H 'content-type: application/json' \
+  -d '{"name":"Your Name","email":"you@example.com","password":"a long passphrase here"}' \
+  http://localhost:4000/api/auth/sign-up/email
+# open the verification link printed in the API log, then:
+curl -b jar -c jar -H 'origin: http://localhost:5173' -H 'content-type: application/json' \
+  -d '{"name":"My Company","slug":"my-company"}' http://localhost:4000/v1/tenants
+```
+
+### Connect a brand to Chatwoot and chat through the API
+
+This needs `pnpm chatwoot:up` (it writes `CHATWOOT_URL` and `CHATWOOT_PLATFORM_TOKEN` to
+`.env.local`), plus `pnpm api` and `pnpm worker` running. `CHATWOOT_WEBHOOK_BASE_URL` (default
+`http://host.docker.internal:4000`) is how Chatwoot's webhooks reach the gateway.
+
+1. Use the tenant ID (`tnt_…`) returned above. Find the workspace, then create a brand with the
+   websites allowed to embed its chat:
+
+   ```bash
+   T=tnt_...   # your tenant id
+   h=(-b jar -H 'origin: http://localhost:5173' -H 'content-type: application/json' -H "x-hamnivo-tenant: $T")
+   curl "${h[@]}" http://localhost:4000/v1/admin/workspaces
+   curl "${h[@]}" -d '{"workspaceId":"wsp_...","name":"My Shop","allowedOrigins":["http://localhost:8080"]}' \
+     http://localhost:4000/v1/admin/brands
+   ```
+
+2. Connect the brand. This provisions a Chatwoot account with an HMAC inbox, the AI bot and signed
+   webhooks, and stores every credential encrypted:
+
+   ```bash
+   curl "${h[@]}" -d '{"brandId":"brd_..."}' http://localhost:4000/v1/admin/authority/connections
+   ```
+
+3. Publish the brand's AI agent. Connecting created it as a draft that uses the offline
+   `hamnivo-mock` model, and until it is published, people answer every conversation:
+
+   ```bash
+   curl "${h[@]}" http://localhost:4000/v1/admin/agents          # note the agent id (agt_…)
+   curl "${h[@]}" -d '{}' http://localhost:4000/v1/admin/agents/agt_.../publish
+   ```
+
+   To use a real model, save a new draft with a different `model`, then publish again. For example,
+   use `{"provider":"anthropic","modelId":"…"}` with `ANTHROPIC_API_KEY` in `.env.local`, or store
+   a tenant key first with `POST /v1/admin/model-connections` and reference its `connectionId`.
+   Publishing checks that the model has credentials. Every published version stays unchanged, and
+   publishing an older version (`{"version":1}`) is the rollback.
+
+4. Chat as a website visitor would. Use the brand's `widgetId`:
+
+   ```bash
+   S=$(curl -s -H 'content-type: application/json' \
+     -d '{"widgetId":"wid_...","hostOrigin":"http://localhost:8080"}' http://localhost:4000/v1/widget/sessions)
+   A=$(echo "$S" | node -pe 'JSON.parse(require("fs").readFileSync(0)).accessToken')
+   curl -H "authorization: Bearer $A" -H 'content-type: application/json' \
+     -d '{"firstMessage":"Assalamu alaikum, where is my order?"}' http://localhost:4000/v1/widget/conversations
+   curl -N -H "authorization: Bearer $A" -H 'last-event-id: 0' \
+     http://localhost:4000/v1/widget/conversations/conv_.../events
+   ```
+
+The stream shows your message and, a moment later, the AI assistant's reply. With the default
+agent, the reply comes from the offline `hamnivo-mock` model. The same conversation appears in
+Chatwoot (`http://127.0.0.1:3000`), where your staff can also answer. A person replying or taking
+over there takes the conversation from the AI.
+
+Each AI reply is recorded as a run: agent version, model, tokens, time and outcome, but no message
+text (`GET /v1/admin/runs`). To stop the AI at once, for the whole tenant, one brand or one agent:
+
+```bash
+curl "${h[@]}" -d '{"scope":"brand","targetId":"brd_...","reason":"Checking answers"}' \
+  http://localhost:4000/v1/admin/kill-switches
+```
+
+Conversations the AI held go to people with an internal note, and people keep chatting as usual.
+Clearing the switch (`POST /v1/admin/kill-switches/ksw_.../clear`) lets the AI answer again.
+
+### Give the AI your knowledge
+
+1. **Create a source.** Only `public` sources ground answers to customers. An `internal` source is
+   for staff and for assist mode.
+
+   ```bash
+   curl "${h[@]}" -d '{"brandId":"brd_...","name":"Help centre","reviewEveryDays":90}' \
+     http://localhost:4000/v1/admin/knowledge/sources
+   ```
+
+2. **Add documents.** Send text for plain text, Markdown or HTML, or `base64` for PDF and Word
+   files. Each document can be up to 5 MB.
+
+   ```bash
+   curl "${h[@]}" -d '{"title":"Returns","url":"https://shop.example/returns","content":
+     {"mediaType":"text/markdown","text":"# Returns\n\nYou can return unworn items within 30 days."}}' \
+     http://localhost:4000/v1/admin/knowledge/sources/ksrc_.../documents
+   ```
+
+   The worker processes each document in order:
+   1. It scans the upload. Malware, or a failure to scan, means refusal.
+   2. It checks the file really is the declared type.
+   3. It extracts the text, splits it into passages under their headings, and indexes them for
+      keyword and vector search.
+
+   A new version of a document replaces the old one only when it is ready.
+
+3. **Connect the knowledge to the agent.** Put the source IDs in the agent's `knowledgeSourceIds`,
+   save a draft and publish it. Answers then:
+   - cite passages as `[1]`;
+   - list the sources under the message in the chat;
+   - drop any citation that matches nothing retrieved.
+
+   Documents stop grounding answers when they are retired, past `validUntil`, or not reviewed
+   within their source's cycle (`POST /v1/admin/knowledge/documents/doc_.../review`).
+
+To preview what an answer would use, send `POST /v1/admin/knowledge/search` with
+`{"query":"…","brandId":"brd_…"}`.
+
+On a server, run ClamAV and set `CLAMAV_URL=tcp://clamav:3310`. Without it, uploads are checked only
+for the EICAR test file. `EMBEDDING_PROVIDER` selects the embedding model; the default offline
+`mock` matches shared words only, so use a real provider for meaning-based search.
+
+### Put the chat on a web page
+
+The widget is a static app, and the loader is one small script served next to it.
+
+1. Build them and serve them from one origin:
+
+   ```bash
+   pnpm build
+   cp packages/widget-loader/dist/loader.js apps/widget/dist/
+   pnpm --filter @hamnivo/widget preview    # serves apps/widget/dist on http://localhost:5174
+   ```
+
+2. `PUBLIC_WIDGET_ORIGIN` in `.env.local` must be the origin the widget is served from
+   (`http://localhost:5174` here). The gateway allows cross-origin widget calls only from that
+   origin, so restart `pnpm api` after changing it.
+
+3. Add the loader to any page on a website in the brand's `allowedOrigins`
+   (`http://localhost:8080` in the example above):
+
+   ```html
+   <script src="http://localhost:5174/loader.js" data-widget-id="wid_..."
+           data-api="http://localhost:4000" async></script>
+   ```
+
+   For example, save that line as `index.html` in an empty folder and run
+   `python3 -m http.server 8080` there.
+
+Open the page and click the chat button. The widget opens, and you can send a message, get the AI
+reply, ask for a person, and watch a staff reply from Chatwoot arrive live. Add
+`data-locale="ur"` or `"ar"` for right to left. The loader options and the JavaScript API are
+in `packages/widget-loader/README.md`. To build your own chat UI instead, see
+`packages/client/README.md`.
+
+On a server, serve `apps/widget/dist` (with `loader.js` copied in) as static files behind your TLS
+proxy (for example `https://chat.example.com`). Set `PUBLIC_WIDGET_ORIGIN` to that origin, and
+list each customer website in the brand's `allowedOrigins`.
+
+### The public website
+
+`apps/site` is a static site in English, Arabic, Hindi and Urdu. It uses the brand's product
+visuals, and every page passes an accessibility audit in the checks.
+
+```bash
+pnpm --filter @hamnivo/brand build
+pnpm --filter @hamnivo/site build        # static files in apps/site/dist
+pnpm --filter @hamnivo/site preview      # http://localhost:5190
+```
+
+Serve `apps/site/dist` from any web server or CDN. Set these at build time:
+- `PUBLIC_SITE_URL`: the address used in canonical links and the sitemap.
+- To embed a live chat demo: `PUBLIC_HAMNIVO_WIDGET_ID`, `PUBLIC_HAMNIVO_WIDGET_ORIGIN` and
+  `PUBLIC_HAMNIVO_API`. Without them, the page shows the loader snippet instead.
+
 ## 5. Run the checks
 
 ```bash
-pnpm ci:local               # everything; about 5–10 minutes
-pnpm ci:local --quick       # lint, typecheck, unit tests, status and licence checks
-pnpm ci:local --skip-a11y   # everything except the Storybook accessibility audit
+pnpm ci:local                   # everything; about 8–12 minutes
+pnpm ci:local --quick           # lint, typecheck, unit tests, status and licence checks
+pnpm ci:local --skip-a11y       # everything except the Storybook accessibility audit
+pnpm ci:local --skip-chatwoot   # everything except the real-Chatwoot contract suite
+pnpm ci:local --skip-e2e        # everything except the browser checks (widget journey, website)
 PG_VERSIONS=18 pnpm ci:local
 ```
 
-Integration tests run in throwaway PostgreSQL 16/18 and Valkey containers with fresh random
-passwords, so your development data is never touched. The summary is written to
-`test-results/ci-local.md`. Paste it into the pull request when you review a change.
+Integration tests run in throwaway containers with fresh random passwords, so your development data
+is never touched:
+
+- PostgreSQL 16 and 18 with Valkey, for the database and gateway tests.
+- A complete Chatwoot v4.18.0-ce on a random port, for the contract suite. The checks delete it
+  afterwards, volumes included.
+- A fresh PostgreSQL 18 and Valkey for the widget journey. It builds everything, then starts the
+  gateway, the worker, a fake Chatwoot, the widget and a host page on another origin. Chromium
+  then chats through it: AI reply, staff takeover, offline resend, right to left, an axe audit,
+  and refusal on a website that is not allowed.
+
+- The built website in Chromium: every language at desktop and phone width, with an axe audit.
+
+The summary is written to `test-results/ci-local.md`. Paste it into the pull request when you
+review a change.
 
 To run the quick checks automatically before every `git push`:
 
@@ -121,10 +621,5 @@ pnpm ci:local
 
 ## Coming with the next milestones
 
-- Gateway and worker (M4). Adds `deploy/compose/hamnivo.yml` with the API, the background worker
-  and Caddy for automatic HTTPS. DNS needs `api.`, `app.` and `chat.` records pointing at the server.
-- Chatwoot CE v4.18.0 (M5). Runs in the same compose project with its own database, plus a
-  bootstrap script for the super admin and the platform token.
-- Widget, Studio and website (M6 onward).
-- Backups and restore drill (ops round). Nightly `pg_dump` for both databases, volume snapshots
-  and a scripted restore test.
+- Studio, the staff console, served at `app.` by the same web server.
+- Monitoring dashboards and alerts (ops round).

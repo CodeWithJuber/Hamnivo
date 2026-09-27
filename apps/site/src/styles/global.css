@@ -1,0 +1,316 @@
+@import "tailwindcss";
+@import "@hamnivo/brand/theme.css";
+/* Same families as packages/ui, limited to the scripts each one covers. */
+@import "@fontsource-variable/dm-sans/wght.css";
+@import "@fontsource/noto-sans-arabic/arabic-400.css";
+@import "@fontsource/noto-sans-arabic/arabic-600.css";
+@import "@fontsource/noto-sans-devanagari/devanagari-400.css";
+@import "@fontsource/noto-sans-devanagari/devanagari-600.css";
+/* Nastaliq is large (about 160 KB), so Urdu uses one weight and headings rely on size. */
+@import "@fontsource/noto-nastaliq-urdu/arabic-400.css";
+
+/* Ink-band colours; the --ink-* values come from the brand's dark-theme roles (lib/theme.ts). */
+@theme inline {
+  --color-on-ink-secondary: var(--ink-text-secondary);
+  --color-on-ink-border: var(--ink-border);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+  body {
+    background-color: var(--hv-bg);
+    color: var(--hv-text);
+    font-family: var(--hv-font-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  html:lang(ar) body {
+    line-height: 1.8;
+  }
+  html:lang(hi) body {
+    line-height: 1.75;
+  }
+  /* Nastaliq needs room above and below each line, and must never be faux-bolded. */
+  html:lang(ur) {
+    font-synthesis-weight: none;
+  }
+  html:lang(ur) body {
+    font-size: 1.0625rem;
+    line-height: 2.2;
+  }
+  :where(a, button, [tabindex]):focus-visible {
+    outline: 2px solid var(--hv-focus);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .on-ink :where(a, button, [tabindex]):focus-visible,
+  .on-ink:where([tabindex]):focus-visible {
+    outline-color: var(--ink-focus);
+  }
+  [id] {
+    scroll-margin-top: 1.5rem;
+  }
+}
+
+@layer components {
+  .page-container {
+    margin-inline: auto;
+    width: 100%;
+    max-width: 76rem;
+    padding-inline: 1rem;
+  }
+  @media (min-width: 40rem) {
+    .page-container {
+      padding-inline: 1.5rem;
+    }
+  }
+  @media (min-width: 64rem) {
+    .page-container {
+      padding-inline: 2rem;
+    }
+  }
+
+  .on-ink {
+    background-color: var(--ink-bg);
+    color: var(--ink-text);
+  }
+
+  .skip-link {
+    position: absolute;
+    inset-inline-start: 1rem;
+    top: 0.75rem;
+    z-index: 60;
+    padding: 0.625rem 1rem;
+    border-radius: var(--hv-radius-md);
+    background-color: var(--ink-primary);
+    color: var(--ink-on-primary);
+    font-weight: 600;
+    transform: translateY(-300%);
+  }
+  .skip-link:focus {
+    transform: none;
+  }
+  /* It appears over the ink header, where the default ink ring would vanish. */
+  .skip-link:focus-visible {
+    outline-color: var(--ink-focus);
+  }
+
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.5rem;
+    color: var(--hv-text-secondary);
+  }
+  .eyebrow::before {
+    content: "";
+    flex: none;
+    width: 1.5rem;
+    height: 2px;
+    border-radius: 1px;
+    background-color: var(--hv-accent);
+  }
+  .on-ink .eyebrow {
+    color: var(--ink-text-secondary);
+  }
+
+  .display,
+  .heading-2 {
+    font-weight: 600;
+    text-wrap: balance;
+  }
+  .display {
+    font-size: clamp(2rem, 1.35rem + 2.9vw, 3.5rem);
+    line-height: 1.1;
+  }
+  .heading-2 {
+    font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.5rem);
+    line-height: 1.15;
+  }
+  .heading-3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.75rem;
+  }
+  /* Tracking only suits Latin; it would break joined Arabic and Devanagari letters. */
+  :is(.display, .heading-2):lang(en) {
+    letter-spacing: -0.02em;
+  }
+  :is(.display, .heading-2):lang(ar) {
+    line-height: 1.4;
+  }
+  :is(.display, .heading-2):lang(hi) {
+    line-height: 1.35;
+  }
+  :is(.display, .heading-2, .heading-3):lang(ur) {
+    font-weight: 400;
+    line-height: 1.9;
+  }
+
+  .lead {
+    font-size: 1.125rem;
+    line-height: 1.7;
+    color: var(--hv-text-secondary);
+  }
+  .on-ink .lead {
+    color: var(--ink-text-secondary);
+  }
+  .lead:lang(ur) {
+    line-height: 2.2;
+  }
+
+  .site-link {
+    color: var(--hv-link);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+  .site-link:hover {
+    text-decoration-thickness: 2px;
+  }
+  .on-ink .site-link {
+    color: var(--ink-text);
+    text-decoration-color: var(--hv-accent);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.25rem;
+    border: 1px solid transparent;
+    border-radius: var(--hv-radius-md);
+    font-weight: 600;
+    line-height: 1.5rem;
+    text-align: center;
+    text-decoration: none;
+    transition:
+      background-color var(--hv-motion-fast) var(--hv-easing),
+      border-color var(--hv-motion-fast) var(--hv-easing);
+  }
+  .btn:lang(ur) {
+    line-height: 2rem;
+  }
+  .btn-primary {
+    background-color: var(--hv-primary);
+    color: var(--hv-on-primary);
+  }
+  .btn-primary:hover {
+    background-color: var(--hv-primary-hover);
+  }
+  .on-ink .btn-primary {
+    background-color: var(--ink-primary);
+    color: var(--ink-on-primary);
+  }
+  .on-ink .btn-primary:hover {
+    background-color: var(--ink-primary-hover);
+  }
+  .btn-secondary {
+    border-color: var(--hv-border-input);
+    color: var(--hv-text);
+  }
+  .btn-secondary:hover {
+    background-color: var(--hv-surface-sunken);
+  }
+  .on-ink .btn-secondary {
+    border-color: var(--ink-border);
+    color: var(--ink-text);
+  }
+  .on-ink .btn-secondary:hover {
+    background-color: var(--ink-raised);
+  }
+
+  /* "Coming" label: text carries the meaning, the coral dot is decoration. */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0.625rem;
+    border: 1px solid var(--hv-border);
+    border-radius: var(--hv-radius-full);
+    background-color: var(--hv-accent-subtle);
+    color: var(--hv-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: normal;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .badge::before {
+    content: "";
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background-color: var(--hv-accent);
+  }
+  .badge:lang(ur) {
+    line-height: 1.75rem;
+  }
+
+  .code-block {
+    min-width: 0;
+    overflow: hidden;
+    border-radius: var(--hv-radius-lg);
+  }
+  .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    padding-block: 0.375rem;
+    padding-inline: 1rem 0.375rem;
+    background-color: var(--ink-raised);
+    color: var(--ink-text-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+  }
+  .code-pre {
+    margin: 0;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: var(--hv-font-mono);
+    font-size: 0.875rem;
+    line-height: 1.7;
+    tab-size: 2;
+    white-space: pre;
+  }
+  /* Inset, because the rounded code block clips anything drawn outside it. */
+  .code-pre:focus-visible {
+    outline-offset: -4px;
+    border-radius: var(--hv-radius-md);
+  }
+  .copy-btn {
+    min-height: 2rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--ink-border);
+    border-radius: var(--hv-radius-sm);
+    color: var(--ink-text);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .copy-btn:hover {
+    background-color: var(--ink-bg);
+  }
+}
+
+/*
+ * Unlayered, so it outranks the text-size utilities: their line heights suit Latin, while
+ * Nastaliq's tall letters need about twice the font size.
+ */
+:lang(ur) :is(.text-sm, .text-base, .text-lg) {
+  line-height: 2;
+}
