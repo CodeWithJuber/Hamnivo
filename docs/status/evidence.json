@@ -1336,14 +1336,17 @@
     "note": "The commerce module owns the purchase, payment, order and refund lifecycles through explicit state machines, and the AI has no commerce tools. Prices come only from live provider quotes, only the signed-in customer approves their quote, only staff with the right permission request or approve refunds, and the AI may state an outcome only with a receipt (tested)."
   },
   "K06": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "packages/domain/src/commerce/live-data.ts",
       "packages/domain/test/commerce/policy.test.ts",
       "apps/gateway/src/commerce/no-store.interceptor.ts",
-      "apps/gateway/test/commerce.int.test.ts"
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/gateway/src/commerce/answer-cache.ts",
+      "apps/gateway/src/cache/answers.ts",
+      "apps/gateway/test/cache.int.test.ts"
     ],
-    "note": "Every commerce response is sent with Cache-Control: no-store, prices and stock are read live for each quote (a catalog snapshot is never used to charge), and answerCacheDecision() marks any answer built from commerce data as not cacheable (tested). Pending: the answer cache must call it; there is no answer cache in this branch yet."
+    "note": "Every commerce response is sent with Cache-Control: no-store, prices and stock are read live for each quote (a catalog snapshot is never used to charge), and answerCacheDecision() decides for the answer cache: commerce registers it as a cache exclusion rule in both processes, so a reply in a conversation that holds catalog, cart, quote, payment, order or refund data is neither read from nor written to the cache, and a reply whose receipt check read a payment or refund status is not stored. Tested end to end with a paid order next to a plain knowledge answer that is still cached, and mutation-checked."
   },
   "HNV-20-01": {
     "status": "implemented",
