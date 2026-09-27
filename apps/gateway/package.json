@@ -5,6 +5,9 @@
   "description": "Hamnivo Gateway: public REST API, staff authentication, administration and background worker (NestJS + Fastify)",
   "license": "MIT",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json && node --env-file-if-exists=../../.env.local --watch-path=dist dist/main.api.js",

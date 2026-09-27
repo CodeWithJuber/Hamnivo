@@ -66,6 +66,9 @@ const EnvSchema = z.object({
   /** ClamAV daemon for uploads (tcp://host:3310). Without it only the EICAR test file is caught. */
   CLAMAV_URL: z.url().optional(),
 
+  /** The worker rewrites this file after every outbox pass (for container health checks). */
+  WORKER_HEARTBEAT_FILE: z.string().min(1).optional(),
+
   /** Bearer token for GET /metrics; the endpoint is disabled without it. */
   METRICS_TOKEN: z.string().min(16).optional(),
   API_DOCS: bool.default(true),

@@ -25,6 +25,7 @@ import {
   CreateWidgetSessionRequest,
   IdentifyRequest,
   RefreshWidgetSessionRequest,
+  WidgetFramePolicy,
   WidgetSession,
 } from './widget.js';
 
@@ -69,6 +70,21 @@ export const widgetRoutes = {
     auth: 'public',
     body: CreateWidgetSessionRequest,
     success: { status: 201, description: 'Session created', schema: WidgetSession },
+  },
+  framePolicy: {
+    method: 'get',
+    path: '/v1/widget/frame-policy',
+    operationId: 'getWidgetFramePolicy',
+    summary: 'Websites allowed to embed this widget (used by the proxy for CSP frame-ancestors)',
+    tags: ['Widget'],
+    auth: 'public',
+    query: z.object({ widgetId: z.string().meta({ description: 'Widget ID (wid_…)' }) }),
+    success: {
+      status: 200,
+      description:
+        'The allowed frame ancestors, also sent space-separated in the X-Hamnivo-Frame-Ancestors header',
+      schema: WidgetFramePolicy,
+    },
   },
   refreshSession: {
     method: 'post',

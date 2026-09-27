@@ -59,6 +59,50 @@
         }
       }
     },
+    "/v1/widget/frame-policy": {
+      "get": {
+        "operationId": "getWidgetFramePolicy",
+        "summary": "Websites allowed to embed this widget (used by the proxy for CSP frame-ancestors)",
+        "tags": [
+          "Widget"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "widgetId",
+            "schema": {
+              "type": "string",
+              "description": "Widget ID (wid_…)"
+            },
+            "required": true,
+            "description": "Widget ID (wid_…)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The allowed frame ancestors, also sent space-separated in the X-Hamnivo-Frame-Ancestors header",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetFramePolicy"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/widget/sessions/refresh": {
       "post": {
         "operationId": "refreshWidgetSession",
@@ -6019,6 +6063,26 @@
         ],
         "additionalProperties": false,
         "description": "RFC 9457 problem details"
+      },
+      "WidgetFramePolicy": {
+        "type": "object",
+        "properties": {
+          "widgetId": {
+            "type": "string"
+          },
+          "frameAncestors": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "widgetId",
+          "frameAncestors"
+        ],
+        "additionalProperties": false
       },
       "MessagePage": {
         "type": "object",

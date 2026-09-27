@@ -41,6 +41,15 @@ export class WidgetController {
     });
   }
 
+  @Get('frame-policy')
+  async framePolicy(@Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    const input = parseInput(widgetRoutes.framePolicy.query, query);
+    const policy = await this.sessions.framePolicy(input.widgetId);
+    reply.header('x-hamnivo-frame-ancestors', policy.frameAncestors.join(' '));
+    reply.header('cache-control', 'no-store');
+    return policy;
+  }
+
   @Post('sessions/refresh')
   @HttpCode(200)
   refresh(@Body() body: unknown) {

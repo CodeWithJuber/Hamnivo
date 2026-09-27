@@ -1,0 +1,80 @@
+# Hamnivo edge: HTTPS for every public name, the static apps and the reverse proxies.
+# Names and the certificate setting come from deploy/production/.env (see env.example):
+#   HAMNIVO_TLS  an email address: certificates from Let's Encrypt (renewed automatically)
+#                "internal": certificates from Caddy's own CA (tests, private networks)
+# To change something, copy this file, edit it and mount it over /etc/caddy/Caddyfile.
+
+(tls) {
+	tls {$HAMNIVO_TLS}
+}
+
+(headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
+
+# Gateway API: REST, staff sign-in, webhooks and live streams (Server-Sent Events are flushed
+# as they arrive; responses are not compressed so streams are never buffered).
+{$HAMNIVO_API_HOST} {
+	import tls
+	import headers
+	reverse_proxy api:4000
+}
+
+# Chat widget and its loader. The widget page may only be framed by the brand's allowed websites:
+# the gateway names them and they become the page's CSP frame-ancestors. Unknown widgets get 404.
+{$HAMNIVO_CHAT_HOST} {
+	import tls
+	import headers
+	encode zstd gzip
+	root * /srv/chat
+
+	@page path / /index.html
+	route @page {
+		request_header -X-Hamnivo-Frame-Ancestors
+		forward_auth api:4000 {
+			uri /v1/widget/frame-policy?{query}
+			copy_headers X-Hamnivo-Frame-Ancestors
+		}
+		header {
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors {http.request.header.X-Hamnivo-Frame-Ancestors}"
+			Cache-Control no-store
+		}
+	}
+
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	# Customer websites load this script; a short cache lets updates reach them quickly.
+	header /loader.js Cache-Control "public, max-age=300"
+	file_server
+}
+
+# Chatwoot, the conversation authority (its dashboard, APIs and live updates over WebSocket).
+{$HAMNIVO_SUPPORT_HOST} {
+	import tls
+	import headers
+	encode zstd gzip
+	reverse_proxy chatwoot-web:3000
+}
+
+# Public website (static, English, Arabic, Hindi and Urdu).
+{$HAMNIVO_SITE_HOSTS} {
+	import tls
+	import headers
+	encode zstd gzip
+	root * /srv/site
+	@assets path /_astro/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	file_server
+}
+
+# Container health check (port 2020 is not published).
+http://:2020 {
+	respond /health 200
+}
+
+import /etc/caddy/sites/*.caddy

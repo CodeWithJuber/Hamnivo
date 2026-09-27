@@ -1,0 +1,321 @@
+# Hamnivo on one server: every service, with automatic HTTPS.
+#
+# Use deploy/production/hamnivo.sh (setup, up, status, backup, restore, update). It runs this file
+# with the settings in deploy/production/.env, which `hamnivo.sh setup` creates.
+#
+# Public names (DNS records pointing at this server), all served by the edge container:
+#   HAMNIVO_APP_HOST (Studio, when it ships)   HAMNIVO_API_HOST (API)   HAMNIVO_CHAT_HOST (widget)
+#   HAMNIVO_SUPPORT_HOST (Chatwoot)            HAMNIVO_SITE_HOSTS (website)
+# Only the edge publishes ports (80 and 443). Databases, Valkey, the API and Chatwoot are reachable
+# only inside this compose network.
+name: hamnivo-production
+
+x-gateway: &gateway
+  image: hamnivo/gateway:${HAMNIVO_IMAGE_TAG:-local}
+  build:
+    context: ../..
+    dockerfile: deploy/docker/Dockerfile
+    target: gateway
+  restart: unless-stopped
+  init: true
+  environment: &gateway-env
+    NODE_ENV: production
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    DATABASE_URL: postgres://hamnivo_app:${HAMNIVO_DB_APP_PASSWORD:?run hamnivo.sh setup}@hamnivo-db:5432/hamnivo
+    DATABASE_PLATFORM_URL: postgres://hamnivo_platform:${HAMNIVO_DB_PLATFORM_PASSWORD:?run hamnivo.sh setup}@hamnivo-db:5432/hamnivo
+    DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+    REDIS_URL: redis://:${HAMNIVO_VALKEY_PASSWORD:?run hamnivo.sh setup}@valkey:6379
+    HAMNIVO_KEK_BASE64: ${HAMNIVO_KEK_BASE64:?run hamnivo.sh setup}
+    HAMNIVO_KEK_VERSION: ${HAMNIVO_KEK_VERSION:-1}
+    HAMNIVO_KEK_RETIRED: ${HAMNIVO_KEK_RETIRED:-}
+    BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?run hamnivo.sh setup}
+    PUBLIC_API_ORIGIN: ${HAMNIVO_API_ORIGIN:?run hamnivo.sh setup}
+    PUBLIC_CONSOLE_ORIGIN: ${HAMNIVO_APP_ORIGIN:?run hamnivo.sh setup}
+    PUBLIC_WIDGET_ORIGIN: ${HAMNIVO_CHAT_ORIGIN:?run hamnivo.sh setup}
+    REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
+    STEP_UP_MAX_AGE_MINUTES: ${STEP_UP_MAX_AGE_MINUTES:-10}
+    SMTP_URL: ${SMTP_URL:-}
+    MAIL_FROM: ${MAIL_FROM:-}
+    WIDGET_SIGNING_KEY: ${WIDGET_SIGNING_KEY:?run hamnivo.sh setup}
+    CHATWOOT_URL: http://chatwoot-web:3000
+    CHATWOOT_PLATFORM_TOKEN: ${CHATWOOT_PLATFORM_TOKEN:-}
+    CHATWOOT_WEBHOOK_BASE_URL: ${CHATWOOT_WEBHOOK_BASE_URL:?run hamnivo.sh setup}
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:-}
+    OPENAI_COMPATIBLE_BASE_URL: ${OPENAI_COMPATIBLE_BASE_URL:-}
+    OPENAI_COMPATIBLE_API_KEY: ${OPENAI_COMPATIBLE_API_KEY:-}
+    EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-mock}
+    EMBEDDING_MODEL: ${EMBEDDING_MODEL:-hamnivo-embed}
+    CLAMAV_URL: ${CLAMAV_URL:-}
+    METRICS_TOKEN: ${METRICS_TOKEN:-}
+    API_DOCS: ${API_DOCS:-true}
+    RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-600}
+  depends_on: &gateway-deps
+    migrate:
+      condition: service_completed_successfully
+    valkey:
+      condition: service_healthy
+
+x-chatwoot: &chatwoot
+  image: chatwoot/chatwoot:v4.18.0-ce
+  restart: unless-stopped
+  environment: &chatwoot-env
+    RAILS_ENV: production
+    NODE_ENV: production
+    INSTALLATION_ENV: docker
+    SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE:?run hamnivo.sh setup}
+    FRONTEND_URL: ${HAMNIVO_SUPPORT_ORIGIN:?run hamnivo.sh setup}
+    DEFAULT_LOCALE: en
+    ENABLE_ACCOUNT_SIGNUP: 'false'
+    # TLS ends at the edge; Chatwoot is not reachable any other way.
+    FORCE_SSL: 'false'
+    POSTGRES_HOST: chatwoot-db
+    POSTGRES_PORT: '5432'
+    POSTGRES_DATABASE: chatwoot
+    POSTGRES_USERNAME: postgres
+    POSTGRES_PASSWORD: ${CHATWOOT_DB_PASSWORD:?run hamnivo.sh setup}
+    REDIS_URL: redis://chatwoot-redis:6379
+    REDIS_PASSWORD: ${CHATWOOT_REDIS_PASSWORD:?run hamnivo.sh setup}
+    RAILS_LOG_TO_STDOUT: 'true'
+    LOG_LEVEL: ${CHATWOOT_LOG_LEVEL:-info}
+    ACTIVE_STORAGE_SERVICE: local
+    # Webhooks reach the gateway through its public HTTPS name, so Chatwoot keeps refusing private
+    # addresses (its SSRF protection).
+    SAFE_FETCH_ALLOW_PRIVATE_NETWORK: ${CHATWOOT_ALLOW_PRIVATE_WEBHOOKS:-false}
+  # Optional Chatwoot settings such as its email (MAILER_SENDER_EMAIL, SMTP_ADDRESS, SMTP_PORT,
+  # SMTP_USERNAME, SMTP_PASSWORD); see chatwoot.env.example.
+  env_file:
+    - path: chatwoot.env
+      required: false
+  volumes:
+    - chatwoot-storage:/app/storage
+
+services:
+  # ---- Hamnivo's database and queues --------------------------------------------------------------
+  hamnivo-db:
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${HAMNIVO_DB_SUPERUSER_PASSWORD:?run hamnivo.sh setup}
+    volumes:
+      # PostgreSQL 18 images keep data under /var/lib/postgresql/18/docker.
+      - hamnivo-db:/var/lib/postgresql
+    shm_size: 256m
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # Roles, database and extensions (deploy/postgres/init.sh). Idempotent; runs on every start, so a
+  # changed role password in .env is applied.
+  db-init:
+    image: pgvector/pgvector:pg18
+    restart: 'no'
+    entrypoint: ['bash', '/hamnivo-db-init/init.sh']
+    environment:
+      PGHOST: hamnivo-db
+      PGUSER: postgres
+      PGPASSWORD: ${HAMNIVO_DB_SUPERUSER_PASSWORD:?run hamnivo.sh setup}
+      HAMNIVO_DATABASES: hamnivo
+      HAMNIVO_DB_OWNER_PASSWORD: ${HAMNIVO_DB_OWNER_PASSWORD:?run hamnivo.sh setup}
+      HAMNIVO_DB_APP_PASSWORD: ${HAMNIVO_DB_APP_PASSWORD:?run hamnivo.sh setup}
+      HAMNIVO_DB_PLATFORM_PASSWORD: ${HAMNIVO_DB_PLATFORM_PASSWORD:?run hamnivo.sh setup}
+    volumes:
+      - ../postgres:/hamnivo-db-init:ro
+    depends_on:
+      hamnivo-db:
+        condition: service_healthy
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    # BullMQ needs noeviction; append-only persistence keeps queued jobs across restarts.
+    command:
+      - sh
+      - -c
+      - exec valkey-server --appendonly yes --maxmemory-policy noeviction --requirepass "$$VALKEY_PASSWORD"
+    environment:
+      VALKEY_PASSWORD: ${HAMNIVO_VALKEY_PASSWORD:?run hamnivo.sh setup}
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'valkey-cli --no-auth-warning -a "$$VALKEY_PASSWORD" ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---- Hamnivo gateway ---------------------------------------------------------------------------
+  migrate:
+    <<: *gateway
+    restart: 'no'
+    command: ['node', 'dist/main.migrate.js']
+    environment:
+      DATABASE_OWNER_URL: postgres://hamnivo_owner:${HAMNIVO_DB_OWNER_PASSWORD:?run hamnivo.sh setup}@hamnivo-db:5432/hamnivo
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  api:
+    <<: *gateway
+    command: ['node', 'dist/main.api.js']
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/health/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
+
+  worker:
+    <<: *gateway
+    command: ['node', 'dist/main.worker.js']
+    environment:
+      <<: *gateway-env
+      WORKER_HEARTBEAT_FILE: /tmp/hamnivo-worker.alive
+    healthcheck:
+      # Healthy while the outbox relay keeps completing passes (at least one every few seconds).
+      test:
+        - CMD
+        - node
+        - -e
+        - "const fs = require('node:fs'); try { process.exit(Date.now() - fs.statSync('/tmp/hamnivo-worker.alive').mtimeMs < 120000 ? 0 : 1) } catch { process.exit(1) }"
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+  # ---- Edge: HTTPS and the static apps -----------------------------------------------------------
+  edge:
+    image: hamnivo/edge:${HAMNIVO_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: edge
+      args:
+        HAMNIVO_API_ORIGIN: ${HAMNIVO_API_ORIGIN:?run hamnivo.sh setup}
+        HAMNIVO_CHAT_ORIGIN: ${HAMNIVO_CHAT_ORIGIN:?run hamnivo.sh setup}
+        HAMNIVO_SITE_URL: ${HAMNIVO_SITE_ORIGIN:?run hamnivo.sh setup}
+        HAMNIVO_DEMO_WIDGET_ID: ${HAMNIVO_DEMO_WIDGET_ID:-}
+    restart: unless-stopped
+    environment:
+      HAMNIVO_TLS: ${HAMNIVO_TLS:?run hamnivo.sh setup}
+      HAMNIVO_API_HOST: ${HAMNIVO_API_HOST:?run hamnivo.sh setup}
+      HAMNIVO_CHAT_HOST: ${HAMNIVO_CHAT_HOST:?run hamnivo.sh setup}
+      HAMNIVO_SUPPORT_HOST: ${HAMNIVO_SUPPORT_HOST:?run hamnivo.sh setup}
+      HAMNIVO_SITE_HOSTS: ${HAMNIVO_SITE_HOSTS:?run hamnivo.sh setup}
+      HAMNIVO_API_ORIGIN: ${HAMNIVO_API_ORIGIN:?run hamnivo.sh setup}
+    ports:
+      - '${HAMNIVO_HTTP_PORT:-80}:80'
+      - '${HAMNIVO_HTTPS_PORT:-443}:443'
+      - '${HAMNIVO_HTTPS_PORT:-443}:443/udp'
+    volumes:
+      # Certificates and the ACME account: keep this volume (backups include it).
+      - caddy-data:/data
+      - caddy-config:/config
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:2020/health']
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 6
+    depends_on:
+      api:
+        condition: service_started
+
+  # ---- Chatwoot CE v4.18.0 (conversation authority) ---------------------------------------------
+  chatwoot-db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chatwoot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${CHATWOOT_DB_PASSWORD:?run hamnivo.sh setup}
+    volumes:
+      - chatwoot-db:/var/lib/postgresql/data
+    shm_size: 256m
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d chatwoot']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  chatwoot-redis:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - exec valkey-server --appendonly yes --requirepass "$$VALKEY_PASSWORD"
+    environment:
+      VALKEY_PASSWORD: ${CHATWOOT_REDIS_PASSWORD:?run hamnivo.sh setup}
+    volumes:
+      - chatwoot-redis:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'valkey-cli --no-auth-warning -a "$$VALKEY_PASSWORD" ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Creates or migrates Chatwoot's schema before web and sidekiq start (idempotent).
+  chatwoot-prepare:
+    <<: *chatwoot
+    restart: 'no'
+    command: ['bundle', 'exec', 'rails', 'db:chatwoot_prepare']
+    depends_on:
+      chatwoot-db:
+        condition: service_healthy
+      chatwoot-redis:
+        condition: service_healthy
+
+  chatwoot-web:
+    <<: *chatwoot
+    entrypoint: docker/entrypoints/rails.sh
+    command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO /dev/null http://127.0.0.1:3000/api']
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 12
+    depends_on:
+      chatwoot-prepare:
+        condition: service_completed_successfully
+
+  chatwoot-sidekiq:
+    <<: *chatwoot
+    command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
+    depends_on:
+      chatwoot-prepare:
+        condition: service_completed_successfully
+
+  # ---- Upload scanning (profile "scan", on by default through COMPOSE_PROFILES in .env) ----------
+  # Needs about 2 GB of memory. Without it, set CLAMAV_URL= (empty) and remove "scan" from
+  # COMPOSE_PROFILES; uploads are then checked only for the EICAR test file. While ClamAV loads its
+  # signatures (a few minutes after a start), uploads wait and are scanned when it is ready.
+  clamav:
+    image: clamav/clamav:1.5
+    profiles: ['scan']
+    restart: unless-stopped
+    volumes:
+      - clamav-db:/var/lib/clamav
+    healthcheck:
+      test: ['CMD', 'clamdcheck.sh']
+      interval: 30s
+      timeout: 10s
+      start_period: 300s
+      retries: 5
+
+volumes:
+  hamnivo-db:
+  valkey-data:
+  caddy-data:
+  caddy-config:
+  chatwoot-db:
+  chatwoot-redis:
+  chatwoot-storage:
+  clamav-db:

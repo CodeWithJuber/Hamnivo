@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Hamnivo's complete check pipeline, for your own machine or server (there is no hosted CI).
 #
-#   pnpm ci:local                    everything below
+#   pnpm ci:local                    every check below except the opt-in production smoke test
 #   pnpm ci:local --quick            install, lint, typecheck, unit tests, status/licence checks
 #   pnpm ci:local --skip-a11y        skip the Storybook accessibility audit
 #   pnpm ci:local --skip-chatwoot    skip the contract suite against a real Chatwoot
 #   pnpm ci:local --skip-e2e         skip the browser checks (widget journey and website)
+#   pnpm ci:local --with-production  also build the production images and check the real
+#                                    deployment with a backup and restore drill (10–20 minutes)
 #   PG_VERSIONS=18 pnpm ci:local     run integration tests on one PostgreSQL major only
 #
 # Integration tests run against throwaway PostgreSQL (+pgvector), Valkey and Chatwoot containers
@@ -21,13 +23,15 @@ quick=0
 a11y=1
 chatwoot=1
 e2e=1
+production=0
 for arg in "$@"; do
   case "$arg" in
     --quick) quick=1 ;;
     --skip-a11y) a11y=0 ;;
     --skip-chatwoot) chatwoot=0 ;;
     --skip-e2e) e2e=0 ;;
-    -h | --help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --with-production) production=1 ;;
+    -h | --help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -202,6 +206,11 @@ if ((quick == 0)); then
     # The journey's build step also built the static website.
     step "Website in a browser (Playwright + axe, 4 languages)" pnpm --filter @hamnivo/site test:e2e
   fi
+fi
+
+if ((quick == 0 && production == 1)); then
+  step "Production deployment smoke test (images, HTTPS, Chatwoot, backup and restore)" \
+    bash "$root/scripts/ci/production-smoke.sh"
 fi
 
 summary

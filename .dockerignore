@@ -1,0 +1,30 @@
+# Keeps the Docker build context small and free of secrets. Images are built from source only.
+.git
+.githooks
+.claude
+.turbo
+**/.turbo
+**/node_modules
+**/dist
+**/build
+**/.astro
+**/storybook-static
+**/coverage
+**/test-results
+**/playwright-report
+**/blob-report
+**/*.tsbuildinfo
+**/*.log
+
+# Secrets and local data never enter an image.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+deploy/production/.env
+deploy/production/backups
+.data
+
+# Not needed to build: design boards, documentation and the design originals.
+docs

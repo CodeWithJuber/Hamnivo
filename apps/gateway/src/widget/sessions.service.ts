@@ -1,4 +1,8 @@
-import { IdentityAssertionClaims, type WidgetSession } from '@hamnivo/contracts';
+import {
+  IdentityAssertionClaims,
+  type WidgetFramePolicy,
+  type WidgetSession,
+} from '@hamnivo/contracts';
 import {
   type Db,
   fromPublicId,
@@ -29,6 +33,13 @@ import { principalConversations } from './views.js';
 
 const REFRESH_GRACE_MS = 30_000;
 const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+/** CSP form of LOCAL_ORIGIN (CSP host sources cannot name IPv6 addresses). */
+const LOCAL_ANCESTORS = [
+  'http://localhost:*',
+  'https://localhost:*',
+  'http://127.0.0.1:*',
+  'https://127.0.0.1:*',
+];
 
 type SessionRow = typeof schema.widgetSessions.$inferSelect;
 type PrincipalRow = typeof schema.customerPrincipals.$inferSelect;
@@ -59,6 +70,21 @@ export class WidgetSessionsService {
     throw new AppError('ORIGIN_NOT_ALLOWED', {
       detail: 'Add this website to the brand’s allowed websites to use the chat here.',
     });
+  }
+
+  /**
+   * Websites that may show this widget in a frame, matching the session origin check. The TLS
+   * proxy sends it as CSP frame-ancestors on the widget page.
+   */
+  async framePolicy(widgetId: string): Promise<WidgetFramePolicy> {
+    const widget = await resolveWidget(this.db, widgetId);
+    if (widget?.brandStatus !== 'active' || widget.tenantStatus !== 'active') {
+      throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
+    }
+    return {
+      widgetId,
+      frameAncestors: widget.allowedOrigins.length > 0 ? widget.allowedOrigins : LOCAL_ANCESTORS,
+    };
   }
 
   async create(input: {

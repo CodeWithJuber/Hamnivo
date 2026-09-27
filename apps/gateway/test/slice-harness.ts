@@ -9,6 +9,7 @@ import type { LanguageModel } from 'ai';
 import { type EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
 import { InboxProcessor } from '../src/authority/processor.service.js';
 import { loadConfig } from '../src/config.js';
+import type { Scanner } from '../src/knowledge/scanner.js';
 import { OutboxRelay } from '../src/outbox/relay.service.js';
 import { WorkerModule } from '../src/worker.module.js';
 import { Client, type Gateway, signUp, startGateway, testEnv } from './harness.js';
@@ -40,7 +41,7 @@ export interface Slice {
 
 /** Gateway on a real port, a worker driven by hand, and a fake Chatwoot that calls back over HTTP. */
 export async function startSlice(
-  options: { clock?: () => Date; model?: LanguageModel } = {},
+  options: { clock?: () => Date; model?: LanguageModel; scanner?: Scanner } = {},
 ): Promise<Slice> {
   const fake = await startFakeChatwoot();
   const port = await freePort();
@@ -65,6 +66,7 @@ export async function startSlice(
     WorkerModule.forRoot(config, {
       ...(options.clock ? { clock: options.clock } : {}),
       ...(options.model ? { model: options.model } : {}),
+      ...(options.scanner ? { scanner: options.scanner } : {}),
     }),
     { logger: false },
   );

@@ -95,6 +95,27 @@ describe('widget sessions', () => {
     await expect(unknown.open()).rejects.toThrow(/404/);
   });
 
+  it('tells the proxy which websites may frame the widget', async () => {
+    const policy = await visitor.call(
+      'GET',
+      `/v1/widget/frame-policy?widgetId=${alpha.brand.widgetId}`,
+    );
+    expect(policy.status).toBe(200);
+    expect(policy.body).toEqual({
+      widgetId: alpha.brand.widgetId,
+      frameAncestors: [alpha.hostOrigin],
+    });
+    expect(policy.headers.get('x-hamnivo-frame-ancestors')).toBe(alpha.hostOrigin);
+    expect(policy.headers.get('cache-control')).toBe('no-store');
+    const unknown = await visitor.call(
+      'GET',
+      '/v1/widget/frame-policy?widgetId=wid_01j9zk7w3xq8r4t2v6m5n1p0cd',
+    );
+    expect(unknown.status).toBe(404);
+    expect(unknown.headers.get('x-hamnivo-frame-ancestors')).toBeNull();
+    expect((await visitor.call('GET', '/v1/widget/frame-policy')).status).toBe(422);
+  });
+
   it('opens an anonymous session with the brand configuration and an AI disclosure', async () => {
     const session = await visitor.open();
     expect(session.principal).toMatchObject({ verified: false, displayName: null });

@@ -6,6 +6,11 @@ The Hamnivo Gateway: one codebase, two processes, both built on NestJS 12 and Fa
 |---|---|---|
 | API | `src/main.api.ts` | REST API, staff sign-in at `/api/auth/*` (Better Auth), administration, OpenAPI at `/v1/openapi.json` and `/docs`, health, metrics |
 | Worker | `src/main.worker.ts` | Outbox relay (at-least-once), BullMQ maintenance: audit partitions and expiry purge |
+| Migrations | `src/main.migrate.ts` | Applies pending database migrations as the schema owner (`DATABASE_OWNER_URL`), then exits |
+
+In production, all three run from one image (`deploy/docker/Dockerfile`, target `gateway`); see
+`docs/self-hosting.md`, Part A. The worker rewrites `WORKER_HEARTBEAT_FILE` after every outbox
+pass, and the container health check reads it.
 
 ## Request pipeline
 
@@ -109,6 +114,14 @@ missing kill-switch check and a disabled honesty guard.
 `test/knowledge.int.test.ts` covers ingestion of Markdown, HTML and PDF, refusals, version
 replacement, visibility and freshness rules, Urdu and Hindi search, cited answers and tenant
 isolation. `test/knowledge.test.ts` covers the parsers, the ClamAV client, chunking and citations.
+
+## Widget framing
+
+`GET /v1/widget/frame-policy?widgetId=wid_…` names the websites that may frame a brand's widget
+(its allowed websites, or local pages while none are set), in the body and in the
+`X-Hamnivo-Frame-Ancestors` header. It returns 404 for unknown or disabled widgets. The production
+web server asks it for every widget page and sends the answer as CSP `frame-ancestors`
+(`deploy/production/Caddyfile`), so other websites cannot embed a brand's chat.
 
 ## Security rules enforced here
 

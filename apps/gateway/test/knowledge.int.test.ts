@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
 import { createMockModel } from '@hamnivo/adapters/models';
 import { fromPublicId, schema, withTenant } from '@hamnivo/db';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuthorityRegistry } from '../src/authority/registry.js';
+import { EicarScanner, type Scanner, type ScanVerdict } from '../src/knowledge/scanner.js';
 import { tinyPdf } from './fixtures.js';
 import { connectedTenant, type Slice, startSlice, Visitor } from './slice-harness.js';
 
@@ -25,6 +26,20 @@ function answeringModel() {
 
 const EICAR = 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
 
+/** The development scanner, switched off on demand as when ClamAV restarts. */
+class SwitchableScanner implements Scanner {
+  down = false;
+  private readonly engine = new EicarScanner();
+
+  scan(bytes: Uint8Array): Promise<ScanVerdict> {
+    if (this.down) {
+      return Promise.resolve({ clean: false, engine: 'clamav', reason: 'scan_unavailable' });
+    }
+    return this.engine.scan(bytes);
+  }
+}
+const scanner = new SwitchableScanner();
+
 const answering = answeringModel();
 let slice: Slice;
 let shop: Awaited<ReturnType<typeof connectedTenant>>;
@@ -40,6 +55,22 @@ async function addDocument(sourceId: string, body: Record<string, unknown>) {
   return document.body as Record<string, any>;
 }
 
+/** Makes waiting ingestion retries due now, as if their backoff had passed, and runs them. */
+async function retryIngestion(attempts?: number) {
+  await withTenant(slice.app, { tenantId }, (tx) =>
+    tx
+      .update(schema.outboxEvents)
+      .set({ availableAt: new Date(), ...(attempts ? { attempts } : {}) })
+      .where(
+        and(
+          eq(schema.outboxEvents.topic, 'knowledge.ingest'),
+          isNull(schema.outboxEvents.processedAt),
+        ),
+      ),
+  );
+  await slice.drain();
+}
+
 async function search(query: string, audience: 'customer' | 'staff' = 'customer') {
   const found = await shop.owner.post('/v1/admin/knowledge/search', {
     query,
@@ -51,7 +82,7 @@ async function search(query: string, audience: 'customer' | 'staff' = 'customer'
 }
 
 beforeAll(async () => {
-  slice = await startSlice({ model: answering.model });
+  slice = await startSlice({ model: answering.model, scanner });
   shop = await connectedTenant(slice, 'kb');
   tenantId = fromPublicId('tenant', shop.tenantId);
   const created = await shop.owner.post('/v1/admin/knowledge/sources', {
@@ -157,6 +188,35 @@ describe('ingestion', () => {
       content: { mediaType: 'text/plain', text: 'x'.repeat(5 * 1024 * 1024 + 1) },
     });
     expect([413, 422]).toContain(huge.status);
+  });
+
+  it('waits while the scanner is starting, and refuses uploads it can never scan', async () => {
+    scanner.down = true;
+    try {
+      const waiting = await addDocument(publicSource, {
+        title: 'Delivery areas',
+        content: { mediaType: 'text/plain', text: 'We deliver to Lahore, Karachi and Multan.' },
+      });
+      expect(waiting.latest).toMatchObject({ state: 'processing' });
+      scanner.down = false;
+      await retryIngestion();
+      const ready = await shop.owner.get(`/v1/admin/knowledge/documents/${waiting.id}`);
+      expect(ready.body.current).toMatchObject({ state: 'ready' });
+
+      scanner.down = true;
+      const stuck = await addDocument(publicSource, {
+        title: 'Never scanned',
+        content: { mediaType: 'text/plain', text: 'This upload never gets a scan.' },
+      });
+      expect(stuck.latest).toMatchObject({ state: 'processing' });
+      // The last attempt: the upload is refused and its bytes are dropped.
+      await retryIngestion(9);
+      const refused = await shop.owner.get(`/v1/admin/knowledge/documents/${stuck.id}`);
+      expect(refused.body.latest).toMatchObject({ state: 'rejected' });
+      expect(refused.body.latest.error).toContain('could not be scanned');
+    } finally {
+      scanner.down = false;
+    }
   });
 
   it('keeps the old version answering until the new one is ready, then replaces it', async () => {

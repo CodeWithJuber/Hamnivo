@@ -16,6 +16,8 @@ type VersionRow = typeof schema.documentVersions.$inferSelect;
 const BATCH = 64;
 /** Outbox attempts before an embedding outage fails the version. */
 const EMBED_ATTEMPTS = 5;
+/** Outbox attempts while the scanner is unreachable before an upload is refused. */
+const SCAN_ATTEMPTS = 10;
 
 /**
  * Knowledge ingestion (G17), run by the worker for `knowledge.ingest`:
@@ -72,6 +74,11 @@ export class IngestionService {
 
     const verdict = await this.scanner.scan(version.raw);
     if (!verdict.clean) {
+      // ClamAV needs a few minutes to load its signatures after a restart: keep the upload and
+      // retry with the outbox backoff (about ten minutes in all) before refusing it.
+      if (verdict.reason === 'scan_unavailable' && event.attempts < SCAN_ATTEMPTS) {
+        throw new Error('The malware scanner is not reachable yet');
+      }
       await this.end(
         tenantId,
         versionId,

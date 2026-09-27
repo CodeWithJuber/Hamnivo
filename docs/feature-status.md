@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 180 · in-progress: 50 · implemented: 2
+**Blueprint features (232):** planned: 179 · in-progress: 51 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -17,7 +17,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| W01 | One-script installation | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `packages/widget-loader/src/loader.ts`, `packages/widget-loader/test/size.test.ts` — One dependency-free script (1.7 KB gzip) adds an accessible launcher; the widget iframe is created only when opened (tested: nothing else loads before). Brand colours from the published config and CSP frame-ancestors per brand pending. |
+| W01 | One-script installation | P0 | C | in-progress | `apps/gateway/src/widget/sessions.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `deploy/production/Caddyfile`, `packages/widget-loader/src/loader.ts`, `packages/widget-loader/test/size.test.ts`, `scripts/ci/production-smoke.ts` — One dependency-free script (1.7 KB gzip) adds an accessible launcher; the widget iframe is created only when opened (tested: nothing else loads before). In production the widget page carries CSP frame-ancestors from the brand's allowed websites (GET /v1/widget/frame-policy; tested through Caddy, including a spoofed header and an unknown widget). Brand colours from the published config are pending. |
 | W02 | Layout modes | P0 | C | planned |  |
 | W03 | Brand theme | P0 | C | in-progress | `packages/brand/src/contrast.ts`, `packages/brand/test/contrast.test.ts` — Contrast validation implemented; widget studio UI pending. |
 | W04 | Clear responder identity | P0 | C | in-progress | `apps/gateway/src/authority/views.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx` — Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested). |
@@ -111,7 +111,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | G14 | Action receipts | P1 | C | planned |  |
 | G15 | Limited autopilot | P1 | C | planned |  |
 | G16 | Durable case workflows | P1 | C | planned |  |
-| G17 | Knowledge ingestion pipeline | P0 | C | in-progress | `apps/gateway/src/knowledge/extract.ts`, `apps/gateway/src/knowledge/ingestion.service.ts`, `apps/gateway/src/knowledge/scanner.ts`, `apps/gateway/src/knowledge/text.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/gateway/test/knowledge.test.ts` — Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). Parsing runs in-process (no sandbox) and URL sources are pending. |
+| G17 | Knowledge ingestion pipeline | P0 | C | in-progress | `apps/gateway/src/knowledge/extract.ts`, `apps/gateway/src/knowledge/ingestion.service.ts`, `apps/gateway/src/knowledge/scanner.ts`, `apps/gateway/src/knowledge/text.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/gateway/test/knowledge.test.ts` — Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Parsing runs in-process (no sandbox) and URL sources are pending. |
 | G18 | Knowledge editorial workflow | P1 | C | planned |  |
 | G19 | Customer memory | P1 | L | planned |  |
 | G20 | Outcome learning queue | P1 | L | planned |  |
@@ -171,10 +171,10 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
 | O01 | Metrics and alerts | P0 | C | in-progress | `apps/gateway/src/platform/metrics.ts`, `apps/gateway/src/platform/health.controller.ts`, `apps/gateway/test/identity.int.test.ts` — Prometheus metrics (request latency by route template, process metrics) behind a bearer token (tested: hidden without it, served with it) and liveness/readiness checks; alert rules and dashboards pending. |
-| O02 | Backups and recovery | P0 | C | planned |  |
-| O03 | CI/CD and versioning | P0 | F | in-progress | `scripts/ci/local.sh`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `docs/adr/0007-self-hosted-verification.md` — Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence/status checks, accessibility audit) run with pnpm ci:local; release and rollback automation pending. |
+| O02 | Backups and recovery | P0 | C | in-progress | `deploy/production/hamnivo.sh`, `scripts/ci/production-smoke.sh`, `scripts/ci/production-smoke.ts`, `docs/self-hosting.md` — hamnivo.sh backup dumps both databases (pg_dump), Chatwoot files, certificates and settings with checksums and keeps the newest N; restore checks the checksums, refuses a backup made with other secrets, replaces data and files, then runs pending migrations. The production smoke test runs a drill (tested: a brand made after the backup is gone and the conversation history is back). Point-in-time recovery, off-site copies and a deletion replay after restore are pending. |
+| O03 | CI/CD and versioning | P0 | F | in-progress | `deploy/postgres/init.sh`, `docs/adr/0007-self-hosted-verification.md`, `docs/self-hosting.md`, `scripts/ci/local.sh`, `scripts/ci/production-smoke.sh` — Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence and status checks, Chatwoot contract, accessibility, browser journeys) run with pnpm ci:local; --with-production also builds the images and checks the deployment. Versioned releases and rollback are pending. |
 | O04 | Product analytics | P1 | C | planned |  |
-| O05 | Self-hosted distribution | P1 | C | in-progress | `deploy/compose/services.yml`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `.env.example` — Self-hosted infrastructure (PostgreSQL 18 + pgvector, Valkey), generated secrets, environment reference and server guide; versioned application containers follow with the gateway. |
+| O05 | Self-hosted distribution | P1 | C | in-progress | `.env.example`, `deploy/compose/services.yml`, `deploy/docker/Dockerfile`, `deploy/postgres/init.sh`, `deploy/production/Caddyfile`, `deploy/production/compose.yml`, `deploy/production/hamnivo.sh`, `docs/self-hosting.md`, `scripts/ci/production-smoke.sh` — One-server production stack: gateway and edge images built from source, compose file with PostgreSQL 18 + pgvector, Valkey, Chatwoot 4.18.0-ce, ClamAV and Caddy (automatic HTTPS, HTTP to HTTPS, HTTP/3); only the edge publishes ports. hamnivo.sh sets up generated secrets and runs up, status, logs, backup, restore and update. The smoke test deploys it with Caddy's internal CA and checks sign-up, a real Chatwoot connection, an AI reply over the stream, the website and a backup and restore (tested). Let's Encrypt issuance needs public DNS and was not exercised here; Studio joins the stack when it ships. |
 | O06 | Marketplace and partner certification | P2 | A | planned |  |
 
 ### Collaboration

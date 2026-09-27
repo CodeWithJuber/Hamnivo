@@ -8,7 +8,8 @@ import './styles.css';
 const query = new URLSearchParams(window.location.search);
 const locale = pickLocale(query.get('locale') ?? navigator.language);
 const params = {
-  apiBase: query.get('api') ?? import.meta.env.VITE_HAMNIVO_API ?? 'http://localhost:4000',
+  // A production build pins its gateway; the loader's `api` parameter serves development builds.
+  apiBase: import.meta.env.VITE_HAMNIVO_API ?? query.get('api') ?? 'http://localhost:4000',
   widgetId: query.get('widgetId') ?? '',
   hostOrigin: query.get('host'),
   locale,

@@ -21,3 +21,7 @@ docs/design/.originals/
 
 # Agent worktrees (parallel work lanes)
 .claude/worktrees/
+
+# Production settings and backups on a server (deploy/production)
+deploy/production/chatwoot.env
+deploy/production/backups/

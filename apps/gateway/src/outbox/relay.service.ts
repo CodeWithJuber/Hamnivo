@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { type ClaimedOutboxEvent, claimOutbox, type Db, schema, withTenant } from '@hamnivo/db';
 import {
   Inject,
@@ -7,7 +8,8 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { APP_DB, CLOCK, type Clock } from '../tokens.js';
+import type { AppConfig } from '../config.js';
+import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 
 export type OutboxHandler = (event: ClaimedOutboxEvent) => Promise<void>;
 export const OUTBOX_HANDLERS = Symbol('OUTBOX_HANDLERS');
@@ -37,6 +39,7 @@ export class OutboxRelay implements OnApplicationBootstrap, OnApplicationShutdow
     @Inject(APP_DB) private readonly db: Db,
     @Inject(OUTBOX_HANDLERS) private readonly handlers: Map<string, OutboxHandler>,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(CONFIG) private readonly config: AppConfig,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -54,12 +57,23 @@ export class OutboxRelay implements OnApplicationBootstrap, OnApplicationShutdow
     if (this.stopped) return;
     this.timer = setTimeout(() => {
       this.loop = this.drainOnce()
-        .then((count) => this.schedule(count === BATCH ? 0 : 1000))
+        .then(async (count) => {
+          await this.beat();
+          this.schedule(count === BATCH ? 0 : 1000);
+        })
         .catch((error: unknown) => {
           this.logger.error(`outbox relay failed: ${String(error)}`);
           this.schedule(5000);
         });
     }, delay);
+  }
+
+  /** Marks a completed pass, so a container health check can tell a stuck worker from a busy one. */
+  private async beat(): Promise<void> {
+    if (!this.config.WORKER_HEARTBEAT_FILE) return;
+    await writeFile(this.config.WORKER_HEARTBEAT_FILE, String(this.clock().getTime())).catch(
+      (error: unknown) => this.logger.warn(`heartbeat not written: ${String(error)}`),
+    );
   }
 
   /** Processes one batch; returns how many events were leased. */
