@@ -8,7 +8,7 @@ import type {
 } from '@hamnivo/contracts';
 import { schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { Reconciliation } from '@hamnivo/migration-sdk';
-import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { iso } from '../common/views.js';
 
 export type JobRow = typeof schema.migrationJobs.$inferSelect;
@@ -133,6 +133,7 @@ export function jobView(
     report: ReportRow | null;
     exportAvailable: boolean;
     packageAvailable: boolean;
+    file: MigrationJob['file'];
   },
 ): MigrationJob {
   return {
@@ -152,6 +153,7 @@ export function jobView(
     error: job.errorCode ? { code: job.errorCode, detail: job.errorDetail } : null,
     exportAvailable: context.exportAvailable,
     packageAvailable: context.packageAvailable,
+    file: context.file,
     createdBy: job.createdBy ? toPublicId('staff', job.createdBy) : null,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
@@ -171,18 +173,36 @@ export async function jobViews(tx: TenantTx, jobs: JobRow[]): Promise<MigrationJ
     .from(schema.reconciliationReports)
     .where(inArray(schema.reconciliationReports.jobId, ids))
     .orderBy(sql`${schema.reconciliationReports.createdAt} desc`);
+  // Never the bytes themselves: only whether they are still kept.
   const files = await tx
-    .select({ jobId: schema.migrationFiles.jobId, purpose: schema.migrationFiles.purpose })
+    .select({
+      jobId: schema.migrationFiles.jobId,
+      purpose: schema.migrationFiles.purpose,
+      name: schema.migrationFiles.name,
+      byteSize: schema.migrationFiles.byteSize,
+      createdAt: schema.migrationFiles.createdAt,
+      kept: sql<boolean>`${schema.migrationFiles.raw} is not null`,
+    })
     .from(schema.migrationFiles)
-    .where(and(inArray(schema.migrationFiles.jobId, ids), isNotNull(schema.migrationFiles.raw)));
-  return jobs.map((job) =>
-    jobView(job, {
+    .where(inArray(schema.migrationFiles.jobId, ids));
+  return jobs.map((job) => {
+    const own = files.filter((f) => f.jobId === job.id);
+    const upload =
+      own.find((f) => f.purpose === 'export') ?? own.find((f) => f.purpose === 'package');
+    return jobView(job, {
       tallies: counts,
       report: reports.find((r) => r.jobId === job.id) ?? null,
-      exportAvailable: files.some((f) => f.jobId === job.id && f.purpose === 'export'),
-      packageAvailable: files.some((f) => f.jobId === job.id && f.purpose === 'package'),
-    }),
-  );
+      exportAvailable: own.some((f) => f.purpose === 'export' && f.kept),
+      packageAvailable: own.some((f) => f.purpose === 'package' && f.kept),
+      file: upload
+        ? {
+            name: upload.name,
+            byteSize: Number(upload.byteSize),
+            uploadedAt: upload.createdAt.toISOString(),
+          }
+        : null,
+    });
+  });
 }
 
 export function itemView(row: ItemRow): MigrationItem {

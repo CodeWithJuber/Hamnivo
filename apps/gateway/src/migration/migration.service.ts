@@ -741,10 +741,13 @@ export class MigrationService {
         importedAt: null,
         attachments: m.attachmentIds.map((id) => {
           const item = status('attachment', id);
+          const attachment = parsed.attachments.get(id);
+          // Before the import, a file the export can't provide is shown as it will be treated.
+          const planned = attachment ? attachment.problem : 'missing_attachment';
           return {
-            name: parsed.attachments.get(id)?.entry.name ?? 'file',
-            status: item?.status ?? 'pending',
-            reason: item?.reason ?? null,
+            name: attachment?.entry.name ?? 'file',
+            status: item?.status ?? (planned ? 'quarantined' : 'pending'),
+            reason: item?.reason ?? planned ?? null,
           };
         }),
       })),
@@ -781,7 +784,11 @@ export class MigrationService {
                 : m.direction === 'incoming'
                   ? 'customer'
                   : 'agent',
-            name: meta.author?.name ?? (m.sender.kind === 'system' ? null : m.sender.name),
+            name: meta.author
+              ? (meta.author.name ?? null)
+              : m.sender.kind === 'system'
+                ? null
+                : m.sender.name,
           },
           visibility: m.private ? ('internal' as const) : ('public' as const),
           text: m.text ? redact(m.text) : null,
