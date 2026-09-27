@@ -144,8 +144,15 @@ be decrypted. Backups include it (A7).
 Then edit `deploy/production/.env` for:
 
 - **Email:** `SMTP_URL`, for example `smtps://user:password@smtp.example.com:465`, and `MAIL_FROM`.
-  Without them, sign-in emails are written to the API log (`hamnivo.sh logs api`), where you can
-  copy the links.
+  In the user name and password, write `@` as `%40`, `:` as `%3A`, `/` as `%2F` and `#` as `%23`.
+  If the password has a `$`, put the whole value in single quotes. Examples:
+  - Hostinger: `smtps://no-reply%40example.com:PASSWORD@smtp.hostinger.com:465`.
+  - Gmail: `smtps://you%40gmail.com:APP_PASSWORD@smtp.gmail.com:465`. Use an app password
+    (Google account → Security → 2-Step Verification → App passwords), and send from that
+    address.
+
+  Without `SMTP_URL`, no email leaves the server. Sign-in emails go to the API log instead, and
+  `hamnivo.sh mail` shows the latest ones with their links.
 - **AI models (optional):** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`,
   or `OPENAI_COMPATIBLE_BASE_URL` for a local model. Each company can also store its own keys
   later. `EMBEDDING_PROVIDER` chooses the model for knowledge search.
@@ -192,7 +199,8 @@ Open Studio, the staff console, at `https://app.example.com` (your domain in pla
 `example.com`).
 
 1. **Create your account** with "Create an account". Confirm your email with the link Hamnivo sends
-   you; it brings you back to Studio. Without SMTP, the link is in `hamnivo.sh logs api`.
+   you; it brings you back to Studio. Without SMTP, no email arrives: run
+   `./deploy/production/hamnivo.sh mail you@example.com` on the server and open the link it shows.
 2. **Create your workspace.** This is your company in Hamnivo.
 3. **Turn on two-step verification** under Account security. Registering identity keys needs it,
    and publishing asks you to sign in again.
@@ -391,7 +399,9 @@ up and deploys.
   is ready.
 - **The chat does not open on a website:** the website's exact origin (scheme, name and port) must
   be in the brand's `allowedOrigins`.
-- **No emails:** set `SMTP_URL` and run `hamnivo.sh up`. Until then, links are in the API log.
+- **No emails:** set `SMTP_URL` and run `hamnivo.sh up --no-build`, then send the email again. Until
+  then, `hamnivo.sh mail` shows the emails and their links. With `SMTP_URL` set, failures to send
+  are in `hamnivo.sh logs api`.
 - **Out of memory:** remove `scan` from `COMPOSE_PROFILES` and empty `CLAMAV_URL` to run without
   ClamAV, or add memory.
 - **Building behind a proxy that inspects TLS:** set `HAMNIVO_BUILD_CA=/path/to/proxy-ca.pem`

@@ -6,6 +6,7 @@
 #   hamnivo.sh up           build the images, start everything, connect Chatwoot, print the addresses
 #   hamnivo.sh status       services and their health
 #   hamnivo.sh logs [service...]
+#   hamnivo.sh mail [ADDRESS]   the latest emails, while SMTP_URL is not set (they go to the API log)
 #   hamnivo.sh backup [--to DIR] [--keep N] [--no-secrets]
 #   hamnivo.sh restore DIR [--yes] [--ignore-current-database]
 #   hamnivo.sh update       deploy the latest commit of the deploy branch now (see deploy)
@@ -132,7 +133,7 @@ Point these DNS names at this server (A and AAAA records), then run: $0 up
 Ports $(get HAMNIVO_HTTP_PORT) and $(get HAMNIVO_HTTPS_PORT) (TCP, and UDP for HTTP/3) must be open.
 EOF
   if [[ -z "$(get SMTP_URL)" ]]; then
-    printf '%s\n' "Email: set SMTP_URL in $env_file to send sign-in emails (until then they appear in: $0 logs api)." >&2
+    printf '%s\n' "Email: set SMTP_URL in $env_file to send sign-in emails (until then, read them with: $0 mail)." >&2
   fi
 }
 
@@ -299,6 +300,34 @@ Hamnivo is running.
   Chatwoot   $(get HAMNIVO_SUPPORT_ORIGIN)   (super admin $(get CHATWOOT_ADMIN_EMAIL); password in .env)
 Next: open Studio, create your account and set up a brand (docs/self-hosting.md, "First steps").
 EOF
+  if [[ -z "$(get SMTP_URL)" ]]; then
+    cat >&2 <<EOF
+
+Email is not set up (SMTP_URL in $env_file), so no email leaves this server. The link that
+confirms your account is in the API log instead: $0 mail
+EOF
+  fi
+}
+
+# Without SMTP_URL, the API writes each email to its log instead of sending it: account
+# confirmations, invitations and password resets. Prints the latest three, to ADDRESS if given.
+cmd_mail() {
+  need_env
+  local to="${1:-}" found
+  if [[ -n "$(get SMTP_URL)" ]]; then
+    log 'SMTP_URL is set, so emails are sent, not written to the log. Failures to send are in: logs api'
+  fi
+  found="$("${compose[@]}" logs --no-log-prefix api 2>/dev/null | TO="$to" awk '
+    /^\[mail\] to=/ {
+      keep = ENVIRON["TO"] == "" || index($0, "[mail] to=" ENVIRON["TO"] " ") == 1
+      if (keep) { n++; mail[n] = $0 }
+      next
+    }
+    keep && (/^[{]/ || /^\[Nest\]/) { keep = 0 }
+    keep { mail[n] = mail[n] "\n" $0 }
+    END { for (i = (n > 3 ? n - 2 : 1); i <= n; i++) printf "%s\n\n", mail[i] }')"
+  [[ -n "$found" ]] || fail "No emails${to:+ to $to} in the API log since it last started."
+  printf '%s\n' "$found"
 }
 
 cmd_status() {
@@ -533,6 +562,7 @@ main() {
     up) cmd_up "$@" ;;
     status) cmd_status ;;
     logs) need_env; "${compose[@]}" logs --tail 200 -f "$@" ;;
+    mail) cmd_mail "$@" ;;
     backup) cmd_backup "$@" ;;
     restore) cmd_restore "$@" ;;
     build) cmd_build "$@" ;;
@@ -540,7 +570,7 @@ main() {
     deploy | rollback | deploys | autodeploy) exec bash "$here/deploy.sh" "$command" "$@" ;;
     down) need_env; "${compose[@]}" down ;;
     compose) need_env; "${compose[@]}" "$@" ;;
-    help | -h | --help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//' ;;
+    help | -h | --help) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0" ;;
     *) fail "Unknown command: $command (try: $0 help)" ;;
   esac
 }
