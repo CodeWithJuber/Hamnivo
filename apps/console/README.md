@@ -156,3 +156,12 @@ These need gateway changes:
 - A draft has no revision number, so two saves of the same draft version can only be told apart
   by comparing their content. Studio checks for that before saving and publishing.
 - Nothing confirms that a website has installed the snippet.
+
+In the inbox, not yet:
+
+- Round-robin routing with capacity checks, SLA deadlines and skill-based routing.
+- Conversation summaries and next-step suggestions from the AI; only suggested replies exist.
+- Writing a reply in the customer's language with a translation to review before sending.
+- Defining tags and custom fields, and editing or deleting saved replies: still done in Chatwoot.
+- Merging and splitting conversations: linking is supported instead, and Chatwoot keeps the
+  transcripts.
