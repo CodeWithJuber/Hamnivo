@@ -7,9 +7,9 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 152 · in-progress: 60 · implemented: 19 · partial: 1
+**Blueprint features (232):** planned: 132 · in-progress: 62 · implemented: 32 · implemented-live-unverified: 5 · partial: 1
 
-**Design states (168):** planned: 129 · in-progress: 12 · implemented: 26 · partial: 1
+**Design states (168):** planned: 119 · in-progress: 12 · implemented: 36 · partial: 1
 
 ## Blueprint features
 
@@ -187,7 +187,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | R04 | Three conversation lanes | P0 | C | planned |  |
 | R05 | Public response ownership | P0 | C | in-progress | `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/conversation-flow.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The lease with expiry (columns present) is not used yet. |
 | R06 | Human takeover fencing | P0 | C | in-progress | `apps/gateway/src/authority/publications.service.ts`, `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, by a Chatwoot pre-flight owner check and by a re-check of Hamnivo's own fence right before posting (each mutation-tested). A reply that still races a takeover while it is posted is marked late_publication, audited and reported to the new owner in a private note (tested). Undispatched tool actions follow with the tool gateway. |
-| R07 | In-flight action reconciliation | P0 | Q | planned |  |
+| R07 | In-flight action reconciliation | P0 | Q | implemented | `apps/gateway/src/commerce/in-flight.ts`, `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/commerce/orders.service.ts`, `apps/gateway/test/commerce.int.test.ts` — Operations keep their conversation and the ownership epoch they started in. Whenever a person becomes the owner (a takeover, an inbox claim, a supervisor's assignment, an assignment or reply in Chatwoot), a private note lists the payments and refunds still owed an outcome and asks them not to repeat them; a move back to the queue waits for the next person. The worker keeps reconciling whoever owns the conversation, and the conversation's commerce view lists what is in flight (tested for the takeover, the inbox claim and an assignment). |
 | R08 | Bounded parallel specialists | P1 | C | planned |  |
 | R09 | Pause remove replace agents | P0 | C | planned |  |
 | R10 | Guest invitation | P1 | A | planned |  |
@@ -225,26 +225,26 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| C01 | Merchant connection registry | P0 | Q | planned |  |
-| C02 | Catalog and comparison | P0 | Q | planned |  |
-| C03 | Cart and exact quote | P0 | Q | planned |  |
-| C04 | Trusted approval card | P0 | Q | planned |  |
-| C05 | Hosted checkout | P0 | Q | planned |  |
-| C06 | Payment challenge resume | P0 | Q | planned |  |
-| C07 | Operation ledger | P0 | Q | planned |  |
-| C08 | Webhook verification and inbox | P0 | Q | planned |  |
-| C09 | Unknown payment reconciliation | P0 | Q | planned |  |
-| C10 | Order and fulfillment lifecycle | P0 | Q | planned |  |
+| C01 | Merchant connection registry | P0 | Q | implemented | `apps/gateway/src/commerce/merchants.service.ts`, `apps/gateway/src/commerce/providers.service.ts`, `packages/db/src/schema/commerce.ts`, `packages/db/test/commerce.int.test.ts`, `apps/gateway/test/commerce.int.test.ts` — Each brand has at most one active merchant connection (Stripe, or the mock provider outside production) with currencies, delivery, refund policy and a capability manifest. The API key and webhook secret are stored only in the secret broker: responses show them masked, and they never reach logs, audit data or the browser. Connecting and rotating keys need two-step verification and are audited (tested). Connections are managed through the API; a Studio screen is pending. |
+| C02 | Catalog and comparison | P0 | Q | implemented | `apps/gateway/src/commerce/carts.service.ts`, `packages/adapters/src/commerce/stripe.ts`, `packages/adapters/test/commerce/contract.ts`, `apps/widget/src/commerce/Cards.tsx`, `apps/gateway/test/commerce.int.test.ts`, `apps/widget/e2e/shopping.spec.ts` — Product cards come from the merchant's live catalog (Stripe prices are the variants). They show the seller, the price with its currency, stock as the merchant reports it, and when it was read; a snapshot keeps what was shown. Products are listed side by side; there is no separate comparison view. Recurring products are left out until C14 (tested). |
+| C03 | Cart and exact quote | P0 | Q | implemented | `packages/domain/src/commerce/money.ts`, `packages/domain/src/commerce/quote.ts`, `packages/domain/test/commerce/money.test.ts`, `packages/domain/test/commerce/quote.test.ts`, `apps/gateway/src/commerce/carts.service.ts`, `apps/gateway/test/commerce.int.test.ts` — Carts are versioned, and a stale revision is refused. Quotes are priced live by the provider in exact integer minor units (lines, discount, delivery, tax, total), checked again before they are saved, and expire. Approval binds to the canonical hash of the quote document (RFC 8785, SHA-256) (tested). |
+| C04 | Trusted approval card | P0 | Q | implemented | `packages/domain/src/commerce/approval.ts`, `packages/domain/src/commerce/hash.ts`, `apps/gateway/src/commerce/checkout.service.ts`, `apps/widget/src/commerce/Cards.tsx`, `apps/gateway/test/commerce.int.test.ts`, `apps/widget/e2e/shopping.spec.ts` — The approval card shows the seller, lines, delivery, total, refund terms, expiry, and that payment happens on the provider's page. The widget recomputes the quote hash before it enables Approve, and the server accepts only that hash and cart revision, once. A changed cart invalidates the approval, an expired quote cannot be approved, and the button is disabled at expiry (tested). |
+| C05 | Hosted checkout | P0 | Q | implemented-live-unverified | `packages/adapters/src/commerce/stripe.ts`, `packages/adapters/test/commerce/stripe-mock.test.ts`, `packages/adapters/src/commerce/stripe-fake.ts`, `apps/gateway/src/commerce/checkout.service.ts`, `apps/gateway/test/commerce.int.test.ts`, `apps/widget/e2e/shopping.spec.ts` — Payment happens on Stripe Checkout (hosted page, opened in a new tab); the chat never collects card details. The model's context holds the conversation and card summaries but no payment page link, session or payment reference (tested). The Stripe adapter is tested against stripe-mock (when STRIPE_MOCK_URL is set) and a stateful fake; it has not been run against Stripe's live test mode. |
+| C06 | Payment challenge resume | P0 | Q | implemented-live-unverified | `apps/gateway/src/commerce/worker.service.ts`, `apps/gateway/src/commerce/purchases.service.ts`, `apps/widget/src/commerce/Cards.tsx`, `apps/gateway/test/commerce.int.test.ts`, `apps/widget/e2e/shopping.spec.ts` — When the bank asks the customer to confirm a payment (3-D Secure), the purchase stays on the same open payment page. The chat says so, another tap cannot start a second purchase, and paying there completes it once; a repeated challenge event changes nothing (tested with the mock provider and, in the browser, the fake Stripe). Not yet checked against Stripe's live test mode. |
+| C07 | Operation ledger | P0 | Q | implemented | `packages/db/src/schema/operations.ts`, `apps/gateway/src/commerce/ledger.ts`, `apps/gateway/src/commerce/checkout.service.ts`, `apps/gateway/src/commerce/refunds.service.ts`, `packages/db/test/commerce.int.test.ts`, `apps/gateway/test/commerce.int.test.ts` — Every checkout and refund call is an operation with a durable business key (unique per tenant) and one provider idempotency key. The exact request is stored, so a resend is identical, and every observation is an append-only receipt. A lost request is resent under the same key only inside the provider's key window; after that it is looked up by its reference, never sent again, and a person is asked (tested). |
+| C08 | Webhook verification and inbox | P0 | Q | implemented-live-unverified | `apps/gateway/src/commerce/webhooks.service.ts`, `apps/gateway/src/commerce/webhooks.controller.ts`, `apps/gateway/src/commerce/worker.service.ts`, `packages/adapters/src/commerce/stripe.ts`, `apps/gateway/test/commerce.int.test.ts` — Webhooks are verified with the Stripe SDK's constructEvent over the raw body, using the connection's secret from the broker, and checked against the connection's account. Each is stored once per provider event id, then applied by the worker through the state machines. Replayed deliveries are applied once; tampered, stale and foreign-secret ones are refused (tested). Not yet received from Stripe's live test mode. |
+| C09 | Unknown payment reconciliation | P0 | Q | implemented-live-unverified | `apps/gateway/src/commerce/checkout.service.ts`, `apps/gateway/src/commerce/worker.service.ts`, `apps/gateway/test/commerce.int.test.ts` — A timeout after the provider acted leaves the purchase unknown: never failed, never sent again blindly. The worker finds the session by its reference and continues, so the purchase ends paid with one charge. A lost webhook is found by asking the provider (tested with the mock provider and the fake Stripe; not yet against the live test mode). |
+| C10 | Order and fulfillment lifecycle | P0 | Q | implemented | `packages/domain/src/commerce/machines.ts`, `apps/gateway/src/commerce/orders.service.ts`, `apps/console/src/pages/OrderDetailPage.tsx`, `apps/widget/src/commerce/Cards.tsx`, `apps/gateway/test/commerce.int.test.ts`, `apps/console/e2e/commerce.spec.ts`, `apps/widget/e2e/shopping.spec.ts` — An order is created with the payment page and confirmed only by a captured payment. Fulfilment is separate: staff record in progress, delayed (with the shop's estimate), shipped, delivered, active or failed. Paid, shipped and delivered stay distinct for staff and customers, and each step is posted to the chat (tested). Updates are entered by staff; reading them from the merchant's system is pending (see C18). |
 | C11 | Cancellation and returns | P1 | A | planned |  |
-| C12 | Refund workflow | P0 | Q | planned |  |
+| C12 | Refund workflow | P0 | Q | implemented-live-unverified | `packages/domain/src/commerce/refund-policy.ts`, `apps/gateway/src/commerce/refunds.service.ts`, `apps/console/src/pages/OrderDetailPage.tsx`, `apps/gateway/test/commerce.int.test.ts`, `apps/console/e2e/commerce.spec.ts` — A refund is checked for eligibility (captured payment, amount left, window, provider capability) and the merchant's approval policy. The person who asked can never approve it, approving needs two-step verification, and it shows as refunded only after the provider confirms it. A lost answer is found instead of refunding twice (tested with the mock provider and the fake Stripe; not yet against the live test mode). |
 | C13 | Partial order accounting | P1 | A | planned |  |
 | C14 | Subscription changes | P1 | A | planned |  |
 | C15 | Buyer delegation | P2 | A | planned |  |
 | C16 | Concurrent spending budgets | P0 | A | planned |  |
 | C17 | Commerce protocol adapters | P2 | A | planned |  |
-| C18 | Merchant provisioning adapter | P1 | Q | planned |  |
-| C19 | Finance exception dashboard | P0 | Q | planned |  |
-| C20 | Commerce recovery suite | P0 | Q | planned |  |
+| C18 | Merchant provisioning adapter | P1 | Q | planned | P1, not started in this wave: the P0 commerce work came first. Service fulfilment is recorded by staff for now (C10). |
+| C19 | Finance exception dashboard | P0 | Q | implemented | `apps/gateway/src/commerce/exceptions.ts`, `apps/gateway/src/commerce/exceptions.service.ts`, `apps/console/src/pages/FinancePage.tsx`, `apps/gateway/test/commerce.int.test.ts`, `apps/console/e2e/commerce.spec.ts` — Unknown and failed payments and refunds, amount mismatches and orders that could not be updated open a finance exception with its evidence and the next safe action. Finance can check with the provider, or resolve with a reason; resolving is audited and moves no money (tested). |
+| C20 | Commerce recovery suite | P0 | Q | implemented | `apps/gateway/test/commerce.int.test.ts`, `apps/widget/e2e/shopping.spec.ts`, `apps/console/e2e/commerce.spec.ts` — The commerce suite checks the final financial state after duplicate taps and webhooks, timeouts before and after the provider acted, lost requests outside the provider's key window, stale and expired quotes, a price change after the quote, a cancel after payment, a bank challenge, a takeover with a payment in flight, and cross-tenant access (gateway integration and browser tests; the key checks were mutation-tested). |
 
 ### Harness and security
 
@@ -259,10 +259,10 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | X07 | Plugin isolation | P0 | A | planned |  |
 | X08 | Scoped kill switches | P0 | C | in-progress | `apps/gateway/src/runtime/kill-switches.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/db/migrations/20260927021253_agents_runtime_security.sql` — Kill switches for the tenant, a brand or an agent stop AI replies at once; AI-held conversations go to people on their next message, new conversations start with people, and clearing restores AI replies (tested, mutation-checked). Switches are cleared, never deleted. Tool-level switches arrive with tools. |
 | X09 | Source-aware context | P0 | C | in-progress | `apps/gateway/src/runtime/prompt.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/gateway/test/knowledge.test.ts` — Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool outputs arrive with tools. Injection resistance is not yet measured by an adversarial suite. |
-| X10 | Receipt-based completion | P0 | Q | planned |  |
+| X10 | Receipt-based completion | P0 | Q | implemented | `packages/domain/src/commerce/claims.ts`, `packages/domain/test/commerce/claims.test.ts`, `apps/gateway/src/commerce/claims.ts`, `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/commerce.int.test.ts` — A payment or refund counts as done only with a succeeded receipt from the provider. An AI reply that claims one without it is regenerated once with a correction, then the conversation goes to people; an open payment page is not a payment (tested). Future tool actions need the same check. |
 | X11 | Privacy-safe trace records | P0 | C | in-progress | `apps/gateway/src/runtime/runs.service.ts`, `apps/gateway/test/agents.int.test.ts` — Run and step records hold versions, counts, hashes and error kinds but no prompt or reply text (tested); staff read them through the API with analytics.read. |
 | X12 | Prompt and memory injection tests | P0 | L | planned |  |
-| X13 | Crash and replay tests | P0 | Q | in-progress | `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/src/authority/processor.service.ts` — Replaying a whole conversation through the reconciler neither duplicates messages nor repeats a takeover, and repeated webhook deliveries are applied once (tested). Commerce and tool crash cases are pending. |
+| X13 | Crash and replay tests | P0 | Q | in-progress | `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/src/authority/processor.service.ts`, `apps/gateway/test/commerce.int.test.ts`, `apps/widget/e2e/shopping.spec.ts` — Replaying a whole conversation through the reconciler neither duplicates messages nor repeats a takeover, and repeated webhook deliveries are applied once (tested). Commerce: replayed payment and refund webhooks, repeated approval taps, lost provider answers (timeouts before and after the provider acted) and repeated worker runs leave one payment page, one charge, one refund and one card each (tested). Pending: tool crash cases, and a test that kills the worker process mid-call. |
 | X14 | Policy release controls | P0 | C | planned |  |
 
 ### Language and behavior
@@ -274,7 +274,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | U03 | Per-participant translations | P1 | C | planned |  |
 | U04 | RTL interaction | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `apps/widget/src/i18n.ts` — Document direction follows the language and message text uses dir=auto, so Arabic and Urdu read right to left while Latin order numbers keep their direction; bidi copy behaviour tests pending. |
 | U05 | Localized complete flows | P0 | C | planned |  |
-| U06 | Locale-safe numbers and dates | P0 | Q | planned |  |
+| U06 | Locale-safe numbers and dates | P0 | Q | in-progress | `packages/domain/src/commerce/format.ts`, `packages/domain/src/commerce/amount-input.ts`, `packages/domain/test/commerce/format.test.ts`, `apps/widget/src/commerce/format.ts`, `apps/console/e2e/commerce.spec.ts` — Amounts are exact minor units formatted for the locale with the currency always shown; times always carry their zone, and shop dates (delivery estimates) are shown as calendar dates. Typed amounts in Latin, Arabic-Indic, Persian and Devanagari digits are read exactly, and an ambiguous one such as "1,500" is asked, not guessed (tested). Pending: native-language review of the wording and number display. |
 | U07 | Language-capable routing | P0 | C | planned |  |
 | U08 | Accessible multilingual composer | P0 | C | planned |  |
 | U09 | Honest AI identity | P0 | C | in-progress | `apps/gateway/src/runtime/honesty.ts`, `apps/gateway/src/runtime/prompt.ts`, `apps/gateway/test/agents.int.test.ts`, `apps/gateway/test/runtime.test.ts` — Non-removable prompt rules plus an output guard for claims of being human in English, Hinglish, Roman Urdu, Hindi, Urdu and Arabic: regenerate once, otherwise publish nothing and hand over (tested, mutation-checked). Native-speaker review of the phrase lists pending. |
@@ -283,7 +283,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | U12 | Anti-sycophancy suite | P0 | C | planned |  |
 | U13 | Fairness pair evaluation | P0 | C | planned |  |
 | U14 | Native-language adjudication | P0 | C | planned |  |
-| U15 | Commercial transparency | P0 | Q | planned |  |
+| U15 | Commercial transparency | P0 | Q | implemented | `apps/gateway/src/commerce/views.ts`, `apps/widget/src/commerce/Cards.tsx`, `apps/widget/src/commerce/copy.ts`, `apps/gateway/test/commerce.int.test.ts`, `apps/widget/e2e/shopping.spec.ts` — Quote cards name the seller and show every line, delivery, tax, the total, the refund terms, how long the price holds, and that payment happens on the provider's page. Stock is shown only as the merchant reports it, with no urgency messages. Recurring products are not sold in chat until C14 (tested in English and Arabic). The Arabic, Hindi and Urdu text awaits native review. |
 | U16 | Voice language evaluation | P2 | Research | planned |  |
 
 ### Extensibility and research
@@ -291,7 +291,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
 | E01 | Domain ownership contracts | P0 | F | planned |  |
-| E02 | Provider capability negotiation | P0 | Q | planned |  |
+| E02 | Provider capability negotiation | P0 | Q | implemented | `packages/domain/src/commerce/capabilities.ts`, `packages/domain/test/commerce/policy.test.ts`, `apps/gateway/src/commerce/access.ts`, `apps/gateway/test/commerce.int.test.ts`, `apps/console/e2e/commerce.spec.ts` — Each connection publishes a versioned capability manifest (catalog, hosted checkout, full and partial refunds, currencies, recurring, provisioning). Operations are checked against it before any provider call. An unsupported checkout is refused with a plain reason and the cart is kept; when the provider refunds only whole payments, Studio offers the full amount (tested). |
 | E03 | Runtime-independent ports | P0 | C | planned |  |
 | E04 | Event and schema compatibility | P0 | F | in-progress | `packages/contracts/src/events.ts`, `packages/contracts/src/parts.ts`, `packages/contracts/fixtures/v1/future-minor-version.json`, `packages/contracts/test/contracts.test.ts`, `docs/contracts/compatibility.md` — Forward-compatible parsing and fixtures in place; client SDK compatibility tests follow with packages/client. |
 | E05 | Plugin permission diffs | P0 | A | planned |  |
@@ -301,7 +301,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | E09 | License and dataset inventory | P0 | F | implemented | `scripts/licenses/inventory.ts`, `docs/licenses.md`, `scripts/ci/local.sh` — Inventory generated from the lockfile; the local check pipeline fails on a stale inventory or unreviewed licences. |
 | E10 | Research evidence registry | P1 | L | planned |  |
 | E11 | Semantic co-model experiments | P2 | Research | planned |  |
-| E12 | Workflow authority boundary | P0 | Q | planned |  |
+| E12 | Workflow authority boundary | P0 | Q | implemented | `apps/gateway/src/commerce/checkout.service.ts`, `apps/gateway/src/commerce/purchases.service.ts`, `apps/gateway/src/commerce/carts.service.ts`, `packages/domain/src/commerce/machines.ts`, `apps/gateway/test/commerce.int.test.ts` — The commerce module owns the purchase, payment, order and refund lifecycles through explicit state machines, and the AI has no commerce tools. Prices come only from live provider quotes, only the signed-in customer approves their quote, only staff with the right permission request or approve refunds, and the AI may state an outcome only with a receipt (tested). |
 
 ### NLP and AI caching
 
@@ -312,7 +312,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | K03 | Retrieval cache | P1 | C | planned |  |
 | K04 | Translation and NLP cache | P1 | C | planned |  |
 | K05 | Semantic FAQ cache | P1 | A | planned |  |
-| K06 | Sensitive and live-data exclusions | P0 | Q | planned |  |
+| K06 | Sensitive and live-data exclusions | P0 | Q | in-progress | `packages/domain/src/commerce/live-data.ts`, `packages/domain/test/commerce/policy.test.ts`, `apps/gateway/src/commerce/no-store.interceptor.ts`, `apps/gateway/test/commerce.int.test.ts` — Every commerce response is sent with Cache-Control: no-store, prices and stock are read live for each quote (a catalog snapshot is never used to charge), and answerCacheDecision() marks any answer built from commerce data as not cacheable (tested). Pending: the answer cache must call it; there is no answer cache in this branch yet. |
 | K07 | Versioned invalidation | P0 | C | planned |  |
 | K08 | Singleflight and outage fallback | P1 | C | planned |  |
 | K09 | Cache privacy and deletion | P0 | L | in-progress | `apps/gateway/src/memory/cache.ts`, `packages/domain/src/memory/recall.ts`, `apps/gateway/src/memory/widget-memory.controller.ts`, `apps/gateway/test/memory.int.test.ts` — Memory is never cached: recall reads the database each reply, runs record that any reply built with memory may not enter a shared cache, and memory endpoints send no-store. Each customer has a memory version and a cache namespace in Valkey that is bumped on every change and purged on deletion (tested). The general reply cache (K lane) must key per-customer entries with this version and respect the shared-cache rule when it lands. |
@@ -535,23 +535,23 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-20-01 | Shopping conversation | Product discovery | planned |  |
-| HNV-20-02 | Cart review | Draft cart | planned |  |
-| HNV-20-03 | Quote approval | Exact quote ready | planned |  |
-| HNV-20-04 | Hosted checkout | Payment authentication required | planned |  |
-| HNV-20-05 | Checkout return | Pending confirmation | planned |  |
-| HNV-20-06 | Checkout return | Declined, expired or cancelled | planned |  |
+| HNV-20-01 | Shopping conversation | Product discovery | implemented | `apps/widget/src/commerce/Cards.tsx`, `apps/widget/e2e/shopping.spec.ts` — Live product cards with price, currency, stock as reported and when it was read (tested in the browser with axe). |
+| HNV-20-02 | Cart review | Draft cart | implemented | `apps/widget/src/commerce/ShopBar.tsx`, `apps/widget/src/commerce/useCommerce.ts`, `apps/widget/e2e/shopping.spec.ts` — Quantity controls change a draft cart only; nothing is bought until a quote is approved. Delivery and tax appear in the exact quote; the address is collected on the provider's payment page (tested). |
+| HNV-20-03 | Quote approval | Exact quote ready | implemented | `apps/widget/src/commerce/Cards.tsx`, `apps/widget/e2e/shopping.spec.ts`, `apps/gateway/test/commerce.int.test.ts` — Seller, lines, delivery, total, refund terms, expiry and cancel. A changed cart or an expired price returns to review (tested in English and Arabic, with axe). |
+| HNV-20-04 | Hosted checkout | Payment authentication required | implemented | `apps/widget/src/commerce/Cards.tsx`, `apps/widget/e2e/shopping.spec.ts` — The provider's page opens in a new tab with the order reference; no card fields in the chat; cancelling returns to the kept cart; after a bank challenge the same page finishes the payment (tested). |
+| HNV-20-05 | Checkout return | Pending confirmation | implemented | `apps/widget/src/checkout-return.ts`, `apps/widget/src/commerce/Cards.tsx`, `apps/widget/e2e/shopping.spec.ts`, `apps/gateway/test/commerce.int.test.ts` — Coming back from the page shows 'confirming', never 'paid', until the provider's event; Check status asks the provider without starting a second payment (tested). |
+| HNV-20-06 | Checkout return | Declined, expired or cancelled | implemented | `apps/widget/src/commerce/Cards.tsx`, `apps/widget/e2e/shopping.spec.ts`, `apps/gateway/test/commerce.int.test.ts` — A cancelled, expired or refused payment page says nothing was charged and keeps the cart for a fresh quote; nothing is bought again automatically (tested). |
 
 ### 21 · Orders, subscriptions and refunds
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-21-01 | Order confirmation | Paid and confirmed | planned |  |
-| HNV-21-02 | Order tracking | Fulfilment delayed | planned |  |
-| HNV-21-03 | Order detail | Cancellation eligibility review | planned |  |
-| HNV-21-04 | Refund request | Human/finance approval required | planned |  |
-| HNV-21-05 | Refund status | Pending or failed | planned |  |
-| HNV-21-06 | Subscription | Renewal or payment-action needed | planned |  |
+| HNV-21-01 | Order confirmation | Paid and confirmed | implemented | `apps/widget/src/commerce/Cards.tsx`, `apps/widget/e2e/shopping.spec.ts` — A receipt card with the order reference appears only after the provider confirms the payment; fulfilment is shown separately (tested). |
+| HNV-21-02 | Order tracking | Fulfilment delayed | implemented | `apps/widget/src/commerce/Cards.tsx`, `apps/console/src/pages/OrderDetailPage.tsx`, `apps/widget/e2e/shopping.spec.ts`, `apps/console/e2e/commerce.spec.ts`, `apps/gateway/test/commerce.int.test.ts` — Staff record a delay in Studio with the shop's estimate. The chat shows the milestone, the estimate as an estimate (not a promise), when it was updated, and Talk to a person (tested in both, with axe; Studio also in Urdu). |
+| HNV-21-03 | Order detail | Cancellation eligibility review | planned | Cancellation and returns are C11 (wave A). |
+| HNV-21-04 | Refund request | Human/finance approval required | implemented | `apps/console/src/pages/OrderDetailPage.tsx`, `apps/console/e2e/commerce.spec.ts`, `apps/gateway/test/commerce.int.test.ts` — Amount, reason, policy and approver. The requester cannot approve their own refund; approval needs two-step verification; rejection needs a reason (tested, with axe and in Arabic). |
+| HNV-21-05 | Refund status | Pending or failed | implemented | `apps/console/src/pages/OrderDetailPage.tsx`, `apps/console/e2e/commerce.spec.ts`, `apps/gateway/test/commerce.int.test.ts` — Refund reference, amount, the provider's state, last update and Check status. A refund is never shown as refunded before the provider confirms it, and a failed one opens a finance exception (tested). |
+| HNV-21-06 | Subscription | Renewal or payment-action needed | planned | Subscriptions are C14 (wave A). |
 
 ### 22 · Team, subadmins, permissions and audit
 

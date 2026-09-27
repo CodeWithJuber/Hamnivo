@@ -162,6 +162,20 @@
       "when": 1790505680619,
       "tag": "20260927104120_inbox_security",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790510504179,
+      "tag": "20260927120144_commerce",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790510515489,
+      "tag": "20260927120155_commerce_security",
+      "breakpoints": true
     }
   ]
 }

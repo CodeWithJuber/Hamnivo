@@ -9,6 +9,7 @@ import type { LanguageModel } from 'ai';
 import { type EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
 import { InboxProcessor } from '../src/authority/processor.service.js';
 import { ReconcilerService } from '../src/authority/reconciler.service.js';
+import { CommerceWorker } from '../src/commerce/worker.service.js';
 import { loadConfig } from '../src/config.js';
 import type { Scanner } from '../src/knowledge/scanner.js';
 import { OutboxRelay } from '../src/outbox/relay.service.js';
@@ -48,6 +49,8 @@ export async function startSlice(
     /** The model the API process uses (copilot, translation). */
     apiModel?: LanguageModel;
     scanner?: Scanner;
+    /** Extra environment for both processes (e.g. commerce provider settings). */
+    env?: Record<string, string>;
   } = {},
 ): Promise<Slice> {
   const fake = await startFakeChatwoot();
@@ -59,6 +62,7 @@ export async function startSlice(
     CHATWOOT_WEBHOOK_BASE_URL: baseUrl,
     PUBLIC_API_ORIGIN: baseUrl,
     STREAM_HEARTBEAT_SECONDS: '1',
+    ...options.env,
   };
   const gw = await startGateway(env, undefined, {
     ...(options.clock ? { clock: options.clock } : {}),
@@ -84,6 +88,7 @@ export async function startSlice(
   await worker.get(OutboxRelay).onApplicationShutdown();
   await worker.get(InboxProcessor).onApplicationShutdown();
   await worker.get(ReconcilerService).onApplicationShutdown();
+  await worker.get(CommerceWorker).onApplicationShutdown();
   const app = createDb(gw.database.app, { max: 2 });
   return {
     gw,

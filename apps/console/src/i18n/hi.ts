@@ -1,3 +1,4 @@
+import { commerceHi } from './commerce/hi';
 import type { Translation } from './en';
 
 /** Hindi. Pending review by native speakers, as the note in the interface says. */
@@ -1273,6 +1274,7 @@ export const hi: Translation = {
       loading: 'पासकी लोड हो रही हैं',
     },
   },
+  commerce: commerceHi,
   memory: {
     title: 'ग्राहक मेमोरी',
     description: 'तय करें कि हम आपके ग्राहकों के बारे में क्या याद रखते हैं।',
