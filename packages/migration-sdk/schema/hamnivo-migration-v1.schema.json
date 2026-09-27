@@ -1,0 +1,731 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hamnivo.dev/schemas/migration/v1.json",
+  "title": "Hamnivo migration package v1",
+  "description": "A ZIP holding manifest.json (Manifest), records.ndjson (one PackageRecord per line: contacts, then each conversation followed by its messages), attachments.json (AttachmentsManifest) and the files under attachments/. A bare NDJSON package starts with a ManifestLine. Every record keeps a reference to where it came from in the source export.",
+  "$defs": {
+    "Manifest": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "const": "hamnivo.migration"
+        },
+        "version": {
+          "type": "number",
+          "const": 1
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "generator": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "version": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          "required": ["name", "version"]
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "schemaVersion": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "exportedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "account": {
+              "type": "string",
+              "maxLength": 255
+            }
+          },
+          "required": ["system"]
+        },
+        "counts": {
+          "$ref": "#/$defs/Counts"
+        },
+        "files": {
+          "default": {
+            "records": "records.ndjson",
+            "attachments": "attachments.json"
+          },
+          "type": "object",
+          "properties": {
+            "records": {
+              "default": "records.ndjson",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "attachments": {
+              "default": "attachments.json",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            }
+          }
+        },
+        "checksums": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "notes": {
+          "default": [],
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "required": ["format", "version", "createdAt", "generator", "source", "counts", "complete"]
+    },
+    "Counts": {
+      "type": "object",
+      "properties": {
+        "contacts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "conversations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "messages": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "attachments": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["contacts", "conversations", "messages", "attachments"]
+    },
+    "ManifestLine": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "const": "hamnivo.migration"
+        },
+        "version": {
+          "type": "number",
+          "const": 1
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "generator": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "version": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          "required": ["name", "version"]
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "schemaVersion": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "exportedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "account": {
+              "type": "string",
+              "maxLength": 255
+            }
+          },
+          "required": ["system"]
+        },
+        "counts": {
+          "$ref": "#/$defs/Counts"
+        },
+        "files": {
+          "default": {
+            "records": "records.ndjson",
+            "attachments": "attachments.json"
+          },
+          "type": "object",
+          "properties": {
+            "records": {
+              "default": "records.ndjson",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "attachments": {
+              "default": "attachments.json",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            }
+          }
+        },
+        "checksums": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "notes": {
+          "default": [],
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "type": {
+          "type": "string",
+          "const": "manifest"
+        }
+      },
+      "required": [
+        "format",
+        "version",
+        "createdAt",
+        "generator",
+        "source",
+        "counts",
+        "complete",
+        "type"
+      ]
+    },
+    "PackageRecord": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ContactRecord"
+        },
+        {
+          "$ref": "#/$defs/ConversationRecord"
+        },
+        {
+          "$ref": "#/$defs/MessageRecord"
+        }
+      ]
+    },
+    "ContactRecord": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "contact"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 255
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verified": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "subject": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "issuer": {
+                  "type": "string",
+                  "maxLength": 255
+                }
+              },
+              "required": ["subject"]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unverified": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "maxLength": 320
+            },
+            "phone": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "city": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "countryCode": {
+              "type": "string",
+              "maxLength": 8
+            }
+          }
+        },
+        "attributes": {
+          "default": {},
+          "$ref": "#/$defs/Attributes"
+        }
+      },
+      "required": ["type", "id", "source", "name"]
+    },
+    "SourceRef": {
+      "type": "object",
+      "properties": {
+        "system": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "schemaVersion": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "raw": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "pointer": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          "required": ["file"]
+        }
+      },
+      "required": ["system", "id"]
+    },
+    "Attributes": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 2000
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "ConversationRecord": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "conversation"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "contactId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "pending", "resolved", "snoozed"]
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "endedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subject": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "channel": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "labels": {
+          "default": [],
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "assignee": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 255
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sourceId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 255
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["name", "sourceId"]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "declaredMessageCount": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attributes": {
+          "default": {},
+          "$ref": "#/$defs/Attributes"
+        }
+      },
+      "required": ["type", "id", "source", "contactId", "status", "startedAt"]
+    },
+    "MessageRecord": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "message"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "conversationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "author": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["customer", "agent", "bot", "system"]
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": ["kind"]
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public", "internal"]
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 150000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attachmentIds": {
+          "default": [],
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "sourceType": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "source",
+        "conversationId",
+        "createdAt",
+        "author",
+        "visibility",
+        "text"
+      ]
+    },
+    "AttachmentsManifest": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AttachmentEntry"
+          }
+        }
+      },
+      "required": ["items"]
+    },
+    "AttachmentEntry": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 512
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 2048
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["id", "messageId", "name", "mediaType", "size", "sha256", "path"]
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/Manifest"
+    },
+    {
+      "$ref": "#/$defs/ManifestLine"
+    },
+    {
+      "$ref": "#/$defs/PackageRecord"
+    },
+    {
+      "$ref": "#/$defs/AttachmentsManifest"
+    }
+  ]
+}
