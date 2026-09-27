@@ -170,12 +170,17 @@ if (response.ok) {
 }
 ```
 
-When the customer signs out, call `Hamnivo.reset()` before your own sign-out. It waits for the
-chat, so wait a few seconds at most:
+When the customer signs out, call `Hamnivo.reset()` before your own sign-out. The chat then:
+- clears the conversation from the screen;
+- ends the session in Hamnivo and in the browser, and forgets unsent messages;
+- starts again as an anonymous visitor.
+
+Other open tabs of your website clear their chat too. `reset()` waits for the chat, so don't let
+it hold up your sign-out for more than a few seconds:
 
 ```js
 const timeout = new Promise((resolve) => setTimeout(resolve, 3000));
-await Promise.race([Hamnivo.reset(), timeout]);
+await Promise.race([Hamnivo.reset().catch(() => {}), timeout]);
 ```
 
 - Fetch a new assertion for every `identify` call.
@@ -185,6 +190,11 @@ await Promise.race([Hamnivo.reset(), timeout]);
 - `Hamnivo.identify` loads the chat frame if it is not loaded yet.
 - `Hamnivo.identify` rejects when Hamnivo refuses the assertion. See
   [Troubleshooting](#troubleshooting-assertion_invalid).
+- After `identify`, the chat shows that customer's own conversations.
+- `identify` and `reset` reject with `Error('timeout')` when the chat does not answer within 20
+  seconds.
+- `reset` rejects with `reset_incomplete` when the chat could not reach Hamnivo. The browser has
+  still forgotten the session.
 - A different `sub` is a different customer, and their conversations are never merged.
   Identifying another customer ends the previous chat session in that browser.
 
@@ -255,8 +265,8 @@ is in the browser's network panel. The chat's `POST /v1/widget/identity` answers
 
 Other problems:
 
-- **`identify` or `reset` never settles.** The chat frame did not load. Check the loader's `src`
-  and `data-widget-id`, and the browser console.
+- **`identify` or `reset` rejects with `timeout`.** The chat frame did not load within 20 seconds.
+  Check the loader's `src` and `data-widget-id`, and the browser console.
 - **The chat does not open, or the API answers `ORIGIN_NOT_ALLOWED`.** Add the page's exact origin
   to the brand's allowed websites. See
   [`examples/html/README.md`](../../examples/html/README.md#allowed-websites).
@@ -265,9 +275,5 @@ Other problems:
 
 ## Current limits
 
-- The chat does not answer `Hamnivo.reset()` yet. The promise never settles, and the chat keeps
-  the verified session in that browser. It lasts until it expires (after 30 days by default,
-  `WIDGET_SESSION_DAYS`) or until another customer is identified there. Keep the time limit
-  around `reset()`, so sign-out still works.
-- The chat's screens for verified customers are still in progress. See W12 in
-  [`docs/feature-status.md`](../feature-status.md).
+- The chat does not yet say on screen that the customer is signed in, for example by showing
+  their name. See W12 in [`docs/feature-status.md`](../feature-status.md).

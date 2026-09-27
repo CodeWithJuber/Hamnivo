@@ -47,7 +47,7 @@ export class Outbox {
   }
 
   private get key() {
-    return `hamnivo:${this.client.options.widgetId}:outbox:${this.conversationId}`;
+    return this.client.outboxKey(this.conversationId);
   }
 
   private load(): OutgoingMessage[] {
@@ -64,6 +64,7 @@ export class Outbox {
     const pending = this.items.filter((i) => i.state !== 'accepted');
     if (pending.length) this.client.storage.setItem(this.key, JSON.stringify(pending));
     else this.client.storage.removeItem(this.key);
+    this.client.trackOutbox(this.conversationId, pending.length > 0);
     for (const listener of this.listeners) listener(this.items);
   }
 

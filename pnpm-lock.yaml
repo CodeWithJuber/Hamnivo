@@ -363,6 +363,9 @@ importers:
       '@hamnivo/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@hamnivo/server':
+        specifier: workspace:*
+        version: link:../../packages/server-sdk
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0

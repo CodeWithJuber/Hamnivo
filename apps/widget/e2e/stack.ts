@@ -6,7 +6,7 @@
  * e2e/.stack.json for the tests. Stops everything on SIGTERM/SIGINT.
  */
 import { type ChildProcess, spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { createReadStream, existsSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
@@ -26,6 +26,31 @@ const ports = {
   console: Number(process.env.E2E_CONSOLE_PORT ?? 5183),
 };
 const origin = (port: number) => `http://127.0.0.1:${port}`;
+const PASSWORD = 'correct horse battery staple';
+
+/** The code an authenticator app shows for a base32 TOTP secret (RFC 6238: SHA-1, 6 digits). */
+function totp(secret: string, at = Date.now()): string {
+  let bits = 0;
+  let value = 0;
+  const key: number[] = [];
+  for (const char of secret.replace(/=+$/, '').toUpperCase()) {
+    value = (value << 5) | 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.indexOf(char);
+    bits += 5;
+    if (bits >= 8) {
+      key.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
+  const digest = createHmac('sha1', Buffer.from(key)).update(counter).digest();
+  const offset = (digest.at(-1) ?? 0) & 0x0f;
+  return String((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+
+/** "name=value; …" for the cookies a response sets. */
+const cookiesOf = (response: Response) =>
+  (response.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ');
 const children: ChildProcess[] = [];
 const servers: Server[] = [];
 const cleanups: Array<() => Promise<void>> = [];
@@ -141,13 +166,9 @@ try {
   const signUp = await fetch(`${origin(ports.api)}/api/auth/sign-up/email`, {
     method: 'POST',
     headers: consoleHeaders,
-    body: JSON.stringify({
-      name: 'Sara Staff',
-      email: 'sara@example.com',
-      password: 'correct horse battery staple',
-    }),
+    body: JSON.stringify({ name: 'Sara Staff', email: 'sara@example.com', password: PASSWORD }),
   });
-  const cookie = (signUp.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ');
+  let cookie = cookiesOf(signUp);
   if (!signUp.ok || !cookie) throw new Error(`sign-up failed: ${signUp.status}`);
   const call = async (method: string, path: string, body?: unknown, tenant?: string) => {
     const response = await fetch(`${origin(ports.api)}${path}`, {
@@ -179,6 +200,31 @@ try {
   const agent = agents.items.find((a: { brandId: string }) => a.brandId === brand.id);
   await call('POST', `/v1/admin/agents/${agent.id}/publish`, {}, tenantId);
 
+  // A key that vouches for signed-in customers (W12). Registering one needs two-step verification
+  // and a sign-in with a code, as an owner would do it.
+  const enabled = await call('POST', '/api/auth/two-factor/enable', { password: PASSWORD });
+  const totpSecret = new URL(enabled.totpURI).searchParams.get('secret') ?? '';
+  await call('POST', '/api/auth/two-factor/verify-totp', { code: totp(totpSecret) });
+  const firstFactor = await fetch(`${origin(ports.api)}/api/auth/sign-in/email`, {
+    method: 'POST',
+    headers: consoleHeaders,
+    body: JSON.stringify({ email: 'sara@example.com', password: PASSWORD }),
+  });
+  const secondFactor = await fetch(`${origin(ports.api)}/api/auth/two-factor/verify-totp`, {
+    method: 'POST',
+    headers: { ...consoleHeaders, cookie: cookiesOf(firstFactor) },
+    body: JSON.stringify({ code: totp(totpSecret) }),
+  });
+  cookie = cookiesOf(secondFactor);
+  if (!secondFactor.ok || !cookie)
+    throw new Error(`two-step sign-in failed: ${secondFactor.status}`);
+  const identityKey = await call(
+    'POST',
+    `/v1/admin/brands/${brand.id}/identity-keys`,
+    { alg: 'HS256' },
+    tenantId,
+  );
+
   const hostPage = join(root, 'apps/widget/e2e/.host.html');
   writeFileSync(
     hostPage,
@@ -203,6 +249,7 @@ try {
         widgetId: brand.widgetId,
         tenantId,
         cookie,
+        identityKey: { kid: identityKey.kid, secret: identityKey.secret },
         databaseUrl: database.app,
       },
       null,

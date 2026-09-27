@@ -240,15 +240,24 @@
     "note": "Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. Server side, the worker's reconciler recovers messages and state changes whose Chatwoot webhooks were lost (tested with every webhook dropped)."
   },
   "W12": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/admin/identity-keys.service.ts",
       "apps/gateway/src/widget/sessions.service.ts",
       "apps/gateway/src/widget/tokens.service.ts",
       "apps/gateway/test/identity-keys.int.test.ts",
-      "apps/gateway/test/slice.int.test.ts"
+      "apps/gateway/test/slice.int.test.ts",
+      "apps/widget/e2e/journey.spec.ts",
+      "apps/widget/src/App.tsx",
+      "apps/widget/src/useChat.ts",
+      "docs/guides/identity.md",
+      "packages/client/src/client.ts",
+      "packages/client/test/client.test.ts",
+      "packages/server-sdk/src/assertion.ts",
+      "packages/server-sdk/test/assertion.test.ts",
+      "packages/widget-loader/src/loader.ts"
     ],
-    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending. Brands register their verification keys through the admin API (ES256, EdDSA or RS256 public keys, or a generated HS256 secret shown once), with two-step verification and a recent sign-in; keys retire (still verifying) or are revoked at once (tested)."
+    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, and identity assertions signed by the tenant: kid, audience, a five-minute lifetime and a single-use jti. A new identity is a new principal: the old session and its streams end. Brands register their keys through the admin API, with two-step verification and a recent sign-in: ES256, EdDSA or RS256 public keys, or an HS256 secret shown once. Keys can be retired or revoked. @hamnivo/server signs assertions. In the widget, identify shows the customer's own chats; reset clears the screen, ends the session in Hamnivo and in the browser, forgets unsent messages and clears other tabs; a late token renewal cannot undo either. All of this is tested, including in Chromium with a real key. The widget does not yet show the signed-in customer's name."
   },
   "H08": {
     "status": "in-progress",
@@ -690,5 +699,10 @@
     "status": "in-progress",
     "evidence": ["apps/console/src/pages/BrandsPage.tsx", "apps/console/e2e/journeys.spec.ts"],
     "note": "Each brand shows a copyable install snippet, and its allowed websites can be changed (tested); an event test comes later."
+  },
+  "D05": {
+    "status": "in-progress",
+    "evidence": ["examples/wordpress/hamnivo-chat.php", "examples/wordpress/README.md"],
+    "note": "A WordPress plugin adds the chat loader and signs assertions for signed-in WordPress users. It passes php -l but is not yet tested against a real WordPress installation."
   }
 }
