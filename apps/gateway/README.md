@@ -248,8 +248,10 @@ The rules:
 - **Only the provider says "paid".** Payment, refund and order states move only on a provider
   answer, webhook or check, and each observation is an append-only receipt. The customer sees
   "confirming" until then, and the AI may not say "paid" or "refunded" without a receipt.
-- **Takeover.** When a person takes over, a private note lists the payments and refunds still owed
-  an outcome. The worker keeps checking them whoever owns the conversation.
+- **Takeover.** Whenever a person becomes the owner (a takeover, an inbox claim, a supervisor's
+  assignment, an assignment or reply in Chatwoot), a private note lists the payments and refunds
+  still owed an outcome. It comes from `OwnershipService.transition`, which every path uses. The
+  worker keeps checking them whoever owns the conversation.
 - **Staff actions** use `@hamnivo/policy` (`commerce.read`, `commerce.carts.manage`,
   `commerce.orders.manage`, `commerce.refunds.request`, `commerce.refunds.approve`,
   `commerce.exceptions.resolve`, `commerce.merchants.manage`) and are audited. The person who

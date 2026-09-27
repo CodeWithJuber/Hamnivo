@@ -715,6 +715,58 @@ describe('unknown outcomes are reconciled, never repeated blindly (C07, C09, R07
     expect(after.body.orders).toEqual([expect.objectContaining({ paymentState: 'captured' })]);
   });
 
+  it('tells whoever claims or is given the conversation in the inbox about money in flight (R07)', async () => {
+    const { visitor, conversationId } = await newCustomer();
+    const cart = await cartWith(visitor, conversationId, [{ productId: 'prod_pens', quantity: 1 }]);
+    const quote = await quoted(visitor, conversationId, cart.revision);
+    store.inject('createCheckout', 'timeout_after');
+    const purchase = await approve(visitor, conversationId, quote);
+    expect(purchase.body.state).toBe('unknown');
+    const notes = async () =>
+      (await authorityMessages(conversationId))
+        .filter((m) => m.private && (m.text ?? '').startsWith('Money in progress'))
+        .map((m) => m.text);
+    const note = [
+      'Money in progress in this conversation:',
+      '- Payment page for a new order, AED 25.00: outcome not known yet, being checked with the provider.',
+      'Do not take the payment or make the refund again. Hamnivo keeps checking and posts the outcome here.',
+    ].join('\n');
+    const assign = (to: Record<string, unknown>) =>
+      admin.post(`/v1/inbox/conversations/${conversationId}/assign`, { to });
+
+    // A person claims it from the inbox.
+    const claimed = await assign({ kind: 'me' });
+    expect(claimed.status, JSON.stringify(claimed.body)).toBe(200);
+    await settle();
+    expect(await notes()).toEqual([note]);
+
+    // A supervisor gives it to a colleague, who is told as well.
+    await member('Rana Agent', 'rana@example.com', 'agent');
+    const options = await admin.get(`/v1/inbox/conversations/${conversationId}/assignees`);
+    const rana = options.body.staff.find(
+      (s: { displayName: string }) => s.displayName === 'Rana Agent',
+    );
+    expect(rana, JSON.stringify(options.body)).toBeTruthy();
+    const assigned = await assign({ kind: 'staff', staffMemberId: rana.staffMemberId });
+    expect(assigned.status, JSON.stringify(assigned.body)).toBe(200);
+    await settle();
+    expect(await notes()).toEqual([note, note]);
+
+    // Back to the queue: the next person to take it is told then, not now.
+    expect((await assign({ kind: 'queue' })).status).toBe(200);
+    await settle();
+    expect(await notes()).toHaveLength(2);
+
+    // The outcome is found whoever owns the conversation; nothing is paid twice.
+    await makeChecksDue();
+    await settle();
+    const found = await visitor.call(
+      'GET',
+      commerce(conversationId, `purchases/${purchase.body.id}`),
+    );
+    expect(found.body.outcome).toBe('awaiting_payment');
+  });
+
   it('resends a request that never arrived under the same idempotency key: one session', async () => {
     const { visitor, conversationId } = await newCustomer();
     const cart = await cartWith(visitor, conversationId, [{ productId: 'prod_pens', quantity: 1 }]);

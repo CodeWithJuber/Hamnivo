@@ -185,8 +185,10 @@ export class OwnershipService {
         origin: options.origin,
       },
     });
-    // Whoever takes over sees the money still in flight here (R07).
-    if (mode !== 'AI_ACTIVE') {
+    // Whoever takes over sees the money still in flight here (R07): on every path by which a person
+    // becomes the owner (takeover, inbox claim, assignment by a supervisor, a Chatwoot assignment
+    // or reply). A move to the queue waits for the person who picks it up.
+    if (mode === 'HUMAN_ACTIVE') {
       const note = await inFlightNote(tx, conversationId);
       if (note) {
         await enqueueOutbox(tx, tenantId, {

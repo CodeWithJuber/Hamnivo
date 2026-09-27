@@ -1279,7 +1279,7 @@
       "apps/gateway/src/commerce/orders.service.ts",
       "apps/gateway/test/commerce.int.test.ts"
     ],
-    "note": "Operations keep their conversation and the ownership epoch they started in. When a person takes over, a private note in Chatwoot lists the payments and refunds still owed an outcome and asks them not to repeat them; the worker keeps reconciling and posts the outcome, and the conversation's commerce view lists them (tested)."
+    "note": "Operations keep their conversation and the ownership epoch they started in. Whenever a person becomes the owner (a takeover, an inbox claim, a supervisor's assignment, an assignment or reply in Chatwoot), a private note lists the payments and refunds still owed an outcome and asks them not to repeat them; a move back to the queue waits for the next person. The worker keeps reconciling whoever owns the conversation, and the conversation's commerce view lists what is in flight (tested for the takeover, the inbox claim and an assignment)."
   },
   "X10": {
     "status": "implemented",
