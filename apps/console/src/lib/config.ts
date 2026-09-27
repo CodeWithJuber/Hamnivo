@@ -10,7 +10,7 @@ function setting(name: string, built: string | undefined): string | undefined {
 const trim = (value: string) => value.trim().replace(/\/+$/, '');
 
 // The Vite dev server passes /v1 and /api/auth on to the gateway (vite.config.ts), so development
-// stays same-origin by default. That matters: the gateway's CORS rules don't allow PUT (draft saves).
+// stays same-origin by default. Production builds name the API origin (deploy/docker/Dockerfile).
 const DEFAULT_API = import.meta.env.DEV ? '' : 'http://localhost:4000';
 
 /** Base URL of API requests; empty means this origin. */

@@ -9,8 +9,10 @@
 #
 # Checks: HTTPS on every name, staff sign-up, a brand connected to the real Chatwoot, publishing
 # the AI agent, the widget's frame policy, a customer conversation answered by the AI over the live
-# stream, the website, then a backup and restore drill. HAMNIVO_BUILD_CA and HAMNIVO_BUILD_NETWORK
-# are passed to the image builds (see deploy/production/hamnivo.sh).
+# stream, the website and Studio, then a backup and restore drill. Last, a new owner uses Studio in
+# Chromium: sign-up, a brand, the Chatwoot connection and an agent draft, all across origins.
+# HAMNIVO_BUILD_CA and HAMNIVO_BUILD_NETWORK are passed to the image builds (see
+# deploy/production/hamnivo.sh).
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -72,3 +74,9 @@ done
 [[ -s "$work/caddy-root.crt" ]] || { echo 'Caddy did not create its internal CA' >&2; exit 1; }
 
 pnpm exec tsx "$root/scripts/ci/production-smoke.ts" "$HAMNIVO_ENV_FILE" "$work/caddy-root.crt" "$hamnivo"
+
+env_value() { sed -n "s/^$1=//p" "$HAMNIVO_ENV_FILE" | tail -1 | sed 's/^"\(.*\)"$/\1/'; }
+echo 'Studio in a browser'
+SMOKE_APP_ORIGIN="$(env_value HAMNIVO_APP_ORIGIN)" SMOKE_API_ORIGIN="$(env_value HAMNIVO_API_ORIGIN)" \
+  SMOKE_CHAT_ORIGIN="$(env_value HAMNIVO_CHAT_ORIGIN)" \
+  pnpm --filter @hamnivo/console exec playwright test --config playwright.production.config.ts

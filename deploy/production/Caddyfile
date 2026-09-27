@@ -17,6 +17,30 @@
 	}
 }
 
+# Studio, the staff console: a static app in which every path falls back to index.html. It talks
+# only to the API, and no website may frame it.
+{$HAMNIVO_APP_HOST} {
+	import tls
+	import headers
+	encode zstd gzip
+	root * /srv/studio
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		X-Frame-Options DENY
+	}
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	@app not path /assets/*
+	header @app Cache-Control no-cache
+	# Deep links such as /brands load the app; a missing asset stays a 404.
+	@deepLink {
+		not path /assets/*
+		not file
+	}
+	rewrite @deepLink /index.html
+	file_server
+}
+
 # Gateway API: REST, staff sign-in, webhooks and live streams (Server-Sent Events are flushed
 # as they arrive; responses are not compressed so streams are never buffered).
 {$HAMNIVO_API_HOST} {

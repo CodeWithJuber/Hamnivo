@@ -4,7 +4,7 @@
 # with the settings in deploy/production/.env, which `hamnivo.sh setup` creates.
 #
 # Public names (DNS records pointing at this server), all served by the edge container:
-#   HAMNIVO_APP_HOST (Studio, when it ships)   HAMNIVO_API_HOST (API)   HAMNIVO_CHAT_HOST (widget)
+#   HAMNIVO_APP_HOST (Studio)                  HAMNIVO_API_HOST (API)   HAMNIVO_CHAT_HOST (widget)
 #   HAMNIVO_SUPPORT_HOST (Chatwoot)            HAMNIVO_SITE_HOSTS (website)
 # Only the edge publishes ports (80 and 443). Databases, Valkey, the API and Chatwoot are reachable
 # only inside this compose network.
@@ -204,6 +204,7 @@ services:
     restart: unless-stopped
     environment:
       HAMNIVO_TLS: ${HAMNIVO_TLS:?run hamnivo.sh setup}
+      HAMNIVO_APP_HOST: ${HAMNIVO_APP_HOST:?run hamnivo.sh setup}
       HAMNIVO_API_HOST: ${HAMNIVO_API_HOST:?run hamnivo.sh setup}
       HAMNIVO_CHAT_HOST: ${HAMNIVO_CHAT_HOST:?run hamnivo.sh setup}
       HAMNIVO_SUPPORT_HOST: ${HAMNIVO_SUPPORT_HOST:?run hamnivo.sh setup}

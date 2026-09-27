@@ -222,11 +222,12 @@ cmd_up() {
   cat >&2 <<EOF
 
 Hamnivo is running.
+  Studio     $(get HAMNIVO_APP_ORIGIN)   (create your account here)
   Website    $(get HAMNIVO_SITE_ORIGIN)
   API        $(get HAMNIVO_API_ORIGIN)   (reference: $(get HAMNIVO_API_ORIGIN)/docs)
   Chat       $(get HAMNIVO_CHAT_ORIGIN)/loader.js
   Chatwoot   $(get HAMNIVO_SUPPORT_ORIGIN)   (super admin $(get CHATWOOT_ADMIN_EMAIL); password in .env)
-Next: create your account and company (docs/self-hosting.md, "First steps").
+Next: open Studio, create your account and set up a brand (docs/self-hosting.md, "First steps").
 EOF
 }
 

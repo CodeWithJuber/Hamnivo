@@ -9,5 +9,13 @@
     "types": ["vite/client", "node"],
     "noEmit": true
   },
-  "include": ["src", "e2e", "scripts", "vite.config.ts", "playwright.config.ts"]
+  "include": [
+    "src",
+    "e2e",
+    "production",
+    "scripts",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "playwright.production.config.ts"
+  ]
 }

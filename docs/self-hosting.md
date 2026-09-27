@@ -20,9 +20,10 @@ this repository.
 | Chatwoot CE v4.18.0 (conversation authority) with the Hamnivo Platform App | ready | `pnpm chatwoot:up` |
 | Chat API: widget sessions, conversations, live stream, staff takeover | ready | see "Connect a brand to Chatwoot" below |
 | Chat widget (Hamnivo Chat), its one-script loader and the JS client SDK | ready (first version) | see "Put the chat on a web page" below |
+| Verified customers: the server SDK (`@hamnivo/server`), with examples for plain HTML, Node Express and WordPress | ready (first version) | [`docs/guides/identity.md`](guides/identity.md) |
 | Public website (EN/AR/HI/UR, static) | ready | see "The public website" below |
 | AI agents: real models (Anthropic, OpenAI, Gemini, OpenAI-compatible), knowledge, kill switches | ready (API) | see "Connect a brand to Chatwoot" below |
-| Studio (staff console) | being built | until it ships, set things up through the API (A6) |
+| Studio (staff console): sign-in with two-step verification, brands and install, Chatwoot connection, AI agents, model connections, knowledge, Stop AI, runs | ready (first version) | `https://app.<your domain>` (A6); `pnpm --filter @hamnivo/console dev` in development |
 
 # Part A: Host Hamnivo on your server
 
@@ -118,7 +119,7 @@ The first run takes 10 to 20 minutes. It does the following:
 
 1. **Builds the two images from this code:**
    - `hamnivo/gateway`: the API, the worker and database migrations;
-   - `hamnivo/edge`: Caddy, with the widget and the website.
+   - `hamnivo/edge`: Caddy, with Studio, the widget and the website.
 2. **Starts PostgreSQL** (with pgvector) and creates the database roles.
 3. **Applies the database migrations.**
 4. **Prepares Chatwoot's database and starts Chatwoot.**
@@ -136,56 +137,55 @@ When it finishes, it prints the addresses. Check the services at any time:
 
 ## A6. First steps
 
-Studio, the staff console, will do all of this in the browser. Until it ships, use the API from
-any computer. Replace `example.com` with your domain.
+Open Studio, the staff console, at `https://app.example.com` (your domain in place of
+`example.com`).
 
-1. **Create your account.**
+1. **Create your account** with "Create an account". Confirm your email with the link Hamnivo sends
+   you; it brings you back to Studio. Without SMTP, the link is in `hamnivo.sh logs api`.
+2. **Create your workspace.** This is your company in Hamnivo.
+3. **Turn on two-step verification** under Account security. Registering identity keys needs it,
+   and publishing asks you to sign in again.
+4. **Create a brand** under "Brands and install". Give it a name and list the websites that may show
+   its chat, for example `https://www.yourshop.com`. No other website can show it. You can change the
+   list later with "Edit". A website you take off the list stops showing the chat at once, and its
+   open chats end.
+5. **Connect Chatwoot** with the button on the brand. Before anything happens, Studio lists what it
+   will set up: a Chatwoot account with an inbox for the website chat, an AI bot that answers there,
+   and signed webhooks back to Hamnivo.
+6. **Publish the AI agent** from "AI agents". It answers with the offline `hamnivo-mock` model
+   until you add a model under "Model connections", choose it in the agent and publish again.
+7. **Give the AI your knowledge** under Knowledge. Upload text, Markdown, HTML, PDF or Word files.
+8. **Put the chat on your website.** Copy the install code from the brand's card into your pages,
+   for example:
+
+   ```html
+   <script src="https://chat.example.com/loader.js" data-widget-id="wid_..."
+           data-api="https://api.example.com" async></script>
+   ```
+
+Staff can answer customers in Chatwoot at `https://support.example.com`. The super admin email and
+password are in `.env` (`CHATWOOT_ADMIN_EMAIL` and `CHATWOOT_ADMIN_PASSWORD`).
+
+### Settings that need the API for now
+
+Two settings have no Studio screen yet: **business hours** and **identity keys**. Set them through
+the API from any computer.
+
+1. **Sign in with curl.**
 
    ```bash
    A=https://api.example.com; O=https://app.example.com
    curl -c jar -H "origin: $O" -H 'content-type: application/json' \
-     -d '{"name":"Your Name","email":"you@example.com","password":"a long passphrase here"}' \
-     $A/api/auth/sign-up/email
-   ```
-
-2. **Confirm your email.** Open the link in the email. Without SMTP, the link is in
-   `hamnivo.sh logs api`.
-
-3. **Sign in and create your company.**
-
-   ```bash
+     -d '{"email":"you@example.com","password":"your passphrase"}' $A/api/auth/sign-in/email
+   # With two-step verification on, finish signing in with a code from your app:
    curl -c jar -b jar -H "origin: $O" -H 'content-type: application/json' \
-     -d '{"email":"you@example.com","password":"a long passphrase here"}' $A/api/auth/sign-in/email
-   curl -b jar -H "origin: $O" -H 'content-type: application/json' \
-     -d '{"name":"My Company","slug":"my-company"}' $A/v1/tenants
+     -d '{"code":"123456"}' $A/api/auth/two-factor/verify-totp
+   curl -b jar -H "origin: $O" $A/v1/me        # your workspaces, with their ids (tnt_...)
+   h=(-b jar -H "origin: $O" -H 'content-type: application/json' -H "x-hamnivo-tenant: tnt_...")
    ```
 
-4. **Create a brand and connect it.** Use the company id (`tnt_…`) returned above:
-
-   ```bash
-   T=tnt_...
-   h=(-b jar -H "origin: $O" -H 'content-type: application/json' -H "x-hamnivo-tenant: $T")
-   ```
-
-   Then follow the steps under "Connect a brand to Chatwoot and chat through the API" in Part B,
-   with `$A` in place of `http://localhost:4000`. List your real websites in `allowedOrigins`, for
-   example `["https://www.yourshop.com"]`. Only those websites can show the chat, and the widget
-   page refuses to be framed anywhere else.
-
-5. **Publish the AI agent.** It answers with the offline `hamnivo-mock` model until you choose a
-   real model and publish again.
-
-6. **Optional: verify signed-in customers.** Register a key for the brand, then have your backend
-   sign a short-lived identity assertion for each signed-in customer. The widget then shows
-   verified customers their own history. Registering a key needs two-step verification and a
-   recent sign-in:
-
-   ```bash
-   curl "${h[@]}" -d '{"alg":"HS256"}' $A/v1/admin/brands/brd_.../identity-keys   # secret shown once
-   ```
-
-7. **Optional: set business hours.** Then the chat tells customers honestly when people are
-   away and when they are back. The AI keeps answering at any hour:
+2. **Business hours.** With them set, the chat tells customers honestly when people are away and
+   when they are back. The AI keeps answering at any hour.
 
    ```bash
    curl "${h[@]}" -X PUT $A/v1/admin/brands/brd_.../business-hours -d '{"businessHours":
@@ -195,16 +195,20 @@ any computer. Replace `example.com` with your domain.
       "fri":[{"open":"09:00","close":"12:30"},{"open":"14:30","close":"17:00"}]}}}'
    ```
 
-8. **Put the chat on your website** with the brand's widget ID:
+3. **Identity keys** let the widget recognize customers who signed in on your website. The
+   [identity guide](guides/identity.md) covers the whole flow, with examples.
+   - Register a key for the brand.
+   - Your backend then signs a short-lived identity assertion for each signed-in customer.
+   - The widget shows verified customers their own history.
 
-   ```html
-   <script src="https://chat.example.com/loader.js" data-widget-id="wid_..."
-           data-api="https://api.example.com" async></script>
+   Registering a key needs two-step verification and a recent sign-in:
+
+   ```bash
+   curl "${h[@]}" -d '{"alg":"HS256"}' $A/v1/admin/brands/brd_.../identity-keys   # secret shown once
    ```
 
-Staff can answer in Chatwoot at `https://support.example.com`. The super admin email and password
-are in `.env` (`CHATWOOT_ADMIN_EMAIL` and `CHATWOOT_ADMIN_PASSWORD`). The interactive API reference
-is at `https://api.example.com/docs`; set `API_DOCS=false` to hide it.
+`curl "${h[@]}" $A/v1/admin/brands` lists your brands with their ids (`brd_...`). The interactive
+API reference is at `https://api.example.com/docs`; set `API_DOCS=false` to hide it.
 
 ## A7. Everyday operations
 
@@ -576,6 +580,17 @@ in `packages/widget-loader/README.md`. To build your own chat UI instead, see
 On a server, serve `apps/widget/dist` (with `loader.js` copied in) as static files behind your TLS
 proxy (for example `https://chat.example.com`). Set `PUBLIC_WIDGET_ORIGIN` to that origin, and
 list each customer website in the brand's `allowedOrigins`.
+
+### Studio in development
+
+```bash
+pnpm --filter @hamnivo/console dev   # http://localhost:5173
+```
+
+The development server passes `/v1` and `/api/auth` on to the API at `http://localhost:4000`
+(`HAMNIVO_GATEWAY_URL` changes that), so Studio and the API share one origin. Sign up there. Without
+SMTP, the confirmation link is in the API's log. `apps/console/README.md` describes the screens
+and the browser tests.
 
 ### The public website
 

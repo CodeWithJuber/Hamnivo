@@ -17,7 +17,8 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
 - **Overview.** Brands with their Chatwoot connection, each brand's AI assistant (live version or
   "draft only"), active AI stops, and the latest runs.
 - **Brands and install.**
-  - Create a brand with its allowed websites.
+  - Create a brand with its allowed websites, and edit its name and websites later. Studio warns
+    that a website taken off the list ends the chats open there.
   - Connect it to Chatwoot.
   - Copy the loader snippet with the brand's widget ID.
 - **AI agents.**
