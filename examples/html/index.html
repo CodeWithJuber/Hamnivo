@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hamnivo Chat on a static page</title>
+  </head>
+  <body>
+    <main>
+      <h1>Hamnivo Chat on a static page</h1>
+      <p>The chat button is in the bottom corner of this page.</p>
+      <p><button type="button" id="open-chat">Chat with us</button></p>
+    </main>
+
+    <!--
+      Hamnivo Chat. Replace the three placeholders:
+      - https://chat.example.com: where Hamnivo Chat and its loader.js are served;
+      - YOUR_WIDGET_ID: the brand's widget ID (wid_...);
+      - https://api.example.com: the Hamnivo API.
+      This page's origin must be one of the brand's allowed websites. See README.md.
+    -->
+    <script
+      src="https://chat.example.com/loader.js"
+      data-widget-id="YOUR_WIDGET_ID"
+      data-api="https://api.example.com"
+      async
+    ></script>
+
+    <script>
+      // Optional: open the chat from your own button too.
+      document.getElementById('open-chat').addEventListener('click', () => {
+        window.Hamnivo?.open();
+      });
+    </script>
+  </body>
+</html>

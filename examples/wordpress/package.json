@@ -1,0 +1,7 @@
+{
+  "name": "@hamnivo/example-wordpress",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example: a single-file WordPress plugin that adds the Hamnivo chat loader from its settings",
+  "license": "MIT"
+}
