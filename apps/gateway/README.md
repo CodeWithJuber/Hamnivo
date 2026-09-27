@@ -149,7 +149,9 @@ Late publication (R06):
   verify their customers' identity assertions: an ES256, EdDSA or RS256 public key, or an HS256
   secret generated and shown once. Registering needs `widget.identity_keys`, two-step
   verification and a recent sign-in. A key can be retired (it still verifies during a rotation)
-  or revoked (refused at once).
+  or revoked. A revoked key is refused at once, and the chat sessions it signed customers into end
+  (`widget_sessions.identity_key_id`). Assertions may be dated up to 5 seconds ahead of this
+  server's clock.
 - **One reply per burst.** A reply job stops when the customer wrote again meanwhile. It checks
   before and after generation. The newer message's job answers with both messages in view.
 - **Feedback and reopen.** `POST …/feedback` stores a rating of a resolved conversation, and staff

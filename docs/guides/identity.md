@@ -217,8 +217,9 @@ Rotate keys on a schedule, and at once if a key may have leaked.
    curl "${h[@]}" -d '{}' $A/v1/admin/brands/$B/identity-keys/OLD_KID/revoke
    ```
 
-A revoked key never verifies again. If a key leaked, revoke it at once, then register and deploy
-a new one. Revoking a key does not end chat sessions that it already verified.
+A revoked key never verifies again. Revoking it also ends at once every chat session it signed a
+customer into; those customers continue anonymously until your website identifies them again. If a
+key leaked, revoke it at once, then register and deploy a new one. Retiring a key ends nothing.
 
 ## Security
 

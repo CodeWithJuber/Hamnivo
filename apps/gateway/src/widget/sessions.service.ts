@@ -33,6 +33,8 @@ import {
 import { principalConversations } from './views.js';
 
 const REFRESH_GRACE_MS = 30_000;
+/** Identity assertions may be dated up to this many seconds in the future (clock differences). */
+const ASSERTION_CLOCK_TOLERANCE_SECONDS = 5;
 
 type SessionRow = typeof schema.widgetSessions.$inferSelect;
 type PrincipalRow = typeof schema.customerPrincipals.$inferSelect;
@@ -122,6 +124,7 @@ export class WidgetSessionsService {
     brandId: string,
     principal: PrincipalRow,
     hostOrigin: string,
+    identityKeyId: string | null = null,
   ): Promise<WidgetSession> {
     const now = this.clock();
     const refresh = newRefreshSecret();
@@ -134,6 +137,7 @@ export class WidgetSessionsService {
         principalId: principal.id,
         refreshHash: refresh.hash,
         hostOrigin,
+        identityKeyId,
         lastUsedAt: now,
         expiresAt: new Date(now.getTime() + this.config.WIDGET_SESSION_DAYS * 86_400_000),
       })
@@ -293,6 +297,8 @@ export class WidgetSessionsService {
           algorithms: [key.alg],
           audience: claims.widgetId,
           maxTokenAge: '5m',
+          // The website's clock may run a little ahead of or behind this server's.
+          clockTolerance: ASSERTION_CLOCK_TOLERANCE_SECONDS,
           currentDate: now,
           requiredClaims: ['sub', 'exp', 'iat', 'jti'],
         });
@@ -368,6 +374,7 @@ export class WidgetSessionsService {
         claims.brandId,
         principal,
         current?.hostOrigin ?? 'unknown',
+        key.id,
       );
     });
   }

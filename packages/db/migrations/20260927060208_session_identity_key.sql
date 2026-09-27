@@ -1,0 +1,3 @@
+ALTER TABLE "widget_sessions" ADD COLUMN "identity_key_id" uuid;--> statement-breakpoint
+ALTER TABLE "widget_sessions" ADD CONSTRAINT "widget_sessions_identity_key_fk" FOREIGN KEY ("tenant_id","identity_key_id") REFERENCES "public"."brand_identity_keys"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "widget_sessions_identity_key_idx" ON "widget_sessions" USING btree ("tenant_id","identity_key_id");

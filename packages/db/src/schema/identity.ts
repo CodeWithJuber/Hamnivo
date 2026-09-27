@@ -367,6 +367,8 @@ export const widgetSessions = pgTable(
     previousRefreshHash: bytea('previous_refresh_hash'),
     generation: integer('generation').notNull().default(0),
     hostOrigin: text('host_origin').notNull(),
+    /** The brand key that verified the customer, so that revoking the key ends the session. */
+    identityKeyId: uuid('identity_key_id'),
     createdAt: createdAt(),
     lastUsedAt: tstz('last_used_at').notNull().defaultNow(),
     expiresAt: tstz('expires_at').notNull(),
@@ -375,6 +377,12 @@ export const widgetSessions = pgTable(
   },
   (t) => [
     unique('widget_sessions_tenant_id_id_key').on(t.tenantId, t.id),
+    foreignKey({
+      name: 'widget_sessions_identity_key_fk',
+      columns: [t.tenantId, t.identityKeyId],
+      foreignColumns: [brandIdentityKeys.tenantId, brandIdentityKeys.id],
+    }),
+    index('widget_sessions_identity_key_idx').on(t.tenantId, t.identityKeyId),
     foreignKey({
       name: 'widget_sessions_brand_fk',
       columns: [t.tenantId, t.brandId],
