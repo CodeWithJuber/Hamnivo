@@ -68,8 +68,11 @@ export interface DateTimeFormatOptions {
   digits?: DigitPreference;
   /** IANA zone the reader is in (e.g. Asia/Dubai). The zone is always printed with the time. */
   timeZone: string;
-  /** Date and time (default) or only the time of day. */
-  part?: 'datetime' | 'time';
+  /**
+   * Date and time (default), only the time of day, or only the calendar date. A date alone is
+   * for calendar days (a delivery estimate): pass `timeZone: 'UTC'` to show the day as stored.
+   */
+  part?: 'datetime' | 'time' | 'date';
 }
 
 /** "Sep 28, 2026, 1:00 AM GMT+4": the zone is part of the text, never implied. */
@@ -78,8 +81,15 @@ export function formatDateTime(
   locale: string,
   options: DateTimeFormatOptions,
 ): string {
+  const day = { year: 'numeric', month: 'short', day: 'numeric' } as const;
+  if (options.part === 'date') {
+    return new Intl.DateTimeFormat(localeTag(locale, options.digits), {
+      ...day,
+      timeZone: options.timeZone,
+    }).format(value);
+  }
   return new Intl.DateTimeFormat(localeTag(locale, options.digits), {
-    ...(options.part === 'time' ? {} : { year: 'numeric', month: 'short', day: 'numeric' }),
+    ...(options.part === 'time' ? {} : day),
     hour: 'numeric',
     minute: '2-digit',
     timeZone: options.timeZone,

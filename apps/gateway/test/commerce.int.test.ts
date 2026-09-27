@@ -902,6 +902,140 @@ describe('refunds need approval and a separate approver (C12, C19)', () => {
   });
 });
 
+describe('order and fulfilment lifecycle (C10, HNV-21-02)', () => {
+  it('keeps paid, delayed, shipped and delivered distinct and tells the customer each step', async () => {
+    const paid = await paidOrder();
+    const orderId = paid.purchase.order.id as string;
+    const reference = paid.purchase.order.reference as string;
+    const lead = await member('Lina Lead', 'lina@example.com', 'supervisor');
+    const helper = await member('Omar Agent', 'omar@example.com', 'agent');
+    const fulfil = (who: Client, body: Record<string, unknown>) =>
+      who.post(`/v1/admin/commerce/orders/${orderId}/fulfillments`, body);
+
+    // Paid is not shipped: nothing has been sent yet.
+    const before = await lead.get(`/v1/admin/commerce/orders/${orderId}`);
+    expect(before.body.order).toMatchObject({
+      state: 'confirmed',
+      paymentState: 'captured',
+      fulfillmentState: 'not_started',
+    });
+    expect(before.body.fulfillments).toEqual([]);
+
+    // Agents can read orders but not record fulfilment.
+    const noRight = await fulfil(helper, { kind: 'shipment', state: 'shipped' });
+    expect(noRight.status).toBe(403);
+    expect(noRight.body.code).toBe('SCOPE_DENIED');
+
+    // A delay is its own state, with the merchant's estimate.
+    const delayed = await fulfil(lead, {
+      kind: 'shipment',
+      state: 'delayed',
+      estimateAt: '2026-10-05T09:00:00.000Z',
+      note: 'Waiting for stock',
+    });
+    expect(delayed.status, JSON.stringify(delayed.body)).toBe(200);
+    expect(delayed.body.order).toMatchObject({
+      state: 'confirmed',
+      paymentState: 'captured',
+      fulfillmentState: 'delayed',
+    });
+    expect(delayed.body.fulfillments).toMatchObject([
+      {
+        kind: 'shipment',
+        state: 'delayed',
+        source: 'staff',
+        estimateAt: '2026-10-05T09:00:00.000Z',
+        note: 'Waiting for stock',
+      },
+    ]);
+
+    const shipped = await fulfil(lead, { kind: 'shipment', state: 'shipped', carrierRef: 'TRK-1' });
+    expect(shipped.status, JSON.stringify(shipped.body)).toBe(200);
+    expect(shipped.body.order).toMatchObject({ state: 'confirmed', fulfillmentState: 'shipped' });
+    expect(shipped.body.fulfillments).toMatchObject([
+      { state: 'shipped', carrierRef: 'TRK-1', estimateAt: '2026-10-05T09:00:00.000Z' },
+    ]);
+
+    // A shipment cannot become an activated service.
+    const wrong = await fulfil(lead, { kind: 'shipment', state: 'provisioned' });
+    expect(wrong.status).toBe(409);
+
+    const delivered = await fulfil(lead, { kind: 'shipment', state: 'delivered' });
+    expect(delivered.status, JSON.stringify(delivered.body)).toBe(200);
+    expect(delivered.body.order).toMatchObject({
+      state: 'fulfilled',
+      paymentState: 'captured',
+      fulfillmentState: 'delivered',
+    });
+    expect(delivered.body.fulfillments).toHaveLength(1);
+
+    // The customer sees the same states, and each step was posted to the chat as a card.
+    const customer = await paid.visitor.call(
+      'GET',
+      commerce(paid.conversationId, `orders/${orderId}`),
+    );
+    expect(customer.body).toMatchObject({
+      state: 'fulfilled',
+      paymentState: 'captured',
+      fulfillmentState: 'delivered',
+    });
+    await settle();
+    const statusCards = (await authorityMessages(paid.conversationId)).filter(
+      (m) =>
+        m.key?.startsWith('hv1:c:') &&
+        (m.contentAttributes.hv as { card: { type: string } }).card.type === 'order_status',
+    );
+    const notGuaranteed = "The shop's estimate: 2026-10-05. This date is not guaranteed.";
+    expect(statusCards.map((m) => m.text)).toEqual([
+      `Order ${reference} is delayed. ${notGuaranteed}`,
+      `Order ${reference} has shipped. ${notGuaranteed}`,
+      `Order ${reference} was delivered.`,
+    ]);
+    const history = await paid.visitor.call(
+      'GET',
+      `/v1/widget/conversations/${paid.conversationId}/messages`,
+    );
+    const shown = history.body.items.flatMap(
+      (m: { parts: { type: string; card?: { kind: string } }[] }) =>
+        m.parts.flatMap((p) => (p.card?.kind === 'order_status' ? [p.card] : [])),
+    );
+    // Newest first in the widget history.
+    expect([...shown].reverse()).toMatchObject([
+      { fulfillmentState: 'delayed', paymentState: 'paid', estimateAt: '2026-10-05T09:00:00.000Z' },
+      { fulfillmentState: 'shipped', estimateAt: '2026-10-05T09:00:00.000Z' },
+      { fulfillmentState: 'fulfilled', estimateAt: null },
+    ]);
+
+    const audited = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .select()
+        .from(schema.auditEvents)
+        .where(eq(schema.auditEvents.action, 'commerce.fulfillment.recorded'))
+        .orderBy(asc(schema.auditEvents.occurredAt)),
+    );
+    expect(audited.map((a) => (a.data as { state: string }).state)).toEqual([
+      'delayed',
+      'shipped',
+      'delivered',
+    ]);
+  });
+
+  it('does not fulfil an order that is not paid', async () => {
+    const { visitor, conversationId } = await newCustomer();
+    const cart = await cartWith(visitor, conversationId, [
+      { productId: 'prod_notebook', quantity: 1 },
+    ]);
+    const quote = await quoted(visitor, conversationId, cart.revision);
+    const purchase = await approve(visitor, conversationId, quote);
+    expect(purchase.body.order.id).toBeTruthy();
+    const unpaid = await shop.owner.post(
+      `/v1/admin/commerce/orders/${purchase.body.order.id}/fulfillments`,
+      { kind: 'shipment', state: 'shipped' },
+    );
+    expect(unpaid.status).toBe(422);
+  });
+});
+
 describe('tenant isolation (cross-tenant denial)', () => {
   it('hides one tenant’s orders, carts and webhooks from another', async () => {
     const paid = await paidOrder();

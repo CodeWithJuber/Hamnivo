@@ -40,6 +40,12 @@ export function formatWhen(iso: string | null | undefined): string {
   });
 }
 
+/** A calendar date the shop gave (a delivery estimate): the same day wherever it is read. */
+export function formatDay(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return formatDateTime(new Date(iso), locale(), { timeZone: 'UTC', part: 'date' });
+}
+
 export function useOrders(filter: { q?: string; needsAttention?: boolean }) {
   const { can } = useTenant();
   const query = new URLSearchParams({ limit: '100' });
@@ -110,6 +116,27 @@ export function useRefundDecision(orderId: string) {
         method: 'POST',
         tenant,
         body: input.decision === 'reject' ? { reason: input.reason } : {},
+      }),
+    [commerceKeys.orders, commerceKeys.order(orderId)],
+  );
+}
+
+export interface FulfilmentInput {
+  kind: 'shipment' | 'service';
+  state: 'in_progress' | 'delayed' | 'shipped' | 'delivered' | 'provisioned' | 'failed';
+  estimateAt?: string;
+  carrierRef?: string;
+  note?: string;
+}
+
+/** Records what the shop reported (C10, HNV-21-02); the customer sees it in the chat. */
+export function useRecordFulfilment(orderId: string) {
+  return useStudioMutation(
+    (input: FulfilmentInput, tenant: string) =>
+      api<OrderDetail>(`/v1/admin/commerce/orders/${orderId}/fulfillments`, {
+        method: 'POST',
+        tenant,
+        body: input,
       }),
     [commerceKeys.orders, commerceKeys.order(orderId)],
   );

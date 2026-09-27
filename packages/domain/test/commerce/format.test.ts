@@ -67,6 +67,16 @@ describe('formatDateTime (U06)', () => {
       '٢٨ سبتمبر ٢٠٢٦، ١:٠٠ ص غرينتش+٤',
     );
   });
+
+  it('shows a calendar date alone, as stored when read in UTC', () => {
+    const estimate = new Date('2026-10-05T00:00:00Z');
+    expect(plain(formatDateTime(estimate, 'en', { timeZone: 'UTC', part: 'date' }))).toBe(
+      'Oct 5, 2026',
+    );
+    expect(
+      plain(formatDateTime(estimate, 'hi', { timeZone: 'UTC', part: 'date', digits: 'native' })),
+    ).toBe('५ अक्टू॰ २०२६');
+  });
 });
 
 describe('parseAmountInput (U06)', () => {

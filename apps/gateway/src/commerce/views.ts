@@ -248,6 +248,7 @@ export function fulfillmentView(row: FulfillmentRow): Fulfillment {
     state: row.state,
     source: row.source,
     estimateAt: iso(row.estimateAt),
+    carrierRef: row.carrierRef,
     note: row.note,
     lastUpdateAt: row.lastUpdateAt.toISOString(),
   };

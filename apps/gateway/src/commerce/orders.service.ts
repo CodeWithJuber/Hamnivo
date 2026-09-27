@@ -2,6 +2,7 @@ import type {
   ConversationCommerce,
   CustomerOrderView,
   OrderDetail,
+  OrderStatusCard,
   OrderSummary,
   RecordFulfillmentRequest,
 } from '@hamnivo/contracts';
@@ -86,6 +87,24 @@ const FULFILLMENT_TEXT: Record<string, string> = {
   provisioned: 'is active',
   failed: 'could not be completed',
 };
+
+/** What the customer's card shows for each fulfilment state: shipped is not delivered (C10). */
+const CARD_FULFILLMENT: Record<
+  FulfillmentState,
+  z.infer<typeof OrderStatusCard>['fulfillmentState']
+> = {
+  pending: 'not_started',
+  in_progress: 'processing',
+  delayed: 'delayed',
+  shipped: 'shipped',
+  delivered: 'fulfilled',
+  provisioned: 'provisioned',
+  failed: 'failed',
+  cancelled: 'cancelled',
+};
+
+/** States in which a delivery estimate still means something. */
+const ESTIMATE_STATES: readonly FulfillmentState[] = ['in_progress', 'delayed', 'shipped'];
 
 /**
  * Orders and fulfilment (C10), staff order views with operations, receipts and exceptions
@@ -437,9 +456,18 @@ export class OrdersService {
         .from(schema.merchantConnections)
         .where(eq(schema.merchantConnections.id, order.merchantConnectionId));
       if (control && merchant) {
-        const estimate = input.estimateAt
-          ? ` The merchant's estimate: ${input.estimateAt.slice(0, 10)}.`
+        // An estimate is the shop's, and only while the order is still on its way.
+        const estimateAt = ESTIMATE_STATES.includes(to)
+          ? (input.estimateAt ?? fulfillment.estimateAt?.toISOString() ?? null)
+          : null;
+        const estimate = estimateAt
+          ? ` The shop's estimate: ${estimateAt.slice(0, 10)}. This date is not guaranteed.`
           : '';
+        const [payment] = await tx
+          .select({ refunded: schema.payments.refundedMinor })
+          .from(schema.payments)
+          .where(eq(schema.payments.purchaseIntentId, order.purchaseIntentId));
+        const refunded = payment?.refunded ?? 0n;
         await this.cards.enqueue(
           tx,
           principal.tenantId,
@@ -450,15 +478,14 @@ export class OrdersService {
               version: 1,
               orderId: toPublicId('order', order.id),
               reference: order.reference,
-              paymentState: 'paid',
-              fulfillmentState:
-                to === 'delayed'
-                  ? 'delayed'
-                  : done
-                    ? 'fulfilled'
-                    : to === 'failed'
-                      ? 'unknown'
-                      : 'processing',
+              paymentState:
+                refunded <= 0n
+                  ? 'paid'
+                  : refunded >= order.totalMinor
+                    ? 'refunded'
+                    : 'partially_refunded',
+              fulfillmentState: CARD_FULFILLMENT[to],
+              estimateAt,
               summary:
                 `Order ${order.reference} ${FULFILLMENT_TEXT[to] ?? 'was updated'}.${estimate}`.slice(
                   0,

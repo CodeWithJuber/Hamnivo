@@ -102,18 +102,20 @@ function Bubble({
   onRetry,
   commerce,
   locale,
+  onHelp,
 }: {
   message: ThreadMessageLike;
   onRetry: (id: string) => void;
   commerce: Commerce;
   locale: Locale;
+  onHelp: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const custom = (message.metadata?.custom ?? {}) as unknown as Partial<Custom>;
   if (custom.card) {
     return (
       <li className="flex flex-col items-start gap-1" data-sender="system">
-        <CommerceCard part={custom.card} commerce={commerce} locale={locale} />
+        <CommerceCard part={custom.card} commerce={commerce} locale={locale} onHelp={onHelp} />
       </li>
     );
   }
@@ -230,6 +232,8 @@ export function Chat(props: {
     () => toThread(state.messages, props.pending, t('you')),
     [state.messages, props.pending, t],
   );
+  const canAskPerson =
+    conversation?.responder !== 'person' && conversation?.status !== 'waiting_for_person';
   const last = state.messages.at(-1);
   const aiWriting =
     conversation?.responder === 'ai' &&
@@ -345,6 +349,7 @@ export function Chat(props: {
                     onRetry={props.onRetry}
                     commerce={props.commerce}
                     locale={locale}
+                    onHelp={canAskPerson ? () => void props.onHandoff() : undefined}
                   />
                 )}
               </ThreadPrimitive.Messages>
@@ -352,8 +357,7 @@ export function Chat(props: {
           </ThreadPrimitive.Viewport>
           <div className="border-t border-border bg-surface px-3 pb-3 pt-2">
             <ShopBar commerce={props.commerce} locale={locale} />
-            {conversation?.responder !== 'person' &&
-            conversation?.status !== 'waiting_for_person' ? (
+            {canAskPerson ? (
               <Button
                 variant="link"
                 className="mb-1 h-auto text-sm"

@@ -30,11 +30,14 @@ import { ActionError, QueryState } from '../components/States';
 import { directionOf, isLocale } from '../i18n';
 import { newIdempotencyKey } from '../lib/api';
 import {
+  type FulfilmentInput,
   formatAmount,
+  formatDay,
   formatWhen,
   type OrderDetail,
   type RefundView,
   useOrder,
+  useRecordFulfilment,
   useRefundDecision,
   useRequestRefund,
 } from '../lib/commerce';
@@ -56,6 +59,208 @@ const REFUND_TONE: Record<RefundView['state'], StatusTone> = {
 };
 
 const REASONS = ['customer_request', 'damaged', 'not_delivered', 'duplicate', 'other'] as const;
+
+const FULFILMENT_TONE: Record<string, StatusTone> = {
+  not_started: 'neutral',
+  pending: 'neutral',
+  in_progress: 'info',
+  delayed: 'warning',
+  shipped: 'info',
+  delivered: 'success',
+  provisioned: 'success',
+  failed: 'danger',
+  cancelled: 'neutral',
+};
+
+/** What each kind can become: a shipment ships and is delivered, a service becomes active. */
+const NEXT_STATES = {
+  shipment: ['in_progress', 'delayed', 'shipped', 'delivered', 'failed'],
+  service: ['in_progress', 'delayed', 'provisioned', 'failed'],
+} as const satisfies Record<FulfilmentInput['kind'], readonly FulfilmentInput['state'][]>;
+
+/** States in which a delivery estimate still means something. */
+const ESTIMABLE: readonly string[] = ['in_progress', 'delayed', 'shipped'];
+
+/** Only paid orders are fulfilled. */
+const FULFILLABLE: readonly string[] = ['confirmed', 'partially_fulfilled', 'fulfilled'];
+
+/** Records a shipment or service update the shop reported (C10, HNV-21-02). */
+function FulfilmentDialog({
+  order,
+  open,
+  onOpenChange,
+}: {
+  order: OrderDetail;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const announce = useAnnouncer();
+  const record = useRecordFulfilment(order.order.id);
+  const [kind, setKind] = useState<FulfilmentInput['kind']>('shipment');
+  const [state, setState] = useState<FulfilmentInput['state']>('in_progress');
+  const [estimate, setEstimate] = useState('');
+  const [carrierRef, setCarrierRef] = useState('');
+  const [note, setNote] = useState('');
+  const [failure, setFailure] = useState<unknown>(null);
+  const estimable = ESTIMABLE.includes(state);
+
+  const reset = () => {
+    setKind('shipment');
+    setState('in_progress');
+    setEstimate('');
+    setCarrierRef('');
+    setNote('');
+    setFailure(null);
+  };
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setFailure(null);
+    try {
+      await record.mutateAsync({
+        kind,
+        state,
+        ...(estimable && estimate ? { estimateAt: `${estimate}T00:00:00.000Z` } : {}),
+        ...(carrierRef.trim() ? { carrierRef: carrierRef.trim() } : {}),
+        ...(note.trim() ? { note: note.trim() } : {}),
+      });
+      announce(t('commerce.fulfilmentForm.saved'));
+      reset();
+      onOpenChange(false);
+    } catch (caught) {
+      if (!isCancelled(caught)) setFailure(caught);
+    }
+  };
+
+  return (
+    <AppDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) reset();
+        onOpenChange(next);
+      }}
+      title={t('commerce.fulfilmentForm.title')}
+      description={t('commerce.fulfilmentForm.description')}
+      testId="fulfilment-dialog"
+    >
+      <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)} noValidate>
+        <SelectField
+          id="fulfilment-kind"
+          label={t('commerce.fulfilmentForm.kind')}
+          value={kind}
+          onChange={(event) => {
+            const next = event.target.value as FulfilmentInput['kind'];
+            setKind(next);
+            if (!(NEXT_STATES[next] as readonly string[]).includes(state)) setState('in_progress');
+          }}
+          options={(['shipment', 'service'] as const).map((value) => ({
+            value,
+            label: t(`commerce.detail.kind.${value}`),
+          }))}
+        />
+        <SelectField
+          id="fulfilment-state"
+          label={t('commerce.fulfilmentForm.state')}
+          value={state}
+          onChange={(event) => setState(event.target.value as FulfilmentInput['state'])}
+          options={NEXT_STATES[kind].map((value) => ({
+            value,
+            label: t(`commerce.fulfilment.${value}`),
+          }))}
+        />
+        {estimable ? (
+          <TextField
+            id="fulfilment-estimate"
+            type="date"
+            label={t('commerce.fulfilmentForm.estimate')}
+            labelNote={t('app.optional')}
+            hint={t('commerce.fulfilmentForm.estimateHint')}
+            value={estimate}
+            dir="ltr"
+            onChange={(event) => setEstimate(event.target.value)}
+          />
+        ) : null}
+        <TextField
+          id="fulfilment-carrier"
+          label={t('commerce.fulfilmentForm.carrierRef')}
+          labelNote={t('app.optional')}
+          value={carrierRef}
+          maxLength={120}
+          dir="ltr"
+          autoComplete="off"
+          onChange={(event) => setCarrierRef(event.target.value)}
+        />
+        <TextareaField
+          id="fulfilment-note"
+          label={t('commerce.fulfilmentForm.note')}
+          labelNote={t('app.optional')}
+          hint={t('commerce.fulfilmentForm.noteHint')}
+          value={note}
+          maxLength={500}
+          onChange={(event) => setNote(event.target.value)}
+        />
+        <ActionError error={failure} />
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            {t('app.cancel')}
+          </Button>
+          <Button type="submit" busy={record.isPending}>
+            {t('commerce.fulfilmentForm.submit')}
+          </Button>
+        </DialogFooter>
+      </form>
+    </AppDialog>
+  );
+}
+
+/** Each shipment or service with its milestone, the shop's estimate, source and last update. */
+function FulfilmentList({ order }: { order: OrderDetail }) {
+  const { t } = useTranslation();
+  if (order.fulfillments.length === 0) {
+    return <p className="text-sm text-text-secondary">{t('commerce.detail.noFulfilment')}</p>;
+  }
+  return (
+    <ul className="flex flex-col gap-3" data-testid="fulfilments">
+      {order.fulfillments.map((f) => (
+        <li
+          key={f.id}
+          className="flex flex-col gap-1 rounded-lg border border-border p-3 text-sm"
+          data-fulfilment={f.state}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{t(`commerce.detail.kind.${f.kind}`)}</span>
+            <StatusBadge
+              tone={FULFILMENT_TONE[f.state] ?? 'neutral'}
+              data-testid="fulfilment-state"
+            >
+              <FulfilmentText state={f.state} />
+            </StatusBadge>
+          </div>
+          {f.estimateAt ? (
+            <p data-testid="fulfilment-estimate">
+              {t('commerce.detail.estimate', { date: formatDay(f.estimateAt) })}
+            </p>
+          ) : null}
+          {f.carrierRef ? (
+            <p className="text-text-secondary">
+              {t('commerce.detail.tracking', { ref: `\u2068${f.carrierRef}\u2069` })}
+            </p>
+          ) : null}
+          {f.note ? (
+            <p className="text-text" dir="auto">
+              {f.note}
+            </p>
+          ) : null}
+          <p className="text-xs text-text-secondary">
+            {t(`commerce.detail.source.${f.source}`)} ·{' '}
+            {t('commerce.detail.updated', { time: formatWhen(f.lastUpdateAt) })}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** Refund request drawer (C12, U06): the amount is read in any script and never guessed. */
 function RefundDrawer({
@@ -413,6 +618,7 @@ function Detail({ order }: { order: OrderDetail }) {
   const { t } = useTranslation();
   const { can } = useTenant();
   const [drawer, setDrawer] = useState(false);
+  const [recording, setRecording] = useState(false);
   const currency = order.order.currency;
   return (
     <div className="flex flex-col gap-6">
@@ -428,7 +634,17 @@ function Detail({ order }: { order: OrderDetail }) {
             {t('commerce.detail.back')}
           </Link>
         }
-        actions={<PaymentBadge state={order.order.paymentState} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <PaymentBadge state={order.order.paymentState} />
+            <StatusBadge
+              tone={FULFILMENT_TONE[order.order.fulfillmentState] ?? 'neutral'}
+              data-testid="order-fulfilment-state"
+            >
+              <FulfilmentText state={order.order.fulfillmentState} />
+            </StatusBadge>
+          </div>
+        }
       />
       <div className="grid gap-6 lg:grid-cols-2">
         <Section id="order-items" title={t('commerce.detail.items')}>
@@ -507,23 +723,21 @@ function Detail({ order }: { order: OrderDetail }) {
               </dd>
             </dl>
           ) : null}
-          <h3 className="text-md font-semibold text-text">{t('commerce.detail.fulfilments')}</h3>
-          {order.fulfillments.length === 0 ? (
-            <p className="text-sm text-text-secondary">{t('commerce.detail.noFulfilment')}</p>
-          ) : (
-            <ul className="flex flex-col gap-1 text-sm">
-              {order.fulfillments.map((f) => (
-                <li key={f.id}>
-                  <FulfilmentText state={f.state} /> · {formatWhen(f.lastUpdateAt)}
-                  {f.estimateAt
-                    ? ` · ${t('commerce.detail.estimate', { time: formatWhen(f.estimateAt) })}`
-                    : ''}
-                </li>
-              ))}
-            </ul>
-          )}
         </Section>
       </div>
+      <Section
+        id="order-fulfilment"
+        title={t('commerce.detail.fulfilments')}
+        actions={
+          can('commerce.orders.manage') && FULFILLABLE.includes(order.order.state) ? (
+            <Button variant="secondary" onClick={() => setRecording(true)}>
+              {t('commerce.fulfilmentForm.open')}
+            </Button>
+          ) : null
+        }
+      >
+        <FulfilmentList order={order} />
+      </Section>
       <Section
         id="order-refunds"
         title={t('commerce.refunds.title')}
@@ -604,6 +818,7 @@ function Detail({ order }: { order: OrderDetail }) {
         </Section>
       ) : null}
       <RefundDrawer order={order} open={drawer} onOpenChange={setDrawer} />
+      <FulfilmentDialog order={order} open={recording} onOpenChange={setRecording} />
     </div>
   );
 }

@@ -69,15 +69,21 @@ export const OrderStatusCard = z
       'partially_refunded',
       'unknown',
     ]),
+    /** Paid, shipped and provisioned stay distinct (C10); `fulfilled` means delivered. */
     fulfillmentState: z.enum([
       'not_started',
       'processing',
       'partially_fulfilled',
+      'shipped',
       'fulfilled',
+      'provisioned',
       'delayed',
+      'failed',
       'cancelled',
       'unknown',
     ]),
+    /** The shop's own estimate, shown as an estimate and never as a promise (HNV-21-02). */
+    estimateAt: Timestamp.nullable().optional(),
     summary: z.string().max(300),
     /** When the authoritative system was last read — freshness is shown, not implied. */
     observedAt: Timestamp,

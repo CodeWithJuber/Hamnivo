@@ -2,7 +2,7 @@ import type { Card, MessagePart } from '@hamnivo/contracts';
 import { Button } from '@hamnivo/ui/components/button';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { price, time } from './format.js';
+import { day, price, time } from './format.js';
 import type { Commerce } from './useCommerce.js';
 
 export type Part = Extract<MessagePart, { type: 'card' }>;
@@ -14,7 +14,13 @@ type OrderStatusCard = Extract<Card, { kind: 'order_status' }>;
 const box = 'w-full max-w-[92%] rounded-2xl border border-border bg-surface p-3 text-sm text-text';
 
 /** A card shown in the conversation, rendered from Hamnivo's record (never from model text). */
-export function CommerceCard(props: { part: Part; commerce: Commerce; locale: string }) {
+export function CommerceCard(props: {
+  part: Part;
+  commerce: Commerce;
+  locale: string;
+  /** Asks for a person; absent when a person already has the conversation. */
+  onHelp?: (() => void) | undefined;
+}) {
   const { card } = props.part;
   switch (card.kind) {
     case 'catalog':
@@ -24,7 +30,7 @@ export function CommerceCard(props: { part: Part; commerce: Commerce; locale: st
     case 'receipt':
       return <Receipt card={card} locale={props.locale} />;
     case 'order_status':
-      return <OrderStatus card={card} locale={props.locale} />;
+      return <OrderStatus card={card} locale={props.locale} onHelp={props.onHelp} />;
     default:
       return (
         <p dir="auto" className="text-sm text-text-muted">
@@ -369,20 +375,42 @@ function Receipt(props: { card: ReceiptCard; locale: string }) {
   );
 }
 
-function OrderStatus(props: { card: OrderStatusCard; locale: string }) {
+/** Where an order is (HNV-21-02): the milestone, the shop's estimate, when, and who can help. */
+function OrderStatus(props: { card: OrderStatusCard; locale: string; onHelp?: () => void }) {
   const { t } = useTranslation();
   const { card } = props;
+  const troubled = card.fulfillmentState === 'delayed' || card.fulfillmentState === 'failed';
   return (
     <section
       className={box}
       data-card="order_status"
+      data-status={card.fulfillmentState}
       aria-label={t('shop.orderRef', { reference: card.reference })}
     >
       <h2 className="font-semibold">{t('shop.orderRef', { reference: card.reference })}</h2>
-      <p className="mt-1">{t(`shop.fulfillment.${card.fulfillmentState}`)}</p>
+      <p className="mt-1 font-medium" data-testid="order-milestone">
+        {t(`shop.fulfillment.${card.fulfillmentState}`)}
+      </p>
+      {card.estimateAt ? (
+        <p className="mt-1" data-testid="order-estimate">
+          {t('shop.estimateDate', { date: day(card.estimateAt, props.locale) })}
+        </p>
+      ) : card.fulfillmentState === 'delayed' ? (
+        <p className="mt-1" data-testid="order-estimate">
+          {t('shop.noEstimate')}
+        </p>
+      ) : null}
       <p className="mt-1 text-xs text-text-muted">
         {t('shop.updatedAt', { time: time(card.observedAt, props.locale) })}
       </p>
+      {troubled && props.onHelp ? (
+        <div className="mt-2 flex flex-col items-start gap-1">
+          <p className="text-xs text-text-muted">{t('shop.orderHelp')}</p>
+          <Button variant="secondary" size="sm" onClick={props.onHelp}>
+            {t('talkToPerson')}
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }

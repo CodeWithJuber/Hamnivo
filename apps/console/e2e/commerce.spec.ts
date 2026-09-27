@@ -5,10 +5,11 @@ import { type BrowserContext, expect, test } from '@playwright/test';
 import { audit, PASSWORD, SHOP, seedWorkspace, stack, totp, uniqueEmail } from './support';
 
 /**
- * Studio commerce (boards HNV-21-04 and HNV-21-05; C10, C12, C19): a customer pays through the
- * fake Stripe server, one team member asks for a refund, and only a second one, signed in with
- * two-step verification, can approve it. The refund shows as refunded only after the provider
- * says so.
+ * Studio commerce (boards HNV-21-02, HNV-21-04 and HNV-21-05; C10, C12, C19): a customer pays
+ * through the fake Stripe server, one team member asks for a refund, and only a second one, signed
+ * in with two-step verification, can approve it. The refund shows as refunded only after the
+ * provider says so. A reported delay is recorded with the shop's estimate and stays distinct from
+ * the payment.
  */
 
 const stripe = (): { url: string; apiKey: string } =>
@@ -174,10 +175,9 @@ async function member(owner: Person, name: string, role: string, twoFactor: bool
   return person;
 }
 
-test('HNV-21-04 HNV-21-05 · a refund waits for a second person, then shows refunded only when the provider confirms', async ({
-  browser,
-}) => {
-  const workspace = await seedWorkspace({ brand: 'Noor Books', connect: true });
+/** A workspace whose brand sells in chat through the fake Stripe; the owner has two-step sign-in. */
+async function stripeShop(name: string) {
+  const workspace = await seedWorkspace({ brand: name, connect: true });
   const owner = new Person(workspace.staff.email, workspace.staff.cookie);
   owner.tenantId = workspace.staff.tenantId;
   await owner.withTwoFactor();
@@ -188,7 +188,7 @@ test('HNV-21-04 HNV-21-05 · a refund waits for a second person, then shows refu
     {
       brandId: workspace.brand.id,
       provider: 'stripe',
-      displayName: 'Noor Books',
+      displayName: name,
       currencies: ['AED'],
       apiKey: stripe().apiKey,
       webhookSecret,
@@ -201,6 +201,13 @@ test('HNV-21-04 HNV-21-05 · a refund waits for a second person, then shows refu
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ url: merchant.webhookUrl, secret: webhookSecret }),
   });
+  return { workspace, owner };
+}
+
+test('HNV-21-04 HNV-21-05 · a refund waits for a second person, then shows refunded only when the provider confirms', async ({
+  browser,
+}) => {
+  const { workspace, owner } = await stripeShop('Noor Books');
   const { orderId, reference } = await paidOrder(workspace.brand.widgetId);
   const supervisor = await member(owner, 'Sami Supervisor', 'supervisor', false);
   const finance = await member(owner, 'Farah Finance', 'finance', true);
@@ -275,4 +282,64 @@ test('HNV-21-04 HNV-21-05 · a refund waits for a second person, then shows refu
 
   await requesterContext.close();
   await approverContext.close();
+});
+
+test('HNV-21-02 · a delay is recorded with the shop’s estimate; paid and delayed stay distinct', async ({
+  browser,
+}) => {
+  const { workspace, owner } = await stripeShop('Noor Stationery');
+  const { orderId, reference } = await paidOrder(workspace.brand.widgetId);
+  const context = await browser.newContext();
+  await owner.signIn(context);
+  const page = await context.newPage();
+  await page.goto(`/orders/${orderId}`);
+  await expect(page.getByRole('heading', { level: 1, name: `Order ${reference}` })).toBeVisible();
+  await expect(page.getByTestId('order-fulfilment-state')).toHaveText('Not started');
+
+  await page.getByRole('button', { name: 'Record an update' }).click();
+  const dialog = page.getByTestId('fulfilment-dialog');
+  await dialog.getByLabel('New status').selectOption('delayed');
+  await dialog.getByLabel('Estimated date').fill('2026-10-05');
+  await dialog.getByLabel('Note for the team').fill('Waiting for stock');
+  await expect(dialog).toContainText('The customer sees it as an estimate, not a promise.');
+  expect(await audit(page, 'record an update')).toEqual([]);
+  await dialog.getByRole('button', { name: 'Save and tell the customer' }).click();
+  await expect(dialog).toBeHidden();
+
+  const shipment = page.locator('[data-fulfilment]').first();
+  await expect(shipment.getByTestId('fulfilment-state')).toHaveText('Delayed');
+  await expect(shipment.getByTestId('fulfilment-estimate')).toHaveText(
+    'Estimate from the shop: Oct 5, 2026',
+  );
+  await expect(shipment).toContainText('Recorded by the team');
+  await expect(shipment).toContainText('Waiting for stock');
+  await expect(page.getByTestId('order-fulfilment-state')).toHaveText('Delayed');
+  await expect(page.locator('[data-payment]').first()).toHaveText('Paid');
+  expect(await audit(page, 'order detail with a delay')).toEqual([]);
+
+  // Shipped is its own step, and the estimate the shop gave stays until it is delivered.
+  await page.getByRole('button', { name: 'Record an update' }).click();
+  await dialog.getByLabel('New status').selectOption('shipped');
+  await dialog.getByLabel('Tracking reference').fill('TRK-5501');
+  await dialog.getByRole('button', { name: 'Save and tell the customer' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(shipment.getByTestId('fulfilment-state')).toHaveText('Shipped');
+  await expect(shipment).toContainText('TRK-5501');
+  await expect(shipment.getByTestId('fulfilment-estimate')).toContainText('Oct 5, 2026');
+
+  // The order list shows payment and fulfilment side by side.
+  await page.goto('/orders');
+  const row = page.locator(`[data-order="${reference}"]`);
+  await expect(row).toContainText('Paid');
+  await expect(row).toContainText('Shipped');
+
+  // Urdu: right to left, and still accessible.
+  await page.goto(`/orders/${orderId}?lang=ur`);
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.locator('[data-fulfilment]').first()).toHaveAttribute(
+    'data-fulfilment',
+    'shipped',
+  );
+  expect(await audit(page, 'order detail (ur)')).toEqual([]);
+  await context.close();
 });

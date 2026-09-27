@@ -438,7 +438,9 @@ export const FulfillmentView = z.object({
     'cancelled',
   ]),
   source: z.enum(['merchant', 'staff']),
+  /** The shop's estimate: a date to show as an estimate, never as a promise (HNV-21-02). */
   estimateAt: Timestamp.nullable(),
+  carrierRef: z.string().nullable(),
   note: z.string().nullable(),
   lastUpdateAt: Timestamp,
 });

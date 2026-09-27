@@ -3,18 +3,40 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, type FrameLocator, type Page, test } from '@playwright/test';
 
 /**
- * Shopping in the chat (boards HNV-20-01…06, HNV-21-01) against the real gateway and worker, the
+ * Shopping in the chat (boards HNV-20-01…06, HNV-21-01, HNV-21-02) against the real gateway and worker, the
  * fake Chatwoot and the fake Stripe server with its hosted payment page. The widget renders every
  * card from Hamnivo's records; payment happens only on the provider's page.
  */
 
 interface Stack {
   hostUrl: string;
+  apiBase: string;
   widgetOrigin: string;
+  consoleOrigin: string;
+  tenantId: string;
+  cookie: string;
 }
 
 const stack = (): Stack =>
   JSON.parse(readFileSync(new URL('./.stack.json', import.meta.url), 'utf8'));
+
+/** A call from Studio as the shop's owner. */
+async function staff(method: string, path: string, body?: unknown) {
+  const s = stack();
+  const response = await fetch(`${s.apiBase}${path}`, {
+    method,
+    headers: {
+      origin: s.consoleOrigin,
+      cookie: s.cookie,
+      'x-hamnivo-tenant': s.tenantId,
+      'content-type': 'application/json',
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  const json = await response.json();
+  expect(response.ok, `${method} ${path} → ${response.status} ${JSON.stringify(json)}`).toBe(true);
+  return json;
+}
 
 async function openWidget(page: Page): Promise<FrameLocator> {
   await page.goto(stack().hostUrl);
@@ -43,7 +65,7 @@ async function audit(page: Page) {
 }
 
 test.describe('Shopping in the chat', () => {
-  test('products → cart → exact quote → approval → hosted payment → paid receipt', async ({
+  test('products → cart → exact quote → approval → hosted payment → paid receipt → delay update', async ({
     page,
     context,
   }) => {
@@ -97,6 +119,30 @@ test.describe('Shopping in the chat', () => {
     await expect(receipt).toContainText('Payment received. Order HV-', { timeout: 30_000 });
     await expect(receipt).toHaveAttribute('data-outcome', 'completed');
     await audit(page);
+
+    // HNV-21-02: the shop reports a delay. The chat shows the milestone, the shop's estimate as
+    // an estimate, when it was updated, and a way to reach a person.
+    const reference = /HV-[0-9A-Z]{6}/.exec((await receipt.textContent()) ?? '')?.[0] ?? '';
+    const found = await staff('GET', `/v1/admin/commerce/orders?q=${reference}`);
+    expect(found.items).toHaveLength(1);
+    await staff('POST', `/v1/admin/commerce/orders/${found.items[0].id}/fulfillments`, {
+      kind: 'shipment',
+      state: 'delayed',
+      estimateAt: '2026-10-05T00:00:00.000Z',
+      note: 'Waiting for stock',
+    });
+    const status = frame.locator('[data-card="order_status"]').last();
+    await expect(status).toHaveAttribute('data-status', 'delayed', { timeout: 30_000 });
+    await expect(status.getByTestId('order-milestone')).toHaveText('Delayed');
+    await expect(status.getByTestId('order-estimate')).toHaveText(
+      "The shop's estimate: Oct 5, 2026. This date is not guaranteed.",
+    );
+    await expect(status).toContainText('Updated');
+    await expect(status).toContainText(`Order ${reference}`);
+    await audit(page);
+    await status.getByRole('button', { name: 'Talk to a person' }).click();
+    await expect(frame.getByTestId('status-banner')).toBeVisible({ timeout: 15_000 });
+    await expect(status.getByRole('button', { name: 'Talk to a person' })).toHaveCount(0);
   });
 
   test('cancelling the payment page keeps the cart; the quote card is right to left in Arabic', async ({
