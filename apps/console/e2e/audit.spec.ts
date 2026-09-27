@@ -105,6 +105,13 @@ for (const locale of LOCALES) {
     await page.getByTestId('stop-ai-button').click();
     await expect(page.getByTestId('stop-ai-dialog')).toBeVisible();
     violations.push(...(await audit(page, `stop-ai-dialog (${locale})`)));
+    // The brand editor, warning that a website taken off the list ends its chats.
+    await open(page, '/brands', locale);
+    await page.getByTestId('edit-brand').first().click();
+    const editor = page.getByTestId('edit-brand-dialog');
+    await editor.locator('#edit-brand-websites').fill('');
+    await expect(editor.getByTestId('websites-removed')).toBeVisible();
+    violations.push(...(await audit(page, `edit-brand-dialog (${locale})`)));
     await context.close();
 
     expect(violations).toEqual([]);

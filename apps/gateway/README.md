@@ -167,6 +167,14 @@ Late publication (R06):
 web server asks it for every widget page and sends the answer as CSP `frame-ancestors`
 (`deploy/production/Caddyfile`), so other websites cannot embed a brand's chat.
 
+`PATCH /v1/admin/brands/{brandId}` (brands.manage) renames a brand or replaces its allowed
+websites. A website taken off the list stops working at once:
+- it gets no frame permission;
+- new chats from it are refused (`ORIGIN_NOT_ALLOWED`);
+- chats already open there end, because their sessions are revoked and cannot be refreshed.
+
+The audit entry `brand.updated` records the websites added and removed and how many chats ended.
+
 ## Security rules enforced here
 
 - **Delegation ceiling (A03).** Grants and invitations may only hand out permissions the grantor

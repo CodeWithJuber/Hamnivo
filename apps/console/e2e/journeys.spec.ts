@@ -68,6 +68,19 @@ test('HNV-02-01 HNV-03-02 HNV-17-02 HNV-17-03 HNV-17-05 · sign up, create a wor
   await expect(card).toContainText('Noor Books');
   await expect(card).toContainText('https://noor.example');
 
+  // Websites can change later; taking one off says first that its open chats will end.
+  await card.getByRole('button', { name: 'Edit Noor Books' }).click();
+  const edit = page.getByRole('dialog', { name: 'Edit Noor Books' });
+  await expect(edit.getByLabel('Brand name')).toHaveValue('Noor Books');
+  await expect(edit.getByTestId('websites-removed')).toHaveCount(0);
+  await edit.getByLabel('Allowed websites').fill('https://noor.example\nhttps://books.example');
+  await expect(edit.getByTestId('websites-removed')).toContainText('https://shop.example');
+  await edit.getByRole('button', { name: 'Save changes' }).click();
+  await expect(edit).toBeHidden();
+  await expect(page.locator('[data-slot="announcer-polite"]')).toHaveText('Noor Books was saved.');
+  await expect(card).toContainText('https://books.example');
+  await expect(card).not.toContainText('https://shop.example');
+
   // Connecting says what will be set up before anything happens.
   await card.getByRole('button', { name: 'Connect Chatwoot' }).click();
   const connect = page.getByRole('dialog', { name: 'Connect Noor Books to Chatwoot' });

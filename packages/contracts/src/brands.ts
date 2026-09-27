@@ -20,6 +20,18 @@ export const CreateBrandRequest = z
   })
   .meta({ id: 'CreateBrandRequest' });
 
+/** Rename a brand or replace the websites allowed to embed its chat; at least one of the two. */
+export const UpdateBrandRequest = z
+  .object({
+    name: z.string().trim().min(1).max(80).optional(),
+    /** The full new list; websites left out can no longer load the chat, and their chats end. */
+    allowedOrigins: z.array(WebOrigin).max(50).optional(),
+  })
+  .refine((v) => v.name !== undefined || v.allowedOrigins !== undefined, {
+    message: 'Send a new name, new allowed websites or both',
+  })
+  .meta({ id: 'UpdateBrandRequest' });
+
 const LocalTime = z
   .string()
   .regex(/^(([01]\d|2[0-3]):[0-5]\d|24:00)$/, 'Use 24-hour HH:MM, such as 09:30');

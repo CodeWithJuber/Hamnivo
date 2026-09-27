@@ -315,7 +315,13 @@ export const en = {
     widgetId: 'Widget ID',
     allowed: 'Allowed websites',
     noWebsites: 'No websites are allowed yet, so the chat won’t load anywhere.',
-    editNote: 'Allowed websites can’t be changed in Studio yet.',
+    edit: 'Edit',
+    editLabel: 'Edit {{name}}',
+    editTitle: 'Edit {{name}}',
+    save: 'Save changes',
+    saved: '{{name}} was saved.',
+    removedWarning:
+      'Saving ends the chats open on the websites you took off the list, and the chat stops loading there:',
     empty: {
       title: 'No brands yet',
       description: 'A brand has its own chat widget, allowed websites and AI assistant.',

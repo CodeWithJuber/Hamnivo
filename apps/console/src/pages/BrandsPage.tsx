@@ -6,7 +6,7 @@ import { ReasonedAction } from '@hamnivo/ui/components/reasoned-action';
 import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import { StatusBadge } from '@hamnivo/ui/components/status-badge';
 import { useRouterState } from '@tanstack/react-router';
-import { GlobeIcon, PlugZapIcon, PlusIcon } from 'lucide-react';
+import { GlobeIcon, PencilIcon, PlugZapIcon, PlusIcon, TriangleAlertIcon } from 'lucide-react';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppDialog, ConfirmDialog, DialogFooter } from '../components/AppDialog';
@@ -176,6 +176,126 @@ function CreateBrandDialog({
   );
 }
 
+function EditBrandDialog({
+  brand,
+  open,
+  onOpenChange,
+}: {
+  brand: Brand;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const announce = useAnnouncer();
+  const [name, setName] = useState(brand.name);
+  const [websites, setWebsites] = useState(brand.allowedOrigins.join('\n'));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [attempted, setAttempted] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setName(brand.name);
+    setWebsites(brand.allowedOrigins.join('\n'));
+    setErrors({});
+    setAttempted(false);
+  }, [open, brand]);
+
+  const save = useStudioMutation(
+    (body: { name: string; allowedOrigins: string[] }, tenant) =>
+      api<Brand>(`/v1/admin/brands/${brand.id}`, { method: 'PATCH', body, tenant }),
+    [keys.brands, keys.workspaces],
+  );
+
+  const parsed = parseWebsites(websites);
+  // Saving ends the chats open on websites taken off the list, so say which before it happens.
+  const removed = brand.allowedOrigins.filter((origin) => !parsed.origins.includes(origin));
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setAttempted(true);
+    const next: Record<string, string> = {};
+    if (!name.trim()) next.name = t('brands.nameRequired');
+    const invalid = parsed.invalid[0];
+    if (invalid !== undefined) next.websites = t('brands.websiteInvalid', { value: invalid });
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+    try {
+      const saved = await save.mutateAsync({ name: name.trim(), allowedOrigins: parsed.origins });
+      announce(t('brands.saved', { name: saved.name }));
+      onOpenChange(false);
+    } catch {
+      // Shown below the form.
+    }
+  };
+
+  const summary = attempted
+    ? Object.entries(errors).map(([field, message]) => ({
+        fieldId: `edit-brand-${field}`,
+        message,
+      }))
+    : [];
+
+  return (
+    <AppDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!save.isPending) onOpenChange(next);
+      }}
+      title={t('brands.editTitle', { name: brand.name })}
+      testId="edit-brand-dialog"
+    >
+      <form className="flex flex-col gap-5" onSubmit={submit} noValidate>
+        <FormErrorSummary title={t('auth.errorSummary')} errors={summary} />
+        <TextField
+          id="edit-brand-name"
+          label={t('brands.name')}
+          hint={t('brands.nameHint')}
+          value={name}
+          maxLength={80}
+          onChange={(event) => setName(event.target.value)}
+          error={errors.name}
+        />
+        <TextareaField
+          id="edit-brand-websites"
+          label={t('brands.websites')}
+          hint={t('brands.websitesHint')}
+          value={websites}
+          rows={4}
+          dir="ltr"
+          spellCheck={false}
+          onChange={(event) => setWebsites(event.target.value)}
+          error={errors.websites}
+        />
+        {removed.length > 0 ? (
+          <p
+            className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning-subtle p-3 text-sm text-text"
+            data-testid="websites-removed"
+          >
+            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+            <span>
+              {t('brands.removedWarning')} <bdi dir="ltr">{removed.join(', ')}</bdi>
+            </span>
+          </p>
+        ) : null}
+        <ActionError error={save.error} />
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onOpenChange(false)}
+            disabled={save.isPending}
+          >
+            {t('app.cancel')}
+          </Button>
+          <Button type="submit" busy={save.isPending}>
+            {t('brands.save')}
+          </Button>
+        </DialogFooter>
+      </form>
+    </AppDialog>
+  );
+}
+
 function ChatConnection({
   brand,
   connection,
@@ -257,6 +377,8 @@ function BrandCard({
   connectionsState: 'ready' | 'loading' | 'hidden';
 }) {
   const { t } = useTranslation();
+  const { can } = useTenant();
+  const [editing, setEditing] = useState(false);
   const snippet = installSnippet(brand.widgetId);
   const codeRef = useRef<HTMLElement>(null);
   const titleId = `brand-${brand.id}-title`;
@@ -280,10 +402,25 @@ function BrandCard({
             </bdi>
           </p>
         </div>
-        {brand.status === 'disabled' ? (
-          <StatusBadge tone="neutral">{t('status.connection.disabled')}</StatusBadge>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {brand.status === 'disabled' ? (
+            <StatusBadge tone="neutral">{t('status.connection.disabled')}</StatusBadge>
+          ) : null}
+          {can('brands.manage') ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setEditing(true)}
+              aria-label={t('brands.editLabel', { name: brand.name })}
+              data-testid="edit-brand"
+            >
+              <PencilIcon aria-hidden="true" />
+              {t('brands.edit')}
+            </Button>
+          ) : null}
+        </div>
       </div>
+      <EditBrandDialog brand={brand} open={editing} onOpenChange={setEditing} />
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
@@ -303,7 +440,6 @@ function BrandCard({
                 ))}
               </ul>
             )}
-            <p className="text-xs text-text-secondary">{t('brands.editNote')}</p>
           </div>
           <div className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold text-text">{t('brands.chat.title')}</h3>

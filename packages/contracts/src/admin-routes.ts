@@ -32,6 +32,7 @@ import {
   CreateIdentityKeyRequest,
   IdentityKey,
   SetBusinessHoursRequest,
+  UpdateBrandRequest,
 } from './brands.js';
 import type { RouteDef } from './routes.js';
 
@@ -297,6 +298,17 @@ export const adminRoutes = {
     body: CreateBrandRequest,
     idempotent: true,
     success: { status: 201, description: 'Brand created', schema: Brand },
+  },
+  updateBrand: {
+    method: 'patch',
+    path: '/v1/admin/brands/{brandId}',
+    operationId: 'updateBrand',
+    summary: 'Rename a brand or change the websites allowed to embed its chat (brands.manage)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    params: brandParams,
+    body: UpdateBrandRequest,
+    success: { status: 200, description: 'Brand', schema: Brand },
   },
   setBusinessHours: {
     method: 'put',
