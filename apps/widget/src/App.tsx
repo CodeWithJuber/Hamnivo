@@ -3,6 +3,7 @@ import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { HostBridge } from './bridge.js';
+import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
 import { applyLocale, type Locale } from './i18n.js';
 import { useChat } from './useChat.js';
@@ -28,6 +29,9 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     [params],
   );
   const chat = useChat(client);
+  const commerce = useCommerce(client, chat.state.conversation?.id ?? null);
+  const { onEvent } = chat;
+  useEffect(() => onEvent(commerce.onEvent), [onEvent, commerce.onEvent]);
 
   useEffect(() => {
     applyLocale(locale);
@@ -106,6 +110,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       <Chat
         session={chat.state.session}
         state={chat.state}
+        commerce={commerce}
         pending={chat.pending}
         locale={locale}
         onLocale={setLocale}

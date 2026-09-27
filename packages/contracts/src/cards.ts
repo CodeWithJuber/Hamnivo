@@ -174,6 +174,7 @@ export const CatalogCard = z
     source: z.string().max(80),
   })
   .meta({ id: 'CatalogCard' });
+export type CatalogCard = z.infer<typeof CatalogCard>;
 
 export const Card = z.discriminatedUnion('kind', [
   QuoteCard,

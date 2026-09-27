@@ -157,11 +157,13 @@ export const CartView = z
     updatedAt: Timestamp,
   })
   .meta({ id: 'CartView' });
+export type CartView = z.infer<typeof CartView>;
 
 /** The shop a conversation can buy from, if the brand sells in chat. */
 export const ShopInfo = z
   .object({ merchantId: typeId('merchant'), name: z.string(), currency: CurrencyCode })
   .meta({ id: 'ShopInfo' });
+export type ShopInfo = z.infer<typeof ShopInfo>;
 
 export const CatalogSearchRequest = z
   .object({ query: z.string().trim().max(200).optional() })
@@ -304,6 +306,7 @@ export const CustomerOrderView = z
     observedAt: Timestamp,
   })
   .meta({ id: 'CustomerOrderView' });
+export type CustomerOrderView = z.infer<typeof CustomerOrderView>;
 
 // ── Staff side: orders, refunds, exceptions (C10, C12, C19, R07) ─────────────────────────────
 

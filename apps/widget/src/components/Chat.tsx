@@ -12,6 +12,9 @@ import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { ParticipantBadge, type ParticipantKind } from '@hamnivo/ui/components/participant-badge';
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CommerceCard, type Part } from '../commerce/Cards.js';
+import { ShopBar } from '../commerce/ShopBar.js';
+import type { Commerce } from '../commerce/useCommerce.js';
 import { LANGUAGE_NAMES, LOCALES, type Locale } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
 import type { ChatState } from '../useChat.js';
@@ -31,13 +34,17 @@ interface Custom {
   clientMessageId?: string;
   /** Knowledge an AI answer cites, numbered as in its text (G06). */
   sources?: Source[];
+  /** A card (quote, receipt…) from Hamnivo's records, rendered instead of text. */
+  card?: Part;
 }
 
 const textOf = (m: Message) =>
   m.parts
-    .map((p) => (p.type === 'text' ? p.text : ''))
+    .map((p) => (p.type === 'text' ? p.text : p.type === 'card' ? p.fallbackText : ''))
     .join('\n')
     .trim();
+
+const cardOf = (m: Message): Part | undefined => m.parts.find((p): p is Part => p.type === 'card');
 
 const sourcesOf = (m: Message): Source[] =>
   m.parts.flatMap((p) =>
@@ -65,6 +72,7 @@ function toThread(
           role: m.sender.roleLabel ?? '',
           state: 'accepted',
           sources: sourcesOf(m),
+          ...(cardOf(m) ? { card: cardOf(m) } : {}),
         } satisfies Custom,
       },
     };
@@ -92,12 +100,23 @@ function toThread(
 function Bubble({
   message,
   onRetry,
+  commerce,
+  locale,
 }: {
   message: ThreadMessageLike;
   onRetry: (id: string) => void;
+  commerce: Commerce;
+  locale: Locale;
 }) {
   const { t } = useTranslation();
   const custom = (message.metadata?.custom ?? {}) as unknown as Partial<Custom>;
+  if (custom.card) {
+    return (
+      <li className="flex flex-col items-start gap-1" data-sender="system">
+        <CommerceCard part={custom.card} commerce={commerce} locale={locale} />
+      </li>
+    );
+  }
   // While the AI is expected to answer, assistant-ui adds an optimistic placeholder message.
   if (!custom.kind) {
     return message.role === 'assistant' ? (
@@ -193,6 +212,7 @@ function Bubble({
 export function Chat(props: {
   session: WidgetSession;
   state: ChatState;
+  commerce: Commerce;
   pending: readonly OutgoingMessage[];
   locale: Locale;
   onLocale: (locale: Locale) => void;
@@ -323,12 +343,15 @@ export function Chat(props: {
                   <Bubble
                     message={message as unknown as ThreadMessageLike}
                     onRetry={props.onRetry}
+                    commerce={props.commerce}
+                    locale={locale}
                   />
                 )}
               </ThreadPrimitive.Messages>
             </ul>
           </ThreadPrimitive.Viewport>
           <div className="border-t border-border bg-surface px-3 pb-3 pt-2">
+            <ShopBar commerce={props.commerce} locale={locale} />
             {conversation?.responder !== 'person' &&
             conversation?.status !== 'waiting_for_person' ? (
               <Button

@@ -1,5 +1,6 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { SHOP_COPY } from './commerce/copy.js';
 
 /** Widget chrome in the four launch languages (translations await native review). */
 const resources = {
@@ -23,6 +24,7 @@ const resources = {
       startError: 'The chat could not start. Please try again.',
       typing: 'The assistant is writing…',
       sources: 'Sources',
+      shop: SHOP_COPY.en,
     },
   },
   ar: {
@@ -45,6 +47,7 @@ const resources = {
       startError: 'تعذّر بدء المحادثة. حاول مرة أخرى.',
       typing: 'المساعد يكتب…',
       sources: 'المصادر',
+      shop: SHOP_COPY.ar,
     },
   },
   hi: {
@@ -67,6 +70,7 @@ const resources = {
       startError: 'चैट शुरू नहीं हो सकी। कृपया फिर कोशिश करें।',
       typing: 'सहायक लिख रहा है…',
       sources: 'स्रोत',
+      shop: SHOP_COPY.hi,
     },
   },
   ur: {
@@ -89,6 +93,7 @@ const resources = {
       startError: 'چیٹ شروع نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔',
       typing: 'اسسٹنٹ لکھ رہا ہے…',
       sources: 'ذرائع',
+      shop: SHOP_COPY.ur,
     },
   },
 } as const;
