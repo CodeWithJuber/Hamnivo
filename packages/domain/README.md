@@ -82,3 +82,75 @@ rubrics. It never authorizes, never computes money or dates, and never writes re
 - The language tag is a hint. In Latin script, phrases with English or Hindi person words are tagged
   Hinglish, and phrases with Urdu words (insaan, banda) are tagged Roman Urdu.
 - The cases live in `test/fixtures/human-requests.json`, so evaluation can reuse them.
+
+## Language preferences (`src/language.ts`)
+
+Interface locale, reply language, script, style and time zone are separate settings (U01). Reply
+languages are BCP 47 tags: `en`, `ar`, `hi`, `ur`, `hi-Latn` (Hinglish) and `ur-Latn` (Roman
+Urdu). Each maps to an evaluation slice (`SLICE_OF_LANGUAGE`).
+
+- `detectLanguage(text)` returns `{ language, candidates, script, ambiguous }` for one message.
+  - Order numbers, emails, web addresses and amounts are ignored, so `NL-1048 کہاں ہے؟` is Urdu.
+  - Arabic and Urdu are told apart by letters and common words.
+  - Latin text with Hindustani grammar words is Hinglish or Roman Urdu, never English, even
+    when it is full of English nouns ("Order pay ho gaya, delivery nahi mili"). Most short
+    messages fit both, so both are candidates and `ambiguous` is true.
+  - Greetings, names and unknown words give no candidates. A name never decides a language.
+- `resolveReplyLanguage(input)` chooses the reply language:
+  1. an explicit choice always wins;
+  2. a message whose language is clear decides;
+  3. an ambiguous message keeps the previous language when it fits; otherwise the candidate that
+     matches the interface locale (or the first) is suggested and the customer is asked to
+     confirm once (`confirm`), never twice;
+  4. without words, the previous language, then the interface locale, then English.
+- `styleInstructions(style)` turns a customer's style (concise, conversational or formal; gentle
+  or direct) into prompt lines that change wording only (U10).
+- `textDirection(text)` says whether a message reads right to left by counting letters, ignoring
+  identifiers. `bidiSegments(text)` splits out identifiers, amounts, emails and web addresses so
+  they can be isolated left to right; the segments join back to the exact text.
+- The cases live in `test/fixtures/language-detection.json`.
+
+## Routing (`src/routing.ts`)
+
+Intent and team routing (J02, U07). A decision provider may suggest the intent; code picks the
+team.
+
+- `routingQuestion(intents)` is a choice over the brand's intents plus `other`.
+- `baselineIntent(text, intents)` is the deterministic baseline: keyword matches over normalized
+  text. No match or a tie gives `other`.
+- `chooseTeam({ intent, language, teams })` considers only teams that are accepting
+  conversations. Among teams that handle the intent, one that speaks the language beats one with a
+  reviewed translation path, which beats a language gap. Otherwise a default team is chosen the
+  same way.
+- `decideRoute(...)` uses a decided provider answer with an offered intent. Anything else
+  (abstained, unavailable, invalid, a label that was not offered, or no provider) falls back to the
+  baseline and records why. Routing only picks a destination: a customer who asked for a person
+  has already been handed over before routing runs.
+- `rankStaffForLanguage(staff, language)` orders people: available first, then those who speak
+  the language, then by load.
+- `summarizeExperiment(records)` reports provider versus baseline (J08): agreement on decided
+  records, abstentions and failures counted separately, accuracy only against reviewer labels,
+  latency percentiles and tokens, overall and per language slice.
+
+## Cache keys and eligibility (`src/cache.ts`)
+
+- `cacheKey(envelope, sha256)` builds the key from tier, tenant, brand, audience, language, model,
+  prompt version, every dependency with its version, and a keyed digest of the input. The tenant
+  and brand prefix the stored key. Keys never contain input text; incomplete envelopes throw.
+- `cacheDependency` names dependencies (`knowledge:source:<id>`, `agent:<id>`, `brand:<id>`,
+  `cache_policy:<brandId>`). Bumping a version changes the key, so stale entries stop being read.
+- `cacheEligibility(request, policy, { rules, forStore })` checks, in order: the tier is on, no
+  excluded data class (personal, identity, account, memory, live order, payment, approval and tool
+  results are never cached), not personalized, no side effects, no personal data in the input,
+  then every added exclusion rule. Writes also need complete, validated output.
+- `CacheExclusionRule` is the hook for other modules, such as commerce excluding live order
+  questions (K06).
+- Answers are off by default (`DEFAULT_CACHE_POLICY`); exact NLP and embeddings are on.
+
+## Personal data (`src/privacy.ts`)
+
+`findPersonalData(text)` lists the kinds of personal data a text seems to contain: emails, phone
+numbers, payment cards (Luhn), IBANs, order and ticket references and street addresses, with
+Arabic-Indic and Devanagari digits. `redactPersonalData(text)` replaces them with `[email]`,
+`[phone]` and so on, for the minimized state sent to a decision provider. It errs towards finding
+too much.
