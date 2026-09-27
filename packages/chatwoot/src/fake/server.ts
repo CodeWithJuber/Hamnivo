@@ -210,6 +210,11 @@ export interface FakeChatwoot {
    */
   setResponseFault(fault: ((method: string, url: string) => number | null) | null): void;
   /**
+   * Refuses matching requests before anything is processed, answering with the returned status
+   * (Chatwoot rejected the request and changed nothing). `null` clears it.
+   */
+  setRequestFault(fault: ((method: string, url: string) => number | null) | null): void;
+  /**
    * Runs before each request is processed; resolve to let it through. Lets a test interleave
    * another actor with a request in flight (for example, a takeover while a reply is posted).
    * `null` clears it.
@@ -315,6 +320,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
   let pumping: Promise<void> | null = null;
   let paused = false;
   let responseFault: ((method: string, url: string) => number | null) | null = null;
+  let requestFault: ((method: string, url: string) => number | null) | null = null;
   let requestHook: ((method: string, url: string) => Promise<void> | void) | null = null;
 
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024 * 1024 });
@@ -332,6 +338,8 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
   );
   app.addHook('preHandler', async (request) => {
     await requestHook?.(request.method, request.url);
+    const refused = requestFault?.(request.method, request.url);
+    if (refused) throw new HttpError(refused, { message: 'Refused by the test', status: refused });
   });
   if (options.latencyMs) {
     const latency = options.latencyMs;
@@ -1771,6 +1779,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
     setResponseFault(fault) {
       responseFault = fault;
+    },
+    setRequestFault(fault) {
+      requestFault = fault;
     },
     setRequestHook(hook) {
       requestHook = hook;

@@ -32,7 +32,7 @@ import {
   type SourceSystem,
 } from '@hamnivo/migration-sdk';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, asc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { fileTypeFromBuffer } from 'file-type';
 import { AuthorityRegistry } from '../authority/registry.js';
 import type { AppConfig } from '../config.js';
@@ -1390,6 +1390,44 @@ export class MigrationEngine {
     }
   }
 
+  /**
+   * A person this job created whose conversations from a later import remain: that import takes
+   * the person over (with the ID mapping), so its own rollback removes them and nothing is left.
+   */
+  private async handOver(tenantId: string, job: JobRow, item: ItemRow): Promise<string | null> {
+    return this.tx(tenantId, async (tx) => {
+      const [heir] = await tx
+        .select()
+        .from(schema.migrationItems)
+        .where(
+          and(
+            eq(schema.migrationItems.kind, 'contact'),
+            eq(schema.migrationItems.targetRef, item.targetRef as string),
+            eq(schema.migrationItems.status, 'imported'),
+            ne(schema.migrationItems.jobId, job.id),
+          ),
+        )
+        .orderBy(desc(schema.migrationItems.updatedAt))
+        .limit(1);
+      if (!heir) return null;
+      await tx
+        .update(schema.migrationItems)
+        .set({ created: true, updatedAt: this.clock() })
+        .where(eq(schema.migrationItems.id, heir.id));
+      await tx
+        .update(schema.externalIdMappings)
+        .set({ jobId: heir.jobId })
+        .where(
+          and(
+            eq(schema.externalIdMappings.jobId, job.id),
+            eq(schema.externalIdMappings.kind, 'contact'),
+            eq(schema.externalIdMappings.targetRef, item.targetRef as string),
+          ),
+        );
+      return heir.jobId;
+    });
+  }
+
   private async rollbackSlice(tenantId: string, job: JobRow): Promise<void> {
     if (!job.connectionId) throw new Error('migration job without a connection');
     const runtime = await this.registry.get(tenantId, job.connectionId);
@@ -1448,7 +1486,12 @@ export class MigrationEngine {
       );
       if (others.length > 0) {
         kept += 1;
-        await this.setItem(tenantId, item.id, { detail: 'kept: has other conversations' });
+        const heir = await this.handOver(tenantId, job, item);
+        await this.setItem(tenantId, item.id, {
+          detail: heir
+            ? `kept: used by ${toPublicId('migration', heir)}`
+            : 'kept: has other conversations',
+        });
         continue;
       }
       await importer.deleteContact(contactId);

@@ -76,6 +76,30 @@ describe('reconciliation', () => {
     expect(report.gate).toBe('failed');
   });
 
+  it('fails while objects Chatwoot refused are neither retried nor accepted', () => {
+    const report = reconcile({
+      ...base,
+      tallies: [
+        ...tallies,
+        {
+          kind: 'message',
+          status: 'failed',
+          reason: 'authority_rejected',
+          private: false,
+          count: 2,
+        },
+      ],
+    });
+    // Every object has a reason, but two of them could have been imported.
+    expect(report.checks.find((c) => c.code === 'all_accounted')?.ok).toBe(true);
+    expect(report.checks.find((c) => c.code === 'no_failures')).toEqual({
+      code: 'no_failures',
+      ok: false,
+      detail: '2 failed',
+    });
+    expect(report.gate).toBe('failed');
+  });
+
   it('fails when the export was cut short and says how much is missing', () => {
     const report = reconcile({
       ...base,

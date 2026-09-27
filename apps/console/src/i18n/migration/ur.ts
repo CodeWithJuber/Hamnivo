@@ -421,6 +421,7 @@ export const migrationUr: MigrationTranslation = {
       failed: 'ناکام',
       codes: {
         all_accounted: 'ہر ریکارڈ درآمد ہوا یا اس کی وجہ درج ہے',
+        no_failures: 'کسی ریکارڈ کی درآمد ناکام نہیں ہوئی',
         export_complete: 'ایکسپورٹ مکمل تھی',
         no_duplicates: 'کچھ بھی دو بار درآمد نہیں ہوا',
         private_kept_private: 'اندرونی نوٹس نجی رہے',

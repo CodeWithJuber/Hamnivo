@@ -414,6 +414,7 @@ export const migrationAr: MigrationTranslation = {
       failed: 'فشل',
       codes: {
         all_accounted: 'استُورد كل سجل أو له سبب',
+        no_failures: 'لم يفشل استيراد أي سجل',
         export_complete: 'كان ملف التصدير كاملًا',
         no_duplicates: 'لم يُستورد شيء مرتين',
         private_kept_private: 'بقيت الملاحظات الداخلية خاصة',

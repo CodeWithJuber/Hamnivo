@@ -34,6 +34,7 @@ const COLUMNS = [
 ] as const;
 const CHECKS = [
   'all_accounted',
+  'no_failures',
   'export_complete',
   'no_duplicates',
   'private_kept_private',

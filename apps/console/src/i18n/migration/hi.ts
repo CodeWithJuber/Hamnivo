@@ -413,6 +413,7 @@ export const migrationHi: MigrationTranslation = {
       failed: 'विफल',
       codes: {
         all_accounted: 'हर रिकॉर्ड आयात हुआ या उसका कारण दर्ज है',
+        no_failures: 'किसी रिकॉर्ड का आयात विफल नहीं हुआ',
         export_complete: 'एक्सपोर्ट पूरा था',
         no_duplicates: 'कुछ भी दो बार आयात नहीं हुआ',
         private_kept_private: 'आंतरिक नोट निजी रहे',

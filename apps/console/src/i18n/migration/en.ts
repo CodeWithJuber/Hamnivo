@@ -423,6 +423,7 @@ export const migrationEn = {
       failed: 'Failed',
       codes: {
         all_accounted: 'Every record was imported or has a reason',
+        no_failures: 'Nothing failed to import',
         export_complete: 'The export was complete',
         no_duplicates: 'Nothing was imported twice',
         private_kept_private: 'Internal notes stayed private',

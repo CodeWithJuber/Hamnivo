@@ -456,10 +456,12 @@ export class MigrationService {
             detail: 'Nothing failed that a retry could fix.',
           });
         }
+        // Chatwoot may have stored a write whose answer never came (unavailable): it is looked up
+        // by its key first. Everything else was refused or never sent, and is simply sent again.
         await tx
           .update(schema.migrationItems)
           .set({
-            status: 'pending',
+            status: sql`case when ${schema.migrationItems.reason} = 'authority_unavailable' then 'writing' else 'pending' end`,
             attempts: 0,
             reason: null,
             detail: null,

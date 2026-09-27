@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { fromPublicId, schema, withTenant } from '@hamnivo/db';
 import { importMessageKey, readExport, readZip, writeZip } from '@hamnivo/migration-sdk';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OutboxRelay } from '../src/outbox/relay.service.js';
 import { MaintenanceService } from '../src/worker/maintenance.service.js';
@@ -35,6 +35,24 @@ let tenantId: string;
 let checkedJobId: string;
 /** The import that survived lost answers; its contacts are reused by a later job. */
 let crashJobId: string;
+
+/** The helpdesk package with other source IDs (the same people), and no files. */
+function renamed(suffix: string) {
+  return helpdeskPackage({
+    conversations: conversations.map((c) => ({
+      ...c,
+      id: `${c.id}${suffix}`,
+      source: { ...c.source, id: `${c.id}${suffix}` },
+    })),
+    messages: messages.map((m) => ({
+      ...m,
+      id: `${m.id}${suffix}`,
+      conversationId: `${m.conversationId}${suffix}`,
+      attachmentIds: [],
+    })),
+    attachments: [],
+  });
+}
 
 /** Runs the worker until the job reaches one of the states, letting retries become due. */
 async function settle(id: string, ...states: string[]) {
@@ -696,21 +714,7 @@ describe('resumable jobs (M07)', () => {
   });
 
   it('cancels at a checkpoint: what was imported stays until rolled back, the rest is reported', async () => {
-    const renamed = helpdeskPackage({
-      conversations: conversations.map((c) => ({
-        ...c,
-        id: `${c.id}-b`,
-        source: { ...c.source, id: `${c.id}-b` },
-      })),
-      messages: messages.map((m) => ({
-        ...m,
-        id: `${m.id}-b`,
-        conversationId: `${m.conversationId}-b`,
-        attachmentIds: [],
-      })),
-      attachments: [],
-    });
-    const created = await upload(shop.owner, shop.brand.id, 'hamnivo', 'cancel.zip', renamed);
+    const created = await upload(shop.owner, shop.brand.id, 'hamnivo', 'cancel.zip', renamed('-b'));
     await settle(created.id, 'ready');
     await act(shop.owner, created.id, 'dry-run');
     await settle(created.id, 'dry_run_ready');
@@ -748,8 +752,83 @@ describe('resumable jobs (M07)', () => {
     const after = slice.fake.snapshot(shop.connection.accountId);
     expect(middle.conversations - after.conversations).toBe(2);
     for (const id of kept) expect(await importer.getConversation(id)).toBeNull();
-    // This job created no contacts (it reused the earlier job's), so it removes none.
-    expect(after.contacts).toBe(middle.contacts);
+    // The people passed to this job when the earlier one was rolled back: nothing is left behind.
+    expect(middle.contacts - after.contacts).toBe(2);
+    expect(rolledBack.report.kinds.contact).toMatchObject({ rolledBack: 2 });
+    const mappings = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx.select().from(schema.externalIdMappings),
+    );
+    expect(
+      mappings.filter((m) =>
+        [crashJobId, created.id].map((id) => fromPublicId('migration', id)).includes(m.jobId),
+      ),
+    ).toEqual([]);
+  });
+
+  it('retries only what failed: refused records are sent again, unconfirmed ones looked up first', async () => {
+    const created = await upload(shop.owner, shop.brand.id, 'hamnivo', 'retry.zip', renamed('-r'));
+    await settle(created.id, 'ready');
+    await act(shop.owner, created.id, 'dry-run');
+    await settle(created.id, 'dry_run_ready');
+    let posted = 0;
+    // Chatwoot refuses the last message of the first conversation and stores nothing.
+    slice.fake.setRequestFault((method, url) =>
+      method === 'POST' && /\/conversations\/\d+\/messages$/.test(url) && ++posted === 4
+        ? 422
+        : null,
+    );
+    let done: Record<string, any>;
+    try {
+      await act(shop.owner, created.id, 'start');
+      done = await settle(created.id, 'completed');
+    } finally {
+      slice.fake.setRequestFault(null);
+    }
+    expect(done.progress.messages).toMatchObject({ failed: 1, imported: 8 });
+    expect(done.report.checks).toContainEqual({
+      code: 'no_failures',
+      ok: false,
+      detail: '1 failed',
+    });
+    expect(done.report.gate).toBe('failed');
+    const failed = (await itemsOf(slice, shop.tenantId, created.id)).filter(
+      (i) => i.status === 'failed',
+    );
+    expect(failed).toMatchObject([{ sourceId: 'm-4-r', reason: 'authority_rejected' }]);
+
+    // A write whose answer never came: Chatwoot has the message, the job gave up waiting.
+    await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .update(schema.migrationItems)
+        .set({ status: 'failed', reason: 'authority_unavailable', attempts: 5 })
+        .where(
+          and(
+            eq(schema.migrationItems.jobId, fromPublicId('migration', created.id)),
+            eq(schema.migrationItems.sourceId, 'm-3-r'),
+          ),
+        ),
+    );
+    const posts = slice.fake.requests.filter((r) => r.method === 'POST').length;
+    await act(shop.owner, created.id, 'retry');
+    const retried = await settle(created.id, 'completed');
+    // One message sent again (the refused one); the unconfirmed one was found by its key.
+    const newPosts = slice.fake.requests
+      .filter((r) => r.method === 'POST')
+      .slice(posts)
+      .filter((r) => /\/messages$/.test(r.url));
+    expect(newPosts).toHaveLength(1);
+    expect(retried.progress.messages).toMatchObject({ failed: 0, imported: 9 });
+    expect(retried.report.gate).toBe('passed');
+    const { importer } = await chatwootOf(slice, shop.tenantId, shop.connection.id);
+    const conversationsOfJob = (await importer.listConversations({ page: 1 })).conversations.filter(
+      (c) => c.attributes.hv_import_job === created.id,
+    );
+    const keys = (await Promise.all(conversationsOfJob.map((c) => importer.listMessages(c.id))))
+      .flat()
+      .map((m) => m.key)
+      .filter((k): k is string => Boolean(k?.startsWith(`hv1:imp:${created.id}:`)));
+    expect(keys).toHaveLength(9);
+    expect(new Set(keys).size).toBe(9);
   });
 });
 

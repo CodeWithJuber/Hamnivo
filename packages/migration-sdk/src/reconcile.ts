@@ -51,6 +51,7 @@ export interface DestinationFacts {
 
 export type CheckCode =
   | 'all_accounted'
+  | 'no_failures'
   | 'export_complete'
   | 'no_duplicates'
   | 'private_kept_private'
@@ -158,6 +159,7 @@ export function reconcile(input: {
     0,
   );
   const pending = Object.values(kinds).reduce((sum, k) => sum + k.pending, 0);
+  const failed = Object.values(kinds).reduce((sum, k) => sum + k.failed, 0);
   const v = input.verification;
   const d = input.destination;
   const checks: ReconciliationCheck[] = [
@@ -166,6 +168,13 @@ export function reconcile(input: {
       ok: unexplained === 0 && pending === 0 && inFlight === 0 && input.unidentified === 0,
       ...(pending > 0 ? { detail: `${pending} not imported yet` } : {}),
       ...(input.unidentified > 0 ? { detail: `${input.unidentified} unreadable records` } : {}),
+    },
+    // A failed object could have been imported (Chatwoot refused it or was unavailable): unlike a
+    // quarantined one, it is a gap to retry or to accept knowingly.
+    {
+      code: 'no_failures',
+      ok: failed === 0,
+      ...(failed > 0 ? { detail: `${failed} failed` } : {}),
     },
     {
       code: 'export_complete',
