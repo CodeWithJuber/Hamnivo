@@ -929,6 +929,47 @@ describe('refunds need approval and a separate approver (C12, C19)', () => {
     expect(store.refunds.size).toBe(refundsBefore);
   });
 
+  it('rejects a refund only with a reason; nothing is sent and the customer sees it (HNV-21-04)', async () => {
+    const fresh = await paidOrder();
+    const orderId = fresh.purchase.order.id as string;
+    const requested = await agent.post(`/v1/admin/commerce/orders/${orderId}/refunds`, {
+      clientRequestId: randomUUID(),
+      amountMinor: '600',
+      reason: 'other',
+    });
+    expect(requested.status, JSON.stringify(requested.body)).toBe(201);
+    const refundsBefore = store.refunds.size;
+    const path = `/v1/admin/commerce/refunds/${requested.body.id}`;
+    expect((await finance.post(`${path}/reject`, { reason: '  ' })).status).toBe(422);
+    const noRight = await agent.post(`${path}/reject`, { reason: 'No' });
+    expect(noRight.status).toBe(403);
+    const rejected = await finance.post(`${path}/reject`, {
+      reason: 'Outside the return window',
+    });
+    expect(rejected.status, JSON.stringify(rejected.body)).toBe(200);
+    expect(rejected.body).toMatchObject({
+      state: 'rejected',
+      rejectionReason: 'Outside the return window',
+      rejectedBy: { name: 'Farah Finance' },
+    });
+    expect((await finance.post(`${path}/approve`, {})).status).toBe(409);
+    expect(store.refunds.size).toBe(refundsBefore);
+    const customer = await fresh.visitor.call(
+      'GET',
+      commerce(fresh.conversationId, `orders/${orderId}`),
+    );
+    expect(customer.body.refunds).toMatchObject([{ state: 'not_refunded' }]);
+    const audited = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .select()
+        .from(schema.auditEvents)
+        .where(eq(schema.auditEvents.action, 'commerce.refund.rejected')),
+    );
+    expect(audited.map((a) => (a.data as { reason: string }).reason)).toEqual([
+      'Outside the return window',
+    ]);
+  });
+
   it('never resends a lost refund once the provider may have forgotten its key (C07)', async () => {
     const fresh = await paidOrder();
     const requested = await agent.post(
