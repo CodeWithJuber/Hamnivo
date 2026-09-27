@@ -66,6 +66,21 @@ const EnvSchema = z.object({
   /** ClamAV daemon for uploads (tcp://host:3310). Without it only the EICAR test file is caught. */
   CLAMAV_URL: z.url().optional(),
 
+  /**
+   * Jev (TypeSafe) for routing decisions. Without a key, rubrics that name Jev record every
+   * decision as unavailable and the deterministic baseline decides.
+   */
+  JEV_API_KEY: z.string().min(8).optional(),
+  JEV_BASE_URL: z.url().optional(),
+
+  /** Prefix of every cache key in Valkey; separate deployments and test runs use their own. */
+  CACHE_KEY_PREFIX: z
+    .string()
+    .regex(/^[A-Za-z0-9:_-]{1,64}$/)
+    .default('hv:cache:'),
+  /** Deadline of one cache operation; slower answers count as misses (fail open). */
+  CACHE_TIMEOUT_MS: z.coerce.number().int().min(10).max(2000).default(150),
+
   /** The worker rewrites this file after every outbox pass (for container health checks). */
   WORKER_HEARTBEAT_FILE: z.string().min(1).optional(),
 

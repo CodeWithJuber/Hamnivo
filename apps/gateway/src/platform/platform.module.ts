@@ -1,3 +1,4 @@
+import type { CacheStore } from '@hamnivo/adapters/cache';
 import { closeDb, createDb, type Db } from '@hamnivo/db';
 import {
   type DynamicModule,
@@ -15,6 +16,10 @@ import { LogMailer, type Mailer, SmtpMailer } from './mailer.js';
 export interface PlatformOverrides {
   mailer?: Mailer;
   clock?: () => Date;
+  /** Replaces the transport of the Jev decision provider (tests). */
+  decisionFetch?: typeof fetch;
+  /** Replaces the cache store, for example with one that is down (tests). */
+  cacheStore?: CacheStore;
 }
 
 @Injectable()

@@ -146,6 +146,16 @@ export class OwnershipService {
           ])
         : [];
 
+    // A conversation that now waits for people is routed to a team (J02). Routing runs after this
+    // transaction and only picks the team; the handoff itself is already done here.
+    if (mode === 'WAITING_HUMAN') {
+      await enqueueOutbox(tx, tenantId, {
+        topic: 'conversation.route',
+        aggregateType: 'conversation',
+        aggregateId: conversationId,
+        payload: { conversationId, trigger: 'handoff', ref: `handoff:${epoch}` },
+      });
+    }
     if (options.origin === 'hamnivo') {
       await enqueueOutbox(tx, tenantId, {
         topic: 'conversation.owner_changed',

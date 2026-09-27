@@ -1,5 +1,6 @@
 import { createServer } from 'node:net';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
+import type { CacheStore } from '@hamnivo/adapters/cache';
 import { createMockModel } from '@hamnivo/adapters/models';
 import { type FakeChatwoot, startFakeChatwoot } from '@hamnivo/chatwoot/fake';
 import { closeDb, createDb, type Db } from '@hamnivo/db';
@@ -42,7 +43,15 @@ export interface Slice {
 
 /** Gateway on a real port, a worker driven by hand, and a fake Chatwoot that calls back over HTTP. */
 export async function startSlice(
-  options: { clock?: () => Date; model?: LanguageModel; scanner?: Scanner } = {},
+  options: {
+    clock?: () => Date;
+    model?: LanguageModel;
+    scanner?: Scanner;
+    /** A fake Jev transport for decision providers. */
+    decisionFetch?: typeof fetch;
+    /** A cache store to use instead of Valkey (for outage tests). */
+    cacheStore?: CacheStore;
+  } = {},
 ): Promise<Slice> {
   const fake = await startFakeChatwoot();
   const port = await freePort();
@@ -54,17 +63,26 @@ export async function startSlice(
     PUBLIC_API_ORIGIN: baseUrl,
     STREAM_HEARTBEAT_SECONDS: '1',
   };
-  const gw = await startGateway(env, undefined, options.clock ? { clock: options.clock } : {});
+  const shared = {
+    ...(options.decisionFetch ? { decisionFetch: options.decisionFetch } : {}),
+    ...(options.cacheStore ? { cacheStore: options.cacheStore } : {}),
+  };
+  const gw = await startGateway(env, undefined, {
+    ...(options.clock ? { clock: options.clock } : {}),
+    ...shared,
+  });
   await gw.app.listen(port, '127.0.0.1');
   const config = loadConfig(
     testEnv(gw.database, {
       ...env,
       BETTER_AUTH_SECRET: gw.config.BETTER_AUTH_SECRET,
       HAMNIVO_KEK_BASE64: gw.config.HAMNIVO_KEK_BASE64,
+      CACHE_KEY_PREFIX: gw.config.CACHE_KEY_PREFIX,
     }),
   );
   const worker = await NestFactory.createApplicationContext(
     WorkerModule.forRoot(config, {
+      ...shared,
       ...(options.clock ? { clock: options.clock } : {}),
       ...(options.model ? { model: options.model } : {}),
       ...(options.scanner ? { scanner: options.scanner } : {}),

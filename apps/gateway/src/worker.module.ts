@@ -8,7 +8,10 @@ import { ReconcilerService } from './authority/reconciler.service.js';
 import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
 import { AuthoritySyncService } from './authority/sync.service.js';
+import { cacheProviders } from './cache/cache.providers.js';
 import type { AppConfig } from './config.js';
+import { decisionProviders } from './decisions/decisions.providers.js';
+import { RoutingService } from './decisions/routing.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
@@ -72,6 +75,8 @@ export class WorkerModule {
         AgentsService,
         RunsService,
         AuthorityContactsService,
+        ...decisionProviders(overrides),
+        ...cacheProviders(overrides),
         EmbeddingFactory,
         RetrievalService,
         { provide: SCANNER, useValue: overrides.scanner ?? scannerFromUrl(config.CLAMAV_URL) },
@@ -79,11 +84,12 @@ export class WorkerModule {
         RepliesService,
         {
           provide: OUTBOX_HANDLERS,
-          inject: [AuthoritySyncService, RepliesService, IngestionService],
+          inject: [AuthoritySyncService, RepliesService, IngestionService, RoutingService],
           useFactory: (
             sync: AuthoritySyncService,
             replies: RepliesService,
             ingestion: IngestionService,
+            routing: RoutingService,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -92,6 +98,8 @@ export class WorkerModule {
               ['conversation.note', (event) => sync.applyNote(event)],
               ['conversation.customer_message', (event) => replies.onCustomerMessage(event)],
               ['knowledge.ingest', (event) => ingestion.onIngest(event)],
+              ['conversation.route', (event) => routing.onRoute(event)],
+              ['conversation.team_sync', (event) => routing.onTeamSync(event)],
             ]),
         },
         OutboxRelay,

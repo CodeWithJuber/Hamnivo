@@ -21,8 +21,11 @@ import { PublicationsService } from '../authority/publications.service.js';
 import { AuthorityRegistry, type ConnectionRuntime } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage, type PublicationFacts, type SourceRef } from '../authority/views.js';
+import { AnswerCache, type AnswerLookup } from '../cache/answers.js';
+import type { SourceRefRow } from '../cache/cache.service.js';
 import { AppError } from '../common/app-error.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
+import { LanguageService } from '../language/language.service.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
 import { type ActiveAgent, AgentsService } from './agents.service.js';
@@ -30,7 +33,13 @@ import { type AiHandoffReason, HANDOFF_NOTES } from './handoff-notes.js';
 import { checkHonesty } from './honesty.js';
 import { KillSwitchesService } from './kill-switches.service.js';
 import { ModelFactory, ModelUnavailableError } from './models.js';
-import { applyCitations, historyMessages, systemPrompt } from './prompt.js';
+import {
+  applyCitations,
+  historyMessages,
+  type PromptOptions,
+  promptVersion,
+  systemPrompt,
+} from './prompt.js';
 import { type RunOutcome, RunsService } from './runs.service.js';
 
 interface CustomerMessageEvent {
@@ -55,7 +64,12 @@ interface Generated {
   latencyMs: number;
   /** Knowledge the reply cites, in citation order. */
   sources: SourceRef[];
+  /** The cited documents and versions, for the answer cache to recheck before reuse. */
+  refs: SourceRefRow[];
 }
+
+/** Prompt options, and why the reply language was chosen (recorded with the model step). */
+type GenerateOptions = PromptOptions & { languageSource?: string };
 
 /** The customer's most recent words in a conversation. */
 function latestCustomerText(history: AuthorityMessage[]): string {
@@ -127,6 +141,8 @@ export class RepliesService {
     private readonly contacts: AuthorityContactsService,
     private readonly retrieval: RetrievalService,
     private readonly publications: PublicationsService,
+    private readonly language: LanguageService,
+    private readonly answers: AnswerCache,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -279,18 +295,74 @@ export class RepliesService {
       return;
     }
 
+    // Reply in the customer's language (U01): their explicit choice, otherwise their words.
+    const question = latestCustomerText(history.messages);
+    const chosen = await this.language.forReply(tenantId, control.principalId, question);
+    const options: GenerateOptions = {
+      language: chosen.resolution.language,
+      style: chosen.style,
+      languageSource: chosen.resolution.source,
+    };
+    const cached = await this.cachedAnswer(
+      tenantId,
+      run.id,
+      context,
+      agent,
+      history,
+      question,
+      options,
+    );
+
     let generated: Generated | null;
-    try {
-      generated = await this.generate(tenantId, run.id, context, agent, history);
-    } catch (error) {
-      const failure = classifyModelError(error);
-      if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
-      await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_unavailable', failure.kind);
-      return;
-    }
-    if (!generated) {
-      await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_blocked');
-      return;
+    if (cached.kind === 'hit') {
+      generated = {
+        text: cached.answer.text,
+        provider: 'cache',
+        modelId: cached.answer.modelId,
+        inputTokens: 0,
+        outputTokens: 0,
+        latencyMs: 0,
+        sources: cached.answer.sources,
+        refs: cached.answer.refs,
+      };
+    } else {
+      try {
+        generated = await this.generate(tenantId, run.id, context, agent, history, options);
+      } catch (error) {
+        const failure = classifyModelError(error);
+        if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
+        await this.handOff(
+          tenantId,
+          control,
+          run.id,
+          payload.epoch,
+          'ai_unavailable',
+          failure.kind,
+        );
+        return;
+      }
+      if (!generated) {
+        await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_blocked');
+        return;
+      }
+      // Only complete answers that passed the honesty guard, from the configured model, are kept.
+      const config = agent.config;
+      if (
+        cached.kind === 'fill' &&
+        generated.provider === config.model.provider &&
+        generated.modelId === config.model.modelId
+      ) {
+        await cached.fill({
+          text: generated.text,
+          sources: generated.sources,
+          refs: generated.refs,
+          provider: generated.provider,
+          modelId: generated.modelId,
+          inputTokens: generated.inputTokens,
+          outputTokens: generated.outputTokens,
+          latencyMs: generated.latencyMs,
+        });
+      }
     }
     const reply = generated.text;
     const telemetry = {
@@ -428,9 +500,19 @@ export class RepliesService {
       await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'drafted' }));
       return;
     }
+    const history = await this.history(tenantId, runtime, control);
+    const chosen = await this.language.forReply(
+      tenantId,
+      control.principalId,
+      latestCustomerText(history.messages),
+    );
     let generated: Generated | null;
     try {
-      generated = await this.generate(tenantId, run.id, context, agent);
+      generated = await this.generate(tenantId, run.id, context, agent, history, {
+        language: chosen.resolution.language,
+        style: chosen.style,
+        languageSource: chosen.resolution.source,
+      });
     } catch (error) {
       const failure = classifyModelError(error);
       if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
@@ -514,6 +596,52 @@ export class RepliesService {
   }
 
   /**
+   * The exact answer cache (K01): a customer's opening question to an answering agent, over public
+   * knowledge only. The lookup is recorded as a run step with its outcome, never the text.
+   */
+  private async cachedAnswer(
+    tenantId: string,
+    runId: string,
+    context: Context,
+    agent: ActiveAgent,
+    history: { messages: AuthorityMessage[] },
+    question: string,
+    options: GenerateOptions,
+  ): Promise<AnswerLookup> {
+    const brandId = context.control.brandId;
+    if (!brandId || !options.language) {
+      return { kind: 'skip', status: 'bypass', reason: 'no_brand' };
+    }
+    const started = Date.now();
+    const found = await this.answers.lookup({
+      tenantId,
+      brandId,
+      agentId: agent.profile.id,
+      agentVersionId: agent.version.id,
+      config: agent.config,
+      promptVersion: promptVersion(agent.config, context.brandName, options),
+      language: options.language,
+      history: history.messages,
+      question,
+    });
+    // With answer caching off (the default) there is nothing worth recording.
+    if (found.kind === 'skip' && found.reason === 'tier_disabled') return found;
+    await this.tx(tenantId, (tx) =>
+      this.runs.step(tx, tenantId, runId, {
+        kind: 'decision',
+        name: 'answer_cache',
+        status: found.kind === 'hit' ? 'ok' : 'skipped',
+        latencyMs: Date.now() - started,
+        detail:
+          found.kind === 'hit'
+            ? { outcome: 'hit', fingerprint: found.fingerprint }
+            : { outcome: found.status, ...(found.kind === 'skip' ? { reason: found.reason } : {}) },
+      }),
+    );
+    return found;
+  }
+
+  /**
    * Generates within the agent's limits, trying fallback models only when the main one is
    * overloaded or unavailable. Returns null when the honesty guard blocks the reply twice.
    */
@@ -523,6 +651,7 @@ export class RepliesService {
     context: Context,
     agent: ActiveAgent,
     fetched?: { messages: AuthorityMessage[]; view: 'customer' | 'staff_filtered' },
+    options: GenerateOptions = {},
   ): Promise<Generated | null> {
     const runtime = await this.registry.get(tenantId, context.control.connectionId);
     const { messages: history, view } =
@@ -532,13 +661,17 @@ export class RepliesService {
     const assist = config.mode === 'assist';
     const passages = await this.retrieve(tenantId, runId, context, config, history);
     const base =
-      systemPrompt(config, context.brandName, passages) +
+      systemPrompt(config, context.brandName, passages, options) +
       (assist
         ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
         : '');
     for (const correction of [null, CORRECTION]) {
       const system = correction ? `${base}\n\n${correction}` : base;
-      const generated = await this.callModels(tenantId, runId, config, system, messages, view);
+      const generated = await this.callModels(tenantId, runId, config, system, messages, {
+        view,
+        ...(options.language ? { language: options.language } : {}),
+        ...(options.languageSource ? { languageSource: options.languageSource } : {}),
+      });
       const cited = applyCitations(generated.text, passages, (p) => p.documentId);
       const result: Generated = {
         ...generated,
@@ -551,6 +684,12 @@ export class RepliesService {
           version: `v${p.version}`,
           excerpt: excerptOf(p.text),
           freshness: 'current',
+        })),
+        refs: cited.cited.map((p) => ({
+          documentId: p.documentId,
+          sourceId: p.sourceId,
+          title: p.title.slice(0, 300),
+          version: p.version,
         })),
       };
       const verdict = checkHonesty(result.text);
@@ -624,7 +763,7 @@ export class RepliesService {
     config: AgentConfig,
     system: string,
     messages: ReturnType<typeof historyMessages>,
-    view: string,
+    context: { view: string; language?: string; languageSource?: string },
   ): Promise<Generated> {
     const choices: ModelChoice[] = [config.model, ...config.fallbackModels];
     const inputHash = sha256(canonicalize({ system, messages }) ?? '');
@@ -650,6 +789,7 @@ export class RepliesService {
           outputTokens: result.usage.outputTokens ?? null,
           latencyMs: Date.now() - started,
           sources: [],
+          refs: [],
         };
         await this.tx(tenantId, (tx) =>
           this.runs.step(tx, tenantId, runId, {
@@ -663,7 +803,12 @@ export class RepliesService {
             latencyMs: generated.latencyMs,
             inputHash,
             outputHash: sha256(generated.text),
-            detail: { finishReason: result.finishReason, history: messages.length, view, index },
+            detail: {
+              finishReason: result.finishReason,
+              history: messages.length,
+              ...context,
+              index,
+            },
           }),
         );
         return generated;
@@ -693,7 +838,7 @@ export class RepliesService {
     tenantId: string,
     runId: string,
     outcome: RunOutcome,
-    telemetry: Omit<Generated, 'text' | 'sources'>,
+    telemetry: Omit<Generated, 'text' | 'sources' | 'refs'>,
   ) {
     await this.runs.finish(tx, runId, { outcome, ...telemetry });
     const now = this.clock();
