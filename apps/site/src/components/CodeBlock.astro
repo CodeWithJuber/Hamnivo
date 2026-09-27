@@ -1,0 +1,26 @@
+---
+import type { Dictionary } from '../i18n';
+
+interface Props {
+  id: string;
+  code: string;
+  /** Visible name of the language or tool, such as HTML or Terminal. */
+  label: string;
+  strings: Dictionary['code'];
+  class?: string;
+}
+
+const { id, code, label, strings, class: className } = Astro.props;
+---
+
+<div class:list={['code-block on-ink', className]}>
+  <div class="code-head">
+    <span>{label}</span>
+    <span class="ms-auto" role="status" data-copy-status={id}></span>
+    {/* Hidden until scripts/enhance.ts confirms the Clipboard API; the code stays selectable. */}
+    <button type="button" class="copy-btn" data-copy={id} data-copied={strings.copied} data-failed={strings.copyFailed} hidden>
+      {strings.copy}
+    </button>
+  </div>
+  <pre id={id} class="code-pre" tabindex="0" dir="ltr" lang="en" translate="no"><code>{code}</code></pre>
+</div>

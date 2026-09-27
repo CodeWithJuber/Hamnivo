@@ -1,0 +1,19 @@
+---
+interface Props {
+  /** Plain text in which `backticks` mark a command or file name. */
+  text: string;
+}
+
+// Odd-numbered parts sit between backticks. They stay left to right inside right-to-left text.
+const parts = Astro.props.text.split('`');
+---
+
+{
+  parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <code dir="ltr" translate="no" class="rounded-sm bg-surface-sunken px-1.5 py-0.5 font-mono text-[0.875em] text-text">{part}</code>
+    ) : (
+      part
+    ),
+  )
+}
