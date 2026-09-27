@@ -147,14 +147,15 @@ github_status() { # github_status STATE DESCRIPTION
 # used first: HAMNIVO_DEPLOY_BUILD_CACHE_GB, default 8. Without --all, Docker would only remove
 # dangling entries, which is almost nothing. Older Docker versions have other flags.
 prune_build_cache() { # prune_build_cache [GB]
-  local limit="${1:-${HAMNIVO_DEPLOY_BUILD_CACHE_GB:-8}}gb"
+  local limit="${1:-$(setting HAMNIVO_DEPLOY_BUILD_CACHE_GB 8)}gb"
   docker builder prune --all -f --max-used-space "$limit" >/dev/null 2>&1 ||
     docker builder prune --all -f --keep-storage "$limit" >/dev/null 2>&1 ||
     docker builder prune --all -f --filter until=168h >/dev/null 2>&1 || true
 }
 
 check_disk() {
-  local dir free need="${HAMNIVO_DEPLOY_MIN_FREE_GB:-8}"
+  local dir free need
+  need="$(setting HAMNIVO_DEPLOY_MIN_FREE_GB 8)"
   dir="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)"
   free="$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print int($4 / 1048576) }')"
   ((${free:-0} >= need)) && return 0
@@ -256,7 +257,7 @@ check_guards() { # check_guards FROM TO
 start_version() { # start_version COMMIT TAG
   git_ checkout --quiet --detach "$1" || return 1
   set_kv HAMNIVO_IMAGE_TAG "$2"
-  HAMNIVO_FAIL_UNHEALTHY=1 HAMNIVO_WAIT_SECONDS="${HAMNIVO_DEPLOY_HEALTH_SECONDS:-600}" \
+  HAMNIVO_FAIL_UNHEALTHY=1 HAMNIVO_WAIT_SECONDS="$(setting HAMNIVO_DEPLOY_HEALTH_SECONDS 600)" \
     "${hamnivo[@]}" up --no-build --quiet || return 1
   probe || return 1
   runs_commit "$1" || {
@@ -268,7 +269,8 @@ start_version() { # start_version COMMIT TAG
 # A new version must stay healthy for a while, not only answer once: nothing may restart
 # (HAMNIVO_DEPLOY_SOAK_SECONDS, default 45).
 soak() {
-  local seconds="${HAMNIVO_DEPLOY_SOAK_SECONDS:-45}" service id state i=0 restarts=()
+  local seconds service id state i=0 restarts=()
+  seconds="$(setting HAMNIVO_DEPLOY_SOAK_SECONDS 45)"
   ((seconds > 0)) || return 0
   for service in api worker edge; do
     id="$(container_of "$service")"
@@ -300,7 +302,7 @@ backup_if_needed() { # backup_if_needed FROM TO
   else
     log 'This version changes the database or its containers: backing up first'
   fi
-  "${hamnivo[@]}" backup --to "$here/backups/before-deploy" --keep "${HAMNIVO_DEPLOY_BACKUPS:-5}"
+  "${hamnivo[@]}" backup --to "$here/backups/before-deploy" --keep "$(setting HAMNIVO_DEPLOY_BACKUPS 5)"
 }
 
 # Puts back the settings saved before the switch, in one step (see set_kv).
@@ -318,7 +320,8 @@ restore_env() {
 # Removes images of old versions: keeps the live one, the one before, and the newest others up to
 # HAMNIVO_DEPLOY_KEEP (default 3) in all; then shrinks the build cache.
 prune_images() {
-  local keep="${HAMNIVO_DEPLOY_KEEP:-3}" repo tag kept current_tag previous_tag
+  local keep repo tag kept current_tag previous_tag
+  keep="$(setting HAMNIVO_DEPLOY_KEEP 3)"
   current_tag="$(read_state current)"
   current_tag="${current_tag##* }"
   previous_tag="$(read_state previous)"

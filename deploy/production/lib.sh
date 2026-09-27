@@ -46,6 +46,12 @@ set_kv() {
   mv -f "$tmp" "$file"
 }
 ensure() { has "$1" || set_kv "$1" "$2"; }
+# A setting from the environment, else from .env, else DEFAULT.
+setting() { # setting NAME DEFAULT
+  local value="${!1:-}"
+  [[ -n "$value" ]] || value="$(get "$1")"
+  printf '%s' "${value:-$2}"
+}
 hex() { openssl rand -hex 24; }
 
 need_env() {

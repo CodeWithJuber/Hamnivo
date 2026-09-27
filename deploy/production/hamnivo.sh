@@ -143,11 +143,7 @@ release_of() {
 
 # How many packages are built and tested at once. Builds share the server with the live services,
 # so this bounds their memory: lower it (1) on small servers, raise it on big ones.
-concurrency() {
-  local n="${HAMNIVO_BUILD_CONCURRENCY:-}"
-  [[ -n "$n" ]] || n="$(get HAMNIVO_BUILD_CONCURRENCY)"
-  printf '%s' "${n:-2}"
-}
+concurrency() { setting HAMNIVO_BUILD_CONCURRENCY 2; }
 
 # The webhook receiver; the month in a build argument reinstalls its package with Debian's fixes.
 build_hook() {

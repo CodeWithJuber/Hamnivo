@@ -32,6 +32,8 @@ this repository.
 
 - **A server** with Ubuntu 24.04 LTS (or another recent Linux), 4 vCPU, 8 GB of memory and 40 GB
   of SSD. Add 2 GB of memory for virus scanning of uploads (ClamAV, on by default).
+  - Automatic deploys (A10) build on the server. They keep a build cache and the images of three
+    versions: plan 60 GB of SSD, and swap (A2) on 8 GB of memory.
 - **A domain** you control, for example `example.com`.
 - **DNS records** (A, and AAAA if the server has IPv6) pointing at the server for these names:
 
@@ -68,6 +70,15 @@ sudo ufw enable
 Only the web server publishes ports. The databases, Valkey, the API and Chatwoot are reachable only
 inside Docker's network.
 
+Builds (the first start, updates and automatic deploys) run next to the live services. On 8 GB of
+memory, a 4 GB swap file keeps a build from pushing the services out of memory:
+
+```bash
+sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
 ## A3. Get the code
 
 The repository is private, so the server reads it with its own key, a read-only deploy key.
@@ -81,7 +92,15 @@ The repository is private, so the server reads it with its own key, a read-only 
 
 2. On GitHub, open the repository's **Settings → Deploy keys → Add deploy key**. Paste the key and
    leave "Allow write access" off.
-3. Clone:
+3. Trust GitHub's host key, as GitHub publishes it on docs.github.com (fingerprint
+   `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`), so that no first connection has to be
+   confirmed blindly:
+
+   ```bash
+   echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >>~/.ssh/known_hosts
+   ```
+
+4. Clone:
 
    ```bash
    sudo mkdir -p /opt/hamnivo && sudo chown "$USER" /opt/hamnivo
@@ -91,9 +110,8 @@ The repository is private, so the server reads it with its own key, a read-only 
    git config core.sshCommand 'ssh -i ~/.ssh/hamnivo_deploy_ed25519 -o IdentitiesOnly=yes'
    ```
 
-The first connection asks you to confirm GitHub's host key. Its fingerprint must be
-`SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`, as GitHub publishes it on docs.github.com.
-`hamnivo.sh autodeploy enable` (A10) sets up the same key if you skip this step.
+Run everything as this user, without `sudo` (it is in the `docker` group). `hamnivo.sh autodeploy
+enable` (A10) sets up the same key if you skip this step.
 
 ## A4. Configure
 
@@ -296,13 +314,15 @@ restore drill in its checks.
 This deploys the newest commit of `main` (the branch in `HAMNIVO_DEPLOY_BRANCH`), the way automatic
 deploys do (A10):
 
-1. **Checks** the code: Biome, type checks and unit tests. A failure stops here and touches
-   nothing that runs.
-2. **Adds** new settings to `.env`, and **builds** images tagged with the commit.
-3. **Backs up** first when the new version changes the database, into `backups/before-deploy/`.
-4. **Starts** the new version. Database migrations run first. Then it waits until the new version
-   is healthy and answers over HTTPS.
-5. **Rolls back** if the new version is not healthy: the version that ran before starts again.
+1. **Checks** a clean copy of the new version: Biome, type checks and unit tests. A failure stops
+   here and touches nothing that runs.
+2. **Builds** its images, tagged with the commit.
+3. **Backs up** first when the new version changes the database or its containers, into
+   `backups/before-deploy/`.
+4. **Switches:** the checkout moves to the new version, `.env` gets its new settings, database
+   migrations run, and the new version starts. It must answer over HTTPS, then stay healthy for 45
+   seconds.
+5. **Rolls back** if it does not: the settings and the version that ran before come back.
 
 While the API restarts, requests wait a few seconds for it, and open chats reconnect by
 themselves. `hamnivo.sh deploys` lists every deploy; `hamnivo.sh rollback` goes back to the
@@ -350,15 +370,25 @@ up and deploys.
 - **A push was not deployed:**
   - `hamnivo.sh autodeploy status` shows the mode, the git access and the last deploys.
   - `journalctl -u hamnivo-deploy` shows each run.
-  - On GitHub, **Settings → Webhooks → Recent Deliveries** shows GitHub's calls. `403` means
-    another branch or repository; `500` means a wrong secret.
+  - On GitHub, **Settings → Webhooks → Recent Deliveries** shows GitHub's calls:
+    - `200`: the server checks for a new commit. Pushes to other branches get `200` too, and
+      deploy nothing.
+    - `403`: another repository or another event than push.
+    - `500`: a wrong secret.
   - The 5-minute check deploys even when a webhook is lost.
-  - A commit that failed is not retried. Push a fix, or run `hamnivo.sh deploy --force <commit>`.
+  - A commit that failed is not retried, except once after 30 minutes when it stopped before the
+    switch (for example, a download failed during the build). Push a fix, or run
+    `hamnivo.sh deploy --force <commit>`.
+  - `hamnivo.sh deploys` lists versions that wait for a deploy by hand (A10).
 - **A deploy stopped or rolled back:** its full log is in `deploy/production/state/logs/`, and
   `hamnivo.sh deploys` names the step.
   - "local changes on the server": files tracked by git were edited on the server. Commit such
     changes to the repository instead.
   - "not enough disk space": free space for Docker, or lower `HAMNIVO_DEPLOY_BUILD_CACHE_GB`.
+  - "stopped at guards": a migration that already ran was edited or removed, or a new one is dated
+    before the newest applied one. Add or regenerate the migration in a new commit.
+- **After restoring a backup on a new server:** run `hamnivo.sh autodeploy enable` there too. The
+  restore builds the images when the backup's version is not on the server.
 
 ## A10. Automatic deployment from GitHub
 
@@ -374,9 +404,19 @@ push to main ─► GitHub webhook (signed) ─► https://api.example.com/_depl
 A timer also looks for new commits every 5 minutes, because GitHub never sends a failed webhook
 again.
 
-Each deploy runs like `hamnivo.sh update` (A7): the checks and the build come first, and a version
-that is not healthy is replaced by the one before. Two things are specific to automatic deploys:
-- A commit that failed is not tried again automatically; the next commit is.
+Each deploy runs like `hamnivo.sh update` (A7). The checks and the build run on a clean copy of the
+new version while the running one keeps serving. The new version must then become healthy and stay
+healthy for a short while; otherwise the one before starts again. Specific to automatic deploys:
+- A commit that failed is not tried again automatically; the next commit is. One exception: a
+  deploy that stopped before the switch (for example, a download failed during the build) is tried
+  once more after 30 minutes.
+- Some versions wait for you, because starting the previous version could not undo them:
+  - a migration that drops, renames or changes the type of data;
+  - a new version of other software in `compose.yml` (Chatwoot, PostgreSQL, Valkey). Chatwoot,
+    for example, migrates its database when it starts.
+
+  `hamnivo.sh deploys` lists them. Deploy one with `hamnivo.sh deploy <commit>` when you are
+  ready; it backs up first.
 - With a GitHub token, each deploy appears on GitHub under **Environments → production**.
 
 ### Turn it on
@@ -406,8 +446,11 @@ that is not healthy is replaced by the one before. Two things are specific to au
    2. Save it in a file and run `hamnivo.sh autodeploy enable --github-token-file <file>`.
    3. Delete the file.
 
-Without a public webhook, for example behind NAT, run `hamnivo.sh autodeploy enable --mode poll`.
-The server then checks every 5 minutes.
+GitHub sends webhooks only to a certificate it trusts, such as Let's Encrypt's (the default). Without
+one (`--tls internal`), or without a public address (for example behind NAT), run
+`hamnivo.sh autodeploy enable --mode poll`. The server then checks every 5 minutes.
+
+Run `autodeploy enable` as the user who owns the checkout, without `sudo`: deploys run as that user.
 
 ### Watch, pause, go back
 
@@ -430,19 +473,36 @@ A rollback starts the older code on the newer database. Change the schema in two
 1. **Add first:** new tables, and new columns that may be empty.
 2. **Remove later:** drop old columns only in a later release, once nothing uses them.
 
-When a release changes the database, the deploy backs up first, into
-`deploy/production/backups/before-deploy/`. The newest 5 of those backups are kept.
+Deploys check what they can:
+- **Stopped:** a migration that already ran was edited or removed, or a new one is dated before the
+  newest applied one. The database would skip it for good. Add or regenerate the migration in a new
+  commit. The unit tests also check that migrations are dated in order.
+- **Waits for you:** a migration that drops, renames or changes the type of data.
+- **Backed up first:** a release that changes the database, its containers (`compose.yml`) or
+  `deploy/postgres/`. The backup goes to `deploy/production/backups/before-deploy/`, where the
+  newest 5 are kept.
 
 ### Resources
 
-The checks and builds run on the server. With Docker's build cache they usually take a few
-minutes, because only changed packages are rebuilt and tested.
+The checks and builds run on the server, next to the live services. With Docker's build cache they
+usually take a few minutes, because only changed packages are rebuilt and tested.
+
+They build 2 packages at a time, which takes about 3 GB of memory besides the running services. On a
+server with 8 GB, add swap (A2) or set `HAMNIVO_BUILD_CONCURRENCY=1`.
+
+These settings go in `.env` (see `env.example`):
 
 | Setting | Default | Meaning |
 |---|---|---|
+| `HAMNIVO_BUILD_CONCURRENCY` | 2 | Packages built and tested at once |
 | `HAMNIVO_DEPLOY_BUILD_CACHE_GB` | 8 | Maximum size of Docker's build cache |
 | `HAMNIVO_DEPLOY_KEEP` | 3 | How many versions' images are kept |
 | `HAMNIVO_DEPLOY_MIN_FREE_GB` | 8 | Free space a deploy needs |
+| `HAMNIVO_DEPLOY_HEALTH_SECONDS` | 600 | How long a new version may take to become healthy |
+| `HAMNIVO_DEPLOY_SOAK_SECONDS` | 45 | How long it must then stay healthy |
+
+During a switch, requests to the API wait for it (up to 30 s), and open chats reconnect by
+themselves. The website and the widget pause for about 3 seconds while the web server restarts.
 
 # Part B: Develop and run the checks
 
