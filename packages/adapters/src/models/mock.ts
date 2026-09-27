@@ -73,12 +73,45 @@ const REPLIES: Record<Script, { greeting: string; body: string }> = {
   },
 };
 
+/** Latin-script Hindustani replies, used when the instructions ask for them. */
+const LATIN_REPLIES: Record<'hi-Latn' | 'ur-Latn', { greeting: string; body: string }> = {
+  'hi-Latn': {
+    greeting: 'Walaikum assalam! ',
+    body: 'Aapke message ke liye dhanyavaad. Main ek AI assistant hoon. Kripya thodi aur jaankari (jaise order number) dijiye, main madad karunga, ya kabhi bhi kisi vyakti se baat karne ke liye kahiye.',
+  },
+  'ur-Latn': {
+    greeting: 'Walaikum assalam! ',
+    body: 'Aap ke paighaam ka shukriya. Main aik AI assistant hoon. Meherbani kar ke mazeed tafseel (jaise order number) batayein, main madad karunga, ya kisi bhi waqt kisi insaan se baat karne ka kahein.',
+  },
+};
+
+/** The reply language the instructions name (`Reply language code: ur-Latn.`), if any. */
+function requestedLanguage(system: string) {
+  const code = system.match(/Reply language code: ([A-Za-z]{2,3}(?:-[A-Za-z]{4})?)\./)?.[1];
+  switch (code) {
+    case 'hi-Latn':
+    case 'ur-Latn':
+      return LATIN_REPLIES[code];
+    case 'ar':
+      return REPLIES.arabic;
+    case 'ur':
+      return REPLIES.urdu;
+    case 'hi':
+      return REPLIES.devanagari;
+    case 'en':
+      return REPLIES.latin;
+    default:
+      return undefined;
+  }
+}
+
 /**
- * Default reply: answers in the customer's script, returns a greeting of peace, says plainly that
- * it is an AI and asks for details. It claims no facts it does not have.
+ * Default reply: answers in the reply language the instructions name, otherwise in the customer's
+ * script; returns a greeting of peace, says plainly that it is an AI and asks for details. It
+ * claims no facts it does not have.
  */
-export const defaultMockReply: MockReply = ({ text }) => {
-  const reply = REPLIES[scriptOf(text)];
+export const defaultMockReply: MockReply = ({ system, text }) => {
+  const reply = requestedLanguage(system) ?? REPLIES[scriptOf(text)];
   return `${GREETING.test(text) ? reply.greeting : ''}${reply.body}`;
 };
 

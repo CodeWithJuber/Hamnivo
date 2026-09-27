@@ -269,6 +269,22 @@ export class ChatwootAuthority implements ConversationAuthority {
     );
   }
 
+  /** Chatwoot's team assignment (`team_id`; 0 clears it). It leaves the assignee as it is. */
+  async assignTeam(
+    conversationRef: string,
+    teamRef: string | null,
+    actor: ActorCredential,
+  ): Promise<void> {
+    const client = await this.as(actor);
+    await call(
+      'assignConversation',
+      client.POST('/api/v1/accounts/{account_id}/conversations/{conversation_id}/assignments', {
+        params: { path: this.conversationPath(conversationRef) },
+        body: { team_id: teamRef === null ? 0 : Number(teamRef) } as never,
+      }) as never,
+    );
+  }
+
   async setStatus(
     conversationRef: string,
     status: ConversationStatus,

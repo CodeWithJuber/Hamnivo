@@ -77,7 +77,9 @@ function contract(name: string, make: (clock: () => number) => CacheStore) {
 }
 
 contract('memory', (clock) => createMemoryCacheStore({ clock }));
-contract('valkey', (clock) => createValkeyCacheStore({ commands: fakeValkey(clock), prefix: 'hv:test:' }));
+contract('valkey', (clock) =>
+  createValkeyCacheStore({ commands: fakeValkey(clock), prefix: 'hv:test:' }),
+);
 
 describe('valkey store', () => {
   it('keeps each prefix apart on the same server', async () => {
