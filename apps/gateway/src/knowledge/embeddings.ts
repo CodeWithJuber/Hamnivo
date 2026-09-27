@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
 import type { EmbeddingModelV4 } from '@ai-sdk/provider';
+import { createEmbeddingModel, type ModelSpec } from '@hamnivo/adapters/models';
 import { EMBEDDING_DIMENSIONS } from '@hamnivo/db/schema';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { embedMany } from 'ai';
@@ -9,45 +9,36 @@ import { CONFIG } from '../tokens.js';
 /** Test hook: when provided, knowledge is embedded with this model. */
 export const EMBEDDING_MODEL = Symbol('EMBEDDING_MODEL');
 
-/**
- * Deterministic offline embeddings: hashed word features, L2-normalized. Texts that share words
- * are close, which is enough for development and tests; it understands no meaning.
- */
-export function hashingEmbeddingModel(modelId = 'hamnivo-embed'): EmbeddingModelV4 {
-  const embed = (text: string): number[] => {
-    const vector = new Array<number>(EMBEDDING_DIMENSIONS).fill(0);
-    const words =
-      text
-        .normalize('NFKC')
-        .toLowerCase()
-        .match(/[\p{L}\p{M}\p{N}]+/gu) ?? [];
-    for (const word of words) {
-      const digest = createHash('sha256').update(word).digest();
-      const index = digest.readUInt32BE(0) % EMBEDDING_DIMENSIONS;
-      vector[index] = (vector[index] ?? 0) + ((digest[4] ?? 0) & 1 ? 1 : -1);
-    }
-    const norm = Math.hypot(...vector) || 1;
-    return vector.map((v) => v / norm);
-  };
-  return {
-    specificationVersion: 'v4',
-    provider: 'mock',
-    modelId,
-    maxEmbeddingsPerCall: 256,
-    supportsParallelCalls: true,
-    async doEmbed({ values }) {
+/** The platform embedding spec, with the platform key for its provider. */
+function embeddingSpec(config: AppConfig): ModelSpec {
+  const base = { provider: config.EMBEDDING_PROVIDER, modelId: config.EMBEDDING_MODEL } as const;
+  switch (config.EMBEDDING_PROVIDER) {
+    case 'openai':
+      return { ...base, ...(config.OPENAI_API_KEY ? { apiKey: config.OPENAI_API_KEY } : {}) };
+    case 'google':
       return {
-        embeddings: values.map(embed),
-        usage: { tokens: values.reduce((n, v) => n + v.split(/\s+/).length, 0) },
-        warnings: [],
+        ...base,
+        ...(config.GOOGLE_GENERATIVE_AI_API_KEY
+          ? { apiKey: config.GOOGLE_GENERATIVE_AI_API_KEY }
+          : {}),
       };
-    },
-  };
+    case 'openai-compatible':
+      return {
+        ...base,
+        ...(config.OPENAI_COMPATIBLE_BASE_URL
+          ? { baseURL: config.OPENAI_COMPATIBLE_BASE_URL }
+          : {}),
+        ...(config.OPENAI_COMPATIBLE_API_KEY ? { apiKey: config.OPENAI_COMPATIBLE_API_KEY } : {}),
+      };
+    case 'mock':
+      return base;
+  }
 }
 
 /**
- * The embedding model for knowledge (platform-wide, EMBEDDING_PROVIDER / EMBEDDING_MODEL). Chunks
- * remember which model embedded them; search compares only vectors from the current model.
+ * The embedding model for knowledge (platform-wide: EMBEDDING_PROVIDER / EMBEDDING_MODEL, keys from
+ * the platform model keys). Chunks remember which model embedded them, and search compares only
+ * vectors from the current model, so changing the model means re-indexing, never mixing.
  */
 @Injectable()
 export class EmbeddingFactory {
@@ -57,27 +48,20 @@ export class EmbeddingFactory {
     @Inject(CONFIG) config: AppConfig,
     @Optional() @Inject(EMBEDDING_MODEL) override?: EmbeddingModelV4,
   ) {
-    if (override) this.model = override;
-    else if (config.EMBEDDING_PROVIDER === 'mock') {
-      this.model = hashingEmbeddingModel(config.EMBEDDING_MODEL);
-    } else {
-      throw new Error(
-        `EMBEDDING_PROVIDER=${config.EMBEDDING_PROVIDER} is not available in this build yet.`,
-      );
-    }
-  }
-
-  /**
-   * Cosine distance above which a passage is no vector match at all. Hashed words only match
-   * shared words, so the offline model accepts any overlap.
-   */
-  get maxDistance(): number {
-    return this.model.provider === 'mock' ? 0.95 : 0.7;
+    this.model = override ?? createEmbeddingModel(embeddingSpec(config));
   }
 
   /** `provider:model`, stored with each chunk. */
   get id(): string {
     return `${this.model.provider}:${this.model.modelId}`;
+  }
+
+  /**
+   * Cosine distance above which a passage is no vector match at all. The offline mock only
+   * matches shared words, so it accepts any overlap.
+   */
+  get maxDistance(): number {
+    return this.model.provider === 'mock' ? 0.95 : 0.7;
   }
 
   async embed(values: string[], abortSignal?: AbortSignal): Promise<number[][]> {
@@ -86,6 +70,11 @@ export class EmbeddingFactory {
       model: this.model,
       values,
       maxRetries: 1,
+      // Stored vectors have a fixed size; models that can shorten their output are asked to.
+      providerOptions: {
+        openai: { dimensions: EMBEDDING_DIMENSIONS },
+        google: { outputDimensionality: EMBEDDING_DIMENSIONS },
+      },
       ...(abortSignal ? { abortSignal } : {}),
     });
     for (const vector of embeddings) {

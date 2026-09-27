@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 186 · in-progress: 44 · implemented: 2
+**Blueprint features (232):** planned: 180 · in-progress: 50 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -96,7 +96,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
 | G01 | Agent profiles | P0 | C | in-progress | `apps/gateway/src/runtime/agents.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/contracts/src/agents.ts`, `packages/db/src/schema/runtime.ts` — Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending. |
-| G02 | Provider adapter | P0 | C | in-progress | `apps/gateway/src/runtime/models.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/adapters/src/models/mock.ts`, `packages/adapters/test/mock.test.ts` — Agents choose a provider and model with tenant credentials (encrypted connections) or platform keys, checked at publication; fallback models on overload (tested with hamnivo-mock). Anthropic, OpenAI, Gemini and OpenAI-compatible adapters are being added. |
+| G02 | Provider adapter | P0 | C | in-progress | `apps/gateway/src/runtime/models.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/adapters/src/models/capabilities.ts`, `packages/adapters/src/models/errors.ts`, `packages/adapters/src/models/fallback.ts`, `packages/adapters/src/models/mock.ts`, `packages/adapters/src/models/registry.ts`, `packages/adapters/test/mock.test.ts`, `packages/adapters/test/models/contract.test.ts` — Anthropic, OpenAI, Google Gemini and OpenAI-compatible adapters (AI SDK 7) plus deterministic mocks, a sourced capability table and error normalization; agents use them with tenant or platform keys, checked at publication, with fallback models on overload (tested against provider fixtures and with the mock end to end). No live provider call has run in the checks. |
 | G03 | Assist and answer modes | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/agents.int.test.ts` — Answer mode replies to customers; assist mode writes suggestions only as internal notes and never answers customers (tested). Grounded answers from knowledge arrive with knowledge sources. |
 | G04 | Approved knowledge sources | P0 | C | in-progress | `apps/gateway/src/knowledge/knowledge.service.ts`, `apps/gateway/test/knowledge.int.test.ts`, `packages/db/src/schema/knowledge.ts` — Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). URL crawling and Studio screens pending. |
 | G05 | Retrieval with access controls | P0 | C | in-progress | `apps/gateway/src/knowledge/retrieval.service.ts`, `apps/gateway/test/knowledge.int.test.ts` — Hybrid vector + keyword retrieval with eligibility filters applied before ranking: tenant (RLS), brand, agent's sources, audience (internal sources never reach customer answers), current ready version, expiry and review cycle (tested). Per-customer document scopes pending. |
@@ -124,13 +124,13 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| J01 | Jev decision adapter | P0 | C | planned |  |
+| J01 | Jev decision adapter | P0 | C | in-progress | `packages/adapters/src/jev/provider.ts`, `packages/adapters/test/jev/contract.test.ts`, `packages/domain/src/decisions.ts` — Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). Not yet called by the gateway; no live Jev call has run. |
 | J02 | Intent and team routing | P0 | C | planned |  |
 | J03 | Skill and evidence ranking | P1 | C | planned |  |
-| J04 | Escalation advisory | P0 | C | planned |  |
+| J04 | Escalation advisory | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/domain/src/human-request.ts`, `packages/domain/test/human-request.test.ts` — A typed request for a person (English, Hinglish, Roman Urdu, Arabic, Hindi, Urdu, with negation and look-alikes) hands the conversation to people before any model or decision provider runs (tested end to end); Jev escalation advice for other cases is pending. |
 | J05 | Threshold and rubric editor | P1 | C | planned |  |
-| J06 | Provider fallback | P0 | C | planned |  |
-| J07 | Decision audit and cost | P0 | C | planned |  |
+| J06 | Provider fallback | P0 | C | in-progress | `packages/adapters/src/jev/breaker.ts`, `packages/adapters/src/jev/provider.ts`, `packages/adapters/test/jev/resilience.test.ts` — Total deadline, caller cancellation (also when the transport ignores it), no retries, circuit breaker with half-open probe, and decided/abstained/unavailable/invalid results (tested). The fallback chain in the gateway is pending. |
+| J07 | Decision audit and cost | P0 | C | in-progress | `packages/adapters/src/jev/provider.ts`, `packages/domain/src/decisions.ts` — Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested); persisting decision records and cost is pending. |
 | J08 | Jev versus baseline experiments | P1 | C | planned |  |
 
 ### Developer integrations
@@ -270,7 +270,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
 | U01 | Language preference model | P0 | C | planned |  |
-| U02 | Hinglish and Roman Urdu | P0 | C | planned |  |
+| U02 | Hinglish and Roman Urdu | P0 | C | in-progress | `apps/gateway/test/agents.int.test.ts`, `packages/domain/src/human-request.ts`, `packages/domain/test/fixtures/human-requests.json` — Hinglish and Roman Urdu requests for a person are detected across spellings, transliterations and negation (74 fixture cases) and act end to end; identifiers pass through unchanged. Native-speaker review pending. |
 | U03 | Per-participant translations | P1 | C | planned |  |
 | U04 | RTL interaction | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `apps/widget/src/i18n.ts` — Document direction follows the language and message text uses dir=auto, so Arabic and Urdu read right to left while Latin order numbers keep their direction; bidi copy behaviour tests pending. |
 | U05 | Localized complete flows | P0 | C | planned |  |
@@ -295,9 +295,9 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | E03 | Runtime-independent ports | P0 | C | planned |  |
 | E04 | Event and schema compatibility | P0 | F | in-progress | `packages/contracts/src/events.ts`, `packages/contracts/src/parts.ts`, `packages/contracts/fixtures/v1/future-minor-version.json`, `packages/contracts/test/contracts.test.ts`, `docs/contracts/compatibility.md` — Forward-compatible parsing and fixtures in place; client SDK compatibility tests follow with packages/client. |
 | E05 | Plugin permission diffs | P0 | A | planned |  |
-| E06 | Adapter contract fixtures | P0 | C | in-progress | `packages/domain/src/authority.ts`, `packages/chatwoot/test/contract/suite.ts`, `packages/chatwoot/test/contract/fake.test.ts`, `packages/chatwoot/test/contract/real.int.test.ts`, `packages/chatwoot/src/fake/server.ts` — One ConversationAuthority contract suite runs on every test run against the fake Chatwoot and, in pnpm ci:local, against a throwaway real Chatwoot v4.18.0-ce; model, Jev, commerce and scanner adapter kits pending. |
+| E06 | Adapter contract fixtures | P0 | C | in-progress | `packages/adapters/test/jev/contract.test.ts`, `packages/adapters/test/models/contract.test.ts`, `packages/adapters/test/models/contract.ts`, `packages/chatwoot/src/fake/server.ts`, `packages/chatwoot/test/contract/fake.test.ts`, `packages/chatwoot/test/contract/real.int.test.ts`, `packages/chatwoot/test/contract/suite.ts`, `packages/domain/src/authority.ts` — One shared behaviour suite runs against every model provider (generate, stream, wire format, key placement, 401/429/5xx/529/abort) with provider-specific capability tests, and the Jev adapter has its own wire contract fixtures. Fixtures come from public API docs, not recorded traffic. |
 | E07 | Hikmah reuse adapter | P1 | L | planned |  |
-| E08 | Jev contract reconciliation | P0 | C | planned |  |
+| E08 | Jev contract reconciliation | P0 | C | in-progress | `packages/adapters/src/jev/wire.ts`, `packages/adapters/test/jev/contract.test.ts`, `packages/adapters/test/jev/fixtures/systemone-request.json` — Requests and answers use the current keyed-map shapes, checked against an exact fixture; array-shaped answers from the older client are rejected. Proven against the SDK and fixtures, not the live API. |
 | E09 | License and dataset inventory | P0 | F | implemented | `scripts/licenses/inventory.ts`, `docs/licenses.md`, `scripts/ci/local.sh` — Inventory generated from the lockfile; the local check pipeline fails on a stale inventory or unreviewed licences. |
 | E10 | Research evidence registry | P1 | L | planned |  |
 | E11 | Semantic co-model experiments | P2 | Research | planned |  |

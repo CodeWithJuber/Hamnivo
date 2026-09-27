@@ -1,4 +1,4 @@
-import { createMockModel } from '@hamnivo/adapters/models';
+import { createLanguageModel, ModelConfigError } from '@hamnivo/adapters/models';
 import type { ModelChoice, ModelProviderKind } from '@hamnivo/contracts';
 import { type Db, fromPublicId, schema, type TenantTx, withTenant } from '@hamnivo/db';
 import { Inject, Injectable, Optional } from '@nestjs/common';
@@ -41,11 +41,14 @@ export class ModelUnavailableError extends Error {
 }
 
 function languageModelFor(spec: ModelSpec): LanguageModel {
-  if (spec.provider === 'mock') return createMockModel({ modelId: spec.modelId });
-  throw new ModelUnavailableError(
-    'provider_not_supported',
-    `The ${spec.provider} provider is not available in this build yet.`,
-  );
+  try {
+    return createLanguageModel(spec);
+  } catch (error) {
+    if (error instanceof ModelConfigError) {
+      throw new ModelUnavailableError('no_credentials', error.message);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -113,16 +116,21 @@ export class ModelFactory {
 
   /** Throws ModelUnavailableError when the choice cannot run (checked before publishing). */
   async check(tx: TenantTx, choice: ModelChoice): Promise<void> {
-    if (choice.connectionId) await this.connection(tx, choice);
-    else if (!this.platform(choice.provider)) {
+    let credentials: { apiKey?: string; baseURL?: string } | null;
+    if (choice.connectionId) {
+      const row = await this.connection(tx, choice);
+      // The key itself stays sealed; a placeholder is enough to build the model.
+      credentials = { apiKey: 'unrevealed', ...(row.baseUrl ? { baseURL: row.baseUrl } : {}) };
+    } else {
+      credentials = this.platform(choice.provider);
+    }
+    if (!credentials) {
       throw new ModelUnavailableError(
         'no_credentials',
         `No ${choice.provider} key is configured. Add a model connection first.`,
       );
     }
-    if (choice.provider !== 'mock' && !this.override) {
-      languageModelFor({ provider: choice.provider, modelId: choice.modelId, apiKey: 'check' });
-    }
+    languageModelFor({ provider: choice.provider, modelId: choice.modelId, ...credentials });
   }
 
   async resolve(tenantId: string, choice: ModelChoice): Promise<ResolvedModel> {

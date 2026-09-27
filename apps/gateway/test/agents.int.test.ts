@@ -242,6 +242,17 @@ describe('model connections', () => {
     expect(refused.status).toBe(422);
     expect(refused.body.detail).toContain('not allowed');
 
+    // With an allowed model, a real provider publishes: the key stays sealed until a reply runs.
+    await alpha.owner.put(`/v1/admin/agents/${alpha.agentId}/draft`, {
+      config: {
+        ...base,
+        model: { provider: 'openai', modelId: 'gpt-5-mini', connectionId: created.body.id },
+      },
+    });
+    const published = await alpha.owner.post(`/v1/admin/agents/${alpha.agentId}/publish`, {});
+    expect(published.status, JSON.stringify(published.body)).toBe(200);
+    expect(published.body.published.config.model).toMatchObject({ provider: 'openai' });
+
     const disabled = await alpha.owner.post(
       `/v1/admin/model-connections/${created.body.id}/disable`,
     );
@@ -282,6 +293,25 @@ describe('kill switches', () => {
     expect(cleared.body.active).toBe(false);
     const after = await chat('Hello again');
     expect((await inspect(after.conversationId)).botReplies).toHaveLength(1);
+  });
+});
+
+describe('asking for a person', () => {
+  it('hands over at once when the customer types it, in Roman Urdu too', async () => {
+    const { conversationId } = await chat('Mujhe kisi insaan se baat karni hai please');
+    const seen = await inspect(conversationId);
+    expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+    expect(seen.botReplies).toEqual([]);
+    expect(seen.notes.some((n) => n.includes('asked to talk to a person'))).toBe(true);
+    const [run] = await runsOf(conversationId);
+    expect(run).toMatchObject({ outcome: 'handoff' });
+  });
+
+  it('keeps answering when the customer says they do not want a person', async () => {
+    const { conversationId } = await chat('Insaan nahi chahiye, bas order ka status batao');
+    const seen = await inspect(conversationId);
+    expect(seen.control.ownerMode).toBe('AI_ACTIVE');
+    expect(seen.botReplies).toHaveLength(1);
   });
 });
 

@@ -5,7 +5,7 @@
 #   pnpm ci:local --quick            install, lint, typecheck, unit tests, status/licence checks
 #   pnpm ci:local --skip-a11y        skip the Storybook accessibility audit
 #   pnpm ci:local --skip-chatwoot    skip the contract suite against a real Chatwoot
-#   pnpm ci:local --skip-e2e         skip the widget journey in a real browser
+#   pnpm ci:local --skip-e2e         skip the browser checks (widget journey and website)
 #   PG_VERSIONS=18 pnpm ci:local     run integration tests on one PostgreSQL major only
 #
 # Integration tests run against throwaway PostgreSQL (+pgvector), Valkey and Chatwoot containers
@@ -199,6 +199,8 @@ if ((quick == 0)); then
   fi
   if ((e2e == 1)); then
     step "Widget journey in a browser (Playwright + axe)" widget_journey
+    # The journey's build step also built the static website.
+    step "Website in a browser (Playwright + axe, 4 languages)" pnpm --filter @hamnivo/site test:e2e
   fi
 fi
 

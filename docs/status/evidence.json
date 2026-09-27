@@ -182,13 +182,16 @@
   "E06": {
     "status": "in-progress",
     "evidence": [
-      "packages/domain/src/authority.ts",
-      "packages/chatwoot/test/contract/suite.ts",
+      "packages/adapters/test/jev/contract.test.ts",
+      "packages/adapters/test/models/contract.test.ts",
+      "packages/adapters/test/models/contract.ts",
+      "packages/chatwoot/src/fake/server.ts",
       "packages/chatwoot/test/contract/fake.test.ts",
       "packages/chatwoot/test/contract/real.int.test.ts",
-      "packages/chatwoot/src/fake/server.ts"
+      "packages/chatwoot/test/contract/suite.ts",
+      "packages/domain/src/authority.ts"
     ],
-    "note": "One ConversationAuthority contract suite runs on every test run against the fake Chatwoot and, in pnpm ci:local, against a throwaway real Chatwoot v4.18.0-ce; model, Jev, commerce and scanner adapter kits pending."
+    "note": "One shared behaviour suite runs against every model provider (generate, stream, wire format, key placement, 401/429/5xx/529/abort) with provider-specific capability tests, and the Jev adapter has its own wire contract fixtures. Fixtures come from public API docs, not recorded traffic."
   },
   "W05": {
     "status": "in-progress",
@@ -273,10 +276,15 @@
     "evidence": [
       "apps/gateway/src/runtime/models.ts",
       "apps/gateway/test/agents.int.test.ts",
+      "packages/adapters/src/models/capabilities.ts",
+      "packages/adapters/src/models/errors.ts",
+      "packages/adapters/src/models/fallback.ts",
       "packages/adapters/src/models/mock.ts",
-      "packages/adapters/test/mock.test.ts"
+      "packages/adapters/src/models/registry.ts",
+      "packages/adapters/test/mock.test.ts",
+      "packages/adapters/test/models/contract.test.ts"
     ],
-    "note": "Agents choose a provider and model with tenant credentials (encrypted connections) or platform keys, checked at publication; fallback models on overload (tested with hamnivo-mock). Anthropic, OpenAI, Gemini and OpenAI-compatible adapters are being added."
+    "note": "Anthropic, OpenAI, Google Gemini and OpenAI-compatible adapters (AI SDK 7) plus deterministic mocks, a sourced capability table and error normalization; agents use them with tenant or platform keys, checked at publication, with fallback models on overload (tested against provider fixtures and with the mock end to end). No live provider call has run in the checks."
   },
   "W01": {
     "status": "in-progress",
@@ -474,5 +482,56 @@
     "status": "in-progress",
     "evidence": ["apps/widget/src/components/Chat.tsx", "apps/widget/src/markdown.ts"],
     "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers. Structured cards pending."
+  },
+  "J01": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/adapters/src/jev/provider.ts",
+      "packages/adapters/test/jev/contract.test.ts",
+      "packages/domain/src/decisions.ts"
+    ],
+    "note": "Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). Not yet called by the gateway; no live Jev call has run."
+  },
+  "J04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/domain/src/human-request.ts",
+      "packages/domain/test/human-request.test.ts"
+    ],
+    "note": "A typed request for a person (English, Hinglish, Roman Urdu, Arabic, Hindi, Urdu, with negation and look-alikes) hands the conversation to people before any model or decision provider runs (tested end to end); Jev escalation advice for other cases is pending."
+  },
+  "J06": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/adapters/src/jev/breaker.ts",
+      "packages/adapters/src/jev/provider.ts",
+      "packages/adapters/test/jev/resilience.test.ts"
+    ],
+    "note": "Total deadline, caller cancellation (also when the transport ignores it), no retries, circuit breaker with half-open probe, and decided/abstained/unavailable/invalid results (tested). The fallback chain in the gateway is pending."
+  },
+  "J07": {
+    "status": "in-progress",
+    "evidence": ["packages/adapters/src/jev/provider.ts", "packages/domain/src/decisions.ts"],
+    "note": "Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested); persisting decision records and cost is pending."
+  },
+  "E08": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/adapters/src/jev/wire.ts",
+      "packages/adapters/test/jev/contract.test.ts",
+      "packages/adapters/test/jev/fixtures/systemone-request.json"
+    ],
+    "note": "Requests and answers use the current keyed-map shapes, checked against an exact fixture; array-shaped answers from the older client are rejected. Proven against the SDK and fixtures, not the live API."
+  },
+  "U02": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/domain/src/human-request.ts",
+      "packages/domain/test/fixtures/human-requests.json"
+    ],
+    "note": "Hinglish and Roman Urdu requests for a person are detected across spellings, transliterations and negation (74 fixture cases) and act end to end; identifiers pass through unchanged. Native-speaker review pending."
   }
 }

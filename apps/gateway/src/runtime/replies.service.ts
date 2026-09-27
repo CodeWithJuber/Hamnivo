@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { normalizeModelError } from '@hamnivo/adapters/models';
 import type { AgentConfig, ModelChoice } from '@hamnivo/contracts';
 import {
   type ClaimedOutboxEvent,
@@ -9,7 +10,7 @@ import {
   toPublicId,
   withTenant,
 } from '@hamnivo/db';
-import type { AuthorityMessage } from '@hamnivo/domain';
+import { type AuthorityMessage, detectHumanRequest } from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { generateText, isStepCount } from 'ai';
 import canonicalize from 'canonicalize';
@@ -55,6 +56,14 @@ interface Generated {
   sources: SourceRef[];
 }
 
+/** The customer's most recent words in a conversation. */
+function latestCustomerText(history: AuthorityMessage[]): string {
+  const incoming = history
+    .filter((m) => m.direction === 'incoming' && !m.private && m.text?.trim())
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || Number(a.ref) - Number(b.ref));
+  return incoming.at(-1)?.text?.trim() ?? '';
+}
+
 /** Passages retrieved per run. */
 const PASSAGES = 5;
 
@@ -86,18 +95,12 @@ class EmptyReplyError extends Error {
 export function classifyModelError(error: unknown): { kind: string; retryable: boolean } {
   if (error instanceof ModelUnavailableError) return { kind: error.reason, retryable: false };
   if (error instanceof EmptyReplyError) return { kind: 'empty_reply', retryable: false };
-  const name = (error as { name?: unknown })?.name;
-  if (name === 'TimeoutError') return { kind: 'timeout', retryable: true };
-  if (name === 'AbortError') return { kind: 'aborted', retryable: false };
-  const status = (error as { statusCode?: unknown })?.statusCode;
-  if (typeof status === 'number') {
-    if (status === 429) return { kind: 'rate_limited', retryable: true };
-    if (status === 401 || status === 403) return { kind: 'auth', retryable: false };
-    if (status >= 500) return { kind: 'unavailable', retryable: true };
-    return { kind: 'invalid_request', retryable: false };
-  }
-  return { kind: 'unknown', retryable: true };
+  const normalized = normalizeModelError(error);
+  return { kind: normalized.kind, retryable: normalized.retryable };
 }
+
+/** Kinds where another provider may still answer; a bad request would fail there too. */
+const FALLBACK_KINDS = new Set(['rate_limited', 'overloaded', 'unavailable', 'timeout']);
 
 /**
  * AI replies with fenced publication (ADR 0003, R05/R06), run by the brand's published agent
@@ -218,10 +221,26 @@ export class RepliesService {
       await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_stopped');
       return;
     }
+    const history = await this.history(tenantId, runtime, control);
+    // Handoff precedence 1: a customer who asks for a person gets one, and no model or decision
+    // provider is consulted first (J04).
+    const asked = detectHumanRequest(latestCustomerText(history.messages));
+    if (asked.requested) {
+      await this.tx(tenantId, (tx) =>
+        this.runs.step(tx, tenantId, run.id, {
+          kind: 'decision',
+          name: 'human_request',
+          status: 'ok',
+          detail: { language: asked.language ?? null },
+        }),
+      );
+      await this.handOff(tenantId, control, run.id, payload.epoch, 'customer_request');
+      return;
+    }
 
     let generated: Generated | null;
     try {
-      generated = await this.generate(tenantId, run.id, context, agent);
+      generated = await this.generate(tenantId, run.id, context, agent, history);
     } catch (error) {
       const failure = classifyModelError(error);
       if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
@@ -440,9 +459,11 @@ export class RepliesService {
     runId: string,
     context: Context,
     agent: ActiveAgent,
+    fetched?: { messages: AuthorityMessage[]; view: 'customer' | 'staff_filtered' },
   ): Promise<Generated | null> {
     const runtime = await this.registry.get(tenantId, context.control.connectionId);
-    const { messages: history, view } = await this.history(tenantId, runtime, context.control);
+    const { messages: history, view } =
+      fetched ?? (await this.history(tenantId, runtime, context.control));
     const config: AgentConfig = agent.config;
     const messages = historyMessages(history, config.limits.historyMessages);
     const assist = config.mode === 'assist';
@@ -598,8 +619,7 @@ export class RepliesService {
             detail: { errorKind: failure.kind, index },
           }),
         );
-        // Fallbacks cover an overloaded or unavailable provider, not a bad request.
-        if (!['rate_limited', 'unavailable', 'timeout'].includes(failure.kind)) throw error;
+        if (!FALLBACK_KINDS.has(failure.kind)) throw error;
       }
     }
     throw lastError;

@@ -1,8 +1,10 @@
+import { APICallError } from '@ai-sdk/provider';
 import { AgentConfig } from '@hamnivo/contracts';
 import type { AuthorityMessage } from '@hamnivo/domain';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import { checkHonesty } from '../src/runtime/honesty.js';
+import { ModelUnavailableError } from '../src/runtime/models.js';
 import { historyMessages, systemPrompt } from '../src/runtime/prompt.js';
 import { classifyModelError } from '../src/runtime/replies.service.js';
 
@@ -107,24 +109,27 @@ describe('history for the model', () => {
 });
 
 describe('model errors', () => {
+  const failure = (statusCode: number) =>
+    new APICallError({
+      message: 'provider failed',
+      url: 'https://models.example/v1',
+      requestBodyValues: {},
+      statusCode,
+    });
+
   it('separate retryable outages from problems a retry cannot fix', () => {
-    expect(classifyModelError({ statusCode: 429 })).toEqual({
-      kind: 'rate_limited',
-      retryable: true,
-    });
-    expect(classifyModelError({ statusCode: 503 })).toEqual({
-      kind: 'unavailable',
-      retryable: true,
-    });
-    expect(classifyModelError({ statusCode: 401 })).toEqual({ kind: 'auth', retryable: false });
-    expect(classifyModelError({ statusCode: 400 })).toEqual({
-      kind: 'invalid_request',
-      retryable: false,
-    });
-    expect(classifyModelError(Object.assign(new Error('t'), { name: 'TimeoutError' }))).toEqual({
+    expect(classifyModelError(failure(429))).toEqual({ kind: 'rate_limited', retryable: true });
+    expect(classifyModelError(failure(503))).toEqual({ kind: 'unavailable', retryable: true });
+    expect(classifyModelError(failure(529))).toMatchObject({ retryable: true });
+    expect(classifyModelError(failure(401))).toEqual({ kind: 'auth', retryable: false });
+    expect(classifyModelError(failure(400))).toMatchObject({ retryable: false });
+    expect(classifyModelError(new DOMException('slow', 'TimeoutError'))).toEqual({
       kind: 'timeout',
       retryable: true,
     });
+    expect(
+      classifyModelError(new ModelUnavailableError('no_credentials', 'No key for openai')),
+    ).toEqual({ kind: 'no_credentials', retryable: false });
   });
 });
 

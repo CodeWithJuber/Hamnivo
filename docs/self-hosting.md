@@ -7,7 +7,7 @@ this repository. This guide grows with the product. Each milestone adds its serv
 
 | Part | Status | How |
 |---|---|---|
-| Checks (lint, types, unit, integration on PostgreSQL 16 and 18, Chatwoot contract, accessibility, widget journey in a browser) | ready | `pnpm ci:local` |
+| Checks (lint, types, unit, integration on PostgreSQL 16 and 18, Chatwoot contract, accessibility, widget journey and website in a browser) | ready | `pnpm ci:local` |
 | Infrastructure (PostgreSQL 18 + pgvector, Valkey) | ready | `pnpm services:up` |
 | Design system (Storybook) | ready | `pnpm --filter @hamnivo/ui storybook` |
 | Database schema, row-level security and audit log | ready | `pnpm db:migrate` |
@@ -15,7 +15,9 @@ this repository. This guide grows with the product. Each milestone adds its serv
 | Chatwoot CE v4.18.0 (conversation authority) with the Hamnivo Platform App | ready | `pnpm chatwoot:up` |
 | Chat API: widget sessions, conversations, live stream, staff takeover | ready | see "Connect a brand to Chatwoot" below |
 | Chat widget (Hamnivo Chat), its one-script loader and the JS client SDK | ready (first version) | see "Put the chat on a web page" below |
-| Studio, website | not yet built | added by later milestones, with a production compose file and TLS proxy |
+| Public website (EN/AR/HI/UR, static) | ready | see "The public website" below |
+| AI agents: real models (Anthropic, OpenAI, Gemini, OpenAI-compatible), knowledge, kill switches | ready (API) | see "Connect a brand to Chatwoot" below |
+| Studio (staff console) | not yet built | added by a later milestone, with a production compose file and TLS proxy |
 
 ## 1. Server requirements
 
@@ -289,6 +291,22 @@ On a server, serve `apps/widget/dist` (with `loader.js` copied in) as static fil
 proxy (for example `https://chat.example.com`). Set `PUBLIC_WIDGET_ORIGIN` to that origin, and
 list each customer website in the brand's `allowedOrigins`.
 
+### The public website
+
+`apps/site` is a static site in English, Arabic, Hindi and Urdu. It uses the brand's product
+visuals, and every page passes an accessibility audit in the checks.
+
+```bash
+pnpm --filter @hamnivo/brand build
+pnpm --filter @hamnivo/site build        # static files in apps/site/dist
+pnpm --filter @hamnivo/site preview      # http://localhost:5190
+```
+
+Serve `apps/site/dist` from any web server or CDN. Set these at build time:
+- `PUBLIC_SITE_URL`: the address used in canonical links and the sitemap.
+- To embed a live chat demo: `PUBLIC_HAMNIVO_WIDGET_ID`, `PUBLIC_HAMNIVO_WIDGET_ORIGIN` and
+  `PUBLIC_HAMNIVO_API`. Without them, the page shows the loader snippet instead.
+
 ## 5. Run the checks
 
 ```bash
@@ -296,7 +314,7 @@ pnpm ci:local                   # everything; about 8–12 minutes
 pnpm ci:local --quick           # lint, typecheck, unit tests, status and licence checks
 pnpm ci:local --skip-a11y       # everything except the Storybook accessibility audit
 pnpm ci:local --skip-chatwoot   # everything except the real-Chatwoot contract suite
-pnpm ci:local --skip-e2e        # everything except the widget journey in a browser
+pnpm ci:local --skip-e2e        # everything except the browser checks (widget journey, website)
 PG_VERSIONS=18 pnpm ci:local
 ```
 
@@ -310,6 +328,8 @@ is never touched:
   gateway, the worker, a fake Chatwoot, the widget and a host page on another origin. Chromium
   then chats through it: AI reply, staff takeover, offline resend, right to left, an axe audit,
   and refusal on a website that is not allowed.
+
+- The built website in Chromium: every language at desktop and phone width, with an axe audit.
 
 The summary is written to `test-results/ci-local.md`. Paste it into the pull request when you
 review a change.
