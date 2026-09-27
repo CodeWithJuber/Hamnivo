@@ -32,6 +32,8 @@ import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage } from '../authority/views.js';
 import { AppError } from '../common/app-error.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
+import { AgentsService } from '../runtime/agents.service.js';
+import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { AuthorityContactsService } from './contacts.service.js';
 import { handoffMessage } from './copy.js';
@@ -52,6 +54,7 @@ export class WidgetConversationsService {
     private readonly journal: JournalService,
     private readonly ownership: OwnershipService,
     private readonly outbound: OutboundMessagesService,
+    private readonly agents: AgentsService,
   ) {}
 
   private tx<T>(claims: WidgetClaims, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -149,8 +152,8 @@ export class WidgetConversationsService {
       if (error instanceof AppError) throw error;
       throw authorityUnavailable(error, 'The chat could not be started. Please try again.');
     }
-    await this.tx(claims, (tx) =>
-      tx.insert(schema.conversationControls).values({
+    const handedOver = await this.tx(claims, async (tx) => {
+      await tx.insert(schema.conversationControls).values({
         id: conversationId,
         tenantId: claims.tenantId,
         connectionId: inbox.connectionId,
@@ -162,8 +165,26 @@ export class WidgetConversationsService {
         ownerBotId: aiOwned ? (runtime.primaryBot?.id ?? null) : null,
         authorityStatus: status,
         authorityUpdatedAt: version,
-      }),
-    );
+      });
+      if (!aiOwned) return [];
+      // Without a published answering agent (or with the AI stopped), people answer from the start.
+      const decision = await this.agents.answering(tx, claims.brandId);
+      if (decision.answering) return [];
+      const result = await this.ownership.transition(
+        tx,
+        claims.tenantId,
+        conversationId,
+        { kind: 'queue' },
+        {
+          origin: 'hamnivo',
+          reason: decision.reason,
+          actor: { type: 'system', id: 'ai' },
+          handoffNote: HANDOFF_NOTES[decision.reason],
+        },
+      );
+      return result.journal;
+    });
+    await this.journal.notify(claims.tenantId, conversationId, handedOver);
     const publicId = toPublicId('conversation', conversationId);
     if (input.firstMessage) {
       await this.send(claims, publicId, {
@@ -209,15 +230,14 @@ export class WidgetConversationsService {
           .update(schema.conversationControls)
           .set({ lastCustomerMessageAt: this.clock() })
           .where(eq(schema.conversationControls.id, conversationId));
-        // The AI answers only while it owns the conversation; the reply job re-checks the epoch.
-        if (control.ownerMode === 'AI_ACTIVE') {
-          await enqueueOutbox(tx, claims.tenantId, {
-            topic: 'conversation.customer_message',
-            aggregateType: 'conversation',
-            aggregateId: conversationId,
-            payload: { conversationId, ledgerId, epoch: control.ownershipEpoch },
-          });
-        }
+        // The AI job decides: a fenced reply while the AI owns the conversation, a suggestion
+        // for staff in assist mode, otherwise nothing.
+        await enqueueOutbox(tx, claims.tenantId, {
+          topic: 'conversation.customer_message',
+          aggregateType: 'conversation',
+          aggregateId: conversationId,
+          payload: { conversationId, ledgerId, epoch: control.ownershipEpoch },
+        });
       },
     });
   }

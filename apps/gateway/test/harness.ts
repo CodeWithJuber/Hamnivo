@@ -78,7 +78,7 @@ export class Client {
   constructor(private readonly app: NestFastifyApplication) {}
 
   async request<T = any>(
-    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     url: string,
     options: { body?: unknown; headers?: Record<string, string>; tenant?: string | null } = {},
   ): Promise<Reply<T>> {
@@ -117,6 +117,8 @@ export class Client {
     this.request<T>('GET', url, options);
   post = <T = any>(url: string, body?: unknown, options: Parameters<Client['request']>[2] = {}) =>
     this.request<T>('POST', url, { ...options, body: body ?? {} });
+  put = <T = any>(url: string, body: unknown, options: Parameters<Client['request']>[2] = {}) =>
+    this.request<T>('PUT', url, { ...options, body });
   patch = <T = any>(url: string, body: unknown, options: Parameters<Client['request']>[2] = {}) =>
     this.request<T>('PATCH', url, { ...options, body });
   delete = <T = any>(url: string, options?: Parameters<Client['request']>[2]) =>

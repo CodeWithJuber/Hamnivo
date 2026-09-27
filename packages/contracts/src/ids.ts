@@ -49,6 +49,8 @@ export const ID_PREFIX = {
   inbox: 'inb',
   secret: 'sec',
   connection: 'acn',
+  modelConnection: 'mcn',
+  killSwitch: 'ksw',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

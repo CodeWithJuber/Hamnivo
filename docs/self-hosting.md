@@ -167,7 +167,21 @@ This needs `pnpm chatwoot:up` (it writes `CHATWOOT_URL` and `CHATWOOT_PLATFORM_T
    curl "${h[@]}" -d '{"brandId":"brd_..."}' http://localhost:4000/v1/admin/authority/connections
    ```
 
-3. Chat as a website visitor would. Use the brand's `widgetId`:
+3. Publish the brand's AI agent. Connecting created it as a draft that uses the offline
+   `hamnivo-mock` model, and until it is published, people answer every conversation:
+
+   ```bash
+   curl "${h[@]}" http://localhost:4000/v1/admin/agents          # note the agent id (agt_…)
+   curl "${h[@]}" -d '{}' http://localhost:4000/v1/admin/agents/agt_.../publish
+   ```
+
+   To use a real model, save a new draft with a different `model`, then publish again. For example,
+   use `{"provider":"anthropic","modelId":"…"}` with `ANTHROPIC_API_KEY` in `.env.local`, or store
+   a tenant key first with `POST /v1/admin/model-connections` and reference its `connectionId`.
+   Publishing checks that the model has credentials. Every published version stays unchanged, and
+   publishing an older version (`{"version":1}`) is the rollback.
+
+4. Chat as a website visitor would. Use the brand's `widgetId`:
 
    ```bash
    S=$(curl -s -H 'content-type: application/json' \
@@ -179,10 +193,21 @@ This needs `pnpm chatwoot:up` (it writes `CHATWOOT_URL` and `CHATWOOT_PLATFORM_T
      http://localhost:4000/v1/widget/conversations/conv_.../events
    ```
 
-The stream shows your message and, a moment later, the AI assistant's reply. With no model keys,
-the reply comes from the offline `hamnivo-mock` model. The same conversation appears in Chatwoot
-(`http://127.0.0.1:3000`), where your staff can also answer. A person replying or taking over there
-takes the conversation from the AI.
+The stream shows your message and, a moment later, the AI assistant's reply. With the default
+agent, the reply comes from the offline `hamnivo-mock` model. The same conversation appears in
+Chatwoot (`http://127.0.0.1:3000`), where your staff can also answer. A person replying or taking
+over there takes the conversation from the AI.
+
+Each AI reply is recorded as a run: agent version, model, tokens, time and outcome, but no message
+text (`GET /v1/admin/runs`). To stop the AI at once, for the whole tenant, one brand or one agent:
+
+```bash
+curl "${h[@]}" -d '{"scope":"brand","targetId":"brd_...","reason":"Checking answers"}' \
+  http://localhost:4000/v1/admin/kill-switches
+```
+
+Conversations the AI held go to people with an internal note, and people keep chatting as usual.
+Clearing the switch (`POST /v1/admin/kill-switches/ksw_.../clear`) lets the AI answer again.
 
 ### Put the chat on a web page
 

@@ -218,8 +218,8 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
           })
           .where(eq(schema.messageLedger.id, ledger.id));
         // The webhook can confirm a customer message before the API request that sent it does.
-        // Whichever commits the message asks the AI for a reply, so it happens exactly once.
-        if (ledger.senderKind === 'customer' && control.ownerMode === 'AI_ACTIVE') {
+        // Whichever commits the message starts the AI job, so it runs exactly once.
+        if (ledger.senderKind === 'customer') {
           await enqueueOutbox(tx, tenantId, {
             topic: 'conversation.customer_message',
             aggregateType: 'conversation',

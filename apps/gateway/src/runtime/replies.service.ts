@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { AgentConfig, ModelChoice } from '@hamnivo/contracts';
 import {
   type ClaimedOutboxEvent,
   type Db,
@@ -9,16 +10,24 @@ import {
 } from '@hamnivo/db';
 import type { AuthorityMessage } from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { generateText, type LanguageModel, type ModelMessage } from 'ai';
+import { generateText, isStepCount } from 'ai';
+import canonicalize from 'canonicalize';
 import { and, eq } from 'drizzle-orm';
 import { type JournalEntry, JournalService } from '../authority/journal.service.js';
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
 import { AuthorityRegistry, type ConnectionRuntime } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage } from '../authority/views.js';
+import { AppError } from '../common/app-error.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
-
-export const LANGUAGE_MODEL = Symbol('LANGUAGE_MODEL');
+import { AuthorityContactsService } from '../widget/contacts.service.js';
+import { type ActiveAgent, AgentsService } from './agents.service.js';
+import { type AiHandoffReason, HANDOFF_NOTES } from './handoff-notes.js';
+import { checkHonesty } from './honesty.js';
+import { KillSwitchesService } from './kill-switches.service.js';
+import { ModelFactory, ModelUnavailableError } from './models.js';
+import { historyMessages, systemPrompt } from './prompt.js';
+import { type RunOutcome, RunsService } from './runs.service.js';
 
 interface CustomerMessageEvent {
   conversationId: string;
@@ -26,16 +35,61 @@ interface CustomerMessageEvent {
   epoch: number;
 }
 
-const HISTORY = 20;
+interface Context {
+  control: ControlRow;
+  agent: ActiveAgent | null;
+  stopped: boolean;
+  brandName: string;
+}
+
+interface Generated {
+  text: string;
+  provider: string;
+  modelId: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  latencyMs: number;
+}
 
 /** Why a reply was not published, recorded on the publication for review. */
 type AbortReason = 'owner_changed' | 'preflight_owner_mismatch' | 'not_ai_owned';
 
+const CORRECTION =
+  'Your previous draft claimed to be a person. You are an AI assistant; say so if it matters.';
+
+/** Outbox attempts before a failing model hands the conversation to people. */
+const MODEL_ATTEMPTS = 3;
+
+const sha256 = (value: string) => createHash('sha256').update(value).digest();
+
+/** The model answered with nothing to say. */
+class EmptyReplyError extends Error {
+  override readonly name = 'EmptyReplyError';
+}
+
+/** Failure of a model call, without prompt text or credentials. */
+export function classifyModelError(error: unknown): { kind: string; retryable: boolean } {
+  if (error instanceof ModelUnavailableError) return { kind: error.reason, retryable: false };
+  if (error instanceof EmptyReplyError) return { kind: 'empty_reply', retryable: false };
+  const name = (error as { name?: unknown })?.name;
+  if (name === 'TimeoutError') return { kind: 'timeout', retryable: true };
+  if (name === 'AbortError') return { kind: 'aborted', retryable: false };
+  const status = (error as { statusCode?: unknown })?.statusCode;
+  if (typeof status === 'number') {
+    if (status === 429) return { kind: 'rate_limited', retryable: true };
+    if (status === 401 || status === 403) return { kind: 'auth', retryable: false };
+    if (status >= 500) return { kind: 'unavailable', retryable: true };
+    return { kind: 'invalid_request', retryable: false };
+  }
+  return { kind: 'unknown', retryable: true };
+}
+
 /**
- * AI replies with fenced publication (ADR 0003, R05/R06). The reply is generated outside any lock,
+ * AI replies with fenced publication (ADR 0003, R05/R06), run by the brand's published agent
+ * (G01) within its limits (G09), recorded as a run (G12). The reply is generated outside any lock,
  * then reserved under the ownership epoch the customer message arrived in. A pre-flight check
- * confirms Chatwoot still shows the Hamnivo bot as owner, and the message is posted with its
- * publication key. A takeover at any point before the post makes the reply unpublishable.
+ * confirms Chatwoot still shows the Hamnivo bot as owner before the post. When the AI cannot or
+ * must not answer, the conversation goes to people with a note saying why.
  */
 @Injectable()
 export class RepliesService {
@@ -44,10 +98,14 @@ export class RepliesService {
   constructor(
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: Clock,
-    @Inject(LANGUAGE_MODEL) private readonly model: LanguageModel,
     private readonly registry: AuthorityRegistry,
     private readonly journal: JournalService,
     private readonly ownership: OwnershipService,
+    private readonly agents: AgentsService,
+    private readonly switches: KillSwitchesService,
+    private readonly runs: RunsService,
+    private readonly models: ModelFactory,
+    private readonly contacts: AuthorityContactsService,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -61,97 +119,135 @@ export class RepliesService {
     return null;
   }
 
-  private prompt(history: AuthorityMessage[]): ModelMessage[] {
-    return history
-      .filter(
-        (m) => !m.private && (m.direction === 'incoming' || m.direction === 'outgoing') && m.text,
-      )
-      .slice(-HISTORY)
-      .map((m) =>
-        m.direction === 'incoming'
-          ? ({ role: 'user', content: m.text as string } as const)
-          : ({ role: 'assistant', content: m.text as string } as const),
-      );
-  }
-
   /** Outbox handler for `conversation.customer_message`. Safe to run more than once. */
   async onCustomerMessage(event: ClaimedOutboxEvent): Promise<void> {
     const payload = event.payload as CustomerMessageEvent;
-    const tenantId = event.tenantId;
-    const sourceKey = `hv1:p:${uuidV5(payload.conversationId, `reply:${payload.ledgerId}`)}`;
-    const start = await this.tx(tenantId, async (tx) => {
+    const context = await this.tx(event.tenantId, async (tx): Promise<Context | null> => {
       const [control] = await tx
         .select()
         .from(schema.conversationControls)
         .where(eq(schema.conversationControls.id, payload.conversationId));
-      const [publication] = await tx
-        .select()
-        .from(schema.publications)
-        .where(eq(schema.publications.sourceKey, sourceKey));
-      return { control, publication };
+      if (!control) return null;
+      const agent = control.brandId ? await this.agents.activeFor(tx, control.brandId) : null;
+      const stop = await this.switches.activeFor(tx, {
+        brandId: control.brandId,
+        agentId: agent?.profile.id ?? null,
+      });
+      const [brand] = control.brandId
+        ? await tx.select().from(schema.brands).where(eq(schema.brands.id, control.brandId))
+        : [];
+      return { control, agent, stopped: stop !== null, brandName: brand?.name ?? 'this business' };
     });
-    if (!start.control) return;
-    if (
-      start.publication &&
-      start.publication.state !== 'reserved' &&
-      start.publication.state !== 'unknown'
-    )
-      return;
-    const runtime = await this.registry.get(tenantId, start.control.connectionId);
-    const ref = String(start.control.externalConversationId);
-    const bot = runtime.bots.find((b) => b.id === start.control?.ownerBotId) ?? runtime.primaryBot;
+    if (!context) return;
+    if (context.control.ownerMode === 'AI_ACTIVE') {
+      await this.reply(event, payload, context);
+    } else if (context.agent?.config.mode === 'assist' && !context.stopped) {
+      await this.suggest(event, payload, context);
+    }
+  }
+
+  private async reply(event: ClaimedOutboxEvent, payload: CustomerMessageEvent, context: Context) {
+    const tenantId = event.tenantId;
+    const { control, agent } = context;
+    const sourceKey = `hv1:p:${uuidV5(payload.conversationId, `reply:${payload.ledgerId}`)}`;
+    const [publication] = await this.tx(tenantId, (tx) =>
+      tx.select().from(schema.publications).where(eq(schema.publications.sourceKey, sourceKey)),
+    );
+    if (publication && publication.state !== 'reserved' && publication.state !== 'unknown') return;
+    const runtime = await this.registry.get(tenantId, control.connectionId);
+    const ref = String(control.externalConversationId);
+    const bot = runtime.bots.find((b) => b.id === control.ownerBotId) ?? runtime.primaryBot;
     if (!bot) return;
+    const run = await this.tx(tenantId, (tx) =>
+      this.runs.start(tx, {
+        tenantId,
+        conversationId: control.id,
+        brandId: control.brandId,
+        agentId: agent?.profile.id ?? null,
+        agentVersionId: agent?.version.id ?? null,
+        triggerRef: `reply:${payload.ledgerId}`,
+        kind: 'reply',
+        epoch: payload.epoch,
+      }),
+    );
 
     // An earlier attempt may already have posted this reply.
-    if (start.publication) {
-      const posted = await runtime.authority.findByKey(ref, sourceKey, start.publication.createdAt);
+    if (publication) {
+      const posted = await runtime.authority.findByKey(ref, sourceKey, publication.createdAt);
       if (posted) {
         await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted);
+        await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'replied' }));
         return;
       }
     }
-    if (this.fenced(start.control, payload.epoch)) return;
+    if (this.fenced(control, payload.epoch)) {
+      await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'fenced' }));
+      return;
+    }
+    if (agent?.config.mode !== 'answer') {
+      await this.handOff(
+        tenantId,
+        control,
+        run.id,
+        payload.epoch,
+        agent ? 'assist_mode' : 'no_agent',
+      );
+      return;
+    }
+    if (context.stopped) {
+      await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_stopped');
+      return;
+    }
 
-    const history = await runtime.authority.listMessages(ref, { view: 'staff' });
-    const { text } = await generateText({
-      model: this.model,
-      system:
-        'You are the AI assistant of this business. Be kind and brief, say plainly that you are an AI, ' +
-        'never claim facts you do not have, and offer a person whenever the customer asks.',
-      messages: this.prompt(history),
-      maxRetries: 1,
-      abortSignal: AbortSignal.timeout(30_000),
-    });
-    const reply = text.trim();
-    if (!reply) return;
+    let generated: Generated | null;
+    try {
+      generated = await this.generate(tenantId, run.id, context, agent);
+    } catch (error) {
+      const failure = classifyModelError(error);
+      if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
+      await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_unavailable', failure.kind);
+      return;
+    }
+    if (!generated) {
+      await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_blocked');
+      return;
+    }
+    const reply = generated.text;
+    const telemetry = {
+      provider: generated.provider,
+      modelId: generated.modelId,
+      inputTokens: generated.inputTokens,
+      outputTokens: generated.outputTokens,
+      latencyMs: generated.latencyMs,
+    };
 
-    const contentHash = createHash('sha256').update(reply).digest();
     const reserved = await this.tx(tenantId, async (tx) => {
-      const control = await this.ownership.lock(tx, payload.conversationId);
-      const reason = this.fenced(control, payload.epoch);
-      const [publication] = await tx
+      const locked = await this.ownership.lock(tx, payload.conversationId);
+      const reason = this.fenced(locked, payload.epoch);
+      const [row] = await tx
         .insert(schema.publications)
         .values({
           tenantId,
-          conversationId: control.id,
+          conversationId: locked.id,
           epoch: payload.epoch,
           sourceKey,
-          contentHash,
+          contentHash: sha256(reply),
           state: reason ? 'aborted' : 'reserved',
-          detail: reason ? { reason, currentEpoch: control.ownershipEpoch } : {},
+          detail: reason ? { reason, currentEpoch: locked.ownershipEpoch } : {},
         })
         .onConflictDoUpdate({
           target: schema.publications.sourceKey,
           set: reason
             ? {
                 state: 'aborted',
-                detail: { reason, currentEpoch: control.ownershipEpoch },
+                detail: { reason, currentEpoch: locked.ownershipEpoch },
                 updatedAt: this.clock(),
               }
             : { updatedAt: this.clock() },
         })
         .returning();
-      return { publication, reason };
+      if (reason) await this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry });
+      return { publication: row, reason };
     });
     if (reserved.reason || !reserved.publication) {
       this.logger.log(
@@ -166,6 +262,9 @@ export class RepliesService {
       await this.abort(tenantId, sourceKey, 'preflight_owner_mismatch', {
         authorityOwner: state.owner,
       });
+      await this.tx(tenantId, (tx) =>
+        this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry }),
+      );
       return;
     }
     let posted: AuthorityMessage;
@@ -187,6 +286,296 @@ export class RepliesService {
       throw error;
     }
     await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted);
+    await this.tx(tenantId, (tx) =>
+      this.finishWithUsage(tx, tenantId, run.id, 'replied', telemetry),
+    );
+  }
+
+  /** Assist mode (G03): a suggestion for staff as an internal note, never a customer reply. */
+  private async suggest(
+    event: ClaimedOutboxEvent,
+    payload: CustomerMessageEvent,
+    context: Context,
+  ) {
+    const tenantId = event.tenantId;
+    const { control } = context;
+    const agent = context.agent as ActiveAgent;
+    const runtime = await this.registry.get(tenantId, control.connectionId);
+    const bot = runtime.primaryBot;
+    if (!bot) return;
+    const ref = String(control.externalConversationId);
+    const key = `hv1:d:${uuidV5(payload.conversationId, `draft:${payload.ledgerId}`)}`;
+    const run = await this.tx(tenantId, (tx) =>
+      this.runs.start(tx, {
+        tenantId,
+        conversationId: control.id,
+        brandId: control.brandId,
+        agentId: agent.profile.id,
+        agentVersionId: agent.version.id,
+        triggerRef: `draft:${payload.ledgerId}`,
+        kind: 'draft',
+        epoch: payload.epoch,
+      }),
+    );
+    if (run.state !== 'running') return;
+    if (run.attempts > 1 && (await runtime.authority.findByKey(ref, key, run.startedAt))) {
+      await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'drafted' }));
+      return;
+    }
+    let generated: Generated | null;
+    try {
+      generated = await this.generate(tenantId, run.id, context, agent);
+    } catch (error) {
+      const failure = classifyModelError(error);
+      if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
+      await this.tx(tenantId, (tx) =>
+        this.runs.finish(tx, run.id, { outcome: 'error', errorKind: failure.kind }),
+      );
+      return;
+    }
+    if (!generated) {
+      await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'blocked' }));
+      return;
+    }
+    await runtime.authority.appendMessage({
+      conversationRef: ref,
+      key,
+      author: { kind: 'bot', botRef: String(bot.externalBotId) },
+      visibility: 'private',
+      text: `AI suggestion (not sent to the customer):\n\n${generated.text}`,
+    });
+    await this.tx(tenantId, (tx) =>
+      this.finishWithUsage(tx, tenantId, run.id, 'drafted', {
+        provider: generated.provider,
+        modelId: generated.modelId,
+        inputTokens: generated.inputTokens,
+        outputTokens: generated.outputTokens,
+        latencyMs: generated.latencyMs,
+      }),
+    );
+  }
+
+  /** Customer-visible history: the Client API view when the contact is known. */
+  private async history(
+    tenantId: string,
+    runtime: ConnectionRuntime,
+    control: ControlRow,
+  ): Promise<{ messages: AuthorityMessage[]; view: 'customer' | 'staff_filtered' }> {
+    const ref = String(control.externalConversationId);
+    const contact = await this.tx(tenantId, async (tx) => {
+      if (!control.principalId) return null;
+      const [row] = await tx
+        .select({ contact: schema.authorityContacts, inbox: schema.authorityInboxes })
+        .from(schema.authorityContacts)
+        .innerJoin(
+          schema.authorityInboxes,
+          eq(schema.authorityInboxes.id, schema.authorityContacts.inboxId),
+        )
+        .where(
+          and(
+            eq(schema.authorityContacts.inboxId, control.inboxId),
+            eq(schema.authorityContacts.principalId, control.principalId),
+          ),
+        );
+      return row ?? null;
+    });
+    if (contact) {
+      const messages = await runtime.authority.listMessages(ref, {
+        view: 'customer',
+        contactSourceId: this.contacts.sourceIdOf(tenantId, contact.contact),
+        inboxRef: String(contact.inbox.externalInboxId),
+      });
+      return { messages, view: 'customer' };
+    }
+    // Conversations from other channels have no Hamnivo contact; private notes are removed here.
+    const messages = await runtime.authority.listMessages(ref, { view: 'staff' });
+    return {
+      messages: messages.filter((m) => !m.private && m.direction !== 'activity'),
+      view: 'staff_filtered',
+    };
+  }
+
+  /**
+   * Generates within the agent's limits, trying fallback models only when the main one is
+   * overloaded or unavailable. Returns null when the honesty guard blocks the reply twice.
+   */
+  private async generate(
+    tenantId: string,
+    runId: string,
+    context: Context,
+    agent: ActiveAgent,
+  ): Promise<Generated | null> {
+    const runtime = await this.registry.get(tenantId, context.control.connectionId);
+    const { messages: history, view } = await this.history(tenantId, runtime, context.control);
+    const config: AgentConfig = agent.config;
+    const messages = historyMessages(history, config.limits.historyMessages);
+    const assist = config.mode === 'assist';
+    const base =
+      systemPrompt(config, context.brandName) +
+      (assist
+        ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
+        : '');
+    for (const correction of [null, CORRECTION]) {
+      const system = correction ? `${base}\n\n${correction}` : base;
+      const result = await this.callModels(tenantId, runId, config, system, messages, view);
+      const verdict = checkHonesty(result.text);
+      await this.tx(tenantId, (tx) =>
+        this.runs.step(tx, tenantId, runId, {
+          kind: 'guard',
+          name: 'honest_identity',
+          status: verdict.ok ? 'ok' : 'blocked',
+          outputHash: sha256(result.text),
+          detail: verdict.ok ? {} : { rule: verdict.rule },
+        }),
+      );
+      if (verdict.ok) {
+        if (!result.text) throw new EmptyReplyError('The model returned no text.');
+        return result;
+      }
+    }
+    return null;
+  }
+
+  private async callModels(
+    tenantId: string,
+    runId: string,
+    config: AgentConfig,
+    system: string,
+    messages: ReturnType<typeof historyMessages>,
+    view: string,
+  ): Promise<Generated> {
+    const choices: ModelChoice[] = [config.model, ...config.fallbackModels];
+    const inputHash = sha256(canonicalize({ system, messages }) ?? '');
+    let lastError: unknown;
+    for (const [index, choice] of choices.entries()) {
+      const started = Date.now();
+      try {
+        const resolved = await this.models.resolve(tenantId, choice);
+        const result = await generateText({
+          model: resolved.model,
+          instructions: system,
+          messages,
+          maxOutputTokens: config.limits.maxOutputTokens,
+          stopWhen: isStepCount(config.limits.maxSteps),
+          maxRetries: 0,
+          abortSignal: AbortSignal.timeout(config.limits.timeoutMs),
+        });
+        const generated: Generated = {
+          text: result.text.trim(),
+          provider: resolved.provider,
+          modelId: resolved.modelId,
+          inputTokens: result.usage.inputTokens ?? null,
+          outputTokens: result.usage.outputTokens ?? null,
+          latencyMs: Date.now() - started,
+        };
+        await this.tx(tenantId, (tx) =>
+          this.runs.step(tx, tenantId, runId, {
+            kind: 'model',
+            name: 'generate',
+            status: 'ok',
+            provider: generated.provider,
+            modelId: generated.modelId,
+            inputTokens: generated.inputTokens,
+            outputTokens: generated.outputTokens,
+            latencyMs: generated.latencyMs,
+            inputHash,
+            outputHash: sha256(generated.text),
+            detail: { finishReason: result.finishReason, history: messages.length, view, index },
+          }),
+        );
+        return generated;
+      } catch (error) {
+        lastError = error;
+        const failure = classifyModelError(error);
+        await this.tx(tenantId, (tx) =>
+          this.runs.step(tx, tenantId, runId, {
+            kind: 'model',
+            name: 'generate',
+            status: 'error',
+            provider: choice.provider,
+            modelId: choice.modelId,
+            latencyMs: Date.now() - started,
+            inputHash,
+            detail: { errorKind: failure.kind, index },
+          }),
+        );
+        // Fallbacks cover an overloaded or unavailable provider, not a bad request.
+        if (!['rate_limited', 'unavailable', 'timeout'].includes(failure.kind)) throw error;
+      }
+    }
+    throw lastError;
+  }
+
+  private async finishWithUsage(
+    tx: TenantTx,
+    tenantId: string,
+    runId: string,
+    outcome: RunOutcome,
+    telemetry: Omit<Generated, 'text'>,
+  ) {
+    await this.runs.finish(tx, runId, { outcome, ...telemetry });
+    const now = this.clock();
+    const entries = [
+      ['ai.tokens.input', telemetry.inputTokens],
+      ['ai.tokens.output', telemetry.outputTokens],
+    ] as const;
+    for (const [meter, quantity] of entries) {
+      if (quantity === null) continue;
+      await tx
+        .insert(schema.usageEntries)
+        .values({
+          tenantId,
+          meter,
+          quantity,
+          unit: 'token',
+          occurredAt: now,
+          dedupeKey: `run:${runId}:${meter}`,
+          sourceRef: toPublicId('run', runId),
+        })
+        .onConflictDoNothing();
+    }
+  }
+
+  /** Hands an AI-owned conversation to people, unless someone already took it. */
+  private async handOff(
+    tenantId: string,
+    control: ControlRow,
+    runId: string,
+    epoch: number,
+    reason: AiHandoffReason,
+    errorKind?: string,
+  ) {
+    const outcome: RunOutcome = reason === 'ai_blocked' ? 'blocked' : 'handoff';
+    let journal: JournalEntry[] = [];
+    try {
+      journal = await this.tx(tenantId, async (tx) => {
+        const result = await this.ownership.transition(
+          tx,
+          tenantId,
+          control.id,
+          { kind: 'queue' },
+          {
+            origin: 'hamnivo',
+            reason,
+            actor: { type: 'system', id: 'ai' },
+            expectedEpoch: epoch,
+            handoffNote: HANDOFF_NOTES[reason],
+          },
+        );
+        await this.runs.finish(tx, runId, {
+          outcome,
+          state: reason === 'ai_unavailable' ? 'failed' : 'succeeded',
+          ...(errorKind ? { errorKind } : {}),
+        });
+        return result.journal;
+      });
+    } catch (error) {
+      if (!(error instanceof AppError && error.code === 'OWNERSHIP_CHANGED')) throw error;
+      await this.tx(tenantId, (tx) => this.runs.finish(tx, runId, { outcome: 'fenced' }));
+      return;
+    }
+    await this.journal.notify(tenantId, control.id, journal);
+    this.logger.log(`conversation ${control.id} handed to people: ${reason}`);
   }
 
   private async abort(

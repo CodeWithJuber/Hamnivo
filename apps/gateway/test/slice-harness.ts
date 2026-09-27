@@ -98,7 +98,11 @@ export async function startSlice(
 }
 
 /** A tenant owner with a brand connected to the fake Chatwoot. */
-export async function connectedTenant(slice: Slice, label: string) {
+export async function connectedTenant(
+  slice: Slice,
+  label: string,
+  options: { publishAgent?: boolean } = {},
+) {
   const owner = await signUp(slice.gw, `${label} Owner`, `${label}-owner@example.com`);
   const tenant = await owner.post('/v1/tenants', {
     name: `${label} Store`,
@@ -121,8 +125,19 @@ export async function connectedTenant(slice: Slice, label: string) {
   if (connection.status !== 201) {
     throw new Error(`connect: ${connection.status} ${JSON.stringify(connection.body)}`);
   }
+  // Connecting creates the brand's default agent as a draft; publishing lets the AI answer.
+  const agents = await owner.get('/v1/admin/agents');
+  const agentId = agents.body.items.find((a: { brandId: string }) => a.brandId === brand.body.id)
+    ?.id as string;
+  if (options.publishAgent !== false) {
+    const published = await owner.post(`/v1/admin/agents/${agentId}/publish`, {});
+    if (published.status !== 200) {
+      throw new Error(`publish: ${published.status} ${JSON.stringify(published.body)}`);
+    }
+  }
   return {
     owner,
+    agentId,
     tenantId: owner.tenant as string,
     workspaceId,
     brand: brand.body as { id: string; widgetId: string },

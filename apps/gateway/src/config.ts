@@ -50,6 +50,16 @@ const EnvSchema = z.object({
   /** Chatwoot request timeout in milliseconds. */
   CHATWOOT_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(10_000),
 
+  /**
+   * Platform model keys. Agents that name no tenant connection use these; without one, an agent
+   * using that provider cannot be published. `hamnivo-mock` needs no key.
+   */
+  ANTHROPIC_API_KEY: z.string().min(8).optional(),
+  OPENAI_API_KEY: z.string().min(8).optional(),
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(8).optional(),
+  OPENAI_COMPATIBLE_BASE_URL: z.url().optional(),
+  OPENAI_COMPATIBLE_API_KEY: z.string().min(1).optional(),
+
   /** Bearer token for GET /metrics; the endpoint is disabled without it. */
   METRICS_TOKEN: z.string().min(16).optional(),
   API_DOCS: bool.default(true),
@@ -62,7 +72,10 @@ export type AppConfig = z.infer<typeof EnvSchema> & {
 
 /** Parses and validates the environment once at start-up; misconfiguration stops the process. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  const parsed = EnvSchema.safeParse(env);
+  // `KEY=` in an env file means "not set", as in .env.example.
+  const parsed = EnvSchema.safeParse(
+    Object.fromEntries(Object.entries(env).filter(([, value]) => value !== '')),
+  );
   if (!parsed.success) {
     const problems = parsed.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)

@@ -174,6 +174,10 @@ try {
     tenantId,
   );
   await call('POST', '/v1/admin/authority/connections', { brandId: brand.id }, tenantId);
+  // Connecting creates the brand's assistant as a draft; publishing it lets the AI answer.
+  const agents = await call('GET', '/v1/admin/agents', undefined, tenantId);
+  const agent = agents.items.find((a: { brandId: string }) => a.brandId === brand.id);
+  await call('POST', `/v1/admin/agents/${agent.id}/publish`, {}, tenantId);
 
   const hostPage = join(root, 'apps/widget/e2e/.host.html');
   writeFileSync(

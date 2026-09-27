@@ -1,4 +1,3 @@
-import { createMockModel } from '@hamnivo/adapters/models';
 import { type DynamicModule, Logger, Module } from '@nestjs/common';
 import type { LanguageModel } from 'ai';
 import { JournalService } from './authority/journal.service.js';
@@ -10,8 +9,13 @@ import { AuthoritySyncService } from './authority/sync.service.js';
 import type { AppConfig } from './config.js';
 import { OUTBOX_HANDLERS, type OutboxHandler, OutboxRelay } from './outbox/relay.service.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
-import { LANGUAGE_MODEL, RepliesService } from './runtime/replies.service.js';
+import { AgentsService } from './runtime/agents.service.js';
+import { KillSwitchesService } from './runtime/kill-switches.service.js';
+import { LANGUAGE_MODEL, ModelFactory } from './runtime/models.js';
+import { RepliesService } from './runtime/replies.service.js';
+import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
+import { AuthorityContactsService } from './widget/contacts.service.js';
 import { MaintenanceService } from './worker/maintenance.service.js';
 
 /** Outbox topics with a consumer that needs no other service. */
@@ -29,7 +33,7 @@ export function defaultOutboxHandlers(): Map<string, OutboxHandler> {
 export interface WorkerOverrides extends PlatformOverrides {
   /** Replaces every outbox handler (tests of the relay itself). */
   handlers?: Map<string, OutboxHandler>;
-  /** Language model for AI replies; the deterministic hamnivo-mock model by default. */
+  /** Replaces every agent's model (tests); agents otherwise use their configured model. */
   model?: LanguageModel;
 }
 
@@ -51,7 +55,12 @@ export class WorkerModule {
         StaffLinksService,
         AuthoritySyncService,
         InboxProcessor,
-        { provide: LANGUAGE_MODEL, useValue: overrides.model ?? createMockModel() },
+        ...(overrides.model ? [{ provide: LANGUAGE_MODEL, useValue: overrides.model }] : []),
+        ModelFactory,
+        KillSwitchesService,
+        AgentsService,
+        RunsService,
+        AuthorityContactsService,
         RepliesService,
         {
           provide: OUTBOX_HANDLERS,

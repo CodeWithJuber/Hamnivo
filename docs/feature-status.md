@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 200 · in-progress: 30 · implemented: 2
+**Blueprint features (232):** planned: 192 · in-progress: 38 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -76,7 +76,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | A04 | Multi-brand settings | P0 | C | planned |  |
 | A05 | Basic business hours | P0 | C | planned |  |
 | A06 | Secrets and API credentials | P0 | F | in-progress | `apps/gateway/src/secrets/envelope.ts`, `apps/gateway/src/secrets/secret-broker.service.ts`, `apps/gateway/test/secrets.int.test.ts`, `packages/db/src/schema/identity.ts` — Write-only, masked, envelope-encrypted secrets with rotation, revocation, KEK rotation and MFA + fresh sign-in; API keys for service accounts pending. |
-| A07 | Draft/publish configuration | P0 | C | planned |  |
+| A07 | Draft/publish configuration | P0 | C | in-progress | `apps/gateway/src/runtime/agents.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/db/migrations/20260927021253_agents_runtime_security.sql`, `packages/db/test/agents.int.test.ts` — Saved drafts are not live; publishing freezes a version with its configuration hash (a database trigger rejects changes), one version is live at a time, and publishing an earlier version is the rollback (tested). Studio screens pending. |
 | A08 | Usage limits | P0 | C | planned |  |
 | A09 | Audit trail | P0 | C | in-progress | `packages/db/src/audit.ts`, `packages/db/src/schema/audit.ts`, `packages/db/migrations/20260926232017_security.sql`, `packages/db/test/audit.int.test.ts`, `apps/gateway/src/audit/audit.controller.ts`, `apps/gateway/test/admin.int.test.ts` — Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection, list/filter/verify API and events for every administrative change; export and Studio views pending. |
 | A10 | Retention and exports | P0 | C | planned |  |
@@ -95,18 +95,18 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| G01 | Agent profiles | P0 | C | planned |  |
-| G02 | Provider adapter | P0 | C | in-progress | `packages/adapters/src/models/mock.ts`, `packages/adapters/test/mock.test.ts` — Deterministic hamnivo-mock model on the AI SDK 7 V4 interface (generate and stream), used for replies without keys; live provider adapters pending. |
-| G03 | Assist and answer modes | P0 | C | planned |  |
+| G01 | Agent profiles | P0 | C | in-progress | `apps/gateway/src/runtime/agents.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/contracts/src/agents.ts`, `packages/db/src/schema/runtime.ts` — Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending. |
+| G02 | Provider adapter | P0 | C | in-progress | `apps/gateway/src/runtime/models.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/adapters/src/models/mock.ts`, `packages/adapters/test/mock.test.ts` — Agents choose a provider and model with tenant credentials (encrypted connections) or platform keys, checked at publication; fallback models on overload (tested with hamnivo-mock). Anthropic, OpenAI, Gemini and OpenAI-compatible adapters are being added. |
+| G03 | Assist and answer modes | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/agents.int.test.ts` — Answer mode replies to customers; assist mode writes suggestions only as internal notes and never answers customers (tested). Grounded answers from knowledge arrive with knowledge sources. |
 | G04 | Approved knowledge sources | P0 | C | planned |  |
 | G05 | Retrieval with access controls | P0 | C | planned |  |
 | G06 | Source citations | P0 | C | planned |  |
 | G07 | Tool registry | P0 | C | planned |  |
 | G08 | Tool authorization gateway | P0 | C | planned |  |
-| G09 | Bounded execution | P0 | C | planned |  |
+| G09 | Bounded execution | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/contracts/src/agents.ts` — Per-agent ceilings on output tokens, time, steps and history; model failures are retried twice by the outbox, then the conversation goes to people with an honest note (tested). Cost and concurrency budgets pending. |
 | G10 | Handoff packet | P0 | C | planned |  |
 | G11 | Simulation/replay tests | P0 | C | planned |  |
-| G12 | Runtime telemetry | P0 | C | planned |  |
+| G12 | Runtime telemetry | P0 | C | in-progress | `apps/gateway/src/runtime/runs.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/db/src/schema/runtime.ts` — Each run records agent version, provider, model, tokens, latency, outcome, error kind and per-step records; token usage goes to the usage ledger (tested). Cost estimates and dashboards pending. |
 | G13 | Action approvals | P1 | C | planned |  |
 | G14 | Action receipts | P1 | C | planned |  |
 | G15 | Limited autopilot | P1 | C | planned |  |
@@ -257,10 +257,10 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | X05 | Network egress policy | P0 | C | planned |  |
 | X06 | Inter-agent authenticity | P0 | A | planned |  |
 | X07 | Plugin isolation | P0 | A | planned |  |
-| X08 | Scoped kill switches | P0 | C | planned |  |
+| X08 | Scoped kill switches | P0 | C | in-progress | `apps/gateway/src/runtime/kill-switches.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/db/migrations/20260927021253_agents_runtime_security.sql` — Kill switches for the tenant, a brand or an agent stop AI replies at once; AI-held conversations go to people on their next message, new conversations start with people, and clearing restores AI replies (tested, mutation-checked). Switches are cleared, never deleted. Tool-level switches arrive with tools. |
 | X09 | Source-aware context | P0 | C | planned |  |
 | X10 | Receipt-based completion | P0 | Q | planned |  |
-| X11 | Privacy-safe trace records | P0 | C | planned |  |
+| X11 | Privacy-safe trace records | P0 | C | in-progress | `apps/gateway/src/runtime/runs.service.ts`, `apps/gateway/test/agents.int.test.ts` — Run and step records hold versions, counts, hashes and error kinds but no prompt or reply text (tested); staff read them through the API with analytics.read. |
 | X12 | Prompt and memory injection tests | P0 | L | planned |  |
 | X13 | Crash and replay tests | P0 | Q | planned |  |
 | X14 | Policy release controls | P0 | C | planned |  |
@@ -277,7 +277,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | U06 | Locale-safe numbers and dates | P0 | Q | planned |  |
 | U07 | Language-capable routing | P0 | C | planned |  |
 | U08 | Accessible multilingual composer | P0 | C | planned |  |
-| U09 | Honest AI identity | P0 | C | planned |  |
+| U09 | Honest AI identity | P0 | C | in-progress | `apps/gateway/src/runtime/honesty.ts`, `apps/gateway/src/runtime/prompt.ts`, `apps/gateway/test/agents.int.test.ts`, `apps/gateway/test/runtime.test.ts` — Non-removable prompt rules plus an output guard for claims of being human in English, Hinglish, Roman Urdu, Hindi, Urdu and Arabic: regenerate once, otherwise publish nothing and hand over (tested, mutation-checked). Native-speaker review of the phrase lists pending. |
 | U10 | Configurable communication style | P1 | C | planned |  |
 | U11 | Respectful correction | P0 | C | planned |  |
 | U12 | Anti-sycophancy suite | P0 | C | planned |  |

@@ -27,6 +27,15 @@ import { TenantsService } from './identity/tenants.service.js';
 import { HealthController } from './platform/health.controller.js';
 import type { Mailer } from './platform/mailer.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
+import { AgentsController } from './runtime/agents.controller.js';
+import { AgentsService } from './runtime/agents.service.js';
+import { KillSwitchesController } from './runtime/kill-switches.controller.js';
+import { KillSwitchesService } from './runtime/kill-switches.service.js';
+import { ModelConnectionsController } from './runtime/model-connections.controller.js';
+import { ModelConnectionsService } from './runtime/model-connections.service.js';
+import { ModelFactory } from './runtime/models.js';
+import { RunsController } from './runtime/runs.controller.js';
+import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
 import { SecretsController } from './secrets/secrets.controller.js';
 import { APP_DB, AUTH, CONFIG, MAILER } from './tokens.js';
@@ -56,6 +65,10 @@ export class ApiModule {
         ChatwootIngressController,
         WidgetController,
         StaffConversationsController,
+        AgentsController,
+        ModelConnectionsController,
+        KillSwitchesController,
+        RunsController,
       ],
       providers: [
         {
@@ -77,6 +90,11 @@ export class ApiModule {
         OutboundMessagesService,
         StaffLinksService,
         StaffConversationsService,
+        ModelFactory,
+        KillSwitchesService,
+        AgentsService,
+        ModelConnectionsService,
+        RunsService,
         WidgetTokens,
         WidgetSessionsService,
         AuthorityContactsService,

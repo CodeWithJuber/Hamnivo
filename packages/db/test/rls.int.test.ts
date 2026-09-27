@@ -140,6 +140,12 @@ describe('two-tenant isolation', () => {
     'processed_events',
     'idempotency_keys',
     'usage_entries',
+    'model_connections',
+    'agent_profiles',
+    'agent_versions',
+    'kill_switches',
+    'runs',
+    'run_steps',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -155,17 +161,22 @@ describe('two-tenant isolation', () => {
       );
     });
 
-    if (table !== 'audit_events') {
+    // The audit log is append-only; kill switches are cleared, never deleted.
+    const updatable = table !== 'audit_events';
+    const deletable = updatable && table !== 'kill_switches';
+    if (updatable) {
       // Updates and deletes aimed at tenant B affect nothing.
       await withTenant(h.app, { tenantId: a.tenantId }, async (tx) => {
         const updated = await tx.execute(
           sql`update ${t} set ${column} = ${column} where ${column} = ${b.tenantId}::uuid`,
         );
         expect(updated.rowCount).toBe(0);
-        const deleted = await tx.execute(
-          sql`delete from ${t} where ${column} = ${b.tenantId}::uuid`,
-        );
-        expect(deleted.rowCount).toBe(0);
+        if (deletable) {
+          const deleted = await tx.execute(
+            sql`delete from ${t} where ${column} = ${b.tenantId}::uuid`,
+          );
+          expect(deleted.rowCount).toBe(0);
+        }
       });
     }
 
@@ -186,11 +197,13 @@ describe('two-tenant isolation', () => {
       '42501',
     );
 
-    // Moving A's rows to B is rejected (audit rows cannot be updated at all).
+    // Moving A's rows to B is rejected (audit rows cannot be updated at all). Published agent
+    // versions are immutable before RLS is even consulted, so the draft is the row moved.
+    const movable = table === 'agent_versions' ? sql` and state = 'draft'` : sql``;
     await expectPgError(
       withTenant(h.app, { tenantId: a.tenantId }, (tx) =>
         tx.execute(
-          sql`update ${t} set ${column} = ${b.tenantId}::uuid where ${column} = ${a.tenantId}::uuid`,
+          sql`update ${t} set ${column} = ${b.tenantId}::uuid where ${column} = ${a.tenantId}::uuid${movable}`,
         ),
       ),
       '42501',
@@ -240,6 +253,12 @@ describe('two-tenant isolation', () => {
       'processed_events',
       'idempotency_keys',
       'usage_entries',
+      'model_connections',
+      'agent_profiles',
+      'agent_versions',
+      'kill_switches',
+      'runs',
+      'run_steps',
       'audit_heads',
       'audit_events',
     ]);

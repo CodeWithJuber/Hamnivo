@@ -270,8 +270,13 @@
   },
   "G02": {
     "status": "in-progress",
-    "evidence": ["packages/adapters/src/models/mock.ts", "packages/adapters/test/mock.test.ts"],
-    "note": "Deterministic hamnivo-mock model on the AI SDK 7 V4 interface (generate and stream), used for replies without keys; live provider adapters pending."
+    "evidence": [
+      "apps/gateway/src/runtime/models.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/adapters/src/models/mock.ts",
+      "packages/adapters/test/mock.test.ts"
+    ],
+    "note": "Agents choose a provider and model with tenant credentials (encrypted connections) or platform keys, checked at publication; fallback models on overload (tested with hamnivo-mock). Anthropic, OpenAI, Gemini and OpenAI-compatible adapters are being added."
   },
   "W01": {
     "status": "in-progress",
@@ -341,5 +346,78 @@
       "apps/widget/src/i18n.ts"
     ],
     "note": "Document direction follows the language and message text uses dir=auto, so Arabic and Urdu read right to left while Latin order numbers keep their direction; bidi copy behaviour tests pending."
+  },
+  "G01": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/agents.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/contracts/src/agents.ts",
+      "packages/db/src/schema/runtime.ts"
+    ],
+    "note": "Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending."
+  },
+  "G03": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/agents.int.test.ts"
+    ],
+    "note": "Answer mode replies to customers; assist mode writes suggestions only as internal notes and never answers customers (tested). Grounded answers from knowledge arrive with knowledge sources."
+  },
+  "G09": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/contracts/src/agents.ts"
+    ],
+    "note": "Per-agent ceilings on output tokens, time, steps and history; model failures are retried twice by the outbox, then the conversation goes to people with an honest note (tested). Cost and concurrency budgets pending."
+  },
+  "G12": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/runs.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/db/src/schema/runtime.ts"
+    ],
+    "note": "Each run records agent version, provider, model, tokens, latency, outcome, error kind and per-step records; token usage goes to the usage ledger (tested). Cost estimates and dashboards pending."
+  },
+  "X08": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/kill-switches.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/db/migrations/20260927021253_agents_runtime_security.sql"
+    ],
+    "note": "Kill switches for the tenant, a brand or an agent stop AI replies at once; AI-held conversations go to people on their next message, new conversations start with people, and clearing restores AI replies (tested, mutation-checked). Switches are cleared, never deleted. Tool-level switches arrive with tools."
+  },
+  "X11": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/runs.service.ts",
+      "apps/gateway/test/agents.int.test.ts"
+    ],
+    "note": "Run and step records hold versions, counts, hashes and error kinds but no prompt or reply text (tested); staff read them through the API with analytics.read."
+  },
+  "U09": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/honesty.ts",
+      "apps/gateway/src/runtime/prompt.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "apps/gateway/test/runtime.test.ts"
+    ],
+    "note": "Non-removable prompt rules plus an output guard for claims of being human in English, Hinglish, Roman Urdu, Hindi, Urdu and Arabic: regenerate once, otherwise publish nothing and hand over (tested, mutation-checked). Native-speaker review of the phrase lists pending."
+  },
+  "A07": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/agents.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "packages/db/migrations/20260927021253_agents_runtime_security.sql",
+      "packages/db/test/agents.int.test.ts"
+    ],
+    "note": "Saved drafts are not live; publishing freezes a version with its configuration hash (a database trigger rejects changes), one version is live at a time, and publishing an earlier version is the rollback (tested). Studio screens pending."
   }
 }

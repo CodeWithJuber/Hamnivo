@@ -17,6 +17,7 @@ import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { enforce } from '../identity/staff.guard.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
+import { AgentsService } from '../runtime/agents.service.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 
@@ -55,6 +56,7 @@ export class ConnectionsService {
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly secrets: SecretBroker,
+    private readonly agents: AgentsService,
   ) {}
 
   private tx<T>(principal: StaffPrincipal, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -260,6 +262,8 @@ export class ConnectionsService {
           brandId: toPublicId('brand', brandId),
         },
       });
+      // A ready-made agent draft; nothing AI-written reaches customers until it is published.
+      await this.agents.ensureDefaultDraft(tx, context.brand);
       await enqueueOutbox(tx, tenantId, {
         topic: 'authority.connected',
         aggregateType: 'authority_connection',

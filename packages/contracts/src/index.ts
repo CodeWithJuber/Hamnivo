@@ -1,5 +1,7 @@
 export * from './admin.js';
 export * from './admin-routes.js';
+export * from './agent-routes.js';
+export * from './agents.js';
 export * from './brands.js';
 export * from './bridge.js';
 export * from './cards.js';

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { adminRoutes, identityRoutes } from './admin-routes.js';
+import { agentRoutes } from './agent-routes.js';
 import {
   CustomerConversation,
   FeedbackRequest,
@@ -329,6 +330,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...widgetRoutes,
   ...identityRoutes,
   ...adminRoutes,
+  ...agentRoutes,
   ...integrationRoutes,
   ...conversationRoutes,
 };

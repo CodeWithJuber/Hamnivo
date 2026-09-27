@@ -20,6 +20,9 @@ export interface SeededTenant {
   principalId: string;
   conversationId: string;
   sessionId: string;
+  agentId: string;
+  /** Version 1, published. Version 2 is a draft. */
+  agentVersionId: string;
 }
 
 const bytes = (n = 32) => randomBytes(n);
@@ -50,6 +53,10 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     principalId: newId(),
     conversationId: newId(),
     sessionId: newId(),
+    modelSecretId: newId(),
+    agentId: newId(),
+    agentVersionId: newId(),
+    runId: newId(),
   };
 
   await withTenant(db, { tenantId, actorId: 'seed' }, async (tx) => {
@@ -277,6 +284,77 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       occurredAt: new Date(),
       dedupeKey: `run_${suffix}`,
     });
+    await tx.insert(s.secrets).values({
+      id: ids.modelSecretId,
+      tenantId,
+      kind: 'model_api_key',
+      label: 'Model key',
+      hint: 'abcd',
+      ciphertext: bytes(),
+      iv: bytes(12),
+      wrappedKey: bytes(),
+      kekVersion: 1,
+    });
+    await tx.insert(s.modelConnections).values({
+      tenantId,
+      provider: 'openai-compatible',
+      label: 'Local models',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      apiKeySecretId: ids.modelSecretId,
+    });
+    await tx.insert(s.agentProfiles).values({
+      id: ids.agentId,
+      tenantId,
+      workspaceId: ids.workspaceId,
+      brandId: ids.brandId,
+      name: 'Support assistant',
+      isDefault: true,
+    });
+    await tx.insert(s.agentVersions).values({
+      id: ids.agentVersionId,
+      tenantId,
+      profileId: ids.agentId,
+      version: 1,
+      state: 'published',
+      config: { displayName: 'Assistant', model: { provider: 'mock', modelId: 'hamnivo-mock' } },
+      configHash: bytes(),
+      publishedAt: new Date(),
+    });
+    await tx.insert(s.agentVersions).values({
+      tenantId,
+      profileId: ids.agentId,
+      version: 2,
+      state: 'draft',
+      config: { displayName: 'Assistant', model: { provider: 'mock', modelId: 'hamnivo-mock' } },
+    });
+    await tx.insert(s.killSwitches).values({
+      tenantId,
+      scope: 'agent',
+      agentId: ids.agentId,
+      reason: 'Seeded and cleared',
+      clearedAt: new Date(),
+    });
+    await tx.insert(s.runs).values({
+      id: ids.runId,
+      tenantId,
+      conversationId: ids.conversationId,
+      brandId: ids.brandId,
+      agentId: ids.agentId,
+      agentVersionId: ids.agentVersionId,
+      triggerRef: `reply:${suffix}`,
+      kind: 'reply',
+      state: 'succeeded',
+      outcome: 'replied',
+      epoch: 0,
+    });
+    await tx.insert(s.runSteps).values({
+      tenantId,
+      runId: ids.runId,
+      seq: 0,
+      kind: 'model',
+      name: 'generate',
+      status: 'ok',
+    });
     await appendAudit(tx, {
       actorType: 'system',
       actorId: 'seed',
@@ -302,5 +380,7 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     principalId: ids.principalId,
     conversationId: ids.conversationId,
     sessionId: ids.sessionId,
+    agentId: ids.agentId,
+    agentVersionId: ids.agentVersionId,
   };
 }

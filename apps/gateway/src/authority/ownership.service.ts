@@ -27,7 +27,12 @@ export interface TransitionOptions {
     | 'customer_request'
     | 'authority_assignment'
     | 'authority_handoff'
-    | 'human_reply';
+    | 'human_reply'
+    | 'no_agent'
+    | 'assist_mode'
+    | 'ai_stopped'
+    | 'ai_unavailable'
+    | 'ai_blocked';
   /** Audit actor (`stf_…`, `cus_…`, `authority`). */
   actor: { type: 'staff' | 'customer' | 'system'; id: string };
   /** The epoch the caller saw; a different current epoch fails with OWNERSHIP_CHANGED. */
