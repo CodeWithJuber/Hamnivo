@@ -4544,6 +4544,986 @@
         }
       }
     },
+    "/v1/widget/memory": {
+      "get": {
+        "operationId": "getMyMemory",
+        "summary": "What is remembered about me, and my memory choice",
+        "tags": [
+          "Widget memory"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "My memory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerMemory"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/memory/consent": {
+      "post": {
+        "operationId": "setMyMemoryConsent",
+        "summary": "Agree to be remembered, decline, or turn memory off",
+        "tags": [
+          "Widget memory"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetMemoryConsentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryConsent"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/memory/{memoryId}/correct": {
+      "post": {
+        "operationId": "correctMyMemory",
+        "summary": "Correct a remembered value; the old one is kept as history",
+        "tags": [
+          "Widget memory"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memoryId",
+            "schema": {
+              "type": "string",
+              "description": "Memory ID (mem_…)"
+            },
+            "required": true,
+            "description": "Memory ID (mem_…)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectMemoryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Corrected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryChange"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/memory/{memoryId}/confirm": {
+      "post": {
+        "operationId": "confirmMyMemory",
+        "summary": "Confirm a newer value that waits for review",
+        "tags": [
+          "Widget memory"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memoryId",
+            "schema": {
+              "type": "string",
+              "description": "Memory ID (mem_…)"
+            },
+            "required": true,
+            "description": "Memory ID (mem_…)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryChange"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/memory/{memoryId}/delete": {
+      "post": {
+        "operationId": "deleteMyMemory",
+        "summary": "Forget one memory with its history, indexes and citations",
+        "tags": [
+          "Widget memory"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memoryId",
+            "schema": {
+              "type": "string",
+              "description": "Memory ID (mem_…)"
+            },
+            "required": true,
+            "description": "Memory ID (mem_…)"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Deleting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryDeletionReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/memory/forget": {
+      "post": {
+        "operationId": "forgetMyMemory",
+        "summary": "Forget everything remembered about me",
+        "tags": [
+          "Widget memory"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "Deleting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryDeletionReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/memory/deletions/{deletionId}": {
+      "get": {
+        "operationId": "getMyMemoryDeletion",
+        "summary": "Progress of one of my deletions",
+        "tags": [
+          "Widget memory"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deletionId",
+            "schema": {
+              "type": "string",
+              "description": "Deletion receipt ID (mdel_…)"
+            },
+            "required": true,
+            "description": "Deletion receipt ID (mdel_…)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deletion receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryDeletionReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/customers": {
+      "get": {
+        "operationId": "listMemoryCustomers",
+        "summary": "Customers with something remembered or a memory choice (memory.read)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "brandId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MemoryCustomerSummary"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/customers/{customerId}": {
+      "get": {
+        "operationId": "getCustomerMemory",
+        "summary": "One customer’s memory with provenance, history and deletions (memory.read)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerId",
+            "schema": {
+              "type": "string",
+              "description": "Customer ID (cus_…)"
+            },
+            "required": true,
+            "description": "Customer ID (cus_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer memory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryCustomerDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/records/{memoryId}/correct": {
+      "post": {
+        "operationId": "correctMemory",
+        "summary": "Correct a value with a reason; the old one is kept as history (memory.manage)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memoryId",
+            "schema": {
+              "type": "string",
+              "description": "Memory ID (mem_…)"
+            },
+            "required": true,
+            "description": "Memory ID (mem_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffCorrectMemoryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Corrected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryChange"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/records/{memoryId}/confirm": {
+      "post": {
+        "operationId": "confirmMemory",
+        "summary": "Use a newer value that waits for review (memory.manage)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memoryId",
+            "schema": {
+              "type": "string",
+              "description": "Memory ID (mem_…)"
+            },
+            "required": true,
+            "description": "Memory ID (mem_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryReasonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryChange"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/records/{memoryId}/outdated": {
+      "post": {
+        "operationId": "markMemoryOutdated",
+        "summary": "Stop using a value without replacing it (memory.manage)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memoryId",
+            "schema": {
+              "type": "string",
+              "description": "Memory ID (mem_…)"
+            },
+            "required": true,
+            "description": "Memory ID (mem_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryReasonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Outdated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryChange"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/records/{memoryId}/reject": {
+      "post": {
+        "operationId": "rejectMemory",
+        "summary": "Keep the current value and delete a newer one waiting for review (memory.manage)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memoryId",
+            "schema": {
+              "type": "string",
+              "description": "Memory ID (mem_…)"
+            },
+            "required": true,
+            "description": "Memory ID (mem_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryReasonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Deleting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryDeletionReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/records/{memoryId}/delete": {
+      "post": {
+        "operationId": "deleteMemory",
+        "summary": "Delete a memory with its history, indexes and citations (memory.delete)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memoryId",
+            "schema": {
+              "type": "string",
+              "description": "Memory ID (mem_…)"
+            },
+            "required": true,
+            "description": "Memory ID (mem_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryReasonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Deleting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryDeletionReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/customers/{customerId}/erase": {
+      "post": {
+        "operationId": "eraseCustomerMemory",
+        "summary": "Erase everything remembered about a customer (memory.erase)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerId",
+            "schema": {
+              "type": "string",
+              "description": "Customer ID (cus_…)"
+            },
+            "required": true,
+            "description": "Customer ID (cus_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EraseCustomerMemoryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Erasing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryDeletionReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/customers/{customerId}/export": {
+      "get": {
+        "operationId": "exportCustomerMemory",
+        "summary": "Everything remembered about a customer, for an access request (memory.export)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customerId",
+            "schema": {
+              "type": "string",
+              "description": "Customer ID (cus_…)"
+            },
+            "required": true,
+            "description": "Customer ID (cus_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryExport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/deletions/{deletionId}": {
+      "get": {
+        "operationId": "getMemoryDeletion",
+        "summary": "Progress of a deletion (memory.read)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deletionId",
+            "schema": {
+              "type": "string",
+              "description": "Deletion receipt ID (mdel_…)"
+            },
+            "required": true,
+            "description": "Deletion receipt ID (mdel_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deletion receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryDeletionReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/integrations/chatwoot/{connectionId}/{source}": {
       "post": {
         "operationId": "receiveChatwootWebhook",
@@ -5837,6 +6817,10 @@
               "description": "source identifier (TypeID with prefix \"ksrc\")",
               "example": "ksrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
             }
+          },
+          "memory": {
+            "default": {},
+            "$ref": "#/components/schemas/AgentMemory"
           }
         },
         "required": [
@@ -5902,6 +6886,27 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 10
+          }
+        }
+      },
+      "AgentMemory": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "maxItems": {
+            "default": 8,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "maxChars": {
+            "default": 1200,
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 4000
           }
         }
       },
@@ -6226,6 +7231,96 @@
         "required": [
           "query",
           "brandId"
+        ]
+      },
+      "SetMemoryConsentRequest": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "granted",
+              "declined",
+              "withdrawn"
+            ]
+          },
+          "noticeVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "state",
+          "noticeVersion"
+        ]
+      },
+      "CorrectMemoryRequest": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "StaffCorrectMemoryRequest": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "value",
+          "reason"
+        ]
+      },
+      "MemoryReasonRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "EraseCustomerMemoryRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "turnOff": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "TakeoverRequest": {
@@ -6932,6 +8027,9 @@
                 "$ref": "#/components/schemas/SourcePart"
               },
               {
+                "$ref": "#/components/schemas/MemoryPart"
+              },
+              {
                 "$ref": "#/components/schemas/CardPart"
               },
               {
@@ -6951,6 +8049,7 @@
                 "text": "#/components/schemas/TextPartOutput",
                 "attachment": "#/components/schemas/AttachmentPart",
                 "source": "#/components/schemas/SourcePart",
+                "memory": "#/components/schemas/MemoryPart",
                 "card": "#/components/schemas/CardPart",
                 "task_update": "#/components/schemas/TaskUpdatePart",
                 "action_receipt": "#/components/schemas/ActionReceiptPart",
@@ -7084,6 +8183,28 @@
           "version",
           "excerpt",
           "freshness"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "memory"
+          },
+          "memoryId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 60
+          }
+        },
+        "required": [
+          "type",
+          "memoryId",
+          "key"
         ],
         "additionalProperties": false
       },
@@ -11602,6 +12723,803 @@
         ],
         "additionalProperties": false
       },
+      "CustomerMemory": {
+        "type": "object",
+        "properties": {
+          "offered": {
+            "type": "boolean"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/MemoryConsent"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryItem"
+            }
+          },
+          "maxRetentionDays": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "offered",
+          "consent",
+          "items",
+          "maxRetentionDays"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryConsent": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/MemoryConsentState"
+          },
+          "decidedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "noticeVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "decidedAt",
+          "noticeVersion"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryConsentState": {
+        "type": "string",
+        "enum": [
+          "undecided",
+          "granted",
+          "declined",
+          "withdrawn"
+        ]
+      },
+      "MemoryItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "memory identifier (TypeID with prefix \"mem\")",
+            "example": "mem_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "customerId": {
+            "type": "string",
+            "description": "customer identifier (TypeID with prefix \"cus\")",
+            "example": "cus_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MemoryKind"
+          },
+          "value": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemoryStatus"
+          },
+          "reviewStatus": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "confirmed",
+              "pending"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "person",
+              "conversation"
+            ]
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "sensitivity": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "personal"
+            ]
+          },
+          "evidenceStatus": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "refuted",
+              "conflicting",
+              "unknown"
+            ]
+          },
+          "source": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "customer_statement",
+                  "customer_control",
+                  "staff_entry",
+                  "agent_inference",
+                  "system_record",
+                  "import"
+                ]
+              },
+              "messageIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "conversationId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "conversation identifier (TypeID with prefix \"conv\")",
+                    "example": "conv_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "observedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              }
+            },
+            "required": [
+              "type",
+              "messageIds",
+              "conversationId",
+              "observedAt"
+            ],
+            "additionalProperties": false
+          },
+          "writtenBy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "ai",
+                  "system"
+                ]
+              },
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "extracted_from_message",
+              "customer_correction",
+              "customer_confirmation",
+              "staff_correction",
+              "staff_confirmation"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "supersedes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "memory identifier (TypeID with prefix \"mem\")",
+                "example": "mem_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "supersededBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "memory identifier (TypeID with prefix \"mem\")",
+                "example": "mem_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflictsWith": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "memory identifier (TypeID with prefix \"mem\")",
+                "example": "mem_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "validUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "supersededAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastConfirmedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policyVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "customerId",
+          "brandId",
+          "key",
+          "kind",
+          "value",
+          "status",
+          "reviewStatus",
+          "scope",
+          "purpose",
+          "sensitivity",
+          "evidenceStatus",
+          "source",
+          "writtenBy",
+          "reason",
+          "note",
+          "version",
+          "supersedes",
+          "supersededBy",
+          "conflictsWith",
+          "validFrom",
+          "validUntil",
+          "expiresAt",
+          "recordedAt",
+          "supersededAt",
+          "lastConfirmedAt",
+          "reviewedAt",
+          "policyVersion"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryKind": {
+        "type": "string",
+        "enum": [
+          "observation",
+          "episode",
+          "claim",
+          "preference",
+          "procedure",
+          "commitment",
+          "constraint",
+          "outcome",
+          "correction"
+        ]
+      },
+      "MemoryStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "pending",
+          "superseded",
+          "outdated"
+        ]
+      },
+      "MemoryChange": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "corrected",
+              "confirmed",
+              "unchanged",
+              "outdated"
+            ]
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryItem"
+          },
+          "explanation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "memory",
+          "explanation"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryDeletionReceipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "memoryDeletion identifier (TypeID with prefix \"mdel\")",
+            "example": "mdel_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "record",
+              "customer"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "customer_request",
+              "staff_request",
+              "erasure_request",
+              "retention_expired",
+              "review_rejected"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "completed"
+            ]
+          },
+          "records": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "step": {
+                  "type": "string",
+                  "enum": [
+                    "records",
+                    "embeddings",
+                    "citations",
+                    "caches",
+                    "verification"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "done",
+                    "pending"
+                  ]
+                }
+              },
+              "required": [
+                "step",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "kept": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "audit_log",
+                "consent_log",
+                "deletion_record",
+                "chat_history"
+              ]
+            }
+          },
+          "requestedBy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "customer",
+                  "staff",
+                  "system"
+                ]
+              },
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "reason",
+          "status",
+          "records",
+          "steps",
+          "kept",
+          "requestedBy",
+          "createdAt",
+          "completedAt"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryCustomerSummary": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/MemoryCustomerRef"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/MemoryConsentState"
+          },
+          "active": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "lastChangedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "customer",
+          "consent",
+          "active",
+          "pending",
+          "lastChangedAt"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryCustomerRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "customer identifier (TypeID with prefix \"cus\")",
+            "example": "cus_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "displayName",
+          "email",
+          "verified",
+          "since"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryCustomerDetail": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/MemoryCustomerRef"
+          },
+          "offered": {
+            "type": "boolean"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/MemoryConsent"
+          },
+          "consentHistory": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryConsentRecord"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryItem"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryItem"
+            }
+          },
+          "deletions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryDeletionReceipt"
+            }
+          }
+        },
+        "required": [
+          "customer",
+          "offered",
+          "consent",
+          "consentHistory",
+          "items",
+          "history",
+          "deletions"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryConsentRecord": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/MemoryConsentState"
+          },
+          "decidedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "noticeVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decidedBy": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "staff"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "decidedAt",
+          "noticeVersion",
+          "decidedBy"
+        ],
+        "additionalProperties": false
+      },
+      "MemoryExport": {
+        "type": "object",
+        "properties": {
+          "exportedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/MemoryCustomerRef"
+          },
+          "consentHistory": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryConsentRecord"
+            }
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryItem"
+            }
+          },
+          "deletions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryDeletionReceipt"
+            }
+          }
+        },
+        "required": [
+          "exportedAt",
+          "policyVersion",
+          "customer",
+          "consentHistory",
+          "records",
+          "deletions"
+        ],
+        "additionalProperties": false
+      },
       "StaffConversation": {
         "type": "object",
         "properties": {
@@ -12151,6 +14069,9 @@
               "description": "source identifier (TypeID with prefix \"ksrc\")",
               "example": "ksrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
             }
+          },
+          "memory": {
+            "$ref": "#/components/schemas/AgentMemoryOutput"
           }
         },
         "required": [
@@ -12163,7 +14084,8 @@
           "model",
           "fallbackModels",
           "limits",
-          "knowledgeSourceIds"
+          "knowledgeSourceIds",
+          "memory"
         ],
         "additionalProperties": false
       },
@@ -12223,6 +14145,33 @@
           "timeoutMs",
           "historyMessages",
           "maxSteps"
+        ],
+        "additionalProperties": false
+      },
+      "AgentMemoryOutput": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "maxItems": {
+            "default": 8,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "maxChars": {
+            "default": 1200,
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 4000
+          }
+        },
+        "required": [
+          "enabled",
+          "maxItems",
+          "maxChars"
         ],
         "additionalProperties": false
       }

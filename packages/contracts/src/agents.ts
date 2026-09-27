@@ -30,6 +30,21 @@ export const AgentLimits = z
   .meta({ id: 'AgentLimits' });
 
 /**
+ * Customer memory for this agent (G19). When on, the agent proposes what customers ask it to
+ * remember and uses what is remembered, but only for customers who agreed; the memory-write
+ * policy decides what is stored.
+ */
+export const AgentMemory = z
+  .object({
+    enabled: z.boolean().default(false),
+    /** Memories given to the model for one reply. */
+    maxItems: z.int().min(1).max(20).default(8),
+    /** Characters of memories given to the model for one reply. */
+    maxChars: z.int().min(100).max(4000).default(1200),
+  })
+  .meta({ id: 'AgentMemory' });
+
+/**
  * Everything that decides how an agent behaves. A published version of it never changes; edits
  * create a new draft (A07).
  */
@@ -57,6 +72,7 @@ export const AgentConfig = z
     limits: AgentLimits.prefault({}),
     /** Knowledge the agent answers from. Customer answers use only public sources (G05). */
     knowledgeSourceIds: z.array(typeId('source')).max(20).default([]),
+    memory: AgentMemory.prefault({}),
   })
   .meta({ id: 'AgentConfig' });
 export type AgentConfig = z.output<typeof AgentConfig>;

@@ -68,6 +68,46 @@ describe('catalog and presets', () => {
   });
 });
 
+describe('customer memory permissions', () => {
+  it('keeps memory with administrators and supervisors, not with every agent', () => {
+    expect(presetPermissions('admin')).toEqual(
+      expect.arrayContaining([
+        'memory.read',
+        'memory.manage',
+        'memory.delete',
+        'memory.erase',
+        'memory.export',
+      ]),
+    );
+    expect(presetPermissions('supervisor')).toContain('memory.read');
+    expect(presetPermissions('supervisor')).not.toContain('memory.erase');
+    expect(presetPermissions('agent')).not.toContain('memory.read');
+  });
+
+  it('asks for a fresh sign-in before deleting, erasing or exporting, within the brand', () => {
+    const manager = grant({
+      permissions: ['memory.*'],
+      scope: { type: 'brand', id: 'B' },
+    });
+    for (const permission of ['memory.delete', 'memory.erase', 'memory.export'] as const) {
+      expect(
+        authorize(
+          staff([manager], { authenticatedAt: minutesAgo(60) }),
+          permission,
+          {
+            brandId: 'B',
+          },
+          { now },
+        ),
+      ).toMatchObject({ reason: 'step_up_required' });
+      expect(authorize(staff([manager]), permission, { brandId: 'B' }, { now }).allowed).toBe(true);
+      expect(authorize(staff([manager]), permission, { brandId: 'B2' }, { now })).toMatchObject({
+        reason: 'outside_scope',
+      });
+    }
+  });
+});
+
 describe('authorize', () => {
   const agentOnTeam = grant({
     permissions: presetPermissions('agent'),
