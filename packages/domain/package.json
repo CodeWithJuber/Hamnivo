@@ -2,7 +2,7 @@
   "name": "@hamnivo/domain",
   "version": "0.1.0",
   "private": true,
-  "description": "Hamnivo domain types and ports: the conversation authority port and pure domain rules",
+  "description": "Hamnivo domain types and ports: the conversation authority and decision ports, and pure domain rules such as explicit human-request detection",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
