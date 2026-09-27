@@ -5,6 +5,8 @@ export * from './agents.js';
 export * from './brands.js';
 export * from './bridge.js';
 export * from './cards.js';
+export * from './commerce.js';
+export * from './commerce-routes.js';
 export * from './common.js';
 export * from './conversations.js';
 export * from './errors.js';

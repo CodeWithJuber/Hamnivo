@@ -2,6 +2,11 @@ import { z } from 'zod';
 import { adminRoutes, identityRoutes } from './admin-routes.js';
 import { agentRoutes } from './agent-routes.js';
 import {
+  commerceAdminRoutes,
+  commerceIntegrationRoutes,
+  commerceWidgetRoutes,
+} from './commerce-routes.js';
+import {
   CustomerConversation,
   FeedbackRequest,
   HandoffRequest,
@@ -37,7 +42,8 @@ export type RouteAuth =
   | 'widget_session'
   | 'staff_session'
   | 'api_key'
-  | 'integration_signature';
+  | 'integration_signature'
+  | 'provider_signature';
 
 export interface RouteDef {
   method: HttpMethod;
@@ -351,4 +357,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...knowledgeRoutes,
   ...integrationRoutes,
   ...conversationRoutes,
+  ...commerceAdminRoutes,
+  ...commerceWidgetRoutes,
+  ...commerceIntegrationRoutes,
 };

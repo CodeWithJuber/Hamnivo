@@ -25,6 +25,13 @@ const securitySchemes = {
     description:
       'sha256=HMAC-SHA256(secret, "{X-Chatwoot-Timestamp}.{raw body}") with the secret of the account, inbox or bot webhook',
   },
+  stripeSignature: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'Stripe-Signature',
+    description:
+      't={timestamp},v1=HMAC-SHA256(signing secret, "{timestamp}.{raw body}"), checked with the Stripe SDK',
+  },
 } as const;
 
 const securityFor: Record<RouteDef['auth'], Record<string, string[]>[] | undefined> = {
@@ -33,6 +40,7 @@ const securityFor: Record<RouteDef['auth'], Record<string, string[]>[] | undefin
   staff_session: [{ staffSession: [] }],
   api_key: [{ apiKey: [] }],
   integration_signature: [{ chatwootSignature: [] }],
+  provider_signature: [{ stripeSignature: [] }],
 };
 
 /** Builds the OpenAPI 3.1 document from route definitions (contract-first; no running server). */

@@ -31,6 +31,9 @@ export const ErrorCode = z.enum([
   'CONVERSATION_CLOSED',
   'RESYNC_REQUIRED',
   'FEATURE_DISABLED',
+  'QUOTE_EXPIRED',
+  'CAPABILITY_UNSUPPORTED',
+  'SEPARATE_APPROVER_REQUIRED',
   'INTERNAL',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
@@ -82,6 +85,21 @@ export const ERROR_DEFAULTS: Record<
   CONVERSATION_CLOSED: { status: 409, retryable: false, title: 'This conversation is closed' },
   RESYNC_REQUIRED: { status: 410, retryable: true, title: 'History must be reloaded' },
   FEATURE_DISABLED: { status: 403, retryable: false, title: 'This feature is turned off' },
+  QUOTE_EXPIRED: {
+    status: 409,
+    retryable: false,
+    title: 'This price has expired. Please review the order again.',
+  },
+  CAPABILITY_UNSUPPORTED: {
+    status: 422,
+    retryable: false,
+    title: 'This store does not support that',
+  },
+  SEPARATE_APPROVER_REQUIRED: {
+    status: 403,
+    retryable: false,
+    title: 'Someone other than the requester must approve this',
+  },
   INTERNAL: { status: 500, retryable: true, title: 'Something went wrong on our side' },
 };
 

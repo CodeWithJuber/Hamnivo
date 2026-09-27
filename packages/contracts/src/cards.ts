@@ -142,6 +142,39 @@ export const ReceiptCard = z
   })
   .meta({ id: 'ReceiptCard' });
 
+export const CatalogItem = z
+  .object({
+    productId: z.string().max(200),
+    /** Provider price or variant reference; null when the product has one price. */
+    variantId: z.string().max(200).nullable(),
+    name: z.string().max(200),
+    description: z.string().max(500).nullable(),
+    unitPriceMinor: MinorUnits,
+    currency: CurrencyCode,
+    availability: z.enum(['in_stock', 'out_of_stock', 'unknown']),
+    /** Units the merchant reported in stock; null when it does not report stock. */
+    stockQuantity: z.int().nonnegative().nullable(),
+    imageUrl: z.url().nullable(),
+  })
+  .meta({ id: 'CatalogItem' });
+
+/**
+ * Products as the merchant listed them at `observedAt` (C02). Prices here are what the catalog
+ * said then; the binding price is always the quote, read from the merchant again.
+ */
+export const CatalogCard = z
+  .object({
+    kind: z.literal('catalog'),
+    version: z.literal(1),
+    snapshotId: z.string(),
+    merchant: z.object({ id: z.string(), name: z.string() }),
+    items: z.array(CatalogItem).max(20),
+    observedAt: Timestamp,
+    /** Where the data came from (e.g. `stripe:prices.list`). */
+    source: z.string().max(80),
+  })
+  .meta({ id: 'CatalogCard' });
+
 export const Card = z.discriminatedUnion('kind', [
   QuoteCard,
   ApprovalCard,
@@ -150,6 +183,7 @@ export const Card = z.discriminatedUnion('kind', [
   FormCard,
   ArticleCard,
   ReceiptCard,
+  CatalogCard,
 ]);
 export type Card = z.infer<typeof Card>;
 export const CARD_KINDS = [
@@ -160,4 +194,5 @@ export const CARD_KINDS = [
   'form',
   'article',
   'receipt',
+  'catalog',
 ] as const;
