@@ -4,6 +4,12 @@
 #                "internal": certificates from Caddy's own CA (tests, private networks)
 # To change something, copy this file, edit it and mount it over /etc/caddy/Caddyfile.
 
+{
+	# Deploys restart the edge. Open live streams then get 3 s to finish (clients reconnect by
+	# themselves) instead of holding the restart until Docker kills Caddy after 10 s.
+	grace_period 3s
+}
+
 (tls) {
 	tls {$HAMNIVO_TLS}
 }
@@ -46,7 +52,30 @@
 {$HAMNIVO_API_HOST} {
 	import tls
 	import headers
-	reverse_proxy api:4000
+	# GitHub push webhooks for automatic deploys (hamnivo.sh autodeploy), only in webhook mode;
+	# otherwise this path reaches the API, which answers 404.
+	@deployHook {
+		method POST
+		path /_deploy/github
+		expression `"{$HAMNIVO_AUTODEPLOY:off}" == "webhook"`
+	}
+	handle @deployHook {
+		request_body {
+			max_size 5MB
+		}
+		rewrite * /hooks/github
+		reverse_proxy deploy-hook:9000 {
+			lb_try_duration 5s
+		}
+	}
+	handle {
+		# While the API restarts during a deploy, requests wait for it (up to 30 s) instead of
+		# failing.
+		reverse_proxy api:4000 {
+			lb_try_duration 30s
+			lb_try_interval 250ms
+		}
+	}
 }
 
 # Chat widget and its loader. The widget page may only be framed by the brand's allowed websites:
@@ -63,6 +92,8 @@
 		forward_auth api:4000 {
 			uri /v1/widget/frame-policy?{query}
 			copy_headers X-Hamnivo-Frame-Ancestors
+			lb_try_duration 30s
+			lb_try_interval 250ms
 		}
 		header {
 			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors {http.request.header.X-Hamnivo-Frame-Ancestors}"
@@ -82,7 +113,10 @@
 	import tls
 	import headers
 	encode zstd gzip
-	reverse_proxy chatwoot-web:3000
+	reverse_proxy chatwoot-web:3000 {
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
 }
 
 # Public website (static, English, Arabic, Hindi and Urdu).

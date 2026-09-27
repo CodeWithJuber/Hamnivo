@@ -1,0 +1,44 @@
+# GitHub webhooks for automatic deploys (hamnivo.sh autodeploy), served by adnanh/webhook with
+# -template. A request passes only with a valid signature for the configured secret, and only as
+# a push to this repository (or GitHub's ping when the webhook is added). Pushes to any branch
+# pass: the server then fetches from GitHub itself and deploys only what is new on the deploy
+# branch, so a push elsewhere costs one fetch, and nothing from the request reaches a shell.
+# Answers: 200 when the deploy check was requested, 403 for other events or repositories, 500
+# for a wrong signature (or when the request could not be recorded).
+- id: github
+  http-methods: [POST]
+  execute-command: /usr/bin/touch
+  pass-arguments-to-command:
+    - source: string
+      name: /requests/webhook
+  # Wait for the file to be written, so a failure is not reported to GitHub as a success.
+  include-command-output-in-response: true
+  trigger-rule-mismatch-http-response-code: 403
+  trigger-rule:
+    and:
+      - match:
+          type: payload-hmac-sha256
+          secret: {{ getenv "HAMNIVO_DEPLOY_WEBHOOK_SECRET" | printf "%q" }}
+          parameter:
+            source: header
+            name: X-Hub-Signature-256
+      - or:
+          - match:
+              type: value
+              value: ping
+              parameter:
+                source: header
+                name: X-GitHub-Event
+          - and:
+              - match:
+                  type: value
+                  value: push
+                  parameter:
+                    source: header
+                    name: X-GitHub-Event
+              - match:
+                  type: regex
+                  regex: {{ printf "(?i)^%s$" (getenv "HAMNIVO_DEPLOY_REPOSITORY") | printf "%q" }}
+                  parameter:
+                    source: payload
+                    name: repository.full_name

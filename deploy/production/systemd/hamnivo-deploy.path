@@ -1,0 +1,11 @@
+# Installed by "hamnivo.sh autodeploy enable" in webhook mode. The webhook receiver creates a file
+# in the request folder for each accepted push; this starts the deploy service.
+[Unit]
+Description=Hamnivo deploy on GitHub push
+
+[Path]
+DirectoryNotEmpty=@STATE@/requests
+Unit=hamnivo-deploy.service
+
+[Install]
+WantedBy=paths.target

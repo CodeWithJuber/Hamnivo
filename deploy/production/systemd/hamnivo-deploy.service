@@ -1,0 +1,28 @@
+# Installed by "hamnivo.sh autodeploy enable" (the @...@ values are filled in then).
+# Deploys the newest commit of the deploy branch when a webhook request waits or the timer fires.
+[Unit]
+Description=Hamnivo automatic deploy
+Documentation=file://@ROOT@/docs/self-hosting.md
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=@USER@
+Group=@GROUP@
+Environment=HAMNIVO_ENV_FILE=@ENV_FILE@
+Environment=HAMNIVO_PROJECT=@PROJECT@
+Environment=HAMNIVO_STATE_DIR=@STATE@
+Environment=GIT_TERMINAL_PROMPT=0
+# Note whether a webhook asked for this run, then empty the request folder first: systemd starts
+# this service again at once while the folder is not empty, even after a failure.
+ExecStartPre=/bin/sh -c 'if [ -n "$$(ls -A "@STATE@/requests" 2>/dev/null)" ]; then echo webhook; else echo timer; fi >"@STATE@/trigger"; find "@STATE@/requests" -mindepth 1 -delete'
+ExecStart=@HAMNIVO@ deploy --latest --trigger auto
+TimeoutStartSec=2h
+# Builds run in the Docker daemon; this keeps git and the checks around them polite.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
