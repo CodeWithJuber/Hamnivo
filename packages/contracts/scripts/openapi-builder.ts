@@ -18,6 +18,13 @@ const securitySchemes = {
     description: 'Hamnivo Studio session',
   },
   apiKey: { type: 'http', scheme: 'bearer', description: 'Scoped API key (hv_…)' },
+  chatwootSignature: {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-Chatwoot-Signature',
+    description:
+      'sha256=HMAC-SHA256(secret, "{X-Chatwoot-Timestamp}.{raw body}") with the secret of the account, inbox or bot webhook',
+  },
 } as const;
 
 const securityFor: Record<RouteDef['auth'], Record<string, string[]>[] | undefined> = {
@@ -25,7 +32,7 @@ const securityFor: Record<RouteDef['auth'], Record<string, string[]>[] | undefin
   widget_session: [{ widgetSession: [] }],
   staff_session: [{ staffSession: [] }],
   api_key: [{ apiKey: [] }],
-  integration_signature: [],
+  integration_signature: [{ chatwootSignature: [] }],
 };
 
 /** Builds the OpenAPI 3.1 document from route definitions (contract-first; no running server). */
@@ -69,7 +76,7 @@ export function buildOpenApi(
         content: { 'application/json': { schema: route.body } },
       };
     const parameters: Record<string, unknown>[] = [];
-    if (route.path.startsWith('/v1/admin/')) {
+    if (route.path.startsWith('/v1/admin/') || route.path.startsWith('/v1/conversations/')) {
       parameters.push({
         in: 'header',
         name: 'X-Hamnivo-Tenant',

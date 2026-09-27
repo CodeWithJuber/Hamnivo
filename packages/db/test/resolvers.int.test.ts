@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  claimIntegrationInbox,
   claimOutbox,
   purgeExpired,
   resolveApiKey,
@@ -89,6 +90,36 @@ describe('worker maintenance', () => {
     expect(own.rowCount).toBe(1);
   });
 
+  it('leases webhook events across tenants and purges them a week after processing', async () => {
+    const first = await claimIntegrationInbox(h.app, { limit: 10, leaseSeconds: 60 });
+    expect(new Set(first.map((e) => e.tenantId))).toEqual(new Set([a.tenantId, b.tenantId]));
+    expect(first.find((e) => e.tenantId === a.tenantId)).toMatchObject({
+      connectionId: a.connectionId,
+      attempts: 1,
+    });
+    expect(await claimIntegrationInbox(h.app, { limit: 10, leaseSeconds: 60 })).toEqual([]);
+
+    const event = first.find((e) => e.tenantId === a.tenantId);
+    if (!event) throw new Error('missing tenant A event');
+    const processedAt = new Date(Date.now() - 8 * 24 * 3600_000);
+    const foreign = await withTenant(h.app, { tenantId: b.tenantId }, (tx) =>
+      tx.execute(
+        sql`update integration_inbox set processed_at = ${processedAt} where id = ${event.id}::uuid`,
+      ),
+    );
+    expect(foreign.rowCount).toBe(0);
+    await withTenant(h.app, { tenantId: a.tenantId }, (tx) =>
+      tx.execute(
+        sql`update integration_inbox set processed_at = ${processedAt} where id = ${event.id}::uuid`,
+      ),
+    );
+    expect(await purgeExpired(h.app)).toMatchObject({ integration_inbox: 1 });
+    const left = await withTenant(h.app, { tenantId: b.tenantId }, (tx) =>
+      tx.select().from(schema.integrationInbox),
+    );
+    expect(left).toHaveLength(1);
+  });
+
   it('purges only expired journal entries, nonces and idempotency keys', async () => {
     await withTenant(h.app, { tenantId: a.tenantId }, async (tx) => {
       await tx.insert(schema.conversationJournal).values({
@@ -102,7 +133,12 @@ describe('worker maintenance', () => {
       });
     });
     const purged = await purgeExpired(h.app);
-    expect(purged).toEqual({ conversation_journal: 1, identity_nonces: 0, idempotency_keys: 0 });
+    expect(purged).toEqual({
+      conversation_journal: 1,
+      identity_nonces: 0,
+      idempotency_keys: 0,
+      integration_inbox: 0,
+    });
     const remaining = await withTenant(h.app, { tenantId: a.tenantId }, (tx) =>
       tx.select().from(schema.conversationJournal),
     );

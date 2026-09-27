@@ -58,6 +58,11 @@ export const CreateWidgetSessionRequest = z
     locale: SupportedLocale.optional(),
     /** Refresh token from a previous session on this device (resumes the anonymous principal). */
     resumeToken: z.string().max(512).optional(),
+    /**
+     * Origin of the page embedding the widget, as the loader saw it. Checked against the brand's
+     * allowed websites. The browser enforces embedding itself with CSP frame-ancestors.
+     */
+    hostOrigin: z.url().max(300).optional(),
   })
   .meta({ id: 'CreateWidgetSessionRequest' });
 

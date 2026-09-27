@@ -95,3 +95,25 @@ export function hintOf(value: string): string {
   const visible = Math.min(4, Math.floor(value.length / 4));
   return visible > 0 ? value.slice(-visible) : '';
 }
+
+export interface DirectSealed {
+  ciphertext: Buffer;
+  iv: Buffer;
+  kekVersion: number;
+}
+
+/**
+ * Encrypts a small value directly with the KEK (AES-256-GCM) for columns that store only
+ * ciphertext, IV and KEK version, such as Chatwoot contact-inbox source ids. The AAD binds the value
+ * to its tenant and row.
+ */
+export function sealDirect(ring: KeyRing, plaintext: string, aad: Buffer): DirectSealed {
+  const { iv, payload } = gcmEncrypt(ring.key, Buffer.from(plaintext, 'utf8'), aad);
+  return { ciphertext: payload, iv, kekVersion: ring.version };
+}
+
+export function openDirect(ring: KeyRing, sealed: DirectSealed, aad: Buffer): string {
+  return gcmDecrypt(kekFor(ring, sealed.kekVersion), sealed.iv, sealed.ciphertext, aad).toString(
+    'utf8',
+  );
+}

@@ -230,6 +230,11 @@ export async function provisionStaffUser(options: {
   /** Hamnivo-generated unique address (never adopt an existing Chatwoot user). */
   email: string;
   role: ChatwootRole;
+  /**
+   * The address is derived from a Hamnivo id, so an existing user with it can only be one Hamnivo
+   * created before (a retry after a crash). Only then may it be reused.
+   */
+  adoptOwnAddress?: boolean;
   fetch?: typeof fetch;
 }): Promise<CreatedUser> {
   const platform = createChatwootClient({
@@ -237,7 +242,43 @@ export async function provisionStaffUser(options: {
     token: options.platformToken,
     ...(options.fetch ? { fetch: options.fetch } : {}),
   });
-  const user = await createPlatformUser(platform, { name: options.name, email: options.email });
+  let user: CreatedUser;
+  try {
+    user = await createPlatformUser(platform, { name: options.name, email: options.email });
+  } catch (error) {
+    if (!(options.adoptOwnAddress && error instanceof ChatwootUserAdoptedError)) throw error;
+    const token = await call<Json>(
+      'createUserToken',
+      platform.POST('/platform/api/v1/users/{id}/token', {
+        params: { path: { id: error.userId } },
+      }) as never,
+    );
+    user = { userId: error.userId, token: String(token.access_token) };
+  }
   await addAccountUser(platform, options.accountId, user.userId, options.role);
   return user;
+}
+
+/** Adds users to an inbox, so agent-role users can see and act on its conversations. */
+export async function addInboxMembers(options: {
+  baseUrl: string;
+  /** An administrator's token (the integration user). */
+  token: string;
+  accountId: number;
+  inboxId: number;
+  userIds: number[];
+  fetch?: typeof fetch;
+}): Promise<void> {
+  const client = createChatwootClient({
+    baseUrl: options.baseUrl,
+    token: options.token,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+  await call(
+    'addInboxMembers',
+    client.POST('/api/v1/accounts/{account_id}/inbox_members', {
+      params: { path: { account_id: options.accountId } },
+      body: { inbox_id: options.inboxId, user_ids: options.userIds } as never,
+    }) as never,
+  );
 }

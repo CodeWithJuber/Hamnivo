@@ -23,6 +23,35 @@ The Hamnivo Gateway: one codebase, two processes, both built on NestJS 12 and Fa
 8. Errors become RFC 9457 problem details (`application/problem+json`) with a stable `code`.
    Malformed or foreign ids are `NOT_FOUND`.
 
+## Conversations (M6 vertical slice)
+
+| Area | Where |
+|---|---|
+| Chatwoot connection: provisioning, credential registry, staff users | `src/authority/connections.service.ts`, `registry.ts`, `staff-links.service.ts` |
+| Webhook intake: signature per source, dedupe across copies, redaction | `src/authority/ingress.*` |
+| Worker: webhook events → ledger, publications, journal, Chatwoot-side takeovers | `src/authority/processor.service.ts` |
+| Ownership and fencing (epoch, outbox sync to Chatwoot) | `src/authority/ownership.service.ts`, `sync.service.ts` |
+| Exactly-once writes through the message ledger | `src/authority/outbound.service.ts` |
+| Realtime journal (per-lane gapless sequences, Valkey wake-ups) | `src/authority/journal.service.ts` |
+| Widget API: sessions, identity, conversations, SSE, long-poll | `src/widget/*` |
+| Staff actions: view, takeover, return to AI, reply and notes as yourself | `src/conversations/*` |
+| AI replies with fenced publication (`hamnivo-mock` without model keys) | `src/runtime/replies.service.ts` |
+
+`test/slice.int.test.ts` runs the whole slice over HTTP: the gateway, a hand-driven worker, and
+the fake Chatwoot, which calls the gateway's webhook endpoints. It covers:
+
+- the AI reply;
+- idempotent sends;
+- stream resume;
+- takeover while a reply is in flight, and during generation;
+- a takeover made inside Chatwoot, caught by the pre-flight check;
+- staff replies and private notes;
+- handoff;
+- identity switch;
+- refresh-token reuse;
+- cross-tenant denial;
+- webhook signatures.
+
 ## Security rules enforced here
 
 - **Delegation ceiling (A03).** Grants and invitations may only hand out permissions the grantor

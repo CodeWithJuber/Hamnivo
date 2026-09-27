@@ -40,16 +40,38 @@ export async function createApiApp(
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule.forRoot(config, overrides),
     adapter,
-    { logger: config.NODE_ENV === 'test' ? false : ['error', 'warn', 'log'] },
+    // Raw bodies are kept for webhook signature checks (HMAC over the exact bytes).
+    { rawBody: true, logger: config.NODE_ENV === 'test' ? false : ['error', 'warn', 'log'] },
   );
   app.useGlobalFilters(new ProblemFilter());
-  app.enableCors({
+  // Studio uses cookies from its own origin; the widget iframe uses bearer tokens and no cookies.
+  const consoleCors = {
     origin: [config.PUBLIC_CONSOLE_ORIGIN],
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     allowedHeaders: ['content-type', 'x-hamnivo-tenant', 'idempotency-key', 'x-request-id'],
     exposedHeaders: ['x-request-id', 'idempotent-replayed', 'retry-after'],
-  });
+  };
+  const widgetCors = {
+    origin: [config.PUBLIC_WIDGET_ORIGIN],
+    credentials: false,
+    methods: ['GET', 'POST'],
+    allowedHeaders: [
+      'authorization',
+      'content-type',
+      'idempotency-key',
+      'last-event-id',
+      'x-request-id',
+    ],
+    exposedHeaders: ['x-request-id', 'idempotent-replayed', 'retry-after'],
+    maxAge: 600,
+  };
+  app.enableCors({
+    delegator: (
+      request: { url?: string },
+      callback: (error: Error | null, options: object) => void,
+    ) => callback(null, request.url?.startsWith('/v1/widget/') ? widgetCors : consoleCors),
+  } as never);
 
   const fastify = app.getHttpAdapter().getInstance();
   await app.register(helmet, {
@@ -62,7 +84,9 @@ export async function createApiApp(
     redis: app.get<Redis>(REDIS),
     nameSpace: 'hamnivo:rate:',
     skipOnError: true,
-    allowList: (request) => request.url.startsWith('/health'),
+    // Webhooks are signature-checked and arrive from one Chatwoot address in bursts.
+    allowList: (request) =>
+      request.url.startsWith('/health') || request.url.startsWith('/v1/integrations/'),
   });
   // Errors raised outside handlers (body parsing, rate limits, 404) reach ProblemFilter through
   // Nest's Fastify error handler as well.

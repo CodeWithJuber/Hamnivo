@@ -152,6 +152,7 @@
   "X04": {
     "status": "in-progress",
     "evidence": [
+      "apps/gateway/src/authority/registry.ts",
       "apps/gateway/src/secrets/secret-broker.service.ts",
       "apps/gateway/test/secrets.int.test.ts"
     ],
@@ -169,12 +170,14 @@
   "A11": {
     "status": "in-progress",
     "evidence": [
+      "apps/gateway/src/authority/connections.service.ts",
+      "apps/gateway/test/slice.int.test.ts",
+      "deploy/compose/chatwoot.yml",
       "packages/chatwoot/src/provisioning.ts",
       "packages/chatwoot/test/contract/suite.ts",
-      "scripts/chatwoot/up.sh",
-      "deploy/compose/chatwoot.yml"
+      "scripts/chatwoot/up.sh"
     ],
-    "note": "Chatwoot connection provisioning (account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed account webhook, Copilot dashboard app) verified against real Chatwoot v4.18.0-ce; health checks, reconnect instructions and the Studio setup screen pending."
+    "note": "Admin API connects a brand to Chatwoot: account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed webhooks and Copilot dashboard app; every credential stored with the secret broker (tested end to end against the fake, provisioning also against real Chatwoot v4.18.0-ce). Health checks, reconnect instructions and the Studio screen pending."
   },
   "E06": {
     "status": "in-progress",
@@ -186,5 +189,79 @@
       "packages/chatwoot/src/fake/server.ts"
     ],
     "note": "One ConversationAuthority contract suite runs on every test run against the fake Chatwoot and, in pnpm ci:local, against a throwaway real Chatwoot v4.18.0-ce; model, Jev, commerce and scanner adapter kits pending."
+  },
+  "W05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/conversations.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "Customer history from Chatwoot's customer view (private notes and activity excluded) with an opaque older-page cursor; unread markers and widget UI pending."
+  },
+  "W06": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/authority/outbound.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "Server-side 'accepted' only after the authority committed the message; client-side queued/sending/failed states arrive with the widget SDK."
+  },
+  "W07": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/events.service.ts",
+      "apps/gateway/src/authority/journal.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "SSE replay from Last-Event-ID over a per-lane gapless journal, resync_required when the cursor expired, long-poll fallback and idempotent resends (tested); draft preservation is client-side and pending."
+  },
+  "W12": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/sessions.service.ts",
+      "apps/gateway/src/widget/tokens.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending."
+  },
+  "H08": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/authority/ownership.service.ts",
+      "apps/gateway/src/conversations/staff-conversations.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending."
+  },
+  "R05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/src/authority/ownership.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "One public AI speaker per conversation fenced by the ownership epoch; the lease with expiry (columns present) is not used yet."
+  },
+  "R06": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, and by a Chatwoot pre-flight owner check (mutation-tested). Undispatched tool actions follow with the tool gateway."
+  },
+  "R12": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/conversations.service.ts",
+      "apps/gateway/src/widget/copy.ts",
+      "apps/gateway/test/slice.int.test.ts"
+    ],
+    "note": "'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note and honest availability ('queued'); business hours and follow-up channels pending."
+  },
+  "G02": {
+    "status": "in-progress",
+    "evidence": ["packages/adapters/src/models/mock.ts", "packages/adapters/test/mock.test.ts"],
+    "note": "Deterministic hamnivo-mock model on the AI SDK 7 V4 interface (generate and stream), used for replies without keys; live provider adapters pending."
   }
 }

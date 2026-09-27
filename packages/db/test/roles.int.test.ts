@@ -89,6 +89,7 @@ describe('database roles', () => {
     const definers = rows.filter((r) => r.secdef);
     expect(definers.map((r) => r.fn).sort()).toEqual(
       [
+        'app.claim_integration_inbox(integer,integer)',
         'app.claim_outbox(integer,integer)',
         'app.ensure_audit_partitions(integer)',
         'app.purge_expired(integer)',

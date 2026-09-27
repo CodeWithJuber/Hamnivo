@@ -6,6 +6,7 @@ import { inject } from 'vitest';
 import { createApiApp } from '../src/app.js';
 import { type AppConfig, loadConfig } from '../src/config.js';
 import { MemoryMailer } from '../src/platform/mailer.js';
+import type { PlatformOverrides } from '../src/platform/platform.module.js';
 
 export const CONSOLE_ORIGIN = 'http://localhost:5173';
 
@@ -41,12 +42,13 @@ export function testEnv(
 export async function startGateway(
   extraEnv: Record<string, string> = {},
   database?: TestDatabase,
+  overrides: PlatformOverrides = {},
 ): Promise<Gateway> {
   loadLocalEnv();
   const db = database ?? (await createTestDatabase(inject('templateDatabase')));
   const mailer = new MemoryMailer();
   const config = loadConfig(testEnv(db, extraEnv));
-  const app = await createApiApp(config, { mailer });
+  const app = await createApiApp(config, { mailer, ...overrides });
   const owner = createDb(db.owner, { max: 1 });
   return {
     app,

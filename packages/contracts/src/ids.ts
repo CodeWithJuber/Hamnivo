@@ -48,6 +48,7 @@ export const ID_PREFIX = {
   form: 'form',
   inbox: 'inb',
   secret: 'sec',
+  connection: 'acn',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

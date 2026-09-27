@@ -31,6 +31,25 @@ const EnvSchema = z.object({
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default('Hamnivo <no-reply@hamnivo.local>'),
 
+  /** Origin that serves the chat widget iframe (allowed to call /v1/widget/* from browsers). */
+  PUBLIC_WIDGET_ORIGIN: z.url().default('http://localhost:5174'),
+  /** ES256 private key (PKCS#8 PEM, base64) that signs widget access tokens. */
+  WIDGET_SIGNING_KEY: z.string().optional(),
+  WIDGET_TOKEN_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
+  WIDGET_SESSION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  /** Seconds between stream heartbeats (each one also re-checks the session). */
+  STREAM_HEARTBEAT_SECONDS: z.coerce.number().int().min(1).max(60).default(15),
+  /** Days a realtime journal entry stays replayable (it is a projection, not a transcript). */
+  JOURNAL_RETENTION_DAYS: z.coerce.number().int().min(1).max(30).default(7),
+
+  /** Chatwoot and the operator's Platform App token, used to provision tenant accounts. */
+  CHATWOOT_URL: z.url().optional(),
+  CHATWOOT_PLATFORM_TOKEN: z.string().min(8).optional(),
+  /** Base URL Chatwoot uses to reach this gateway's webhook endpoints (default PUBLIC_API_ORIGIN). */
+  CHATWOOT_WEBHOOK_BASE_URL: z.url().optional(),
+  /** Chatwoot request timeout in milliseconds. */
+  CHATWOOT_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(10_000),
+
   /** Bearer token for GET /metrics; the endpoint is disabled without it. */
   METRICS_TOKEN: z.string().min(16).optional(),
   API_DOCS: bool.default(true),

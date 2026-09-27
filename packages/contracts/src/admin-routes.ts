@@ -23,6 +23,12 @@ import {
   UpdateRoleRequest,
   WorkspaceSummary,
 } from './admin.js';
+import {
+  AuthorityConnection,
+  Brand,
+  ConnectChatwootRequest,
+  CreateBrandRequest,
+} from './brands.js';
 import type { RouteDef } from './routes.js';
 
 const idParam = (description: string) => z.object({ id: z.string().meta({ description }) });
@@ -263,5 +269,50 @@ export const adminRoutes = {
     tags: ['Administration'],
     auth: 'staff_session',
     success: { status: 200, description: 'Verification result', schema: AuditVerification },
+  },
+  listBrands: {
+    method: 'get',
+    path: '/v1/admin/brands',
+    operationId: 'listBrands',
+    summary: 'Brands you can manage, with their widget IDs (brands.manage)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    success: { status: 200, description: 'Brands', schema: z.object({ items: z.array(Brand) }) },
+  },
+  createBrand: {
+    method: 'post',
+    path: '/v1/admin/brands',
+    operationId: 'createBrand',
+    summary: 'Create a brand and its widget ID in a workspace (brands.manage)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    body: CreateBrandRequest,
+    idempotent: true,
+    success: { status: 201, description: 'Brand created', schema: Brand },
+  },
+  listAuthorityConnections: {
+    method: 'get',
+    path: '/v1/admin/authority/connections',
+    operationId: 'listAuthorityConnections',
+    summary: 'Conversation-authority (Chatwoot) connections of the tenant (integrations.manage)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    success: {
+      status: 200,
+      description: 'Connections',
+      schema: z.object({ items: z.array(AuthorityConnection) }),
+    },
+  },
+  connectChatwoot: {
+    method: 'post',
+    path: '/v1/admin/authority/connections',
+    operationId: 'connectChatwoot',
+    summary:
+      'Provision a Chatwoot account for a brand: integration user, HMAC inbox, AI bot and signed webhooks (integrations.manage, fresh sign-in)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    body: ConnectChatwootRequest,
+    idempotent: true,
+    success: { status: 201, description: 'Connected', schema: AuthorityConnection },
   },
 } as const satisfies Record<string, RouteDef>;

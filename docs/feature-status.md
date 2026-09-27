@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 217 · in-progress: 13 · implemented: 2
+**Blueprint features (232):** planned: 208 · in-progress: 22 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -21,14 +21,14 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | W02 | Layout modes | P0 | C | planned |  |
 | W03 | Brand theme | P0 | C | in-progress | `packages/brand/src/contrast.ts`, `packages/brand/test/contrast.test.ts` — Contrast validation implemented; widget studio UI pending. |
 | W04 | Clear responder identity | P0 | C | planned |  |
-| W05 | Conversation history | P0 | C | planned |  |
-| W06 | Delivery states | P0 | C | planned |  |
-| W07 | Reconnect and draft preservation | P0 | C | planned |  |
+| W05 | Conversation history | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts` — Customer history from Chatwoot's customer view (private notes and activity excluded) with an opaque older-page cursor; unread markers and widget UI pending. |
+| W06 | Delivery states | P0 | C | in-progress | `apps/gateway/src/authority/outbound.service.ts`, `apps/gateway/test/slice.int.test.ts` — Server-side 'accepted' only after the authority committed the message; client-side queued/sending/failed states arrive with the widget SDK. |
+| W07 | Reconnect and draft preservation | P0 | C | in-progress | `apps/gateway/src/widget/events.service.ts`, `apps/gateway/src/authority/journal.service.ts`, `apps/gateway/test/slice.int.test.ts` — SSE replay from Last-Event-ID over a per-lane gapless journal, resync_required when the cursor expired, long-poll fallback and idempotent resends (tested); draft preservation is client-side and pending. |
 | W08 | Rich content | P0 | C | planned |  |
 | W09 | Attachments | P0 | C | planned |  |
 | W10 | Human handoff | P0 | C | planned |  |
 | W11 | Offline support | P0 | C | planned |  |
-| W12 | Identity lifecycle | P0 | C | planned |  |
+| W12 | Identity lifecycle | P0 | C | in-progress | `apps/gateway/src/widget/sessions.service.ts`, `apps/gateway/src/widget/tokens.service.ts`, `apps/gateway/test/slice.int.test.ts` — Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending. |
 | W13 | Locale and RTL | P0 | C | planned |  |
 | W14 | Accessibility controls | P0 | C | planned |  |
 | W15 | Feedback and reopen | P0 | C | planned |  |
@@ -54,7 +54,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | H05 | Saved replies | P0 | C | planned |  |
 | H06 | Customer context | P0 | C | planned |  |
 | H07 | Search | P0 | C | planned |  |
-| H08 | Ownership and collisions | P0 | C | planned |  |
+| H08 | Ownership and collisions | P0 | C | in-progress | `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/conversations/staff-conversations.service.ts`, `apps/gateway/test/slice.int.test.ts` — Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending. |
 | H09 | Drafts and failed sends | P0 | C | planned |  |
 | H10 | Resolve, reopen and snooze | P0 | C | planned |  |
 | H11 | AI copilot | P0 | C | planned |  |
@@ -80,7 +80,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | A08 | Usage limits | P0 | C | planned |  |
 | A09 | Audit trail | P0 | C | in-progress | `packages/db/src/audit.ts`, `packages/db/src/schema/audit.ts`, `packages/db/migrations/20260926232017_security.sql`, `packages/db/test/audit.int.test.ts`, `apps/gateway/src/audit/audit.controller.ts`, `apps/gateway/test/admin.int.test.ts` — Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection, list/filter/verify API and events for every administrative change; export and Studio views pending. |
 | A10 | Retention and exports | P0 | C | planned |  |
-| A11 | Channel setup | P0 | C | in-progress | `packages/chatwoot/src/provisioning.ts`, `packages/chatwoot/test/contract/suite.ts`, `scripts/chatwoot/up.sh`, `deploy/compose/chatwoot.yml` — Chatwoot connection provisioning (account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed account webhook, Copilot dashboard app) verified against real Chatwoot v4.18.0-ce; health checks, reconnect instructions and the Studio setup screen pending. |
+| A11 | Channel setup | P0 | C | in-progress | `apps/gateway/src/authority/connections.service.ts`, `apps/gateway/test/slice.int.test.ts`, `deploy/compose/chatwoot.yml`, `packages/chatwoot/src/provisioning.ts`, `packages/chatwoot/test/contract/suite.ts`, `scripts/chatwoot/up.sh` — Admin API connects a brand to Chatwoot: account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed webhooks and Copilot dashboard app; every credential stored with the secret broker (tested end to end against the fake, provisioning also against real Chatwoot v4.18.0-ce). Health checks, reconnect instructions and the Studio screen pending. |
 | A12 | Custom role builder | P1 | C | planned |  |
 | A13 | Enterprise identity | P1 | C | planned |  |
 | A14 | Provisioning and access reviews | P2 | A | planned |  |
@@ -96,7 +96,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
 | G01 | Agent profiles | P0 | C | planned |  |
-| G02 | Provider adapter | P0 | C | planned |  |
+| G02 | Provider adapter | P0 | C | in-progress | `packages/adapters/src/models/mock.ts`, `packages/adapters/test/mock.test.ts` — Deterministic hamnivo-mock model on the AI SDK 7 V4 interface (generate and stream), used for replies without keys; live provider adapters pending. |
 | G03 | Assist and answer modes | P0 | C | planned |  |
 | G04 | Approved knowledge sources | P0 | C | planned |  |
 | G05 | Retrieval with access controls | P0 | C | planned |  |
@@ -185,14 +185,14 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | R02 | AI specialist invitation | P0 | C | planned |  |
 | R03 | History grants | P0 | C | planned |  |
 | R04 | Three conversation lanes | P0 | C | planned |  |
-| R05 | Public response ownership | P0 | C | planned |  |
-| R06 | Human takeover fencing | P0 | C | planned |  |
+| R05 | Public response ownership | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/test/slice.int.test.ts` — One public AI speaker per conversation fenced by the ownership epoch; the lease with expiry (columns present) is not used yet. |
+| R06 | Human takeover fencing | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/slice.int.test.ts` — Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, and by a Chatwoot pre-flight owner check (mutation-tested). Undispatched tool actions follow with the tool gateway. |
 | R07 | In-flight action reconciliation | P0 | Q | planned |  |
 | R08 | Bounded parallel specialists | P1 | C | planned |  |
 | R09 | Pause remove replace agents | P0 | C | planned |  |
 | R10 | Guest invitation | P1 | A | planned |  |
 | R11 | Review versus takeover | P0 | C | planned |  |
-| R12 | Human unavailable state | P0 | C | planned |  |
+| R12 | Human unavailable state | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/src/widget/copy.ts`, `apps/gateway/test/slice.int.test.ts` — 'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note and honest availability ('queued'); business hours and follow-up channels pending. |
 | R13 | Specialist result provenance | P0 | C | planned |  |
 | R14 | External agent gateway | P1 | A | planned |  |
 | R15 | Participant activity UX | P1 | C | planned |  |
@@ -253,7 +253,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | X01 | Workload identity | P0 | F | in-progress | `apps/gateway/src/identity/principal.service.ts`, `apps/gateway/src/identity/staff.guard.ts`, `apps/gateway/test/identity.int.test.ts` — Staff principals come from server-verified sessions and per-request grant loading; service-account and workload identities pending. |
 | X02 | Tool precondition checks | P0 | C | planned |  |
 | X03 | Resource and fan-out limits | P0 | C | planned |  |
-| X04 | Secret broker | P0 | F | in-progress | `apps/gateway/src/secrets/secret-broker.service.ts`, `apps/gateway/test/secrets.int.test.ts` — Secret broker reveals credentials only to server code inside the owning tenant; scoped short-lived credentials for tools and agents pending. |
+| X04 | Secret broker | P0 | F | in-progress | `apps/gateway/src/authority/registry.ts`, `apps/gateway/src/secrets/secret-broker.service.ts`, `apps/gateway/test/secrets.int.test.ts` — Secret broker reveals credentials only to server code inside the owning tenant; scoped short-lived credentials for tools and agents pending. |
 | X05 | Network egress policy | P0 | C | planned |  |
 | X06 | Inter-agent authenticity | P0 | A | planned |  |
 | X07 | Plugin isolation | P0 | A | planned |  |

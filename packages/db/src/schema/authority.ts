@@ -89,6 +89,8 @@ export const authorityInboxes = pgTable(
     /** Client API inbox identifier (API channel). */
     inboxIdentifier: text('inbox_identifier'),
     hmacSecretId: uuid('hmac_secret_id'),
+    /** Secret that signs this API inbox's webhook deliveries. */
+    webhookSecretId: uuid('webhook_secret_id'),
     channelType: text('channel_type').notNull(),
     status: text('status', { enum: ['active', 'disabled'] })
       .notNull()
@@ -114,6 +116,11 @@ export const authorityInboxes = pgTable(
       columns: [t.tenantId, t.hmacSecretId],
       foreignColumns: [secrets.tenantId, secrets.id],
     }),
+    foreignKey({
+      name: 'authority_inboxes_webhook_secret_fk',
+      columns: [t.tenantId, t.webhookSecretId],
+      foreignColumns: [secrets.tenantId, secrets.id],
+    }),
     tenantIsolation(),
   ],
 );
@@ -130,6 +137,8 @@ export const authorityBots = pgTable(
     role: text('role', { enum: ['primary', 'specialist'] }).notNull(),
     agentProfileId: uuid('agent_profile_id'),
     accessTokenSecretId: uuid('access_token_secret_id').notNull(),
+    /** Secret that signs this bot's webhook deliveries. */
+    webhookSecretId: uuid('webhook_secret_id'),
     status: text('status', { enum: ['active', 'detached', 'disabled'] })
       .notNull()
       .default('active'),
@@ -149,6 +158,11 @@ export const authorityBots = pgTable(
       columns: [t.tenantId, t.accessTokenSecretId],
       foreignColumns: [secrets.tenantId, secrets.id],
     }),
+    foreignKey({
+      name: 'authority_bots_webhook_secret_fk',
+      columns: [t.tenantId, t.webhookSecretId],
+      foreignColumns: [secrets.tenantId, secrets.id],
+    }),
     tenantIsolation(),
   ],
 );
@@ -165,7 +179,8 @@ export const authorityContacts = pgTable(
     connectionId: uuid('connection_id').notNull(),
     inboxId: uuid('inbox_id').notNull(),
     principalId: uuid('principal_id').notNull(),
-    externalContactId: integer('external_contact_id').notNull(),
+    /** Null until Chatwoot confirmed the contact (the source id is stored first, so retries reuse it). */
+    externalContactId: integer('external_contact_id'),
     /** `hv:{brand}:{sub}` for verified customers, `hv:anon:{principal}` otherwise. */
     identifier: text('identifier').notNull(),
     sourceIdCiphertext: bytea('source_id_ciphertext').notNull(),
@@ -257,7 +272,14 @@ export const conversationControls = pgTable(
     externalConversationId: integer('external_conversation_id').notNull(),
     ownerMode: text('owner_mode', { enum: OWNER_MODES }).notNull(),
     ownershipEpoch: bigint('ownership_epoch', { mode: 'number' }).notNull().default(0),
+    /**
+     * Last epoch whose owner change Chatwoot has applied. While it trails `ownership_epoch`, the
+     * authority's owner fields are stale and must not be read back as a new takeover.
+     */
+    ownerSyncedEpoch: bigint('owner_synced_epoch', { mode: 'number' }).notNull().default(0),
     ownerStaffId: uuid('owner_staff_id'),
+    /** A Chatwoot user who took over in Chatwoot and has no Hamnivo staff link. */
+    ownerExternalUserId: integer('owner_external_user_id'),
     ownerBotId: uuid('owner_bot_id'),
     leaseHolder: text('lease_holder'),
     leaseExpiresAt: tstz('lease_expires_at'),
@@ -266,7 +288,10 @@ export const conversationControls = pgTable(
     }).notNull(),
     /** Chatwoot's float `updated_at`; state is applied only when newer. */
     authorityUpdatedAt: doublePrecision('authority_updated_at'),
+    /** Journal heads per lane; each lane is gapless, so a customer stream reveals nothing else. */
     journalSeq: bigint('journal_seq', { mode: 'number' }).notNull().default(0),
+    staffJournalSeq: bigint('staff_journal_seq', { mode: 'number' }).notNull().default(0),
+    agentJournalSeq: bigint('agent_journal_seq', { mode: 'number' }).notNull().default(0),
     lastCustomerMessageAt: tstz('last_customer_message_at'),
     lastActivityAt: tstz('last_activity_at').notNull().defaultNow(),
     createdAt: createdAt(),
@@ -316,7 +341,7 @@ export const conversationControls = pgTable(
     ),
     check(
       'conversation_controls_human_owner_ck',
-      sql`${t.ownerMode} <> 'HUMAN_ACTIVE' or ${t.ownerStaffId} is not null`,
+      sql`${t.ownerMode} <> 'HUMAN_ACTIVE' or ${t.ownerStaffId} is not null or ${t.ownerExternalUserId} is not null`,
     ),
     tenantIsolation(),
   ],
@@ -468,7 +493,7 @@ export const conversationJournal = pgTable(
   (t) => [
     primaryKey({
       name: 'conversation_journal_pkey',
-      columns: [t.tenantId, t.conversationId, t.seq],
+      columns: [t.tenantId, t.conversationId, t.lane, t.seq],
     }),
     index('conversation_journal_expires_idx').on(t.expiresAt),
     foreignKey({

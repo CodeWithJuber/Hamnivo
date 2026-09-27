@@ -13,6 +13,7 @@ this repository. This guide grows with the product. Each milestone adds its serv
 | Database schema, row-level security and audit log | ready | `pnpm db:migrate` |
 | Gateway API (staff sign-in, tenants, members, roles, grants, secrets, audit) and worker | ready | `pnpm api`, `pnpm worker` |
 | Chatwoot CE v4.18.0 (conversation authority) with the Hamnivo Platform App | ready | `pnpm chatwoot:up` |
+| Chat API: widget sessions, conversations, live stream, staff takeover | ready (API) | see "Connect a brand to Chatwoot" below |
 | Widget, Studio, website | not yet built | added by later milestones, with a production compose file and TLS proxy |
 
 ## 1. Server requirements
@@ -140,6 +141,47 @@ curl -c jar -H 'origin: http://localhost:5173' -H 'content-type: application/jso
 curl -b jar -c jar -H 'origin: http://localhost:5173' -H 'content-type: application/json' \
   -d '{"name":"My Company","slug":"my-company"}' http://localhost:4000/v1/tenants
 ```
+
+### Connect a brand to Chatwoot and chat through the API
+
+This needs `pnpm chatwoot:up` (it writes `CHATWOOT_URL` and `CHATWOOT_PLATFORM_TOKEN` to
+`.env.local`), plus `pnpm api` and `pnpm worker` running. `CHATWOOT_WEBHOOK_BASE_URL` (default
+`http://host.docker.internal:4000`) is how Chatwoot's webhooks reach the gateway.
+
+1. Use the tenant ID (`tnt_…`) returned above. Find the workspace, then create a brand with the
+   websites allowed to embed its chat:
+
+   ```bash
+   T=tnt_...   # your tenant id
+   h=(-b jar -H 'origin: http://localhost:5173' -H 'content-type: application/json' -H "x-hamnivo-tenant: $T")
+   curl "${h[@]}" http://localhost:4000/v1/admin/workspaces
+   curl "${h[@]}" -d '{"workspaceId":"wsp_...","name":"My Shop","allowedOrigins":["http://localhost:8080"]}' \
+     http://localhost:4000/v1/admin/brands
+   ```
+
+2. Connect the brand. This provisions a Chatwoot account with an HMAC inbox, the AI bot and signed
+   webhooks, and stores every credential encrypted:
+
+   ```bash
+   curl "${h[@]}" -d '{"brandId":"brd_..."}' http://localhost:4000/v1/admin/authority/connections
+   ```
+
+3. Chat as a website visitor would. Use the brand's `widgetId`:
+
+   ```bash
+   S=$(curl -s -H 'content-type: application/json' \
+     -d '{"widgetId":"wid_...","hostOrigin":"http://localhost:8080"}' http://localhost:4000/v1/widget/sessions)
+   A=$(echo "$S" | node -pe 'JSON.parse(require("fs").readFileSync(0)).accessToken')
+   curl -H "authorization: Bearer $A" -H 'content-type: application/json' \
+     -d '{"firstMessage":"Assalamu alaikum, where is my order?"}' http://localhost:4000/v1/widget/conversations
+   curl -N -H "authorization: Bearer $A" -H 'last-event-id: 0' \
+     http://localhost:4000/v1/widget/conversations/conv_.../events
+   ```
+
+The stream shows your message and, a moment later, the AI assistant's reply. With no model keys,
+the reply comes from the offline `hamnivo-mock` model. The same conversation appears in Chatwoot
+(`http://127.0.0.1:3000`), where your staff can also answer. A person replying or taking over there
+takes the conversation from the AI.
 
 ## 5. Run the checks
 

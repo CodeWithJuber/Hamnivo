@@ -1,0 +1,33 @@
+{
+  "name": "@hamnivo/adapters",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hamnivo provider adapters behind shared contracts: models (including the deterministic hamnivo-mock), and later Jev, commerce, scanner, storage and network adapters",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./models": {
+      "types": "./dist/models/index.d.ts",
+      "import": "./dist/models/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-sdk/provider": "4.0.18"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "ai": "7.0.116",
+    "tsdown": "0.23.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

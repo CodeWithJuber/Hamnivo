@@ -14,6 +14,12 @@ import {
 import { HamnivoEvent, StreamControl } from './events.js';
 import { AttachmentPart } from './parts.js';
 import {
+  StaffConversation,
+  StaffMessageRequest,
+  StaffMessageResponse,
+  TakeoverRequest,
+} from './staff-conversations.js';
+import {
   CreateWidgetSessionRequest,
   IdentifyRequest,
   RefreshWidgetSessionRequest,
@@ -244,8 +250,85 @@ export const widgetRoutes = {
   },
 } as const satisfies Record<string, RouteDef>;
 
+/** Inbound events from the conversation authority, authenticated by their HMAC signature. */
+export const integrationRoutes = {
+  chatwootWebhook: {
+    method: 'post',
+    path: '/v1/integrations/chatwoot/{connectionId}/{source}',
+    operationId: 'receiveChatwootWebhook',
+    summary:
+      'Chatwoot account, API-inbox or agent-bot webhook; verified, deduplicated and acknowledged before processing',
+    tags: ['Integrations'],
+    auth: 'integration_signature',
+    params: z.object({
+      connectionId: z.string().meta({ description: 'Authority connection ID (acn_…)' }),
+      source: z.enum(['account', 'inbox', 'bot']),
+    }),
+    success: { status: 204, description: 'Accepted (or already received)' },
+  },
+} as const satisfies Record<string, RouteDef>;
+
+const staffConversationParams = z.object({
+  conversationId: z.string().meta({ description: 'Conversation ID (conv_…)' }),
+});
+
+/** Staff actions on a conversation (Studio, Copilot and the API; requires X-Hamnivo-Tenant). */
+export const conversationRoutes = {
+  getStaffConversation: {
+    method: 'get',
+    path: '/v1/conversations/{conversationId}',
+    operationId: 'getStaffConversation',
+    summary: 'Control state of a conversation (conversations.read)',
+    tags: ['Conversations'],
+    auth: 'staff_session',
+    params: staffConversationParams,
+    success: { status: 200, description: 'Conversation', schema: StaffConversation },
+  },
+  takeOver: {
+    method: 'post',
+    path: '/v1/conversations/{conversationId}/takeover',
+    operationId: 'takeOverConversation',
+    summary:
+      'Take over from the AI or a colleague; pending AI replies are discarded (conversations.takeover)',
+    tags: ['Conversations'],
+    auth: 'staff_session',
+    params: staffConversationParams,
+    body: TakeoverRequest,
+    success: { status: 200, description: 'You own the conversation', schema: StaffConversation },
+  },
+  returnToAi: {
+    method: 'post',
+    path: '/v1/conversations/{conversationId}/return-to-ai',
+    operationId: 'returnConversationToAi',
+    summary: 'Hand the conversation back to the AI assistant (conversations.assign)',
+    tags: ['Conversations'],
+    auth: 'staff_session',
+    params: staffConversationParams,
+    body: TakeoverRequest,
+    success: { status: 200, description: 'The AI answers again', schema: StaffConversation },
+  },
+  sendStaffMessage: {
+    method: 'post',
+    path: '/v1/conversations/{conversationId}/messages',
+    operationId: 'sendStaffMessage',
+    summary:
+      'Reply to the customer or write an internal note as yourself (conversations.reply / conversations.note)',
+    tags: ['Conversations'],
+    auth: 'staff_session',
+    params: staffConversationParams,
+    body: StaffMessageRequest,
+    success: {
+      status: 202,
+      description: 'Committed by the authority',
+      schema: StaffMessageResponse,
+    },
+  },
+} as const satisfies Record<string, RouteDef>;
+
 export const allRoutes: Record<string, RouteDef> = {
   ...widgetRoutes,
   ...identityRoutes,
   ...adminRoutes,
+  ...integrationRoutes,
+  ...conversationRoutes,
 };
