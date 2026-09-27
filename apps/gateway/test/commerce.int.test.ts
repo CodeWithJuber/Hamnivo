@@ -731,6 +731,43 @@ describe('unknown outcomes are reconciled, never repeated blindly (C07, C09, R07
     expect(op).toMatchObject({ state: 'succeeded', attempts: 2 });
   });
 
+  it('does not resend a lost checkout too late to be paid; nothing is charged and the cart is kept', async () => {
+    const { visitor, conversationId } = await newCustomer();
+    const cart = await cartWith(visitor, conversationId, [{ productId: 'prod_pens', quantity: 1 }]);
+    const quote = await quoted(visitor, conversationId, cart.revision);
+    const sessionsBefore = store.sessions.size;
+    store.inject('createCheckout', 'timeout_before');
+    const purchase = await approve(visitor, conversationId, quote);
+    expect(purchase.body.state).toBe('unknown');
+    const sendsBefore = store.countCalls('createCheckout');
+    // The stored request would now open a page that closes in 10 minutes: too short to resend.
+    await withTenant(slice.app, { tenantId }, async (tx) => {
+      const where = eq(schema.operations.resourceId, fromPublicId('purchase', purchase.body.id));
+      const [op] = await tx.select().from(schema.operations).where(where);
+      const detail = structuredClone(op?.detail) as { request: { expiresAt: string } };
+      detail.request.expiresAt = new Date(clock().getTime() + 10 * 60_000).toISOString();
+      await tx.update(schema.operations).set({ detail }).where(where);
+    });
+    await makeChecksDue();
+    await settle();
+    expect(store.countCalls('createCheckout')).toBe(sendsBefore);
+    expect(store.sessions.size).toBe(sessionsBefore);
+    const failed = await visitor.call(
+      'GET',
+      commerce(conversationId, `purchases/${purchase.body.id}`),
+    );
+    expect(failed.body).toMatchObject({ outcome: 'failed', checkout: null });
+    const kept = await visitor.call('GET', commerce(conversationId, 'cart'));
+    expect(kept.body.cart).toMatchObject({ status: 'open' });
+    const [op] = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .select()
+        .from(schema.operations)
+        .where(eq(schema.operations.resourceId, fromPublicId('purchase', purchase.body.id))),
+    );
+    expect(op).toMatchObject({ state: 'failed', attempts: 1 });
+  });
+
   it('finds a lost webhook by asking the provider (payment sync)', async () => {
     const { visitor, conversationId } = await newCustomer();
     const cart = await cartWith(visitor, conversationId, [{ productId: 'prod_pens', quantity: 1 }]);
@@ -878,6 +915,44 @@ describe('refunds need approval and a separate approver (C12, C19)', () => {
     );
     expect(checked.body.state).toBe('pending');
     expect(store.refunds.size).toBe(refundsBefore);
+  });
+
+  it('never resends a lost refund once the provider may have forgotten its key (C07)', async () => {
+    const fresh = await paidOrder();
+    const requested = await agent.post(
+      `/v1/admin/commerce/orders/${fresh.purchase.order.id}/refunds`,
+      { clientRequestId: randomUUID(), amountMinor: '700', reason: 'customer_request' },
+    );
+    expect(requested.status, JSON.stringify(requested.body)).toBe(201);
+    const refundsBefore = store.refunds.size;
+    // The request never reaches the provider, and the answer is a timeout.
+    store.inject('createRefund', 'timeout_before');
+    const approved = await finance.post(
+      `/v1/admin/commerce/refunds/${requested.body.id}/approve`,
+      {},
+    );
+    expect(approved.body.state).toBe('unknown');
+    // A day later: past the provider's idempotency window (24 hours at Stripe).
+    await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .update(schema.operations)
+        .set({ createdAt: sql`now() - interval '25 hours'` })
+        .where(eq(schema.operations.resourceId, fromPublicId('refund', requested.body.id))),
+    );
+    const sendsBefore = store.countCalls('createRefund');
+    await makeChecksDue();
+    await settle();
+    // Looked up by its durable reference, not found, and not sent again.
+    expect(store.countCalls('createRefund')).toBe(sendsBefore);
+    expect(store.refunds.size).toBe(refundsBefore);
+    const detail = await finance.get(`/v1/admin/commerce/orders/${fresh.purchase.order.id}`);
+    expect(
+      detail.body.refunds.find((r: { id: string }) => r.id === requested.body.id),
+    ).toMatchObject({ state: 'unknown' });
+    expect(detail.body.payment.refundedMinor).toBe('0');
+    expect(detail.body.exceptions).toMatchObject([
+      { kind: 'refund_unknown', state: 'open', nextSafeAction: 'check_status' },
+    ]);
   });
 
   it('lists and resolves finance exceptions with a reason (audited, moves no money)', async () => {

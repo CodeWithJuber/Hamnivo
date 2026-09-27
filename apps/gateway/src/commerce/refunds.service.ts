@@ -997,8 +997,33 @@ export class RefundsService {
         }
         return;
       }
-      // Refused when resent, or not found and too old to resend: a person decides.
-      await this.applyResult(tx, loaded, null, failure ?? new Error('not_found'), obs, effects);
+      if (!failure) {
+        // Not found, and too late to resend safely: the provider may no longer remember the
+        // idempotency key, so nothing is sent again (C07). A person checks the provider (C19);
+        // the check goes on, so a refund that shows up later is still applied.
+        await addReceipt(tx, loaded.operation, {
+          kind: 'reconcile',
+          outcome: 'unknown',
+          source,
+          evidence: { subject: 'refund', status: 'not_found', resendAllowed: false },
+          observedAt,
+        });
+        await openException(tx, {
+          tenantId,
+          kind: 'refund_unknown',
+          subjectType: 'refund',
+          subjectId: loaded.refund.id,
+          operationId: op.id,
+          orderId: loaded.order.id,
+          sourceState: 'not_found',
+          nextSafeAction: 'check_status',
+          evidence: { attempts: op.attempts, reason: 'outside_resend_window' },
+          now: observedAt,
+        });
+        return;
+      }
+      // Refused when resent: the provider said no.
+      await this.applyResult(tx, loaded, null, failure, obs, effects);
     });
     await effects.flush(this.journal);
     if (failure) this.logger.warn(`refund ${op.id} reconcile: ${errorCode(failure)}`);
