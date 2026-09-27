@@ -151,6 +151,9 @@ export interface CartLine {
   productId: string;
   variantId: string | null;
   quantity: number;
+  /** What the catalog card showed when the item was added: an estimate, never charged. */
+  name?: string | null;
+  unitPriceMinor?: string | null;
 }
 
 /** A customer's cart in a conversation. Every edit bumps the revision (optimistic concurrency). */

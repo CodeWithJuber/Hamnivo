@@ -158,6 +158,15 @@ export const CartView = z
   })
   .meta({ id: 'CartView' });
 
+/** The shop a conversation can buy from, if the brand sells in chat. */
+export const ShopInfo = z
+  .object({ merchantId: typeId('merchant'), name: z.string(), currency: CurrencyCode })
+  .meta({ id: 'ShopInfo' });
+
+export const CatalogSearchRequest = z
+  .object({ query: z.string().trim().max(200).optional() })
+  .meta({ id: 'CatalogSearchRequest' });
+
 export const RequestQuoteRequest = z
   .object({ cartRevision: z.int().positive() })
   .meta({ id: 'RequestQuoteRequest' });

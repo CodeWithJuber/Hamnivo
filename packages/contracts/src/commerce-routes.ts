@@ -3,6 +3,7 @@ import { CatalogCard } from './cards.js';
 import {
   ApproveQuoteRequest,
   CartView,
+  CatalogSearchRequest,
   ConversationCommerce,
   CreateMerchantConnectionRequest,
   CreateRefundRequest,
@@ -19,6 +20,7 @@ import {
   RequestQuoteRequest,
   ResolveExceptionRequest,
   ShareCatalogRequest,
+  ShopInfo,
   UpdateCartRequest,
   UpdateMerchantConnectionRequest,
 } from './commerce.js';
@@ -222,6 +224,17 @@ const widgetConversation = z.object(conversation);
 
 /** Customer: cart, quote, approval and checkout inside a conversation (widget session). */
 export const commerceWidgetRoutes = {
+  searchCatalog: {
+    method: 'post',
+    path: '/v1/widget/conversations/{conversationId}/commerce/catalogs',
+    operationId: 'searchCatalog',
+    summary: 'Show products from the shop, read live from the merchant, as a card in the chat',
+    tags: ['Widget commerce'],
+    auth: 'widget_session',
+    params: widgetConversation,
+    body: CatalogSearchRequest,
+    success: { status: 201, description: 'Catalog', schema: CatalogCard },
+  },
   getCatalog: {
     method: 'get',
     path: '/v1/widget/conversations/{conversationId}/commerce/catalogs/{catalogId}',
@@ -236,14 +249,14 @@ export const commerceWidgetRoutes = {
     method: 'get',
     path: '/v1/widget/conversations/{conversationId}/commerce/cart',
     operationId: 'getCart',
-    summary: 'Your open cart in this conversation, if any',
+    summary: 'Your open cart in this conversation, if any, and the shop you can buy from',
     tags: ['Widget commerce'],
     auth: 'widget_session',
     params: widgetConversation,
     success: {
       status: 200,
       description: 'Cart',
-      schema: z.object({ cart: CartView.nullable() }),
+      schema: z.object({ cart: CartView.nullable(), shop: ShopInfo.nullable() }),
     },
   },
   updateCart: {

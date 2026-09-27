@@ -5826,6 +5826,64 @@
         }
       }
     },
+    "/v1/widget/conversations/{conversationId}/commerce/catalogs": {
+      "post": {
+        "operationId": "searchCatalog",
+        "summary": "Show products from the shop, read live from the merchant, as a card in the chat",
+        "tags": [
+          "Widget commerce"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogCard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/widget/conversations/{conversationId}/commerce/catalogs/{catalogId}": {
       "get": {
         "operationId": "getCatalogCard",
@@ -5885,7 +5943,7 @@
     "/v1/widget/conversations/{conversationId}/commerce/cart": {
       "get": {
         "operationId": "getCart",
-        "summary": "Your open cart in this conversation, if any",
+        "summary": "Your open cart in this conversation, if any, and the shop you can buy from",
         "tags": [
           "Widget commerce"
         ],
@@ -5923,10 +5981,21 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "shop": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/ShopInfo"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
-                    "cart"
+                    "cart",
+                    "shop"
                   ],
                   "additionalProperties": false
                 }
@@ -8273,6 +8342,15 @@
               "minLength": 1,
               "maxLength": 200
             }
+          }
+        }
+      },
+      "CatalogSearchRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200
           }
         }
       },
@@ -15410,6 +15488,29 @@
           "itemCount",
           "estimatedSubtotalMinor",
           "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ShopInfo": {
+        "type": "object",
+        "properties": {
+          "merchantId": {
+            "type": "string",
+            "description": "merchant identifier (TypeID with prefix \"mrc\")",
+            "example": "mrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          }
+        },
+        "required": [
+          "merchantId",
+          "name",
+          "currency"
         ],
         "additionalProperties": false
       },

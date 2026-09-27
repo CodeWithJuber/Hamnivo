@@ -8,6 +8,9 @@ import { ReconcilerService } from './authority/reconciler.service.js';
 import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
 import { AuthoritySyncService } from './authority/sync.service.js';
+import { CARD_TOPIC, CommerceCardsService } from './commerce/card-publisher.service.js';
+import { COMMERCE_WORKER_PROVIDERS } from './commerce/commerce.module.js';
+import { CommerceWorker } from './commerce/worker.service.js';
 import type { AppConfig } from './config.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
@@ -46,7 +49,8 @@ export interface WorkerOverrides extends PlatformOverrides {
 }
 
 /**
- * Background process: outbox relay (owner sync to Chatwoot, AI replies), the integration-inbox
+ * Background process: outbox relay (owner sync to Chatwoot, AI replies, commerce cards), the
+ * commerce worker (provider events and reconciliation), the integration-inbox
  * processor for Chatwoot webhooks, the reconciler that catches what webhooks missed, and
  * scheduled maintenance.
  */
@@ -77,13 +81,15 @@ export class WorkerModule {
         { provide: SCANNER, useValue: overrides.scanner ?? scannerFromUrl(config.CLAMAV_URL) },
         IngestionService,
         RepliesService,
+        ...COMMERCE_WORKER_PROVIDERS,
         {
           provide: OUTBOX_HANDLERS,
-          inject: [AuthoritySyncService, RepliesService, IngestionService],
+          inject: [AuthoritySyncService, RepliesService, IngestionService, CommerceCardsService],
           useFactory: (
             sync: AuthoritySyncService,
             replies: RepliesService,
             ingestion: IngestionService,
+            cards: CommerceCardsService,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -92,6 +98,7 @@ export class WorkerModule {
               ['conversation.note', (event) => sync.applyNote(event)],
               ['conversation.customer_message', (event) => replies.onCustomerMessage(event)],
               ['knowledge.ingest', (event) => ingestion.onIngest(event)],
+              [CARD_TOPIC, (event) => cards.onCardEvent(event)],
             ]),
         },
         OutboxRelay,
@@ -104,6 +111,7 @@ export class WorkerModule {
         ReconcilerService,
         RepliesService,
         JournalService,
+        CommerceWorker,
       ],
     };
   }

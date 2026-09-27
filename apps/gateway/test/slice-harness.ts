@@ -9,6 +9,7 @@ import type { LanguageModel } from 'ai';
 import { type EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
 import { InboxProcessor } from '../src/authority/processor.service.js';
 import { ReconcilerService } from '../src/authority/reconciler.service.js';
+import { CommerceWorker } from '../src/commerce/worker.service.js';
 import { loadConfig } from '../src/config.js';
 import type { Scanner } from '../src/knowledge/scanner.js';
 import { OutboxRelay } from '../src/outbox/relay.service.js';
@@ -42,7 +43,13 @@ export interface Slice {
 
 /** Gateway on a real port, a worker driven by hand, and a fake Chatwoot that calls back over HTTP. */
 export async function startSlice(
-  options: { clock?: () => Date; model?: LanguageModel; scanner?: Scanner } = {},
+  options: {
+    clock?: () => Date;
+    model?: LanguageModel;
+    scanner?: Scanner;
+    /** Extra environment for both processes (e.g. commerce provider settings). */
+    env?: Record<string, string>;
+  } = {},
 ): Promise<Slice> {
   const fake = await startFakeChatwoot();
   const port = await freePort();
@@ -53,6 +60,7 @@ export async function startSlice(
     CHATWOOT_WEBHOOK_BASE_URL: baseUrl,
     PUBLIC_API_ORIGIN: baseUrl,
     STREAM_HEARTBEAT_SECONDS: '1',
+    ...options.env,
   };
   const gw = await startGateway(env, undefined, options.clock ? { clock: options.clock } : {});
   await gw.app.listen(port, '127.0.0.1');
@@ -75,6 +83,7 @@ export async function startSlice(
   await worker.get(OutboxRelay).onApplicationShutdown();
   await worker.get(InboxProcessor).onApplicationShutdown();
   await worker.get(ReconcilerService).onApplicationShutdown();
+  await worker.get(CommerceWorker).onApplicationShutdown();
   const app = createDb(gw.database.app, { max: 2 });
   return {
     gw,

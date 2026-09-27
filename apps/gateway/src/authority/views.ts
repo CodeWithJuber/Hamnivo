@@ -1,4 +1,4 @@
-import type { DeliveryState, Message, Sender, SourcePart } from '@hamnivo/contracts';
+import type { CardPart, DeliveryState, Message, Sender, SourcePart } from '@hamnivo/contracts';
 import { schema, type TenantTx } from '@hamnivo/db';
 import type { OwnerMode } from '@hamnivo/db/schema';
 import type { AuthorityMessage } from '@hamnivo/domain';
@@ -12,6 +12,8 @@ export interface PublicationFacts {
   sources: SourceRef[];
   /** The agent's display name at the time (a role such as "AI assistant"). */
   displayName?: string;
+  /** A card post (`hv1:c:` key): the card as recorded, and the seller shown as its sender. */
+  card?: { part: z.infer<typeof CardPart>; senderName: string };
 }
 
 /**
@@ -26,7 +28,11 @@ export async function publicationFacts(
   messages: Pick<AuthorityMessage, 'ref' | 'key'>[],
 ): Promise<Map<string, PublicationFacts>> {
   const refs = [...new Set(messages.map((m) => Number(m.ref)).filter(Number.isSafeInteger))];
-  const keys = [...new Set(messages.map((m) => m.key).filter((k) => k?.startsWith('hv1:p:')))];
+  const keys = [
+    ...new Set(
+      messages.map((m) => m.key).filter((k) => k?.startsWith('hv1:p:') || k?.startsWith('hv1:c:')),
+    ),
+  ];
   if (refs.length === 0 && keys.length === 0) return new Map();
   const rows = await tx
     .select({
@@ -46,10 +52,19 @@ export async function publicationFacts(
     );
   const found = new Map<string, PublicationFacts>();
   for (const row of rows) {
-    const detail = (row.detail ?? {}) as { sources?: SourceRef[]; displayName?: string };
+    const detail = (row.detail ?? {}) as {
+      sources?: SourceRef[];
+      displayName?: string;
+      kind?: string;
+      part?: z.infer<typeof CardPart>;
+      senderName?: string;
+    };
     const facts: PublicationFacts = {
       sources: detail.sources ?? [],
       ...(detail.displayName ? { displayName: detail.displayName } : {}),
+      ...(detail.kind === 'card' && detail.part
+        ? { card: { part: detail.part, senderName: detail.senderName ?? 'Shop' } }
+        : {}),
     };
     const byKey = messages.find((m) => m.key === row.key);
     const ref = byKey?.ref ?? (row.authorityId === null ? null : String(row.authorityId));
@@ -116,6 +131,22 @@ export function contractMessage(input: {
   const sender = senderOf(input.message);
   if (sender.kind === 'ai_agent' && input.facts?.displayName) {
     sender.displayName = input.facts.displayName;
+  }
+  const card = input.facts?.card;
+  if (card && sender.kind === 'ai_agent') {
+    // A card is a record from the seller, rendered from Hamnivo's copy; its text is the fallback.
+    return {
+      id: input.id,
+      conversationId: input.conversationId,
+      sequence: input.sequence,
+      sender: { kind: 'system', displayName: card.senderName.slice(0, 120) },
+      visibility: 'public',
+      parts: [card.part],
+      createdAt: input.message.createdAt.toISOString(),
+      clientMessageId: input.clientMessageId,
+      delivery: input.delivery,
+      language: null,
+    };
   }
   const text = input.message.text?.trim();
   return {
