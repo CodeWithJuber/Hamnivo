@@ -13,6 +13,8 @@ import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
 import { type Scanner, scannerFromUrl } from './knowledge/scanner.js';
+import { MigrationEngine } from './migration/engine.service.js';
+import { MigrationExporter } from './migration/export.service.js';
 import { OUTBOX_HANDLERS, type OutboxHandler, OutboxRelay } from './outbox/relay.service.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
 import { AgentsService } from './runtime/agents.service.js';
@@ -77,13 +79,23 @@ export class WorkerModule {
         { provide: SCANNER, useValue: overrides.scanner ?? scannerFromUrl(config.CLAMAV_URL) },
         IngestionService,
         RepliesService,
+        MigrationEngine,
+        MigrationExporter,
         {
           provide: OUTBOX_HANDLERS,
-          inject: [AuthoritySyncService, RepliesService, IngestionService],
+          inject: [
+            AuthoritySyncService,
+            RepliesService,
+            IngestionService,
+            MigrationEngine,
+            MigrationExporter,
+          ],
           useFactory: (
             sync: AuthoritySyncService,
             replies: RepliesService,
             ingestion: IngestionService,
+            migration: MigrationEngine,
+            exporter: MigrationExporter,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -92,6 +104,11 @@ export class WorkerModule {
               ['conversation.note', (event) => sync.applyNote(event)],
               ['conversation.customer_message', (event) => replies.onCustomerMessage(event)],
               ['knowledge.ingest', (event) => ingestion.onIngest(event)],
+              ['migration.scan', (event) => migration.onScan(event)],
+              ['migration.dry_run', (event) => migration.onDryRun(event)],
+              ['migration.run', (event) => migration.onRun(event)],
+              ['migration.rollback', (event) => migration.onRollback(event)],
+              ['migration.export', (event) => exporter.onExport(event)],
             ]),
         },
         OutboxRelay,

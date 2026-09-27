@@ -154,9 +154,7 @@ export const migrationFiles = pgTable(
   (t) => [
     unique('migration_files_tenant_id_id_key').on(t.tenantId, t.id),
     index('migration_files_job_idx').on(t.tenantId, t.jobId),
-    index('migration_files_purge_idx')
-      .on(t.purgeAfter)
-      .where(sql`${t.raw} is not null`),
+    index('migration_files_purge_idx').on(t.purgeAfter).where(sql`${t.raw} is not null`),
     foreignKey({
       name: 'migration_files_job_fk',
       columns: [t.tenantId, t.jobId],

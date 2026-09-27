@@ -30,6 +30,8 @@ import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { KnowledgeController } from './knowledge/knowledge.controller.js';
 import { KnowledgeService } from './knowledge/knowledge.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
+import { MigrationController } from './migration/migration.controller.js';
+import { MigrationService } from './migration/migration.service.js';
 import { HealthController } from './platform/health.controller.js';
 import type { Mailer } from './platform/mailer.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
@@ -77,6 +79,7 @@ export class ApiModule {
         KillSwitchesController,
         RunsController,
         KnowledgeController,
+        MigrationController,
       ],
       providers: [
         {
@@ -107,6 +110,7 @@ export class ApiModule {
         EmbeddingFactory,
         RetrievalService,
         KnowledgeService,
+        MigrationService,
         WidgetTokens,
         WidgetSessionsService,
         AuthorityContactsService,

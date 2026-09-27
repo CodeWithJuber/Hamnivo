@@ -12991,6 +12991,13 @@
             "description": "brand identifier (TypeID with prefix \"brd\")",
             "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "import",
+              "export"
+            ]
+          },
           "source": {
             "type": "string",
             "enum": [
@@ -13178,6 +13185,7 @@
           "id",
           "workspaceId",
           "brandId",
+          "kind",
           "source",
           "sourceKind",
           "label",

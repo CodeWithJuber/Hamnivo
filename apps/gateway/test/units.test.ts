@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { InvalidPublicIdError } from '@hamnivo/db';
 import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
+import { isImportEvent } from '../src/authority/ingress.service.js';
 import {
   nextReconcileInterval,
   RECONCILE_MIN_SECONDS,
@@ -150,5 +151,47 @@ describe('reconciler polling', () => {
     expect(reconcileCeiling('open', 'HUMAN_ACTIVE')).toBe(120);
     expect(reconcileCeiling('snoozed', 'HUMAN_ACTIVE')).toBe(600);
     expect(reconcileCeiling('resolved', 'AI_ACTIVE')).toBe(3600);
+  });
+});
+
+describe('webhook intake of imported history', () => {
+  const inboxes = new Set([42]);
+
+  it('drops events about import inboxes, imported conversations and imported contacts', () => {
+    expect(isImportEvent({ event: 'message_created', inbox: { id: 42 } }, inboxes)).toBe(true);
+    expect(
+      isImportEvent(
+        { event: 'message_created', conversation: { inbox_id: 42, custom_attributes: {} } },
+        inboxes,
+      ),
+    ).toBe(true);
+    // Before the intake knows the new import inbox, the conversation's key still gives it away.
+    expect(
+      isImportEvent(
+        {
+          event: 'conversation_status_changed',
+          inbox_id: 7,
+          custom_attributes: { hv_import_key: 'hv1:imp:mig_1:c:conv-1' },
+        },
+        inboxes,
+      ),
+    ).toBe(true);
+    expect(
+      isImportEvent({ event: 'contact_created', identifier: 'hv:imp:mig_1:abc' }, inboxes),
+    ).toBe(true);
+  });
+
+  it('keeps every other event', () => {
+    expect(isImportEvent({ event: 'message_created', inbox: { id: 7 } }, inboxes)).toBe(false);
+    expect(
+      isImportEvent(
+        { event: 'conversation_updated', inbox_id: 7, custom_attributes: { hv_import_key: 'x' } },
+        inboxes,
+      ),
+    ).toBe(false);
+    expect(isImportEvent({ event: 'contact_created', identifier: 'cust_881' }, inboxes)).toBe(
+      false,
+    );
+    expect(isImportEvent(null, inboxes)).toBe(false);
   });
 });

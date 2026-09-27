@@ -66,6 +66,15 @@ const EnvSchema = z.object({
   /** ClamAV daemon for uploads (tcp://host:3310). Without it only the EICAR test file is caught. */
   CLAMAV_URL: z.url().optional(),
 
+  /** Messages per minute written into one conversation while importing (Chatwoot allows 200). */
+  MIGRATION_MESSAGES_PER_MINUTE: z.coerce.number().int().min(1).max(200).default(180),
+  /** One worker pass works on an import for at most this long, then hands over to the next. */
+  MIGRATION_SLICE_SECONDS: z.coerce.number().int().min(1).max(300).default(20),
+  /** …and for at most this many conversations. */
+  MIGRATION_SLICE_CONVERSATIONS: z.coerce.number().int().min(1).max(10_000).default(200),
+  /** Days an uploaded export is kept after its job ends (samples and retries need it). */
+  MIGRATION_EXPORT_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+
   /** The worker rewrites this file after every outbox pass (for container health checks). */
   WORKER_HEARTBEAT_FILE: z.string().min(1).optional(),
 

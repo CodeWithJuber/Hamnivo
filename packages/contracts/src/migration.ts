@@ -225,6 +225,8 @@ export const MigrationJob = z
     id: typeId('migration'),
     workspaceId: typeId('workspace'),
     brandId: typeId('brand'),
+    /** An import into Chatwoot, or an export of the brand's history as a package. */
+    kind: z.enum(['import', 'export']),
     source: MigrationSource,
     sourceKind: z.enum(['file', 'api']),
     label: z.string(),
