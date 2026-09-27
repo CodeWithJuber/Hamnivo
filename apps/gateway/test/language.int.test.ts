@@ -103,7 +103,7 @@ describe('reply language (U01)', () => {
       style: { verbosity: null, tone: null },
     });
 
-    const chosen = await v.call('PUT', '/v1/widget/language', { replyLanguage: 'ur' });
+    const chosen = await v.call('POST', '/v1/widget/language', { replyLanguage: 'ur' });
     expect(chosen.status).toBe(200);
     expect(chosen.body).toMatchObject({ uiLocale: 'ar', replyLanguage: 'ur', source: 'explicit' });
 
@@ -113,7 +113,7 @@ describe('reply language (U01)', () => {
     expect(reply.step).toMatchObject({ language: 'ur', languageSource: 'explicit' });
 
     // The interface locale is separate from the reply language.
-    const locale = await v.call('PUT', '/v1/widget/language', { uiLocale: 'hi' });
+    const locale = await v.call('POST', '/v1/widget/language', { uiLocale: 'hi' });
     expect(locale.body).toMatchObject({ uiLocale: 'hi', replyLanguage: 'ur', source: 'explicit' });
 
     // Preferences keep choices and detected candidates only, never the words.
@@ -161,7 +161,7 @@ describe('reply language (U01)', () => {
     });
 
     // The customer answers: Hinglish. The question is not asked again.
-    const answered = await v.call('PUT', '/v1/widget/language', { replyLanguage: 'hi-Latn' });
+    const answered = await v.call('POST', '/v1/widget/language', { replyLanguage: 'hi-Latn' });
     expect(answered.body).toMatchObject({
       replyLanguage: 'hi-Latn',
       source: 'explicit',
@@ -181,7 +181,7 @@ describe('reply language (U01)', () => {
       suggested: 'hi-Latn',
       alternatives: ['ur-Latn'],
     });
-    const dismissed = await v.call('PUT', '/v1/widget/language', { dismissPrompt: true });
+    const dismissed = await v.call('POST', '/v1/widget/language', { dismissPrompt: true });
     expect(dismissed.body).toMatchObject({ replyLanguage: 'hi-Latn', confirm: null });
     const again = await say(v, AMBIGUOUS, first.conversationId);
     // The language in use is kept, without asking.
@@ -191,12 +191,12 @@ describe('reply language (U01)', () => {
 
   it('refuses unknown languages and requests without a widget session', async () => {
     const v = await visitor();
-    const unknown = await v.call('PUT', '/v1/widget/language', { replyLanguage: 'fr' });
+    const unknown = await v.call('POST', '/v1/widget/language', { replyLanguage: 'fr' });
     expect(unknown.status).toBe(422);
     const anonymous = new Visitor(slice.baseUrl, tenant.brand.widgetId, tenant.hostOrigin);
     expect((await anonymous.call('GET', '/v1/widget/language')).status).toBe(401);
     expect(
-      (await anonymous.call('PUT', '/v1/widget/language', { replyLanguage: 'ur' })).status,
+      (await anonymous.call('POST', '/v1/widget/language', { replyLanguage: 'ur' })).status,
     ).toBe(401);
   });
 });

@@ -81,6 +81,42 @@ describe('sessions', () => {
   });
 });
 
+describe('language', () => {
+  it('reads the settings and saves the customer’s choice', async () => {
+    const saved: unknown[] = [];
+    const state = {
+      uiLocale: 'ur',
+      replyLanguage: 'ur-Latn',
+      source: 'previous',
+      confirm: { suggested: 'ur-Latn', alternatives: ['hi-Latn'] },
+      style: { verbosity: null, tone: null },
+    };
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => HttpResponse.json(session(), { status: 201 })),
+      http.get(`${API}/v1/widget/language`, () => HttpResponse.json(state)),
+      http.post(`${API}/v1/widget/language`, async ({ request }) => {
+        saved.push(await request.json());
+        return HttpResponse.json({
+          ...state,
+          replyLanguage: 'hi-Latn',
+          source: 'explicit',
+          confirm: null,
+        });
+      }),
+    );
+    const c = client();
+    await c.connect();
+    expect((await c.language()).confirm).toEqual({
+      suggested: 'ur-Latn',
+      alternatives: ['hi-Latn'],
+    });
+    const chosen = await c.setLanguage({ replyLanguage: 'hi-Latn' });
+    expect(chosen).toMatchObject({ replyLanguage: 'hi-Latn', confirm: null });
+    await c.setLanguage({ dismissPrompt: true });
+    expect(saved).toEqual([{ replyLanguage: 'hi-Latn' }, { dismissPrompt: true }]);
+  });
+});
+
 describe('identity changes', () => {
   it('are not undone by a token renewal still in flight', async () => {
     let parked: (() => void) | null = null;

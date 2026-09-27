@@ -6284,7 +6284,7 @@
           }
         }
       },
-      "put": {
+      "post": {
         "operationId": "setWidgetLanguage",
         "summary": "Choose a reply language or style, or close the language question",
         "tags": [

@@ -42,3 +42,4 @@ export const SetWidgetLanguageRequest = z
     style: CommunicationStyle.partial().optional(),
   })
   .meta({ id: 'SetWidgetLanguageRequest' });
+export type SetWidgetLanguageRequest = z.input<typeof SetWidgetLanguageRequest>;

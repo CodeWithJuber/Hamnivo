@@ -1,5 +1,5 @@
 import { SetWidgetLanguageRequest } from '@hamnivo/contracts';
-import { Body, Controller, Get, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { parseInput } from '../common/validation.js';
 import type { WidgetClaims } from '../widget/tokens.service.js';
 import { CurrentWidget, WidgetRoute } from '../widget/widget.guard.js';
@@ -16,7 +16,8 @@ export class LanguageController {
     return this.language.state(claims);
   }
 
-  @Put()
+  @Post()
+  @HttpCode(200)
   @WidgetRoute()
   set(@CurrentWidget() claims: WidgetClaims, @Body() body: unknown) {
     return this.language.update(claims, parseInput(SetWidgetLanguageRequest, body));

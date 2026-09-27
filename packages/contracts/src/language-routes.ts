@@ -13,7 +13,8 @@ export const languageRoutes = {
     success: { status: 200, description: 'Language settings', schema: WidgetLanguageState },
   },
   setWidgetLanguage: {
-    method: 'put',
+    // POST: the widget's cross-origin surface allows only GET and POST.
+    method: 'post',
     path: '/v1/widget/language',
     operationId: 'setWidgetLanguage',
     summary: 'Choose a reply language or style, or close the language question',
