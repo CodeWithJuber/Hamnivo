@@ -30,6 +30,33 @@ describe('platform endpoints', () => {
     expect((await client.get('/metrics')).status).toBe(404);
   });
 
+  it('serves Prometheus metrics only with the metrics token', async () => {
+    const token = 'metrics-token-0123456789abcdef';
+    const metrics = await startGateway({ METRICS_TOKEN: token }, gw.database);
+    try {
+      const client = new Client(metrics.app);
+      await client.get('/health/live');
+      const scrape = (authorization?: string) =>
+        metrics.app.inject({
+          method: 'GET',
+          url: '/metrics',
+          headers: authorization ? { authorization } : {},
+        });
+      expect((await scrape()).statusCode).toBe(404);
+      expect((await scrape(`Bearer ${token.slice(0, -1)}x`)).statusCode).toBe(404);
+      expect((await scrape(token)).statusCode).toBe(404);
+      const ok = await scrape(`Bearer ${token}`);
+      expect(ok.statusCode).toBe(200);
+      expect(ok.headers['content-type']).toContain('text/plain');
+      expect(ok.body).toContain('hamnivo_process_cpu_user_seconds_total');
+      expect(ok.body).toMatch(
+        /hamnivo_http_request_duration_seconds_count\{method="GET",route="\/health\/live",status="200"\} [1-9]/,
+      );
+    } finally {
+      await metrics.close();
+    }
+  });
+
   it('renders malformed bodies and unknown routes as problem details too', async () => {
     const client = new Client(gw.app);
     const malformed = await gw.app.inject({

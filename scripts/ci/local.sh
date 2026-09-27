@@ -4,10 +4,11 @@
 #   pnpm ci:local                    everything below
 #   pnpm ci:local --quick            install, lint, typecheck, unit tests, status/licence checks
 #   pnpm ci:local --skip-a11y        skip the Storybook accessibility audit
+#   pnpm ci:local --skip-chatwoot    skip the contract suite against a real Chatwoot
 #   PG_VERSIONS=18 pnpm ci:local     run integration tests on one PostgreSQL major only
 #
-# Integration tests run against throwaway PostgreSQL (+pgvector) and Valkey containers with
-# generated passwords, so your development data is never touched.
+# Integration tests run against throwaway PostgreSQL (+pgvector), Valkey and Chatwoot containers
+# with generated passwords, so your development data is never touched.
 # Needs: Node >= 22.12 (24 recommended), pnpm 10, Docker, openssl.
 # Writes a summary to test-results/ci-local.md.
 set -euo pipefail
@@ -17,18 +18,31 @@ cd "$root"
 
 quick=0
 a11y=1
+chatwoot=1
 for arg in "$@"; do
   case "$arg" in
     --quick) quick=1 ;;
     --skip-a11y) a11y=0 ;;
-    -h | --help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --skip-chatwoot) chatwoot=0 ;;
+    -h | --help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
 
 results=()
 containers=()
-cleanup() { ((${#containers[@]})) && docker rm -f "${containers[@]}" >/dev/null 2>&1 || true; }
+compose_projects=()
+chatwoot_file="$root/deploy/compose/chatwoot.yml"
+remove_chatwoot() {
+  # Interpolation needs the required variables even when tearing down.
+  CHATWOOT_SECRET_KEY_BASE=unused CHATWOOT_DB_PASSWORD=unused \
+    docker compose -p "$1" -f "$chatwoot_file" down --volumes --remove-orphans >/dev/null 2>&1 || true
+}
+cleanup() {
+  ((${#containers[@]})) && docker rm -f "${containers[@]}" >/dev/null 2>&1
+  for project in "${compose_projects[@]}"; do remove_chatwoot "$project"; done
+  true
+}
 trap cleanup EXIT
 
 summary() {
@@ -105,7 +119,8 @@ integration() {
   pg_port="$(docker port "$pg" 5432/tcp | head -1 | awk -F: '{print $NF}')"
   valkey_port="$(docker port "$valkey" 6379/tcp | head -1 | awk -F: '{print $NF}')"
 
-  DATABASE_URL="postgres://hamnivo_app:$app@127.0.0.1:$pg_port/hamnivo" \
+  env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN \
+    DATABASE_URL="postgres://hamnivo_app:$app@127.0.0.1:$pg_port/hamnivo" \
     DATABASE_OWNER_URL="postgres://hamnivo_owner:$owner@127.0.0.1:$pg_port/hamnivo" \
     DATABASE_PLATFORM_URL="postgres://hamnivo_platform:$platform@127.0.0.1:$pg_port/hamnivo" \
     REDIS_URL="redis://127.0.0.1:$valkey_port" \
@@ -113,6 +128,30 @@ integration() {
     pnpm test:int
   local status=$?
   docker rm -f "$pg" >/dev/null 2>&1 || true
+  return "$status"
+}
+
+free_port() {
+  node -e 'const s = require("node:net").createServer().listen(0, "127.0.0.1", () => { console.log(s.address().port); s.close(); })'
+}
+
+chatwoot_contract() {
+  local project="hamnivo-check-chatwoot-$$" port output token status
+  port="$(free_port)" || return 1
+  compose_projects+=("$project")
+  output="$(
+    COMPOSE_PROJECT_NAME="$project" CHATWOOT_BIND=127.0.0.1 CHATWOOT_PORT="$port" \
+      CHATWOOT_URL="http://127.0.0.1:$port" \
+      CHATWOOT_SECRET_KEY_BASE="$(openssl rand -hex 64)" CHATWOOT_DB_PASSWORD="$(openssl rand -hex 16)" \
+      CHATWOOT_ADMIN_EMAIL="admin-$$@hamnivo.invalid" CHATWOOT_ADMIN_PASSWORD="Hv-$(openssl rand -hex 12)-9a!" \
+      bash "$root/scripts/chatwoot/up.sh" --ephemeral
+  )" || return 1
+  token="$(printf '%s\n' "$output" | sed -n 's/^CHATWOOT_PLATFORM_TOKEN=//p' | tail -1)"
+  [[ -n "$token" ]] || return 1
+  CHATWOOT_URL="http://127.0.0.1:$port" CHATWOOT_PLATFORM_TOKEN="$token" \
+    pnpm --filter @hamnivo/chatwoot test:int
+  status=$?
+  remove_chatwoot "$project"
   return "$status"
 }
 
@@ -129,6 +168,9 @@ if ((quick == 0)); then
   for version in ${PG_VERSIONS:-16 18}; do
     step "Integration tests (PostgreSQL $version + Valkey)" integration "$version"
   done
+  if ((chatwoot == 1)); then
+    step "Chatwoot contract suite (real Chatwoot v4.18.0-ce)" chatwoot_contract
+  fi
   if ((a11y == 1)); then
     step "Build brand assets" pnpm --filter @hamnivo/brand build
     step "Build Storybook" pnpm --filter @hamnivo/ui build-storybook

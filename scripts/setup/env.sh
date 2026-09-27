@@ -34,4 +34,13 @@ ensure REDIS_URL "redis://127.0.0.1:$(get HAMNIVO_VALKEY_PORT)"
 ensure HAMNIVO_KEK_BASE64 "$(b64)"
 ensure BETTER_AUTH_SECRET "$(b64)"
 
+# Chatwoot CE (deploy/compose/chatwoot.yml). The Platform App token is added by pnpm chatwoot:up.
+ensure CHATWOOT_PORT 3000
+ensure CHATWOOT_URL "http://127.0.0.1:$(get CHATWOOT_PORT)"
+ensure CHATWOOT_SECRET_KEY_BASE "$(openssl rand -hex 64)"
+ensure CHATWOOT_DB_PASSWORD "$(hex)"
+ensure CHATWOOT_ADMIN_EMAIL "admin@hamnivo.local"
+# Chatwoot requires upper and lower case letters, a digit and a symbol.
+ensure CHATWOOT_ADMIN_PASSWORD "Hv-$(hex)-9a!"
+
 echo "[hamnivo] $file is ready (secrets generated where missing)."

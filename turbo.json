@@ -24,7 +24,10 @@
         "DATABASE_OWNER_URL",
         "DATABASE_PLATFORM_URL",
         "REDIS_URL",
-        "HAMNIVO_*"
+        "HAMNIVO_*",
+        "CHATWOOT_URL",
+        "CHATWOOT_PLATFORM_TOKEN",
+        "CHATWOOT_WEBHOOK_HOST"
       ]
     },
     "test:e2e": {

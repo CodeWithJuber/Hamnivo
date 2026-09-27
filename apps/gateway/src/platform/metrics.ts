@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
+import { collectDefaultMetrics, Histogram, Registry } from '@prometheus-io/client';
 import type { FastifyInstance } from 'fastify';
-import { collectDefaultMetrics, Histogram, Registry } from 'prom-client';
 
 /**
  * Prometheus metrics (O01): process defaults plus request latency by route template and status.

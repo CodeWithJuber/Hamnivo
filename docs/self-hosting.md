@@ -7,18 +7,20 @@ this repository. This guide grows with the product. Each milestone adds its serv
 
 | Part | Status | How |
 |---|---|---|
-| Checks (lint, types, unit, integration on PostgreSQL 16 and 18, accessibility) | ready | `pnpm ci:local` |
+| Checks (lint, types, unit, integration on PostgreSQL 16 and 18, Chatwoot contract, accessibility) | ready | `pnpm ci:local` |
 | Infrastructure (PostgreSQL 18 + pgvector, Valkey) | ready | `pnpm services:up` |
 | Design system (Storybook) | ready | `pnpm --filter @hamnivo/ui storybook` |
 | Database schema, row-level security and audit log | ready | `pnpm db:migrate` |
 | Gateway API (staff sign-in, tenants, members, roles, grants, secrets, audit) and worker | ready | `pnpm api`, `pnpm worker` |
-| Widget, Studio, website, Chatwoot | not yet built | added by later milestones, with a production compose file and TLS proxy |
+| Chatwoot CE v4.18.0 (conversation authority) with the Hamnivo Platform App | ready | `pnpm chatwoot:up` |
+| Widget, Studio, website | not yet built | added by later milestones, with a production compose file and TLS proxy |
 
 ## 1. Server requirements
 
 - **OS:** Ubuntu 24.04 LTS or any recent Linux with Docker. macOS works for development.
-- **Checks and development:** 2 vCPU, 4 GB RAM, 20 GB free disk.
-- **Full stack with Chatwoot, later:** 4 vCPU, 8 GB RAM, 40 GB SSD, and a domain name you control.
+- **Checks and development:** 2 vCPU, 6 GB RAM, 25 GB free disk. The Chatwoot stage of the checks
+  starts a complete Chatwoot (web, background jobs, database) for a few minutes.
+- **Full stack in production, later:** 4 vCPU, 8 GB RAM, 40 GB SSD, and a domain name you control.
 
 ## 2. One-time setup
 
@@ -94,6 +96,40 @@ pnpm worker    # outbox relay and scheduled maintenance, in a second terminal
 - Without `SMTP_URL`, verification and invitation emails are printed to the API log, so you can
   open the links directly. On a server, set `SMTP_URL` (for example `smtps://user:pass@smtp.example.com:465`).
 
+### Start Chatwoot
+
+Chatwoot CE v4.18.0 owns conversations, messages and private notes. Hamnivo talks to it through its
+APIs and signed webhooks (ADR 0001).
+
+```bash
+pnpm chatwoot:up      # first run about 2 minutes; http://127.0.0.1:3000
+pnpm chatwoot:down    # stop; data stays in Docker volumes (add --volumes to delete it)
+```
+
+What `chatwoot:up` does:
+
+1. It starts Chatwoot's own PostgreSQL 16 (with pgvector) and Valkey.
+2. It creates or migrates the Chatwoot schema.
+3. It starts the web and background-job processes.
+4. It creates a super admin and the "Hamnivo" Platform App.
+5. It writes the Platform App token to `.env.local` as `CHATWOOT_PLATFORM_TOKEN`.
+
+The super admin email and password are in `.env.local` (`CHATWOOT_ADMIN_*`). Keep the Platform
+token secret. Anyone holding it can create accounts and users.
+
+Check the connector against your Chatwoot at any time:
+
+```bash
+set -a; . ./.env.local; set +a
+pnpm --filter @hamnivo/chatwoot test:int
+```
+
+This runs the same contract suite the checks use. Each run creates a small test account in the
+Chatwoot you point it at. Chatwoot delivers webhooks to `host.docker.internal`, which is this
+machine. For that reason the development stack allows webhooks to private addresses
+(`CHATWOOT_ALLOW_PRIVATE_WEBHOOKS=true`). In production the gateway has a public HTTPS address, so
+set it to `false` and keep Chatwoot's SSRF protection on.
+
 First steps with the API, before the Studio exists:
 
 ```bash
@@ -108,14 +144,19 @@ curl -b jar -c jar -H 'origin: http://localhost:5173' -H 'content-type: applicat
 ## 5. Run the checks
 
 ```bash
-pnpm ci:local               # everything; about 5–10 minutes
-pnpm ci:local --quick       # lint, typecheck, unit tests, status and licence checks
-pnpm ci:local --skip-a11y   # everything except the Storybook accessibility audit
+pnpm ci:local                   # everything; about 8–12 minutes
+pnpm ci:local --quick           # lint, typecheck, unit tests, status and licence checks
+pnpm ci:local --skip-a11y       # everything except the Storybook accessibility audit
+pnpm ci:local --skip-chatwoot   # everything except the real-Chatwoot contract suite
 PG_VERSIONS=18 pnpm ci:local
 ```
 
-Integration tests run in throwaway PostgreSQL 16/18 and Valkey containers with fresh random
-passwords, so your development data is never touched. The summary is written to
+Integration tests run in throwaway containers with fresh random passwords, so your development data
+is never touched:
+
+- PostgreSQL 16 and 18 with Valkey, for the database and gateway tests.
+- A complete Chatwoot v4.18.0-ce on a random port, for the contract suite. The checks delete it
+  afterwards, volumes included. The summary is written to
 `test-results/ci-local.md`. Paste it into the pull request when you review a change.
 
 To run the quick checks automatically before every `git push`:
@@ -146,10 +187,9 @@ pnpm ci:local
 
 ## Coming with the next milestones
 
-- Gateway and worker (M4). Adds `deploy/compose/hamnivo.yml` with the API, the background worker
-  and Caddy for automatic HTTPS. DNS needs `api.`, `app.` and `chat.` records pointing at the server.
-- Chatwoot CE v4.18.0 (M5). Runs in the same compose project with its own database, plus a
-  bootstrap script for the super admin and the platform token.
+- Production compose file (with the vertical slice, M6). Adds `deploy/compose/hamnivo.yml` with the
+  API, the background worker, Chatwoot and Caddy for automatic HTTPS. DNS needs `api.`, `app.`,
+  `chat.` and `support.` (Chatwoot) records pointing at the server.
 - Widget, Studio and website (M6 onward).
 - Backups and restore drill (ops round). Nightly `pg_dump` for both databases, volume snapshots
   and a scripted restore test.

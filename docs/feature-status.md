@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 219 · in-progress: 11 · implemented: 2
+**Blueprint features (232):** planned: 217 · in-progress: 13 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -80,7 +80,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | A08 | Usage limits | P0 | C | planned |  |
 | A09 | Audit trail | P0 | C | in-progress | `packages/db/src/audit.ts`, `packages/db/src/schema/audit.ts`, `packages/db/migrations/20260926232017_security.sql`, `packages/db/test/audit.int.test.ts`, `apps/gateway/src/audit/audit.controller.ts`, `apps/gateway/test/admin.int.test.ts` — Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection, list/filter/verify API and events for every administrative change; export and Studio views pending. |
 | A10 | Retention and exports | P0 | C | planned |  |
-| A11 | Channel setup | P0 | C | planned |  |
+| A11 | Channel setup | P0 | C | in-progress | `packages/chatwoot/src/provisioning.ts`, `packages/chatwoot/test/contract/suite.ts`, `scripts/chatwoot/up.sh`, `deploy/compose/chatwoot.yml` — Chatwoot connection provisioning (account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed account webhook, Copilot dashboard app) verified against real Chatwoot v4.18.0-ce; health checks, reconnect instructions and the Studio setup screen pending. |
 | A12 | Custom role builder | P1 | C | planned |  |
 | A13 | Enterprise identity | P1 | C | planned |  |
 | A14 | Provisioning and access reviews | P2 | A | planned |  |
@@ -170,7 +170,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| O01 | Metrics and alerts | P0 | C | in-progress | `apps/gateway/src/platform/metrics.ts`, `apps/gateway/src/platform/health.controller.ts`, `apps/gateway/test/identity.int.test.ts` — Prometheus metrics (request latency by route, process metrics) and liveness/readiness checks; alert rules and dashboards pending. |
+| O01 | Metrics and alerts | P0 | C | in-progress | `apps/gateway/src/platform/metrics.ts`, `apps/gateway/src/platform/health.controller.ts`, `apps/gateway/test/identity.int.test.ts` — Prometheus metrics (request latency by route template, process metrics) behind a bearer token (tested: hidden without it, served with it) and liveness/readiness checks; alert rules and dashboards pending. |
 | O02 | Backups and recovery | P0 | C | planned |  |
 | O03 | CI/CD and versioning | P0 | F | in-progress | `scripts/ci/local.sh`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `docs/adr/0007-self-hosted-verification.md` — Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence/status checks, accessibility audit) run with pnpm ci:local; release and rollback automation pending. |
 | O04 | Product analytics | P1 | C | planned |  |
@@ -295,7 +295,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | E03 | Runtime-independent ports | P0 | C | planned |  |
 | E04 | Event and schema compatibility | P0 | F | in-progress | `packages/contracts/src/events.ts`, `packages/contracts/src/parts.ts`, `packages/contracts/fixtures/v1/future-minor-version.json`, `packages/contracts/test/contracts.test.ts`, `docs/contracts/compatibility.md` — Forward-compatible parsing and fixtures in place; client SDK compatibility tests follow with packages/client. |
 | E05 | Plugin permission diffs | P0 | A | planned |  |
-| E06 | Adapter contract fixtures | P0 | C | planned |  |
+| E06 | Adapter contract fixtures | P0 | C | in-progress | `packages/domain/src/authority.ts`, `packages/chatwoot/test/contract/suite.ts`, `packages/chatwoot/test/contract/fake.test.ts`, `packages/chatwoot/test/contract/real.int.test.ts`, `packages/chatwoot/src/fake/server.ts` — One ConversationAuthority contract suite runs on every test run against the fake Chatwoot and, in pnpm ci:local, against a throwaway real Chatwoot v4.18.0-ce; model, Jev, commerce and scanner adapter kits pending. |
 | E07 | Hikmah reuse adapter | P1 | L | planned |  |
 | E08 | Jev contract reconciliation | P0 | C | planned |  |
 | E09 | License and dataset inventory | P0 | F | implemented | `scripts/licenses/inventory.ts`, `docs/licenses.md`, `scripts/ci/local.sh` — Inventory generated from the lockfile; the local check pipeline fails on a stale inventory or unreviewed licences. |

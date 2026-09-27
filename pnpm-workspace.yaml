@@ -22,3 +22,9 @@ catalog:
   vitest: 5.0.2
   zod: 4.6.5
   "@types/node": 24.19.0
+
+# openapi-typescript 7.13 (latest) still declares TypeScript 5; its generator runs unchanged on
+# TypeScript 6 and `pnpm --filter @hamnivo/chatwoot test` fails if the output drifts.
+peerDependencyRules:
+  allowedVersions:
+    openapi-typescript>typescript: "6"
