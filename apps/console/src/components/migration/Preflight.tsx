@@ -23,6 +23,7 @@ const CHECK_CODES = [
   'integrations',
   'authority_unreachable',
   'source_mismatch',
+  'source_access',
 ] as const;
 type CheckCode = (typeof CHECK_CODES)[number];
 
@@ -44,6 +45,11 @@ const LIMITS = [
   'tawk_no_notes',
   'tawk_unverified_email',
   'package_links_only',
+  'chatwoot_snapshot_cap',
+  'chatwoot_agent_scope',
+  'chatwoot_activity',
+  'chatwoot_unverified_contacts',
+  'chatwoot_token_once',
 ] as const;
 
 /** A readiness check in plain words (M01): what is ready, or what to change in Chatwoot. */

@@ -208,6 +208,8 @@ export function parseTawkExport(files: Map<string, Uint8Array>): ParsedSource {
         : null,
     truncated,
     files: jsonFiles,
+    // Chat IDs are UUIDs, unique across tawk.to properties.
+    origin: { system: 'tawk.to', account: null },
   };
 }
 

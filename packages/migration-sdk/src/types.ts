@@ -129,6 +129,11 @@ export interface ParsedSource {
   truncated: boolean;
   /** Files read from the export. */
   files: number;
+  /**
+   * Where the records come from, as the export says (a package's `manifest.source`). Source IDs
+   * are unique only within it, so deduplication across imports is scoped to it.
+   */
+  origin: { system: string; account: string | null } | null;
 }
 
 export interface FileSourceAdapter {

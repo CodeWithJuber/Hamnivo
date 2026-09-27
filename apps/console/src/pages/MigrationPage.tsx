@@ -58,6 +58,12 @@ const REJECTIONS = [
   'unsafe_path',
   'not_utf8',
   'empty',
+  'source_denied',
+  'source_unreachable',
+  'private_address',
+  'insecure_url',
+  'invalid_url',
+  'unresolved',
 ] as const;
 
 function JobList({ onOpen, onStart }: { onOpen: (id: string) => void; onStart?: () => void }) {
@@ -287,8 +293,16 @@ function StepContent({ job, onNewImport }: { job: MigrationJob; onNewImport?: ()
             aria-hidden="true"
           />
           <div className="flex flex-col gap-0.5">
-            <p className="font-medium text-text">{t('migration.scanning.title')}</p>
-            <p className="text-sm text-text-secondary">{t('migration.scanning.description')}</p>
+            <p className="font-medium text-text">
+              {job.sourceKind === 'api'
+                ? t('migration.scanning.apiTitle')
+                : t('migration.scanning.title')}
+            </p>
+            <p className="text-sm text-text-secondary">
+              {job.sourceKind === 'api'
+                ? t('migration.scanning.apiDescription')
+                : t('migration.scanning.description')}
+            </p>
           </div>
         </div>
       );

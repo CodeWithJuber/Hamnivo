@@ -28,6 +28,12 @@ export interface ChatwootImportOptions {
   fetch?: typeof fetch;
 }
 
+/** Who the token belongs to in the account: what reading a source can see depends on it. */
+export interface ChatwootTokenAccess {
+  /** `administrator`, `agent`, or null when the token has no access to the account. */
+  role: string | null;
+}
+
 export interface ImportInboxSettings {
   webhookUrl: string | null;
   agentBot: boolean;
@@ -453,7 +459,16 @@ export class ChatwootImporter {
   }
 
   /** One page of the account's conversations (25 per page), optionally of one inbox. */
-  async listConversations(options: { page: number; inboxId?: number }): Promise<{
+  /**
+   * One page (25) of the account's conversations in every status. `oldestFirst` pages by creation
+   * time, so conversations started while a source is being read land on later pages instead of
+   * shifting the ones already read.
+   */
+  async listConversations(options: {
+    page: number;
+    inboxId?: number;
+    oldestFirst?: boolean;
+  }): Promise<{
     conversations: ChatwootConversationInfo[];
     total: number;
   }> {
@@ -463,6 +478,7 @@ export class ChatwootImporter {
           status: 'all',
           page: options.page,
           ...(options.inboxId ? { inbox_id: options.inboxId } : {}),
+          ...(options.oldestFirst ? { sort_by: 'created_at_asc' } : {}),
         }),
       ).data,
     );
@@ -471,6 +487,35 @@ export class ChatwootImporter {
       conversations: list(result.payload).map(conversationInfo),
       total: Number(meta.all_count ?? 0),
     };
+  }
+
+  /**
+   * The token's role in the account (`GET /api/v1/profile`). Only the role is read: the profile
+   * also carries the user's own access token, which is dropped here.
+   */
+  async access(): Promise<ChatwootTokenAccess> {
+    const url = new URL('/api/v1/profile', this.options.baseUrl);
+    let response: Response;
+    try {
+      response = await this.fetcher(url, {
+        headers: { api_access_token: this.options.token, accept: 'application/json' },
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+      });
+    } catch (error) {
+      throw new ChatwootError('profile', 0, error instanceof Error ? error.message : String(error));
+    }
+    const text = await response.text();
+    if (!response.ok) throw new ChatwootError('profile', response.status, null);
+    let profile: unknown = null;
+    try {
+      profile = JSON.parse(text);
+    } catch {
+      profile = null;
+    }
+    const account = list(obj(profile).accounts)
+      .map(obj)
+      .find((a) => Number(a.id) === this.options.accountId);
+    return { role: typeof account?.role === 'string' ? account.role : null };
   }
 
   /**

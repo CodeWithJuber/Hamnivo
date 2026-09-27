@@ -1,3 +1,4 @@
+export * from './adapters/chatwoot.js';
 export * from './adapters/tawk.js';
 export * from './checkpoint.js';
 export * from './fields.js';

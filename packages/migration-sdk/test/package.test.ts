@@ -103,6 +103,8 @@ describe('Hamnivo package', () => {
     expect(parsed.issues).toEqual([]);
     expect(parsed.truncated).toBe(false);
     expect(parsed.schemaVersion).toBe('v1');
+    // Source IDs are unique within the system the manifest names.
+    expect(parsed.origin).toEqual({ system: 'acme-desk', account: null });
     expect(parsed.contacts).toEqual([contact]);
     const [only] = parsed.conversations;
     expect(only?.record).toEqual(conversation);

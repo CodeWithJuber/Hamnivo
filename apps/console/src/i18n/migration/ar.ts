@@ -75,6 +75,7 @@ export const migrationAr: MigrationTranslation = {
     sourceHints: {
       'tawk.to': 'ملفات ZIP أو JSON من «تصدير المحادثات» في tawk.to.',
       hamnivo: 'حزمة مُصدَّرة من Hamnivo أو مُعدّة بصيغة Hamnivo.',
+      chatwoot: 'حساب Chatwoot آخر، يُقرأ برمز وصول أحد مستخدميه.',
     },
     file: 'ملف التصدير',
     fileHint: 'ZIP أو JSON أو NDJSON، حتى 20 ميغابايت. يُفحص بحثًا عن البرمجيات الضارة قبل قراءته.',
@@ -82,6 +83,22 @@ export const migrationAr: MigrationTranslation = {
     fileRequired: 'اختر ملف التصدير.',
     fileType: 'اختر ملف ZIP أو JSON أو NDJSON.',
     fileTooLarge: 'حجم هذا الملف {{size}}. الحد الأقصى لملف التصدير 20 ميغابايت.',
+    chatwoot: {
+      url: 'عنوان Chatwoot',
+      urlHint: 'مثلًا https://chat.example.com',
+      urlRequired: 'أدخل عنوان Chatwoot الذي تستورد منه.',
+      account: 'معرّف الحساب',
+      accountHint: 'الرقم بعد ‎/accounts/‎ في شريط عنوان Chatwoot ذاك.',
+      accountInvalid: 'أدخل رقم الحساب.',
+      token: 'رمز الوصول',
+      tokenHint:
+        'من إعدادات الملف الشخصي في Chatwoot ذاك. رمز المسؤول يقرأ كل الصناديق. يُستخدم مرة واحدة ثم يُحذف.',
+      tokenRequired: 'أدخل رمز الوصول.',
+      inboxes: 'معرّفات الصناديق',
+      inboxesHint: 'هذه الصناديق فقط، مفصولة بفواصل. اتركه فارغًا للكل.',
+      inboxesInvalid: 'استخدم أرقام الصناديق مفصولة بفواصل.',
+      submit: 'اتصل وافحص',
+    },
     privacy:
       'لا يرى الملف إلا من يدير عمليات الاستيراد لهذه العلامة التجارية. يُحذف بعد الموافقة على الاستيراد أو حذفه.',
     submit: 'رفع وفحص',
@@ -89,6 +106,7 @@ export const migrationAr: MigrationTranslation = {
   },
   file: {
     uploaded: 'رُفع {{time}} · {{size}}',
+    read: 'قُرئ {{time}} · {{size}}',
     into: 'إلى {{brand}}',
     purged: 'حُذف الملف نفسه. تبقى الأعداد والتقارير.',
     change: 'رفع ملف آخر',
@@ -96,6 +114,9 @@ export const migrationAr: MigrationTranslation = {
   scanning: {
     title: 'جارٍ فحص الملف',
     description: 'نفحصه بحثًا عن البرمجيات الضارة ونقرؤه. لم يُستورد شيء بعد.',
+    apiTitle: 'جارٍ القراءة من Chatwoot',
+    apiDescription:
+      'نقرأ المحادثات والملفات، ثم نفحصها بحثًا عن البرمجيات الضارة. لم يُستورد شيء بعد.',
   },
   rejected: {
     title: 'لا يمكن استيراد هذا الملف',
@@ -109,6 +130,13 @@ export const migrationAr: MigrationTranslation = {
       too_many_files: 'يحتوي الأرشيف على ملفات كثيرة جدًا. قسّم التصدير إلى ملفات أصغر.',
       unsafe_path: 'يحتوي الأرشيف على اسم ملف غير آمن.',
       not_utf8: 'الملف ليس نصًا بترميز UTF-8.',
+      source_denied:
+        'لا يستطيع الرمز قراءة هذا الحساب. تحقّق من معرّف الحساب، واستخدم رمز أحد مسؤوليه.',
+      source_unreachable: 'تعذّر الوصول إلى Chatwoot ذاك. تحقّق من العنوان وحاول مرة أخرى.',
+      private_address: 'هذا العنوان داخل شبكة خاصة لا يصل إليها الاستيراد.',
+      insecure_url: 'يجب أن يبدأ العنوان بـ https://.',
+      invalid_url: 'هذا العنوان غير صالح.',
+      unresolved: 'تعذّر العثور على هذا العنوان.',
       empty: 'الملف فارغ.',
       other: 'تعذّرت قراءة الملف.',
     },
@@ -162,6 +190,10 @@ export const migrationAr: MigrationTranslation = {
           ok: 'يمكن الوصول إلى Chatwoot.',
           blocked: 'تعذّر الوصول إلى Chatwoot الآن. حاول مرة أخرى بعد بضع دقائق.',
         },
+        source_access: {
+          ok: 'يستطيع الرمز قراءة كل صناديق الحساب.',
+          blocked: 'الرمز ليس لمسؤول: تُقرأ الصناديق التي يراها فقط.',
+        },
         source_mismatch: {
           ok: 'الملف يطابق المصدر الذي اخترته.',
           blocked: 'الملف لا يطابق المصدر الذي اخترته.',
@@ -213,6 +245,14 @@ export const migrationAr: MigrationTranslation = {
         'contact.unverified_email': 'البريد الإلكتروني، يُحفظ كغير موثّق',
         'contact.unverified_phone': 'الهاتف، يُحفظ كغير موثّق',
         'contact.location': 'الموقع',
+        'conversation.status': 'الحالة',
+        'conversation.labels': 'الوسوم',
+        'conversation.assignee': 'المسؤول عنها',
+        'conversation.team': 'الفريق',
+        'message.visibility': 'خاصة أو عامة',
+        'attachment.file': 'الملف',
+        'contact.attribute': 'تفصيل الشخص',
+        'contact.identifier': 'المعرّف',
       },
     },
     missing: {
@@ -233,6 +273,14 @@ export const migrationAr: MigrationTranslation = {
         tawk_no_notes: 'لا تحتوي ملفات تصدير tawk.to على ملاحظات داخلية.',
         tawk_unverified_email:
           'كتب الزوار عناوين البريد الإلكتروني بأنفسهم. تُحفظ للرجوع إليها ولا تُستخدم أبدًا لمطابقة الأشخاص.',
+        chatwoot_snapshot_cap:
+          'يقرأ الاستيراد الواحد عددًا محددًا من المحادثات، الأقدم أولًا. شغّله مرة أخرى للمتابعة: لا تُقرأ المحادثات المستوردة مرتين.',
+        chatwoot_agent_scope: 'رمز الموظف يقرأ صناديق ذلك الموظف فقط.',
+        chatwoot_activity: 'لا تُستورد رسائل النشاط (تغيّر الحالة، الإسناد).',
+        chatwoot_unverified_contacts:
+          'تُحفظ عناوين البريد وأرقام الهاتف كغير موثّقة، ولا يُطابَق بها الأشخاص أبدًا.',
+        chatwoot_token_once:
+          'يُستخدم الرمز مرة واحدة لقراءة الحساب ثم يُحذف من Hamnivo. ألغِه في Chatwoot بعد ذلك.',
         package_links_only: 'لا تُستورد الملفات المذكورة كروابط فقط.',
       },
     },

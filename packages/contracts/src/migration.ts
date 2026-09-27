@@ -50,19 +50,40 @@ export const MigrationSourceInfo = z
   .meta({ id: 'MigrationSourceInfo' });
 export type MigrationSourceInfo = z.infer<typeof MigrationSourceInfo>;
 
+/** An uploaded export (tawk.to files or a Hamnivo package). */
+const FileMigration = z.object({
+  brandId: typeId('brand'),
+  source: z.enum(['tawk.to', 'hamnivo']),
+  file: z.object({
+    name: z.string().trim().min(1).max(200),
+    base64: z
+      .string()
+      .min(4)
+      .max(Math.ceil((MIGRATION_MAX_BYTES * 4) / 3) + 4),
+  }),
+});
+
+/**
+ * Another Chatwoot account, read with an access token of one of its users (M04). The token goes
+ * to the secret broker only, is used once to read the account and is never returned.
+ */
+const ChatwootMigration = z.object({
+  brandId: typeId('brand'),
+  source: z.literal('chatwoot'),
+  connection: z.object({
+    /** The Chatwoot address, for example https://chat.example.com. */
+    baseUrl: z.url().max(500),
+    accountId: z.int().positive(),
+    apiToken: z.string().trim().min(8).max(200),
+    /** Only these inboxes; every inbox the token can see when absent. */
+    inboxIds: z.array(z.int().positive()).max(50).optional(),
+  }),
+});
+
 export const CreateMigrationRequest = z
-  .object({
-    brandId: typeId('brand'),
-    source: z.enum(['tawk.to', 'hamnivo']),
-    file: z.object({
-      name: z.string().trim().min(1).max(200),
-      base64: z
-        .string()
-        .min(4)
-        .max(Math.ceil((MIGRATION_MAX_BYTES * 4) / 3) + 4),
-    }),
-  })
+  .union([FileMigration, ChatwootMigration])
   .meta({ id: 'CreateMigrationRequest' });
+export type CreateMigrationRequest = z.infer<typeof CreateMigrationRequest>;
 
 const IssueExample = z.object({
   kind: z.enum(['contact', 'conversation', 'message', 'attachment']).optional(),

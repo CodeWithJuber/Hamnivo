@@ -20,10 +20,26 @@ import {
 import { useBrandRefs } from '../../lib/names';
 import { useStudioMutation } from '../../lib/queries';
 import { AppDialog, DialogFooter } from '../AppDialog';
-import { ChoiceField, describedBy, SelectField } from '../Fields';
+import { ChoiceField, describedBy, SelectField, TextField } from '../Fields';
 import { ActionError } from '../States';
 
-/** Step 1 (HNV-18-01): the brand to import into, where the export comes from, and the file. */
+type NewSource = ImportSource | 'chatwoot';
+
+const isNewSource = (system: string): system is NewSource =>
+  system === 'tawk.to' || system === 'hamnivo' || system === 'chatwoot';
+
+type CreateBody =
+  | { brandId: string; source: ImportSource; file: { name: string; base64: string } }
+  | {
+      brandId: string;
+      source: 'chatwoot';
+      connection: { baseUrl: string; accountId: number; apiToken: string; inboxIds?: number[] };
+    };
+
+/**
+ * Step 1 (HNV-18-01): the brand to import into and the source: an export file (tawk.to or a
+ * Hamnivo package), or another Chatwoot account read with an access token (M04).
+ */
 export function NewImportDialog({
   open,
   onOpenChange,
@@ -38,8 +54,12 @@ export function NewImportDialog({
   const brands = useBrandRefs();
   const sources = useMigrationSources();
   const [brandId, setBrandId] = useState('');
-  const [source, setSource] = useState<ImportSource>('tawk.to');
+  const [source, setSource] = useState<NewSource>('tawk.to');
   const [file, setFile] = useState<File | null>(null);
+  const [url, setUrl] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [token, setToken] = useState('');
+  const [inboxes, setInboxes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [attempted, setAttempted] = useState(false);
   const [reading, setReading] = useState(false);
@@ -51,16 +71,17 @@ export function NewImportDialog({
     setBrandId('');
     setSource('tawk.to');
     setFile(null);
+    setUrl('');
+    setAccountId('');
+    setToken('');
+    setInboxes('');
     setErrors({});
     setAttempted(false);
     setIdempotencyKey(newIdempotencyKey());
   }, [open]);
 
   const create = useStudioMutation(
-    (
-      body: { brandId: string; source: ImportSource; file: { name: string; base64: string } },
-      tenant,
-    ) =>
+    (body: CreateBody, tenant) =>
       api<MigrationJob>('/v1/admin/migrations', { method: 'POST', body, tenant, idempotencyKey }),
     [migrationKeys.all],
   );
@@ -75,30 +96,62 @@ export function NewImportDialog({
   };
 
   const chosenBrand = brandId || (activeBrands.length === 1 ? (activeBrands[0]?.id ?? '') : '');
+  const inboxIds = inboxes
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setAttempted(true);
     const next: Record<string, string> = {};
     if (!chosenBrand) next.brand = t('migration.upload.brandRequired');
-    const problem = fileError(file);
-    if (problem) next.file = problem;
-    setErrors(next);
-    if (Object.keys(next).length > 0 || !file) return;
-    let base64: string;
-    setReading(true);
-    try {
-      base64 = await readBase64(file);
-    } finally {
-      setReading(false);
+    if (source === 'chatwoot') {
+      if (!/^https?:\/\/\S+$/i.test(url.trim()))
+        next.url = t('migration.upload.chatwoot.urlRequired');
+      if (!/^\d{1,10}$/.test(accountId.trim()) || Number(accountId) < 1) {
+        next.account = t('migration.upload.chatwoot.accountInvalid');
+      }
+      if (token.trim().length < 8) next.token = t('migration.upload.chatwoot.tokenRequired');
+      if (inboxIds.some((id) => !/^\d{1,10}$/.test(id) || Number(id) < 1)) {
+        next.inboxes = t('migration.upload.chatwoot.inboxesInvalid');
+      }
+    } else {
+      const problem = fileError(file);
+      if (problem) next.file = problem;
     }
-    try {
-      const job = await create.mutateAsync({
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+    let body: CreateBody;
+    if (source === 'chatwoot') {
+      body = {
         brandId: chosenBrand,
         source,
-        file: { name: file.name, base64 },
-      });
-      announce(t('migration.upload.uploaded', { name: file.name }));
+        connection: {
+          baseUrl: url.trim(),
+          accountId: Number(accountId),
+          apiToken: token.trim(),
+          ...(inboxIds.length > 0 ? { inboxIds: inboxIds.map(Number) } : {}),
+        },
+      };
+    } else {
+      if (!file) return;
+      setReading(true);
+      try {
+        body = {
+          brandId: chosenBrand,
+          source,
+          file: { name: file.name, base64: await readBase64(file) },
+        };
+      } finally {
+        setReading(false);
+      }
+    }
+    try {
+      const job = await create.mutateAsync(body);
+      // The token never stays in the page once it was sent.
+      setToken('');
+      announce(t('migration.upload.uploaded', { name: job.label }));
       onCreated(job);
       onOpenChange(false);
     } catch {
@@ -110,20 +163,18 @@ export function NewImportDialog({
     ? Object.entries(errors).map(([field, message]) => ({ fieldId: `import-${field}`, message }))
     : [];
   const busy = reading || create.isPending;
-  const isImportSource = (system: string): system is ImportSource =>
-    system === 'tawk.to' || system === 'hamnivo';
-  // The sources this server can import from (both until the list has loaded).
+  // The sources this server can import from (all three until the list has loaded).
   const systems = (sources.data?.items ?? [])
     .filter((s) => s.available)
     .map((s) => s.system)
-    .filter(isImportSource);
-  const choices = (systems.length > 0 ? systems : (['tawk.to', 'hamnivo'] as const)).map(
-    (system) => ({
-      value: system,
-      label: t(`migration.sources.${system}`),
-      hint: t(`migration.upload.sourceHints.${system}`),
-    }),
-  );
+    .filter(isNewSource);
+  const choices = (
+    systems.length > 0 ? systems : (['tawk.to', 'hamnivo', 'chatwoot'] as const)
+  ).map((system) => ({
+    value: system,
+    label: t(`migration.sources.${system}`),
+    hint: t(`migration.upload.sourceHints.${system}`),
+  }));
 
   return (
     <AppDialog
@@ -156,37 +207,95 @@ export function NewImportDialog({
           id="import-source"
           legend={t('migration.upload.source')}
           value={source}
-          onValueChange={(value) => setSource(value as ImportSource)}
+          onValueChange={(value) => {
+            setSource(value as NewSource);
+            setErrors({});
+          }}
           choices={choices}
         />
-        <Field data-invalid={errors.file ? true : undefined} className="gap-2">
-          <FieldLabel htmlFor="import-file">{t('migration.upload.file')}</FieldLabel>
-          <Input
-            id="import-file"
-            type="file"
-            accept={ACCEPTED_EXPORTS}
-            aria-invalid={errors.file ? true : undefined}
-            aria-describedby={describedBy('import-file', true, errors.file)}
-            onChange={(event) => {
-              const chosen = event.target.files?.[0] ?? null;
-              setFile(chosen);
-              // Say at once if the file can't be sent, before anything is uploaded.
-              if (chosen) {
-                const problem = fileError(chosen);
-                setErrors((current) => {
-                  const { file: _removed, ...rest } = current;
-                  return problem ? { ...rest, file: problem } : rest;
-                });
-              }
-            }}
-          />
-          <FieldDescription id="import-file-hint">
-            {file && !errors.file
-              ? t('migration.upload.fileChosen', { name: file.name, size: formatBytes(file.size) })
-              : t('migration.upload.fileHint')}
-          </FieldDescription>
-          {errors.file ? <FieldError id="import-file-error">{errors.file}</FieldError> : null}
-        </Field>
+        {source === 'chatwoot' ? (
+          <div className="flex flex-col gap-4" data-testid="chatwoot-source">
+            <TextField
+              id="import-url"
+              label={t('migration.upload.chatwoot.url')}
+              hint={t('migration.upload.chatwoot.urlHint')}
+              type="url"
+              dir="ltr"
+              autoComplete="off"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              error={errors.url}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                id="import-account"
+                label={t('migration.upload.chatwoot.account')}
+                hint={t('migration.upload.chatwoot.accountHint')}
+                inputMode="numeric"
+                dir="ltr"
+                autoComplete="off"
+                value={accountId}
+                onChange={(event) => setAccountId(event.target.value)}
+                error={errors.account}
+              />
+              <TextField
+                id="import-inboxes"
+                label={t('migration.upload.chatwoot.inboxes')}
+                hint={t('migration.upload.chatwoot.inboxesHint')}
+                labelNote={t('app.optional')}
+                dir="ltr"
+                autoComplete="off"
+                value={inboxes}
+                onChange={(event) => setInboxes(event.target.value)}
+                error={errors.inboxes}
+              />
+            </div>
+            <TextField
+              id="import-token"
+              label={t('migration.upload.chatwoot.token')}
+              hint={t('migration.upload.chatwoot.tokenHint')}
+              type="password"
+              dir="ltr"
+              autoComplete="off"
+              spellCheck={false}
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
+              error={errors.token}
+            />
+          </div>
+        ) : (
+          <Field data-invalid={errors.file ? true : undefined} className="gap-2">
+            <FieldLabel htmlFor="import-file">{t('migration.upload.file')}</FieldLabel>
+            <Input
+              id="import-file"
+              type="file"
+              accept={ACCEPTED_EXPORTS}
+              aria-invalid={errors.file ? true : undefined}
+              aria-describedby={describedBy('import-file', true, errors.file)}
+              onChange={(event) => {
+                const chosen = event.target.files?.[0] ?? null;
+                setFile(chosen);
+                // Say at once if the file can't be sent, before anything is uploaded.
+                if (chosen) {
+                  const problem = fileError(chosen);
+                  setErrors((current) => {
+                    const { file: _removed, ...rest } = current;
+                    return problem ? { ...rest, file: problem } : rest;
+                  });
+                }
+              }}
+            />
+            <FieldDescription id="import-file-hint">
+              {file && !errors.file
+                ? t('migration.upload.fileChosen', {
+                    name: file.name,
+                    size: formatBytes(file.size),
+                  })
+                : t('migration.upload.fileHint')}
+            </FieldDescription>
+            {errors.file ? <FieldError id="import-file-error">{errors.file}</FieldError> : null}
+          </Field>
+        )}
         <p className="text-sm text-text-secondary">{t('migration.upload.privacy')}</p>
         <ActionError error={create.error} />
         <DialogFooter>
@@ -199,7 +308,9 @@ export function NewImportDialog({
             {t('app.cancel')}
           </Button>
           <Button type="submit" busy={busy}>
-            {t('migration.upload.submit')}
+            {source === 'chatwoot'
+              ? t('migration.upload.chatwoot.submit')
+              : t('migration.upload.submit')}
           </Button>
         </DialogFooter>
       </form>

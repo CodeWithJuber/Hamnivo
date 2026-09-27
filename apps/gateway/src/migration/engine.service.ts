@@ -1,4 +1,5 @@
-import { ChatwootError, type ChatwootImporter } from '@hamnivo/chatwoot';
+import { createHash } from 'node:crypto';
+import { ChatwootError, ChatwootImporter } from '@hamnivo/chatwoot';
 import {
   appendAudit,
   type ClaimedOutboxEvent,
@@ -10,6 +11,7 @@ import {
 } from '@hamnivo/db';
 import {
   type ContactRecord,
+  chatwootDescriptor,
   classifyStatus,
   dryRun,
   type ItemTally,
@@ -29,7 +31,7 @@ import {
   type Reason,
   reconcile,
   type SampleVerification,
-  type SourceSystem,
+  writePackage,
 } from '@hamnivo/migration-sdk';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
@@ -39,14 +41,18 @@ import type { AppConfig } from '../config.js';
 import { SCANNER } from '../knowledge/ingestion.service.js';
 import type { Scanner } from '../knowledge/scanner.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
+import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
+import { readChatwootHistory } from './chatwoot-source.js';
 import {
   brandConnectionId,
   destinationChecks,
   importerFor,
   importInboxOf,
   readUpload,
+  uploadFormat,
 } from './destination.js';
+import { checkSourceUrl, guardedFetch, SourceUrlError } from './source-guard.js';
 import type { Checkpoint, ItemRow, JobRow, JobStats } from './views.js';
 
 /** Outbox attempts while the scanner is unreachable before an upload is refused. */
@@ -58,6 +64,15 @@ const LEASE_MS = 120_000;
 const ATTACHMENT_MAX_BYTES = 40 * 1024 * 1024;
 const SAMPLE_SIZE = 5;
 const ACTOR = 'migration-worker';
+/** Largest snapshot of an API source (it is stored like an upload until the job is closed). */
+const SNAPSHOT_MAX_BYTES = 200 * 1024 * 1024;
+
+/** Where an API source is read from (migration_jobs.source_config); the token is a secret. */
+export interface ApiSourceConfig {
+  baseUrl: string;
+  accountId: number;
+  inboxIds?: number[];
+}
 
 /** A Chatwoot answer that may change on a later attempt (outage, timeout, rate limit). */
 class Transient extends Error {
@@ -89,6 +104,8 @@ interface Context {
   importer: ChatwootImporter;
   connectionId: string;
   importInboxId: number;
+  /** Source IDs are unique only within their origin: mappings are keyed by both. */
+  namespace: string;
   pacerSeeded: Set<string>;
   /** When this pass hands over to the next one (epoch ms). */
   deadline: number;
@@ -115,6 +132,7 @@ export class MigrationEngine {
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(SCANNER) private readonly scanner: Scanner,
     private readonly registry: AuthorityRegistry,
+    private readonly secrets: SecretBroker,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -191,7 +209,20 @@ export class MigrationEngine {
   private async openUpload(tenantId: string, job: JobRow) {
     const file = await this.exportFile(tenantId, job.id);
     if (!file?.raw) throw new PackageError('empty', 'The uploaded export is no longer available.');
-    return readUpload(file, file.raw, job.sourceSystem as SourceSystem);
+    return readUpload(file, file.raw, uploadFormat(job));
+  }
+
+  /** Source IDs are unique only within their origin (a package's source, an API account). */
+  private namespaceOf(job: JobRow, parsed: ParsedSource | null): string {
+    if (job.sourceKind === 'api') {
+      const config = job.sourceConfig as Partial<ApiSourceConfig>;
+      return `${config.baseUrl ?? ''}#${config.accountId ?? ''}`;
+    }
+    return parsed?.origin ? `${parsed.origin.system}#${parsed.origin.account ?? ''}` : '';
+  }
+
+  private mapKey(namespace: string, sourceId: string): string {
+    return namespace ? `${namespace}|${sourceId}` : sourceId;
   }
 
   // ------------------------------------------------------------------ scan and preflight
@@ -199,9 +230,15 @@ export class MigrationEngine {
   async onScan(event: ClaimedOutboxEvent): Promise<void> {
     const { jobId } = event.payload as { jobId: string };
     const tenantId = event.tenantId;
-    const job = await this.job(tenantId, jobId);
-    const file = job?.state === 'scanning' ? await this.exportFile(tenantId, jobId) : null;
-    if (!job || !file?.raw) return;
+    let job = await this.job(tenantId, jobId);
+    if (job?.state !== 'scanning') return;
+    if (job.sourceKind === 'api' && !(await this.exportFile(tenantId, jobId))) {
+      // An API source is read once into a package, which is then checked like an upload.
+      if (!(await this.snapshotSource(tenantId, job, event.attempts))) return;
+      job = (await this.job(tenantId, jobId)) ?? job;
+    }
+    const file = await this.exportFile(tenantId, jobId);
+    if (!file?.raw) return;
 
     const verdict = await this.scanner.scan(file.raw);
     if (!verdict.clean) {
@@ -214,7 +251,7 @@ export class MigrationEngine {
     }
     let opened: ReturnType<typeof readUpload>;
     try {
-      opened = readUpload(file, file.raw, job.sourceSystem as SourceSystem);
+      opened = readUpload(file, file.raw, uploadFormat(job));
     } catch (error) {
       if (!(error instanceof PackageError)) throw error;
       await this.reject(tenantId, job, file.id, error.code, verdict.engine, error.message);
@@ -233,7 +270,9 @@ export class MigrationEngine {
           preflight: report,
           updatedAt: this.clock(),
         })
-        .where(eq(schema.migrationJobs.id, job.id));
+        .where(
+          and(eq(schema.migrationJobs.id, job.id), eq(schema.migrationJobs.state, 'scanning')),
+        );
       await this.audit(tx, job, 'migration.checked', {
         blocking: report.blocking,
         conversations: report.counts.conversations,
@@ -275,9 +314,196 @@ export class MigrationEngine {
     });
   }
 
+  /**
+   * Reads another Chatwoot account (M04) with the token staff gave, oldest conversations first,
+   * skipping those an earlier import of the same account already brought in, and stores what it
+   * read as a package. The token is used for this only: it is revoked in Hamnivo afterwards.
+   * Returns false when the job was refused (it then says why).
+   */
+  private async snapshotSource(tenantId: string, job: JobRow, attempts: number): Promise<boolean> {
+    const config = job.sourceConfig as ApiSourceConfig;
+    const leased = await this.acquire(tenantId, job.id, ['scanning']);
+    // Another worker is reading this source: try again once its lease has passed.
+    if (!leased) throw new Transient('The source is being read by another worker');
+    const allowPrivate = this.config.MIGRATION_SOURCE_ALLOW_PRIVATE;
+    try {
+      const token = job.sourceSecretId
+        ? await this.tx(tenantId, (tx) =>
+            this.secrets.reveal(tx, tenantId, job.sourceSecretId as string).catch(() => null),
+          )
+        : null;
+      if (!token) {
+        await this.refuse(tenantId, job, 'source_denied');
+        return false;
+      }
+      try {
+        await checkSourceUrl(config.baseUrl, allowPrivate);
+      } catch (error) {
+        if (!(error instanceof SourceUrlError)) throw error;
+        await this.refuse(tenantId, job, error.code);
+        return false;
+      }
+      const source = new ChatwootImporter({
+        baseUrl: config.baseUrl,
+        accountId: config.accountId,
+        token,
+        timeoutMs: this.config.CHATWOOT_TIMEOUT_MS,
+        fetch: guardedFetch(allowPrivate),
+      });
+      const namespace = this.namespaceOf(job, null);
+      const known = await this.tx(tenantId, async (tx) => {
+        const connectionId = await brandConnectionId(tx, job.brandId);
+        if (!connectionId) return new Set<number>();
+        const rows = await tx
+          .select({ sourceId: schema.externalIdMappings.sourceId })
+          .from(schema.externalIdMappings)
+          .where(
+            and(
+              eq(schema.externalIdMappings.connectionId, connectionId),
+              eq(schema.externalIdMappings.sourceSystem, job.sourceSystem),
+              eq(schema.externalIdMappings.kind, 'conversation'),
+              sql`starts_with(${schema.externalIdMappings.sourceId}, ${`${namespace}|conversation:`})`,
+            ),
+          );
+        return new Set(rows.map((r) => Number(r.sourceId.split('|conversation:')[1])));
+      });
+      let renewedAt = this.clock().getTime();
+      let role: string | null;
+      let history: Awaited<ReturnType<typeof readChatwootHistory>>;
+      try {
+        role = (await source.access()).role;
+        if (!role) {
+          await this.refuse(tenantId, job, 'source_denied');
+          return false;
+        }
+        history = await readChatwootHistory(source, {
+          inboxIds: config.inboxIds ?? [],
+          system: 'chatwoot',
+          maxConversations: this.config.MIGRATION_SOURCE_MAX_CONVERSATIONS,
+          maxAttachmentBytes: ATTACHMENT_MAX_BYTES,
+          oldestFirst: true,
+          skip: (id) => known.has(id),
+          onConversation: async () => {
+            const now = this.clock().getTime();
+            if (now - renewedAt < LEASE_MS / 3) return;
+            renewedAt = now;
+            await this.update(tenantId, job.id, { leaseUntil: new Date(now + LEASE_MS) });
+          },
+        });
+      } catch (error) {
+        if (!(error instanceof ChatwootError)) throw error;
+        if (error.status === 401 || error.status === 403 || error.status === 404) {
+          await this.refuse(tenantId, job, 'source_denied', `HTTP ${error.status}`);
+          return false;
+        }
+        if (classifyStatus(error.status) !== 'permanent' && attempts < SCAN_ATTEMPTS) throw error;
+        await this.refuse(tenantId, job, 'source_unreachable', `HTTP ${error.status}`);
+        return false;
+      }
+      const now = this.clock();
+      const missing = history.attachments.filter((a) => !a.bytes).length;
+      const bytes = writePackage({
+        source: {
+          system: 'chatwoot',
+          account: `${new URL(config.baseUrl).host}#${config.accountId}`,
+          exportedAt: now.toISOString(),
+        },
+        generator: { name: 'Hamnivo', version: '1' },
+        contacts: history.contacts,
+        conversations: history.conversations,
+        messages: history.messages,
+        attachments: history.attachments,
+        createdAt: now,
+        complete: !history.truncated && missing === 0,
+        notes: [
+          ...(history.truncated
+            ? [`Read ${history.conversations.length} conversations; the account has more.`]
+            : []),
+          ...(missing > 0 ? [`${missing} files could not be downloaded.`] : []),
+        ],
+      });
+      if (bytes.byteLength > SNAPSHOT_MAX_BYTES) {
+        await this.refuse(tenantId, job, 'too_large');
+        return false;
+      }
+      await this.tx(tenantId, async (tx) => {
+        await tx.insert(schema.migrationFiles).values({
+          tenantId,
+          jobId: job.id,
+          purpose: 'export',
+          name: `chatwoot-${new URL(config.baseUrl).hostname}-${config.accountId}.zip`,
+          mediaType: 'application/zip',
+          byteSize: bytes.byteLength,
+          sha256: createHash('sha256').update(bytes).digest(),
+          raw: Buffer.from(bytes),
+          createdBy: job.createdBy,
+        });
+        await tx
+          .update(schema.migrationJobs)
+          .set({
+            stats: {
+              ...(job.stats as JobStats),
+              sourceRole: role,
+              sourceSkipped: history.skipped,
+              sourceTruncated: history.truncated,
+            },
+            updatedAt: now,
+          })
+          .where(eq(schema.migrationJobs.id, job.id));
+        await this.revokeSource(tx, job);
+        await this.audit(tx, job, 'migration.source_read', {
+          conversations: history.conversations.length,
+          messages: history.messages.length,
+          skipped: history.skipped,
+          truncated: history.truncated,
+          role,
+        });
+      });
+      return true;
+    } finally {
+      await this.update(tenantId, job.id, { leaseUntil: null });
+    }
+  }
+
+  /** The source token is needed once: after reading (or refusing) it is revoked in Hamnivo. */
+  private async revokeSource(tx: TenantTx, job: JobRow) {
+    if (!job.sourceSecretId) return;
+    await tx
+      .update(schema.secrets)
+      .set({ revokedAt: this.clock() })
+      .where(and(eq(schema.secrets.id, job.sourceSecretId), isNull(schema.secrets.revokedAt)));
+  }
+
+  /** Refuses an API source before anything was read (bad address, token, or no access). */
+  private async refuse(tenantId: string, job: JobRow, code: string, detail?: string) {
+    await this.tx(tenantId, async (tx) => {
+      await tx
+        .update(schema.migrationJobs)
+        .set({
+          state: 'rejected',
+          errorCode: code,
+          errorDetail: detail ?? null,
+          finishedAt: this.clock(),
+          updatedAt: this.clock(),
+        })
+        .where(eq(schema.migrationJobs.id, job.id));
+      await this.revokeSource(tx, job);
+      await this.audit(tx, job, 'migration.rejected', { reason: code });
+    });
+  }
+
   /** The export's preflight (M01) with the destination checks, without message content. */
   async preflightReport(tenantId: string, job: JobRow, opened: ReturnType<typeof readUpload>) {
-    const source = preflight(opened.parsed, opened.adapter.descriptor);
+    const api = job.sourceKind === 'api';
+    const descriptor = api
+      ? {
+          ...opened.adapter.descriptor,
+          system: 'chatwoot' as const,
+          limits: chatwootDescriptor.limits,
+        }
+      : opened.adapter.descriptor;
+    const source = preflight(opened.parsed, descriptor);
+    if (api) source.source.system = 'chatwoot';
     const destination = await this.tx(tenantId, async (tx) => {
       const connectionId = await brandConnectionId(tx, job.brandId);
       return {
@@ -294,6 +520,15 @@ export class MigrationEngine {
     }
     if (opened.detected)
       checks.push({ code: 'source_mismatch', status: 'blocked', detail: opened.detected });
+    if (api) {
+      // A token of an agent reads only that agent's inboxes.
+      const role = (job.stats as JobStats).sourceRole ?? null;
+      checks.push({
+        code: 'source_access',
+        status: role === 'administrator' ? 'ok' : 'warning',
+        ...(role ? { detail: role } : {}),
+      });
+    }
     return {
       ...source,
       detected: opened.detected,
@@ -344,7 +579,11 @@ export class MigrationEngine {
     job: JobRow,
     parsed: ParsedSource,
   ): Promise<Set<string>> {
-    const ids = parsed.conversations.map((c) => c.record.id);
+    const namespace = this.namespaceOf(job, parsed);
+    const byKey = new Map(
+      parsed.conversations.map((c) => [this.mapKey(namespace, c.record.id), c.record.id]),
+    );
+    const ids = [...byKey.keys()];
     const found = new Set<string>();
     for (let i = 0; i < ids.length; i += 1000) {
       const rows = await tx
@@ -361,7 +600,10 @@ export class MigrationEngine {
             inArray(schema.externalIdMappings.sourceId, ids.slice(i, i + 1000)),
           ),
         );
-      for (const row of rows) if (row.jobId !== job.id) found.add(row.sourceId);
+      for (const row of rows) {
+        const id = byKey.get(row.sourceId);
+        if (row.jobId !== job.id && id !== undefined) found.add(id);
+      }
     }
     return found;
   }
@@ -459,6 +701,7 @@ export class MigrationEngine {
       importer,
       connectionId,
       importInboxId,
+      namespace: this.namespaceOf(job, parsed),
       pacerSeeded: new Set(),
       deadline: started + this.config.MIGRATION_SLICE_SECONDS * 1000,
       leaseRenewedAt: this.clock().getTime(),
@@ -550,6 +793,7 @@ export class MigrationEngine {
         importer: runtime ? importerFor(runtime, this.config) : (null as never),
         connectionId: connectionId ?? '',
         importInboxId: 0,
+        namespace: this.namespaceOf(job, parsed),
         pacerSeeded: new Set(),
         deadline: 0,
         leaseRenewedAt: 0,
@@ -773,9 +1017,10 @@ export class MigrationEngine {
     if (!['pending', 'writing'].includes(item.status)) return null;
     const contact = ctx.parsed.contacts.find((c) => c.id === contactSourceId);
     if (!contact) return null;
+    // A verified person is the same person whichever export they come from.
     const key = contact.verified
       ? `verified:${contact.verified.issuer ?? ''}:${contact.verified.subject}`
-      : contactSourceId;
+      : this.mapKey(ctx.namespace, contactSourceId);
 
     // The same person imported by an earlier job (by source ID or verified identity) is reused.
     const [mapping] = await this.tx(tenantId, (tx) =>
@@ -872,6 +1117,7 @@ export class MigrationEngine {
   ): Promise<number | null> {
     const { tenantId, job } = ctx;
     const sourceId = conversation.record.id;
+    const mapped = this.mapKey(ctx.namespace, sourceId);
     if (item.targetRef) return Number(item.targetRef);
     const reserved = await this.tx(tenantId, async (tx) => {
       await tx
@@ -882,7 +1128,7 @@ export class MigrationEngine {
           brandId: job.brandId,
           sourceSystem: job.sourceSystem,
           kind: 'conversation',
-          sourceId,
+          sourceId: mapped,
           targetRef: 'pending',
           jobId: job.id,
         })
@@ -895,7 +1141,7 @@ export class MigrationEngine {
             eq(schema.externalIdMappings.connectionId, ctx.connectionId),
             eq(schema.externalIdMappings.sourceSystem, job.sourceSystem),
             eq(schema.externalIdMappings.kind, 'conversation'),
-            eq(schema.externalIdMappings.sourceId, sourceId),
+            eq(schema.externalIdMappings.sourceId, mapped),
           ),
         );
       return row;
@@ -944,7 +1190,7 @@ export class MigrationEngine {
               and(
                 eq(schema.externalIdMappings.jobId, job.id),
                 eq(schema.externalIdMappings.kind, 'conversation'),
-                eq(schema.externalIdMappings.sourceId, sourceId),
+                eq(schema.externalIdMappings.sourceId, mapped),
               ),
             ),
         );
@@ -964,7 +1210,7 @@ export class MigrationEngine {
           and(
             eq(schema.externalIdMappings.jobId, job.id),
             eq(schema.externalIdMappings.kind, 'conversation'),
-            eq(schema.externalIdMappings.sourceId, sourceId),
+            eq(schema.externalIdMappings.sourceId, mapped),
           ),
         ),
     );

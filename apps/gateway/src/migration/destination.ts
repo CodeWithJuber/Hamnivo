@@ -122,6 +122,11 @@ export async function destinationChecks(
   return checks;
 }
 
+/** How a job's stored export is read: an API source is stored as a Hamnivo package. */
+export function uploadFormat(job: { sourceKind: string; sourceSystem: string }): SourceSystem {
+  return (job.sourceKind === 'api' ? 'hamnivo' : job.sourceSystem) as SourceSystem;
+}
+
 const parsed = new Map<string, OpenedSource>();
 
 /** Reads an uploaded export, keeping the last few parses in memory (a job reads it per pass). */

@@ -22,23 +22,24 @@ import {
   withTenant,
 } from '@hamnivo/db';
 import {
+  chatwootDescriptor,
   importMessageKey,
   isZip,
   PackageError,
   packageDescriptor,
   redact,
-  type SourceSystem,
   tawkDescriptor,
 } from '@hamnivo/migration-sdk';
 import { authorize, type Permission, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gt, inArray, isNotNull, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { AuthorityRegistry } from '../authority/registry.js';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { enforce } from '../identity/staff.guard.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
+import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import {
   brandConnectionId,
@@ -46,7 +47,10 @@ import {
   importerFor,
   importInboxOf,
   readUpload,
+  uploadFormat,
 } from './destination.js';
+import type { ApiSourceConfig } from './engine.service.js';
+import { checkSourceUrl, SourceUrlError } from './source-guard.js';
 import {
   type Checkpoint,
   itemView,
@@ -90,6 +94,7 @@ export class MigrationService {
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly registry: AuthorityRegistry,
+    private readonly secrets: SecretBroker,
   ) {}
 
   private tx<T>(principal: StaffPrincipal, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -170,6 +175,7 @@ export class MigrationService {
     return [
       { ...tawkDescriptor, available: true },
       { ...packageDescriptor, available: true },
+      { ...chatwootDescriptor, available: true },
     ].map((d) => ({
       system: d.system,
       accepts: d.accepts,
@@ -204,11 +210,12 @@ export class MigrationService {
     );
   }
 
-  /** Stores the upload in quarantine and queues the scan and preflight. */
+  /** Stores the upload in quarantine (or the source's token in the secret broker), then checks. */
   async create(
     principal: StaffPrincipal,
     input: z.output<typeof CreateMigrationRequest>,
   ): Promise<MigrationJob> {
+    if (input.source === 'chatwoot') return this.createFromChatwoot(principal, input);
     const bytes = Buffer.from(input.file.base64, 'base64');
     if (bytes.byteLength === 0) {
       throw new AppError('VALIDATION_FAILED', { detail: 'The file is empty.' });
@@ -254,6 +261,72 @@ export class MigrationService {
         source: input.source,
         file: name,
         bytes: bytes.byteLength,
+        brandId: input.brandId,
+      });
+      return this.view(tx, job);
+    });
+  }
+
+  /**
+   * An import from another Chatwoot account (M04). The address is checked now (https, public) and
+   * again on every connection; the token goes to the secret broker and nowhere else.
+   */
+  private async createFromChatwoot(
+    principal: StaffPrincipal,
+    input: Extract<z.output<typeof CreateMigrationRequest>, { source: 'chatwoot' }>,
+  ): Promise<MigrationJob> {
+    let origin: URL;
+    try {
+      origin = await checkSourceUrl(
+        input.connection.baseUrl,
+        this.config.MIGRATION_SOURCE_ALLOW_PRIVATE,
+      );
+    } catch (error) {
+      if (!(error instanceof SourceUrlError)) throw error;
+      throw new AppError('VALIDATION_FAILED', {
+        detail: error.message,
+        fields: [{ path: 'connection.baseUrl', message: error.code }],
+      });
+    }
+    const brandId = fromPublicId('brand', input.brandId);
+    const config: ApiSourceConfig = {
+      baseUrl: origin.origin,
+      accountId: input.connection.accountId,
+      ...(input.connection.inboxIds?.length ? { inboxIds: input.connection.inboxIds } : {}),
+    };
+    return this.tx(principal, async (tx) => {
+      const [brand] = await tx.select().from(schema.brands).where(eq(schema.brands.id, brandId));
+      if (!brand) throw new AppError('NOT_FOUND', { detail: 'Brand not found.' });
+      enforce(
+        this.allowed(principal, 'migration.run', { workspaceId: brand.workspaceId, brandId }),
+      );
+      const secretId = await this.secrets.storeIn(tx, principal.tenantId, {
+        kind: 'migration_source',
+        label: `Chatwoot import · ${origin.host} · account ${config.accountId}`,
+        value: input.connection.apiToken,
+      });
+      const [job] = await tx
+        .insert(schema.migrationJobs)
+        .values({
+          tenantId: principal.tenantId,
+          workspaceId: brand.workspaceId,
+          brandId,
+          sourceSystem: 'chatwoot',
+          sourceKind: 'api',
+          label: `Chatwoot · ${origin.host} · #${config.accountId}`,
+          state: 'scanning',
+          sourceConfig: config,
+          sourceSecretId: secretId,
+          createdBy: principal.staffMemberId,
+        })
+        .returning();
+      if (!job) throw new Error('job insert returned nothing');
+      await this.queue(tx, job, 'migration.scan');
+      await this.audit(tx, principal, 'migration.created', job, {
+        source: 'chatwoot',
+        host: origin.host,
+        accountId: config.accountId,
+        inboxes: config.inboxIds?.length ?? 0,
         brandId: input.brandId,
       });
       return this.view(tx, job);
@@ -402,10 +475,13 @@ export class MigrationService {
       principal,
       publicId,
       'migration.run',
-      ['queued', 'running', 'paused', 'failed', 'ready', 'dry_run_ready', 'blocked'],
+      ['scanning', 'queued', 'running', 'paused', 'failed', 'ready', 'dry_run_ready', 'blocked'],
       async (tx, job) => {
-        if (['ready', 'dry_run_ready', 'blocked'].includes(job.state) || !job.connectionId) {
-          // Nothing was imported yet: the job simply ends.
+        if (
+          ['scanning', 'ready', 'dry_run_ready', 'blocked'].includes(job.state) ||
+          !job.connectionId
+        ) {
+          // Nothing was imported yet: the job simply ends, and its file and token go.
           await tx
             .update(schema.migrationJobs)
             .set({ state: 'cancelled', finishedAt: this.clock(), updatedAt: this.clock() })
@@ -414,6 +490,14 @@ export class MigrationService {
             .update(schema.migrationFiles)
             .set({ purgeAfter: this.clock() })
             .where(eq(schema.migrationFiles.jobId, job.id));
+          if (job.sourceSecretId) {
+            await tx
+              .update(schema.secrets)
+              .set({ revokedAt: this.clock() })
+              .where(
+                and(eq(schema.secrets.id, job.sourceSecretId), isNull(schema.secrets.revokedAt)),
+              );
+          }
           return 'migration.cancelled';
         }
         await tx
@@ -719,7 +803,7 @@ export class MigrationService {
     }
     let parsed: ReturnType<typeof readUpload>['parsed'];
     try {
-      parsed = readUpload(file, file.raw, job.sourceSystem as SourceSystem).parsed;
+      parsed = readUpload(file, file.raw, uploadFormat(job)).parsed;
     } catch (error) {
       if (error instanceof PackageError) throw new AppError('NOT_FOUND');
       throw error;

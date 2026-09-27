@@ -77,6 +77,7 @@ export const migrationHi: MigrationTranslation = {
     sourceHints: {
       'tawk.to': 'tawk.to में “Export chats” से मिली ZIP या JSON फ़ाइलें।',
       hamnivo: 'Hamnivo से निर्यात किया गया या Hamnivo फ़ॉर्मेट में बना पैकेज।',
+      chatwoot: 'दूसरा Chatwoot खाता, उसके किसी उपयोगकर्ता के एक्सेस टोकन से पढ़ा जाता है।',
     },
     file: 'एक्सपोर्ट फ़ाइल',
     fileHint: 'ZIP, JSON या NDJSON, 20 MB तक। पढ़ने से पहले इसमें मैलवेयर की जाँच होती है।',
@@ -84,6 +85,22 @@ export const migrationHi: MigrationTranslation = {
     fileRequired: 'एक्सपोर्ट फ़ाइल चुनें।',
     fileType: 'ZIP, JSON या NDJSON फ़ाइल चुनें।',
     fileTooLarge: 'यह फ़ाइल {{size}} की है। एक्सपोर्ट 20 MB तक हो सकता है।',
+    chatwoot: {
+      url: 'Chatwoot का पता',
+      urlHint: 'उदाहरण: https://chat.example.com',
+      urlRequired: 'जिस Chatwoot से आयात करना है उसका पता लिखें।',
+      account: 'खाता ID',
+      accountHint: 'उस Chatwoot के पता बार में /accounts/ के बाद वाली संख्या।',
+      accountInvalid: 'खाता संख्या लिखें।',
+      token: 'एक्सेस टोकन',
+      tokenHint:
+        'उस Chatwoot की प्रोफ़ाइल सेटिंग से। एडमिन का टोकन हर इनबॉक्स पढ़ता है। यह एक बार इस्तेमाल होता है, फिर मिटा दिया जाता है।',
+      tokenRequired: 'एक्सेस टोकन लिखें।',
+      inboxes: 'इनबॉक्स ID',
+      inboxesHint: 'सिर्फ़ ये इनबॉक्स, कॉमा से अलग। सभी के लिए ख़ाली छोड़ें।',
+      inboxesInvalid: 'कॉमा से अलग इनबॉक्स संख्याएँ लिखें।',
+      submit: 'जोड़ें और जाँचें',
+    },
     privacy:
       'इस ब्रांड के आयात संभालने वाले लोग ही फ़ाइल देख सकते हैं। आयात मंज़ूर होने या हटाए जाने पर फ़ाइल मिटा दी जाती है।',
     submit: 'अपलोड करें और जाँचें',
@@ -91,6 +108,7 @@ export const migrationHi: MigrationTranslation = {
   },
   file: {
     uploaded: '{{time}} को अपलोड · {{size}}',
+    read: '{{time}} को पढ़ा · {{size}}',
     into: '{{brand}} में',
     purged: 'फ़ाइल मिटा दी गई। गिनती और रिपोर्ट बनी रहती हैं।',
     change: 'दूसरी फ़ाइल अपलोड करें',
@@ -98,6 +116,8 @@ export const migrationHi: MigrationTranslation = {
   scanning: {
     title: 'फ़ाइल जाँची जा रही है',
     description: 'हम इसमें मैलवेयर की जाँच करते हैं और इसे पढ़ते हैं। अभी कुछ आयात नहीं हुआ।',
+    apiTitle: 'Chatwoot से पढ़ा जा रहा है',
+    apiDescription: 'हम बातचीत और फ़ाइलें पढ़ते हैं, फिर उनमें मैलवेयर की जाँच करते हैं। अभी कुछ आयात नहीं हुआ।',
   },
   rejected: {
     title: 'यह फ़ाइल आयात नहीं हो सकती',
@@ -111,6 +131,12 @@ export const migrationHi: MigrationTranslation = {
       too_many_files: 'आर्काइव में बहुत ज़्यादा फ़ाइलें हैं। एक्सपोर्ट को छोटी फ़ाइलों में बाँटें।',
       unsafe_path: 'आर्काइव में एक फ़ाइल का नाम सुरक्षित नहीं है।',
       not_utf8: 'फ़ाइल UTF-8 टेक्स्ट नहीं है।',
+      source_denied: 'टोकन यह खाता नहीं पढ़ सकता। खाता ID जाँचें, और उसके किसी एडमिन का टोकन इस्तेमाल करें।',
+      source_unreachable: 'उस Chatwoot तक नहीं पहुँचा जा सका। पता जाँचें और फिर कोशिश करें।',
+      private_address: 'यह पता एक निजी नेटवर्क के अंदर है, जहाँ आयात नहीं पहुँच सकता।',
+      insecure_url: 'पता https:// से शुरू होना चाहिए।',
+      invalid_url: 'यह पता मान्य नहीं है।',
+      unresolved: 'यह पता नहीं मिला।',
       empty: 'फ़ाइल ख़ाली है।',
       other: 'फ़ाइल पढ़ी नहीं जा सकी।',
     },
@@ -162,6 +188,10 @@ export const migrationHi: MigrationTranslation = {
         authority_unreachable: {
           ok: 'Chatwoot तक पहुँचा जा सकता है।',
           blocked: 'अभी Chatwoot तक नहीं पहुँचा जा सकता। कुछ मिनट बाद फिर कोशिश करें।',
+        },
+        source_access: {
+          ok: 'टोकन खाते का हर इनबॉक्स पढ़ सकता है।',
+          blocked: 'टोकन किसी एडमिन का नहीं है: सिर्फ़ वही इनबॉक्स पढ़े जाते हैं जो उसे दिखते हैं।',
         },
         source_mismatch: {
           ok: 'फ़ाइल आपके चुने स्रोत से मेल खाती है।',
@@ -215,6 +245,14 @@ export const migrationHi: MigrationTranslation = {
         'contact.unverified_email': 'ईमेल, असत्यापित के रूप में रखा जाता है',
         'contact.unverified_phone': 'फ़ोन, असत्यापित के रूप में रखा जाता है',
         'contact.location': 'स्थान',
+        'conversation.status': 'स्थिति',
+        'conversation.labels': 'लेबल',
+        'conversation.assignee': 'ज़िम्मेदार व्यक्ति',
+        'conversation.team': 'टीम',
+        'message.visibility': 'निजी या सार्वजनिक',
+        'attachment.file': 'फ़ाइल',
+        'contact.attribute': 'व्यक्ति की जानकारी',
+        'contact.identifier': 'पहचानकर्ता',
       },
     },
     missing: {
@@ -235,6 +273,14 @@ export const migrationHi: MigrationTranslation = {
         tawk_no_notes: 'tawk.to के एक्सपोर्ट में आंतरिक नोट नहीं होते।',
         tawk_unverified_email:
           'ईमेल विज़िटर ने ख़ुद लिखे थे। इन्हें संदर्भ के लिए रखा जाता है, लोगों को मिलाने के लिए कभी नहीं।',
+        chatwoot_snapshot_cap:
+          'एक आयात तय संख्या में बातचीत पढ़ता है, सबसे पुरानी पहले। आगे बढ़ने के लिए इसे फिर चलाएँ: आयात हो चुकी बातचीत दोबारा नहीं पढ़ी जाती।',
+        chatwoot_agent_scope: 'एजेंट का टोकन सिर्फ़ उसी एजेंट के इनबॉक्स पढ़ता है।',
+        chatwoot_activity: 'गतिविधि संदेश (स्थिति बदलना, असाइनमेंट) आयात नहीं होते।',
+        chatwoot_unverified_contacts:
+          'ईमेल और फ़ोन नंबर असत्यापित के रूप में रखे जाते हैं; लोगों को इनसे कभी नहीं मिलाया जाता।',
+        chatwoot_token_once:
+          'टोकन खाता पढ़ने के लिए एक बार इस्तेमाल होता है, फिर Hamnivo से मिटा दिया जाता है। बाद में इसे Chatwoot में रद्द करें।',
         package_links_only: 'सिर्फ़ लिंक के रूप में दी गई फ़ाइलें आयात नहीं होतीं।',
       },
     },

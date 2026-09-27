@@ -80,6 +80,7 @@ export const migrationEn = {
     sourceHints: {
       'tawk.to': 'The ZIP or JSON files from “Export chats” in tawk.to.',
       hamnivo: 'A package exported from Hamnivo, or made in the Hamnivo format.',
+      chatwoot: 'Another Chatwoot account, read with an access token of one of its users.',
     },
     file: 'Export file',
     fileHint: 'ZIP, JSON or NDJSON, up to 20 MB. It is checked for malware before it is read.',
@@ -87,6 +88,22 @@ export const migrationEn = {
     fileRequired: 'Choose the export file.',
     fileType: 'Choose a ZIP, JSON or NDJSON file.',
     fileTooLarge: 'This file is {{size}}. Exports can be up to 20 MB.',
+    chatwoot: {
+      url: 'Chatwoot address',
+      urlHint: 'For example https://chat.example.com',
+      urlRequired: 'Enter the address of the Chatwoot to import from.',
+      account: 'Account ID',
+      accountHint: 'The number after /accounts/ in that Chatwoot’s address bar.',
+      accountInvalid: 'Enter the account number.',
+      token: 'Access token',
+      tokenHint:
+        'From Profile settings in that Chatwoot. An administrator’s token reads every inbox. It is used once, then deleted.',
+      tokenRequired: 'Enter the access token.',
+      inboxes: 'Inbox IDs',
+      inboxesHint: 'Only these inboxes, separated by commas. Leave empty for all.',
+      inboxesInvalid: 'Use inbox numbers separated by commas.',
+      submit: 'Connect and check',
+    },
     privacy:
       'Only people who manage imports for this brand can see the file. It is deleted once the import is approved or removed.',
     submit: 'Upload and check',
@@ -94,6 +111,7 @@ export const migrationEn = {
   },
   file: {
     uploaded: 'Uploaded {{time}} · {{size}}',
+    read: 'Read {{time}} · {{size}}',
     into: 'Into {{brand}}',
     purged: 'The file itself was deleted. Counts and reports stay.',
     change: 'Upload another file',
@@ -101,6 +119,9 @@ export const migrationEn = {
   scanning: {
     title: 'Checking the file',
     description: 'We scan it for malware and read it. Nothing is imported yet.',
+    apiTitle: 'Reading from Chatwoot',
+    apiDescription:
+      'We read the conversations and files, then scan them for malware. Nothing is imported yet.',
   },
   rejected: {
     title: 'This file can’t be imported',
@@ -115,6 +136,13 @@ export const migrationEn = {
       too_many_files: 'The archive holds too many files. Split the export into smaller files.',
       unsafe_path: 'The archive contains a file name that is not safe.',
       not_utf8: 'The file is not UTF-8 text.',
+      source_denied:
+        'The token can’t read this account. Check the account ID, and use the token of one of its administrators.',
+      source_unreachable: 'That Chatwoot could not be reached. Check the address and try again.',
+      private_address: 'That address is inside a private network, which imports can’t reach.',
+      insecure_url: 'The address must start with https://.',
+      invalid_url: 'That address is not valid.',
+      unresolved: 'That address could not be found.',
       empty: 'The file is empty.',
       other: 'The file could not be read.',
     },
@@ -168,6 +196,10 @@ export const migrationEn = {
           ok: 'Chatwoot can be reached.',
           blocked: 'Chatwoot can’t be reached right now. Try again in a few minutes.',
         },
+        source_access: {
+          ok: 'The token can read every inbox of the account.',
+          blocked: 'The token is not an administrator’s: only the inboxes it can see are read.',
+        },
         source_mismatch: {
           ok: 'The file matches the source you chose.',
           blocked: 'The file does not match the source you chose.',
@@ -220,6 +252,14 @@ export const migrationEn = {
         'contact.unverified_email': 'Email, kept as not verified',
         'contact.unverified_phone': 'Phone, kept as not verified',
         'contact.location': 'Location',
+        'conversation.status': 'Status',
+        'conversation.labels': 'Labels',
+        'conversation.assignee': 'Assignee',
+        'conversation.team': 'Team',
+        'message.visibility': 'Private or public',
+        'attachment.file': 'File',
+        'contact.attribute': 'Person detail',
+        'contact.identifier': 'Identifier',
       },
     },
     missing: {
@@ -240,6 +280,14 @@ export const migrationEn = {
         tawk_no_notes: 'tawk.to exports have no internal notes.',
         tawk_unverified_email:
           'Emails were typed in by visitors. They are kept for reference and never used to match people.',
+        chatwoot_snapshot_cap:
+          'One import reads a set number of conversations, oldest first. Run it again to continue: conversations already imported are not read twice.',
+        chatwoot_agent_scope: 'An agent’s token reads only that agent’s inboxes.',
+        chatwoot_activity: 'Activity messages (status changes, assignments) are not imported.',
+        chatwoot_unverified_contacts:
+          'Emails and phone numbers are kept as not verified; people are never matched by them.',
+        chatwoot_token_once:
+          'The token is used once to read the account, then deleted from Hamnivo. Revoke it in Chatwoot afterwards.',
         package_links_only: 'Files listed only as links are not imported.',
       },
     },

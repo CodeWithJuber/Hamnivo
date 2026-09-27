@@ -13,6 +13,7 @@ import { toProblem } from '../src/common/problem.filter.js';
 import { requestIdFrom } from '../src/common/request-id.js';
 import { loadConfig } from '../src/config.js';
 import { deterministicUuid } from '../src/identity/tenants.service.js';
+import { checkSourceUrl, guardedFetch, isPublicAddress } from '../src/migration/source-guard.js';
 import { retryDelayMs } from '../src/outbox/relay.service.js';
 import { hintOf, type KeyRing, open, rewrap, seal, secretAad } from '../src/secrets/envelope.js';
 
@@ -193,5 +194,58 @@ describe('webhook intake of imported history', () => {
       false,
     );
     expect(isImportEvent(null, inboxes)).toBe(false);
+  });
+});
+
+describe('source addresses of imports (M04)', () => {
+  it('tells public addresses from internal ones, IPv4 and IPv6', () => {
+    for (const address of ['93.184.215.14', '8.8.8.8', '2606:4700:4700::1111']) {
+      expect(isPublicAddress(address), address).toBe(true);
+    }
+    for (const address of [
+      '127.0.0.1',
+      '10.1.2.3',
+      '172.16.0.1',
+      '192.168.1.1',
+      '169.254.169.254',
+      '100.64.0.1',
+      '0.0.0.0',
+      '224.0.0.1',
+      '::1',
+      '::',
+      'fc00::1',
+      'fe80::1',
+      '::ffff:10.0.0.1',
+      '::ffff:127.0.0.1',
+      '64:ff9b::a00:1',
+      'not-an-address',
+    ]) {
+      expect(isPublicAddress(address), address).toBe(false);
+    }
+  });
+
+  it('accepts only https URLs without credentials that point outside the network', async () => {
+    await expect(checkSourceUrl('https://93.184.215.14/app/', false)).resolves.toEqual(
+      new URL('https://93.184.215.14'),
+    );
+    for (const [url, code] of [
+      ['http://93.184.215.14', 'insecure_url'],
+      ['ftp://93.184.215.14', 'insecure_url'],
+      ['https://user:pass@93.184.215.14', 'invalid_url'],
+      ['https://127.0.0.1', 'private_address'],
+      ['https://[::1]', 'private_address'],
+      ['https://localhost', 'private_address'],
+      ['not a url', 'invalid_url'],
+    ] as const) {
+      await expect(checkSourceUrl(url, false), url).rejects.toMatchObject({ code });
+    }
+    // Development and tests may read a Chatwoot on this machine.
+    await expect(checkSourceUrl('http://127.0.0.1:3000', true)).resolves.toBeInstanceOf(URL);
+  });
+
+  it('refuses to connect to internal addresses, even when a URL got past the first check', async () => {
+    const guarded = guardedFetch(false);
+    await expect(guarded('http://127.0.0.1:9/api/v1/profile')).rejects.toThrow();
+    await expect(guarded('http://localhost:9/api/v1/profile')).rejects.toThrow(/fetch failed/);
   });
 });

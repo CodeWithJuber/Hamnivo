@@ -303,6 +303,12 @@ export function parsePackage(files: Map<string, Uint8Array>): ParsedSource {
     declared,
     truncated,
     files: files.size,
+    origin: manifest
+      ? {
+          system: (manifest as Manifest).source.system,
+          account: (manifest as Manifest).source.account ?? null,
+        }
+      : null,
   };
 }
 

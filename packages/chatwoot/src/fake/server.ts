@@ -1419,11 +1419,6 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     return { meta: { count: found.length, current_page: 1 }, payload: found.map(contactApi) };
   });
 
-  app.get('/api/v1/accounts/:account_id/contacts/:id', async (request) => {
-    const { accountId } = accountAccess(request, 'contacts#show');
-    return { payload: contactApi(contactOf(request, accountId)) };
-  });
-
   app.delete('/api/v1/accounts/:account_id/contacts/:id', async (request, reply: FastifyReply) => {
     const { accountId } = accountAccess(request, 'contacts#destroy', true);
     const contact = contactOf(request, accountId);
@@ -1510,14 +1505,34 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     return conversationApi(conversation);
   });
 
+  // The token's own profile: its accounts and roles (and, as in Chatwoot, its access token).
+  app.get('/api/v1/profile', async (request) => {
+    const principal = principalOf(request);
+    if (principal.kind !== 'user') throw unauthorized();
+    const { user } = principal;
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      access_token: user.token,
+      accounts: [...user.roles.entries()].map(([id, role]) => ({
+        id,
+        name: s.accounts.get(id)?.name ?? '',
+        role,
+      })),
+    };
+  });
+
   app.get('/api/v1/accounts/:account_id/conversations', async (request) => {
     const { accountId } = accountAccess(request, 'conversations#index');
     const query = request.query as Json;
     const inboxId = query.inbox_id === undefined ? null : Number(query.inbox_id);
     const page = Math.max(1, Number(query.page ?? 1));
+    // Chatwoot sorts by last activity by default; created_at_asc pages oldest first.
+    const oldestFirst = query.sort_by === 'created_at_asc';
     const all = [...s.conversations.values()]
       .filter((c) => c.accountId === accountId && (inboxId === null || c.inboxId === inboxId))
-      .sort((a, b) => b.id - a.id);
+      .sort((a, b) => (oldestFirst ? a.id - b.id : b.id - a.id));
     return {
       data: {
         meta: { mine_count: 0, unassigned_count: all.length, all_count: all.length },

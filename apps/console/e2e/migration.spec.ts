@@ -221,6 +221,35 @@ test('HNV-18-01 HNV-18-02 HNV-18-03 HNV-18-04 HNV-18-05 HNV-18-06 · upload a ta
   await expect(row).toContainText('4 of 5');
 });
 
+test('HNV-18-01 · another Chatwoot as the source: the token is never shown, an internal address is refused', async ({
+  page,
+  context,
+}) => {
+  const workspace = await seedWorkspace({ connect: true });
+  await workspace.staff.signIn(context);
+  await page.goto('/migration');
+  await page.getByTestId('new-import').click();
+  const dialog = page.getByRole('dialog', { name: 'Start an import' });
+  await dialog.getByRole('radio', { name: 'Chatwoot' }).click();
+  await expect(dialog.getByLabel('Access token')).toHaveAttribute('type', 'password');
+  await expect(dialog.getByLabel('Access token')).toHaveAttribute('autocomplete', 'off');
+  // Checked before anything is sent.
+  await dialog.getByRole('button', { name: 'Connect and check' }).click();
+  await expect(
+    dialog.getByText('Enter the address of the Chatwoot to import from.').first(),
+  ).toBeVisible();
+  await expect(dialog.getByText('Enter the access token.').first()).toBeVisible();
+  // The gateway refuses an address inside its own network before storing anything.
+  await dialog.getByLabel('Chatwoot address').fill('https://127.0.0.1');
+  await dialog.getByLabel('Account ID').fill('1');
+  await dialog.getByLabel('Access token').fill('token-for-the-browser-test');
+  await dialog.getByRole('button', { name: 'Connect and check' }).click();
+  await expect(dialog.getByTestId('action-error')).toContainText('private network');
+  await expect(dialog).toBeVisible();
+  const jobs = await workspace.staff.call<{ items: unknown[] }>('GET', '/v1/admin/migrations');
+  expect(jobs.items).toEqual([]);
+});
+
 test('HNV-18-06 · rolling back in Arabic removes what the import created', async ({
   page,
   context,
@@ -294,6 +323,10 @@ for (const locale of ['ar', 'ur'] as const) {
     await page.getByTestId('new-import').click();
     await expect(page.getByTestId('new-import-dialog')).toBeVisible();
     violations.push(...(await audit(page, `new-import-dialog (${locale})`)));
+    // The same dialog for another Chatwoot account (address, account, token).
+    await page.getByTestId('new-import-dialog').locator('#import-source-chatwoot').click();
+    await expect(page.getByTestId('chatwoot-source')).toBeVisible();
+    violations.push(...(await audit(page, `new-import-dialog chatwoot (${locale})`)));
     await context.close();
     expect(violations).toEqual([]);
     expect(overflowing).toEqual([]);

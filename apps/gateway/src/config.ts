@@ -74,6 +74,13 @@ const EnvSchema = z.object({
   MIGRATION_SLICE_CONVERSATIONS: z.coerce.number().int().min(1).max(10_000).default(200),
   /** Days an uploaded export is kept after its job ends (samples and retries need it). */
   MIGRATION_EXPORT_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+  /** Conversations one import reads from a Chatwoot source; the next import continues. */
+  MIGRATION_SOURCE_MAX_CONVERSATIONS: z.coerce.number().int().min(1).max(10_000).default(1000),
+  /**
+   * Lets imports read a source at a loopback or private address (development and tests only):
+   * otherwise source URLs must be https and public, checked again on every connection.
+   */
+  MIGRATION_SOURCE_ALLOW_PRIVATE: bool.default(false),
 
   /** The worker rewrites this file after every outbox pass (for container health checks). */
   WORKER_HEARTBEAT_FILE: z.string().min(1).optional(),

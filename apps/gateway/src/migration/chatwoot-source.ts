@@ -24,6 +24,8 @@ export interface ChatwootHistory {
   skippedActivity: number;
   /** More conversations exist than the limit allowed. */
   truncated: boolean;
+  /** Conversations passed over because an earlier import already brought them in. */
+  skipped: number;
 }
 
 function flatAttributes(value: Record<string, unknown>) {
@@ -59,7 +61,18 @@ function authorOf(message: AuthorityMessage): MessageRecord['author'] {
  */
 export async function readChatwootHistory(
   client: ChatwootImporter,
-  options: { inboxIds: number[]; system: string; brandPublicId?: string } & ChatwootReadLimits,
+  options: {
+    /** Inboxes to read; every inbox the token can see when empty. */
+    inboxIds: number[];
+    system: string;
+    brandPublicId?: string;
+    /** Pages by creation time, so conversations started meanwhile only add later pages. */
+    oldestFirst?: boolean;
+    /** Conversations to pass over (already imported); they do not count towards the limit. */
+    skip?: (conversationId: number) => boolean;
+    /** Called after each conversation read (a long read keeps its lease with it). */
+    onConversation?: () => Promise<void>;
+  } & ChatwootReadLimits,
 ): Promise<ChatwootHistory> {
   const history: ChatwootHistory = {
     contacts: [],
@@ -68,13 +81,28 @@ export async function readChatwootHistory(
     attachments: [],
     skippedActivity: 0,
     truncated: false,
+    skipped: 0,
   };
   const contacts = new Map<number, ContactRecord>();
-  for (const inboxId of options.inboxIds) {
+  const seen = new Set<number>();
+  const scopes: Array<number | undefined> =
+    options.inboxIds.length > 0 ? options.inboxIds : [undefined];
+  for (const inboxId of scopes) {
     for (let page = 1; ; page += 1) {
-      const { conversations } = await client.listConversations({ page, inboxId });
+      const { conversations } = await client.listConversations({
+        page,
+        ...(inboxId !== undefined ? { inboxId } : {}),
+        ...(options.oldestFirst ? { oldestFirst: true } : {}),
+      });
       if (conversations.length === 0) break;
       for (const conversation of conversations) {
+        // A page can repeat a conversation when the list moves while it is read.
+        if (seen.has(conversation.id)) continue;
+        seen.add(conversation.id);
+        if (options.skip?.(conversation.id)) {
+          history.skipped += 1;
+          continue;
+        }
         if (history.conversations.length >= options.maxConversations) {
           history.truncated = true;
           break;
@@ -166,6 +194,7 @@ export async function readChatwootHistory(
           labels: [],
           attributes: flatAttributes(conversation.attributes),
         });
+        await options.onConversation?.();
         if (conversation.contactId === null && !contacts.has(0)) {
           contacts.set(0, {
             type: 'contact',

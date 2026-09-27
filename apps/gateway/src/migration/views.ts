@@ -39,6 +39,10 @@ export interface JobStats {
   found?: { contacts?: number; conversations?: number; messages?: number; attachments?: number };
   declared?: { contacts?: number; conversations?: number; messages?: number; attachments?: number };
   truncated?: boolean;
+  /** API sources: the token's role, and conversations passed over as already imported. */
+  sourceRole?: string | null;
+  sourceSkipped?: number;
+  sourceTruncated?: boolean;
 }
 
 export type Tally = { jobId: string; kind: string; status: string; count: number };

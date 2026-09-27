@@ -254,6 +254,31 @@ export function importerContract(
       ]);
     });
 
+    it('reads a source account: the token’s role, and conversations oldest first', async () => {
+      expect(await importer.access()).toEqual({ role: 'administrator' });
+      const elsewhere = new ChatwootImporter({
+        baseUrl: t.baseUrl,
+        accountId: account.accountId + 100_000,
+        token: account.integration.token,
+      });
+      expect(await elsewhere.access()).toEqual({ role: null });
+      const second = (
+        await importer.createConversation({
+          inboxId,
+          contactId,
+          contactInboxSourceId,
+          key: `hv1:imp:${job}:c:chat-2`,
+          attributes: {},
+        })
+      ).conversationId;
+      const ids = (
+        await importer.listConversations({ page: 1, inboxId, oldestFirst: true })
+      ).conversations.map((c) => c.id);
+      expect(ids.indexOf(conversationId)).toBeGreaterThanOrEqual(0);
+      expect(ids.indexOf(conversationId)).toBeLessThan(ids.indexOf(second));
+      expect(await importer.deleteConversation(second)).toBe('deleted');
+    });
+
     it('deletes what it created: the conversation, then the contact', async () => {
       expect(await importer.deleteConversation(conversationId)).toBe('deleted');
       await until(

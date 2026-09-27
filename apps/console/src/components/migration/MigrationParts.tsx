@@ -221,7 +221,7 @@ export function FileCard({
           </span>
           {job.file ? (
             <span className="text-xs text-text-secondary">
-              {t('migration.file.uploaded', {
+              {t(job.sourceKind === 'api' ? 'migration.file.read' : 'migration.file.uploaded', {
                 time: formatDateTime(job.file.uploadedAt),
                 size: formatBytes(job.file.byteSize),
               })}

@@ -23,6 +23,7 @@ describe('tawk.to export', () => {
     expect(detected).toBeNull();
     expect(parsed.system).toBe('tawk.to');
     expect(parsed.files).toBe(4);
+    expect(parsed.origin).toEqual({ system: 'tawk.to', account: null });
     expect(parsed.conversations.map((c) => c.record.id).sort()).toEqual(
       [SARA, OMAR, AYESHA, SARA_AGAIN].sort(),
     );

@@ -10677,44 +10677,101 @@
         ]
       },
       "CreateMigrationRequest": {
-        "type": "object",
-        "properties": {
-          "brandId": {
-            "type": "string",
-            "description": "brand identifier (TypeID with prefix \"brd\")",
-            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
-          },
-          "source": {
-            "type": "string",
-            "enum": [
-              "tawk.to",
-              "hamnivo"
-            ]
-          },
-          "file": {
+        "anyOf": [
+          {
             "type": "object",
             "properties": {
-              "name": {
+              "brandId": {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 200
+                "description": "brand identifier (TypeID with prefix \"brd\")",
+                "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
               },
-              "base64": {
+              "source": {
                 "type": "string",
-                "minLength": 4,
-                "maxLength": 27962031
+                "enum": [
+                  "tawk.to",
+                  "hamnivo"
+                ]
+              },
+              "file": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "base64": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 27962031
+                  }
+                },
+                "required": [
+                  "name",
+                  "base64"
+                ]
               }
             },
             "required": [
-              "name",
-              "base64"
+              "brandId",
+              "source",
+              "file"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "brandId": {
+                "type": "string",
+                "description": "brand identifier (TypeID with prefix \"brd\")",
+                "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              "source": {
+                "type": "string",
+                "const": "chatwoot"
+              },
+              "connection": {
+                "type": "object",
+                "properties": {
+                  "baseUrl": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "format": "uri"
+                  },
+                  "accountId": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "apiToken": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 200
+                  },
+                  "inboxIds": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  }
+                },
+                "required": [
+                  "baseUrl",
+                  "accountId",
+                  "apiToken"
+                ]
+              }
+            },
+            "required": [
+              "brandId",
+              "source",
+              "connection"
             ]
           }
-        },
-        "required": [
-          "brandId",
-          "source",
-          "file"
         ]
       },
       "CreateMigrationExportRequest": {
