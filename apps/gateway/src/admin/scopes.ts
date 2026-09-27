@@ -12,9 +12,15 @@ export async function scopeParents(tx: TenantTx, scope: Scope): Promise<Resource
     new AppError('NOT_FOUND', { detail: 'The selected scope does not exist.' });
   switch (scope.type) {
     case 'tenant':
-    case 'team':
-      // Teams are created with the inbox module; until then team scopes are opaque labels.
       return {};
+    case 'team': {
+      const [row] = await tx
+        .select({ workspaceId: schema.teams.workspaceId })
+        .from(schema.teams)
+        .where(eq(schema.teams.id, scope.id));
+      if (!row) throw notFound();
+      return row.workspaceId ? { workspaceId: row.workspaceId } : {};
+    }
     case 'workspace': {
       const [row] = await tx
         .select({ id: schema.workspaces.id })

@@ -3,6 +3,7 @@ export * from './auth.js';
 export * from './authority.js';
 export { appRole, platformRole } from './helpers.js';
 export * from './identity.js';
+export * from './inbox.js';
 export * from './knowledge.js';
 export * from './memory.js';
 export * from './platform.js';

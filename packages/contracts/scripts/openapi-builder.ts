@@ -76,7 +76,11 @@ export function buildOpenApi(
         content: { 'application/json': { schema: route.body } },
       };
     const parameters: Record<string, unknown>[] = [];
-    if (route.path.startsWith('/v1/admin/') || route.path.startsWith('/v1/conversations/')) {
+    if (
+      route.path.startsWith('/v1/admin/') ||
+      route.path.startsWith('/v1/conversations/') ||
+      route.path.startsWith('/v1/inbox/')
+    ) {
       parameters.push({
         in: 'header',
         name: 'X-Hamnivo-Tenant',

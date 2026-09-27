@@ -10,7 +10,7 @@ records to backups and updates, is Part A of [`docs/self-hosting.md`](../../docs
 
 | File | What it is |
 |---|---|
-| `hamnivo.sh` | The operator script: `setup`, `up`, `status`, `logs`, `backup`, `restore`, `update`, `deploy`, `rollback`, `deploys`, `autodeploy`, `down`, `compose` |
+| `hamnivo.sh` | The operator script: `setup`, `up`, `status`, `logs`, `mail`, `backup`, `restore`, `update`, `deploy`, `rollback`, `deploys`, `autodeploy`, `down`, `compose` |
 | `deploy.sh` | Deploys a commit: checks, build, start, health, rollback; automatic deploys from GitHub (`autodeploy`) |
 | `lib.sh` | Helpers shared by both scripts (settings, compose, health waits, the lock) |
 | `compose.yml` | The services: PostgreSQL 18 + pgvector, Valkey, the gateway (migrations, API, worker), Chatwoot 4.18.0-ce, ClamAV, the edge, and the deploy webhook receiver |

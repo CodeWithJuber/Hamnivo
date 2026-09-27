@@ -1,34 +1,49 @@
 import { describe, expect, it } from 'vitest';
 import { fakeJev, jevWith, request } from './helpers.js';
 
-// Real timers: AbortSignal.timeout is not affected by fake timers.
+// Real timers: AbortSignal.timeout is not affected by fake timers. A busy machine fires timers
+// late, so each call is compared with a plain timer started at the same moment rather than with
+// the clock: the call must end right after that timer, never when the slow transport answers.
 const MARGIN_MS = 150;
+
+/** Runs `call` beside a plain timer of `ms`; returns the result and when each of them ended. */
+async function timed<T>(ms: number, call: () => Promise<T>) {
+  const started = performance.now();
+  const timer = new Promise<number>((resolve) => {
+    setTimeout(() => resolve(performance.now() - started), ms);
+  });
+  const done = call().then((result) => ({ result, at: performance.now() - started }));
+  const [{ result, at }, fired] = await Promise.all([done, timer]);
+  return { result, at, fired };
+}
 
 describe('total deadline (J06)', () => {
   it('resolves unavailable within the deadline when Jev is slow', async () => {
     const { fetch } = fakeJev({ delayMs: 5_000 });
-    const started = performance.now();
-    const result = await jevWith(fetch, { deadlineMs: 100 }).decide(request);
-    const elapsed = performance.now() - started;
+    const { result, at, fired } = await timed(100, () =>
+      jevWith(fetch, { deadlineMs: 100 }).decide(request),
+    );
     expect(result).toMatchObject({ status: 'unavailable', retryable: true, reason: 'deadline' });
-    expect(elapsed).toBeGreaterThanOrEqual(90);
-    expect(elapsed).toBeLessThan(100 + MARGIN_MS);
+    expect(at).toBeGreaterThanOrEqual(90);
+    expect(at).toBeLessThan(fired + MARGIN_MS);
   });
 
   it('holds even when the transport ignores cancellation', async () => {
-    const { fetch } = fakeJev({ delayMs: 600, ignoreAbort: true });
-    const started = performance.now();
-    const result = await jevWith(fetch, { deadlineMs: 100 }).decide(request);
+    const { fetch } = fakeJev({ delayMs: 5_000, ignoreAbort: true });
+    const { result, at, fired } = await timed(100, () =>
+      jevWith(fetch, { deadlineMs: 100 }).decide(request),
+    );
     expect(result).toMatchObject({ status: 'unavailable', reason: 'deadline' });
-    expect(performance.now() - started).toBeLessThan(100 + MARGIN_MS);
+    expect(at).toBeLessThan(fired + MARGIN_MS);
   });
 
   it('uses the default 1.5 s budget, and a per-request deadline when given', async () => {
     const { fetch } = fakeJev({ delayMs: 5_000 });
-    const started = performance.now();
-    const result = await jevWith(fetch).decide({ ...request, deadlineMs: 80 });
+    const { result, at, fired } = await timed(80, () =>
+      jevWith(fetch).decide({ ...request, deadlineMs: 80 }),
+    );
     expect(result).toMatchObject({ status: 'unavailable', reason: 'deadline' });
-    expect(performance.now() - started).toBeLessThan(80 + MARGIN_MS);
+    expect(at).toBeLessThan(fired + MARGIN_MS);
   });
 });
 
@@ -37,10 +52,11 @@ describe('cancellation (J06)', () => {
     const { fetch } = fakeJev({ delayMs: 5_000 });
     const controller = new AbortController();
     setTimeout(() => controller.abort(), 30);
-    const started = performance.now();
-    const result = await jevWith(fetch).decide({ ...request, signal: controller.signal });
+    const { result, at, fired } = await timed(30, () =>
+      jevWith(fetch).decide({ ...request, signal: controller.signal }),
+    );
     expect(result).toMatchObject({ status: 'unavailable', retryable: false, reason: 'aborted' });
-    expect(performance.now() - started).toBeLessThan(30 + MARGIN_MS);
+    expect(at).toBeLessThan(fired + MARGIN_MS);
   });
 
   it('an already-aborted call never reaches the network', async () => {

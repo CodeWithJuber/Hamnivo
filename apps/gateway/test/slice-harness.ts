@@ -42,7 +42,13 @@ export interface Slice {
 
 /** Gateway on a real port, a worker driven by hand, and a fake Chatwoot that calls back over HTTP. */
 export async function startSlice(
-  options: { clock?: () => Date; model?: LanguageModel; scanner?: Scanner } = {},
+  options: {
+    clock?: () => Date;
+    model?: LanguageModel;
+    /** The model the API process uses (copilot, translation). */
+    apiModel?: LanguageModel;
+    scanner?: Scanner;
+  } = {},
 ): Promise<Slice> {
   const fake = await startFakeChatwoot();
   const port = await freePort();
@@ -54,7 +60,10 @@ export async function startSlice(
     PUBLIC_API_ORIGIN: baseUrl,
     STREAM_HEARTBEAT_SECONDS: '1',
   };
-  const gw = await startGateway(env, undefined, options.clock ? { clock: options.clock } : {});
+  const gw = await startGateway(env, undefined, {
+    ...(options.clock ? { clock: options.clock } : {}),
+    ...(options.apiModel ? { model: options.apiModel } : {}),
+  });
   await gw.app.listen(port, '127.0.0.1');
   const config = loadConfig(
     testEnv(gw.database, {

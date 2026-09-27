@@ -16,6 +16,7 @@ import {
   BotIcon,
   BrainIcon,
   BuildingIcon,
+  InboxIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -40,6 +41,7 @@ import { StopAiDialog } from './StopAiDialog';
 
 type NavPath =
   | '/overview'
+  | '/inbox'
   | '/brands'
   | '/agents'
   | '/knowledge'
@@ -61,6 +63,12 @@ function useNavItems(): NavItem[] {
   const { can } = useTenant();
   const items: NavItem[] = [
     { to: '/overview', label: t('nav.overview'), icon: LayoutDashboardIcon },
+    {
+      to: '/inbox',
+      label: t('nav.inbox'),
+      icon: InboxIcon,
+      permission: 'conversations.read',
+    },
     { to: '/brands', label: t('nav.brands'), icon: StoreIcon, permission: 'brands.manage' },
     { to: '/agents', label: t('nav.agents'), icon: BotIcon, permission: 'agents.read' },
     {

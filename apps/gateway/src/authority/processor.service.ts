@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
+import { projectInboxState } from '../inbox/projection.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { retryDelayMs } from '../outbox/relay.service.js';
 import { APP_DB, CLOCK, type Clock, REDIS } from '../tokens.js';
@@ -143,8 +144,10 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
       );
       return;
     }
-    for (const n of notifications)
-      await this.journal.notify(n.tenantId, n.conversationId, n.entries);
+    for (const n of notifications) {
+      if (n.entries.length > 0) await this.journal.notify(n.tenantId, n.conversationId, n.entries);
+      else await this.journal.signalInbox(n.tenantId, n.conversationId);
+    }
   }
 
   private async control(
@@ -387,6 +390,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
         updatedAt: this.clock(),
       })
       .where(eq(schema.conversationControls.id, control.id));
+    await projectInboxState(tx, tenantId, control.id, connectionId, state);
     const wasResolved = control.authorityStatus === 'resolved';
     if (!wasResolved && state.status === 'resolved') {
       entries.push(
@@ -414,6 +418,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
         entries.push(...result.journal);
       }
     }
-    return entries.length ? [{ tenantId, conversationId: control.id, entries }] : [];
+    // Staff inboxes are told even when nothing reached the journal (tags, team, a new owner).
+    return [{ tenantId, conversationId: control.id, entries }];
   }
 }

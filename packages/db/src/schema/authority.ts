@@ -282,6 +282,9 @@ export const conversationControls = pgTable(
     /** A Chatwoot user who took over in Chatwoot and has no Hamnivo staff link. */
     ownerExternalUserId: integer('owner_external_user_id'),
     ownerBotId: uuid('owner_bot_id'),
+    /** Why the current owner has it (the last ownership change), and when that happened. */
+    ownerReason: text('owner_reason'),
+    ownerChangedAt: tstz('owner_changed_at'),
     leaseHolder: text('lease_holder'),
     leaseExpiresAt: tstz('lease_expires_at'),
     authorityStatus: text('authority_status', {

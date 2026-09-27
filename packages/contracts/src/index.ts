@@ -10,6 +10,8 @@ export * from './conversations.js';
 export * from './errors.js';
 export * from './events.js';
 export * from './ids.js';
+export * from './inbox.js';
+export * from './inbox-routes.js';
 export * from './knowledge.js';
 export * from './knowledge-routes.js';
 export * from './memory.js';

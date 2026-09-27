@@ -1615,6 +1615,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounts/{account_id}/search/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Messages the user may read that contain the query (15 per page, newest first) */
+        get: operations["hamnivo-search-messages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounts/{account_id}/teams": {
         parameters: {
             query?: never;
@@ -4501,6 +4518,11 @@ export interface components {
                 url: string;
             }[];
             title: string;
+        };
+        hamnivo_message_search: {
+            payload?: {
+                messages?: Record<string, never>[];
+            };
         };
         hamnivo_user_token: {
             access_token: string;
@@ -11229,6 +11251,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["bad_request_error"];
+                };
+            };
+        };
+    };
+    "hamnivo-search-messages": {
+        parameters: {
+            query: {
+                page?: number;
+                q: string;
+            };
+            header?: never;
+            path: {
+                account_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching messages */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["hamnivo_message_search"];
                 };
             };
         };

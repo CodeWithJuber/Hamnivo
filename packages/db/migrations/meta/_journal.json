@@ -148,6 +148,20 @@
       "when": 1790498774011,
       "tag": "20260927084614_memory_security",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790505672785,
+      "tag": "20260927104112_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790505680619,
+      "tag": "20260927104120_inbox_security",
+      "breakpoints": true
     }
   ]
 }

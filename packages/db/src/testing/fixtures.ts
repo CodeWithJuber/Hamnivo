@@ -477,6 +477,78 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       sourceEventIds: ['msg_seed_deleted'],
       observedAt,
     });
+    // Staff inbox: a team, a second conversation linked to the first, drafts and a review.
+    const teamId = newId();
+    await tx
+      .insert(s.teams)
+      .values({ id: teamId, tenantId, name: 'Billing', createdBy: ids.staffMemberId });
+    await tx.insert(s.teamMembers).values({ tenantId, teamId, staffMemberId: ids.staffMemberId });
+    await tx.insert(s.teamAuthorityLinks).values({
+      tenantId,
+      teamId,
+      connectionId: ids.connectionId,
+      externalTeamId: 5,
+    });
+    await tx.insert(s.conversationInboxState).values({
+      tenantId,
+      conversationId: ids.conversationId,
+      teamId,
+      labels: ['delivery'],
+    });
+    const otherConversationId = newId();
+    await tx.insert(s.conversationControls).values({
+      id: otherConversationId,
+      tenantId,
+      connectionId: ids.connectionId,
+      inboxId: ids.inboxId,
+      brandId: ids.brandId,
+      principalId: ids.principalId,
+      externalConversationId: 12,
+      ownerMode: 'HUMAN_ACTIVE',
+      ownerStaffId: ids.staffMemberId,
+      ownerReason: 'staff_takeover',
+      ownerChangedAt: new Date(),
+      // Resolved, so the reconciler tests still see one conversation to follow per tenant.
+      authorityStatus: 'resolved',
+    });
+    // Links are stored once per pair, smaller id first (UUIDs compare like their hex text).
+    const [low, high] = [ids.conversationId, otherConversationId].sort() as [string, string];
+    await tx.insert(s.conversationLinks).values({
+      tenantId,
+      conversationId: low,
+      linkedConversationId: high,
+      note: 'Same order',
+      createdBy: ids.staffMemberId,
+    });
+    await tx.insert(s.staffDrafts).values([
+      {
+        tenantId,
+        conversationId: ids.conversationId,
+        staffMemberId: ids.staffMemberId,
+        lane: 'internal',
+        kind: 'draft',
+        text: 'Courier delayed',
+      },
+      {
+        tenantId,
+        conversationId: ids.conversationId,
+        staffMemberId: ids.staffMemberId,
+        lane: 'public',
+        kind: 'outgoing',
+        text: 'I am checking your order now.',
+        clientMessageId: newId(),
+        state: 'failed',
+        errorCode: 'AUTHORITY_UNAVAILABLE',
+      },
+    ]);
+    await tx.insert(s.conversationReviews).values({
+      tenantId,
+      conversationId: ids.conversationId,
+      reviewerId: ids.staffMemberId,
+      subjectStaffId: ids.staffMemberId,
+      rating: 4,
+      note: 'Clear and kind.',
+    });
     await appendAudit(tx, {
       actorType: 'system',
       actorId: 'seed',
