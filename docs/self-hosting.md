@@ -46,6 +46,15 @@ this repository.
   | `example.com` and `www.example.com` | the public website |
 
   A wildcard record `*.example.com` covers the first four.
+- **With Cloudflare** (its DNS, optionally its proxy):
+  - **DNS only** (grey cloud) is the simplest: Caddy gets the certificates itself.
+  - **Proxied** (orange cloud) hides the server's address and filters attacks. It needs:
+    - SSL/TLS mode **Full (strict)**. Flexible makes an endless redirect.
+    - **Always Use HTTPS** off. Caddy redirects to HTTPS itself, and certificates are issued and
+      renewed over plain HTTP.
+    - `setup --cloudflare on` (A4), so Hamnivo sees each visitor's own address, not Cloudflare's.
+    - For automatic deploys (A10): **Bot Fight Mode** off, or the `api` name set to DNS only.
+      Otherwise Cloudflare may block GitHub's webhooks.
 - **Open ports:** 80 and 443 over TCP, and 443 over UDP (HTTP/3). Caddy, the web server in the
   stack, uses port 80 to get certificates from Let's Encrypt, then redirects it to HTTPS.
 - **Email (recommended):** an SMTP account for sign-in and invitation emails.
@@ -110,7 +119,8 @@ The repository is private, so the server reads it with its own key, a read-only 
    git config core.sshCommand 'ssh -i ~/.ssh/hamnivo_deploy_ed25519 -o IdentitiesOnly=yes'
    ```
 
-Run everything as this user, without `sudo` (it is in the `docker` group). `hamnivo.sh autodeploy
+Run everything as this user, without `sudo` (it is in the `docker` group), or everything as root.
+As root, the webhook receiver of automatic deploys still runs as `nobody`. `hamnivo.sh autodeploy
 enable` (A10) sets up the same key if you skip this step.
 
 ## A4. Configure
@@ -141,6 +151,10 @@ Then edit `deploy/production/.env` for:
   later. `EMBEDDING_PROVIDER` chooses the model for knowledge search.
 - **Other names:** change `HAMNIVO_*_HOST`, then run `setup` again to update the addresses derived
   from them.
+- **Behind Cloudflare's proxy:** run `setup --cloudflare on`. Caddy then believes the visitor
+  addresses that Cloudflare reports, but only on connections from Cloudflare's own address ranges,
+  which `up` keeps current. Rate limits and the audit log then see each visitor's address.
+  `--cloudflare off` undoes it.
 - **Chatwoot's email:** copy `deploy/production/chatwoot.env.example` to `chatwoot.env` in the
   same folder and fill it in.
 
@@ -349,6 +363,8 @@ up and deploys.
   - the GitHub token, if you added one, is fine-grained, for this repository only, with
     "Deployments" access only.
 - To collect metrics, set `METRICS_TOKEN` and scrape `https://api.example.com/metrics` with it.
+- Behind Cloudflare's proxy, `HAMNIVO_CLOUDFLARE=on` (A4). Without it, every visitor has
+  Cloudflare's address, so rate limits apply to many visitors at once.
 
 ## A9. Troubleshooting
 
@@ -367,6 +383,11 @@ up and deploys.
   ClamAV, or add memory.
 - **Building behind a proxy that inspects TLS:** set `HAMNIVO_BUILD_CA=/path/to/proxy-ca.pem`
   before `hamnivo.sh up`.
+- **Cloudflare:**
+  - "Too many redirects": set SSL/TLS to **Full (strict)**.
+  - Error 525 or 526, or no certificate: turn **Always Use HTTPS** off, or set the names to DNS
+    only until `hamnivo.sh up` has its certificates.
+  - Every visitor has the same address in logs: run `setup --cloudflare on` (A4), then `up`.
 - **A push was not deployed:**
   - `hamnivo.sh autodeploy status` shows the mode, the git access and the last deploys.
   - `journalctl -u hamnivo-deploy` shows each run.
