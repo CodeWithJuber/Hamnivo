@@ -36,6 +36,22 @@ export const PERMISSIONS = {
     description: 'Take over a conversation from the AI or another person',
     scopes: ALL,
   },
+  'conversations.status': {
+    description: 'Resolve, reopen and snooze conversations',
+    scopes: ALL,
+  },
+  'conversations.tag': {
+    description: 'Tag conversations and fill in their custom fields',
+    scopes: ALL,
+  },
+  'conversations.bulk': {
+    description: 'Change many conversations at once',
+    scopes: ALL,
+  },
+  'conversations.review': {
+    description: 'Review and coach other people’s conversations',
+    scopes: ALL,
+  },
   'conversations.export': {
     description: 'Export conversation transcripts',
     scopes: BRAND,

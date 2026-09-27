@@ -104,5 +104,16 @@ export function toConversation(raw: unknown): AuthorityConversationState {
     labels: Array.isArray(c.labels) ? c.labels.map(String) : [],
     attributes: obj(c.custom_attributes),
     version: typeof c.updated_at === 'number' ? c.updated_at : Number(c.timestamp ?? 0),
+    snoozedUntil: timeOf(c.snoozed_until),
   };
+}
+
+/** Chatwoot sends times as ISO strings or Unix seconds depending on the endpoint. */
+export function timeOf(value: unknown): Date | null {
+  if (typeof value === 'number' && value > 0) return new Date(value * 1000);
+  if (typeof value === 'string' && value) {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? new Date(parsed) : null;
+  }
+  return null;
 }

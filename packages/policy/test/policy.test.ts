@@ -66,6 +66,22 @@ describe('catalog and presets', () => {
     expect(presetPermissions('agent')).not.toContain('billing.manage');
     expect(presetPermissions('agent')).toContain('conversations.takeover');
   });
+
+  it('lets agents work their own queue while bulk changes and reviews stay with supervisors', () => {
+    const agent = presetPermissions('agent');
+    expect(agent).toEqual(expect.arrayContaining(['conversations.status', 'conversations.tag']));
+    expect(agent).not.toContain('conversations.bulk');
+    expect(agent).not.toContain('conversations.review');
+    expect(agent).not.toContain('conversations.assign');
+    expect(presetPermissions('supervisor')).toEqual(
+      expect.arrayContaining([
+        'conversations.bulk',
+        'conversations.review',
+        'conversations.assign',
+      ]),
+    );
+    expect(presetPermissions('analyst')).not.toContain('conversations.tag');
+  });
 });
 
 describe('authorize', () => {

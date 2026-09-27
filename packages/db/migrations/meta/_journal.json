@@ -134,6 +134,20 @@
       "when": 1790488928890,
       "tag": "20260927060208_session_identity_key",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790497704885,
+      "tag": "20260927082824_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790497715201,
+      "tag": "20260927082835_inbox_security",
+      "breakpoints": true
     }
   ]
 }

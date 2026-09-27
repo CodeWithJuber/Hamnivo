@@ -84,4 +84,16 @@ describe('toConversation (real v4.18.0 payloads)', () => {
     });
     expect(toConversation({ ...payload, meta: {} }).owner).toEqual({ kind: 'none' });
   });
+
+  it('reads the snooze time from ISO strings (API) and Unix seconds, and null otherwise', () => {
+    const snoozed = { ...api.getConversation, status: 'snoozed' };
+    expect(
+      toConversation({ ...snoozed, snoozed_until: '2026-09-27T09:18:25.000Z' }).snoozedUntil,
+    ).toEqual(new Date('2026-09-27T09:18:25.000Z'));
+    expect(toConversation({ ...snoozed, snoozed_until: 1790497105 }).snoozedUntil).toEqual(
+      new Date(1790497105 * 1000),
+    );
+    expect(toConversation({ ...snoozed, snoozed_until: null }).snoozedUntil).toBeNull();
+    expect(toConversation(api.getConversation).snoozedUntil).toBeNull();
+  });
 });

@@ -74,6 +74,8 @@ export const ROLE_PRESETS = [
       'conversations.reply',
       'conversations.note',
       'conversations.takeover',
+      'conversations.status',
+      'conversations.tag',
       'members.read',
       'knowledge.read',
       'tools.approve',

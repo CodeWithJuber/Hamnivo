@@ -38,6 +38,8 @@ export interface AuthorityConversationState {
   attributes: Record<string, unknown>;
   /** Authority change clock (Chatwoot's float `updated_at`); apply state only when newer. */
   version: number;
+  /** When a snoozed conversation opens again; null when it waits for the customer. */
+  snoozedUntil?: Date | null;
 }
 
 export type AuthorityMessageDirection = 'incoming' | 'outgoing' | 'activity' | 'template';

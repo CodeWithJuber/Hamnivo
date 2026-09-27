@@ -13,6 +13,7 @@ import {
   StartConversationRequest,
 } from './conversations.js';
 import { HamnivoEvent, StreamControl } from './events.js';
+import { inboxRoutes } from './inbox-routes.js';
 import { knowledgeRoutes } from './knowledge-routes.js';
 import { AttachmentPart } from './parts.js';
 import {
@@ -351,4 +352,5 @@ export const allRoutes: Record<string, RouteDef> = {
   ...knowledgeRoutes,
   ...integrationRoutes,
   ...conversationRoutes,
+  ...inboxRoutes,
 };
