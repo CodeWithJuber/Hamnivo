@@ -20,6 +20,7 @@ on request, proposes actions that need explicit approval, and records what actua
 | Hamnivo Studio | `apps/console` | Agent workspace (inbox, lanes, handoff), AI agent studio, knowledge, admin, platform console |
 | Hamnivo Gateway | `apps/gateway` | Public REST API + SSE, Chatwoot connector, AI runtime, workers |
 | Hamnivo Connect | `packages/client`, `packages/react`, `packages/ui-react`, `packages/server-sdk` | Headless SDK, React bindings, server SDK |
+| Hamnivo Connect for servers | `packages/server-sdk` (`@hamnivo/server`) | Signs the identity assertions that verify a website's signed-in customers ([guide](docs/guides/identity.md), [examples](examples)) |
 | Website | `apps/site` | Public site |
 
 Conversation storage is delegated to **Chatwoot Community Edition** (v4.18.0) through a narrow
