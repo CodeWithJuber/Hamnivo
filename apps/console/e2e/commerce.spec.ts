@@ -225,7 +225,17 @@ test('HNV-21-04 HNV-21-05 · a refund waits for a second person, then shows refu
   await expect(requester.getByTestId('order-total')).toContainText('80.00');
   await requester.getByRole('button', { name: 'Request a refund' }).click();
   const sheet = requester.getByTestId('refund-sheet');
+  // U06: "1,500" can be read two ways, so Studio asks instead of guessing.
+  await sheet.getByLabel('Amount in AED').fill('1,500');
+  await sheet.getByRole('button', { name: 'Request refund' }).click();
+  const readings = sheet.getByRole('group', { name: 'Which amount do you mean?' });
+  await expect(readings.getByRole('radio')).toHaveCount(2);
+  await expect(readings).toContainText('1,500.00');
+  await expect(readings).toContainText('1.50');
+  expect(await audit(requester, 'ambiguous amount')).toEqual([]);
+  // Arabic-Indic digits are read exactly.
   await sheet.getByLabel('Amount in AED').fill('٣٥');
+  await expect(readings).toBeHidden();
   await sheet.getByLabel('Reason').selectOption('damaged');
   await sheet.getByRole('button', { name: 'Request refund' }).click();
   await expect(sheet).toBeHidden();
