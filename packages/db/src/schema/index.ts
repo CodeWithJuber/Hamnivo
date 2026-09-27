@@ -1,7 +1,10 @@
+export * from './analytics.js';
 export * from './audit.js';
 export * from './auth.js';
 export * from './authority.js';
+export * from './billing.js';
 export * from './commerce.js';
+export * from './developer.js';
 export { appRole, platformRole } from './helpers.js';
 export * from './identity.js';
 export * from './inbox.js';

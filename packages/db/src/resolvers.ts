@@ -53,10 +53,15 @@ export interface ApiKeyResolution {
   keyId: string;
   serviceAccountId: string;
   secretHash: Buffer;
+  /** Version of the key-encryption key the secret hash was made with. */
+  hashVersion: number;
   scopes: string[];
+  scopeType: string;
+  scopeId: string | null;
   expiresAt: Date | null;
   revokedAt: Date | null;
   tenantStatus: string;
+  serviceAccountStatus: string;
 }
 
 export async function resolveApiKey(db: Db, prefix: string): Promise<ApiKeyResolution | null> {
@@ -65,10 +70,14 @@ export async function resolveApiKey(db: Db, prefix: string): Promise<ApiKeyResol
     key_id: string;
     service_account_id: string;
     secret_hash: Buffer;
+    hash_version: number;
     scopes: string[];
+    scope_type: string;
+    scope_id: string | null;
     expires_at: Date | null;
     revoked_at: Date | null;
     tenant_status: string;
+    service_account_status: string;
   }>(sql`select * from app.resolve_api_key(${prefix})`);
   const row = rows[0];
   return row
@@ -77,10 +86,14 @@ export async function resolveApiKey(db: Db, prefix: string): Promise<ApiKeyResol
         keyId: row.key_id,
         serviceAccountId: row.service_account_id,
         secretHash: row.secret_hash,
+        hashVersion: row.hash_version,
         scopes: row.scopes,
+        scopeType: row.scope_type,
+        scopeId: row.scope_id,
         expiresAt: row.expires_at,
         revokedAt: row.revoked_at,
         tenantStatus: row.tenant_status,
+        serviceAccountStatus: row.service_account_status,
       }
     : null;
 }

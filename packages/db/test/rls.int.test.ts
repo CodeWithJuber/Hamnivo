@@ -20,12 +20,27 @@ let tables: CatalogTable[];
 
 const tenantColumn = (table: string) => (table === 'tenants' ? 'id' : 'tenant_id');
 
+/**
+ * Global platform tables, each with the reason it is not tenant data. They keep forced
+ * row-level security but have no tenant policy: the application role has no access at all, and
+ * the platform role only what the security migration grants. Adding a table here needs a reason.
+ */
+const GLOBAL_TABLES: Record<string, string> = {
+  plans:
+    'Plans are defined by the platform operator for every workspace; a workspace keeps a copy of its plan’s limits in tenant_entitlements',
+  invoices:
+    'Invoices are the platform operator’s billing records; a workspace reads its own through app.tenant_invoices() and cannot change them',
+};
+
 /** Tables the application role may only insert into. */
 const APPEND_ONLY = new Set([
   'audit_events',
   'operation_receipts',
   'learning_consents',
   'deletion_tombstones',
+  'webhook_events',
+  'webhook_attempts',
+  'usage_alerts',
 ]);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
@@ -41,6 +56,10 @@ const NEVER_DELETED = new Set([
   'refunds',
   'finance_exceptions',
   'commerce_events',
+  'webhook_deliveries',
+  'conversation_metrics',
+  'tenant_entitlements',
+  'egress_policies',
 ]);
 
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
@@ -107,17 +126,41 @@ afterAll(async () => {
   await h?.close();
 });
 
-const tenantTables = () => tables.filter((t) => !t.isPartition);
+const allTables = () => tables.filter((t) => !t.isPartition);
+const tenantTables = () => allTables().filter((t) => !Object.hasOwn(GLOBAL_TABLES, t.name));
 
 describe('catalog', () => {
-  it('scopes every table to a tenant', () => {
+  it('scopes every table to a tenant, except the listed global platform tables', () => {
     const unscoped = tenantTables().filter((t) => !t.hasTenantId && t.name !== 'tenants');
     expect(unscoped.map((t) => t.name)).toEqual([]);
+    for (const [name, reason] of Object.entries(GLOBAL_TABLES)) {
+      expect(
+        allTables().map((t) => t.name),
+        `${name} is listed but missing`,
+      ).toContain(name);
+      expect(reason.length, `${name} needs a reason`).toBeGreaterThan(20);
+    }
   });
 
   it('enables and forces row-level security on every table', () => {
-    const weak = tenantTables().filter((t) => !t.rowSecurity || !t.forceRowSecurity);
+    const weak = allTables().filter((t) => !t.rowSecurity || !t.forceRowSecurity);
     expect(weak.map((t) => t.name)).toEqual([]);
+  });
+
+  it('keeps the global platform tables away from the application role', async () => {
+    const { rows } = await h.owner.execute<{ name: string; privileges: boolean; policy: string }>(
+      sql`select c.relname as name,
+                 has_table_privilege('hamnivo_app', c.oid, 'SELECT, INSERT, UPDATE, DELETE') as privileges,
+                 coalesce((select string_agg(p.policyname, ',') from pg_policies p
+                           where p.tablename = c.relname and 'hamnivo_app' = any(p.roles)), '') as policy
+          from pg_class c join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and c.relname in ${Object.keys(GLOBAL_TABLES)}`,
+    );
+    expect(rows.map((r) => r.name).sort()).toEqual(Object.keys(GLOBAL_TABLES).sort());
+    for (const row of rows) {
+      expect(row, row.name).toMatchObject({ privileges: false, policy: '' });
+      await expectPgError(h.app.execute(sql`select * from ${sql.identifier(row.name)}`), '42501');
+    }
   });
 
   it('gives every table a tenant_isolation policy for the application role', async () => {
@@ -218,6 +261,14 @@ describe('two-tenant isolation', () => {
     'refunds',
     'finance_exceptions',
     'commerce_events',
+    'webhook_endpoints',
+    'webhook_events',
+    'webhook_deliveries',
+    'webhook_attempts',
+    'egress_policies',
+    'tenant_entitlements',
+    'usage_alerts',
+    'conversation_metrics',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -355,6 +406,14 @@ describe('two-tenant isolation', () => {
       'refunds',
       'finance_exceptions',
       'commerce_events',
+      'webhook_endpoints',
+      'webhook_events',
+      'webhook_deliveries',
+      'webhook_attempts',
+      'egress_policies',
+      'tenant_entitlements',
+      'usage_alerts',
+      'conversation_metrics',
       'audit_heads',
       'audit_events',
     ]);

@@ -6,6 +6,7 @@ import {
   index,
   integer,
   jsonb,
+  type PgTableExtraConfigValue,
   pgTable,
   primaryKey,
   text,
@@ -214,18 +215,29 @@ export const apiKeys = pgTable(
     id: id(),
     tenantId: tenantId(),
     serviceAccountId: uuid('service_account_id').notNull(),
-    /** Public lookup part of the key, e.g. `hv_live_8f3k2m1q`. */
+    /** Public lookup part of the key, e.g. `hv_live_8f3k2m1qa9bc`. */
     prefix: text('prefix').notNull(),
-    /** HMAC-SHA256 of the secret part with the server pepper; the secret is shown once. */
+    /**
+     * HMAC-SHA256 of the secret part with a key derived from the key-encryption key of version
+     * `hash_version`; the secret itself is shown once and never stored.
+     */
     secretHash: bytea('secret_hash').notNull(),
+    hashVersion: integer('hash_version').notNull().default(1),
+    /** Permissions the key may use (a subset of what an API key can carry). */
     scopes: text('scopes').array().notNull(),
+    /** Where the key's permissions apply, like a grant's scope. */
+    scopeType: text('scope_type', { enum: GRANT_SCOPES }).notNull().default('tenant'),
+    scopeId: uuid('scope_id'),
     lastUsedAt: tstz('last_used_at'),
     expiresAt: tstz('expires_at'),
     revokedAt: tstz('revoked_at'),
+    revokedBy: uuid('revoked_by'),
+    /** The key that replaced this one in a rotation (this one then expires soon after). */
+    replacedBy: uuid('replaced_by'),
     createdBy: uuid('created_by'),
     createdAt: createdAt(),
   },
-  (t) => [
+  (t): PgTableExtraConfigValue[] => [
     unique('api_keys_tenant_id_id_key').on(t.tenantId, t.id),
     uniqueIndex('api_keys_prefix_key').on(t.prefix),
     foreignKey({
@@ -233,6 +245,22 @@ export const apiKeys = pgTable(
       columns: [t.tenantId, t.serviceAccountId],
       foreignColumns: [serviceAccounts.tenantId, serviceAccounts.id],
     }),
+    foreignKey({
+      name: 'api_keys_replaced_by_fk',
+      columns: [t.tenantId, t.replacedBy],
+      foreignColumns: [t.tenantId, t.id],
+    }),
+    foreignKey({
+      name: 'api_keys_created_by_fk',
+      columns: [t.tenantId, t.createdBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    foreignKey({
+      name: 'api_keys_revoked_by_fk',
+      columns: [t.tenantId, t.revokedBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    check('api_keys_scope_ck', sql`(${t.scopeType} = 'tenant') = (${t.scopeId} is null)`),
     tenantIsolation(),
   ],
 );

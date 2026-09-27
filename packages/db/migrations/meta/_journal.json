@@ -176,6 +176,20 @@
       "when": 1790510515489,
       "tag": "20260927120155_commerce_security",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790516022794,
+      "tag": "20260927133342_developer_platform",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790516038270,
+      "tag": "20260927133358_developer_platform_security",
+      "breakpoints": true
     }
   ]
 }

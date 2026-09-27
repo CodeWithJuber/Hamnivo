@@ -238,6 +238,95 @@ async function seedCommerce(
 }
 
 /**
+ * Developer platform: an endpoint (turned off, so later test writes create no webhook events),
+ * one delivered event with its attempt, an egress list, a plan with its limits and an alert.
+ * The analytics projection and the conversation usage entries come from triggers.
+ */
+async function seedDeveloperPlatform(
+  tx: TenantTx,
+  tenantId: string,
+  ref: { secretId: string; staffMemberId: string },
+) {
+  const endpointId = newId();
+  const eventId = newId();
+  const deliveryId = newId();
+  await tx.insert(s.webhookEndpoints).values({
+    id: endpointId,
+    tenantId,
+    url: 'https://hooks.example.com/hamnivo',
+    eventTypes: ['message.created', 'order.updated'],
+    status: 'disabled',
+    disabledReason: 'manual',
+    disabledAt: new Date(),
+    secretId: ref.secretId,
+    createdBy: ref.staffMemberId,
+  });
+  await tx.insert(s.webhookEvents).values({
+    id: eventId,
+    tenantId,
+    type: 'webhook.test',
+    sourceKey: `seed:${eventId}`,
+    body: '{"type":"webhook.test"}',
+    occurredAt: new Date(),
+    expiresAt: inDays(30),
+  });
+  await tx.insert(s.webhookDeliveries).values({
+    id: deliveryId,
+    tenantId,
+    endpointId,
+    eventId,
+    status: 'succeeded',
+    attempts: 1,
+    lastAttemptAt: new Date(),
+    lastStatusCode: 204,
+    lastOutcome: 'succeeded',
+    succeededAt: new Date(),
+  });
+  await tx.insert(s.webhookAttempts).values({
+    tenantId,
+    deliveryId,
+    attempt: 1,
+    startedAt: new Date(),
+    durationMs: 42,
+    statusCode: 204,
+    outcome: 'succeeded',
+  });
+  await tx.insert(s.egressPolicies).values({
+    tenantId,
+    hosts: [{ pattern: 'hooks.example.com', note: null, createdAt: new Date().toISOString() }],
+    updatedBy: ref.staffMemberId,
+  });
+  // Last, so the seeded rows above are not held to the plan's limits.
+  await tx.insert(s.tenantEntitlements).values({
+    tenantId,
+    planKey: 'team',
+    planName: 'Team',
+    currency: 'AED',
+    priceMinor: 10_000n,
+    limits: {
+      conversations: 1000,
+      aiReplies: 5000,
+      aiTokens: 5_000_000,
+      knowledgeStorageBytes: 50_000_000,
+      seats: 10,
+      webhookEndpoints: 5,
+    },
+    assignedAt: new Date(),
+    assignedBy: 'seed',
+    aiTokenBudget: 1_000_000,
+  });
+  await tx.insert(s.usageAlerts).values({
+    tenantId,
+    limitKey: 'conversations',
+    source: 'plan',
+    threshold: 80,
+    periodKey: '2026-09',
+    used: 800,
+    max: 1000,
+  });
+}
+
+/**
  * Creates a tenant with at least one row in every tenant-owned table, through the application
  * role and row-level security (as production code would). Used by the RLS test suite, which
  * fails if a new table is not seeded here.
@@ -764,6 +853,10 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       staffMemberId: ids.staffMemberId,
       principalId: ids.principalId,
       conversationId: ids.conversationId,
+    });
+    await seedDeveloperPlatform(tx, tenantId, {
+      secretId: ids.secretId,
+      staffMemberId: ids.staffMemberId,
     });
     await appendAudit(tx, {
       actorType: 'system',
