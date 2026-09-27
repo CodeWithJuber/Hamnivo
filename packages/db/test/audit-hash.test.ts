@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AUDIT_GENESIS, auditHash } from '../src/audit.js';
+import { AUDIT_GENESIS, AUDIT_REDACTED, auditHash, redactAuditData } from '../src/audit.js';
 
 const record = {
   v: 1 as const,
@@ -29,5 +29,44 @@ describe('audit hash chain', () => {
     expect(auditHash(AUDIT_GENESIS, { ...record, outcome: 'denied' }).equals(base)).toBe(false);
     expect(auditHash(Buffer.alloc(32, 1), record).equals(base)).toBe(false);
     expect(base).toHaveLength(32);
+  });
+});
+
+describe('audit data redaction', () => {
+  it('never keeps a credential, at any depth, and leaves everything else alone', () => {
+    expect(
+      redactAuditData({
+        kind: 'sso',
+        clientSecret: 's3cret',
+        oidc: { client_secret: 'x', clientId: 'hamnivo', tokenEndpoint: 'https://idp/token' },
+        attempts: [{ password: 'p', newPassword: 'q', apiKey: 'k', token: 't' }],
+        inputTokens: 12,
+        secretId: 'sec_1',
+        webhookSecretId: 'sec_2',
+        at: '2026-09-27T00:00:00.000Z',
+        nothing: null,
+      }),
+    ).toEqual({
+      kind: 'sso',
+      clientSecret: AUDIT_REDACTED,
+      oidc: {
+        client_secret: AUDIT_REDACTED,
+        clientId: 'hamnivo',
+        tokenEndpoint: 'https://idp/token',
+      },
+      attempts: [
+        {
+          password: AUDIT_REDACTED,
+          newPassword: AUDIT_REDACTED,
+          apiKey: AUDIT_REDACTED,
+          token: AUDIT_REDACTED,
+        },
+      ],
+      inputTokens: 12,
+      secretId: 'sec_1',
+      webhookSecretId: 'sec_2',
+      at: '2026-09-27T00:00:00.000Z',
+      nothing: null,
+    });
   });
 });

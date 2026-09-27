@@ -2,19 +2,30 @@ import { describe, expect, it } from 'vitest';
 import {
   authorize,
   authorizeAny,
+  authorizePlatform,
   checkDelegation,
+  checkRevocation,
   diffPermissions,
   effectivePermissions,
+  expandPatterns,
   explain,
   type Grant,
   inapplicablePermissions,
+  isPermission,
+  isPlatformPermission,
   PERMISSION_KEYS,
+  PLATFORM_PERMISSION_KEYS,
+  type PlatformPrincipal,
+  permissionsAnywhere,
+  platformPermissions,
   presetPermissions,
   ROLE_PRESETS,
+  roleChangeImpact,
   rolePatterns,
   type ScopeHierarchy,
   type ServiceAccountPrincipal,
   type StaffPrincipal,
+  unreachablePermissions,
   validatePatterns,
 } from '../src/index.js';
 
@@ -423,5 +434,193 @@ describe('permission diff', () => {
     expect(diff.removed).toEqual(['knowledge.manage']);
     expect(diff.added).toContain('conversations.export');
     expect(diff.addedSensitive).toEqual(['conversations.export']);
+  });
+});
+
+describe('revocation ceiling', () => {
+  const owner = staff([grant({ permissions: ['*'], scope: { type: 'tenant' } })], {
+    staffMemberId: 'own',
+  });
+  const admin = staff(
+    [grant({ permissions: presetPermissions('admin'), scope: { type: 'tenant' } })],
+    { staffMemberId: 'adm' },
+  );
+  const lead = staff(
+    [grant({ permissions: presetPermissions('supervisor'), scope: { type: 'team', id: 'T' } })],
+    { staffMemberId: 'lead' },
+  );
+  const agentOnTeam = {
+    permissions: presetPermissions('agent'),
+    scope: { type: 'team', id: 'T' },
+  } as const;
+
+  it('lets people take away only access they could have granted', () => {
+    expect(
+      checkRevocation(lead, { staffMemberId: 'x', grants: [agentOnTeam] }, hierarchy, now),
+    ).toEqual([]);
+    expect(
+      checkRevocation(admin, { staffMemberId: 'x', grants: [agentOnTeam] }, hierarchy, now),
+    ).toEqual([]);
+  });
+
+  it('stops an administrator from suspending or stripping an owner', () => {
+    const problems = checkRevocation(
+      admin,
+      { staffMemberId: 'own', grants: [{ permissions: ['*'], scope: { type: 'tenant' } }] },
+      hierarchy,
+      now,
+      'members.remove',
+    );
+    expect(problems).toEqual([
+      {
+        code: 'exceeds_own_permissions',
+        permissions: expect.arrayContaining(['billing.manage', 'support.grant']),
+      },
+    ]);
+    expect(
+      checkRevocation(
+        owner,
+        { staffMemberId: 'adm', grants: [{ permissions: ['*'], scope: { type: 'tenant' } }] },
+        hierarchy,
+        now,
+        'members.remove',
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps a team lead inside the team and away from their own access', () => {
+    const elsewhere = checkRevocation(
+      lead,
+      {
+        staffMemberId: 'x',
+        grants: [{ permissions: ['conversations.read'], scope: { type: 'team', id: 'T2' } }],
+      },
+      hierarchy,
+      now,
+    ).map((p) => p.code);
+    expect(elsewhere).toEqual(expect.arrayContaining(['not_allowed', 'outside_own_scope']));
+    const self = checkRevocation(
+      lead,
+      { staffMemberId: 'lead', grants: [agentOnTeam] },
+      hierarchy,
+      now,
+    ).map((p) => p.code);
+    expect(self).toEqual(['self_grant']);
+  });
+
+  it('ignores permissions that are inert at the level of the grant', () => {
+    // billing.manage has no effect in a team grant, so the lead is not missing it.
+    const grants = [
+      { permissions: ['conversations.read', 'billing.manage'], scope: { type: 'team', id: 'T' } },
+    ] as const;
+    expect(checkRevocation(lead, { staffMemberId: 'x', grants }, hierarchy, now)).toEqual([]);
+  });
+});
+
+describe('role building reach', () => {
+  it('lists permissions the builder does not hold across the tenant', () => {
+    const wsAdmin = staff([
+      grant({ permissions: presetPermissions('admin'), scope: { type: 'workspace', id: 'W' } }),
+    ]);
+    expect(unreachablePermissions(wsAdmin, ['conversations.read', 'audit.read'], now)).toEqual([
+      'conversations.read',
+      'audit.read',
+    ]);
+    // Reference data (members.read) counts from any scope.
+    expect(unreachablePermissions(wsAdmin, ['members.read'], now)).toEqual([]);
+    const admin = staff([
+      grant({ permissions: presetPermissions('admin'), scope: { type: 'tenant' } }),
+    ]);
+    // A permission that needs two-step verification still counts as held.
+    expect(unreachablePermissions(admin, ['secrets.manage', 'billing.manage'], now)).toEqual([
+      'billing.manage',
+    ]);
+    const suspended = staff([grant({ permissions: ['*'], scope: { type: 'tenant' } })], {
+      status: 'suspended',
+    });
+    expect(unreachablePermissions(suspended, ['conversations.read'], now)).toEqual([
+      'conversations.read',
+    ]);
+  });
+});
+
+describe('role change impact', () => {
+  const members = [
+    {
+      staffMemberId: 'a',
+      grants: [
+        {
+          roleId: 'r1',
+          permissions: ['conversations.read', 'knowledge.read'],
+          scope: { type: 'tenant' },
+        },
+      ],
+    },
+    {
+      staffMemberId: 'b',
+      grants: [
+        {
+          roleId: 'r1',
+          permissions: ['conversations.read', 'knowledge.read'],
+          scope: { type: 'team', id: 'T' },
+        },
+        { roleId: 'r2', permissions: ['knowledge.read'], scope: { type: 'tenant' } },
+      ],
+    },
+    {
+      staffMemberId: 'c',
+      grants: [{ roleId: 'r2', permissions: ['knowledge.read'], scope: { type: 'tenant' } }],
+    },
+  ] as const;
+
+  it('lists only holders of the role, with what they gain and lose', () => {
+    expect(roleChangeImpact(members, 'r1', ['conversations.read', 'audit.read'])).toEqual([
+      { staffMemberId: 'a', gains: ['audit.read'], loses: ['knowledge.read'] },
+      // audit.read has no effect in a team grant, and knowledge.read still comes from r2.
+      { staffMemberId: 'b', gains: [], loses: [] },
+    ]);
+    expect(permissionsAnywhere(members[1].grants)).toEqual(
+      new Set(['conversations.read', 'knowledge.read']),
+    );
+  });
+});
+
+describe('platform permissions', () => {
+  const operator = (overrides: Partial<PlatformPrincipal> = {}): PlatformPrincipal => ({
+    kind: 'platform',
+    operatorId: 'op1',
+    role: 'support_operator',
+    status: 'active',
+    mfa: true,
+    authenticatedAt: minutesAgo(1),
+    ...overrides,
+  });
+
+  it('are separate from tenant roles and follow the operator’s role', () => {
+    for (const key of PLATFORM_PERMISSION_KEYS) expect(isPermission(key)).toBe(false);
+    expect(PERMISSION_KEYS.some((key) => isPlatformPermission(key))).toBe(false);
+    expect(expandPatterns(['*'])).not.toContain('platform.tenants.read');
+    expect(authorizePlatform(operator(), 'platform.tenants.read', { now }).allowed).toBe(true);
+    expect(authorizePlatform(operator(), 'platform.incidents.manage', { now })).toMatchObject({
+      reason: 'no_grant',
+    });
+    const admin = operator({ role: 'platform_admin' });
+    expect(authorizePlatform(admin, 'platform.incidents.manage', { now }).allowed).toBe(true);
+    expect(platformPermissions(operator({ status: 'disabled' }))).toEqual([]);
+  });
+
+  it('asks for two-step verification and a fresh sign-in before support access', () => {
+    expect(
+      authorizePlatform(operator({ mfa: false }), 'platform.support.request', { now }),
+    ).toMatchObject({ reason: 'mfa_required' });
+    const stale = operator({ authenticatedAt: minutesAgo(60) });
+    expect(authorizePlatform(stale, 'platform.support.use', { now })).toMatchObject({
+      reason: 'step_up_required',
+    });
+    const disabled = operator({ status: 'disabled' });
+    expect(explain(authorizePlatform(disabled, 'platform.health.read', { now }))).toMatchObject({
+      allowed: false,
+      key: 'policy.inactive',
+    });
   });
 });

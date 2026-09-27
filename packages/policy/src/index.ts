@@ -3,4 +3,6 @@ export * from './catalog.js';
 export * from './delegation.js';
 export * from './diff.js';
 export * from './explain.js';
+export * from './impact.js';
+export * from './platform.js';
 export * from './presets.js';

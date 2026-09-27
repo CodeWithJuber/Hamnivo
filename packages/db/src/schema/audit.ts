@@ -53,6 +53,9 @@ export const auditEvents = pgTable(
     primaryKey({ name: 'audit_events_pkey', columns: [t.tenantId, t.seq, t.occurredAt] }),
     index('audit_events_time_idx').on(t.tenantId, t.occurredAt),
     index('audit_events_target_idx').on(t.tenantId, t.targetType, t.targetId),
+    // Audit viewer filters (A09): who did it, and what.
+    index('audit_events_actor_idx').on(t.tenantId, t.actorType, t.actorId),
+    index('audit_events_action_idx').on(t.tenantId, t.action),
     tenantIsolation(),
   ],
 );

@@ -158,6 +158,66 @@ export async function resolveTenantSlug(
   return row ? { tenantId: row.tenant_id, tenantStatus: row.tenant_status } : null;
 }
 
+export interface SsoResolution {
+  tenantId: string;
+  connectionId: string;
+  connectionStatus: string;
+  ssoOnly: boolean;
+  tenantStatus: string;
+}
+
+/** The workspace that proved this email domain, with its SSO connection (verified only). */
+export async function resolveSsoDomain(
+  db: Db,
+  domain: string,
+): Promise<(SsoResolution & { providerId: string }) | null> {
+  const { rows } = await db.execute<{
+    tenant_id: string;
+    connection_id: string;
+    provider_id: string;
+    connection_status: string;
+    sso_only: boolean;
+    tenant_status: string;
+  }>(sql`select * from app.resolve_sso_domain(${domain})`);
+  const row = rows[0];
+  return row
+    ? {
+        tenantId: row.tenant_id,
+        connectionId: row.connection_id,
+        providerId: row.provider_id,
+        connectionStatus: row.connection_status,
+        ssoOnly: row.sso_only,
+        tenantStatus: row.tenant_status,
+      }
+    : null;
+}
+
+/** The workspace an SSO callback belongs to (verified domains only). */
+export async function resolveSsoProvider(
+  db: Db,
+  providerId: string,
+): Promise<(SsoResolution & { domain: string }) | null> {
+  const { rows } = await db.execute<{
+    tenant_id: string;
+    connection_id: string;
+    domain: string;
+    connection_status: string;
+    sso_only: boolean;
+    tenant_status: string;
+  }>(sql`select * from app.resolve_sso_provider(${providerId})`);
+  const row = rows[0];
+  return row
+    ? {
+        tenantId: row.tenant_id,
+        connectionId: row.connection_id,
+        domain: row.domain,
+        connectionStatus: row.connection_status,
+        ssoOnly: row.sso_only,
+        tenantStatus: row.tenant_status,
+      }
+    : null;
+}
+
 export async function resolveInvitation(
   db: Db,
   invitationId: string,
