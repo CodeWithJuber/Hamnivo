@@ -1,5 +1,6 @@
 import type { Provider } from '@nestjs/common';
 import { QUERY_VECTOR_CACHE } from '../knowledge/retrieval.service.js';
+import { MemoryCache } from '../memory/cache.js';
 import type { PlatformOverrides } from '../platform/platform.module.js';
 import { CONFIG } from '../tokens.js';
 import { CacheAdminService } from './admin.service.js';
@@ -14,6 +15,7 @@ import {
   CacheHealth,
   cacheStoreFactory,
   PERSONAL_CACHE_SCOPE,
+  type PersonalCacheScope,
   personalStoreFactory,
 } from './store.js';
 import { QueryVectors } from './vectors.js';
@@ -34,8 +36,23 @@ export function cacheProviders(overrides: PlatformOverrides): Provider[] {
       inject: [CONFIG, CacheHealth, CacheConnection, CACHE_STORE_OVERRIDE],
       useFactory: personalStoreFactory,
     },
-    // Per-customer caching stays off until the memory module provides a scope (merge wiring).
-    { provide: PERSONAL_CACHE_SCOPE, useValue: overrides.personalCacheScope ?? null },
+    // A customer's private entries live in their memory namespace, keyed by their memory
+    // version (K09): a memory change makes them unreachable and a deletion removes them.
+    {
+      provide: PERSONAL_CACHE_SCOPE,
+      inject: [MemoryCache],
+      useFactory: (memory: MemoryCache): PersonalCacheScope | null =>
+        overrides.personalCacheScope !== undefined
+          ? overrides.personalCacheScope
+          : {
+              async scope(tenantId, subjectId) {
+                return {
+                  prefix: memory.namespace(tenantId, subjectId),
+                  version: String(await memory.version(tenantId, subjectId)),
+                };
+              },
+            },
+    },
     CacheExclusions,
     CacheService,
     AnswerCache,

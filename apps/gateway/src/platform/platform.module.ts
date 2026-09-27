@@ -22,8 +22,11 @@ export interface PlatformOverrides {
   decisionFetch?: typeof fetch;
   /** Replaces the cache store, for example with one that is down (tests). */
   cacheStore?: CacheStore;
-  /** Places entries private to one customer (tests; memory provides it in production). */
-  personalCacheScope?: PersonalCacheScope;
+  /**
+   * Places entries private to one customer instead of customer memory (tests); `null` turns
+   * per-customer caching off.
+   */
+  personalCacheScope?: PersonalCacheScope | null;
 }
 
 @Injectable()

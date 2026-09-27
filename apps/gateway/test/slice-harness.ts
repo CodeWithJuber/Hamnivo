@@ -54,8 +54,8 @@ export async function startSlice(
     decisionFetch?: typeof fetch;
     /** A cache store to use instead of Valkey (for outage tests). */
     cacheStore?: CacheStore;
-    /** Places entries private to one customer (memory provides it in production). */
-    personalCacheScope?: PersonalCacheScope;
+    /** Replaces the memory-backed scope of private cache entries; `null` turns them off. */
+    personalCacheScope?: PersonalCacheScope | null;
   } = {},
 ): Promise<Slice> {
   const fake = await startFakeChatwoot();
@@ -71,7 +71,9 @@ export async function startSlice(
   const shared = {
     ...(options.decisionFetch ? { decisionFetch: options.decisionFetch } : {}),
     ...(options.cacheStore ? { cacheStore: options.cacheStore } : {}),
-    ...(options.personalCacheScope ? { personalCacheScope: options.personalCacheScope } : {}),
+    ...(options.personalCacheScope !== undefined
+      ? { personalCacheScope: options.personalCacheScope }
+      : {}),
   };
   const gw = await startGateway(env, undefined, {
     ...(options.clock ? { clock: options.clock } : {}),

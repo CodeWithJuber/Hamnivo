@@ -252,10 +252,18 @@ Late publication (R06):
 - **Studio** (`/v1/admin/brands/{brandId}/cache/policy`, `inspect`, `entries`, `impact`,
   `invalidate`, `metrics`): reading needs `knowledge.read`, changing `knowledge.manage`; changes
   are audited. Metrics are counts only; health comes from a live probe of the store.
+- **Customer memory (K09, G19).** Memory is recalled before the cache is read. A reply built with
+  any memory item passes `personalContext: ['personal_memory']`, so it never enters a shared
+  entry; for the opening question it may be kept for that customer alone, under their memory
+  namespace (`MemoryCache.namespace()`, `hamnivo:memory:c:{tenant}:{subject}:`) with their memory
+  version (`MemoryCache.version()`) in the key. A memory change bumps the version, so their
+  entries are no longer reachable; a deletion purges the namespace. The run's `answer_cache` step
+  says whether an entry was `shared` or the customer's own (`scope`).
 - **Hooks for other modules.** `CacheExclusions.register(rule)` excludes requests (commerce, K06).
-  `personalContext` on a cache request (for example `personal_memory`) keeps a result out of
-  shared entries. Entries private to one customer need a `PERSONAL_CACHE_SCOPE` provider that
-  returns the customer's namespace and personal version (memory); without it they are never cached.
+  `personalContext` on a cache request keeps a result out of shared entries. `PERSONAL_CACHE_SCOPE`
+  places private entries (memory provides it; a scope that is missing, slow or not the
+  customer's own means the entry is not cached). A store call must match the lookup's audience,
+  or nothing is stored.
 
 ## Widget framing
 

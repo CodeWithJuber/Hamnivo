@@ -10,7 +10,7 @@ import {
   toPublicId,
   withTenant,
 } from '@hamnivo/db';
-import { type AuthorityMessage, detectHumanRequest } from '@hamnivo/domain';
+import { type AuthorityMessage, detectHumanRequest, sharedCacheEligibility } from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { generateText, isStepCount } from 'ai';
 import canonicalize from 'canonicalize';
@@ -32,7 +32,7 @@ import { AppError } from '../common/app-error.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
 import { LanguageService } from '../language/language.service.js';
 import { citeMemories, memoryBlock } from '../memory/prompt.js';
-import { MemoryRecallService } from '../memory/recall.service.js';
+import { MemoryRecallService, type RecalledMemory } from '../memory/recall.service.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
 import { type ActiveAgent, AgentsService } from './agents.service.js';
@@ -314,6 +314,16 @@ export class RepliesService {
       style: chosen.style,
       languageSource: chosen.resolution.source,
     };
+    // Customer memory (G19) is recalled before the cache: a reply built with it never enters a
+    // shared entry, only the customer's own (keyed by their memory version, K09).
+    const memories = await this.memory.recall(tenantId, {
+      runId: run.id,
+      control: context.control,
+      config: agent.config,
+      history: history.messages,
+    });
+    const shared = sharedCacheEligibility({ memoryItems: memories.length });
+    const personalContext = shared.eligible ? [] : [shared.reason];
     const cached = await this.cachedAnswer(
       tenantId,
       run.id,
@@ -322,6 +332,7 @@ export class RepliesService {
       history,
       question,
       options,
+      personalContext,
     );
 
     let generated: Generated | null;
@@ -335,11 +346,19 @@ export class RepliesService {
         latencyMs: 0,
         sources: cached.answer.sources,
         refs: cached.answer.refs,
-        memories: [],
+        memories: cached.answer.memories ?? [],
       };
     } else {
       try {
-        generated = await this.generate(tenantId, run.id, context, agent, history, options);
+        generated = await this.generate(
+          tenantId,
+          run.id,
+          context,
+          agent,
+          history,
+          options,
+          memories,
+        );
       } catch (error) {
         const failure = classifyModelError(error);
         if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
@@ -364,16 +383,20 @@ export class RepliesService {
         generated.provider === config.model.provider &&
         generated.modelId === config.model.modelId
       ) {
-        await cached.fill({
-          text: generated.text,
-          sources: generated.sources,
-          refs: generated.refs,
-          provider: generated.provider,
-          modelId: generated.modelId,
-          inputTokens: generated.inputTokens,
-          outputTokens: generated.outputTokens,
-          latencyMs: generated.latencyMs,
-        });
+        await cached.fill(
+          {
+            text: generated.text,
+            sources: generated.sources,
+            refs: generated.refs,
+            memories: generated.memories,
+            provider: generated.provider,
+            modelId: generated.modelId,
+            inputTokens: generated.inputTokens,
+            outputTokens: generated.outputTokens,
+            latencyMs: generated.latencyMs,
+          },
+          { personalContext },
+        );
       }
     }
     const reply = generated.text;
@@ -620,6 +643,7 @@ export class RepliesService {
     history: { messages: AuthorityMessage[] },
     question: string,
     options: GenerateOptions,
+    personalContext: string[],
   ): Promise<AnswerLookup> {
     const brandId = context.control.brandId;
     if (!brandId || !options.language) {
@@ -636,6 +660,8 @@ export class RepliesService {
       language: options.language,
       history: history.messages,
       question,
+      personalContext,
+      subjectId: context.control.principalId,
     });
     // With answer caching off (the default) there is nothing worth recording.
     if (found.kind === 'skip' && found.reason === 'tier_disabled') return found;
@@ -647,8 +673,11 @@ export class RepliesService {
         latencyMs: Date.now() - started,
         detail:
           found.kind === 'hit'
-            ? { outcome: 'hit', fingerprint: found.fingerprint }
-            : { outcome: found.status, ...(found.kind === 'skip' ? { reason: found.reason } : {}) },
+            ? { outcome: 'hit', fingerprint: found.fingerprint, scope: found.scope }
+            : {
+                outcome: found.status,
+                ...(found.kind === 'skip' ? { reason: found.reason } : { scope: found.scope }),
+              },
       }),
     );
     return found;
@@ -665,6 +694,7 @@ export class RepliesService {
     agent: ActiveAgent,
     fetched?: { messages: AuthorityMessage[]; view: 'customer' | 'staff_filtered' },
     options: GenerateOptions = {},
+    recalled?: RecalledMemory[],
   ): Promise<Generated | null> {
     const runtime = await this.registry.get(tenantId, context.control.connectionId);
     const { messages: history, view } =
@@ -674,12 +704,14 @@ export class RepliesService {
     const assist = config.mode === 'assist';
     const passages = await this.retrieve(tenantId, runId, context, config, history);
     // Customer memory (G19): only with the customer's consent, in scope and currently valid.
-    const memories = await this.memory.recall(tenantId, {
-      runId,
-      control: context.control,
-      config,
-      history,
-    });
+    const memories =
+      recalled ??
+      (await this.memory.recall(tenantId, {
+        runId,
+        control: context.control,
+        config,
+        history,
+      }));
     const base =
       systemPrompt(config, context.brandName, passages, options) +
       (memories.length ? `\n\n${memoryBlock(memories)}` : '') +

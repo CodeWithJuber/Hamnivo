@@ -62,6 +62,8 @@ export type Lookup<T> =
       key: CacheKey;
       entry: EntryRow | null;
       versions: Record<string, number>;
+      /** Where a private entry lives; null for shared entries. */
+      customer: CustomerCacheScope | null;
       ms: number;
     }
   | {
@@ -146,14 +148,24 @@ export class CacheService {
    */
   private async customerScope(spec: CacheSpec): Promise<CustomerCacheScope | null> {
     if (!this.personal || !spec.subjectId) return null;
+    let timer: NodeJS.Timeout | undefined;
     try {
-      const scope = await this.personal.scope(spec.tenantId, spec.subjectId);
+      // The scope comes from Valkey too: a slow answer means no private entry, never a wait (K08).
+      const timeout = new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), this.config.CACHE_TIMEOUT_MS);
+      });
+      const scope = await Promise.race([
+        this.personal.scope(spec.tenantId, spec.subjectId),
+        timeout,
+      ]);
       if (!scope?.version || !scope.prefix.endsWith(':')) return null;
       const parts = scope.prefix.split(':');
       if (!parts.includes(spec.tenantId) || !parts.includes(spec.subjectId)) return null;
       return scope;
     } catch {
       return null;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -296,7 +308,7 @@ export class CacheService {
     if (parsed !== null && customer) {
       // Private entries are not indexed: they live and go with the customer's namespace.
       await count({ hits: 1, lookupMs: elapsed() });
-      return { status: 'hit', value: parsed, key, entry: null, versions, ms: elapsed() };
+      return { status: 'hit', value: parsed, key, entry: null, versions, customer, ms: elapsed() };
     }
     if (customer) {
       await count({ misses: 1 });
@@ -328,7 +340,7 @@ export class CacheService {
         },
       );
       await count({ hits: 1, lookupMs: elapsed() });
-      return { status: 'hit', value: parsed, key, entry, versions, ms: elapsed() };
+      return { status: 'hit', value: parsed, key, entry, versions, customer: null, ms: elapsed() };
     }
     const earlier = await withTenant(this.db, { tenantId: spec.tenantId, actorId: 'cache' }, (tx) =>
       tx
@@ -393,6 +405,9 @@ export class CacheService {
     value: T,
     meta: { sources?: SourceRefRow[] } = {},
   ): Promise<boolean> {
+    // A private spec is stored only where its lookup placed it, and a shared one never in a
+    // customer's namespace: a spec that changed between lookup and store is not stored at all.
+    if ((spec.audience === 'customer') !== (miss.customer !== null)) return false;
     const stored = await withTenant(
       this.db,
       { tenantId: spec.tenantId, actorId: 'cache' },
@@ -565,7 +580,10 @@ export class CacheService {
 
   /** A hit whose sources no longer qualify: removed, counted as stale, and treated as a miss. */
   async reject<T>(spec: CacheSpec, hit: Extract<Lookup<T>, { status: 'hit' }>, reason: string) {
-    if (hit.entry) await this.retire([hit.entry], reason);
+    if (hit.customer) {
+      const place = this.place(spec, hit.key, hit.customer);
+      await place.store.delete([place.key]);
+    } else if (hit.entry) await this.retire([hit.entry], reason);
     else await this.store.delete([hit.key.key]);
     await this.count(spec, { stale: 1, hits: -1, misses: 1 });
   }

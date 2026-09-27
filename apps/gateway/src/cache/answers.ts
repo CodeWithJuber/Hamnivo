@@ -8,7 +8,7 @@ import {
 } from '@hamnivo/domain';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import type { SourceRef } from '../authority/views.js';
+import type { MemoryPartRef, SourceRef } from '../authority/views.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { CacheService, type CacheSpec, type Lookup, type SourceRefRow } from './cache.service.js';
 
@@ -26,9 +26,12 @@ export interface AnswerContext {
   question: string;
   /**
    * Personal context the reply uses, such as `personal_memory` when customer memory was
-   * recalled. Any code keeps the answer out of the shared cache.
+   * recalled. Any code keeps the answer out of the shared cache; with a customer it may be
+   * cached for that customer alone, under their namespace and memory version.
    */
   personalContext?: readonly string[];
+  /** The customer principal the reply is for, when known. */
+  subjectId?: string | null;
 }
 
 export interface CachedAnswer {
@@ -37,6 +40,8 @@ export interface CachedAnswer {
   sources: SourceRef[];
   /** Document references and versions, to recheck before reuse. */
   refs: SourceRefRow[];
+  /** Customer memories the reply cited (only in the customer's own entries). */
+  memories?: MemoryPartRef[];
   provider: string;
   modelId: string;
   inputTokens: number | null;
@@ -44,10 +49,14 @@ export interface CachedAnswer {
   latencyMs: number;
 }
 
+/** Whether an entry is shared by the brand's customers or private to one customer. */
+export type AnswerScope = 'shared' | 'customer';
+
 export type AnswerLookup =
-  | { kind: 'hit'; answer: CachedAnswer; fingerprint: string }
+  | { kind: 'hit'; answer: CachedAnswer; fingerprint: string; scope: AnswerScope }
   | {
       kind: 'fill';
+      scope: AnswerScope;
       /**
        * Stores the answer when it is still eligible. Pass the personal context the generation
        * ended up using (for example memory recalled after the lookup): any code prevents storing.
@@ -82,11 +91,18 @@ export class AnswerCache {
       (m) => m.direction === 'outgoing' && !m.private && m.text?.trim(),
     );
     const { config } = context;
+    // Only the opening question of a conversation is generic enough to reuse: later turns depend
+    // on the conversation, which is not part of the key.
+    const opening = incoming.length === 1 && !answered && config.mode === 'answer';
+    const personal = [...(context.personalContext ?? []), ...personalContext];
+    // Built with personal context (memory): kept for this customer alone, never shared.
+    const own = opening && personal.length > 0 && Boolean(context.subjectId);
     return {
       tier: 'exact_answer',
       tenantId: context.tenantId,
       brandId: context.brandId,
-      audience: 'public',
+      audience: own ? 'customer' : 'public',
+      ...(own && context.subjectId ? { subjectId: context.subjectId } : {}),
       language: context.language,
       model: `${config.model.provider}/${config.model.modelId}`,
       promptVersion: `${context.agentVersionId}:${context.promptVersion}`,
@@ -104,9 +120,8 @@ export class AnswerCache {
         dataClasses:
           config.knowledgeSourceIds.length > 0 ? ['general', 'public_knowledge'] : ['general'],
         texts: [context.question],
-        // Only the opening question of a conversation is generic enough to share.
-        personalized: incoming.length !== 1 || answered || config.mode !== 'answer',
-        personalContext: [...(context.personalContext ?? []), ...personalContext],
+        personalized: !opening,
+        personalContext: personal,
         complete,
         tags: { channel: 'widget' },
       },
@@ -155,6 +170,7 @@ export class AnswerCache {
 
   async lookup(context: AnswerContext): Promise<AnswerLookup> {
     const spec = this.spec(context);
+    const scope: AnswerScope = spec.audience === 'customer' ? 'customer' : 'shared';
     const result: Lookup<CachedAnswer> = await this.cache.lookup<CachedAnswer>(spec);
     switch (result.status) {
       case 'bypass':
@@ -168,22 +184,27 @@ export class AnswerCache {
             savedOutputTokens: result.value.outputTokens ?? 0,
             savedMs: result.value.latencyMs,
           });
-          return { kind: 'hit', answer: result.value, fingerprint: result.key.fingerprint };
+          return { kind: 'hit', answer: result.value, fingerprint: result.key.fingerprint, scope };
         }
         await this.cache.reject(spec, result, 'source_changed');
-        return this.fillFor(context, await this.cache.lookup<CachedAnswer>(spec));
+        return this.fillFor(context, await this.cache.lookup<CachedAnswer>(spec), scope);
       }
       default:
-        return this.fillFor(context, result);
+        return this.fillFor(context, result, scope);
     }
   }
 
-  private fillFor(context: AnswerContext, result: Lookup<CachedAnswer>): AnswerLookup {
+  private fillFor(
+    context: AnswerContext,
+    result: Lookup<CachedAnswer>,
+    scope: AnswerScope,
+  ): AnswerLookup {
     if (result.status !== 'miss' && result.status !== 'stale') {
       return { kind: 'skip', status: 'unavailable', reason: null };
     }
     return {
       kind: 'fill',
+      scope,
       status: result.status,
       fill: async (answer, used) => {
         await this.cache.put(this.spec(context, true, used?.personalContext), result, answer, {

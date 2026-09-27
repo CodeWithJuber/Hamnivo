@@ -2,13 +2,17 @@ import { randomUUID } from 'node:crypto';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
 import type { CacheStore } from '@hamnivo/adapters/cache';
 import { createMockModel } from '@hamnivo/adapters/models';
-import { fromPublicId, schema, withTenant } from '@hamnivo/db';
+import { MEMORY_NOTICE_VERSION } from '@hamnivo/contracts';
+import { fromPublicId, schema, toPublicId, withTenant } from '@hamnivo/db';
+import { MEMORY_EXTRACTION_MARKER } from '@hamnivo/domain';
 import { eq } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AnswerCache, type AnswerContext, type CachedAnswer } from '../src/cache/answers.js';
 import { CacheService, type CacheSpec } from '../src/cache/cache.service.js';
-import { CacheExclusions, type PersonalCacheScope } from '../src/cache/store.js';
+import { CacheExclusions } from '../src/cache/store.js';
+import { MemoryCache } from '../src/memory/cache.js';
+import { contentHashOf } from '../src/memory/writer.service.js';
 import { connectedTenant, type Slice, startSlice, Visitor } from './slice-harness.js';
 
 /** The mock model, counting the calls that actually reach it. */
@@ -18,8 +22,10 @@ function countingModel() {
   const model: LanguageModelV4 = {
     ...base,
     async doGenerate(call) {
-      state.calls += 1;
       const result = await base.doGenerate(call);
+      // Memory extraction for customers who agreed to memory is not a reply: the mock answers it.
+      if (JSON.stringify(call.prompt).includes(MEMORY_EXTRACTION_MARKER)) return result;
+      state.calls += 1;
       // A reply that cites the first passage, so cached answers carry their sources.
       return {
         ...result,
@@ -45,34 +51,23 @@ interface Brand {
 const QUESTION = 'How can I contact the team?';
 const counted = countingModel();
 
-// Per-customer namespaces as memory keeps them (`…memory:c:{tenant}:{subject}:`), under a prefix
-// of this test run only, with a version the test can bump like a memory change would.
-const MEMORY = `hv:test:${process.pid}:${randomUUID().slice(0, 8)}:memory:c:`;
-const memoryVersions = new Map<string, number>();
-const personalCacheScope: PersonalCacheScope = {
-  async scope(tenantId, subjectId) {
-    // A broken provider that points at another tenant's namespace.
-    if (subjectId === INTRUDER)
-      return { prefix: `${MEMORY}${randomUUID()}:${subjectId}:`, version: '1' };
-    return {
-      prefix: `${MEMORY}${tenantId}:${subjectId}:`,
-      version: String(memoryVersions.get(subjectId) ?? 1),
-    };
-  },
-};
-const INTRUDER = randomUUID();
 let slice: Slice;
 let alpha: Brand;
 let alphaSecond: Brand;
 let beta: Brand;
 let valkey: Redis;
 
+/** Tenants whose memory keys (namespaces and versions) this file removes afterwards. */
+const tenants = new Set<string>();
+
 async function withKnowledge(
   tenant: Tenant,
   brand: { id: string; widgetId: string },
   agentId: string,
   hostOrigin: string,
+  options: { memory?: boolean } = {},
 ): Promise<Brand> {
+  tenants.add(fromPublicId('tenant', tenant.tenantId));
   const { owner } = tenant;
   const source = await owner.post('/v1/admin/knowledge/sources', {
     brandId: brand.id,
@@ -96,6 +91,7 @@ async function withKnowledge(
       ...config,
       languages: ['en', 'ur', 'hi', 'ar'],
       knowledgeSourceIds: [source.body.id],
+      ...(options.memory ? { memory: { ...config.memory, enabled: true } } : {}),
     },
   });
   expect(draft.status, JSON.stringify(draft.body)).toBe(200);
@@ -118,7 +114,8 @@ async function withKnowledge(
 }
 
 beforeAll(async () => {
-  slice = await startSlice({ model: counted.model, personalCacheScope });
+  // Entries private to one customer are placed by customer memory, as in production.
+  slice = await startSlice({ model: counted.model });
   const a = await connectedTenant(slice, 'cachealpha');
   alpha = await withKnowledge(a, a.brand, a.agentId, a.hostOrigin);
   // A second brand of the same tenant, with the same knowledge and settings.
@@ -144,15 +141,21 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const personal = (await valkey?.keys(`${MEMORY}*`)) ?? [];
-  if (personal.length > 0) await valkey.del(...personal);
+  for (const tenantId of tenants) {
+    const keys = [
+      ...((await valkey?.keys(`hamnivo:memory:c:${tenantId}:*`)) ?? []),
+      ...((await valkey?.keys(`hamnivo:memory:v:${tenantId}:*`)) ?? []),
+    ];
+    if (keys.length > 0) await valkey.del(...keys);
+  }
   valkey?.disconnect();
   await slice?.close();
 });
 
-async function ask(brand: Brand, text: string) {
-  const visitor = new Visitor(slice.baseUrl, brand.widgetId, brand.hostOrigin);
-  await visitor.open();
+/** Opens a conversation with `text` (as a new visitor unless one is given) and lets it finish. */
+async function ask(brand: Brand, text: string, existing?: Visitor) {
+  const visitor = existing ?? new Visitor(slice.baseUrl, brand.widgetId, brand.hostOrigin);
+  if (!existing) await visitor.open();
   const started = await visitor.call('POST', '/v1/widget/conversations', {
     firstMessage: text,
     clientMessageId: randomUUID(),
@@ -174,6 +177,9 @@ async function ask(brand: Brand, text: string) {
     run: run.body as Record<string, any>,
     cacheStep: (run.body.steps as Array<Record<string, any>>).find(
       (s) => s.name === 'answer_cache',
+    ),
+    memoryStep: (run.body.steps as Array<Record<string, any>>).find(
+      (s) => s.kind === 'retrieval' && s.name === 'memory',
     ),
     reply,
   };
@@ -487,6 +493,16 @@ describe('memory hooks: personal context and entries private to one customer', (
     },
     ...over,
   });
+  /** An entry for one customer, as a reply built with their memory asks for it. */
+  const privateSpec = (subjectId: string, over: Partial<CacheSpec> = {}): CacheSpec => {
+    const base = spec(over);
+    return {
+      ...base,
+      audience: 'customer',
+      subjectId,
+      request: { ...base.request, personalized: true, personalContext: ['personal_memory'] },
+    };
+  };
 
   it('keeps a reply built with personal context, such as memory, out of the shared cache', async () => {
     const cache = slice.worker.get(CacheService);
@@ -535,73 +551,266 @@ describe('memory hooks: personal context and entries private to one customer', (
     if (again.kind !== 'fill') throw new Error(`expected nothing stored, got ${again.kind}`);
     // The same answer without personal context is stored: the veto above is what kept it out.
     await again.fill(answer);
-    expect(await answers.lookup(context)).toMatchObject({ kind: 'hit' });
+    expect(await answers.lookup(context)).toMatchObject({ kind: 'hit', scope: 'shared' });
     expect((await answers.lookup({ ...context, personalContext: ['personal_memory'] })).kind).toBe(
       'skip',
     );
+
+    // With the customer known, a reply built with their memory is kept for them alone.
+    const customer = { ...context, personalContext: ['personal_memory'], subjectId: randomUUID() };
+    const own = await answers.lookup(customer);
+    expect(own).toMatchObject({ kind: 'fill', scope: 'customer' });
+    if (own.kind !== 'fill') throw new Error(`expected a fill, got ${own.kind}`);
+    await own.fill(answer, { personalContext: ['personal_memory'] });
+    expect(await answers.lookup(customer)).toMatchObject({ kind: 'hit', scope: 'customer' });
+    expect(await answers.lookup(context)).toMatchObject({ kind: 'hit', scope: 'shared' });
   });
 
-  it('keeps entries private to one customer in their namespace, under their memory version', async () => {
+  it('keeps entries private to one customer in their memory namespace, under their memory version', async () => {
     const cache = slice.worker.get(CacheService);
+    const memory = slice.worker.get(MemoryCache);
+    const { tenantId } = ids();
     const indexed = (await entries(alpha)).length;
     const customer = randomUUID();
-    const other = randomUUID();
-    const mine = spec({
-      audience: 'customer',
-      subjectId: customer,
-      request: { ...spec().request, personalized: true, personalContext: ['personal_memory'] },
-    });
+    const mine = privateSpec(customer);
+    const namespace = memory.namespace(tenantId, customer);
 
     const first = await cache.lookup<CachedAnswer>(mine);
     if (first.status !== 'miss') throw new Error(`expected a miss, got ${first.status}`);
-    expect(first.customer?.prefix).toBe(`${MEMORY}${ids().tenantId}:${customer}:`);
+    expect(first.customer).toEqual({
+      prefix: namespace,
+      version: String(await memory.version(tenantId, customer)),
+    });
     expect(await cache.put(mine, first, answer)).toBe(true);
-    // Stored in the customer's namespace, so deleting their memory namespace deletes it.
-    const stored = await valkey.keys(`${MEMORY}${ids().tenantId}:${customer}:*`);
-    expect(stored).toEqual([
-      `${MEMORY}${ids().tenantId}:${customer}:cache:exact_answer:${first.key.fingerprint}`,
+    // Stored in the customer's memory namespace, never under the shared prefix.
+    expect(await valkey.keys(`${namespace}*`)).toEqual([
+      `${namespace}cache:exact_answer:${first.key.fingerprint}`,
     ]);
     expect(
       await valkey.keys(`${slice.gw.config.CACHE_KEY_PREFIX}*${first.key.fingerprint}`),
     ).toEqual([]);
     expect(await cache.lookup<CachedAnswer>(mine)).toMatchObject({ status: 'hit', value: answer });
-
     // Another customer never sees it.
-    expect(await cache.lookup({ ...mine, subjectId: other })).toMatchObject({ status: 'miss' });
-    // A memory change bumps the version: the old entry is no longer reachable.
-    memoryVersions.set(customer, 2);
+    expect(await cache.lookup(privateSpec(randomUUID()))).toMatchObject({ status: 'miss' });
+
+    // A memory change bumps the customer's version: the entry is no longer reachable.
+    await memory.bump(tenantId, customer);
+    const changed = await cache.lookup<CachedAnswer>(mine);
+    if (changed.status !== 'miss') throw new Error(`expected a miss, got ${changed.status}`);
+    expect(changed.key.fingerprint).not.toBe(first.key.fingerprint);
+    expect(await cache.put(mine, changed, answer)).toBe(true);
+    expect(await cache.lookup(mine)).toMatchObject({ status: 'hit' });
+
+    // A deletion purges the namespace (and bumps the version): nothing of theirs is left.
+    expect(await memory.purge(tenantId, customer)).toBe(2);
+    expect(await valkey.keys(`${namespace}*`)).toEqual([]);
     expect(await cache.lookup(mine)).toMatchObject({ status: 'miss' });
-    // A namespace that does not belong to this tenant and customer is refused.
-    expect(await cache.lookup({ ...mine, subjectId: INTRUDER })).toMatchObject({
-      status: 'bypass',
-      reason: 'no_customer_scope',
-    });
     // Private entries never appear in the shared index.
     expect(await entries(alpha)).toHaveLength(indexed);
   });
 
-  it('never caches per customer without a scope from the memory module', async () => {
-    const plain = await startSlice({ model: counted.model });
-    try {
-      const cache = plain.worker.get(CacheService);
-      const t = await connectedTenant(plain, 'cachenoscope');
-      const policy = await t.owner.put(`/v1/admin/brands/${t.brand.id}/cache/policy`, {
-        tiers: { exact_answer: { enabled: true, ttlSeconds: 3600 } },
-      });
-      expect(policy.status).toBe(200);
-      const found = await cache.lookup(
-        spec({
-          tenantId: fromPublicId('tenant', t.tenantId),
-          brandId: fromPublicId('brand', t.brand.id),
-          audience: 'customer',
-          subjectId: randomUUID(),
-          request: { ...spec().request, personalized: true },
-        }),
-      );
-      expect(found).toMatchObject({ status: 'bypass', reason: 'no_customer_scope' });
-    } finally {
-      await plain.close();
+  it('stores nothing when the lookup and the store disagree about whose entry it is', async () => {
+    const cache = slice.worker.get(CacheService);
+    const input = `Which size did I order? ${randomUUID()}`;
+    const shared = spec({ input });
+    const mine = privateSpec(randomUUID(), { input });
+    // Found missing as a shared entry, then offered as a private one: kept out of both.
+    const sharedMiss = await cache.lookup<CachedAnswer>(shared);
+    if (sharedMiss.status !== 'miss') throw new Error(`expected a miss, got ${sharedMiss.status}`);
+    expect(await cache.put(mine, sharedMiss, answer)).toBe(false);
+    // Found missing for the customer, then offered as a shared one: kept out of both.
+    const privateMiss = await cache.lookup<CachedAnswer>(mine);
+    if (privateMiss.status !== 'miss') {
+      throw new Error(`expected a miss, got ${privateMiss.status}`);
     }
+    expect(await cache.put(shared, privateMiss, answer)).toBe(false);
+    expect(await cache.lookup(shared)).toMatchObject({ status: 'miss' });
+    expect(await cache.lookup(mine)).toMatchObject({ status: 'miss' });
+  });
+
+  it('never caches per customer without a namespace that is theirs, answered in time', async () => {
+    const intruder = randomUUID();
+    const slow = randomUUID();
+    const broken = await startSlice({
+      model: counted.model,
+      personalCacheScope: {
+        async scope(_tenantId, subjectId) {
+          // Another tenant's namespace, a provider that never answers, or no namespace at all.
+          if (subjectId === intruder) {
+            return { prefix: `hamnivo:memory:c:${randomUUID()}:${subjectId}:`, version: '1' };
+          }
+          if (subjectId === slow) return new Promise(() => undefined);
+          return null;
+        },
+      },
+    });
+    const off = await startSlice({ model: counted.model, personalCacheScope: null });
+    try {
+      const cases: Array<[Slice, string[]]> = [
+        [broken, [randomUUID(), intruder, slow]],
+        [off, [randomUUID()]],
+      ];
+      for (const [running, subjects] of cases) {
+        const cache = running.worker.get(CacheService);
+        const t = await connectedTenant(running, 'cachenoscope');
+        const policy = await t.owner.put(`/v1/admin/brands/${t.brand.id}/cache/policy`, {
+          tiers: { exact_answer: { enabled: true, ttlSeconds: 3600 } },
+        });
+        expect(policy.status).toBe(200);
+        for (const subjectId of subjects) {
+          const started = Date.now();
+          const found = await cache.lookup(
+            privateSpec(subjectId, {
+              tenantId: fromPublicId('tenant', t.tenantId),
+              brandId: fromPublicId('brand', t.brand.id),
+            }),
+          );
+          expect(found).toMatchObject({ status: 'bypass', reason: 'no_customer_scope' });
+          expect(Date.now() - started).toBeLessThan(running.gw.config.CACHE_TIMEOUT_MS + 1000);
+        }
+      }
+    } finally {
+      await broken.close();
+      await off.close();
+    }
+  });
+});
+
+describe('memory hooks in replies: customer memory stays with the customer (K09, G19)', () => {
+  const ASKED = 'How do I reach your team?';
+  let shop: Brand;
+  let workspaceId: string;
+
+  beforeAll(async () => {
+    const t = await connectedTenant(slice, 'cachememory');
+    workspaceId = t.workspaceId;
+    shop = await withKnowledge(t, t.brand, t.agentId, t.hostOrigin, { memory: true });
+  });
+
+  /** A customer who agreed to memory, with one remembered preference. */
+  async function rememberingCustomer() {
+    const visitor = new Visitor(slice.baseUrl, shop.widgetId, shop.hostOrigin);
+    await visitor.open();
+    const consent = await visitor.call('POST', '/v1/widget/memory/consent', {
+      state: 'granted',
+      noticeVersion: MEMORY_NOTICE_VERSION,
+    });
+    expect(consent.status, JSON.stringify(consent.body)).toBe(200);
+    const tenantId = fromPublicId('tenant', shop.tenantId);
+    const subjectId = fromPublicId('customer', visitor.principalId);
+    const at = new Date(Date.now() - 60_000);
+    const [row] = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .insert(schema.memoryRecords)
+        .values({
+          tenantId,
+          workspaceId: fromPublicId('workspace', workspaceId),
+          brandId: fromPublicId('brand', shop.brandId),
+          subjectId,
+          scope: 'person',
+          kind: 'preference',
+          key: 'contact_method',
+          payload: { value: 'Email' },
+          contentHash: contentHashOf('preference', 'contact_method', 'Email'),
+          sourceType: 'customer_statement',
+          evidenceStatus: 'supported',
+          writtenByType: 'ai',
+          writeReason: 'extracted_from_message',
+          purpose: 'test',
+          allowedPurposes: ['ai_replies', 'staff_context'],
+          allowedRoles: ['customer', 'staff', 'ai'],
+          sensitivity: 'normal',
+          retentionClass: 'long',
+          policyVersion: 'memory-write/1',
+          status: 'active',
+          reviewStatus: 'auto',
+          observedAt: at,
+          validFrom: at,
+        })
+        .returning(),
+    );
+    if (!row) throw new Error('no memory record');
+    const memory = slice.worker.get(MemoryCache);
+    return {
+      visitor,
+      memoryId: toPublicId('memory', row.id),
+      namespace: memory.namespace(tenantId, subjectId),
+      version: () => memory.version(tenantId, subjectId),
+    };
+  }
+
+  const privateKeys = (namespace: string) => valkey.keys(`${namespace}cache:*`);
+
+  it('a reply built with memory never enters a shared entry, only the customer’s own', async () => {
+    const sara = await rememberingCustomer();
+    const first = await ask(shop, ASKED, sara.visitor);
+    expect(first.modelCalls).toBe(1);
+    expect(first.memoryStep).toMatchObject({
+      status: 'ok',
+      detail: { items: 1, sharedCache: { eligible: false, reason: 'personal_memory' } },
+    });
+    expect(first.cacheStep?.detail).toMatchObject({ outcome: 'miss', scope: 'customer' });
+    // Kept in the customer's memory namespace only: nothing shared, nothing indexed.
+    expect(await privateKeys(sara.namespace)).toHaveLength(1);
+    expect(await entries(shop)).toEqual([]);
+
+    // The same customer asking again gets their own entry.
+    const again = await ask(shop, ASKED, sara.visitor);
+    expect(again.modelCalls).toBe(0);
+    expect(again.cacheStep).toMatchObject({
+      status: 'ok',
+      detail: { outcome: 'hit', scope: 'customer' },
+    });
+    expect(again.run).toMatchObject({ provider: 'cache', outcome: 'replied' });
+
+    // Another customer asking the same question never gets it: theirs is a shared entry.
+    const other = await ask(shop, ASKED);
+    expect(other.modelCalls).toBe(1);
+    expect(other.memoryStep).toMatchObject({ status: 'skipped' });
+    expect(other.cacheStep?.detail).toMatchObject({ outcome: 'miss', scope: 'shared' });
+    expect(await entries(shop)).toHaveLength(1);
+    // The customer with memory still gets their own entry, not the shared one.
+    const mine = await ask(shop, ASKED, sara.visitor);
+    expect(mine.cacheStep?.detail).toMatchObject({ outcome: 'hit', scope: 'customer' });
+    expect(await entries(shop)).toHaveLength(1);
+  });
+
+  it('a memory change makes the customer’s entries unreachable, and a deletion removes them', async () => {
+    const ali = await rememberingCustomer();
+    expect((await ask(shop, ASKED, ali.visitor)).cacheStep?.detail).toMatchObject({
+      outcome: 'miss',
+      scope: 'customer',
+    });
+    expect((await ask(shop, ASKED, ali.visitor)).cacheStep?.detail).toMatchObject({
+      outcome: 'hit',
+      scope: 'customer',
+    });
+
+    // The customer corrects what was remembered: their memory version moves on.
+    const version = await ali.version();
+    const corrected = await ali.visitor.call('POST', `/v1/widget/memory/${ali.memoryId}/correct`, {
+      value: 'WhatsApp',
+    });
+    expect(corrected.status, JSON.stringify(corrected.body)).toBe(200);
+    expect(await ali.version()).toBeGreaterThan(version);
+    const changed = await ask(shop, ASKED, ali.visitor);
+    expect(changed.modelCalls).toBe(1);
+    expect(changed.cacheStep?.detail).toMatchObject({ outcome: 'miss', scope: 'customer' });
+    expect(await privateKeys(ali.namespace)).toHaveLength(2);
+
+    // Deleting the memory purges the namespace once the deletion has run.
+    const current = corrected.body.memory.id as string;
+    const deleted = await ali.visitor.call('POST', `/v1/widget/memory/${current}/delete`);
+    expect(deleted.status, JSON.stringify(deleted.body)).toBe(202);
+    await slice.drain();
+    const receipt = await ali.visitor.call('GET', `/v1/widget/memory/deletions/${deleted.body.id}`);
+    expect(receipt.body.status).toBe('completed');
+    expect(await valkey.keys(`${ali.namespace}*`)).toEqual([]);
+    // With nothing remembered, the question is answered like anyone else's.
+    const after = await ask(shop, ASKED, ali.visitor);
+    expect(after.memoryStep).toMatchObject({ status: 'ok', detail: { items: 0 } });
+    expect(after.cacheStep?.detail).toMatchObject({ scope: 'shared' });
+    expect(await privateKeys(ali.namespace)).toEqual([]);
   });
 });
 
