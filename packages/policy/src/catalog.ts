@@ -85,6 +85,16 @@ export const PERMISSIONS = {
   'memory.read': { description: 'Read customer memory records', scopes: ALL },
   'memory.manage': { description: 'Correct or restrict memory records', scopes: BRAND },
   'memory.delete': { description: 'Delete memory records', scopes: BRAND, stepUp: true },
+  'memory.erase': {
+    description: 'Erase everything remembered about a customer',
+    scopes: BRAND,
+    stepUp: true,
+  },
+  'memory.export': {
+    description: 'Export everything remembered about a customer',
+    scopes: BRAND,
+    stepUp: true,
+  },
   'commerce.read': { description: 'See carts, quotes and orders', scopes: ALL },
   'commerce.manage': {
     description: 'Configure merchants and catalog sync',

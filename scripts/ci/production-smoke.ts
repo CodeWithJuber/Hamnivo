@@ -334,7 +334,16 @@ await check('Studio is served with its own security policy', async () => {
   expect(missing.status === 404, `a missing asset answered ${missing.status}`);
 });
 
+const customer = (method: string, path: string, body?: unknown) =>
+  call(method, `${API}/v1/widget/memory${path}`, {
+    ...(body === undefined ? {} : { body }),
+    headers: { origin: CHAT, authorization: `Bearer ${widgetToken}` },
+  });
+const consent = (state: string) => customer('POST', '/consent', { state, noticeVersion: '1' });
+
 await check('a backup restores the data as it was', async () => {
+  const granted = await consent('granted');
+  expect(granted.status === 200, `consent ${granted.status}: ${granted.text}`);
   const backups = `${envFile}.backups`;
   execFileSync('bash', [hamnivo, 'backup', '--to', backups], { stdio: 'inherit' });
   const dir = execFileSync('bash', ['-c', `ls -d "${backups}"/20*Z | tail -1`], {
@@ -348,7 +357,48 @@ await check('a backup restores the data as it was', async () => {
     tenantId,
   );
   expect(later.status === 201, `second brand ${later.status}`);
+  // After the backup, the customer withdraws consent and has everything about them forgotten.
+  // The restore must keep both: restoring the backup alone would bring the consent back.
+  const withdrawn = await consent('withdrawn');
+  expect(withdrawn.status === 200, `withdrawal ${withdrawn.status}: ${withdrawn.text}`);
+  const forgotten = await customer('POST', '/forget');
+  expect(forgotten.status === 202, `forget ${forgotten.status}: ${forgotten.text}`);
   execFileSync('bash', [hamnivo, 'restore', dir, '--yes'], { stdio: 'inherit' });
+  const memory = await customer('GET', '');
+  expect(memory.status === 200, `memory after restore ${memory.status}: ${memory.text}`);
+  expect(
+    memory.body.consent.state === 'withdrawn',
+    `consent after restore: ${memory.body.consent.state}`,
+  );
+  let receipt: Json = null;
+  for (let i = 0; i < 30 && receipt?.status !== 'completed'; i += 1) {
+    if (i > 0) await new Promise((resolve) => setTimeout(resolve, 2000));
+    const found = await customer('GET', `/deletions/${forgotten.body.id}`);
+    expect(found.status === 200, `deletion after restore ${found.status}: ${found.text}`);
+    receipt = found.body;
+  }
+  expect(receipt?.status === 'completed', `deletion after restore: ${receipt?.status}`);
+  const tombstones = execFileSync(
+    'bash',
+    [
+      hamnivo,
+      'compose',
+      'exec',
+      '-T',
+      'hamnivo-db',
+      'psql',
+      '-X',
+      '-At',
+      '-U',
+      'postgres',
+      '-d',
+      'hamnivo',
+      '-c',
+      "select count(*) from deletion_tombstones where target_type = 'memory_subject'",
+    ],
+    { encoding: 'utf8' },
+  ).trim();
+  expect(tombstones === '1', `customer tombstones after restore: ${tombstones}`);
   const brands = await admin('GET', '/v1/admin/brands', undefined, tenantId);
   expect(brands.status === 200, `brands after restore ${brands.status}: ${brands.text}`);
   const names = brands.body.items.map((b: { name: string }) => b.name);

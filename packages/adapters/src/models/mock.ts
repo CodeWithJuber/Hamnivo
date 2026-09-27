@@ -6,6 +6,11 @@ import type {
   LanguageModelV4StreamPart,
   LanguageModelV4Usage,
 } from '@ai-sdk/provider';
+import {
+  type ExtractionInput,
+  MEMORY_EXTRACTION_MARKER,
+  mockExtractMemories,
+} from '@hamnivo/domain';
 
 export interface MockTurn {
   /** System instructions, joined. */
@@ -74,12 +79,37 @@ const REPLIES: Record<Script, { greeting: string; body: string }> = {
 };
 
 /**
- * Default reply: answers in the customer's script, returns a greeting of peace, says plainly that
- * it is an AI and asks for details. It claims no facts it does not have.
+ * Memory extraction (instructions carry MEMORY_EXTRACTION_MARKER): proposes only what the
+ * customer stated explicitly, deterministically, as the JSON the extraction job expects.
  */
-export const defaultMockReply: MockReply = ({ text }) => {
-  const reply = REPLIES[scriptOf(text)];
-  return `${GREETING.test(text) ? reply.greeting : ''}${reply.body}`;
+function mockMemoryExtraction(text: string): string {
+  let input: ExtractionInput = { messages: [] };
+  try {
+    const parsed = JSON.parse(text) as Partial<ExtractionInput>;
+    if (Array.isArray(parsed.messages)) input = { messages: parsed.messages };
+  } catch {
+    // Not the extraction input: nothing to propose.
+  }
+  return JSON.stringify({ memories: mockExtractMemories(input) });
+}
+
+/** The first customer memory in the instructions: "[M1] Label: value (source, date)". */
+const FIRST_MEMORY = /^\[M1\] ([^:\n]+): ([^\n]+) \([^()\n]*\)$/m;
+
+/**
+ * Default reply: answers in the customer's script, returns a greeting of peace, says plainly that
+ * it is an AI and asks for details. It claims no facts it does not have; in English it mentions
+ * the first customer memory it was given, citing it as a memory ([M1]).
+ */
+export const defaultMockReply: MockReply = ({ system, text }) => {
+  if (system.includes(MEMORY_EXTRACTION_MARKER)) return mockMemoryExtraction(text);
+  const script = scriptOf(text);
+  const reply = REPLIES[script];
+  const memory = script === 'latin' ? system.match(FIRST_MEMORY) : null;
+  const remembered = memory
+    ? ` You told us before that your ${memory[1]?.toLowerCase()} is ${memory[2]} [M1].`
+    : '';
+  return `${GREETING.test(text) ? reply.greeting : ''}${reply.body}${remembered}`;
 };
 
 /**

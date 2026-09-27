@@ -89,11 +89,13 @@ describe('database roles', () => {
     const definers = rows.filter((r) => r.secdef);
     expect(definers.map((r) => r.fn).sort()).toEqual(
       [
+        'app.apply_memory_tombstones()',
         'app.claim_integration_inbox(integer,integer)',
         'app.claim_outbox(integer,integer)',
         'app.claim_reconcile_cursors(integer,integer)',
         'app.ensure_audit_partitions(integer)',
         'app.ensure_reconcile_cursors()',
+        'app.expired_memory_subjects(integer)',
         'app.purge_expired(integer)',
         'app.resolve_api_key(text)',
         'app.resolve_authority_connection(uuid)',

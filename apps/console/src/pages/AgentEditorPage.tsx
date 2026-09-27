@@ -87,6 +87,8 @@ function sectionLabel(t: TFunction, key: SectionKey): string {
       return t('editor.sections.limits');
     case 'knowledge':
       return t('editor.sections.knowledge');
+    case 'memory':
+      return t('editor.sections.memory');
   }
 }
 
@@ -748,6 +750,39 @@ function Editor({ detail }: { detail: AgentDetail }) {
                 ))}
               </ul>
             )}
+          </FormSection>
+
+          <FormSection id="section-memory" title={t('editor.sections.memory')}>
+            <CheckboxField
+              id={FIELD_IDS.memoryEnabled}
+              label={t('editor.memory.enabled')}
+              hint={t('editor.memory.hint')}
+              checked={form.memoryEnabled}
+              disabled={!editable}
+              onCheckedChange={(checked) => update({ memoryEnabled: checked })}
+            />
+            {form.memoryEnabled ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextField
+                  id={FIELD_IDS.memoryMaxItems}
+                  label={t('editor.memory.maxItems')}
+                  inputMode="numeric"
+                  value={form.memoryMaxItems}
+                  disabled={!editable}
+                  onChange={(event) => update({ memoryMaxItems: event.target.value })}
+                  error={errors[FIELD_IDS.memoryMaxItems]}
+                />
+                <TextField
+                  id={FIELD_IDS.memoryMaxChars}
+                  label={t('editor.memory.maxChars')}
+                  inputMode="numeric"
+                  value={form.memoryMaxChars}
+                  disabled={!editable}
+                  onChange={(event) => update({ memoryMaxChars: event.target.value })}
+                  error={errors[FIELD_IDS.memoryMaxChars]}
+                />
+              </div>
+            ) : null}
           </FormSection>
 
           <div className="sticky bottom-0 z-10 -mx-4 flex flex-col gap-3 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">

@@ -28,6 +28,14 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
     a conflict with the differing fields; nothing is overwritten silently.
   - Publishing asks for a recent sign-in. A banner says that saved is not live.
   - The version list shows each version's state and hash, with rollback.
+- **Customer memory** (board 15).
+  - Customers with memory or a memory choice, with search, their choice and what waits for review.
+  - Per customer: preferences and conversation facts with purpose, source message, who recorded
+    them, scope, expiry and history. A newer, different value is shown next to the current one to
+    confirm or reject.
+  - Correct with a reason, mark outdated, delete (a receipt shows when indexes and caches are
+    cleared), erase everything and export, each within the person's permissions.
+  - AI agents have a "Customer memory" section to turn memory on and set its limits.
 - **Model connections.** List, add (the API key is write-only; only its last characters are shown
   afterwards) and disable.
 - **Knowledge.**
@@ -115,6 +123,7 @@ pnpm --filter @hamnivo/console test:e2e
   - a Markdown upload that becomes ready, and a search preview;
   - stopping the AI for a brand, then resuming;
   - runs after a widget conversation, with the run's steps;
+  - customer memory: review, correct, delete, export and erase, right to left, and access denied;
   - axe (WCAG 2.2 A and AA) on every main screen in English and Arabic;
   - no sideways scrolling from 320 to 1920 px.
 - The last test saves screenshots for review in `e2e/screenshots/` (not in git).

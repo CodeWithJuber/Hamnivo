@@ -82,3 +82,29 @@ rubrics. It never authorizes, never computes money or dates, and never writes re
 - The language tag is a hint. In Latin script, phrases with English or Hindi person words are tagged
   Hinglish, and phrases with Urdu words (insaan, banda) are tagged Roman Urdu.
 - The cases live in `test/fixtures/human-requests.json`, so evaluation can reuse them.
+
+## Customer memory (`src/memory/`)
+
+Pure, deterministic rules for governed customer memory (release L). The gateway loads what they
+need and carries out what they decide.
+
+- `envelope.ts` and `slots.ts`: the typed record (kind, scope, source, evidence status, purposes,
+  roles, sensitivity, retention) and the closed catalogue of what may be remembered. A slot fixes
+  a record's kind, scope, sensitivity and retention; nothing comes from the proposal.
+- `policy.ts`: `evaluateMemoryWrite(input)` decides one write (`write`, `supersede`, `review`,
+  `unchanged` or `refuse`) with its checks and a plain explanation that never repeats content. It
+  covers consent and its timing, sensitive categories and secrets (`sensitive.ts`), authority
+  claims and instructions, provenance (the quote must be in the customer's own message),
+  confidence, identity for personal details, retention, deletion tombstones, per-customer limits
+  and how the value relates to what is remembered: a different value waits for review, and words
+  older than the slot's last change never reopen it.
+- `temporal.ts`: validity and supersession (event time and transaction time), history states,
+  what was believed at a given time, and correction plans.
+- `recall.ts`: what a reply may use within its budget (profile first, then relevance), the
+  numbered lines the model sees (`[M1] Label: value (source, date)`), citation handling, and the
+  rule that a reply built with memory never enters a shared cache.
+- `tombstones.ts`: when a deletion forbids writing something again. A deleted memory's own
+  messages never count as evidence again; otherwise the slot, the value's fingerprint or an
+  erasure covers evidence observed up to the deletion.
+- `extraction.ts`: the contract between the extraction job and a model, and the offline mock's
+  deterministic proposals (English, Roman Urdu, Urdu, Hindi and Arabic).

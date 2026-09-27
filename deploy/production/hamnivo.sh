@@ -7,7 +7,7 @@
 #   hamnivo.sh status       services and their health
 #   hamnivo.sh logs [service...]
 #   hamnivo.sh backup [--to DIR] [--keep N] [--no-secrets]
-#   hamnivo.sh restore DIR [--yes]
+#   hamnivo.sh restore DIR [--yes] [--ignore-current-database]
 #   hamnivo.sh update       deploy the latest commit of the deploy branch now (see deploy)
 #   hamnivo.sh deploy [--latest | REF] [--force]   check, build, start, and roll back on failure
 #   hamnivo.sh rollback [COMMIT]   run the previous (or a given) version again
@@ -347,12 +347,113 @@ cmd_backup() {
   done < <(find "$to" -mindepth 1 -maxdepth 1 -type d -name '20*Z' | sort -r | tail -n +"$((keep + 1))")
 }
 
+# --- restores keep customers' newer privacy decisions --------------------------------------------
+# Consent to memory, memory deletion receipts and their tombstones are never removed, so the
+# current database has every such row a backup has, plus those made since. A restore saves them
+# before it replaces the database, adds them to the restored one and replays the tombstones before
+# anything starts: restoring an older backup never brings back memory a customer asked to forget,
+# nor consent they withdrew. Saved rows wait in state/restore/ until the databases are switched,
+# so an interrupted restore picks them up again. A table added here must never lose rows, and gets
+# its parents' check in carry_privacy.
+privacy_tables='learning_consents memory_deletions deletion_tombstones'
+
+db_psql() { # db_psql DATABASE [PSQL_ARGS...]: psql in the Hamnivo database server, as superuser
+  "${compose[@]}" exec -T hamnivo-db psql -X -q -v ON_ERROR_STOP=1 -U postgres -d "$@"
+}
+
+# Saves the current database's privacy rows (table and row as JSON, in CSV). Nothing to save on a
+# new server.
+save_privacy() {
+  local found tables t query='' file
+  found="$(db_psql postgres -At -c "select 1 from pg_database where datname = 'hamnivo'")" || return 1
+  [[ "$found" == 1 ]] || return 0
+  tables="$(db_psql hamnivo -At -c "select string_agg(t, ' ') from unnest(string_to_array('$privacy_tables', ' ')) as t where to_regclass('public.' || t) is not null")" || return 1
+  for t in $tables; do
+    query+="${query:+ union all }select '$t', to_jsonb(r) from public.$t as r"
+  done
+  [[ -n "$query" ]] || return 0
+  mkdir -p "$state_dir/restore"
+  file="$state_dir/restore/carry-$(date -u +%Y%m%dT%H%M%SZ)-$$.csv"
+  if ! (umask 077 && db_psql hamnivo -c "copy ($query) to stdout (format csv)" >"$file.part"); then
+    rm -f "$file.part"
+    return 1
+  fi
+  mv -f "$file.part" "$file"
+}
+
+# In one transaction: adds the saved rows to DATABASE, except rows it has and rows whose brand,
+# customer or deletion it lacks; queues the deletions still running, so that the worker finishes
+# them; and replays every tombstone.
+carry_privacy() { # carry_privacy DATABASE
+  local file
+  {
+    printf '%s\n' 'begin;' 'create temp table carry (tbl text not null, j jsonb not null) on commit drop;'
+    for file in "$state_dir"/restore/carry-*.csv; do
+      [[ -f "$file" ]] || continue
+      printf '%s\n' 'copy carry from stdin (format csv);'
+      cat "$file"
+      printf '%s\n' '\.'
+    done
+    cat <<'SQL'
+do $carry$
+declare
+  target text;
+  parents text;
+  cols text;
+  vals text;
+  n bigint;
+begin
+  for target, parents in select * from (values
+    ('learning_consents', 'exists (select from public.brands as b where b.tenant_id = r.tenant_id and b.id = r.brand_id)
+       and exists (select from public.customer_principals as p where p.tenant_id = r.tenant_id and p.id = r.subject_id)'),
+    ('memory_deletions', 'exists (select from public.brands as b where b.tenant_id = r.tenant_id and b.id = r.brand_id)'),
+    ('deletion_tombstones', 'exists (select from public.memory_deletions as d where d.tenant_id = r.tenant_id and d.id = r.deletion_id)')
+  ) as v (t, p) loop
+    continue when to_regclass('public.' || target) is null;
+    -- The columns the saved rows have: a column added since takes its default.
+    select string_agg(format('%I', a.attname), ', ' order by a.attnum),
+           string_agg(format('r.%I', a.attname), ', ' order by a.attnum)
+      into cols, vals
+    from pg_attribute as a
+    where a.attrelid = to_regclass('public.' || target) and a.attnum > 0 and not a.attisdropped
+      and exists (select from carry as c where c.tbl = target and c.j ? a.attname);
+    continue when cols is null;
+    execute format('insert into public.%1$I (%2$s) select %3$s
+      from (select j from carry where tbl = %1$L) as c
+      cross join lateral jsonb_populate_record(null::public.%1$I, c.j) as r
+      where %4$s on conflict do nothing', target, cols, vals, parents);
+    get diagnostics n = row_count;
+    raise notice '% % carried over', n, target;
+  end loop;
+  if to_regclass('public.memory_deletions') is not null then
+    -- The worker purges caches, verifies and completes the receipt (apps/gateway/src/memory/
+    -- deletion.service.ts, topic memory.deleted).
+    insert into public.outbox_events (id, tenant_id, topic, aggregate_type, aggregate_id, payload)
+    select gen_random_uuid(), d.tenant_id, 'memory.deleted', 'memory_deletion', d.id::text,
+      jsonb_build_object('deletionId', d.id)
+    from public.memory_deletions as d
+    where d.status = 'pending'
+      and not exists (select from public.outbox_events as o where o.tenant_id = d.tenant_id
+        and o.topic = 'memory.deleted' and o.aggregate_id = d.id::text and o.processed_at is null);
+  end if;
+  if to_regprocedure('app.apply_memory_tombstones()') is not null then
+    n := app.apply_memory_tombstones();
+    raise notice '% deleted memory records removed again', n;
+  end if;
+end
+$carry$;
+commit;
+SQL
+  } | db_psql "$1"
+}
+
 cmd_restore() {
   need_docker
-  local dir='' yes=0 answer=''
+  local dir='' yes=0 answer='' current=1
   while (($#)); do
     case "$1" in
       --yes) yes=1; shift ;;
+      --ignore-current-database) current=0; shift ;;
       -*) fail "Unknown restore option: $1" ;;
       *) dir="$1"; shift ;;
     esac
@@ -383,11 +484,26 @@ cmd_restore() {
   "${compose[@]}" up -d hamnivo-db chatwoot-db >&2
   wait_healthy hamnivo-db chatwoot-db
 
+  if ((current == 1)); then
+    log 'Saving consent and memory deletions from the current database'
+    save_privacy || fail "Could not read consent and memory deletions from the current database. \
+Without them, memory that customers asked to forget since the backup would come back. Nothing \
+was changed. Repair the database, or add --ignore-current-database to restore without them."
+  fi
+
+  # Restored beside the current database, which stays untouched until the restored one is ready.
   log 'Restoring the Hamnivo database'
-  "${compose[@]}" exec -T hamnivo-db dropdb -U postgres --if-exists --force hamnivo
-  "${compose[@]}" run --rm db-init >&2
-  "${compose[@]}" exec -T hamnivo-db pg_restore -U postgres -d hamnivo --exit-on-error \
+  "${compose[@]}" exec -T hamnivo-db dropdb -U postgres --if-exists --force hamnivo_restore
+  HAMNIVO_DATABASES=hamnivo_restore "${compose[@]}" run --rm -e HAMNIVO_DATABASES db-init >&2
+  "${compose[@]}" exec -T hamnivo-db pg_restore -U postgres -d hamnivo_restore --exit-on-error \
     --single-transaction <"$dir/hamnivo.dump"
+  DATABASE_OWNER_URL="postgres://hamnivo_owner:$(get HAMNIVO_DB_OWNER_PASSWORD)@hamnivo-db:5432/hamnivo_restore" \
+    "${compose[@]}" run --rm --no-deps -T -e DATABASE_OWNER_URL migrate >&2
+  log 'Adding consent and memory deletions made since the backup'
+  carry_privacy hamnivo_restore
+  "${compose[@]}" exec -T hamnivo-db dropdb -U postgres --if-exists --force hamnivo
+  db_psql postgres -c 'alter database hamnivo_restore rename to hamnivo'
+  rm -f "$state_dir"/restore/carry-*.csv
 
   log 'Restoring the Chatwoot database'
   "${compose[@]}" exec -T chatwoot-db dropdb -U postgres --if-exists --force chatwoot

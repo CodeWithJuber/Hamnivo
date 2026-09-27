@@ -9,7 +9,8 @@
 #
 # Checks: HTTPS on every name, staff sign-up, a brand connected to the real Chatwoot, publishing
 # the AI agent, the widget's frame policy, a customer conversation answered by the AI over the live
-# stream, the website and Studio, then a backup and restore drill. Then a new owner uses Studio in
+# stream, the website and Studio, then a backup and restore drill (which must keep a customer's
+# consent withdrawal and memory erasure made after the backup). Then a new owner uses Studio in
 # Chromium: sign-up, a brand, the Chatwoot connection and an agent draft, all across origins. Last,
 # visitor addresses: the API never believes an address a visitor claims, only one reported by a
 # trusted proxy (as with Cloudflare), and the edge runs with Cloudflare's ranges.

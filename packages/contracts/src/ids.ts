@@ -33,6 +33,7 @@ export const ID_PREFIX = {
   source: 'ksrc',
   document: 'doc',
   memory: 'mem',
+  memoryDeletion: 'mdel',
   quote: 'quo',
   cart: 'cart',
   order: 'ord',

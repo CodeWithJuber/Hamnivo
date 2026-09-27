@@ -2,11 +2,13 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  AgentConfig,
   CARD_KINDS,
   Card,
   FrameToHost,
   HostToFrame,
   isTypeId,
+  MEMORY_NOTICE_VERSION,
   MinorUnits,
   Money,
   parseEvent,
@@ -15,6 +17,7 @@ import {
   partsToPlainText,
   problem,
   SendMessageRequest,
+  SetMemoryConsentRequest,
   TRANSIENT_EVENT_TYPES,
   TYPEID_SUFFIX,
   WidgetConfig,
@@ -172,6 +175,32 @@ describe('widget bridge', () => {
         payload: { nested: { a: 1 } },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('customer memory', () => {
+  it('names a memory an answer relied on, and drops it from plain text', () => {
+    const memoryId = 'mem_01j9zk7w3xq8r4t2v6m5n1p0ce';
+    const part = parsePart({ type: 'memory', memoryId, key: 'preferred_language' });
+    expect(part).toEqual({ type: 'memory', memoryId, key: 'preferred_language' });
+    expect(partsToPlainText([{ type: 'text', text: 'Salaam', format: 'plain' }, part])).toBe(
+      'Salaam',
+    );
+  });
+
+  it('keeps memory off for agents saved before it existed', () => {
+    const config = AgentConfig.parse({
+      displayName: 'Assistant',
+      model: { provider: 'mock', modelId: 'hamnivo-mock' },
+    });
+    expect(config.memory).toEqual({ enabled: false, maxItems: 8, maxChars: 1200 });
+  });
+
+  it('accepts only an explicit memory choice with the notice version', () => {
+    const choice = (value: unknown) => SetMemoryConsentRequest.safeParse(value).success;
+    expect(choice({ state: 'granted', noticeVersion: MEMORY_NOTICE_VERSION })).toBe(true);
+    expect(choice({ state: 'undecided', noticeVersion: MEMORY_NOTICE_VERSION })).toBe(false);
+    expect(choice({ state: 'granted' })).toBe(false);
   });
 });
 

@@ -134,6 +134,20 @@
       "when": 1790488928890,
       "tag": "20260927060208_session_identity_key",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790498730472,
+      "tag": "20260927084530_memory",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790498774011,
+      "tag": "20260927084614_memory_security",
+      "breakpoints": true
     }
   ]
 }

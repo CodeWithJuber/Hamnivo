@@ -14,6 +14,7 @@ import {
 } from './conversations.js';
 import { HamnivoEvent, StreamControl } from './events.js';
 import { knowledgeRoutes } from './knowledge-routes.js';
+import { adminMemoryRoutes, widgetMemoryRoutes } from './memory-routes.js';
 import { AttachmentPart } from './parts.js';
 import {
   StaffConversation,
@@ -349,6 +350,8 @@ export const allRoutes: Record<string, RouteDef> = {
   ...adminRoutes,
   ...agentRoutes,
   ...knowledgeRoutes,
+  ...widgetMemoryRoutes,
+  ...adminMemoryRoutes,
   ...integrationRoutes,
   ...conversationRoutes,
 };
