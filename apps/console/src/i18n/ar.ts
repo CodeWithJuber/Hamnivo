@@ -1,3 +1,4 @@
+import { commerceAr } from './commerce/ar';
 import type { Translation } from './en';
 
 /** Arabic (Modern Standard). Pending review by native speakers, as the note in the interface says. */
@@ -885,4 +886,5 @@ export const ar: Translation = {
       loading: 'جارٍ تحميل مفاتيح المرور',
     },
   },
+  commerce: commerceAr,
 };
