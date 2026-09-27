@@ -16,6 +16,7 @@
     "@assistant-ui/react": "0.15.22",
     "@hamnivo/client": "workspace:*",
     "@hamnivo/contracts": "workspace:*",
+    "@hamnivo/domain": "workspace:*",
     "@hamnivo/ui": "workspace:*",
     "dompurify": "3.4.16",
     "i18next": "26.4.2",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
+    "@hamnivo/adapters": "workspace:*",
     "@hamnivo/chatwoot": "workspace:*",
     "@hamnivo/db": "workspace:*",
     "@hamnivo/server": "workspace:*",

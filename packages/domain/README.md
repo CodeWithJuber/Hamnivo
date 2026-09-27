@@ -108,3 +108,19 @@ need and carries out what they decide.
   erasure covers evidence observed up to the deletion.
 - `extraction.ts`: the contract between the extraction job and a model, and the offline mock's
   deterministic proposals (English, Roman Urdu, Urdu, Hindi and Arabic).
+
+## Commerce (`@hamnivo/domain/commerce`)
+
+Pure rules for buying in chat. Nothing here does I/O; the gateway calls them.
+
+| Module | What it does |
+|---|---|
+| `money.ts`, `currencies.ts` | Money as integer minor units (`bigint`) with an ISO 4217 currency. Adding different currencies throws. `applyRate` and `allocate` round explicitly (half-even by default) and never lose a minor unit. |
+| `quote.ts`, `hash.ts` | The quote document, `verifyQuoteArithmetic` (lines, discount, delivery, tax and total add up exactly) and `quoteHash`: SHA-256 over RFC 8785 canonical JSON. The widget recomputes it before a customer approves. |
+| `approval.ts` | `checkQuoteApproval`: the approval must name this quote's hash and cart revision, before the expiry. `quoteExpiry` takes the earliest of the shop's validity and the brand's limit. |
+| `machines.ts` | State machines for cart, quote, purchase intent, payment, order, fulfilment, refund and operation. `nextState` returns `null` for a move that is not allowed; the tests list every allowed move and refuse the rest. |
+| `capabilities.ts` | The provider capability manifest and `negotiate(capabilities, operation, context)`, which says whether an operation is supported and why not. |
+| `refund-policy.ts` | `evaluateRefund` (amount left, window, partial refunds, approval threshold) and `checkRefundApprover` (the requester can never approve). |
+| `claims.ts` | `checkCompletionClaims`: finds "paid" or "refunded" claims in a reply (in the four launch languages) and blocks them unless a provider receipt exists. |
+| `format.ts`, `amount-input.ts` | Locale-safe display: money with its currency, times with their zone, calendar dates for estimates. `parseAmountInput` reads typed amounts in Latin, Arabic-Indic, Persian and Devanagari digits and returns `ambiguous` with the readings instead of guessing ("1,500"). |
+| `live-data.ts` | Commerce data that must never come from a cache (K06): `answerCacheDecision` and the `no-store` header value. |

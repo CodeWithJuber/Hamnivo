@@ -1,3 +1,4 @@
+import { commerceUr } from './commerce/ur';
 import type { Translation } from './en';
 
 /** Urdu. Pending review by native speakers, as the note in the interface says. */
@@ -1294,6 +1295,7 @@ export const ur: Translation = {
       loading: 'پاس کیز لوڈ ہو رہی ہیں',
     },
   },
+  commerce: commerceUr,
   memory: {
     title: 'کسٹمر میموری',
     description: 'طے کریں کہ ہم آپ کے کسٹمرز کے بارے میں کیا یاد رکھتے ہیں۔',

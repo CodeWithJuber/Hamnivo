@@ -17,6 +17,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
+import { startFakeStripe } from '@hamnivo/adapters/commerce/testing';
 import { startFakeChatwoot } from '@hamnivo/chatwoot/fake';
 import {
   createTestDatabase,
@@ -173,6 +174,9 @@ try {
 
   const fake = await startFakeChatwoot();
   cleanups.push(() => fake.close());
+  // A stateful fake of Stripe's API and hosted payment page: nothing reaches the real Stripe.
+  const stripe = await startFakeStripe();
+  cleanups.push(() => stripe.close());
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -196,6 +200,7 @@ try {
     STREAM_HEARTBEAT_SECONDS: '5',
     RATE_LIMIT_PER_MINUTE: '100000',
     EMBEDDING_PROVIDER: 'mock',
+    COMMERCE_STRIPE_API_BASE: stripe.url,
   };
   delete env.WIDGET_SIGNING_KEY;
   const gatewayDist = join(root, 'apps/gateway/dist');
@@ -221,6 +226,7 @@ try {
         apiBase: origin(ports.api),
         widgetOrigin: origin(ports.widget),
         databaseUrl: database.app,
+        stripe: { url: stripe.url, apiKey: stripe.apiKey },
       },
       null,
       2,

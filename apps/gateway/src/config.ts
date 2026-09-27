@@ -66,6 +66,18 @@ const EnvSchema = z.object({
   /** ClamAV daemon for uploads (tcp://host:3310). Without it only the EICAR test file is caught. */
   CLAMAV_URL: z.url().optional(),
 
+  /**
+   * Commerce (C01–C12). Another Stripe API origin, such as stripe-mock or a fake server: tests and
+   * local demos only, refused in production.
+   */
+  COMMERCE_STRIPE_API_BASE: z.url().optional(),
+  /** Payment-provider request timeout; a write that times out is reconciled, never resent blindly. */
+  COMMERCE_PROVIDER_TIMEOUT_MS: z.coerce.number().int().min(200).max(60_000).default(10_000),
+  /** Minutes a hosted payment page stays open (Stripe allows 30 minutes to 24 hours). */
+  COMMERCE_CHECKOUT_MINUTES: z.coerce.number().int().min(30).max(1440).default(60),
+  /** Allows `mock` merchant connections (in-memory store) outside development and tests. */
+  COMMERCE_ALLOW_MOCK: bool.default(false),
+
   /** The worker rewrites this file after every outbox pass (for container health checks). */
   WORKER_HEARTBEAT_FILE: z.string().min(1).optional(),
 
@@ -90,6 +102,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)
       .join('\n');
     throw new Error(`Invalid configuration:\n${problems}`);
+  }
+  if (parsed.data.NODE_ENV === 'production' && parsed.data.COMMERCE_STRIPE_API_BASE) {
+    throw new Error('Invalid configuration:\n  COMMERCE_STRIPE_API_BASE is for tests only');
   }
   const retired = new Map<number, Buffer>();
   for (const pair of parsed.data.HAMNIVO_KEK_RETIRED.split(',').filter(Boolean)) {

@@ -10,6 +10,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { createReadStream, existsSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
+import { startFakeStripe } from '@hamnivo/adapters/commerce/testing';
 import { startFakeChatwoot } from '@hamnivo/chatwoot/fake';
 import {
   createTestDatabase,
@@ -126,6 +127,9 @@ try {
 
   const fake = await startFakeChatwoot();
   cleanups.push(() => fake.close());
+  // A stateful fake of Stripe's API and hosted payment page: nothing reaches the real Stripe.
+  const stripe = await startFakeStripe();
+  cleanups.push(() => stripe.close());
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -146,6 +150,7 @@ try {
     CHATWOOT_WEBHOOK_BASE_URL: origin(ports.api),
     STREAM_HEARTBEAT_SECONDS: '5',
     RATE_LIMIT_PER_MINUTE: '100000',
+    COMMERCE_STRIPE_API_BASE: stripe.url,
   };
   delete env.WIDGET_SIGNING_KEY;
   const gatewayDist = join(root, 'apps/gateway/dist');
@@ -224,6 +229,25 @@ try {
     { alg: 'HS256' },
     tenantId,
   );
+  // The brand sells in chat through Stripe (the fake): prices in AED, delivery AED 10.00.
+  const webhookSecret = `whsec_e2e_${randomBytes(12).toString('hex')}`;
+  const merchant = await call(
+    'POST',
+    '/v1/admin/commerce/merchants',
+    {
+      brandId: brand.id,
+      provider: 'stripe',
+      displayName: 'Noor Books',
+      currencies: ['AED'],
+      apiKey: stripe.apiKey,
+      webhookSecret,
+      shipping: { amountMinor: '1000', label: 'Delivery' },
+      quoteMinutes: 5,
+      terms: { refundSummary: 'Refunds within 14 days of delivery.' },
+    },
+    tenantId,
+  );
+  stripe.webhookEndpoints.push({ url: merchant.webhookUrl, secret: webhookSecret });
 
   const hostPage = join(root, 'apps/widget/e2e/.host.html');
   writeFileSync(
@@ -251,6 +275,7 @@ try {
         cookie,
         identityKey: { kid: identityKey.kid, secret: identityKey.secret },
         databaseUrl: database.app,
+        stripeUrl: stripe.url,
       },
       null,
       2,

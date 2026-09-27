@@ -18,6 +18,7 @@ import { OutboundMessagesService } from './authority/outbound.service.js';
 import { OwnershipService } from './authority/ownership.service.js';
 import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
+import { COMMERCE_API_CONTROLLERS, COMMERCE_API_PROVIDERS } from './commerce/commerce.module.js';
 import { IdempotencyService } from './common/idempotency.service.js';
 import type { AppConfig } from './config.js';
 import { StaffConversationsController } from './conversations/staff-conversations.controller.js';
@@ -109,6 +110,7 @@ export class ApiModule {
         AdminMemoryController,
         InboxController,
         TeamsController,
+        ...COMMERCE_API_CONTROLLERS,
       ],
       providers: [
         {
@@ -164,6 +166,7 @@ export class ApiModule {
         MemoryDeletionService,
         CustomerMemoryService,
         AdminMemoryService,
+        ...COMMERCE_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

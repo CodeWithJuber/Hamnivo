@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
+import { confirmCardPublication } from '../commerce/card-publisher.service.js';
 import { projectInboxState } from '../inbox/projection.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { retryDelayMs } from '../outbox/relay.service.js';
@@ -239,6 +240,8 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
       }
     } else if (message.key?.startsWith('hv1:p:')) {
       await this.publications.confirm(tx, tenantId, control, message.key, message);
+    } else if (message.key?.startsWith('hv1:c:')) {
+      await confirmCardPublication(tx, message.key, message, now);
     }
 
     const entries: JournalEntry[] = [];

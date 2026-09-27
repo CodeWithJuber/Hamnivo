@@ -1,5 +1,6 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { SHOP_COPY } from './commerce/copy.js';
 
 /** Widget chrome in the four launch languages (translations await native review). */
 const resources = {
@@ -23,6 +24,7 @@ const resources = {
       startError: 'The chat could not start. Please try again.',
       typing: 'The assistant is writing…',
       sources: 'Sources',
+      shop: SHOP_COPY.en,
       memory: {
         open: 'Memory',
         title: 'What we remember',
@@ -129,6 +131,7 @@ const resources = {
       startError: 'تعذّر بدء المحادثة. حاول مرة أخرى.',
       typing: 'المساعد يكتب…',
       sources: 'المصادر',
+      shop: SHOP_COPY.ar,
       memory: {
         open: 'الذاكرة',
         title: 'ما نتذكره',
@@ -233,6 +236,7 @@ const resources = {
       startError: 'चैट शुरू नहीं हो सकी। कृपया फिर कोशिश करें।',
       typing: 'सहायक लिख रहा है…',
       sources: 'स्रोत',
+      shop: SHOP_COPY.hi,
       memory: {
         open: 'मेमोरी',
         title: 'हम क्या याद रखते हैं',
@@ -339,6 +343,7 @@ const resources = {
       startError: 'چیٹ شروع نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔',
       typing: 'اسسٹنٹ لکھ رہا ہے…',
       sources: 'ذرائع',
+      shop: SHOP_COPY.ur,
       memory: {
         open: 'میموری',
         title: 'ہم کیا یاد رکھتے ہیں',
