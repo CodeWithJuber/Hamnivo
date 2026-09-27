@@ -5018,10 +5018,10 @@
             "name": "teamId",
             "schema": {
               "type": "string",
-              "description": "Routing team ID (rtm_…)"
+              "description": "Team ID (team_…)"
             },
             "required": true,
-            "description": "Routing team ID (rtm_…)"
+            "description": "Team ID (team_…)"
           },
           {
             "in": "header",
@@ -13732,8 +13732,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "routingTeam identifier (TypeID with prefix \"rtm\")",
-            "example": "rtm_01j9zk7w3xq8r4t2v6m5n1p0cd"
+            "description": "team identifier (TypeID with prefix \"team\")",
+            "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
           },
           "brandId": {
             "type": "string",
@@ -14143,8 +14143,8 @@
                 "properties": {
                   "id": {
                     "type": "string",
-                    "description": "routingTeam identifier (TypeID with prefix \"rtm\")",
-                    "example": "rtm_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                    "description": "team identifier (TypeID with prefix \"team\")",
+                    "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
                   },
                   "name": {
                     "type": "string"

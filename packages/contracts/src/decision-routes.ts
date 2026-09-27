@@ -24,7 +24,7 @@ const taskParams = brandParams.extend({
   task: z.string().meta({ description: 'Decision task, such as team-routing' }),
 });
 const teamParams = z.object({
-  teamId: z.string().meta({ description: 'Routing team ID (rtm_…)' }),
+  teamId: z.string().meta({ description: 'Team ID (team_…)' }),
 });
 const decisionParams = z.object({
   decisionId: z.string().meta({ description: 'Decision ID (dcs_…)' }),

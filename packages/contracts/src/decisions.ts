@@ -18,7 +18,7 @@ export type DecisionTaskName = z.infer<typeof DecisionTaskName>;
  */
 export const RoutingTeam = z
   .object({
-    id: typeId('routingTeam'),
+    id: typeId('team'),
     brandId: typeId('brand'),
     name: z.string(),
     intents: z.array(z.string()),
@@ -210,7 +210,7 @@ export const DecisionRecord = z
     finalIntent: z.string(),
     finalSource: z.enum(['provider', 'baseline']),
     fallback: z.string().nullable(),
-    team: z.object({ id: typeId('routingTeam'), name: z.string() }).nullable(),
+    team: z.object({ id: typeId('team'), name: z.string() }).nullable(),
     teamBasis: z.enum(['intent', 'default', 'none']),
     languageMatch: z.enum(['native', 'translation', 'none', 'unknown']),
     language: LanguageSlice.nullable(),

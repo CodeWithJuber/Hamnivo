@@ -51,7 +51,6 @@ export const ID_PREFIX = {
   connection: 'acn',
   modelConnection: 'mcn',
   killSwitch: 'ksw',
-  routingTeam: 'rtm',
   rubric: 'rbc',
 } as const;
 
