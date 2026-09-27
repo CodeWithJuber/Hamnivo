@@ -470,7 +470,10 @@ describe('quote → approval → hosted checkout → webhook → receipt (C02–
     const events = await withTenant(slice.app, { tenantId }, (tx) =>
       tx.select().from(schema.commerceEvents),
     );
-    expect(events.filter((e) => e.providerEventId === paidEvents[0]?.id)).toHaveLength(1);
+    const stored = events.filter((e) => paidEvents.some((p) => p.id === e.providerEventId));
+    expect(stored).toHaveLength(paidEvents.length);
+    // Stored once and processed once: the replay was acknowledged without being queued again.
+    expect(stored.map((e) => e.attempts)).toEqual(paidEvents.map(() => 1));
     const receiptCards = (await authorityMessages(flow.conversationId)).filter(
       (m) =>
         (m.contentAttributes.hv as { card?: { type: string } } | undefined)?.card?.type ===
@@ -561,6 +564,10 @@ describe('approval binding (C04)', () => {
     await stranger.open();
     const foreign = await approve(stranger, conversationId, quote);
     expect(foreign.status).toBe(404);
+    expect((await stranger.call('POST', commerce(conversationId, 'catalogs'), {})).status).toBe(
+      404,
+    );
+    expect((await stranger.call('GET', commerce(conversationId, 'cart'))).status).toBe(404);
     // Staff and the AI have no approval path: the widget session of that customer is required.
     const staff = await admin.post(commerce(conversationId, `quotes/${quote.id}/approve`), {
       quoteHash: quote.hash,
@@ -936,6 +943,26 @@ describe('receipt-based completion (X10)', () => {
     expect(
       steps.filter((s) => s.run_steps.name === 'receipt_claims').map((s) => s.run_steps.status),
     ).toEqual(['blocked']);
+  });
+
+  it('does not count an open payment page as a payment', async () => {
+    const { visitor, conversationId } = await newCustomer();
+    const cart = await cartWith(visitor, conversationId, [{ productId: 'prod_pens', quantity: 1 }]);
+    const quote = await quoted(visitor, conversationId, cart.revision);
+    expect((await approve(visitor, conversationId, quote)).body.outcome).toBe('awaiting_payment');
+    await settle();
+    const sent = await visitor.call('POST', `/v1/widget/conversations/${conversationId}/messages`, {
+      clientMessageId: randomUUID(),
+      parts: [{ type: 'text', text: 'Did my payment go through?' }],
+    });
+    expect(sent.status).toBe(202);
+    await settle();
+    const replies = (await authorityMessages(conversationId)).filter(
+      (m) => m.sender.kind === 'bot' && !m.private && !m.key?.startsWith('hv1:c:'),
+    );
+    expect(replies.at(-1)?.text).toBe(
+      'I cannot confirm the payment yet. The order card in this chat shows the confirmed status.',
+    );
   });
 
   it('hands the conversation to people when the AI keeps claiming it', async () => {
