@@ -31,6 +31,51 @@ async function versionOf(tenant: SeededTenant, dependency: string): Promise<numb
   });
 }
 
+describe('team routing (J02, U07)', () => {
+  it('routes a team only for brands of its own workspace', async () => {
+    const [workspace] = await inA((tx) =>
+      tx
+        .insert(schema.workspaces)
+        .values({ tenantId: a.tenantId, name: 'Wholesale', slug: 'wholesale' })
+        .returning(),
+    );
+    const [team] = await inA((tx) =>
+      tx
+        .insert(schema.teams)
+        .values({ tenantId: a.tenantId, workspaceId: workspace?.id, name: 'Wholesale desk' })
+        .returning(),
+    );
+    await expectPgError(
+      inA((tx) =>
+        tx
+          .insert(schema.teamRouting)
+          .values({ tenantId: a.tenantId, teamId: team?.id as string, brandId: a.brandId }),
+      ),
+      '23514',
+    );
+    // The seeded team works tenant-wide, so it may route for any brand of the tenant.
+    await inA((tx) =>
+      tx
+        .update(schema.teamRouting)
+        .set({ accepting: false })
+        .where(
+          and(eq(schema.teamRouting.teamId, a.teamId), eq(schema.teamRouting.brandId, a.brandId)),
+        ),
+    );
+  });
+
+  it('never routes to another tenant’s team', async () => {
+    await expectPgError(
+      inA((tx) =>
+        tx
+          .insert(schema.teamRouting)
+          .values({ tenantId: a.tenantId, teamId: b.teamId, brandId: a.brandId }),
+      ),
+      '23503',
+    );
+  });
+});
+
 describe('decision rubrics (J05)', () => {
   const published = () => eq(schema.decisionRubrics.id, a.rubricId);
 

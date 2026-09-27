@@ -170,11 +170,22 @@ describe('two-tenant isolation', () => {
     'knowledge_documents',
     'document_versions',
     'knowledge_chunks',
-    'routing_teams',
+    'learning_consents',
+    'memory_records',
+    'memory_embeddings',
+    'memory_deletions',
+    'deletion_tombstones',
+    'teams',
+    'team_members',
+    'team_authority_links',
+    'conversation_inbox_state',
+    'staff_drafts',
+    'conversation_links',
+    'conversation_reviews',
+    'team_routing',
     'decision_rubrics',
     'decision_tasks',
     'decision_records',
-    'conversation_routes',
     'language_preferences',
     'cache_policies',
     'cache_dependency_versions',
@@ -195,10 +206,12 @@ describe('two-tenant isolation', () => {
       );
     });
 
-    // The audit log is append-only; kill switches are cleared, never deleted; decision records
-    // stay as the decision audit.
-    const updatable = table !== 'audit_events';
-    const deletable = updatable && table !== 'kill_switches' && table !== 'decision_records';
+    // The audit log, consent decisions and deletion tombstones are append-only; kill switches are
+    // cleared and deletion receipts completed, never deleted; decision records stay as the
+    // decision audit.
+    const updatable = !['audit_events', 'learning_consents', 'deletion_tombstones'].includes(table);
+    const deletable =
+      updatable && !['kill_switches', 'memory_deletions', 'decision_records'].includes(table);
     if (updatable) {
       // Updates and deletes aimed at tenant B affect nothing.
       await withTenant(h.app, { tenantId: a.tenantId }, async (tx) => {
@@ -291,11 +304,22 @@ describe('two-tenant isolation', () => {
       'knowledge_documents',
       'document_versions',
       'knowledge_chunks',
-      'routing_teams',
+      'learning_consents',
+      'memory_records',
+      'memory_embeddings',
+      'memory_deletions',
+      'deletion_tombstones',
+      'teams',
+      'team_members',
+      'team_authority_links',
+      'conversation_inbox_state',
+      'staff_drafts',
+      'conversation_links',
+      'conversation_reviews',
+      'team_routing',
       'decision_rubrics',
       'decision_tasks',
       'decision_records',
-      'conversation_routes',
       'language_preferences',
       'cache_policies',
       'cache_dependency_versions',

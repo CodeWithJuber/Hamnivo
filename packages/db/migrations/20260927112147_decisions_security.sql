@@ -1,7 +1,33 @@
--- Decisions, language and cache: forced RLS on the new tables; published decision rubrics and
--- decision records keep their history; cache dependency versions rise with the data they depend
--- on, in the same transaction as the change (K07).
+-- Decisions, language and cache: forced RLS on the new tables; a team routes only for brands of
+-- its workspace; published decision rubrics and decision records keep their history; cache
+-- dependency versions rise with the data they depend on, in the same transaction as the change
+-- (K07).
 SELECT app.harden_tenant_tables();
+--> statement-breakpoint
+-- A team routes only for brands of its own workspace; a tenant-wide team for any brand (U07).
+-- Reads run under the caller's row-level security, so another tenant's rows are never seen.
+CREATE FUNCTION app.team_routing_guard() RETURNS trigger
+  LANGUAGE plpgsql
+  SET search_path = pg_catalog, public
+  AS $$
+DECLARE
+  team_workspace uuid;
+  brand_workspace uuid;
+BEGIN
+  SELECT t.workspace_id INTO team_workspace FROM public.teams t
+    WHERE t.tenant_id = NEW.tenant_id AND t.id = NEW.team_id;
+  SELECT b.workspace_id INTO brand_workspace FROM public.brands b
+    WHERE b.tenant_id = NEW.tenant_id AND b.id = NEW.brand_id;
+  IF team_workspace IS NOT NULL AND team_workspace IS DISTINCT FROM brand_workspace THEN
+    RAISE EXCEPTION 'a team routes only for brands of its own workspace'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER team_routing_guard BEFORE INSERT OR UPDATE OF team_id, brand_id ON team_routing
+  FOR EACH ROW EXECUTE FUNCTION app.team_routing_guard();
 --> statement-breakpoint
 CREATE FUNCTION app.decision_rubrics_guard() RETURNS trigger
   LANGUAGE plpgsql

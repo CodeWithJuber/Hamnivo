@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { Cursor, page } from './common.js';
 import {
-  CreateRoutingTeamRequest,
   DecisionRecord,
   DecisionRubric,
   DecisionStatus,
@@ -11,9 +10,9 @@ import {
   RoutingTeam,
   SaveRubricDraftRequest,
   SetDecisionModeRequest,
+  SetTeamRoutingRequest,
   TestRubricRequest,
   TestRubricResult,
-  UpdateRoutingTeamRequest,
 } from './decisions.js';
 import type { RouteDef } from './routes.js';
 
@@ -23,7 +22,7 @@ const brandParams = z.object({
 const taskParams = brandParams.extend({
   task: z.string().meta({ description: 'Decision task, such as team-routing' }),
 });
-const teamParams = z.object({
+const teamParams = brandParams.extend({
   teamId: z.string().meta({ description: 'Team ID (team_…)' }),
 });
 const decisionParams = z.object({
@@ -36,7 +35,7 @@ export const decisionRoutes = {
     method: 'get',
     path: '/v1/admin/brands/{brandId}/routing/teams',
     operationId: 'listRoutingTeams',
-    summary: 'Teams conversations of a brand can be routed to (decisions.read)',
+    summary: 'Teams that can take a brand’s conversations, with their routing (decisions.read)',
     tags: ['Decisions'],
     auth: 'staff_session',
     params: brandParams,
@@ -46,28 +45,16 @@ export const decisionRoutes = {
       schema: z.object({ items: z.array(RoutingTeam) }),
     },
   },
-  createRoutingTeam: {
-    method: 'post',
-    path: '/v1/admin/brands/{brandId}/routing/teams',
-    operationId: 'createRoutingTeam',
-    summary: 'Add a routing team with its intents and languages (inbox.manage)',
-    tags: ['Decisions'],
-    auth: 'staff_session',
-    params: brandParams,
-    body: CreateRoutingTeamRequest,
-    idempotent: true,
-    success: { status: 201, description: 'Team created', schema: RoutingTeam },
-  },
-  updateRoutingTeam: {
-    method: 'patch',
-    path: '/v1/admin/routing-teams/{teamId}',
-    operationId: 'updateRoutingTeam',
-    summary: 'Change a team, pause it or archive it (inbox.manage)',
+  setTeamRouting: {
+    method: 'put',
+    path: '/v1/admin/brands/{brandId}/routing/teams/{teamId}',
+    operationId: 'setTeamRouting',
+    summary: 'Set a team’s intents, languages and availability for a brand (decisions.manage)',
     tags: ['Decisions'],
     auth: 'staff_session',
     params: teamParams,
-    body: UpdateRoutingTeamRequest,
-    success: { status: 200, description: 'Team', schema: RoutingTeam },
+    body: SetTeamRoutingRequest,
+    success: { status: 200, description: 'Team with its routing', schema: RoutingTeam },
   },
   getDecisionTask: {
     method: 'get',

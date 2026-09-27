@@ -1,5 +1,6 @@
 import { type ClaimedOutboxEvent, type Db, schema, withTenant } from '@hamnivo/db';
 import type { OwnerMode } from '@hamnivo/db/schema';
+import type { ActorCredential } from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { APP_DB } from '../tokens.js';
@@ -22,6 +23,15 @@ interface OwnerChanged {
   target: OwnerTarget;
   reason: string;
   handoffNote?: string;
+  /** Who assigned it (a colleague assigning someone else); defaults to the new owner. */
+  actorStaffMemberId?: string;
+}
+
+interface TeamChanged {
+  conversationId: string;
+  teamId: string | null;
+  /** The staff member who chose the team; null when routing did (J02). */
+  actorStaffMemberId: string | null;
 }
 
 /**
@@ -61,6 +71,91 @@ export class AuthoritySyncService {
     });
   }
 
+  /**
+   * Applies a team assignment in Chatwoot (outbox `conversation.team_changed`): the Hamnivo team's
+   * Chatwoot team is created on first use with the members who have a Chatwoot user, then the
+   * conversation is assigned as the staff member who chose the team. Superseded changes are skipped.
+   */
+  async applyTeamChange(event: ClaimedOutboxEvent): Promise<void> {
+    const payload = event.payload as TeamChanged;
+    const tenantId = event.tenantId;
+    const loaded = await withTenant(this.db, { tenantId }, async (tx) => {
+      const [control] = await tx
+        .select()
+        .from(schema.conversationControls)
+        .where(eq(schema.conversationControls.id, payload.conversationId));
+      if (!control) return null;
+      const [state] = await tx
+        .select({ teamId: schema.conversationInboxState.teamId })
+        .from(schema.conversationInboxState)
+        .where(eq(schema.conversationInboxState.conversationId, control.id));
+      if ((state?.teamId ?? null) !== payload.teamId) return null;
+      if (!payload.teamId) return { control, team: null, link: null, members: [] };
+      const [team] = await tx
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, payload.teamId));
+      if (!team) return null;
+      const [link] = await tx
+        .select()
+        .from(schema.teamAuthorityLinks)
+        .where(
+          and(
+            eq(schema.teamAuthorityLinks.teamId, team.id),
+            eq(schema.teamAuthorityLinks.connectionId, control.connectionId),
+          ),
+        );
+      const members = await tx
+        .select({ externalUserId: schema.staffAuthorityLinks.externalUserId })
+        .from(schema.teamMembers)
+        .innerJoin(
+          schema.staffAuthorityLinks,
+          and(
+            eq(schema.staffAuthorityLinks.staffMemberId, schema.teamMembers.staffMemberId),
+            eq(schema.staffAuthorityLinks.connectionId, control.connectionId),
+            eq(schema.staffAuthorityLinks.status, 'active'),
+          ),
+        )
+        .where(eq(schema.teamMembers.teamId, team.id));
+      return { control, team, link: link ?? null, members };
+    });
+    if (!loaded) return;
+    const { control, team } = loaded;
+    const runtime = await this.registry.get(tenantId, control.connectionId);
+    let teamRef: string | null = null;
+    if (team) {
+      teamRef = loaded.link
+        ? String(loaded.link.externalTeamId)
+        : (await runtime.authority.ensureTeam(team.name)).ref;
+      if (!loaded.link) {
+        const externalTeamId = Number(teamRef);
+        await withTenant(this.db, { tenantId }, (tx) =>
+          tx
+            .insert(schema.teamAuthorityLinks)
+            .values({
+              tenantId,
+              teamId: team.id,
+              connectionId: control.connectionId,
+              externalTeamId,
+            })
+            .onConflictDoNothing(),
+        );
+      }
+      await runtime.authority.addTeamMembers(
+        teamRef,
+        loaded.members.map((m) => String(m.externalUserId)),
+      );
+    }
+    // Routing acts as the integration; a person as their own Chatwoot user.
+    const actor: ActorCredential = payload.actorStaffMemberId
+      ? {
+          kind: 'staff',
+          userRef: String(await this.staffLinks.ensure(runtime, payload.actorStaffMemberId)),
+        }
+      : { kind: 'integration' };
+    await runtime.authority.assignTeam(String(control.externalConversationId), teamRef, actor);
+  }
+
   async applyOwnerChange(event: ClaimedOutboxEvent): Promise<void> {
     const payload = event.payload as OwnerChanged;
     const tenantId = event.tenantId;
@@ -82,10 +177,14 @@ export class AuthoritySyncService {
     switch (target.kind) {
       case 'staff': {
         const userId = await this.staffLinks.ensure(runtime, target.staffMemberId);
+        const actorId =
+          payload.actorStaffMemberId && payload.actorStaffMemberId !== target.staffMemberId
+            ? await this.staffLinks.ensure(runtime, payload.actorStaffMemberId)
+            : userId;
         await authority.setOwner(
           ref,
           { kind: 'user', userRef: String(userId) },
-          { kind: 'staff', userRef: String(userId) },
+          { kind: 'staff', userRef: String(actorId) },
         );
         break;
       }

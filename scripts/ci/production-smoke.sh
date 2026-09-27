@@ -9,8 +9,12 @@
 #
 # Checks: HTTPS on every name, staff sign-up, a brand connected to the real Chatwoot, publishing
 # the AI agent, the widget's frame policy, a customer conversation answered by the AI over the live
-# stream, the website and Studio, then a backup and restore drill. Last, a new owner uses Studio in
-# Chromium: sign-up, a brand, the Chatwoot connection and an agent draft, all across origins.
+# stream, the website and Studio, then a backup and restore drill (which must keep a customer's
+# consent withdrawal and memory erasure made after the backup). Then a new owner uses Studio in
+# Chromium: sign-up, a brand, the Chatwoot connection and an agent draft, all across origins. Then
+# `hamnivo.sh mail`, which shows the emails written to the API log while SMTP is not set. Last,
+# visitor addresses: the API never believes an address a visitor claims, only one reported by a
+# trusted proxy (as with Cloudflare), and the edge runs with Cloudflare's ranges.
 # HAMNIVO_BUILD_CA and HAMNIVO_BUILD_NETWORK are passed to the image builds (see
 # deploy/production/hamnivo.sh).
 set -euo pipefail
@@ -80,3 +84,55 @@ echo 'Studio in a browser'
 SMOKE_APP_ORIGIN="$(env_value HAMNIVO_APP_ORIGIN)" SMOKE_API_ORIGIN="$(env_value HAMNIVO_API_ORIGIN)" \
   SMOKE_CHAT_ORIGIN="$(env_value HAMNIVO_CHAT_ORIGIN)" \
   pnpm --filter @hamnivo/console exec playwright test --config playwright.production.config.ts
+
+echo 'Emails without SMTP'
+# The smoke stack has no SMTP_URL, so sign-up emails went to the API log: `mail` must show them.
+if bash "$hamnivo" mail | grep -q '/api/auth/verify-email?token='; then
+  printf '  ok   hamnivo.sh mail shows the link that confirms an account\n'
+else
+  printf '  FAIL hamnivo.sh mail shows no link that confirms an account\n' >&2
+  exit 1
+fi
+
+echo 'Visitor addresses'
+api_origin="$(env_value HAMNIVO_API_ORIGIN)"
+api_host="${api_origin#https://}"
+api_host="${api_host%%:*}"
+https_port="$(env_value HAMNIVO_HTTPS_PORT)"
+# Calls the API through the edge with a request id, then prints the address the API logged for it.
+seen_by_api() { # seen_by_api REQUEST_ID [CURL_ARGS...]
+  local seen=''
+  curl -fsS -o /dev/null --max-time 10 --cacert "$work/caddy-root.crt" \
+    --resolve "$api_host:$https_port:127.0.0.1" -H "x-request-id: $1" "${@:2}" "$api_origin/health/live"
+  for _ in $(seq 1 20); do
+    seen="$(bash "$hamnivo" compose logs --no-log-prefix api 2>/dev/null | grep -F "\"reqId\":\"$1\"" |
+      grep -o '"remoteAddress":"[^"]*"' | head -1 | cut -d'"' -f4 || true)"
+    [[ -n "$seen" ]] && break
+    sleep 0.5
+  done
+  printf '%s' "$seen"
+}
+expect_address() { # expect_address WHAT ACTUAL EXPECTED
+  if [[ -n "$2" && "$2" == "$3" ]]; then
+    printf '  ok   %s (%s)\n' "$1" "$2"
+  else
+    printf '  FAIL %s: the API saw %s, expected %s\n' "$1" "${2:-nothing}" "$3" >&2
+    exit 1
+  fi
+}
+direct="$(seen_by_api smoke-address-direct)"
+expect_address 'a visitor cannot claim an address' \
+  "$(seen_by_api smoke-address-claimed -H 'CF-Connecting-IP: 203.0.113.9' -H 'X-Forwarded-For: 203.0.113.9')" "$direct"
+# The Docker network stands in for Cloudflare: its connections are now a trusted proxy's.
+set_env HAMNIVO_TRUSTED_PROXIES private_ranges
+bash "$hamnivo" up --no-build --quiet
+expect_address "a trusted proxy's CF-Connecting-IP is believed" \
+  "$(seen_by_api smoke-address-proxy -H 'CF-Connecting-IP: 203.0.113.9')" 203.0.113.9
+expect_address 'from its X-Forwarded-For, only the address the proxy added counts' \
+  "$(seen_by_api smoke-address-chain -H 'X-Forwarded-For: 198.51.100.4, 203.0.113.10')" 203.0.113.10
+# Cloudflare on, with cloudflare.com out of reach: the ranges this version knows, which Caddy must
+# accept; this machine is not Cloudflare, so claims are ignored again.
+HAMNIVO_CLOUDFLARE_IPS_URL=http://127.0.0.1:9 bash "$hamnivo" setup --cloudflare on --quiet 2>/dev/null
+bash "$hamnivo" up --no-build --quiet
+expect_address "with Cloudflare's $(env_value HAMNIVO_TRUSTED_PROXIES | wc -w) ranges, a claim from elsewhere is ignored" \
+  "$(seen_by_api smoke-address-cloudflare -H 'CF-Connecting-IP: 203.0.113.9')" "$direct"

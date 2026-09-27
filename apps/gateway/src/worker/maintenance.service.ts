@@ -8,13 +8,15 @@ import {
 } from '@nestjs/common';
 import { Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
+import { MemoryDeletionService } from '../memory/deletion.service.js';
 import { APP_DB, REDIS } from '../tokens.js';
 
 const QUEUE = 'hamnivo-maintenance';
 
 /**
  * Scheduled upkeep through BullMQ job schedulers: audit partitions daily; expiry purge and
- * reconciler cursors every ten minutes.
+ * reconciler cursors every ten minutes; memory past its retention hourly; memory tombstones
+ * replayed daily (a safety net after restores).
  */
 @Injectable()
 export class MaintenanceService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -25,6 +27,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
   constructor(
     @Inject(APP_DB) private readonly db: Db,
     @Inject(REDIS) private readonly redis: Redis,
+    private readonly memory: MemoryDeletionService,
   ) {}
 
   async run(job: string): Promise<unknown> {
@@ -35,6 +38,10 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         return purgeExpired(this.db);
       case 'reconcile-cursors':
         return { followed: await ensureReconcileCursors(this.db) };
+      case 'memory-retention':
+        return { deleted: await this.memory.purgeExpired() };
+      case 'memory-tombstones':
+        return { removed: await this.memory.replayTombstones() };
       default:
         throw new Error(`Unknown maintenance job ${job}`);
     }
@@ -57,6 +64,16 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       'reconcile-cursors',
       { every: 10 * 60 * 1000 },
       { name: 'reconcile-cursors' },
+    );
+    await this.queue.upsertJobScheduler(
+      'memory-retention',
+      { every: 60 * 60 * 1000 },
+      { name: 'memory-retention' },
+    );
+    await this.queue.upsertJobScheduler(
+      'memory-tombstones',
+      { every: 24 * 60 * 60 * 1000 },
+      { name: 'memory-tombstones' },
     );
     this.worker = new Worker(QUEUE, (job) => this.run(job.name), {
       connection: this.redis.duplicate(),

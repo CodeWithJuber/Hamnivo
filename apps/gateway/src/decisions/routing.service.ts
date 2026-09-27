@@ -27,10 +27,11 @@ import {
   type ThresholdPolicy,
 } from '@hamnivo/domain';
 import type { StaffPrincipal } from '@hamnivo/policy';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import canonicalize from 'canonicalize';
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { z } from 'zod';
+import { JournalService } from '../authority/journal.service.js';
 import { AuthorityRegistry } from '../authority/registry.js';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
@@ -38,8 +39,9 @@ import { LanguageService } from '../language/language.service.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
-import { authorizedBrand } from './access.js';
+import { authorizedBrand, type BrandRow } from './access.js';
 import { DecisionProviders, MOCK_MODEL_VERSION } from './providers.js';
+import { teamsForBrand } from './team-routing.service.js';
 import {
   definitionOf,
   intentsOf,
@@ -56,11 +58,6 @@ export interface RouteRequested {
   trigger: 'new_conversation' | 'handoff';
   /** Unique per conversation: `new:{ledgerId}` or `handoff:{epoch}`. */
   ref: string;
-}
-
-/** Outbox payload of `conversation.team_sync`. */
-interface TeamSync {
-  conversationId: string;
 }
 
 type ControlRow = typeof schema.conversationControls.$inferSelect;
@@ -117,16 +114,16 @@ interface Judged {
  * Intent and team routing (J02, U07). New conversations and handed-off ones are routed to a team
  * by intent and language. The rubric's provider (Jev) suggests the intent within the rubric's
  * total deadline; the deterministic baseline decides whenever it abstains, fails or is too slow.
- * Every decision is recorded with both answers (J07). `shadow` mode applies nothing; `live`
- * records the team on the conversation and sets it in Chatwoot when the team is linked.
+ * Every decision is recorded with both answers (J07). `shadow` mode applies nothing; `live` puts
+ * the conversation in the chosen inbox team's queue the way the inbox does
+ * (`conversation_inbox_state.team_id`, then `conversation.team_changed` sets the Chatwoot team),
+ * so team queues and team-scoped grants see it.
  *
  * A customer who asked for a person was handed over before this runs, in the same transaction
  * that queued it: routing only chooses where the conversation waits and never changes who owns it.
  */
 @Injectable()
 export class RoutingService {
-  private readonly logger = new Logger(RoutingService.name);
-
   constructor(
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -135,13 +132,25 @@ export class RoutingService {
     private readonly contacts: AuthorityContactsService,
     private readonly language: LanguageService,
     private readonly providers: DecisionProviders,
+    private readonly journal: JournalService,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
     return withTenant(this.db, { tenantId, actorId: 'routing' }, work);
   }
 
-  private async setup(tx: TenantTx, brandId: string) {
+  /** Teams routing may choose for a brand: active inbox teams with active routing for it. */
+  private async routingTeams(tx: TenantTx, brand: Pick<BrandRow, 'id' | 'workspaceId'>) {
+    const rows = await teamsForBrand(tx, brand);
+    return rows.flatMap((row) =>
+      row.routing && row.routing.status === 'active'
+        ? [{ team: row.team, routing: row.routing }]
+        : [],
+    );
+  }
+
+  private async setup(tx: TenantTx, brand: Pick<BrandRow, 'id' | 'workspaceId'>) {
+    const brandId = brand.id;
     const [settings] = await tx
       .select()
       .from(schema.decisionTasks)
@@ -158,13 +167,7 @@ export class RoutingService {
           eq(schema.decisionRubrics.state, 'published'),
         ),
       );
-    const teams = await tx
-      .select()
-      .from(schema.routingTeams)
-      .where(
-        and(eq(schema.routingTeams.brandId, brandId), ne(schema.routingTeams.status, 'archived')),
-      )
-      .orderBy(schema.routingTeams.createdAt);
+    const teams = await this.routingTeams(tx, brand);
     return { mode: settings?.mode ?? 'shadow', rubric: rubric ?? null, teams };
   }
 
@@ -332,7 +335,12 @@ export class RoutingService {
         .from(schema.conversationControls)
         .where(eq(schema.conversationControls.id, payload.conversationId));
       if (!control?.brandId) return null;
-      const setup = await this.setup(tx, control.brandId);
+      const [brand] = await tx
+        .select()
+        .from(schema.brands)
+        .where(eq(schema.brands.id, control.brandId));
+      if (!brand) return null;
+      const setup = await this.setup(tx, brand);
       const existing = await tx
         .select()
         .from(schema.decisionRecords)
@@ -393,7 +401,7 @@ export class RoutingService {
     });
     const judged = await this.judge({
       rubric,
-      teams: context.teams.map(teamRule),
+      teams: context.teams.map((t) => teamRule(t.team, t.routing)),
       texts,
       state,
       language: language.slice,
@@ -419,56 +427,63 @@ export class RoutingService {
   }
 
   /**
-   * Live routing: records the team on the conversation and asks for it in Chatwoot. A conversation
-   * a person already handles, or one a person routed by hand, keeps its team.
+   * Live routing: puts the conversation in the team's queue as the inbox does, and asks for the
+   * team in Chatwoot through `conversation.team_changed`. A conversation a person already handles
+   * keeps its team, and so does one whose team a person chose (a team no routing decision set).
    */
   private async apply(tenantId: string, control: ControlRow, record: RecordRow): Promise<void> {
     if (!record.teamId) return;
     const teamId = record.teamId;
-    await this.tx(tenantId, async (tx) => {
+    const changed = await this.tx(tenantId, async (tx) => {
       const [current] = await tx
         .select()
         .from(schema.conversationControls)
         .where(eq(schema.conversationControls.id, control.id))
         .for('update');
-      const [route] = await tx
-        .select()
-        .from(schema.conversationRoutes)
-        .where(eq(schema.conversationRoutes.conversationId, control.id));
-      if (!current || current.ownerMode === 'HUMAN_ACTIVE' || route?.source === 'manual') return;
-      const [team] = await tx
-        .select()
-        .from(schema.routingTeams)
-        .where(eq(schema.routingTeams.id, teamId));
-      if (!team) return;
-      const linked = team.externalTeamId !== null;
-      const values = {
-        teamId,
-        decisionId: record.id,
-        source: record.finalSource,
-        syncState: linked ? ('pending' as const) : ('not_linked' as const),
-        routedAt: this.clock(),
-        syncedAt: null,
-      };
-      await tx
-        .insert(schema.conversationRoutes)
-        .values({ tenantId, conversationId: control.id, brandId: record.brandId, ...values })
-        .onConflictDoUpdate({
-          target: [schema.conversationRoutes.tenantId, schema.conversationRoutes.conversationId],
-          set: values,
-        });
+      if (!current || current.ownerMode === 'HUMAN_ACTIVE') return false;
+      const [state] = await tx
+        .select({ teamId: schema.conversationInboxState.teamId })
+        .from(schema.conversationInboxState)
+        .where(eq(schema.conversationInboxState.conversationId, control.id));
+      const currentTeam = state?.teamId ?? null;
+      if (currentTeam !== null && currentTeam !== teamId) {
+        const [routed] = await tx
+          .select({ id: schema.decisionRecords.id })
+          .from(schema.decisionRecords)
+          .where(
+            and(
+              eq(schema.decisionRecords.conversationId, control.id),
+              eq(schema.decisionRecords.applied, true),
+              eq(schema.decisionRecords.teamId, currentTeam),
+            ),
+          )
+          .limit(1);
+        if (!routed) return false;
+      }
+      const [team] = await tx.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+      if (team?.status !== 'active') return false;
       await tx
         .update(schema.decisionRecords)
         .set({ applied: true, appliedAt: this.clock() })
         .where(eq(schema.decisionRecords.id, record.id));
-      if (linked) {
-        await enqueueOutbox(tx, tenantId, {
-          topic: 'conversation.team_sync',
-          aggregateType: 'conversation',
-          aggregateId: control.id,
-          payload: { conversationId: control.id } satisfies TeamSync,
+      if (currentTeam === teamId) return false;
+      await tx
+        .insert(schema.conversationInboxState)
+        .values({ tenantId, conversationId: control.id, teamId })
+        .onConflictDoUpdate({
+          target: [
+            schema.conversationInboxState.tenantId,
+            schema.conversationInboxState.conversationId,
+          ],
+          set: { teamId, updatedAt: this.clock() },
         });
-      }
+      // The inbox's own path: the sync sets the Chatwoot team (created on first use).
+      await enqueueOutbox(tx, tenantId, {
+        topic: 'conversation.team_changed',
+        aggregateType: 'conversation',
+        aggregateId: control.id,
+        payload: { conversationId: control.id, teamId, actorStaffMemberId: null },
+      });
       await appendAudit(tx, {
         actorType: 'system',
         actorId: 'routing',
@@ -477,6 +492,7 @@ export class RoutingService {
         targetId: toPublicId('conversation', control.id),
         outcome: 'success',
         data: {
+          from: currentTeam ? toPublicId('team', currentTeam) : null,
           team: toPublicId('team', teamId),
           intent: record.finalIntent,
           source: record.finalSource,
@@ -484,54 +500,9 @@ export class RoutingService {
           explicitRequest: record.explicitRequest,
         },
       });
+      return true;
     });
-  }
-
-  /** Outbox handler for `conversation.team_sync`: sets the routed team in Chatwoot. */
-  async onTeamSync(event: ClaimedOutboxEvent): Promise<void> {
-    const payload = event.payload as TeamSync;
-    const tenantId = event.tenantId;
-    const found = await this.tx(tenantId, async (tx) => {
-      const [row] = await tx
-        .select({
-          route: schema.conversationRoutes,
-          control: schema.conversationControls,
-          team: schema.routingTeams,
-        })
-        .from(schema.conversationRoutes)
-        .innerJoin(
-          schema.conversationControls,
-          eq(schema.conversationControls.id, schema.conversationRoutes.conversationId),
-        )
-        .innerJoin(
-          schema.routingTeams,
-          eq(schema.routingTeams.id, schema.conversationRoutes.teamId),
-        )
-        .where(eq(schema.conversationRoutes.conversationId, payload.conversationId));
-      return row ?? null;
-    });
-    if (!found || found.team.externalTeamId === null) return;
-    const runtime = await this.registry.get(tenantId, found.control.connectionId);
-    if (!runtime.authority.assignTeam) {
-      this.logger.warn('the conversation authority cannot assign teams');
-      return;
-    }
-    await runtime.authority.assignTeam(
-      String(found.control.externalConversationId),
-      String(found.team.externalTeamId),
-      { kind: 'integration' },
-    );
-    await this.tx(tenantId, (tx) =>
-      tx
-        .update(schema.conversationRoutes)
-        .set({ syncState: 'synced', syncedAt: this.clock() })
-        .where(
-          and(
-            eq(schema.conversationRoutes.id, found.route.id),
-            eq(schema.conversationRoutes.teamId, found.team.id),
-          ),
-        ),
-    );
+    if (changed) await this.journal.signalInbox(tenantId, control.id);
   }
 
   /**
@@ -569,16 +540,7 @@ export class RoutingService {
               eq(schema.decisionRubrics.state, input.rubric),
             ),
           );
-        const teams = await tx
-          .select()
-          .from(schema.routingTeams)
-          .where(
-            and(
-              eq(schema.routingTeams.brandId, brand.id),
-              ne(schema.routingTeams.status, 'archived'),
-            ),
-          )
-          .orderBy(schema.routingTeams.createdAt);
+        const teams = await this.routingTeams(tx, brand);
         const language = await this.language.forRouting(tx, null, input.message);
         return { brand, rubric, teams, language };
       },
@@ -598,7 +560,7 @@ export class RoutingService {
     const definition = definitionOf(rubric);
     const judged = await this.judge({
       rubric,
-      teams: loaded.teams.map(teamRule),
+      teams: loaded.teams.map((t) => teamRule(t.team, t.routing)),
       texts: [input.message],
       state: minimizedState(
         [input.message],
@@ -637,7 +599,7 @@ export class RoutingService {
         return row;
       },
     );
-    const team = loaded.teams.find((t) => t.id === record.teamId);
+    const team = loaded.teams.find((t) => t.team.id === record.teamId)?.team;
     return {
       record: recordView(record, team?.name ?? null),
       policy: { explicitRequest, redacted: judged.redacted },

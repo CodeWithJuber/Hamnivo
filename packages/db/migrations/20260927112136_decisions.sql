@@ -70,22 +70,6 @@ CREATE TABLE "cache_policies" (
 );
 --> statement-breakpoint
 ALTER TABLE "cache_policies" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-CREATE TABLE "conversation_routes" (
-	"id" uuid PRIMARY KEY NOT NULL,
-	"tenant_id" uuid NOT NULL,
-	"conversation_id" uuid NOT NULL,
-	"brand_id" uuid NOT NULL,
-	"team_id" uuid NOT NULL,
-	"decision_id" uuid,
-	"source" text NOT NULL,
-	"sync_state" text DEFAULT 'pending' NOT NULL,
-	"routed_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"synced_at" timestamp with time zone,
-	CONSTRAINT "conversation_routes_tenant_id_id_key" UNIQUE("tenant_id","id"),
-	CONSTRAINT "conversation_routes_conversation_key" UNIQUE("tenant_id","conversation_id")
-);
---> statement-breakpoint
-ALTER TABLE "conversation_routes" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "decision_records" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"tenant_id" uuid NOT NULL,
@@ -174,26 +158,23 @@ CREATE TABLE "decision_tasks" (
 );
 --> statement-breakpoint
 ALTER TABLE "decision_tasks" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-CREATE TABLE "routing_teams" (
-	"id" uuid PRIMARY KEY NOT NULL,
+CREATE TABLE "team_routing" (
 	"tenant_id" uuid NOT NULL,
+	"team_id" uuid NOT NULL,
 	"brand_id" uuid NOT NULL,
-	"name" text NOT NULL,
 	"intents" text[] DEFAULT '{}'::text[] NOT NULL,
 	"languages" text[] DEFAULT '{}'::text[] NOT NULL,
 	"translation_languages" text[] DEFAULT '{}'::text[] NOT NULL,
-	"external_team_id" integer,
 	"is_default" boolean DEFAULT false NOT NULL,
 	"accepting" boolean DEFAULT true NOT NULL,
 	"status" text DEFAULT 'active' NOT NULL,
-	"created_by" uuid,
+	"updated_by" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "routing_teams_tenant_id_id_key" UNIQUE("tenant_id","id"),
-	CONSTRAINT "routing_teams_name_key" UNIQUE("tenant_id","brand_id","name")
+	CONSTRAINT "team_routing_pkey" PRIMARY KEY("tenant_id","team_id","brand_id")
 );
 --> statement-breakpoint
-ALTER TABLE "routing_teams" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "team_routing" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "language_preferences" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"tenant_id" uuid NOT NULL,
@@ -225,16 +206,11 @@ ALTER TABLE "cache_metrics_daily" ADD CONSTRAINT "cache_metrics_daily_brand_fk" 
 ALTER TABLE "cache_policies" ADD CONSTRAINT "cache_policies_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "cache_policies" ADD CONSTRAINT "cache_policies_brand_fk" FOREIGN KEY ("tenant_id","brand_id") REFERENCES "public"."brands"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "cache_policies" ADD CONSTRAINT "cache_policies_updated_by_fk" FOREIGN KEY ("tenant_id","updated_by") REFERENCES "public"."staff_members"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "conversation_routes" ADD CONSTRAINT "conversation_routes_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "conversation_routes" ADD CONSTRAINT "conversation_routes_conversation_fk" FOREIGN KEY ("tenant_id","conversation_id") REFERENCES "public"."conversation_controls"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "conversation_routes" ADD CONSTRAINT "conversation_routes_brand_fk" FOREIGN KEY ("tenant_id","brand_id") REFERENCES "public"."brands"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "conversation_routes" ADD CONSTRAINT "conversation_routes_team_fk" FOREIGN KEY ("tenant_id","team_id") REFERENCES "public"."routing_teams"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "conversation_routes" ADD CONSTRAINT "conversation_routes_decision_fk" FOREIGN KEY ("tenant_id","decision_id") REFERENCES "public"."decision_records"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "decision_records" ADD CONSTRAINT "decision_records_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "decision_records" ADD CONSTRAINT "decision_records_brand_fk" FOREIGN KEY ("tenant_id","brand_id") REFERENCES "public"."brands"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "decision_records" ADD CONSTRAINT "decision_records_conversation_fk" FOREIGN KEY ("tenant_id","conversation_id") REFERENCES "public"."conversation_controls"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "decision_records" ADD CONSTRAINT "decision_records_rubric_fk" FOREIGN KEY ("tenant_id","rubric_id") REFERENCES "public"."decision_rubrics"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "decision_records" ADD CONSTRAINT "decision_records_team_fk" FOREIGN KEY ("tenant_id","team_id") REFERENCES "public"."routing_teams"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "decision_records" ADD CONSTRAINT "decision_records_team_fk" FOREIGN KEY ("tenant_id","team_id") REFERENCES "public"."teams"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "decision_records" ADD CONSTRAINT "decision_records_reviewed_by_fk" FOREIGN KEY ("tenant_id","reviewed_by") REFERENCES "public"."staff_members"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "decision_rubrics" ADD CONSTRAINT "decision_rubrics_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "decision_rubrics" ADD CONSTRAINT "decision_rubrics_brand_fk" FOREIGN KEY ("tenant_id","brand_id") REFERENCES "public"."brands"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -243,27 +219,27 @@ ALTER TABLE "decision_rubrics" ADD CONSTRAINT "decision_rubrics_published_by_fk"
 ALTER TABLE "decision_tasks" ADD CONSTRAINT "decision_tasks_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "decision_tasks" ADD CONSTRAINT "decision_tasks_brand_fk" FOREIGN KEY ("tenant_id","brand_id") REFERENCES "public"."brands"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "decision_tasks" ADD CONSTRAINT "decision_tasks_updated_by_fk" FOREIGN KEY ("tenant_id","updated_by") REFERENCES "public"."staff_members"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "routing_teams" ADD CONSTRAINT "routing_teams_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "routing_teams" ADD CONSTRAINT "routing_teams_brand_fk" FOREIGN KEY ("tenant_id","brand_id") REFERENCES "public"."brands"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "routing_teams" ADD CONSTRAINT "routing_teams_created_by_fk" FOREIGN KEY ("tenant_id","created_by") REFERENCES "public"."staff_members"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "team_routing" ADD CONSTRAINT "team_routing_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "team_routing" ADD CONSTRAINT "team_routing_team_fk" FOREIGN KEY ("tenant_id","team_id") REFERENCES "public"."teams"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "team_routing" ADD CONSTRAINT "team_routing_brand_fk" FOREIGN KEY ("tenant_id","brand_id") REFERENCES "public"."brands"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "team_routing" ADD CONSTRAINT "team_routing_updated_by_fk" FOREIGN KEY ("tenant_id","updated_by") REFERENCES "public"."staff_members"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "language_preferences" ADD CONSTRAINT "language_preferences_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "language_preferences" ADD CONSTRAINT "language_preferences_principal_fk" FOREIGN KEY ("tenant_id","principal_id") REFERENCES "public"."customer_principals"("tenant_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "cache_entry_index_brand_idx" ON "cache_entry_index" USING btree ("tenant_id","brand_id","created_at");--> statement-breakpoint
 CREATE INDEX "cache_entry_index_lookup_idx" ON "cache_entry_index" USING btree ("tenant_id","tier","lookup");--> statement-breakpoint
 CREATE INDEX "cache_entry_index_dependencies_idx" ON "cache_entry_index" USING gin ("dependencies");--> statement-breakpoint
-CREATE INDEX "conversation_routes_team_idx" ON "conversation_routes" USING btree ("tenant_id","team_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "decision_records_trigger_key" ON "decision_records" USING btree ("tenant_id","conversation_id","task","trigger_ref") WHERE "decision_records"."conversation_id" is not null;--> statement-breakpoint
 CREATE INDEX "decision_records_brand_idx" ON "decision_records" USING btree ("tenant_id","brand_id","task","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "decision_rubrics_version_key" ON "decision_rubrics" USING btree ("tenant_id","brand_id","task","version");--> statement-breakpoint
 CREATE UNIQUE INDEX "decision_rubrics_one_draft_key" ON "decision_rubrics" USING btree ("tenant_id","brand_id","task") WHERE "decision_rubrics"."state" = 'draft';--> statement-breakpoint
 CREATE UNIQUE INDEX "decision_rubrics_one_published_key" ON "decision_rubrics" USING btree ("tenant_id","brand_id","task") WHERE "decision_rubrics"."state" = 'published';--> statement-breakpoint
+CREATE INDEX "team_routing_brand_idx" ON "team_routing" USING btree ("tenant_id","brand_id");--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "cache_dependency_versions" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "cache_entry_index" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "cache_metrics_daily" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "cache_policies" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));--> statement-breakpoint
-CREATE POLICY "tenant_isolation" ON "conversation_routes" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "decision_records" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "decision_rubrics" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "decision_tasks" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));--> statement-breakpoint
-CREATE POLICY "tenant_isolation" ON "routing_teams" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));--> statement-breakpoint
+CREATE POLICY "tenant_isolation" ON "team_routing" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));--> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "language_preferences" AS PERMISSIVE FOR ALL TO "hamnivo_app" USING (tenant_id = (select app.current_tenant())) WITH CHECK (tenant_id = (select app.current_tenant()));

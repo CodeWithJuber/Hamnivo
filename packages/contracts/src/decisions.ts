@@ -12,59 +12,56 @@ export type LanguageSlice = z.infer<typeof LanguageSlice>;
 export const DecisionTaskName = z.enum(['team-routing']).meta({ id: 'DecisionTaskName' });
 export type DecisionTaskName = z.infer<typeof DecisionTaskName>;
 
+const IntentKey = z
+  .string()
+  .regex(/^[a-z][a-z0-9_-]{0,39}$/, 'Use lowercase letters, digits, - or _')
+  .refine((v) => v !== 'other', '"other" is added automatically');
+
 /**
- * A team conversations can be routed to (J02, U07): the intents it handles, the languages its
- * people answer in and the languages it serves through a reviewed translation path.
+ * How an inbox team takes part in one brand's routing (J02, U07): the intents it handles, the
+ * languages its people answer in and those it serves through a reviewed translation path.
+ */
+export const TeamRouting = z
+  .object({
+    intents: z.array(z.string()),
+    languages: z.array(LanguageSlice),
+    translationLanguages: z.array(LanguageSlice),
+    isDefault: z.boolean(),
+    /** Only active teams that are accepting conversations are routed to. */
+    accepting: z.boolean(),
+    status: z.enum(['active', 'archived']),
+    updatedAt: Timestamp,
+  })
+  .meta({ id: 'TeamRouting' });
+export type TeamRouting = z.infer<typeof TeamRouting>;
+
+/**
+ * A team that can take a brand's conversations (an active inbox team of the brand's workspace, or
+ * a tenant-wide one), with its routing for the brand; `routing` is null until it is set up.
+ * Teams and their members are managed with the teams API (`/v1/admin/teams`).
  */
 export const RoutingTeam = z
   .object({
     id: typeId('team'),
     brandId: typeId('brand'),
     name: z.string(),
-    intents: z.array(z.string()),
-    languages: z.array(LanguageSlice),
-    translationLanguages: z.array(LanguageSlice),
-    /** Chatwoot team id; live routing also assigns it there. */
-    externalTeamId: z.int().positive().nullable(),
-    isDefault: z.boolean(),
-    /** Only active teams that are accepting conversations can be routed to. */
-    accepting: z.boolean(),
-    status: z.enum(['active', 'archived']),
-    createdAt: Timestamp,
-    updatedAt: Timestamp,
+    workspaceId: typeId('workspace').nullable(),
+    routing: TeamRouting.nullable(),
   })
   .meta({ id: 'RoutingTeam' });
 export type RoutingTeam = z.infer<typeof RoutingTeam>;
 
-const IntentKey = z
-  .string()
-  .regex(/^[a-z][a-z0-9_-]{0,39}$/, 'Use lowercase letters, digits, - or _')
-  .refine((v) => v !== 'other', '"other" is added automatically');
-
-export const CreateRoutingTeamRequest = z
+export const SetTeamRoutingRequest = z
   .object({
-    name: z.string().trim().min(1).max(80),
     intents: z.array(IntentKey).max(30).default([]),
     languages: z.array(LanguageSlice).max(6).default([]),
     translationLanguages: z.array(LanguageSlice).max(6).default([]),
-    externalTeamId: z.int().positive().nullable().optional(),
     isDefault: z.boolean().default(false),
     accepting: z.boolean().default(true),
+    /** `archived` takes the team out of this brand's routing; its decisions stay recorded. */
+    status: z.enum(['active', 'archived']).default('active'),
   })
-  .meta({ id: 'CreateRoutingTeamRequest' });
-
-export const UpdateRoutingTeamRequest = z
-  .object({
-    name: z.string().trim().min(1).max(80).optional(),
-    intents: z.array(IntentKey).max(30).optional(),
-    languages: z.array(LanguageSlice).max(6).optional(),
-    translationLanguages: z.array(LanguageSlice).max(6).optional(),
-    externalTeamId: z.int().positive().nullable().optional(),
-    isDefault: z.boolean().optional(),
-    accepting: z.boolean().optional(),
-    status: z.enum(['active', 'archived']).optional(),
-  })
-  .meta({ id: 'UpdateRoutingTeamRequest' });
+  .meta({ id: 'SetTeamRoutingRequest' });
 
 export const RoutingIntentSchema = z
   .object({

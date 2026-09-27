@@ -26,7 +26,8 @@ export interface SeededTenant {
   agentVersionId: string;
   knowledgeSourceId: string;
   documentId: string;
-  routingTeamId: string;
+  /** The inbox team; it also routes for the brand. */
+  teamId: string;
   /** Team-routing rubric version 1, published. Version 2 is a draft. */
   rubricId: string;
   decisionId: string;
@@ -67,9 +68,11 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     agentId: newId(),
     agentVersionId: newId(),
     runId: newId(),
-    routingTeamId: newId(),
+    teamId: newId(),
     rubricId: newId(),
     decisionId: newId(),
+    memoryId: newId(),
+    memoryDeletionId: newId(),
   };
 
   await withTenant(db, { tenantId, actorId: 'seed' }, async (tx) => {
@@ -414,15 +417,157 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       name: 'generate',
       status: 'ok',
     });
-    // Decisions, language and cache.
-    await tx.insert(s.routingTeams).values({
-      id: ids.routingTeamId,
+    await tx.insert(s.learningConsents).values({
       tenantId,
       brandId: ids.brandId,
-      name: 'Billing',
+      subjectId: ids.principalId,
+      scope: 'personal_memory',
+      state: 'granted',
+      noticeVersion: 'memory-notice/1',
+      actorType: 'customer',
+    });
+    const observedAt = new Date(Date.now() - 3_600_000);
+    await tx.insert(s.memoryRecords).values({
+      id: ids.memoryId,
+      tenantId,
+      workspaceId: ids.workspaceId,
+      brandId: ids.brandId,
+      subjectId: ids.principalId,
+      conversationId: ids.conversationId,
+      scope: 'person',
+      kind: 'preference',
+      key: 'preferred_language',
+      payload: { value: 'Urdu' },
+      contentHash: bytes(),
+      sourceType: 'customer_statement',
+      sourceEventIds: ['msg_seed'],
+      evidenceStatus: 'supported',
+      writtenByType: 'ai',
+      writeReason: 'extracted_from_message',
+      purpose: 'Reply in the language the customer prefers',
+      allowedPurposes: ['ai_replies', 'staff_context'],
+      allowedRoles: ['customer', 'staff', 'ai'],
+      sensitivity: 'normal',
+      retentionClass: 'long',
+      expiresAt: inDays(365),
+      policyVersion: 'memory-write/1',
+      status: 'active',
+      reviewStatus: 'auto',
+      observedAt,
+      validFrom: observedAt,
+    });
+    await tx.insert(s.memoryEmbeddings).values({
+      tenantId,
+      memoryId: ids.memoryId,
+      subjectId: ids.principalId,
+      embedding: Array.from({ length: 768 }, (_, i) => (i === 0 ? 1 : 0)),
+      embeddingModel: 'hamnivo:seed',
+      contentHash: bytes(),
+    });
+    await tx.insert(s.memoryDeletions).values({
+      id: ids.memoryDeletionId,
+      tenantId,
+      brandId: ids.brandId,
+      subjectId: ids.principalId,
+      scope: 'record',
+      reason: 'customer_request',
+      requestedByType: 'customer',
+      recordCount: 1,
+      status: 'completed',
+      steps: { records: 'done', embeddings: 'done', caches: 'done' },
+      completedAt: new Date(),
+    });
+    await tx.insert(s.deletionTombstones).values({
+      tenantId,
+      deletionId: ids.memoryDeletionId,
+      subjectId: ids.principalId,
+      targetType: 'memory_record',
+      targetId: newId(),
+      memoryKey: 'delivery_note',
+      sourceEventIds: ['msg_seed_deleted'],
+      observedAt,
+    });
+    // Staff inbox: a team, a second conversation linked to the first, drafts and a review.
+    const teamId = ids.teamId;
+    await tx
+      .insert(s.teams)
+      .values({ id: teamId, tenantId, name: 'Billing', createdBy: ids.staffMemberId });
+    await tx.insert(s.teamMembers).values({ tenantId, teamId, staffMemberId: ids.staffMemberId });
+    await tx.insert(s.teamAuthorityLinks).values({
+      tenantId,
+      teamId,
+      connectionId: ids.connectionId,
+      externalTeamId: 5,
+    });
+    await tx.insert(s.conversationInboxState).values({
+      tenantId,
+      conversationId: ids.conversationId,
+      teamId,
+      labels: ['delivery'],
+    });
+    const otherConversationId = newId();
+    await tx.insert(s.conversationControls).values({
+      id: otherConversationId,
+      tenantId,
+      connectionId: ids.connectionId,
+      inboxId: ids.inboxId,
+      brandId: ids.brandId,
+      principalId: ids.principalId,
+      externalConversationId: 12,
+      ownerMode: 'HUMAN_ACTIVE',
+      ownerStaffId: ids.staffMemberId,
+      ownerReason: 'staff_takeover',
+      ownerChangedAt: new Date(),
+      // Resolved, so the reconciler tests still see one conversation to follow per tenant.
+      authorityStatus: 'resolved',
+    });
+    // Links are stored once per pair, smaller id first (UUIDs compare like their hex text).
+    const [low, high] = [ids.conversationId, otherConversationId].sort() as [string, string];
+    await tx.insert(s.conversationLinks).values({
+      tenantId,
+      conversationId: low,
+      linkedConversationId: high,
+      note: 'Same order',
+      createdBy: ids.staffMemberId,
+    });
+    await tx.insert(s.staffDrafts).values([
+      {
+        tenantId,
+        conversationId: ids.conversationId,
+        staffMemberId: ids.staffMemberId,
+        lane: 'internal',
+        kind: 'draft',
+        text: 'Courier delayed',
+      },
+      {
+        tenantId,
+        conversationId: ids.conversationId,
+        staffMemberId: ids.staffMemberId,
+        lane: 'public',
+        kind: 'outgoing',
+        text: 'I am checking your order now.',
+        clientMessageId: newId(),
+        state: 'failed',
+        errorCode: 'AUTHORITY_UNAVAILABLE',
+      },
+    ]);
+    await tx.insert(s.conversationReviews).values({
+      tenantId,
+      conversationId: ids.conversationId,
+      reviewerId: ids.staffMemberId,
+      subjectStaffId: ids.staffMemberId,
+      rating: 4,
+      note: 'Clear and kind.',
+    });
+    // Decisions, language and cache: the inbox team above routes for the brand.
+    await tx.insert(s.teamRouting).values({
+      tenantId,
+      teamId,
+      brandId: ids.brandId,
       intents: ['billing'],
       languages: ['en', 'ur', 'roman-urdu'],
       isDefault: true,
+      updatedBy: ids.staffMemberId,
     });
     const definition = {
       intents: [{ key: 'billing', description: 'Payments and refunds', keywords: ['refund'] }],
@@ -474,20 +619,12 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       baselineIntent: 'billing',
       finalIntent: 'billing',
       finalSource: 'provider',
-      teamId: ids.routingTeamId,
+      teamId,
       teamBasis: 'intent',
       languageMatch: 'native',
       language: 'en',
       latencyMs: 140,
       offered: ['billing', 'other'],
-    });
-    await tx.insert(s.conversationRoutes).values({
-      tenantId,
-      conversationId: ids.conversationId,
-      brandId: ids.brandId,
-      teamId: ids.routingTeamId,
-      decisionId: ids.decisionId,
-      source: 'provider',
     });
     await tx.insert(s.languagePreferences).values({
       tenantId,
@@ -556,7 +693,7 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     agentVersionId: ids.agentVersionId,
     knowledgeSourceId: ids.knowledgeSourceId,
     documentId: ids.documentId,
-    routingTeamId: ids.routingTeamId,
+    teamId: ids.teamId,
     rubricId: ids.rubricId,
     decisionId: ids.decisionId,
   };

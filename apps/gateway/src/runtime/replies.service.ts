@@ -20,12 +20,19 @@ import { type ControlRow, OwnershipService } from '../authority/ownership.servic
 import { PublicationsService } from '../authority/publications.service.js';
 import { AuthorityRegistry, type ConnectionRuntime } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
-import { contractMessage, type PublicationFacts, type SourceRef } from '../authority/views.js';
+import {
+  contractMessage,
+  type MemoryPartRef,
+  type PublicationFacts,
+  type SourceRef,
+} from '../authority/views.js';
 import { AnswerCache, type AnswerLookup } from '../cache/answers.js';
 import type { SourceRefRow } from '../cache/cache.service.js';
 import { AppError } from '../common/app-error.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
 import { LanguageService } from '../language/language.service.js';
+import { citeMemories, memoryBlock } from '../memory/prompt.js';
+import { MemoryRecallService } from '../memory/recall.service.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
 import { type ActiveAgent, AgentsService } from './agents.service.js';
@@ -66,6 +73,8 @@ interface Generated {
   sources: SourceRef[];
   /** The cited documents and versions, for the answer cache to recheck before reuse. */
   refs: SourceRefRow[];
+  /** Customer memories the reply relied on (G19). */
+  memories: MemoryPartRef[];
 }
 
 /** Prompt options, and why the reply language was chosen (recorded with the model step). */
@@ -143,6 +152,7 @@ export class RepliesService {
     private readonly publications: PublicationsService,
     private readonly language: LanguageService,
     private readonly answers: AnswerCache,
+    private readonly memory: MemoryRecallService,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -254,6 +264,7 @@ export class RepliesService {
         await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted, {
           sources: stored.sources ?? [],
           ...(stored.displayName ? { displayName: stored.displayName } : {}),
+          ...(stored.memories?.length ? { memories: stored.memories } : {}),
         });
         await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'replied' }));
         return;
@@ -324,6 +335,7 @@ export class RepliesService {
         latencyMs: 0,
         sources: cached.answer.sources,
         refs: cached.answer.refs,
+        memories: [],
       };
     } else {
       try {
@@ -379,6 +391,7 @@ export class RepliesService {
     const facts: PublicationFacts = {
       sources: generated.sources,
       displayName: agent.config.displayName,
+      ...(generated.memories.length ? { memories: generated.memories } : {}),
     };
     const reserved = await this.tx(tenantId, async (tx) => {
       const locked = await this.ownership.lock(tx, payload.conversationId);
@@ -660,8 +673,16 @@ export class RepliesService {
     const messages = historyMessages(history, config.limits.historyMessages);
     const assist = config.mode === 'assist';
     const passages = await this.retrieve(tenantId, runId, context, config, history);
+    // Customer memory (G19): only with the customer's consent, in scope and currently valid.
+    const memories = await this.memory.recall(tenantId, {
+      runId,
+      control: context.control,
+      config,
+      history,
+    });
     const base =
       systemPrompt(config, context.brandName, passages, options) +
+      (memories.length ? `\n\n${memoryBlock(memories)}` : '') +
       (assist
         ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
         : '');
@@ -673,9 +694,11 @@ export class RepliesService {
         ...(options.languageSource ? { languageSource: options.languageSource } : {}),
       });
       const cited = applyCitations(generated.text, passages, (p) => p.documentId);
+      const remembered = citeMemories(cited.text, memories);
       const result: Generated = {
         ...generated,
-        text: cited.text,
+        text: remembered.text,
+        memories: remembered.memories,
         sources: cited.cited.map((p) => ({
           type: 'source',
           sourceId: toPublicId('document', p.documentId),
@@ -790,6 +813,7 @@ export class RepliesService {
           latencyMs: Date.now() - started,
           sources: [],
           refs: [],
+          memories: [],
         };
         await this.tx(tenantId, (tx) =>
           this.runs.step(tx, tenantId, runId, {
@@ -838,7 +862,7 @@ export class RepliesService {
     tenantId: string,
     runId: string,
     outcome: RunOutcome,
-    telemetry: Omit<Generated, 'text' | 'sources' | 'refs'>,
+    telemetry: Omit<Generated, 'text' | 'sources' | 'refs' | 'memories'>,
   ) {
     await this.runs.finish(tx, runId, { outcome, ...telemetry });
     const now = this.clock();

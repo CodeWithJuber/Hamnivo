@@ -94,8 +94,14 @@ describe('invitations', () => {
 
 describe('delegation ceiling and revocation', () => {
   it('lets a team lead delegate only a subset of their own access inside their team', async () => {
-    const team = { type: 'team', id: newPublicId('team').publicId };
-    const otherTeam = { type: 'team', id: newPublicId('team').publicId };
+    const team = {
+      type: 'team',
+      id: (await owner.post('/v1/admin/teams', { name: 'Care' })).body.id,
+    };
+    const otherTeam = {
+      type: 'team',
+      id: (await owner.post('/v1/admin/teams', { name: 'Billing' })).body.id,
+    };
     const teamLead = await owner.post('/v1/admin/roles', {
       key: 'team_lead',
       name: 'Team lead',

@@ -360,9 +360,9 @@ export class RubricsService {
     const ids = [...new Set(rows.map((r) => r.teamId).filter((id): id is string => id !== null))];
     if (ids.length === 0) return new Map();
     const teams = await tx
-      .select({ id: schema.routingTeams.id, name: schema.routingTeams.name })
-      .from(schema.routingTeams)
-      .where(inArray(schema.routingTeams.id, ids));
+      .select({ id: schema.teams.id, name: schema.teams.name })
+      .from(schema.teams)
+      .where(inArray(schema.teams.id, ids));
     return new Map(teams.map((t) => [t.id, t.name]));
   }
 

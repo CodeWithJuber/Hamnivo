@@ -1,46 +1,30 @@
 import {
-  CreateRoutingTeamRequest,
   decisionRoutes,
   ReviewDecisionRequest,
   SaveRubricDraftRequest,
   SetDecisionModeRequest,
+  SetTeamRoutingRequest,
   TestRubricRequest,
-  UpdateRoutingTeamRequest,
 } from '@hamnivo/contracts';
 import type { StaffPrincipal } from '@hamnivo/policy';
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Param,
-  Patch,
-  Post,
-  Put,
-  Query,
-  Req,
-  Res,
-} from '@nestjs/common';
-import type { FastifyReply, FastifyRequest } from 'fastify';
-import { IdempotencyService, validIdempotencyKey } from '../common/idempotency.service.js';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import { parseInput } from '../common/validation.js';
 import { CurrentPrincipal, StaffRoute } from '../identity/request-auth.js';
 import { RoutingService } from './routing.service.js';
 import { RubricsService } from './rubrics.service.js';
-import { TeamsService } from './teams.service.js';
+import { TeamRoutingService } from './team-routing.service.js';
 
 /**
  * Jev-assisted routing in Studio (J02, J05, J07, J08, board 12). Each handler checks the brand
- * permission itself: reading needs `decisions.read`, rubrics and modes `decisions.manage`
- * (a fresh sign-in), teams `inbox.manage`.
+ * permission itself: reading needs `decisions.read`; rubrics, modes and each team's routing for
+ * the brand need `decisions.manage`. Teams themselves are the inbox's (`/v1/admin/teams`).
  */
 @Controller('v1/admin')
 export class DecisionsController {
   constructor(
-    private readonly teams: TeamsService,
+    private readonly teams: TeamRoutingService,
     private readonly rubrics: RubricsService,
     private readonly routing: RoutingService,
-    private readonly idempotency: IdempotencyService,
   ) {}
 
   @Get('brands/:brandId/routing/teams')
@@ -52,39 +36,15 @@ export class DecisionsController {
     return { items: await this.teams.list(principal, brandId) };
   }
 
-  @Post('brands/:brandId/routing/teams')
-  @StaffRoute({ tenant: true, permission: 'inbox.manage' })
-  async createTeam(
+  @Put('brands/:brandId/routing/teams/:teamId')
+  @StaffRoute({ tenant: true, permission: 'decisions.manage' })
+  setTeamRouting(
     @CurrentPrincipal() principal: StaffPrincipal,
     @Param('brandId') brandId: string,
-    @Body() body: unknown,
-    @Req() request: FastifyRequest,
-    @Res({ passthrough: true }) reply: FastifyReply,
-  ) {
-    const input = parseInput(CreateRoutingTeamRequest, body);
-    const result = await this.idempotency.run(
-      {
-        tenantId: principal.tenantId,
-        actor: `staff:${principal.staffMemberId}`,
-        route: decisionRoutes.createRoutingTeam.operationId,
-        key: validIdempotencyKey(request.headers['idempotency-key']),
-        body: { brandId, ...input },
-      },
-      async () => ({ status: 201, body: await this.teams.create(principal, brandId, input) }),
-    );
-    reply.status(result.status);
-    if (result.replayed) reply.header('idempotent-replayed', 'true');
-    return result.body;
-  }
-
-  @Patch('routing-teams/:teamId')
-  @StaffRoute({ tenant: true, permission: 'inbox.manage' })
-  updateTeam(
-    @CurrentPrincipal() principal: StaffPrincipal,
     @Param('teamId') teamId: string,
     @Body() body: unknown,
   ) {
-    return this.teams.update(principal, teamId, parseInput(UpdateRoutingTeamRequest, body));
+    return this.teams.set(principal, brandId, teamId, parseInput(SetTeamRoutingRequest, body));
   }
 
   @Get('brands/:brandId/decisions/:task')

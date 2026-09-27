@@ -115,6 +115,42 @@ missing kill-switch check and a disabled honesty guard.
 replacement, visibility and freshness rules, Urdu and Hindi search, cited answers and tenant
 isolation. `test/knowledge.test.ts` covers the parsers, the ClamAV client, chunking and citations.
 
+## Customer memory (release L)
+
+| Area | Where |
+|---|---|
+| Extraction after each customer message: the model proposes, the write policy decides (L07) | `src/memory/extraction.service.ts`, `writer.service.ts` |
+| Customer controls in the widget: see, agree, correct, confirm, delete, forget (L04) | `src/memory/widget-memory.controller.ts`, `customer-memory.service.ts` |
+| Studio: provenance, history, review, correct, outdated, delete, erase, export (L04) | `src/memory/admin-memory.controller.ts`, `admin-memory.service.ts` |
+| Deletion receipts, tombstones, citation scrubbing, retention and replay (L05) | `src/memory/deletion.service.ts`, `fingerprints.ts` |
+| Recall in replies within the agent's budget, cited as memories (G19) | `src/memory/recall.service.ts`, `prompt.ts`, `src/runtime/replies.service.ts` |
+| Per-customer memory version and cache namespace (K09) | `src/memory/cache.ts` |
+
+- **Off until both agree.** Nothing runs unless the brand's agent has `memory.enabled` and the
+  customer agreed (`POST /v1/widget/memory/consent`, stored in `learning_consents`). Only
+  messages written after the agreement reach a model for memory, and a job proposes only from the
+  message that started it (earlier ones are context).
+- **The policy decides.** `evaluateMemoryWrite` (`@hamnivo/domain`) sets every field of a record
+  and explains each decision without content. A value that disagrees with the current one waits
+  for review; neither is used in replies until the customer or staff confirm.
+- **Staff permissions.** `memory.read` to see, `memory.manage` to correct, confirm, reject or mark
+  outdated, `memory.delete`, `memory.erase` and `memory.export` (both need a recent sign-in), all
+  checked for the customer's brand and audited with keys and codes only.
+- **Deleting.** In one transaction: a receipt, content-free tombstones (HMAC fingerprints keyed
+  from the KEK), the records and their vectors, and the memory parts of published answers and
+  the realtime journal. The worker then purges the customer's cache namespace, checks that
+  nothing the tombstones cover is left and completes the receipt. Chat history in Chatwoot stays.
+- **Maintenance.** Hourly, memory past its retention is deleted the same way; daily, tombstones
+  are replayed (`app.apply_memory_tombstones()`), as after a restore. Recall also skips any row a
+  tombstone covers.
+- **Never cached, never logged.** Recall reads the database for every reply. Runs record counts,
+  a snapshot hash and that the reply may not enter a shared cache. Memory endpoints send
+  `Cache-Control: no-store`, and logs carry counts only.
+
+`test/memory.int.test.ts` covers consent, the refusals, corrections and review, deletion with its
+receipt, replayed jobs, erasure, retention, restores, access between customers, tenants and staff
+roles, recall in replies and the audit log.
+
 ## Reconciler (M10)
 
 Chatwoot does not retry most webhooks, so webhooks only make Hamnivo fast. The worker's
@@ -163,10 +199,13 @@ Late publication (R06):
 
 ## Team routing decisions (J02, J05, J08)
 
-- **Routing teams** (`/v1/admin/brands/{brandId}/routing/teams`, `PATCH /v1/admin/routing-teams/{teamId}`):
-  the topics a team handles, the languages its people answer in and those served through a
-  reviewed translation path, whether it accepts conversations, and the Chatwoot team it maps to.
-  Reading needs `decisions.read`; changing needs `inbox.manage`.
+- **Team routing** (`GET /v1/admin/brands/{brandId}/routing/teams`,
+  `PUT /v1/admin/brands/{brandId}/routing/teams/{teamId}`): routing uses the inbox's teams
+  (`/v1/admin/teams`, in the brand's workspace or tenant-wide) and keeps, per brand, the topics a
+  team handles, the languages its people answer in and those served through a reviewed
+  translation path, whether it is the default, whether it accepts conversations, and whether
+  routing uses it at all. Reading needs `decisions.read`; changing needs `decisions.manage`; every
+  change is audited.
 - **Rubric** (`/v1/admin/brands/{brandId}/decisions/team-routing`, `…/draft`, `…/publish`,
   `…/mode`, `…/test`): versioned topics with baseline keywords, the inputs shared with the
   provider (recent customer messages with personal data redacted, conversation status), a
@@ -177,8 +216,11 @@ Late publication (R06):
   behind the circuit breaker; the deterministic baseline decides when Jev abstains, fails, is
   too slow or is not sure enough for the language. A request for a person is never overridden.
 - **Modes.** Brands start in `shadow`: both decisions are recorded, the baseline's is final and no
-  team is assigned. `live` assigns the Chatwoot team of the final decision (only accepting teams).
-  Routing picks a team, never an owner.
+  team is assigned. `live` puts the conversation in the chosen team's inbox queue the way the
+  inbox does (`conversation_inbox_state.team_id`, then `conversation.team_changed` sets the
+  Chatwoot team, created on first use), so team queues and team-scoped grants see it. Only
+  accepting teams are chosen; a team a person set is kept, and so is a conversation a person
+  handles. Routing picks a team, never an owner.
 - **Records** (`…/records`, `/v1/admin/decisions/{decisionId}`, `…/review`) keep labels, versions,
   latency and tokens, never customer text; confidence only when the provider gave one.
   `…/experiment` compares Jev with the baseline per language from shadow and live records.

@@ -4,7 +4,7 @@ import rateLimit from '@fastify/rate-limit';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { Redis } from 'ioredis';
-import { ApiModule } from './api.module.js';
+import { ApiModule, type ApiOverrides } from './api.module.js';
 import { ProblemFilter } from './common/problem.filter.js';
 import { requestIdFrom } from './common/request-id.js';
 import type { AppConfig } from './config.js';
@@ -12,7 +12,7 @@ import type { Auth } from './identity/auth.factory.js';
 import { registerAuthRoutes } from './identity/auth.routes.js';
 import { registerApiDocs } from './platform/docs.js';
 import { registerMetrics } from './platform/metrics.js';
-import type { PlatformOverrides } from './platform/platform.module.js';
+
 import { AUTH, REDIS } from './tokens.js';
 
 const REDACT = [
@@ -25,7 +25,7 @@ const REDACT = [
 /** Builds the API application (used by main.api.ts and by the integration tests). */
 export async function createApiApp(
   config: AppConfig,
-  overrides: PlatformOverrides = {},
+  overrides: ApiOverrides = {},
 ): Promise<NestFastifyApplication> {
   const adapter = new FastifyAdapter({
     logger:

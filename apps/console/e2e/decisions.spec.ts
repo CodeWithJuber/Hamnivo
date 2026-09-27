@@ -26,14 +26,32 @@ test('HNV-12-01 HNV-12-02 HNV-12-03 HNV-12-05 · edit, publish and try a routing
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1, name: 'قواعد القرار' })).toBeVisible();
 
-  // A team that handles billing in English and Arabic (U07).
+  // A team that handles billing in English and Arabic (U07). It is an inbox team, created in the
+  // brand's workspace; routing adds its topics and languages for this brand.
   await page.getByRole('textbox', { name: 'اسم الفريق' }).fill('Billing team');
   await page.getByRole('textbox', { name: 'المواضيع', exact: true }).fill('billing');
   await page.getByRole('checkbox', { name: 'الإنجليزية' }).click();
   await page.getByRole('checkbox', { name: 'العربية' }).click();
   await page.getByRole('button', { name: 'إضافة فريق' }).click();
-  await expect(page.getByTestId('routing-team')).toContainText('Billing team');
-  await expect(page.getByTestId('routing-team')).toContainText('الإنجليزية');
+  const team = page.getByTestId('routing-team').filter({ hasText: 'Billing team' });
+  await expect(team).toContainText('الإنجليزية');
+  const inboxTeams = await workspace.staff.call<{ items: Array<{ name: string }> }>(
+    'GET',
+    '/v1/admin/teams',
+  );
+  expect(inboxTeams.items.map((item) => item.name)).toContain('Billing team');
+
+  // Its routing is edited in place: it can also serve Urdu with translation.
+  await team.getByRole('button', { name: 'تعديل التوجيه لفريق Billing team' }).click();
+  const routing = page.getByTestId('team-routing-dialog');
+  await routing
+    .getByRole('group', { name: 'لغات يخدمها الفريق بالترجمة' })
+    .getByRole('checkbox', { name: 'الأردية', exact: true })
+    .click();
+  const dialogViolations = await audit(page, 'team routing dialog (ar)');
+  await routing.getByRole('button', { name: 'حفظ التوجيه' }).click();
+  await expect(routing).toBeHidden();
+  await expect(team).toContainText('بالترجمة: الأردية');
 
   // The rubric: a malformed topic key is refused before anything goes live (HNV-12-01).
   await page.getByRole('combobox', { name: 'من يقترح الفريق' }).selectOption('mock');
@@ -85,7 +103,7 @@ test('HNV-12-01 HNV-12-02 HNV-12-03 HNV-12-05 · edit, publish and try a routing
   await tryMessage(page, 'I want to talk to a person please');
   await expect(result(page)).toContainText('تطلب الرسالة التحدث إلى شخص');
 
-  const violations = await audit(page, 'decisions (ar)');
+  const violations = [...dialogViolations, ...(await audit(page, 'decisions (ar)'))];
 
   // Every brand starts in shadow mode (J02): real conversations record Jev next to the fixed
   // rules, and no team is assigned from Jev's choice.

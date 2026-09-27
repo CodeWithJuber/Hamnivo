@@ -28,7 +28,7 @@ import { PageHeader, Section } from '../components/PageHeader';
 import { ActionError, Forbidden, QueryState } from '../components/States';
 import { api, isApiError } from '../lib/api';
 import { formatDateTime, formatDuration, formatNumber } from '../lib/format';
-import { useStudioMutation, useStudioQuery } from '../lib/queries';
+import { useBrands, useStudioMutation, useStudioQuery, useWorkspaces } from '../lib/queries';
 import { useTenant } from '../lib/tenant';
 import type { Items } from '../lib/types';
 
@@ -172,11 +172,191 @@ function ModeSection({ brandId, task }: { brandId: string; task: DecisionTask })
 }
 
 // ---------------------------------------------------------------------------------------------
-// Teams (J02, U07)
+// Teams (J02, U07): the inbox's teams, and how routing uses them for this brand
 
-function TeamCard({ team }: { team: RoutingTeam }) {
+type TeamRouting = NonNullable<RoutingTeam['routing']>;
+
+/** The workspace a brand belongs to, from whichever list this person may read. */
+function useBrandWorkspace(brandId: string): string | undefined {
+  const brands = useBrands();
+  const workspaces = useWorkspaces();
+  return (
+    brands.data?.items.find((brand) => brand.id === brandId)?.workspaceId ??
+    workspaces.data?.items.find((w) => w.brands.some((brand) => brand.id === brandId))?.id
+  );
+}
+
+/** Checkboxes for language slices, as one labelled group. */
+function LanguageChoices({
+  id,
+  legend,
+  hint,
+  value,
+  onChange,
+}: {
+  id: string;
+  legend: string;
+  hint?: string;
+  value: LanguageSlice[];
+  onChange: (next: LanguageSlice[]) => void;
+}) {
   const { t } = useTranslation();
+  return (
+    <fieldset
+      className="flex flex-col gap-2"
+      {...(hint ? { 'aria-describedby': `${id}-hint` } : {})}
+    >
+      <legend className="mb-2 text-sm font-medium text-text">{legend}</legend>
+      {hint ? (
+        <p id={`${id}-hint`} className="text-sm text-text-secondary">
+          {hint}
+        </p>
+      ) : null}
+      <div className="grid gap-2 sm:grid-cols-3">
+        {SLICES.map((slice) => (
+          <CheckboxField
+            key={slice}
+            id={`${id}-${slice}`}
+            label={t(`decisions.slices.${slice}`)}
+            checked={value.includes(slice)}
+            onCheckedChange={(checked) =>
+              onChange(checked ? [...value, slice] : value.filter((s) => s !== slice))
+            }
+          />
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function TeamRoutingDialog({
+  brandId,
+  team,
+  onClose,
+}: {
+  brandId: string;
+  team: RoutingTeam;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const announce = useAnnouncer();
+  const current = team.routing;
+  const [topics, setTopics] = useState(current?.intents.join(', ') ?? '');
+  const [languages, setLanguages] = useState<LanguageSlice[]>(current?.languages ?? []);
+  const [translation, setTranslation] = useState<LanguageSlice[]>(
+    current?.translationLanguages ?? [],
+  );
+  const [isDefault, setIsDefault] = useState(current?.isDefault ?? false);
+  const [accepting, setAccepting] = useState(current?.accepting ?? true);
+  const [routed, setRouted] = useState(current ? current.status === 'active' : true);
+  const save = useStudioMutation(
+    (body: object, tenant) =>
+      api<RoutingTeam>(`/v1/admin/brands/${brandId}/routing/teams/${team.id}`, {
+        method: 'PUT',
+        tenant,
+        body,
+      }),
+    [keysFor(brandId).teams],
+  );
+  const errors = fieldErrors(save.error);
+  const topicError = [...errors].find(([path]) => path.startsWith('intents'))?.[1];
+  const id = `team-routing-${team.id}`;
+  return (
+    <AppDialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title={t('decisions.teams.editTitle', { name: team.name })}
+      testId="team-routing-dialog"
+    >
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          save.mutate(
+            {
+              intents: splitList(topics),
+              languages,
+              translationLanguages: translation,
+              isDefault,
+              accepting,
+              status: routed ? 'active' : 'archived',
+            },
+            {
+              onSuccess: () => {
+                announce(t('decisions.teams.saved', { name: team.name }));
+                onClose();
+              },
+            },
+          );
+        }}
+      >
+        <CheckboxField
+          id={`${id}-routed`}
+          label={t('decisions.teams.routed')}
+          hint={t('decisions.teams.routedHint')}
+          checked={routed}
+          onCheckedChange={setRouted}
+        />
+        <TextField
+          id={`${id}-topics`}
+          label={t('decisions.teams.topics')}
+          hint={t('decisions.teams.topicsHint')}
+          value={topics}
+          onChange={(event) => setTopics(event.target.value)}
+          dir="ltr"
+          error={topicError}
+        />
+        <LanguageChoices
+          id={`${id}-languages`}
+          legend={t('decisions.teams.languages')}
+          value={languages}
+          onChange={setLanguages}
+        />
+        <LanguageChoices
+          id={`${id}-translation`}
+          legend={t('decisions.teams.translationLanguages')}
+          hint={t('decisions.teams.translationHint')}
+          value={translation}
+          onChange={setTranslation}
+        />
+        <CheckboxField
+          id={`${id}-default`}
+          label={t('decisions.teams.isDefault')}
+          hint={t('decisions.teams.isDefaultHint')}
+          checked={isDefault}
+          onCheckedChange={setIsDefault}
+        />
+        <CheckboxField
+          id={`${id}-accepting`}
+          label={t('decisions.teams.accepting')}
+          hint={t('decisions.teams.acceptingHint')}
+          checked={accepting}
+          onCheckedChange={setAccepting}
+        />
+        <ActionError error={save.error} />
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t('app.cancel')}
+          </Button>
+          <Button type="submit" busy={save.isPending}>
+            {t('decisions.teams.save')}
+          </Button>
+        </DialogFooter>
+      </form>
+    </AppDialog>
+  );
+}
+
+function TeamCard({ brandId, team }: { brandId: string; team: RoutingTeam }) {
+  const { t } = useTranslation();
+  const { can } = useTenant();
   const format = useFormats();
+  const [editing, setEditing] = useState(false);
+  const routing: TeamRouting | null = team.routing?.status === 'active' ? team.routing : null;
+  const names = (slices: LanguageSlice[]) =>
+    format.list(slices.map((slice) => t(`decisions.slices.${slice}`)));
   return (
     <li
       className="flex flex-col gap-2 rounded-lg border border-border p-4 text-sm"
@@ -186,34 +366,66 @@ function TeamCard({ team }: { team: RoutingTeam }) {
         <span className="font-semibold text-text">
           <bdi>{team.name}</bdi>
         </span>
-        {team.isDefault ? (
+        {team.workspaceId === null ? (
+          <StatusBadge tone="neutral">{t('decisions.teams.allWorkspaces')}</StatusBadge>
+        ) : null}
+        {routing?.isDefault ? (
           <StatusBadge tone="info">{t('decisions.teams.defaultBadge')}</StatusBadge>
         ) : null}
-        <StatusBadge tone={team.accepting ? 'success' : 'neutral'}>
-          {team.accepting ? t('decisions.teams.accepting') : t('decisions.teams.paused')}
-        </StatusBadge>
-      </div>
-      <p className="text-text-secondary">
-        {t('decisions.teams.topics')}:{' '}
-        {team.intents.length > 0 ? (
-          <bdi dir="ltr" className="font-mono text-[13px]">
-            {team.intents.join(', ')}
-          </bdi>
+        {routing ? (
+          <StatusBadge tone={routing.accepting ? 'success' : 'neutral'}>
+            {routing.accepting ? t('decisions.teams.accepting') : t('decisions.teams.paused')}
+          </StatusBadge>
         ) : (
-          t('decisions.teams.anyTopic')
+          <StatusBadge tone="neutral">{t('decisions.teams.notRouted')}</StatusBadge>
         )}
-      </p>
-      <p className="text-text-secondary">
-        {t('decisions.teams.languages')}:{' '}
-        {team.languages.length > 0
-          ? format.list(team.languages.map((slice) => t(`decisions.slices.${slice}`)))
-          : t('decisions.teams.noLanguages')}
-      </p>
+      </div>
+      {routing ? (
+        <>
+          <p className="text-text-secondary">
+            {t('decisions.teams.topics')}:{' '}
+            {routing.intents.length > 0 ? (
+              <bdi dir="ltr" className="font-mono text-[13px]">
+                {routing.intents.join(', ')}
+              </bdi>
+            ) : (
+              t('decisions.teams.anyTopic')
+            )}
+          </p>
+          <p className="text-text-secondary">
+            {t('decisions.teams.languages')}:{' '}
+            {routing.languages.length > 0
+              ? names(routing.languages)
+              : t('decisions.teams.noLanguages')}
+          </p>
+          {routing.translationLanguages.length > 0 ? (
+            <p className="text-text-secondary">
+              {t('decisions.teams.throughTranslation')}: {names(routing.translationLanguages)}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+      {can('decisions.manage') ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="self-start"
+          aria-label={t('decisions.teams.editLabel', { name: team.name })}
+          onClick={() => setEditing(true)}
+        >
+          {t('decisions.teams.edit')}
+        </Button>
+      ) : null}
+      {editing ? (
+        <TeamRoutingDialog brandId={brandId} team={team} onClose={() => setEditing(false)} />
+      ) : null}
     </li>
   );
 }
 
-function AddTeam({ brandId }: { brandId: string }) {
+/** Adds an inbox team in the brand's workspace, then sets its routing for the brand. */
+function AddTeam({ brandId, workspaceId }: { brandId: string; workspaceId: string }) {
   const { t } = useTranslation();
   const announce = useAnnouncer();
   const [name, setName] = useState('');
@@ -221,12 +433,18 @@ function AddTeam({ brandId }: { brandId: string }) {
   const [languages, setLanguages] = useState<LanguageSlice[]>([]);
   const [isDefault, setIsDefault] = useState(false);
   const add = useStudioMutation(
-    (body: object, tenant) =>
-      api<RoutingTeam>(`/v1/admin/brands/${brandId}/routing/teams`, {
+    async (input: { name: string; routing: object }, tenant) => {
+      const team = await api<C.Team>('/v1/admin/teams', {
         method: 'POST',
         tenant,
-        body,
-      }),
+        body: { name: input.name, workspaceId },
+      });
+      return api<RoutingTeam>(`/v1/admin/brands/${brandId}/routing/teams/${team.id}`, {
+        method: 'PUT',
+        tenant,
+        body: input.routing,
+      });
+    },
     [keysFor(brandId).teams],
   );
   const errors = fieldErrors(add.error);
@@ -234,7 +452,10 @@ function AddTeam({ brandId }: { brandId: string }) {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     add.mutate(
-      { name: name.trim(), intents: splitList(topics), languages, isDefault },
+      {
+        name: name.trim(),
+        routing: { intents: splitList(topics), languages, isDefault },
+      },
       {
         onSuccess: (team) => {
           announce(t('decisions.teams.added', { name: team.name }));
@@ -272,26 +493,12 @@ function AddTeam({ brandId }: { brandId: string }) {
         dir="ltr"
         error={topicError}
       />
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-medium text-text">
-          {t('decisions.teams.languages')}
-        </legend>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {SLICES.map((slice) => (
-            <CheckboxField
-              key={slice}
-              id={`team-language-${slice}`}
-              label={t(`decisions.slices.${slice}`)}
-              checked={languages.includes(slice)}
-              onCheckedChange={(checked) =>
-                setLanguages((current) =>
-                  checked ? [...current, slice] : current.filter((s) => s !== slice),
-                )
-              }
-            />
-          ))}
-        </div>
-      </fieldset>
+      <LanguageChoices
+        id="team-language"
+        legend={t('decisions.teams.languages')}
+        value={languages}
+        onChange={setLanguages}
+      />
       <CheckboxField
         id="team-default"
         label={t('decisions.teams.isDefault')}
@@ -311,10 +518,12 @@ function AddTeam({ brandId }: { brandId: string }) {
 function TeamsSection({ brandId }: { brandId: string }) {
   const { t } = useTranslation();
   const { can } = useTenant();
+  const workspaceId = useBrandWorkspace(brandId);
   const teams = useStudioQuery<Items<RoutingTeam>>(
     keysFor(brandId).teams,
     `/v1/admin/brands/${brandId}/routing/teams`,
   );
+  const mayAdd = can('teams.manage') && can('decisions.manage');
   return (
     <Section
       id="routing-teams"
@@ -330,16 +539,16 @@ function TeamsSection({ brandId }: { brandId: string }) {
         {(data) => (
           <ul className="grid gap-3 md:grid-cols-2" data-testid="routing-teams">
             {data.items.map((team) => (
-              <TeamCard key={team.id} team={team} />
+              <TeamCard key={team.id} brandId={brandId} team={team} />
             ))}
           </ul>
         )}
       </QueryState>
-      {can('inbox.manage') ? (
-        <AddTeam brandId={brandId} />
-      ) : (
+      {!mayAdd ? (
         <p className="text-sm text-text-secondary">{t('decisions.teams.noPermission')}</p>
-      )}
+      ) : workspaceId ? (
+        <AddTeam brandId={brandId} workspaceId={workspaceId} />
+      ) : null}
     </Section>
   );
 }

@@ -51,11 +51,28 @@ enforce the rest:
   describes;
 - the RLS suite fails when a new table is missing its policy, forced RLS or seed data.
 
+## Customer memory
+
+`src/schema/memory.ts` holds governed customer memory (release L):
+
+- `learning_consents`: every memory choice, append-only (no updates or deletes for the app role).
+- `memory_records`: the typed envelope. Content never changes after a write; a correction is a new
+  record that supersedes the old one (trigger `memory_records_guard`). One current value per slot.
+- `memory_embeddings`: vectors for recall, deleted with their record.
+- `memory_deletions`: receipts; they complete once caches are purged and nothing is left.
+- `deletion_tombstones`: content-free, append-only. The trigger `memory_records_tombstone_guard`
+  refuses to write a deleted record again, or anything observed before a customer's erasure.
+
+**Restores.** Tombstones live in this database. After restoring a backup, run
+`SELECT app.apply_memory_tombstones();` (the worker also runs it daily). A restore to a point
+before a deletion loses that deletion's tombstone too, so the restore procedure must carry the
+tombstones of later deletions across (export them before restoring, insert them after).
+
 ## Decisions, language and cache tables
 
 | File | Tables |
 |---|---|
-| `src/schema/decisions.ts` | `routing_teams` (intents, languages, reviewed translation languages, linked Chatwoot team), `decision_rubrics` (versioned questions and thresholds; published versions are immutable), `decision_tasks` (off, shadow or live per brand), `decision_records` (append-only except applying and reviewing; no delete for the application role), `conversation_routes` |
+| `src/schema/decisions.ts` | `team_routing` (per inbox team and brand: intents, languages, reviewed translation languages, default, accepting; a team routes only for brands of its workspace), `decision_rubrics` (versioned questions and thresholds; published versions are immutable), `decision_tasks` (off, shadow or live per brand), `decision_records` (append-only except applying and reviewing; no delete for the application role) |
 | `src/schema/language.ts` | `language_preferences`: interface locale, explicit reply language, last detection, one-time prompt, script, style and time zone per customer principal |
 | `src/schema/cache.ts` | `cache_policies`, `cache_dependency_versions`, `cache_entry_index` (fingerprints and references, never content), `cache_metrics_daily` (counts only) |
 

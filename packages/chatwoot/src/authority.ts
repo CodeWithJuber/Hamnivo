@@ -3,16 +3,22 @@ import type {
   ActorCredential,
   AppendMessageInput,
   AuthorityCapabilities,
+  AuthorityContact,
   AuthorityConversationState,
+  AuthorityFieldDefinition,
+  AuthorityFieldType,
+  AuthorityLabel,
   AuthorityMessage,
   AuthorityOwner,
+  AuthoritySavedReply,
   ConversationAuthority,
   ConversationStatus,
   EnsureContactInput,
   EnsuredContact,
+  StaffInboxAuthority,
 } from '@hamnivo/domain';
 import { type ChatwootClient, call, createChatwootClient } from './client.js';
-import { toConversation, toMessage } from './mapping.js';
+import { timeOf, toConversation, toMessage } from './mapping.js';
 
 export interface ChatwootInbox {
   /** Client API inbox identifier. */
@@ -37,12 +43,26 @@ export interface ChatwootAuthorityOptions {
 
 type Json = Record<string, unknown>;
 
+/** Chatwoot's `attribute_display_type`, in the order of its enum. */
+const FIELD_TYPES: AuthorityFieldType[] = [
+  'text',
+  'number',
+  'currency',
+  'percent',
+  'link',
+  'date',
+  'list',
+  'checkbox',
+];
+const text = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() ? value : null;
+
 /**
  * ConversationAuthority on Chatwoot CE v4.18.0. Customer and AI messages are written with the
  * Application API so they carry `source_id` (idempotency key); the customer view comes from the
  * Client API, which excludes private notes.
  */
-export class ChatwootAuthority implements ConversationAuthority {
+export class ChatwootAuthority implements ConversationAuthority, StaffInboxAuthority {
   readonly capabilities: AuthorityCapabilities = {
     messageKeys: true,
     ownerCas: false,
@@ -136,10 +156,14 @@ export class ChatwootAuthority implements ConversationAuthority {
     return { conversationRef: String(conversation.id) };
   }
 
-  async getState(conversationRef: string): Promise<AuthorityConversationState> {
+  async getState(
+    conversationRef: string,
+    actor?: ActorCredential,
+  ): Promise<AuthorityConversationState> {
+    const client = actor ? await this.as(actor) : this.integration;
     const conversation = await call<Json>(
       'getConversation',
-      this.integration.GET('/api/v1/accounts/{account_id}/conversations/{conversation_id}', {
+      client.GET('/api/v1/accounts/{account_id}/conversations/{conversation_id}', {
         params: { path: this.conversationPath(conversationRef) },
       }) as never,
     );
@@ -269,22 +293,6 @@ export class ChatwootAuthority implements ConversationAuthority {
     );
   }
 
-  /** Chatwoot's team assignment (`team_id`; 0 clears it). It leaves the assignee as it is. */
-  async assignTeam(
-    conversationRef: string,
-    teamRef: string | null,
-    actor: ActorCredential,
-  ): Promise<void> {
-    const client = await this.as(actor);
-    await call(
-      'assignConversation',
-      client.POST('/api/v1/accounts/{account_id}/conversations/{conversation_id}/assignments', {
-        params: { path: this.conversationPath(conversationRef) },
-        body: { team_id: teamRef === null ? 0 : Number(teamRef) } as never,
-      }) as never,
-    );
-  }
-
   async setStatus(
     conversationRef: string,
     status: ConversationStatus,
@@ -327,6 +335,242 @@ export class ChatwootAuthority implements ConversationAuthority {
         }) as never,
       );
     }
+  }
+
+  private get accountPath() {
+    return { account_id: this.options.accountId };
+  }
+
+  async listStaffMessages(
+    conversationRef: string,
+    page: { before?: string },
+    actor: ActorCredential,
+  ): Promise<AuthorityMessage[]> {
+    const client = await this.as(actor);
+    const result = await call<Json>(
+      'listMessages',
+      client.GET('/api/v1/accounts/{account_id}/conversations/{conversation_id}/messages', {
+        params: {
+          path: this.conversationPath(conversationRef),
+          query: (page.before ? { before: page.before } : {}) as never,
+        },
+      }) as never,
+    );
+    const payload = Array.isArray(result.payload) ? result.payload : [];
+    return payload.map((m) => toMessage(m, conversationRef));
+  }
+
+  async searchMessages(
+    query: string,
+    page: number,
+    actor: ActorCredential,
+  ): Promise<AuthorityMessage[]> {
+    const client = await this.as(actor);
+    const result = await call<Json>(
+      'searchMessages',
+      client.GET('/api/v1/accounts/{account_id}/search/messages', {
+        params: { path: this.accountPath, query: { q: query, page } },
+      }) as never,
+    );
+    const payload = (result.payload ?? {}) as Json;
+    const messages = Array.isArray(payload.messages) ? payload.messages : [];
+    return messages.map((m) => toMessage(m));
+  }
+
+  async listLabels(actor: ActorCredential): Promise<AuthorityLabel[]> {
+    const client = await this.as(actor);
+    const result = await call<Json>(
+      'listLabels',
+      client.GET('/api/v1/accounts/{account_id}/labels', {
+        params: { path: this.accountPath },
+      }) as never,
+    );
+    const payload = Array.isArray(result.payload) ? (result.payload as Json[]) : [];
+    return payload
+      .filter((l) => typeof l.title === 'string')
+      .map((l) => ({
+        title: String(l.title),
+        description: text(l.description),
+        color: text(l.color),
+      }));
+  }
+
+  /** Defines an account tag. Chatwoot allows this to administrators only (the integration user). */
+  async createLabel(label: { title: string; description?: string; color?: string }) {
+    await call(
+      'createLabel',
+      this.integration.POST('/api/v1/accounts/{account_id}/labels', {
+        params: { path: this.accountPath },
+        body: { show_on_sidebar: true, ...label } as never,
+      }) as never,
+    );
+  }
+
+  async listFieldDefinitions(actor: ActorCredential): Promise<AuthorityFieldDefinition[]> {
+    const client = await this.as(actor);
+    const result = await call<unknown>(
+      'listCustomAttributeDefinitions',
+      client.GET('/api/v1/accounts/{account_id}/custom_attribute_definitions', {
+        // 0 = conversation attributes (1 would be contact attributes).
+        params: { path: this.accountPath, query: { attribute_model: 0 } as never },
+      }) as never,
+    );
+    return ((Array.isArray(result) ? result : []) as Json[])
+      .filter((d) => d.attribute_model === 'conversation_attribute')
+      .filter((d) => typeof d.attribute_key === 'string')
+      .map((d) => {
+        const type = String(d.attribute_display_type) as AuthorityFieldType;
+        return {
+          key: String(d.attribute_key),
+          name: text(d.attribute_display_name) ?? String(d.attribute_key),
+          type: FIELD_TYPES.includes(type) ? type : 'text',
+          description: text(d.attribute_description),
+          options: Array.isArray(d.attribute_values) ? d.attribute_values.map(String) : [],
+        };
+      });
+  }
+
+  /** Defines a conversation field (administrators only: the integration user). */
+  async createFieldDefinition(input: {
+    key: string;
+    name: string;
+    type: AuthorityFieldType;
+    options?: string[];
+  }) {
+    await call(
+      'createCustomAttributeDefinition',
+      this.integration.POST('/api/v1/accounts/{account_id}/custom_attribute_definitions', {
+        params: { path: this.accountPath },
+        body: {
+          attribute_key: input.key,
+          attribute_display_name: input.name,
+          attribute_display_type: FIELD_TYPES.indexOf(input.type),
+          attribute_model: 0,
+          ...(input.options ? { attribute_values: input.options } : {}),
+        } as never,
+      }) as never,
+    );
+  }
+
+  async listSavedReplies(
+    search: string | undefined,
+    actor: ActorCredential,
+  ): Promise<AuthoritySavedReply[]> {
+    const client = await this.as(actor);
+    const result = await call<unknown>(
+      'listCannedResponses',
+      client.GET('/api/v1/accounts/{account_id}/canned_responses', {
+        params: { path: this.accountPath, query: (search ? { search } : {}) as never },
+      }) as never,
+    );
+    return ((Array.isArray(result) ? result : []) as Json[]).map((r) => ({
+      ref: String(r.id),
+      shortCode: String(r.short_code ?? ''),
+      content: String(r.content ?? ''),
+    }));
+  }
+
+  async createSavedReply(
+    input: { shortCode: string; content: string },
+    actor: ActorCredential,
+  ): Promise<AuthoritySavedReply> {
+    const client = await this.as(actor);
+    const created = await call<Json>(
+      'createCannedResponse',
+      client.POST('/api/v1/accounts/{account_id}/canned_responses', {
+        params: { path: this.accountPath },
+        body: { short_code: input.shortCode, content: input.content } as never,
+      }) as never,
+    );
+    return {
+      ref: String(created.id),
+      shortCode: String(created.short_code ?? input.shortCode),
+      content: String(created.content ?? input.content),
+    };
+  }
+
+  async getContact(contactRef: string, actor: ActorCredential): Promise<AuthorityContact> {
+    const client = await this.as(actor);
+    const result = await call<Json>(
+      'getContact',
+      client.GET('/api/v1/accounts/{account_id}/contacts/{id}', {
+        params: { path: { account_id: this.options.accountId, id: Number(contactRef) } },
+      }) as never,
+    );
+    const contact = (result.payload ?? result) as Json;
+    return {
+      ref: String(contact.id ?? contactRef),
+      name: text(contact.name),
+      email: text(contact.email),
+      identifier: text(contact.identifier),
+      attributes: (contact.custom_attributes ?? {}) as Record<string, unknown>,
+      createdAt: timeOf(contact.created_at),
+      lastActivityAt: timeOf(contact.last_activity_at),
+    };
+  }
+
+  async snooze(conversationRef: string, until: Date | null, actor: ActorCredential): Promise<void> {
+    const client = await this.as(actor);
+    await call(
+      'toggleStatus',
+      client.POST('/api/v1/accounts/{account_id}/conversations/{conversation_id}/toggle_status', {
+        params: { path: this.conversationPath(conversationRef) },
+        body: {
+          status: 'snoozed',
+          ...(until ? { snoozed_until: Math.floor(until.getTime() / 1000) } : {}),
+        } as never,
+      }) as never,
+    );
+  }
+
+  async ensureTeam(name: string): Promise<{ ref: string }> {
+    // Chatwoot stores team names in lower case.
+    const wanted = name.trim().toLowerCase();
+    const teams = await call<unknown>(
+      'listTeams',
+      this.integration.GET('/api/v1/accounts/{account_id}/teams', {
+        params: { path: this.accountPath },
+      }) as never,
+    );
+    const found = ((Array.isArray(teams) ? teams : []) as Json[]).find(
+      (t) => String(t.name).toLowerCase() === wanted,
+    );
+    if (found) return { ref: String(found.id) };
+    const created = await call<Json>(
+      'createTeam',
+      this.integration.POST('/api/v1/accounts/{account_id}/teams', {
+        params: { path: this.accountPath },
+        body: { name: name.trim(), allow_auto_assign: false } as never,
+      }) as never,
+    );
+    return { ref: String(created.id) };
+  }
+
+  async addTeamMembers(teamRef: string, userRefs: string[]): Promise<void> {
+    if (userRefs.length === 0) return;
+    await call(
+      'addTeamMembers',
+      this.integration.POST('/api/v1/accounts/{account_id}/teams/{team_id}/team_members', {
+        params: { path: { account_id: this.options.accountId, team_id: Number(teamRef) } },
+        body: { user_ids: userRefs.map(Number) } as never,
+      }) as never,
+    );
+  }
+
+  async assignTeam(
+    conversationRef: string,
+    teamRef: string | null,
+    actor: ActorCredential,
+  ): Promise<void> {
+    const client = await this.as(actor);
+    await call(
+      'assignTeam',
+      client.POST('/api/v1/accounts/{account_id}/conversations/{conversation_id}/assignments', {
+        params: { path: this.conversationPath(conversationRef) },
+        // Chatwoot removes the team when no team matches the id.
+        body: { team_id: teamRef === null ? 0 : Number(teamRef) } as never,
+      }) as never,
+    );
   }
 
   async typing(conversationRef: string, on: boolean, actor: ActorCredential): Promise<void> {

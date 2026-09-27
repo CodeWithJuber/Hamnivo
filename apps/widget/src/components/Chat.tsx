@@ -21,7 +21,10 @@ import { useTranslation } from 'react-i18next';
 import { LANGUAGE_NAMES, LOCALES, type Locale, REPLY_LANGUAGE_NAMES } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
 import type { ChatState } from '../useChat.js';
+import type { MemoryControls } from '../useMemory.js';
 import { BidiText, directionOf } from './BidiText.js';
+import { MemoryConsent } from './MemoryConsent.js';
+import { MemoryPanel, useSlotLabel } from './MemoryPanel.js';
 
 interface Source {
   id: string;
@@ -38,6 +41,8 @@ interface Custom {
   clientMessageId?: string;
   /** Knowledge an AI answer cites, numbered as in its text (G06). */
   sources?: Source[];
+  /** Memories an AI answer used (G19): shown as memories, never as something said now. */
+  memories?: string[];
 }
 
 const textOf = (m: Message) =>
@@ -45,6 +50,9 @@ const textOf = (m: Message) =>
     .map((p) => (p.type === 'text' ? p.text : ''))
     .join('\n')
     .trim();
+
+const memoriesOf = (m: Message): string[] =>
+  m.parts.flatMap((p) => (p.type === 'memory' ? [p.key] : []));
 
 const sourcesOf = (m: Message): Source[] =>
   m.parts.flatMap((p) =>
@@ -72,6 +80,7 @@ function toThread(
           role: m.sender.roleLabel ?? '',
           state: 'accepted',
           sources: sourcesOf(m),
+          memories: memoriesOf(m),
         } satisfies Custom,
       },
     };
@@ -99,11 +108,14 @@ function toThread(
 function Bubble({
   message,
   onRetry,
+  onOpenMemory,
 }: {
   message: ThreadMessageLike;
   onRetry: (id: string) => void;
+  onOpenMemory: () => void;
 }) {
   const { t } = useTranslation();
+  const slotLabel = useSlotLabel();
   const custom = (message.metadata?.custom ?? {}) as unknown as Partial<Custom>;
   // While the AI is expected to answer, assistant-ui adds an optimistic placeholder message.
   if (!custom.kind) {
@@ -173,6 +185,16 @@ function Bubble({
             ))}
           </ol>
         </div>
+      ) : null}
+      {custom.memories?.length ? (
+        <p className="max-w-[85%] text-xs text-text-muted" data-testid="memory-note">
+          {t('memory.used', {
+            labels: [...new Set(custom.memories)].map(slotLabel).join(', '),
+          })}{' '}
+          <Button variant="link" className="h-auto text-xs" onClick={onOpenMemory}>
+            {t('memory.see')}
+          </Button>
+        </p>
       ) : null}
       {mine && custom.state !== 'accepted' ? (
         <p
@@ -325,10 +347,31 @@ export function Chat(props: {
     choose: (language: ReplyLanguage) => Promise<void>;
     dismiss: () => Promise<void>;
   };
+  memory: MemoryControls;
 }) {
   const { t } = useTranslation();
   const announce = useAnnouncer();
-  const { session, state, locale } = props;
+  const { session, state, locale, memory } = props;
+  const [view, setView] = useState<'chat' | 'memory'>('chat');
+  const [askLater, setAskLater] = useState(false);
+  const remembered = memory.state.memory;
+  // When memory can't be loaded, the entry stays so the customer can see why (HNV-15-06).
+  const memoryShown =
+    memory.state.phase === 'error' ||
+    (remembered !== null &&
+      (remembered.offered ||
+        remembered.items.length > 0 ||
+        remembered.consent.state === 'granted'));
+  const askConsent =
+    remembered?.offered === true && remembered.consent.state === 'undecided' && !askLater;
+  const openMemory = () => {
+    setView('memory');
+    void memory.reload();
+  };
+  const closeMemory = () => {
+    setView('chat');
+    requestAnimationFrame(() => document.getElementById('hv-memory-open')?.focus());
+  };
   const copy = session.config.copy[locale] ?? session.config.copy.en;
   const conversation = state.conversation;
   const messages = useMemo(
@@ -393,6 +436,17 @@ export function Chat(props: {
               {copy.aiDisclosure}
             </p>
           </div>
+          {memoryShown ? (
+            <Button
+              id="hv-memory-open"
+              variant="ghost"
+              className="h-10 px-2 text-sm"
+              aria-pressed={view === 'memory'}
+              onClick={() => (view === 'memory' ? closeMemory() : openMemory())}
+            >
+              {t('memory.open')}
+            </Button>
+          ) : null}
           <label className="sr-only" htmlFor="hv-locale">
             {t('language')}
           </label>
@@ -432,7 +486,10 @@ export function Chat(props: {
             {connection}
           </p>
         ) : null}
-        <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col">
+        {view === 'memory' ? <MemoryPanel controls={memory} onBack={closeMemory} /> : null}
+        <ThreadPrimitive.Root
+          className={view === 'memory' ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
+        >
           <ThreadPrimitive.Viewport className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
             {state.messages.length === 0 && props.pending.length === 0 ? (
               <p
@@ -442,12 +499,26 @@ export function Chat(props: {
                 {copy.greeting}
               </p>
             ) : null}
+            {askConsent && remembered ? (
+              <MemoryConsent
+                maxRetentionDays={remembered.maxRetentionDays}
+                privacyPolicyUrl={session.config.privacyPolicyUrl}
+                onLater={() => setAskLater(true)}
+                onChoose={async (choice) => {
+                  await memory.setConsent(choice);
+                  announce(
+                    t(choice === 'granted' ? 'memory.switch.turnedOn' : 'memory.consent.declined'),
+                  );
+                }}
+              />
+            ) : null}
             <ul className="flex flex-col gap-4" aria-label={t('title')}>
               <ThreadPrimitive.Messages>
                 {({ message }) => (
                   <Bubble
                     message={message as unknown as ThreadMessageLike}
                     onRetry={props.onRetry}
+                    onOpenMemory={openMemory}
                   />
                 )}
               </ThreadPrimitive.Messages>

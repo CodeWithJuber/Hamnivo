@@ -43,10 +43,37 @@
           "content": { "type": "array", "items": { "type": "object" } }
         },
         "required": ["id", "title"]
+      },
+      "hamnivo_message_search": {
+        "type": "object",
+        "properties": {
+          "payload": {
+            "type": "object",
+            "properties": { "messages": { "type": "array", "items": { "type": "object" } } }
+          }
+        }
       }
     }
   },
   "paths": {
+    "/api/v1/accounts/{account_id}/search/messages": {
+      "get": {
+        "operationId": "hamnivo-search-messages",
+        "summary": "Messages the user may read that contain the query (15 per page, newest first)",
+        "tags": ["Search"],
+        "parameters": [
+          { "name": "account_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching messages",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/hamnivo_message_search" } } }
+          }
+        }
+      }
+    },
     "/platform/api/v1/users/{id}/token": {
       "post": {
         "operationId": "hamnivo-create-user-token",

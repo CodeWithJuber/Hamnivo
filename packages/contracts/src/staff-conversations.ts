@@ -41,6 +41,15 @@ export const StaffMessageRequest = z
     text: z.string().trim().min(1).max(10_000),
     /** `internal` writes a private note that customers never see. */
     visibility: z.enum(['public', 'internal']).default('public'),
+    /**
+     * The ownership epoch the sender saw. A public reply is refused (OWNERSHIP_CHANGED) when the
+     * owner changed since, so a reply written in a stale view is never sent.
+     */
+    expectedEpoch: z.int().nonnegative().optional(),
+    /** Remove the sender's saved draft for this lane once the message is on its way. */
+    clearDraft: z.boolean().default(false),
+    /** The AI suggestion this reply started from (recorded for audit; it is still your reply). */
+    suggestionId: typeId('run').optional(),
   })
   .meta({ id: 'StaffMessageRequest' });
 

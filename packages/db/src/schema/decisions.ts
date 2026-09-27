@@ -8,6 +8,7 @@ import {
   jsonb,
   type PgTableExtraConfigValue,
   pgTable,
+  primaryKey,
   real,
   text,
   unique,
@@ -17,20 +18,23 @@ import {
 import { conversationControls } from './authority.js';
 import { bytea, createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { staffMembers } from './identity.js';
+import { teams } from './inbox.js';
 import { brands, tenantId } from './tenancy.js';
 
 /**
- * A routing destination of a brand (J02, U07): the intents it handles, the languages its people
- * answer in, the languages it serves through a reviewed translation path, and its Chatwoot team
- * when one is linked. Only active teams that are accepting conversations can be routed to.
+ * How a team takes part in one brand's routing (J02, U07). Teams are the inbox's teams
+ * (workspace-scoped, with members and grants); this adds, per brand, the intents the team
+ * handles, the languages its people answer in, the languages it serves through a reviewed
+ * translation path, and whether it is the brand's default and is accepting conversations. A team
+ * routes only for brands of its own workspace (a trigger checks it); a tenant-wide team may route
+ * for any brand. Only active, accepting teams are routed to.
  */
-export const routingTeams = pgTable(
-  'routing_teams',
+export const teamRouting = pgTable(
+  'team_routing',
   {
-    id: id(),
     tenantId: tenantId(),
+    teamId: uuid('team_id').notNull(),
     brandId: uuid('brand_id').notNull(),
-    name: text('name').notNull(),
     intents: text('intents').array().notNull().default(sql`'{}'::text[]`),
     /** Language slices (en, ar, hi, ur, hinglish, roman-urdu). */
     languages: text('languages').array().notNull().default(sql`'{}'::text[]`),
@@ -38,28 +42,31 @@ export const routingTeams = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
-    /** Chatwoot team id in the brand's account; live routing assigns it there too. */
-    externalTeamId: integer('external_team_id'),
     isDefault: boolean('is_default').notNull().default(false),
     accepting: boolean('accepting').notNull().default(true),
     status: text('status', { enum: ['active', 'archived'] })
       .notNull()
       .default('active'),
-    createdBy: uuid('created_by'),
+    updatedBy: uuid('updated_by'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
-    unique('routing_teams_tenant_id_id_key').on(t.tenantId, t.id),
-    unique('routing_teams_name_key').on(t.tenantId, t.brandId, t.name),
+    primaryKey({ name: 'team_routing_pkey', columns: [t.tenantId, t.teamId, t.brandId] }),
+    index('team_routing_brand_idx').on(t.tenantId, t.brandId),
     foreignKey({
-      name: 'routing_teams_brand_fk',
+      name: 'team_routing_team_fk',
+      columns: [t.tenantId, t.teamId],
+      foreignColumns: [teams.tenantId, teams.id],
+    }),
+    foreignKey({
+      name: 'team_routing_brand_fk',
       columns: [t.tenantId, t.brandId],
       foreignColumns: [brands.tenantId, brands.id],
     }),
     foreignKey({
-      name: 'routing_teams_created_by_fk',
-      columns: [t.tenantId, t.createdBy],
+      name: 'team_routing_updated_by_fk',
+      columns: [t.tenantId, t.updatedBy],
       foreignColumns: [staffMembers.tenantId, staffMembers.id],
     }),
     tenantIsolation(),
@@ -265,7 +272,7 @@ export const decisionRecords = pgTable(
     foreignKey({
       name: 'decision_records_team_fk',
       columns: [t.tenantId, t.teamId],
-      foreignColumns: [routingTeams.tenantId, routingTeams.id],
+      foreignColumns: [teams.tenantId, teams.id],
     }),
     foreignKey({
       name: 'decision_records_reviewed_by_fk',
@@ -276,54 +283,6 @@ export const decisionRecords = pgTable(
       'decision_records_confidence_ck',
       sql`${t.confidence} is null or (${t.confidence} >= 0 and ${t.confidence} <= 1)`,
     ),
-    tenantIsolation(),
-  ],
-);
-
-/**
- * The team a conversation is routed to now, by live routing or by a person. Chatwoot gets the
- * team through the outbox when the team is linked to one.
- */
-export const conversationRoutes = pgTable(
-  'conversation_routes',
-  {
-    id: id(),
-    tenantId: tenantId(),
-    conversationId: uuid('conversation_id').notNull(),
-    brandId: uuid('brand_id').notNull(),
-    teamId: uuid('team_id').notNull(),
-    decisionId: uuid('decision_id'),
-    source: text('source', { enum: ['provider', 'baseline', 'manual'] }).notNull(),
-    syncState: text('sync_state', { enum: ['pending', 'synced', 'not_linked', 'failed'] })
-      .notNull()
-      .default('pending'),
-    routedAt: tstz('routed_at').notNull().defaultNow(),
-    syncedAt: tstz('synced_at'),
-  },
-  (t) => [
-    unique('conversation_routes_tenant_id_id_key').on(t.tenantId, t.id),
-    unique('conversation_routes_conversation_key').on(t.tenantId, t.conversationId),
-    index('conversation_routes_team_idx').on(t.tenantId, t.teamId),
-    foreignKey({
-      name: 'conversation_routes_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
-    }),
-    foreignKey({
-      name: 'conversation_routes_brand_fk',
-      columns: [t.tenantId, t.brandId],
-      foreignColumns: [brands.tenantId, brands.id],
-    }),
-    foreignKey({
-      name: 'conversation_routes_team_fk',
-      columns: [t.tenantId, t.teamId],
-      foreignColumns: [routingTeams.tenantId, routingTeams.id],
-    }),
-    foreignKey({
-      name: 'conversation_routes_decision_fk',
-      columns: [t.tenantId, t.decisionId],
-      foreignColumns: [decisionRecords.tenantId, decisionRecords.id],
-    }),
     tenantIsolation(),
   ],
 );

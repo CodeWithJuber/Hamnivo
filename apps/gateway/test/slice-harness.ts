@@ -47,6 +47,8 @@ export async function startSlice(
   options: {
     clock?: () => Date;
     model?: LanguageModel;
+    /** The model the API process uses (copilot, translation). */
+    apiModel?: LanguageModel;
     scanner?: Scanner;
     /** A fake Jev transport for decision providers. */
     decisionFetch?: typeof fetch;
@@ -73,6 +75,7 @@ export async function startSlice(
   };
   const gw = await startGateway(env, undefined, {
     ...(options.clock ? { clock: options.clock } : {}),
+    ...(options.apiModel ? { model: options.apiModel } : {}),
     ...shared,
   });
   await gw.app.listen(port, '127.0.0.1');

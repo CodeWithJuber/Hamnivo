@@ -38,6 +38,8 @@ export interface AuthorityConversationState {
   attributes: Record<string, unknown>;
   /** Authority change clock (Chatwoot's float `updated_at`); apply state only when newer. */
   version: number;
+  /** When a snoozed conversation opens again; null when it waits for the customer. */
+  snoozedUntil?: Date | null;
 }
 
 export type AuthorityMessageDirection = 'incoming' | 'outgoing' | 'activity' | 'template';
@@ -139,7 +141,8 @@ export interface ConversationAuthority {
     contactSourceId: string;
     attributes?: Record<string, unknown>;
   }): Promise<{ conversationRef: string }>;
-  getState(conversationRef: string): Promise<AuthorityConversationState>;
+  /** Current state, read as the integration user unless an actor is given. */
+  getState(conversationRef: string, actor?: ActorCredential): Promise<AuthorityConversationState>;
   /** `customer` view excludes private notes and activity; newest last. */
   listMessages(
     conversationRef: string,
@@ -160,15 +163,6 @@ export interface ConversationAuthority {
   setStatus(
     conversationRef: string,
     status: ConversationStatus,
-    actor: ActorCredential,
-  ): Promise<void>;
-  /**
-   * Puts the conversation in a team's queue; null clears the team. Optional: an authority without
-   * teams leaves routing to Hamnivo's own records.
-   */
-  assignTeam?(
-    conversationRef: string,
-    teamRef: string | null,
     actor: ActorCredential,
   ): Promise<void>;
   annotate(

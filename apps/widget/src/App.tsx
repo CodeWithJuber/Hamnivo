@@ -6,6 +6,7 @@ import type { HostBridge } from './bridge.js';
 import { Chat } from './components/Chat.js';
 import { applyLocale, type Locale } from './i18n.js';
 import { useChat } from './useChat.js';
+import { useMemory } from './useMemory.js';
 import { useReplyLanguage } from './useReplyLanguage.js';
 
 export interface WidgetParams {
@@ -32,6 +33,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const replies = chat.state.messages.filter((m) => m.sender.kind !== 'customer').length;
   const language = useReplyLanguage(client, chat.state.session?.principal.id ?? null, replies);
   const { saveLocale } = language;
+  const memory = useMemory(client, chat.state.session?.principal.id ?? null);
 
   useEffect(() => {
     applyLocale(locale);
@@ -120,6 +122,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
         onRetry={(id) => chat.retry(id)}
         onHandoff={chat.handoff}
         language={language}
+        memory={memory}
         onClose={
           params.hostOrigin
             ? () => bridge.post({ type: 'layout', open: false, width: 0, height: 0 })

@@ -46,6 +46,15 @@ this repository.
   | `example.com` and `www.example.com` | the public website |
 
   A wildcard record `*.example.com` covers the first four.
+- **With Cloudflare** (its DNS, optionally its proxy):
+  - **DNS only** (grey cloud) is the simplest: Caddy gets the certificates itself.
+  - **Proxied** (orange cloud) hides the server's address and filters attacks. It needs:
+    - SSL/TLS mode **Full (strict)**. Flexible makes an endless redirect.
+    - **Always Use HTTPS** off. Caddy redirects to HTTPS itself, and certificates are issued and
+      renewed over plain HTTP.
+    - `setup --cloudflare on` (A4), so Hamnivo sees each visitor's own address, not Cloudflare's.
+    - For automatic deploys (A10): **Bot Fight Mode** off, or the `api` name set to DNS only.
+      Otherwise Cloudflare may block GitHub's webhooks.
 - **Open ports:** 80 and 443 over TCP, and 443 over UDP (HTTP/3). Caddy, the web server in the
   stack, uses port 80 to get certificates from Let's Encrypt, then redirects it to HTTPS.
 - **Email (recommended):** an SMTP account for sign-in and invitation emails.
@@ -110,7 +119,8 @@ The repository is private, so the server reads it with its own key, a read-only 
    git config core.sshCommand 'ssh -i ~/.ssh/hamnivo_deploy_ed25519 -o IdentitiesOnly=yes'
    ```
 
-Run everything as this user, without `sudo` (it is in the `docker` group). `hamnivo.sh autodeploy
+Run everything as this user, without `sudo` (it is in the `docker` group), or everything as root.
+As root, the webhook receiver of automatic deploys still runs as `nobody`. `hamnivo.sh autodeploy
 enable` (A10) sets up the same key if you skip this step.
 
 ## A4. Configure
@@ -134,13 +144,24 @@ be decrypted. Backups include it (A7).
 Then edit `deploy/production/.env` for:
 
 - **Email:** `SMTP_URL`, for example `smtps://user:password@smtp.example.com:465`, and `MAIL_FROM`.
-  Without them, sign-in emails are written to the API log (`hamnivo.sh logs api`), where you can
-  copy the links.
+  In the user name and password, write `@` as `%40`, `:` as `%3A`, `/` as `%2F` and `#` as `%23`.
+  If the password has a `$`, put the whole value in single quotes. Examples:
+  - Hostinger: `smtps://no-reply%40example.com:PASSWORD@smtp.hostinger.com:465`.
+  - Gmail: `smtps://you%40gmail.com:APP_PASSWORD@smtp.gmail.com:465`. Use an app password
+    (Google account → Security → 2-Step Verification → App passwords), and send from that
+    address.
+
+  Without `SMTP_URL`, no email leaves the server. Sign-in emails go to the API log instead, and
+  `hamnivo.sh mail` shows the latest ones with their links.
 - **AI models (optional):** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`,
   or `OPENAI_COMPATIBLE_BASE_URL` for a local model. Each company can also store its own keys
   later. `EMBEDDING_PROVIDER` chooses the model for knowledge search.
 - **Other names:** change `HAMNIVO_*_HOST`, then run `setup` again to update the addresses derived
   from them.
+- **Behind Cloudflare's proxy:** run `setup --cloudflare on`. Caddy then believes the visitor
+  addresses that Cloudflare reports, but only on connections from Cloudflare's own address ranges,
+  which `up` keeps current. Rate limits and the audit log then see each visitor's address.
+  `--cloudflare off` undoes it.
 - **Chatwoot's email:** copy `deploy/production/chatwoot.env.example` to `chatwoot.env` in the
   same folder and fill it in.
 
@@ -178,7 +199,8 @@ Open Studio, the staff console, at `https://app.example.com` (your domain in pla
 `example.com`).
 
 1. **Create your account** with "Create an account". Confirm your email with the link Hamnivo sends
-   you; it brings you back to Studio. Without SMTP, the link is in `hamnivo.sh logs api`.
+   you; it brings you back to Studio. Without SMTP, no email arrives: run
+   `./deploy/production/hamnivo.sh mail you@example.com` on the server and open the link it shows.
 2. **Create your workspace.** This is your company in Hamnivo.
 3. **Turn on two-step verification** under Account security. Registering identity keys needs it,
    and publishing asks you to sign in again.
@@ -294,13 +316,27 @@ A restore:
 
 1. checks the checksums;
 2. stops the applications;
-3. replaces both databases and the files;
-4. starts everything again. Migrations run first, so a backup from an older version works with
-   newer code.
+3. saves customers' memory consent and memory deletions from the current database;
+4. restores the Hamnivo database beside the current one and runs pending migrations, so a backup
+   from an older version works with newer code;
+5. adds the consent and deletions saved in step 3, and deletes again any memory they cover;
+6. only then replaces the current database, so a restore that fails leaves it as it was;
+7. replaces the Chatwoot database and the files, and starts everything again.
 
-It refuses a backup made with other secrets, unless you move your `.env` away first. On a new
-server, clone the code (A3), copy the backup folder over and run the same command. It installs the
-backup's `.env` and builds what it needs.
+Customers' privacy choices are the one thing a restore does not take back. Someone who withdrew
+consent or had their memory deleted after the backup keeps that choice, and the memory stays
+deleted. Deletions that were still running finish once the worker starts.
+
+It refuses a backup made with other secrets, unless you move your `.env` away first. While it
+runs, it needs free disk space for a second copy of the Hamnivo database. If it fails before step 6,
+nothing was replaced, and it starts the applications again. If the current database cannot be
+read, it stops at step 3; `--ignore-current-database` restores without the consent and deletions
+described above.
+
+On a new server, clone the code (A3), copy the backup folder over and run the same command. It
+installs the backup's `.env` and builds what it needs. A new server has no current database, so
+consent and deletions made after the backup are lost with the old server. To move servers, take a
+fresh backup on the old one just before.
 
 Test a restore now and then on a spare server. `scripts/ci/production-smoke.sh` runs a backup and
 restore drill in its checks.
@@ -349,6 +385,8 @@ up and deploys.
   - the GitHub token, if you added one, is fine-grained, for this repository only, with
     "Deployments" access only.
 - To collect metrics, set `METRICS_TOKEN` and scrape `https://api.example.com/metrics` with it.
+- Behind Cloudflare's proxy, `HAMNIVO_CLOUDFLARE=on` (A4). Without it, every visitor has
+  Cloudflare's address, so rate limits apply to many visitors at once.
 
 ## A9. Troubleshooting
 
@@ -362,11 +400,18 @@ up and deploys.
   is ready.
 - **The chat does not open on a website:** the website's exact origin (scheme, name and port) must
   be in the brand's `allowedOrigins`.
-- **No emails:** set `SMTP_URL` and run `hamnivo.sh up`. Until then, links are in the API log.
+- **No emails:** set `SMTP_URL` and run `hamnivo.sh up --no-build`, then send the email again. Until
+  then, `hamnivo.sh mail` shows the emails and their links. With `SMTP_URL` set, failures to send
+  are in `hamnivo.sh logs api`.
 - **Out of memory:** remove `scan` from `COMPOSE_PROFILES` and empty `CLAMAV_URL` to run without
   ClamAV, or add memory.
 - **Building behind a proxy that inspects TLS:** set `HAMNIVO_BUILD_CA=/path/to/proxy-ca.pem`
   before `hamnivo.sh up`.
+- **Cloudflare:**
+  - "Too many redirects": set SSL/TLS to **Full (strict)**.
+  - Error 525 or 526, or no certificate: turn **Always Use HTTPS** off, or set the names to DNS
+    only until `hamnivo.sh up` has its certificates.
+  - Every visitor has the same address in logs: run `setup --cloudflare on` (A4), then `up`.
 - **A push was not deployed:**
   - `hamnivo.sh autodeploy status` shows the mode, the git access and the last deploys.
   - `journalctl -u hamnivo-deploy` shows each run.

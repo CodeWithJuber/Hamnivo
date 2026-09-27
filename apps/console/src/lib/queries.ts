@@ -22,6 +22,8 @@ import type {
   KnowledgeSource,
   Me,
   Member,
+  MemoryCustomerDetail,
+  MemoryCustomerSummary,
   ModelConnection,
   Run,
   RunPage,
@@ -104,6 +106,8 @@ export const keys = {
   sources: ['knowledge', 'sources'],
   documents: (sourceId: string) => ['knowledge', 'sources', sourceId, 'documents'],
   members: ['members'],
+  memoryCustomers: ['memory', 'customers'],
+  memoryCustomer: (customerId: string) => ['memory', 'customers', customerId],
 } as const;
 
 export function useBrands() {
@@ -238,4 +242,36 @@ export function useRun(runId: string | undefined) {
   return useStudioQuery<Run>([...keys.runs, 'detail', runId], `/v1/admin/runs/${runId}`, {
     enabled: Boolean(runId) && can('analytics.read'),
   });
+}
+
+export interface MemoryFilters {
+  query?: string | undefined;
+  brandId?: string | undefined;
+}
+
+/** Customers with memory or a memory choice, newest change first (memory.read). */
+export function useMemoryCustomers(filters: MemoryFilters) {
+  const { can } = useTenant();
+  const query = new URLSearchParams({ limit: '100' });
+  if (filters.query) query.set('query', filters.query);
+  if (filters.brandId) query.set('brandId', filters.brandId);
+  return useStudioQuery<Items<MemoryCustomerSummary>>(
+    [...keys.memoryCustomers, filters],
+    `/v1/admin/memory/customers?${query}`,
+    { enabled: can('memory.read') },
+  );
+}
+
+/** One customer's memory; checked again every 2 s while a deletion is still finishing. */
+export function useCustomerMemory(customerId: string) {
+  const { can } = useTenant();
+  return useStudioQuery<MemoryCustomerDetail>(
+    keys.memoryCustomer(customerId),
+    `/v1/admin/memory/customers/${customerId}`,
+    {
+      enabled: can('memory.read'),
+      refetchInterval: (data) =>
+        data?.deletions.some((deletion) => deletion.status === 'pending') ? 2000 : false,
+    },
+  );
 }

@@ -138,15 +138,43 @@
     {
       "idx": 19,
       "version": "7",
-      "when": 1790501616640,
-      "tag": "20260927093336_decisions_language_cache",
+      "when": 1790498730472,
+      "tag": "20260927084530_memory",
       "breakpoints": true
     },
     {
       "idx": 20,
       "version": "7",
-      "when": 1790501617932,
-      "tag": "20260927093337_decisions_language_cache_security",
+      "when": 1790498774011,
+      "tag": "20260927084614_memory_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790505672785,
+      "tag": "20260927104112_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790505680619,
+      "tag": "20260927104120_inbox_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790508096165,
+      "tag": "20260927112136_decisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790508107385,
+      "tag": "20260927112147_decisions_security",
       "breakpoints": true
     }
   ]

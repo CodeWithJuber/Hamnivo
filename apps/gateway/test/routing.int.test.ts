@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { fromPublicId, schema, withTenant } from '@hamnivo/db';
-import { eq } from 'drizzle-orm';
+import { fromPublicId, schema, toPublicId, withTenant } from '@hamnivo/db';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AuthorityRegistry } from '../src/authority/registry.js';
 import { connectedTenant, type Slice, signUp, startSlice, Visitor } from './slice-harness.js';
@@ -65,43 +65,21 @@ let slice: Slice;
 let alpha: Awaited<ReturnType<typeof connectedTenant>>;
 let tenantId: string;
 const teams: Record<string, string> = {};
-const chatwootTeams: Record<string, number> = {};
 
-/** A Chatwoot team made by an account administrator (the fake's platform API creates one). */
-async function chatwootTeam(accountId: number, name: string): Promise<number> {
-  const platform = {
-    'content-type': 'application/json',
-    api_access_token: slice.fake.platformToken,
-  };
-  const post = async (path: string, body: unknown, headers: Record<string, string>) => {
-    const response = await fetch(`${slice.fake.url}${path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-    expect(response.ok, `${path} → ${response.status}`).toBe(true);
-    return (await response.json()) as Record<string, any>;
-  };
-  const user = await post(
-    '/platform/api/v1/users',
-    { name: 'Team admin', email: `admin-${randomUUID()}@example.com` },
-    platform,
+/** An inbox team, in the brand's workspace or tenant-wide, with its routing for the brand. */
+async function routedTeam(
+  name: string,
+  routing: Record<string, unknown>,
+  workspaceId: string | null = alpha.workspaceId,
+): Promise<string> {
+  const created = await alpha.owner.post('/v1/admin/teams', { name, workspaceId });
+  expect(created.status, JSON.stringify(created.body)).toBe(201);
+  const set = await alpha.owner.put(
+    `/v1/admin/brands/${alpha.brand.id}/routing/teams/${created.body.id}`,
+    routing,
   );
-  await post(
-    `/platform/api/v1/accounts/${accountId}/account_users`,
-    { user_id: user.id, role: 'administrator' },
-    platform,
-  );
-  const token = await post(`/platform/api/v1/users/${user.id}/token`, {}, platform);
-  const team = await post(
-    `/api/v1/accounts/${accountId}/teams`,
-    { name },
-    {
-      'content-type': 'application/json',
-      api_access_token: token.access_token,
-    },
-  );
-  return Number(team.id);
+  expect(set.status, JSON.stringify(set.body)).toBe(200);
+  return created.body.id as string;
 }
 
 const routingPath = () => `/v1/admin/brands/${alpha.brand.id}/decisions/team-routing`;
@@ -110,37 +88,23 @@ beforeAll(async () => {
   slice = await startSlice({ decisionFetch: jev.fetch });
   alpha = await connectedTenant(slice, 'routing');
   tenantId = fromPublicId('tenant', alpha.tenantId);
-  chatwootTeams.billing = await chatwootTeam(alpha.connection.accountId, 'Billing');
-  chatwootTeams.orders = await chatwootTeam(alpha.connection.accountId, 'Orders');
-  const created = [
-    {
-      name: 'Billing',
-      intents: ['billing'],
-      languages: ['en'],
-      externalTeamId: chatwootTeams.billing,
-    },
-    { name: 'Billing Urdu', intents: ['billing'], languages: ['ur', 'roman-urdu'] },
-    {
-      name: 'Orders',
-      intents: ['orders'],
-      languages: ['en'],
-      translationLanguages: ['ar'],
-      externalTeamId: chatwootTeams.orders,
-    },
-    {
-      name: 'Support',
-      isDefault: true,
-      languages: ['en', 'ar', 'hi', 'ur', 'hinglish', 'roman-urdu'],
-    },
-  ];
-  for (const team of created) {
-    const response = await alpha.owner.post(
-      `/v1/admin/brands/${alpha.brand.id}/routing/teams`,
-      team,
-    );
-    expect(response.status, JSON.stringify(response.body)).toBe(201);
-    teams[team.name] = response.body.id;
-  }
+  // The inbox's teams: routing adds, per brand, their intents and languages.
+  teams.Billing = await routedTeam('Billing', { intents: ['billing'], languages: ['en'] });
+  teams['Billing Urdu'] = await routedTeam('Billing Urdu', {
+    intents: ['billing'],
+    languages: ['ur', 'roman-urdu'],
+  });
+  teams.Orders = await routedTeam('Orders', {
+    intents: ['orders'],
+    languages: ['en'],
+    translationLanguages: ['ar'],
+  });
+  // A tenant-wide team may route for any brand.
+  teams.Support = await routedTeam(
+    'Support',
+    { isDefault: true, languages: ['en', 'ar', 'hi', 'ur', 'hinglish', 'roman-urdu'] },
+    null,
+  );
   const threshold = { minConfidence: 0.6 };
   const draft = await alpha.owner.put(`${routingPath()}/draft`, {
     definition: {
@@ -200,16 +164,39 @@ async function recordsOf(conversationId: string) {
   return listed.body.items as Array<Record<string, any>>;
 }
 
-async function routeOf(conversationId: string) {
-  const [route] = await withTenant(slice.app, { tenantId }, (tx) =>
+/** The conversation's team in the inbox (its queue), as a public id; null when it has none. */
+async function inboxTeamOf(conversationId: string): Promise<string | null> {
+  const [state] = await withTenant(slice.app, { tenantId }, (tx) =>
     tx
-      .select()
-      .from(schema.conversationRoutes)
+      .select({ teamId: schema.conversationInboxState.teamId })
+      .from(schema.conversationInboxState)
       .where(
-        eq(schema.conversationRoutes.conversationId, fromPublicId('conversation', conversationId)),
+        eq(
+          schema.conversationInboxState.conversationId,
+          fromPublicId('conversation', conversationId),
+        ),
       ),
   );
-  return route ?? null;
+  return state?.teamId ? toPublicId('team', state.teamId) : null;
+}
+
+/** The Chatwoot team the inbox linked to a Hamnivo team on first use. */
+async function chatwootTeamOf(teamPublicId: string): Promise<string | null> {
+  const [link] = await withTenant(slice.app, { tenantId }, (tx) =>
+    tx
+      .select({ externalTeamId: schema.teamAuthorityLinks.externalTeamId })
+      .from(schema.teamAuthorityLinks)
+      .where(
+        and(
+          eq(schema.teamAuthorityLinks.teamId, fromPublicId('team', teamPublicId)),
+          eq(
+            schema.teamAuthorityLinks.connectionId,
+            fromPublicId('connection', alpha.connection.id),
+          ),
+        ),
+      ),
+  );
+  return link ? String(link.externalTeamId) : null;
 }
 
 async function authorityState(conversationId: string) {
@@ -264,7 +251,7 @@ describe('shadow routing (J02)', () => {
       offered: ['billing', 'orders', 'other'],
     });
     expect(record?.latencyMs).toEqual(expect.any(Number));
-    expect(await routeOf(conversationId)).toBeNull();
+    expect(await inboxTeamOf(conversationId)).toBeNull();
     const { state } = await authorityState(conversationId);
     expect(state.teamRef).toBeNull();
     // Only the selected inputs went to Jev, with personal data replaced by its kind.
@@ -300,7 +287,7 @@ describe('live routing (J02, U07)', () => {
     await setMode('live');
   });
 
-  it('applies the provider decision, and the team is set in Chatwoot', async () => {
+  it('applies the provider decision in the team’s inbox queue and in Chatwoot', async () => {
     jev.set({ kind: 'answer', label: 'orders', confidence: 0.88 });
     const { conversationId } = await chat('Has my parcel been shipped yet? I paid by card.');
     const [record] = await recordsOf(conversationId);
@@ -312,11 +299,19 @@ describe('live routing (J02, U07)', () => {
       team: { id: teams.Orders },
       applied: true,
     });
-    const route = await routeOf(conversationId);
-    expect(route).toMatchObject({ source: 'provider', syncState: 'synced' });
-    expect(route?.teamId).toBe(fromPublicId('team', teams.Orders as string));
+    // The inbox's path: the conversation is in the team's queue …
+    expect(await inboxTeamOf(conversationId)).toBe(teams.Orders);
+    const queue = await alpha.owner.get(
+      `/v1/inbox/conversations?queue=all&status=all&teamId=${teams.Orders}`,
+    );
+    expect(queue.status, JSON.stringify(queue.body)).toBe(200);
+    expect((queue.body.items as Array<{ id: string }>).map((c) => c.id)).toContain(conversationId);
+    // … and Chatwoot has the team the inbox created for it on first use.
     const { state } = await authorityState(conversationId);
-    expect(state.teamRef).toBe(String(chatwootTeams.orders));
+    expect(state.teamRef).not.toBeNull();
+    expect(state.teamRef).toBe(await chatwootTeamOf(teams.Orders as string));
+    // Routing chose where the conversation waits, not who owns it.
+    expect(state.owner).not.toMatchObject({ kind: 'user' });
     const audit = await alpha.owner.get('/v1/admin/audit?action=conversation.routed');
     expect(audit.body.items.length).toBeGreaterThan(0);
   });
@@ -332,7 +327,7 @@ describe('live routing (J02, U07)', () => {
       team: { id: teams.Billing },
       applied: true,
     });
-    expect(await routeOf(conversationId)).toMatchObject({ source: 'baseline' });
+    expect(await inboxTeamOf(conversationId)).toBe(teams.Billing);
   });
 
   it('prefers the team that speaks the customer language', async () => {
@@ -348,8 +343,7 @@ describe('live routing (J02, U07)', () => {
       languageMatch: 'native',
       applied: true,
     });
-    // Billing Urdu is not linked to a Chatwoot team: Hamnivo keeps the route on its own.
-    expect(await routeOf(conversationId)).toMatchObject({ syncState: 'not_linked' });
+    expect(await inboxTeamOf(conversationId)).toBe(teams['Billing Urdu']);
   });
 
   it('uses a reviewed translation path before a language gap', async () => {
@@ -411,6 +405,82 @@ describe('live routing (J02, U07)', () => {
     });
     // An open circuit does not call Jev at all.
     expect(jev.calls.length).toBe(callsBefore);
+  });
+});
+
+describe('the inbox team a person chose (H02)', () => {
+  it('is never replaced by routing', async () => {
+    jev.set({ kind: 'answer', label: 'orders', confidence: 0.9 });
+    const { visitor, conversationId } = await chat('Where is my parcel? It has not arrived.');
+    expect(await inboxTeamOf(conversationId)).toBe(teams.Orders);
+    // A person moves the conversation to another team's queue, the inbox's way.
+    const moved = await alpha.owner.post(`/v1/inbox/conversations/${conversationId}/team`, {
+      teamId: teams.Billing,
+    });
+    expect(moved.status, JSON.stringify(moved.body)).toBe(200);
+    await slice.drain();
+    expect(await inboxTeamOf(conversationId)).toBe(teams.Billing);
+    // A handoff routes again, but the team a person chose stays.
+    const sent = await visitor.call('POST', `/v1/widget/conversations/${conversationId}/messages`, {
+      clientMessageId: randomUUID(),
+      parts: [{ type: 'text', text: 'I want to talk to a person about my parcel' }],
+    });
+    expect(sent.status).toBe(202);
+    await slice.drain();
+    const records = await recordsOf(conversationId);
+    expect(records[0]).toMatchObject({
+      trigger: 'handoff',
+      team: { id: teams.Orders },
+      applied: false,
+    });
+    expect(await inboxTeamOf(conversationId)).toBe(teams.Billing);
+  });
+});
+
+describe('teams and their routing (U07)', () => {
+  it('lists the brand’s teams with their routing, and routes only for the team’s workspace', async () => {
+    const plain = await alpha.owner.post('/v1/admin/teams', {
+      name: 'Returns',
+      workspaceId: alpha.workspaceId,
+    });
+    expect(plain.status, JSON.stringify(plain.body)).toBe(201);
+    // A team of another workspace of the tenant.
+    const [workspace] = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .insert(schema.workspaces)
+        .values({ tenantId, name: 'Wholesale', slug: `wholesale-${Date.now()}` })
+        .returning(),
+    );
+    const foreign = await alpha.owner.post('/v1/admin/teams', {
+      name: 'Wholesale desk',
+      workspaceId: toPublicId('workspace', workspace?.id as string),
+    });
+    expect(foreign.status, JSON.stringify(foreign.body)).toBe(201);
+
+    const listed = await alpha.owner.get(`/v1/admin/brands/${alpha.brand.id}/routing/teams`);
+    expect(listed.status).toBe(200);
+    const byName = new Map(
+      (listed.body.items as Array<Record<string, any>>).map((t) => [t.name, t]),
+    );
+    expect(byName.get('Orders')).toMatchObject({
+      id: teams.Orders,
+      workspaceId: alpha.workspaceId,
+      routing: { intents: ['orders'], translationLanguages: ['ar'], accepting: true },
+    });
+    expect(byName.get('Support')).toMatchObject({
+      workspaceId: null,
+      routing: { isDefault: true },
+    });
+    expect(byName.get('Returns')).toMatchObject({ id: plain.body.id, routing: null });
+    expect(byName.has('Wholesale desk')).toBe(false);
+
+    const refused = await alpha.owner.put(
+      `/v1/admin/brands/${alpha.brand.id}/routing/teams/${foreign.body.id}`,
+      { intents: ['billing'] },
+    );
+    expect(refused.status).toBe(422);
+    const audit = await alpha.owner.get('/v1/admin/audit?action=team.routing_changed&limit=100');
+    expect(audit.body.items.length).toBeGreaterThanOrEqual(4);
   });
 });
 
@@ -534,10 +604,13 @@ describe('access', () => {
     other.tenant = tenant.body.tenant.id;
     const records = await other.get(`${routingPath()}/records`);
     expect(records.status).toBe(404);
-    const team = await other.patch(`/v1/admin/routing-teams/${teams.Billing}`, {
-      accepting: false,
-    });
+    const team = await other.put(
+      `/v1/admin/brands/${alpha.brand.id}/routing/teams/${teams.Billing}`,
+      { accepting: false },
+    );
     expect(team.status).toBe(404);
+    const listed = await other.get(`/v1/admin/brands/${alpha.brand.id}/routing/teams`);
+    expect(listed.status).toBe(404);
   });
 
   it('refuses live routing without a published rubric', async () => {

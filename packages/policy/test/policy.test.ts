@@ -11,6 +11,7 @@ import {
   PERMISSION_KEYS,
   presetPermissions,
   ROLE_PRESETS,
+  rolePatterns,
   type ScopeHierarchy,
   type ServiceAccountPrincipal,
   type StaffPrincipal,
@@ -65,6 +66,72 @@ describe('catalog and presets', () => {
     expect(presetPermissions('admin')).not.toContain('billing.manage');
     expect(presetPermissions('agent')).not.toContain('billing.manage');
     expect(presetPermissions('agent')).toContain('conversations.takeover');
+  });
+
+  it('lets agents work their own queue while bulk changes and reviews stay with supervisors', () => {
+    const agent = presetPermissions('agent');
+    expect(agent).toEqual(expect.arrayContaining(['conversations.status', 'conversations.tag']));
+    expect(agent).not.toContain('conversations.bulk');
+    expect(agent).not.toContain('conversations.review');
+    expect(agent).not.toContain('conversations.assign');
+    expect(presetPermissions('supervisor')).toEqual(
+      expect.arrayContaining([
+        'conversations.bulk',
+        'conversations.review',
+        'conversations.assign',
+      ]),
+    );
+    expect(presetPermissions('analyst')).not.toContain('conversations.tag');
+  });
+
+  it('keeps built-in roles in step with the presets; custom roles keep what was saved', () => {
+    const stored = ['conversations.read', 'conversations.reply'];
+    expect(rolePatterns({ key: 'agent', isPreset: true, permissions: stored })).toEqual(
+      ROLE_PRESETS.find((p) => p.key === 'agent')?.patterns,
+    );
+    expect(rolePatterns({ key: 'agent', isPreset: false, permissions: stored })).toEqual(stored);
+    // A preset key that no longer exists keeps its stored list.
+    expect(rolePatterns({ key: 'retired', isPreset: true, permissions: stored })).toEqual(stored);
+  });
+});
+
+describe('customer memory permissions', () => {
+  it('keeps memory with administrators and supervisors, not with every agent', () => {
+    expect(presetPermissions('admin')).toEqual(
+      expect.arrayContaining([
+        'memory.read',
+        'memory.manage',
+        'memory.delete',
+        'memory.erase',
+        'memory.export',
+      ]),
+    );
+    expect(presetPermissions('supervisor')).toContain('memory.read');
+    expect(presetPermissions('supervisor')).not.toContain('memory.erase');
+    expect(presetPermissions('agent')).not.toContain('memory.read');
+  });
+
+  it('asks for a fresh sign-in before deleting, erasing or exporting, within the brand', () => {
+    const manager = grant({
+      permissions: ['memory.*'],
+      scope: { type: 'brand', id: 'B' },
+    });
+    for (const permission of ['memory.delete', 'memory.erase', 'memory.export'] as const) {
+      expect(
+        authorize(
+          staff([manager], { authenticatedAt: minutesAgo(60) }),
+          permission,
+          {
+            brandId: 'B',
+          },
+          { now },
+        ),
+      ).toMatchObject({ reason: 'step_up_required' });
+      expect(authorize(staff([manager]), permission, { brandId: 'B' }, { now }).allowed).toBe(true);
+      expect(authorize(staff([manager]), permission, { brandId: 'B2' }, { now })).toMatchObject({
+        reason: 'outside_scope',
+      });
+    }
   });
 });
 

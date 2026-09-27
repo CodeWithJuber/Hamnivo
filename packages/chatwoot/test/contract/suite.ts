@@ -343,6 +343,153 @@ export function authorityContract(
       await authority.typing(ref, false, { kind: 'bot', botRef: botRef() });
     });
 
+    describe('staff inbox operations, as the staff member’s own user', () => {
+      const asStaff = () => ({ kind: 'staff' as const, userRef: String(staff.userId) });
+      let outsider: ChatwootAuthority;
+
+      beforeAll(async () => {
+        // An agent of the same account who is not a member of the inbox.
+        const other = await provisionStaffUser({
+          baseUrl: t.baseUrl,
+          platformToken: t.platformToken,
+          accountId: account.accountId,
+          name: 'Omar Outside',
+          email: email('outsider'),
+          role: 'agent',
+        });
+        outsider = new ChatwootAuthority({
+          baseUrl: t.baseUrl,
+          accountId: account.accountId,
+          integrationToken: account.integration.token,
+          botToken: () => account.bot.token,
+          staffToken: async () => other.token,
+          inbox: () => ({
+            identifier: account.inbox.identifier,
+            hmacToken: account.inbox.hmacToken,
+          }),
+        });
+      });
+
+      it('reads notes and activity as the staff member; others outside the inbox cannot', async () => {
+        const ref = state.conversationRef;
+        const page = await authority.listStaffMessages(ref, {}, asStaff());
+        expect(page.length).toBeGreaterThan(0);
+        expect(page.length).toBeLessThanOrEqual(20);
+        const refs = page.map((m) => Number(m.ref));
+        expect(refs).toEqual([...refs].sort((a, b) => a - b));
+        const older = await authority.listStaffMessages(ref, { before: page[0]?.ref }, asStaff());
+        expect(older.length).toBeGreaterThan(0);
+        expect(older.every((m) => Number(m.ref) < Number(page[0]?.ref))).toBe(true);
+        // The handoff note written earlier is private and readable by staff.
+        expect([...older, ...page].some((m) => m.private && m.text?.includes('Handoff'))).toBe(
+          true,
+        );
+        const denied = await outsider
+          .listStaffMessages(ref, {}, { kind: 'staff', userRef: 'x' })
+          .catch((e) => e);
+        expect(denied).toMatchObject({ status: 401 });
+      });
+
+      it('finds messages by text for people who may read them', async () => {
+        const hits = await authority.searchMessages('Handoff packet', 1, asStaff());
+        expect(hits.some((m) => m.private && m.conversationRef === state.conversationRef)).toBe(
+          true,
+        );
+        expect(await outsider.searchMessages('Handoff packet', 1, asStaff())).toEqual([]);
+      });
+
+      it('lists the tags an administrator defined, in lower case', async () => {
+        const title = `vip-${randomUUID().slice(0, 8)}`;
+        await authority.createLabel({ title: title.toUpperCase(), description: 'Important' });
+        const labels = await authority.listLabels(asStaff());
+        expect(labels).toContainEqual(expect.objectContaining({ title, description: 'Important' }));
+        // Chatwoot itself accepts any tag on a conversation: Hamnivo checks them first.
+        await authority.annotate(
+          state.conversationRef,
+          { labels: [title, 'free-form'] },
+          asStaff(),
+        );
+        expect([...(await authority.getState(state.conversationRef)).labels].sort()).toEqual(
+          ['free-form', title].sort(),
+        );
+      });
+
+      it('lists conversation fields and replaces all attribute values on write', async () => {
+        const key = `order_${randomUUID().slice(0, 8).replace(/-/g, '')}`;
+        await authority.createFieldDefinition({ key, name: 'Order', type: 'list', options: ['a'] });
+        const fields = await authority.listFieldDefinitions(asStaff());
+        expect(fields).toContainEqual({
+          key,
+          name: 'Order',
+          type: 'list',
+          description: null,
+          options: ['a'],
+        });
+        const ref = state.conversationRef;
+        await authority.annotate(ref, { attributes: { [key]: 'a', hv_keep: 'x' } }, asStaff());
+        await authority.annotate(ref, { attributes: { [key]: 'a' } }, asStaff());
+        // Chatwoot replaces the whole set, so callers must merge what they keep.
+        expect((await authority.getState(ref)).attributes).toEqual({ [key]: 'a' });
+      });
+
+      it('adds and searches saved replies by short code and content', async () => {
+        const code = `addr${randomUUID().slice(0, 6)}`;
+        const created = await authority.createSavedReply(
+          {
+            shortCode: code,
+            content: 'Hello {{contact.name}}, you can change it before dispatch.',
+          },
+          asStaff(),
+        );
+        expect(created).toMatchObject({ shortCode: code });
+        const byCode = await authority.listSavedReplies(code, asStaff());
+        expect(byCode.map((r) => r.ref)).toContain(created.ref);
+        const byText = await authority.listSavedReplies('before dispatch', asStaff());
+        expect(byText.map((r) => r.ref)).toContain(created.ref);
+      });
+
+      it('reads the contact without the secret contact-inbox id', async () => {
+        const contact = await authority.getContact(state.contactRef, asStaff());
+        expect(contact).toMatchObject({ ref: state.contactRef, name: 'Ayesha' });
+        expect(JSON.stringify(contact)).not.toContain(state.sourceId);
+      });
+
+      it('snoozes until a time or the next customer message, and reopens', async () => {
+        const ref = state.conversationRef;
+        const until = new Date(Date.now() + 3_600_000);
+        await authority.snooze(ref, until, asStaff());
+        const snoozed = await authority.getState(ref);
+        expect(snoozed.status).toBe('snoozed');
+        expect(Math.abs((snoozed.snoozedUntil?.getTime() ?? 0) - until.getTime())).toBeLessThan(
+          2000,
+        );
+        // Snoozing again without a time keeps the earlier time (Chatwoot ignores a null).
+        await authority.snooze(ref, null, asStaff());
+        expect((await authority.getState(ref)).snoozedUntil).toEqual(snoozed.snoozedUntil);
+        await authority.setStatus(ref, 'open', { kind: 'integration' });
+        expect(await authority.getState(ref)).toMatchObject({ status: 'open', snoozedUntil: null });
+        await authority.snooze(ref, null, asStaff());
+        expect(await authority.getState(ref)).toMatchObject({
+          status: 'snoozed',
+          snoozedUntil: null,
+        });
+        await authority.setStatus(ref, 'open', { kind: 'integration' });
+      });
+
+      it('creates a team once, adds members once and assigns or removes it', async () => {
+        const name = `Billing ${randomUUID().slice(0, 6)}`;
+        const team = await authority.ensureTeam(name);
+        expect(await authority.ensureTeam(name.toUpperCase())).toEqual(team);
+        await authority.addTeamMembers(team.ref, [String(staff.userId)]);
+        await authority.addTeamMembers(team.ref, [String(staff.userId)]);
+        const ref = state.conversationRef;
+        await authority.assignTeam(ref, team.ref, asStaff());
+        expect((await authority.getState(ref)).teamRef).toBe(team.ref);
+        await authority.assignTeam(ref, null, asStaff());
+        expect((await authority.getState(ref)).teamRef).toBeNull();
+      });
+    });
+
     it('reports failures as typed errors that say whether to retry', async () => {
       const missing = await authority.getState('987654').catch((error) => error);
       expect(missing).toBeInstanceOf(ChatwootError);

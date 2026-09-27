@@ -117,6 +117,58 @@ describe('language', () => {
   });
 });
 
+describe('customer memory', () => {
+  it('calls the memory controls with the session and turns refusals into errors', async () => {
+    const calls: string[] = [];
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => HttpResponse.json(session(), { status: 201 })),
+      http.get(`${API}/v1/widget/memory`, ({ request }) => {
+        calls.push(`GET memory ${request.headers.get('authorization')?.slice(0, 13)}`);
+        return HttpResponse.json({ offered: true, items: [] });
+      }),
+      http.post(`${API}/v1/widget/memory/consent`, async ({ request }) => {
+        calls.push(`consent ${JSON.stringify(await request.json())}`);
+        return HttpResponse.json({ state: 'granted' });
+      }),
+      http.post(`${API}/v1/widget/memory/:id/correct`, async ({ params, request }) => {
+        calls.push(`correct ${params.id} ${JSON.stringify(await request.json())}`);
+        return problem(422, 'VALIDATION_FAILED', false);
+      }),
+      http.post(`${API}/v1/widget/memory/:id/:action`, ({ params }) => {
+        calls.push(`${params.action} ${params.id}`);
+        return HttpResponse.json({ id: 'mdel_1' }, { status: 202 });
+      }),
+      http.post(`${API}/v1/widget/memory/forget`, () => {
+        calls.push('forget');
+        return HttpResponse.json({ id: 'mdel_2' }, { status: 202 });
+      }),
+      http.get(`${API}/v1/widget/memory/deletions/:id`, ({ params }) => {
+        calls.push(`receipt ${params.id}`);
+        return HttpResponse.json({ status: 'completed' });
+      }),
+    );
+    const c = client();
+    await c.getMemory();
+    await c.setMemoryConsent('granted', 'memory-notice/1');
+    await expect(c.correctMemory('mem_1', 'WhatsApp')).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+    });
+    await c.confirmMemory('mem_2');
+    await c.deleteMemory('mem_3');
+    await c.forgetMemory();
+    await c.getMemoryDeletion('mdel_1');
+    expect(calls).toEqual([
+      'GET memory Bearer access',
+      'consent {"state":"granted","noticeVersion":"memory-notice/1"}',
+      'correct mem_1 {"value":"WhatsApp"}',
+      'confirm mem_2',
+      'delete mem_3',
+      'forget',
+      'receipt mdel_1',
+    ]);
+  });
+});
+
 describe('identity changes', () => {
   it('are not undone by a token renewal still in flight', async () => {
     let parked: (() => void) | null = null;

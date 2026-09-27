@@ -5,6 +5,7 @@ import {
   Global,
   Inject,
   Injectable,
+  Logger,
   Module,
   type OnApplicationShutdown,
 } from '@nestjs/common';
@@ -61,6 +62,10 @@ export class PlatformModule {
             createDb(config.DATABASE_URL, {
               max: config.DATABASE_POOL_MAX,
               applicationName: `hamnivo-${role}`,
+              onConnectionError: (error) =>
+                new Logger('Database').warn(
+                  `connection lost${error.code ? ` (${error.code})` : ''}: ${error.message}`,
+                ),
             }),
         },
         {

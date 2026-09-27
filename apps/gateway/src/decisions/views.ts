@@ -9,7 +9,8 @@ import { schema, toPublicId } from '@hamnivo/db';
 import { LANGUAGE_SLICES, type RoutingIntent, type RoutingTeam as TeamRule } from '@hamnivo/domain';
 import { iso } from '../common/views.js';
 
-export type TeamRow = typeof schema.routingTeams.$inferSelect;
+type TeamRow = typeof schema.teams.$inferSelect;
+type TeamRoutingRow = typeof schema.teamRouting.$inferSelect;
 export type RubricRow = typeof schema.decisionRubrics.$inferSelect;
 export type RecordRow = typeof schema.decisionRecords.$inferSelect;
 
@@ -18,32 +19,43 @@ export const ROUTING_TASK = 'team-routing';
 const slices = (values: readonly string[]): LanguageSlice[] =>
   values.filter((v): v is LanguageSlice => (LANGUAGE_SLICES as readonly string[]).includes(v));
 
-export function teamView(row: TeamRow): RoutingTeam {
+/** An inbox team with its routing for one brand (null until it is set up). */
+export function routingTeamView(
+  team: TeamRow,
+  brandId: string,
+  routing: TeamRoutingRow | null,
+): RoutingTeam {
   return {
-    id: toPublicId('team', row.id),
-    brandId: toPublicId('brand', row.brandId),
-    name: row.name,
-    intents: row.intents,
-    languages: slices(row.languages),
-    translationLanguages: slices(row.translationLanguages),
-    externalTeamId: row.externalTeamId,
-    isDefault: row.isDefault,
-    accepting: row.accepting,
-    status: row.status,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
+    id: toPublicId('team', team.id),
+    brandId: toPublicId('brand', brandId),
+    name: team.name,
+    workspaceId: team.workspaceId ? toPublicId('workspace', team.workspaceId) : null,
+    routing: routing
+      ? {
+          intents: routing.intents,
+          languages: slices(routing.languages),
+          translationLanguages: slices(routing.translationLanguages),
+          isDefault: routing.isDefault,
+          accepting: routing.accepting,
+          status: routing.status,
+          updatedAt: routing.updatedAt.toISOString(),
+        }
+      : null,
   };
 }
 
-/** A team as the routing rules see it; archived teams are never permitted. */
-export function teamRule(row: TeamRow): TeamRule {
+/**
+ * A team as the routing rules see it. Only active teams whose routing for the brand is active
+ * and accepting are permitted; a team without routing for the brand is not a destination.
+ */
+export function teamRule(team: TeamRow, routing: TeamRoutingRow): TeamRule {
   return {
-    id: row.id,
-    intents: row.intents,
-    languages: slices(row.languages),
-    translationLanguages: slices(row.translationLanguages),
-    accepting: row.accepting && row.status === 'active',
-    isDefault: row.isDefault,
+    id: team.id,
+    intents: routing.intents,
+    languages: slices(routing.languages),
+    translationLanguages: slices(routing.translationLanguages),
+    accepting: routing.accepting && routing.status === 'active' && team.status === 'active',
+    isDefault: routing.isDefault,
   };
 }
 
