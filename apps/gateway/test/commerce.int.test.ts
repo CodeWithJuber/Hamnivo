@@ -25,7 +25,7 @@ let offsetMs = 0;
 const clock = () => new Date(Date.now() + offsetMs);
 
 /** Replies for the X10 checks: claims payment unless told there is no receipt. */
-const model = createMockModel({
+const scripted = createMockModel({
   reply: (turn) => {
     if (/did my payment go through/i.test(turn.text)) {
       return turn.system.includes('there is no receipt')
@@ -36,6 +36,20 @@ const model = createMockModel({
     return defaultMockReply(turn);
   },
 });
+
+/** Every prompt the model is given, to check what reaches its context (C05). */
+const prompts: string[] = [];
+const model: typeof scripted = {
+  ...scripted,
+  doGenerate: (call) => {
+    prompts.push(JSON.stringify(call.prompt));
+    return scripted.doGenerate(call);
+  },
+  doStream: (call) => {
+    prompts.push(JSON.stringify(call.prompt));
+    return scripted.doStream(call);
+  },
+};
 
 const WEBHOOK_SECRET = 'whsec_north_test_0123456789abcdef';
 const STORE_ID = `north-${randomUUID().slice(0, 8)}`;
@@ -1260,8 +1274,9 @@ describe('receipt-based completion (X10)', () => {
     expect(conversation.body.status).toBe('waiting_for_person');
   });
 
-  it('lets the AI confirm a payment that has a provider receipt', async () => {
+  it('lets the AI confirm a payment that has a provider receipt, without seeing payment details (C05)', async () => {
     const paid = await paidOrder();
+    const promptsBefore = prompts.length;
     const sent = await paid.visitor.call(
       'POST',
       `/v1/widget/conversations/${paid.conversationId}/messages`,
@@ -1278,6 +1293,32 @@ describe('receipt-based completion (X10)', () => {
     expect(replies.at(-1)?.text).toBe(
       'Your payment has been confirmed and your order is on its way.',
     );
+
+    // The model saw the conversation, but no payment page, session or payment reference.
+    const seen = prompts.slice(promptsBefore).join('\n');
+    expect(seen).toContain('Did my payment go through?');
+    const { intent, payment } = await withTenant(slice.app, { tenantId }, async (tx) => {
+      const id = fromPublicId('purchase', paid.purchase.id);
+      const [intent] = await tx
+        .select()
+        .from(schema.purchaseIntents)
+        .where(eq(schema.purchaseIntents.id, id));
+      const [payment] = await tx
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.purchaseIntentId, id));
+      return { intent, payment };
+    });
+    for (const secret of [
+      intent?.checkoutSessionRef,
+      intent?.checkoutUrl,
+      payment?.paymentRef,
+      payment?.sessionRef,
+    ]) {
+      expect(secret).toBeTruthy();
+      expect(seen).not.toContain(secret);
+    }
+    expect(seen).not.toMatch(/\b(cs|pi)_[A-Za-z0-9]/);
   });
 });
 
