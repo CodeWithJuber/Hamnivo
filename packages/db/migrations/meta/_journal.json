@@ -134,6 +134,20 @@
       "when": 1790488928890,
       "tag": "20260927060208_session_identity_key",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790499206252,
+      "tag": "20260927085326_commerce",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790499217386,
+      "tag": "20260927085337_commerce_security",
+      "breakpoints": true
     }
   ]
 }
