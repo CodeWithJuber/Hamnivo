@@ -740,8 +740,16 @@ autodeploy_enable() {
   fi
 
   set_kv HAMNIVO_AUTODEPLOY "$mode"
-  set_kv HAMNIVO_DEPLOY_UID "$(id -u)"
-  set_kv HAMNIVO_DEPLOY_GID "$(id -g)"
+  # The receiver creates request files as the deploy user. A root deploy user gets nobody instead
+  # (the receiver never needs root); root can still read and empty the folder.
+  if ((EUID == 0)); then
+    chown 65534:65534 "$state_dir/requests"
+    set_kv HAMNIVO_DEPLOY_UID 65534
+    set_kv HAMNIVO_DEPLOY_GID 65534
+  else
+    set_kv HAMNIVO_DEPLOY_UID "$(id -u)"
+    set_kv HAMNIVO_DEPLOY_GID "$(id -g)"
+  fi
   if [[ -n "$token_file" ]]; then
     [[ -s "$token_file" ]] || fail "No token in $token_file."
     set_kv GITHUB_DEPLOY_TOKEN "$(tr -d '[:space:]' <"$token_file")"

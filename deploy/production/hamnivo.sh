@@ -17,7 +17,8 @@
 #   hamnivo.sh compose ...  any docker compose command with this stack's files and settings
 #
 # Setup options: --tls internal (Caddy's own CA instead of Let's Encrypt, for tests and private
-# networks), --https-port N and --http-port N (other ports than 443 and 80), --quiet.
+# networks), --https-port N and --http-port N (other ports than 443 and 80), --cloudflare on|off
+# (the names are proxied by Cloudflare: believe the visitor addresses it reports), --quiet.
 # Environment: HAMNIVO_ENV_FILE (default deploy/production/.env), HAMNIVO_PROJECT (compose
 # project name), HAMNIVO_BUILD_CA (CA file for builds behind a TLS-inspecting proxy),
 # HAMNIVO_BUILD_NETWORK (docker build --network), HAMNIVO_BUILD_CONCURRENCY (packages built at
@@ -30,10 +31,11 @@ source "$here/lib.sh"
 
 # --- setup ---------------------------------------------------------------------------------------
 cmd_setup() {
-  local domain='' tls='' https_port='' http_port='' quiet=0
+  local domain='' tls='' https_port='' http_port='' cloudflare='' quiet=0
   while (($#)); do
     case "$1" in
       --quiet) quiet=1; shift ;;
+      --cloudflare) cloudflare="${2:?--cloudflare needs on or off}"; shift 2 ;;
       --domain) domain="${2:?--domain needs a value}"; shift 2 ;;
       --email) tls="${2:?--email needs a value}"; shift 2 ;;
       --tls) tls="${2:?--tls needs a value}"; shift 2 ;;
@@ -109,6 +111,14 @@ cmd_setup() {
   ensure HAMNIVO_DEPLOY_BRANCH main
   ensure HAMNIVO_AUTODEPLOY off
 
+  if [[ -n "$cloudflare" ]]; then
+    [[ "$cloudflare" == on || "$cloudflare" == off ]] || fail '--cloudflare is on or off.'
+    set_kv HAMNIVO_CLOUDFLARE "$cloudflare"
+    [[ "$cloudflare" == on ]] || set_kv HAMNIVO_TRUSTED_PROXIES ''
+  fi
+  ensure HAMNIVO_CLOUDFLARE off
+  refresh_trusted_proxies
+
   ((quiet == 1)) && return 0
   log "Settings are in $env_file (keep it private and back it up)."
   cat >&2 <<EOF
@@ -124,6 +134,44 @@ EOF
   if [[ -z "$(get SMTP_URL)" ]]; then
     printf '%s\n' "Email: set SMTP_URL in $env_file to send sign-in emails (until then they appear in: $0 logs api)." >&2
   fi
+}
+
+# --- Cloudflare ----------------------------------------------------------------------------------
+# Behind Cloudflare's proxy (HAMNIVO_CLOUDFLARE=on), every connection comes from Cloudflare. The
+# edge then takes each visitor's address from Cloudflare's headers, but only on connections from
+# Cloudflare's published ranges, kept in HAMNIVO_TRUSTED_PROXIES and refreshed by setup and up.
+# The ranges this version knows, for when cloudflare.com can't be reached and none are stored yet:
+cloudflare_ranges='173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18
+108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15
+104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32
+2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32'
+
+# Prints the address ranges of one list (ips-v4 or ips-v6); fails when it can't get a valid list.
+cloudflare_list() {
+  local body range out=''
+  body="$(curl -fsS --max-time 10 "${HAMNIVO_CLOUDFLARE_IPS_URL:-https://www.cloudflare.com}/$1" 2>/dev/null)" || return 1
+  while IFS= read -r range; do
+    range="${range//[[:space:]]/}"
+    [[ -z "$range" ]] && continue
+    [[ "$range" =~ ^[0-9a-fA-F.:]+/[0-9]{1,3}$ ]] || return 1
+    out+="${out:+ }$range"
+  done <<<"$body"
+  [[ -n "$out" ]] && printf '%s' "$out"
+}
+
+refresh_trusted_proxies() {
+  [[ "$(get HAMNIVO_CLOUDFLARE)" == on ]] || return 0
+  local v4 v6 list
+  if v4="$(cloudflare_list ips-v4)" && v6="$(cloudflare_list ips-v6)"; then
+    list="$v4 $v6"
+  elif [[ -n "$(get HAMNIVO_TRUSTED_PROXIES)" ]]; then
+    log "Could not fetch Cloudflare's address ranges; keeping the ones from before"
+    return 0
+  else
+    log "Could not fetch Cloudflare's address ranges; using the ones this version knows"
+    list="$(printf '%s' "$cloudflare_ranges" | tr '\n' ' ')"
+  fi
+  [[ "$list" == "$(get HAMNIVO_TRUSTED_PROXIES)" ]] || set_kv HAMNIVO_TRUSTED_PROXIES "$list"
 }
 
 # --- build and start -----------------------------------------------------------------------------
@@ -228,8 +276,13 @@ cmd_up() {
     # Only images already on this server: a missing one fails here instead of being built.
     no_build=(--no-build)
   fi
-  # The webhook receiver's folder, made by this user (Docker would make it as root).
+  # The webhook receiver's folder, made by this user (Docker would make it as root). When this is
+  # root, the receiver runs as nobody (autodeploy enable), so the folder belongs to nobody.
   mkdir -p "$state_dir/requests"
+  if ((EUID == 0)) && [[ "$(get HAMNIVO_DEPLOY_UID)" == 65534 ]]; then
+    chown 65534:65534 "$state_dir/requests"
+  fi
+  refresh_trusted_proxies
   log "Starting the services (images: $(image_tag))"
   "${compose[@]}" up -d --remove-orphans "${no_build[@]}" >&2
   wait_healthy api chatwoot-web

@@ -216,6 +216,9 @@ services:
       HAMNIVO_API_ORIGIN: ${HAMNIVO_API_ORIGIN:?run hamnivo.sh setup}
       # "webhook" turns on the route to deploy-hook (hamnivo.sh autodeploy enable).
       HAMNIVO_AUTODEPLOY: ${HAMNIVO_AUTODEPLOY:-off}
+      # Proxies whose visitor addresses are believed: Cloudflare's ranges when HAMNIVO_CLOUDFLARE
+      # is on (hamnivo.sh keeps them current), otherwise none.
+      HAMNIVO_TRUSTED_PROXIES: ${HAMNIVO_TRUSTED_PROXIES:-127.0.0.1/32}
     ports:
       - '${HAMNIVO_HTTP_PORT:-80}:80'
       - '${HAMNIVO_HTTPS_PORT:-443}:443'

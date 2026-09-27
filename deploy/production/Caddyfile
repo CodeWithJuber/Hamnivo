@@ -8,6 +8,14 @@
 	# Deploys restart the edge. Open live streams then get 3 s to finish (clients reconnect by
 	# themselves) instead of holding the restart until Docker kills Caddy after 10 s.
 	grace_period 3s
+	# Each visitor's address. Directly, it is the connection's own. Behind Cloudflare's proxy
+	# (hamnivo.sh setup --cloudflare on), it is the address Cloudflare reports, but only on
+	# connections from Cloudflare's ranges (HAMNIVO_TRUSTED_PROXIES), so nobody else can claim one.
+	servers {
+		trusted_proxies static {$HAMNIVO_TRUSTED_PROXIES:127.0.0.1/32}
+		trusted_proxies_strict
+		client_ip_headers CF-Connecting-IP X-Forwarded-For
+	}
 }
 
 (tls) {
@@ -72,6 +80,7 @@
 		# While the API restarts during a deploy, requests wait for it (up to 30 s) instead of
 		# failing.
 		reverse_proxy api:4000 {
+			header_up X-Forwarded-For {client_ip}
 			lb_try_duration 30s
 			lb_try_interval 250ms
 		}
@@ -92,6 +101,7 @@
 		forward_auth api:4000 {
 			uri /v1/widget/frame-policy?{query}
 			copy_headers X-Hamnivo-Frame-Ancestors
+			header_up X-Forwarded-For {client_ip}
 			lb_try_duration 30s
 			lb_try_interval 250ms
 		}
@@ -114,6 +124,7 @@
 	import headers
 	encode zstd gzip
 	reverse_proxy chatwoot-web:3000 {
+		header_up X-Forwarded-For {client_ip}
 		lb_try_duration 30s
 		lb_try_interval 250ms
 	}
