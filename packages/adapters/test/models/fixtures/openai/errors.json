@@ -1,0 +1,42 @@
+{
+  "401": {
+    "error": {
+      "message": "Incorrect API key provided: sk-test-****0000. You can find your API key at https://platform.openai.com/account/api-keys.",
+      "type": "invalid_request_error",
+      "param": null,
+      "code": "invalid_api_key"
+    }
+  },
+  "429": {
+    "error": {
+      "message": "Rate limit reached for gpt-5.4-mini in organization org-hamnivo on requests per min (RPM): Limit 500, Used 500, Requested 1. Please try again in 120ms.",
+      "type": "requests",
+      "param": null,
+      "code": "rate_limit_exceeded"
+    }
+  },
+  "500": {
+    "error": {
+      "message": "The server had an error while processing your request. Sorry about that!",
+      "type": "server_error",
+      "param": null,
+      "code": null
+    }
+  },
+  "503": {
+    "error": {
+      "message": "The requested model is temporarily overloaded. Please retry your request later.",
+      "type": "service_unavailable_error",
+      "param": null,
+      "code": "server_is_overloaded"
+    }
+  },
+  "529": {
+    "error": {
+      "message": "The server is overloaded.",
+      "type": "server_error",
+      "param": null,
+      "code": null
+    }
+  }
+}

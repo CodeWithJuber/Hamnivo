@@ -1,0 +1,14 @@
+data: {"id":"chatcmpl-CXaTVq1s9dJ4kLm2nPo8rStU6vWxY","object":"chat.completion.chunk","created":1790467200,"model":"gpt-5.4-mini-2026-03-17","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"role":"assistant","content":"","refusal":null},"logprobs":null,"finish_reason":null}]}
+
+data: {"id":"chatcmpl-CXaTVq1s9dJ4kLm2nPo8rStU6vWxY","object":"chat.completion.chunk","created":1790467200,"model":"gpt-5.4-mini-2026-03-17","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"Order 1042 left"},"logprobs":null,"finish_reason":null}]}
+
+data: {"id":"chatcmpl-CXaTVq1s9dJ4kLm2nPo8rStU6vWxY","object":"chat.completion.chunk","created":1790467200,"model":"gpt-5.4-mini-2026-03-17","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":" our warehouse today."},"logprobs":null,"finish_reason":null}]}
+
+data: {"id":"chatcmpl-CXaTVq1s9dJ4kLm2nPo8rStU6vWxY","object":"chat.completion.chunk","created":1790467200,"model":"gpt-5.4-mini-2026-03-17","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":" It should arrive on Thursday."},"logprobs":null,"finish_reason":null}]}
+
+data: {"id":"chatcmpl-CXaTVq1s9dJ4kLm2nPo8rStU6vWxY","object":"chat.completion.chunk","created":1790467200,"model":"gpt-5.4-mini-2026-03-17","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}]}
+
+data: {"id":"chatcmpl-CXaTVq1s9dJ4kLm2nPo8rStU6vWxY","object":"chat.completion.chunk","created":1790467200,"model":"gpt-5.4-mini-2026-03-17","service_tier":"default","system_fingerprint":null,"choices":[],"usage":{"prompt_tokens":48,"completion_tokens":16,"total_tokens":64,"prompt_tokens_details":{"cached_tokens":0,"audio_tokens":0},"completion_tokens_details":{"reasoning_tokens":0,"audio_tokens":0,"accepted_prediction_tokens":0,"rejected_prediction_tokens":0}}}
+
+data: [DONE]
+

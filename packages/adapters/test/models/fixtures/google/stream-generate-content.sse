@@ -1,0 +1,6 @@
+data: {"candidates": [{"content": {"parts": [{"text": "Order 1042 left"}],"role": "model"},"index": 0}],"usageMetadata": {"promptTokenCount": 47,"totalTokenCount": 47},"modelVersion": "gemini-3.8-flash","responseId": "nKXXaJfLIeC1qtsP6tSa8Qk"}
+
+data: {"candidates": [{"content": {"parts": [{"text": " our warehouse today."}],"role": "model"},"index": 0}],"usageMetadata": {"promptTokenCount": 47,"totalTokenCount": 47},"modelVersion": "gemini-3.8-flash","responseId": "nKXXaJfLIeC1qtsP6tSa8Qk"}
+
+data: {"candidates": [{"content": {"parts": [{"text": " It should arrive on Thursday."}],"role": "model"},"finishReason": "STOP","index": 0}],"usageMetadata": {"promptTokenCount": 47,"candidatesTokenCount": 15,"totalTokenCount": 62,"promptTokensDetails": [{"modality": "TEXT","tokenCount": 47}]},"modelVersion": "gemini-3.8-flash","responseId": "nKXXaJfLIeC1qtsP6tSa8Qk"}
+
