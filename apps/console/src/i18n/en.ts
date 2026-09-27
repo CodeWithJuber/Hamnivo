@@ -1,3 +1,5 @@
+import { cachingEn } from './caching';
+import { decisionsEn } from './decisions';
 /** Studio interface text in English (the source language). Keep sentences short and plain. */
 export const en = {
   app: {
@@ -895,6 +897,8 @@ export const en = {
       loading: 'Loading passkeys',
     },
   },
+  decisions: decisionsEn,
+  caching: cachingEn,
 } as const;
 
 type Strings<T> = { [K in keyof T]: T[K] extends string ? string : Strings<T[K]> };
