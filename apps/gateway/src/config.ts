@@ -27,6 +27,36 @@ const EnvSchema = z.object({
   REQUIRE_EMAIL_VERIFICATION: bool.default(true),
   /** Minutes a sign-in stays "fresh" for step-up actions. */
   STEP_UP_MAX_AGE_MINUTES: z.coerce.number().int().min(1).max(120).default(10),
+  /**
+   * Identity-provider origins on a private network that tenants may use for single sign-on,
+   * comma-separated (e.g. `https://idp.corp.internal`). Every other provider must use HTTPS on a
+   * publicly routable address; the server never fetches private addresses for a tenant.
+   */
+  SSO_TRUSTED_IDP_ORIGINS: z
+    .string()
+    .default('')
+    .transform((value, ctx) => {
+      const origins: string[] = [];
+      for (const entry of value.split(',').map((origin) => origin.trim())) {
+        if (!entry) continue;
+        if (!URL.canParse(entry)) {
+          ctx.addIssue({ code: 'custom', message: `not a URL: ${entry}` });
+          continue;
+        }
+        origins.push(new URL(entry).origin);
+      }
+      return origins;
+    }),
+  /** DNS servers for domain verification (`ip` or `ip:port`, comma-separated); default: system. */
+  SSO_DNS_SERVERS: z
+    .string()
+    .default('')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((server) => server.trim())
+        .filter(Boolean),
+    ),
 
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default('Hamnivo <no-reply@hamnivo.local>'),

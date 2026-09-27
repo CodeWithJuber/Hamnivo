@@ -248,11 +248,18 @@ describe('delegation ceiling and revocation', () => {
     expect((await owner.patch(`/v1/admin/members/${ivanId}`, { status: 'suspended' })).status).toBe(
       200,
     );
-    expect((await ivan.get('/v1/admin/members')).status).toBe(403);
+    // Ivan belongs to no other workspace, so the suspension also ended his sessions: a restore
+    // later never revives a session that may have been the reason for suspending him.
+    const suspended = await ivan.get('/v1/admin/members');
+    expect(suspended.status).toBe(401);
+    expect(suspended.body.code).toBe('AUTH_REQUIRED');
     expect((await owner.patch(`/v1/admin/members/${ivanId}`, { status: 'active' })).status).toBe(
       200,
     );
-    expect((await ivan.get('/v1/admin/members')).status).toBe(200);
+    const back = new Client(gw.app);
+    await back.post('/api/auth/sign-in/email', { email: 'ivan@example.com', password: PASSWORD });
+    back.tenant = owner.tenant;
+    expect((await back.get('/v1/admin/members')).status).toBe(200);
 
     const me = await owner.get('/v1/me');
     const members = await owner.get('/v1/admin/members');
@@ -374,6 +381,7 @@ describe('roles', () => {
       'grant.created',
       'grant.revoked',
       'member.suspended',
+      'member.sessions_ended',
       'member.restored',
       'role.created',
       'role.updated',

@@ -20,6 +20,7 @@ export const PlatformOperator = z
     mfa: z.boolean(),
   })
   .meta({ id: 'PlatformOperator' });
+export type PlatformOperator = z.infer<typeof PlatformOperator>;
 
 export const PlatformTenant = z
   .object({
@@ -39,6 +40,7 @@ export const PlatformTenant = z
     activeSupportGrants: z.number().int(),
   })
   .meta({ id: 'PlatformTenant' });
+export type PlatformTenant = z.infer<typeof PlatformTenant>;
 
 export const PlatformTenantDetail = PlatformTenant.extend({
   defaultLocale: z.string(),
@@ -66,6 +68,7 @@ export const PlatformTenantDetail = PlatformTenant.extend({
   providerList: z.array(z.object({ provider: z.string(), status: z.enum(['active', 'disabled']) })),
   supportGrants: z.array(SupportGrant),
 }).meta({ id: 'PlatformTenantDetail' });
+export type PlatformTenantDetail = z.infer<typeof PlatformTenantDetail>;
 
 export const ServiceState = z.enum(['healthy', 'degraded', 'down']);
 
@@ -94,6 +97,7 @@ export const PlatformHealth = z
     providers: z.array(z.object({ provider: z.string(), configured: z.boolean() })),
   })
   .meta({ id: 'PlatformHealth' });
+export type PlatformHealth = z.infer<typeof PlatformHealth>;
 
 export const Incident = z
   .object({
@@ -106,6 +110,7 @@ export const Incident = z
     resolvedAt: Timestamp.nullable(),
   })
   .meta({ id: 'Incident' });
+export type Incident = z.infer<typeof Incident>;
 
 export const PlatformOverview = z
   .object({
@@ -121,6 +126,7 @@ export const PlatformOverview = z
     incidents: z.array(Incident),
   })
   .meta({ id: 'PlatformOverview' });
+export type PlatformOverview = z.infer<typeof PlatformOverview>;
 
 export const CreateIncidentRequest = z
   .object({
@@ -160,6 +166,7 @@ export const SupportConfiguration = z
     agents: z.array(z.object({ name: z.string(), status: z.string(), live: z.boolean() })),
   })
   .meta({ id: 'SupportConfiguration' });
+export type SupportConfiguration = z.infer<typeof SupportConfiguration>;
 
 export const SupportConversations = z
   .object({
@@ -173,10 +180,12 @@ export const SupportConversations = z
     ),
   })
   .meta({ id: 'SupportConversations' });
+export type SupportConversations = z.infer<typeof SupportConversations>;
 
 export const SupportAudit = z
   .object({ items: z.array(AuditEventView) })
   .meta({ id: 'SupportAudit' });
+export type SupportAudit = z.infer<typeof SupportAudit>;
 
 export const PlatformAuditEvent = z
   .object({
@@ -191,7 +200,9 @@ export const PlatformAuditEvent = z
     data: z.record(z.string(), z.unknown()),
   })
   .meta({ id: 'PlatformAuditEvent' });
+export type PlatformAuditEvent = z.infer<typeof PlatformAuditEvent>;
 
 export const PlatformAuditPage = z
   .object({ items: z.array(PlatformAuditEvent), nextBefore: z.number().int().nullable() })
   .meta({ id: 'PlatformAuditPage' });
+export type PlatformAuditPage = z.infer<typeof PlatformAuditPage>;

@@ -1,6 +1,7 @@
 import { fromNodeHeaders } from 'better-auth/node';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Auth } from './auth.factory.js';
+import type { SsoRuntime } from './sso/sso-runtime.js';
 
 function requestBody(request: FastifyRequest): string | undefined {
   if (request.body === undefined || request.body === null) return undefined;
@@ -12,19 +13,34 @@ function requestBody(request: FastifyRequest): string | undefined {
   return JSON.stringify(request.body);
 }
 
+/**
+ * The only SSO endpoints in use: starting a sign-in and the provider's callback. Every other path
+ * of the SSO plugin (provider registration, SAML) is closed; tenants manage SSO in Hamnivo.
+ */
+function ssoPathAllowed(pathname: string): boolean {
+  if (!pathname.startsWith('/api/auth/sso/')) return true;
+  return /^\/api\/auth\/sso\/callback\/[A-Za-z0-9_]+$/.test(pathname);
+}
+
 /** Mounts Better Auth's fetch handler at /api/auth/* on the Fastify instance. */
-export function registerAuthRoutes(fastify: FastifyInstance, auth: Auth): void {
+export function registerAuthRoutes(fastify: FastifyInstance, auth: Auth, sso: SsoRuntime): void {
   fastify.route({
     method: ['GET', 'POST'],
     url: '/api/auth/*',
     async handler(request, reply) {
       const url = new URL(request.url, auth.options.baseURL as string);
-      const response = await auth.handler(
-        new Request(url, {
-          method: request.method,
-          headers: fromNodeHeaders(request.headers),
-          body: request.method === 'GET' ? undefined : requestBody(request),
-        }),
+      if (!ssoPathAllowed(url.pathname)) {
+        return reply.status(404).send({ code: 'NOT_FOUND', message: 'Not found' });
+      }
+      const body = request.method === 'GET' ? undefined : requestBody(request);
+      const response = await sso.run(url.pathname, body, () =>
+        auth.handler(
+          new Request(url, {
+            method: request.method,
+            headers: fromNodeHeaders(request.headers),
+            body,
+          }),
+        ),
       );
       reply.status(response.status);
       for (const [key, value] of response.headers) {

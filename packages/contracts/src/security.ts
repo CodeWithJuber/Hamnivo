@@ -37,6 +37,7 @@ export const SsoDomain = z
     createdAt: Timestamp,
   })
   .meta({ id: 'SsoDomain' });
+export type SsoDomain = z.infer<typeof SsoDomain>;
 
 export const AddSsoDomainRequest = z.object({ domain: Domain }).meta({ id: 'AddSsoDomainRequest' });
 
@@ -75,10 +76,12 @@ export const SsoConnection = z
     updatedAt: Timestamp,
   })
   .meta({ id: 'SsoConnection' });
+export type SsoConnection = z.infer<typeof SsoConnection>;
 
 export const SsoSettings = z
   .object({ domains: z.array(SsoDomain), connections: z.array(SsoConnection) })
   .meta({ id: 'SsoSettings' });
+export type SsoSettings = z.infer<typeof SsoSettings>;
 
 export const CreateSsoConnectionRequest = z
   .object({
@@ -142,6 +145,7 @@ export const SupportGrant = z
     endedAt: Timestamp.nullable(),
   })
   .meta({ id: 'SupportGrant' });
+export type SupportGrant = z.infer<typeof SupportGrant>;
 
 export const ApproveSupportRequest = z
   .object({
@@ -169,6 +173,7 @@ export const IncidentNotice = z
     startedAt: Timestamp,
   })
   .meta({ id: 'IncidentNotice' });
+export type IncidentNotice = z.infer<typeof IncidentNotice>;
 
 /** Banners for the Studio shell: active support access and platform incidents (A17, A18). */
 export const WorkspaceNotices = z
@@ -185,3 +190,4 @@ export const WorkspaceNotices = z
     incidents: z.array(IncidentNotice),
   })
   .meta({ id: 'WorkspaceNotices' });
+export type WorkspaceNotices = z.infer<typeof WorkspaceNotices>;

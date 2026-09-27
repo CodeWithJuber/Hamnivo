@@ -2,7 +2,7 @@ import { type Db, resolveStaffMemberships, schema, withTenant } from '@hamnivo/d
 import { type Grant, rolePatterns, type Scope, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
 import { fromNodeHeaders } from 'better-auth/node';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import { APP_DB, AUTH } from '../tokens.js';
 import type { Auth, AuthSession } from './auth.factory.js';
@@ -33,32 +33,49 @@ export class PrincipalService {
     const membership = memberships.find((m) => m.tenantId === tenantId);
     if (membership?.tenantStatus !== 'active') return null;
 
-    const rows = await withTenant(this.db, { tenantId, actorId: membership.staffMemberId }, (tx) =>
-      tx
-        .select({
-          id: schema.grants.id,
-          scopeType: schema.grants.scopeType,
-          scopeId: schema.grants.scopeId,
-          expiresAt: schema.grants.expiresAt,
-          revokedAt: schema.grants.revokedAt,
-          permissions: schema.roleDefinitions.permissions,
-          roleKey: schema.roleDefinitions.key,
-          isPreset: schema.roleDefinitions.isPreset,
-        })
-        .from(schema.grants)
-        .innerJoin(
-          schema.roleDefinitions,
-          and(
-            eq(schema.roleDefinitions.tenantId, schema.grants.tenantId),
-            eq(schema.roleDefinitions.id, schema.grants.roleId),
-          ),
-        )
-        .where(
-          and(
-            eq(schema.grants.staffMemberId, membership.staffMemberId),
-            isNull(schema.grants.revokedAt),
-          ),
-        ),
+    const rows = await withTenant(
+      this.db,
+      { tenantId, actorId: membership.staffMemberId },
+      async (tx) => {
+        // "Last active" for the member list, written at most every five minutes.
+        await tx
+          .update(schema.staffMembers)
+          .set({ lastActiveAt: sql`now()` })
+          .where(
+            and(
+              eq(schema.staffMembers.id, membership.staffMemberId),
+              or(
+                isNull(schema.staffMembers.lastActiveAt),
+                lt(schema.staffMembers.lastActiveAt, sql`now() - interval '5 minutes'`),
+              ),
+            ),
+          );
+        return tx
+          .select({
+            id: schema.grants.id,
+            scopeType: schema.grants.scopeType,
+            scopeId: schema.grants.scopeId,
+            expiresAt: schema.grants.expiresAt,
+            revokedAt: schema.grants.revokedAt,
+            permissions: schema.roleDefinitions.permissions,
+            roleKey: schema.roleDefinitions.key,
+            isPreset: schema.roleDefinitions.isPreset,
+          })
+          .from(schema.grants)
+          .innerJoin(
+            schema.roleDefinitions,
+            and(
+              eq(schema.roleDefinitions.tenantId, schema.grants.tenantId),
+              eq(schema.roleDefinitions.id, schema.grants.roleId),
+            ),
+          )
+          .where(
+            and(
+              eq(schema.grants.staffMemberId, membership.staffMemberId),
+              isNull(schema.grants.revokedAt),
+            ),
+          );
+      },
     );
     const grants: Grant[] = rows.map((row) => ({
       id: row.id,
