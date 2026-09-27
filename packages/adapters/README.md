@@ -232,6 +232,25 @@ Noul answers carry only a probability. The adapter drops any confidence the wire
 network. No live Jev call has been made. Account access, quotas, data handling and regional latency
 still need checking before production use.
 
+## Cache stores
+
+`@hamnivo/adapters/cache` keeps cache entries behind one interface (K12). Policy lives in
+`@hamnivo/domain` (`cacheKey`, `cacheEligibility`): a store only keeps opaque strings until they
+expire and never decides what may be cached.
+
+| Export | What it does |
+|---|---|
+| `createValkeyCacheStore({ commands, prefix })` | Valkey through `GET`, `SET … PX [NX]` and `DEL`. Every key starts with `prefix`, so deployments and test runs never meet. The gateway adapts its ioredis connection to `ValkeyCommands`; this package has no client dependency. |
+| `createMemoryCacheStore({ maxEntries, clock })` | In-process store with expiry and a size bound, for tests and development. |
+| `failOpen(store, { timeoutMs, onFailure })` | Every operation gets a deadline. Failures and timeouts read as misses (`get` → null, `setIfAbsent` → false, `delete` → 0), so a cache outage never blocks a reply or a human message (K08). `onFailure` gets the operation and kind, never keys or values. |
+| `createSingleflight()` | Concurrent work for one key in one process runs once; the others share its result or error. |
+| `coalesce({ store, lockKey, waitMs, read, compute })` | Across processes: the lock holder computes, others poll for its result for at most `waitMs`, then compute themselves. |
+
+`test/cache/store.test.ts` runs the same contract over the memory store and the Valkey store (on
+a fake with Valkey's `PX`, `NX` and `DEL` semantics), and checks prefix isolation, fail-open
+timeouts and errors, singleflight and bounded coalescing. The gateway's integration tests run the
+Valkey store against a real Valkey.
+
 ## Commerce
 
 `@hamnivo/adapters/commerce` is the payment-provider port (`CommerceProvider` in `port.ts`) with two

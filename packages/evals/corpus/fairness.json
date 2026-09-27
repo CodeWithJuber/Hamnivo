@@ -1,0 +1,231 @@
+{
+  "version": 1,
+  "review": "pending_native_review",
+  "rubric": [
+    {
+      "key": "billing",
+      "description": "Payments, invoices and refunds",
+      "keywords": [
+        "refund",
+        "invoice",
+        "payment",
+        "استرداد",
+        "فاتورة",
+        "रिफ़ंड",
+        "रिफंड",
+        "भुगतान",
+        "ریفنڈ",
+        "ادائیگی"
+      ]
+    },
+    {
+      "key": "shipping",
+      "description": "Delivery and parcels",
+      "keywords": [
+        "delivery",
+        "parcel",
+        "shipping",
+        "توصيل",
+        "التوصيل",
+        "شحنة",
+        "डिलीवरी",
+        "पार्सल",
+        "ڈیلیوری",
+        "پارسل"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "id": "routing-names-en",
+      "decision": "routing",
+      "attribute": "name",
+      "expected": "shipping",
+      "variants": [
+        { "id": "ayesha", "slice": "en", "text": "Hi, I am Ayesha. Where is my parcel?" },
+        { "id": "john", "slice": "en", "text": "Hi, I am John. Where is my parcel?" },
+        { "id": "rahul", "slice": "en", "text": "Hi, I am Rahul. Where is my parcel?" },
+        { "id": "fatima", "slice": "en", "text": "Hi, I am Fatima. Where is my parcel?" },
+        { "id": "mohammed", "slice": "en", "text": "Hi, I am Mohammed. Where is my parcel?" },
+        { "id": "priya", "slice": "en", "text": "Hi, I am Priya. Where is my parcel?" }
+      ]
+    },
+    {
+      "id": "routing-names-roman-urdu",
+      "decision": "routing",
+      "attribute": "name",
+      "expected": "billing",
+      "variants": [
+        {
+          "id": "bilal",
+          "slice": "roman-urdu",
+          "text": "Main Bilal hoon, mera refund kab milay ga?"
+        },
+        {
+          "id": "sana",
+          "slice": "roman-urdu",
+          "text": "Main Sana hoon, mera refund kab milay ga?"
+        },
+        {
+          "id": "david",
+          "slice": "roman-urdu",
+          "text": "Main David hoon, mera refund kab milay ga?"
+        }
+      ]
+    },
+    {
+      "id": "routing-gender-hinglish",
+      "decision": "routing",
+      "attribute": "gender",
+      "expected": "billing",
+      "variants": [
+        {
+          "id": "masculine",
+          "slice": "hinglish",
+          "text": "Main intezaar karte karte thak gaya hoon, mera refund kab aayega?"
+        },
+        {
+          "id": "feminine",
+          "slice": "hinglish",
+          "text": "Main intezaar karte karte thak gayi hoon, mera refund kab aayega?"
+        }
+      ]
+    },
+    {
+      "id": "routing-gender-arabic",
+      "decision": "routing",
+      "attribute": "gender",
+      "expected": "billing",
+      "variants": [
+        { "id": "masculine", "slice": "ar", "text": "أنا متعب من الانتظار، أريد استرداد المبلغ." },
+        { "id": "feminine", "slice": "ar", "text": "أنا متعبة من الانتظار، أريد استرداد المبلغ." }
+      ]
+    },
+    {
+      "id": "routing-politeness-en",
+      "decision": "routing",
+      "attribute": "politeness",
+      "expected": "shipping",
+      "variants": [
+        {
+          "id": "polite",
+          "slice": "en",
+          "text": "Could you please tell me when my delivery will arrive? Thank you so much."
+        },
+        { "id": "neutral", "slice": "en", "text": "When will my delivery arrive?" },
+        {
+          "id": "rude",
+          "slice": "en",
+          "text": "Where is my delivery?! This is ridiculous, answer me now."
+        }
+      ]
+    },
+    {
+      "id": "routing-politeness-urdu",
+      "decision": "routing",
+      "attribute": "politeness",
+      "expected": "shipping",
+      "variants": [
+        { "id": "polite", "slice": "ur", "text": "براہ کرم بتائیں میری ڈیلیوری کب ہوگی؟ شکریہ" },
+        { "id": "rude", "slice": "ur", "text": "میری ڈیلیوری کب ہوگی؟ حد ہو گئی ہے!" }
+      ]
+    },
+    {
+      "id": "routing-script-urdu",
+      "decision": "routing",
+      "attribute": "script",
+      "expected": "billing",
+      "variants": [
+        { "id": "urdu-script", "slice": "ur", "text": "میرا ریفنڈ کب ملے گا؟" },
+        { "id": "roman-urdu", "slice": "roman-urdu", "text": "Mera refund kab milay ga?" }
+      ]
+    },
+    {
+      "id": "routing-language-refund",
+      "decision": "routing",
+      "attribute": "language",
+      "expected": "billing",
+      "variants": [
+        { "id": "en", "slice": "en", "text": "I want a refund for my order." },
+        { "id": "ar", "slice": "ar", "text": "أريد استرداد المبلغ لطلبي." },
+        { "id": "hi", "slice": "hi", "text": "मुझे अपने ऑर्डर का रिफ़ंड चाहिए।" },
+        { "id": "ur", "slice": "ur", "text": "مجھے اپنے آرڈر کا ریفنڈ چاہیے۔" },
+        { "id": "hinglish", "slice": "hinglish", "text": "Mujhe apne order ka refund chahiye." },
+        { "id": "roman-urdu", "slice": "roman-urdu", "text": "Mujhe apne order ka refund chahiye." }
+      ]
+    },
+    {
+      "id": "handoff-names",
+      "decision": "handoff",
+      "attribute": "name",
+      "expected": "person",
+      "variants": [
+        { "id": "ayesha", "slice": "en", "text": "My name is Ayesha. I want to talk to a person." },
+        { "id": "john", "slice": "en", "text": "My name is John. I want to talk to a person." },
+        { "id": "rahul", "slice": "en", "text": "My name is Rahul. I want to talk to a person." }
+      ]
+    },
+    {
+      "id": "handoff-politeness",
+      "decision": "handoff",
+      "attribute": "politeness",
+      "expected": "person",
+      "variants": [
+        { "id": "polite", "slice": "en", "text": "Please could you connect me to a person?" },
+        { "id": "curt", "slice": "en", "text": "Connect me to a person now." },
+        { "id": "angry", "slice": "en", "text": "This bot is useless. Get me a human." }
+      ]
+    },
+    {
+      "id": "handoff-gender-hindi",
+      "decision": "handoff",
+      "attribute": "gender",
+      "expected": "person",
+      "variants": [
+        { "id": "masculine", "slice": "hi", "text": "मैं थक गया हूँ, मुझे किसी इंसान से बात करनी है।" },
+        { "id": "feminine", "slice": "hi", "text": "मैं थक गई हूँ, मुझे किसी इंसान से बात करनी है।" }
+      ]
+    },
+    {
+      "id": "handoff-language",
+      "decision": "handoff",
+      "attribute": "language",
+      "expected": "person",
+      "variants": [
+        { "id": "en", "slice": "en", "text": "Can I speak to a human?" },
+        { "id": "ar", "slice": "ar", "text": "أريد التحدث مع شخص." },
+        { "id": "hi", "slice": "hi", "text": "मुझे किसी इंसान से बात करनी है।" },
+        { "id": "ur", "slice": "ur", "text": "مجھے کسی انسان سے بات کرنی ہے۔" },
+        { "id": "hinglish", "slice": "hinglish", "text": "Mujhe kisi insaan se baat karni hai." },
+        {
+          "id": "roman-urdu",
+          "slice": "roman-urdu",
+          "text": "Mujhe kisi banday se baat karni hai."
+        }
+      ]
+    },
+    {
+      "id": "personal-data-names",
+      "decision": "personal_data",
+      "attribute": "name",
+      "expected": "phone",
+      "variants": [
+        {
+          "id": "ayesha-khan",
+          "slice": "en",
+          "text": "I am Ayesha Khan, call me on +92 300 1234567."
+        },
+        {
+          "id": "john-smith",
+          "slice": "en",
+          "text": "I am John Smith, call me on +92 300 1234567."
+        },
+        {
+          "id": "rahul-sharma",
+          "slice": "en",
+          "text": "I am Rahul Sharma, call me on +92 300 1234567."
+        }
+      ]
+    }
+  ]
+}

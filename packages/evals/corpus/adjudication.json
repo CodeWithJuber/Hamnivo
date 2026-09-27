@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "review": "pending_native_review",
+  "locales": {
+    "en": "en",
+    "ar": "ar",
+    "hi": "hi",
+    "ur": "ur",
+    "hinglish": "hi",
+    "roman-urdu": "ur"
+  },
+  "replyLanguages": {
+    "en": "en",
+    "ar": "ar",
+    "hi": "hi",
+    "ur": "ur",
+    "hinglish": "hi-Latn",
+    "roman-urdu": "ur-Latn"
+  },
+  "scenarios": [
+    {
+      "id": "return-window",
+      "domain": "return policy",
+      "evidence": ["Books can be returned within 14 days of delivery."],
+      "facts": ["14"],
+      "offersPerson": false,
+      "reviewNotes": "Says 14 days, counted from delivery. Friendly and short. Does not promise anything else.",
+      "messages": {
+        "en": "How many days do I have to return a book?",
+        "ar": "كم يومًا لدي لإرجاع كتاب؟",
+        "hi": "किताब लौटाने के लिए कितने दिन मिलते हैं?",
+        "ur": "کتاب واپس کرنے کے لیے کتنے دن ملتے ہیں؟",
+        "hinglish": "Book return karne ke liye kitne din milte hain?",
+        "roman-urdu": "Kitaab wapas karne ke liye kitne din miltay hain?"
+      }
+    },
+    {
+      "id": "delivery-time",
+      "domain": "delivery time",
+      "evidence": ["Delivery to Karachi takes 3 to 5 days."],
+      "facts": ["3", "5"],
+      "offersPerson": false,
+      "reviewNotes": "Gives the range 3 to 5 days for Karachi, not a single day or a guarantee.",
+      "messages": {
+        "en": "How long does delivery to Karachi take?",
+        "ar": "كم يستغرق التوصيل إلى كراتشي؟",
+        "hi": "कराची तक डिलीवरी में कितने दिन लगते हैं?",
+        "ur": "کراچی تک ڈیلیوری میں کتنے دن لگتے ہیں؟",
+        "hinglish": "Karachi tak delivery mein kitne din lagte hain?",
+        "roman-urdu": "Karachi tak delivery mein kitne din lagtay hain?"
+      }
+    },
+    {
+      "id": "support-hours",
+      "domain": "opening hours",
+      "evidence": ["Support is open from 9 to 6, Monday to Saturday."],
+      "facts": ["9", "6"],
+      "offersPerson": false,
+      "reviewNotes": "Gives 9 to 6 and Monday to Saturday. Times read naturally in the language.",
+      "messages": {
+        "en": "When is your support open?",
+        "ar": "متى يعمل الدعم لديكم؟",
+        "hi": "आपका सपोर्ट कब खुला रहता है?",
+        "ur": "آپ کی سپورٹ کب کھلی ہوتی ہے؟",
+        "hinglish": "Aapka support kab khula rehta hai?",
+        "roman-urdu": "Aap ki support kab khuli hoti hai?"
+      }
+    },
+    {
+      "id": "refund-time",
+      "domain": "refund time",
+      "evidence": ["Refunds are paid within 10 business days."],
+      "facts": ["10"],
+      "offersPerson": false,
+      "reviewNotes": "Says within 10 business days. Does not say the refund was already sent.",
+      "messages": {
+        "en": "When will I get my refund?",
+        "ar": "متى يصلني المبلغ المسترد؟",
+        "hi": "मुझे रिफ़ंड कब तक मिलेगा?",
+        "ur": "مجھے ریفنڈ کب تک ملے گا؟",
+        "hinglish": "Mujhe refund kab tak milega?",
+        "roman-urdu": "Mujhe refund kab tak milay ga?"
+      }
+    },
+    {
+      "id": "gift-wrap-price",
+      "domain": "catalog price",
+      "evidence": ["Gift wrapping costs 150."],
+      "facts": ["150"],
+      "offersPerson": false,
+      "reviewNotes": "Gives the price 150. Numbers are written the way customers in this language expect.",
+      "messages": {
+        "en": "How much is gift wrapping?",
+        "ar": "كم يكلف تغليف الهدايا؟",
+        "hi": "गिफ़्ट रैपिंग कितने की है?",
+        "ur": "گفٹ ریپنگ کتنے کی ہے؟",
+        "hinglish": "Gift wrapping kitne ki hai?",
+        "roman-urdu": "Gift wrapping kitne ki hai?"
+      }
+    },
+    {
+      "id": "out-of-scope-repair",
+      "domain": "not covered",
+      "evidence": [],
+      "facts": [],
+      "offersPerson": true,
+      "reviewNotes": "Says plainly it does not have this information and offers a person. Does not make up a repair service.",
+      "messages": {
+        "en": "Can you repair my phone?",
+        "ar": "هل يمكنكم إصلاح هاتفي؟",
+        "hi": "क्या आप मेरा फ़ोन ठीक कर सकते हैं?",
+        "ur": "کیا آپ میرا فون ٹھیک کر سکتے ہیں؟",
+        "hinglish": "Kya aap mera phone theek kar sakte ho?",
+        "roman-urdu": "Kya aap mera phone theek kar saktay hain?"
+      }
+    }
+  ]
+}

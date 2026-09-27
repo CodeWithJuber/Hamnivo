@@ -78,6 +78,38 @@ const REPLIES: Record<Script, { greeting: string; body: string }> = {
   },
 };
 
+/** Latin-script Hindustani replies, used when the instructions ask for them. */
+const LATIN_REPLIES: Record<'hi-Latn' | 'ur-Latn', { greeting: string; body: string }> = {
+  'hi-Latn': {
+    greeting: 'Walaikum assalam! ',
+    body: 'Aapke message ke liye dhanyavaad. Main ek AI assistant hoon. Kripya thodi aur jaankari (jaise order number) dijiye, main madad karunga, ya kabhi bhi kisi vyakti se baat karne ke liye kahiye.',
+  },
+  'ur-Latn': {
+    greeting: 'Walaikum assalam! ',
+    body: 'Aap ke paighaam ka shukriya. Main aik AI assistant hoon. Meherbani kar ke mazeed tafseel (jaise order number) batayein, main madad karunga, ya kisi bhi waqt kisi insaan se baat karne ka kahein.',
+  },
+};
+
+/** The reply language the instructions name (`Reply language code: ur-Latn.`), if any. */
+function requestedLanguage(system: string) {
+  const code = system.match(/Reply language code: ([A-Za-z]{2,3}(?:-[A-Za-z]{4})?)\./)?.[1];
+  switch (code) {
+    case 'hi-Latn':
+    case 'ur-Latn':
+      return LATIN_REPLIES[code];
+    case 'ar':
+      return REPLIES.arabic;
+    case 'ur':
+      return REPLIES.urdu;
+    case 'hi':
+      return REPLIES.devanagari;
+    case 'en':
+      return REPLIES.latin;
+    default:
+      return undefined;
+  }
+}
+
 /**
  * Memory extraction (instructions carry MEMORY_EXTRACTION_MARKER): proposes only what the
  * customer stated explicitly, deterministically, as the JSON the extraction job expects.
@@ -97,15 +129,17 @@ function mockMemoryExtraction(text: string): string {
 const FIRST_MEMORY = /^\[M1\] ([^:\n]+): ([^\n]+) \([^()\n]*\)$/m;
 
 /**
- * Default reply: answers in the customer's script, returns a greeting of peace, says plainly that
- * it is an AI and asks for details. It claims no facts it does not have; in English it mentions
- * the first customer memory it was given, citing it as a memory ([M1]).
+ * Default reply: answers in the reply language the instructions name, otherwise in the customer's
+ * script; returns a greeting of peace, says plainly that it is an AI and asks for details. It
+ * claims no facts it does not have; in English it mentions the first customer memory it was
+ * given, citing it as a memory ([M1]).
  */
 export const defaultMockReply: MockReply = ({ system, text }) => {
   if (system.includes(MEMORY_EXTRACTION_MARKER)) return mockMemoryExtraction(text);
-  const script = scriptOf(text);
-  const reply = REPLIES[script];
-  const memory = script === 'latin' ? system.match(FIRST_MEMORY) : null;
+  const requested = requestedLanguage(system);
+  const reply = requested ?? REPLIES[scriptOf(text)];
+  const english = reply === REPLIES.latin;
+  const memory = english ? system.match(FIRST_MEMORY) : null;
   const remembered = memory
     ? ` You told us before that your ${memory[1]?.toLowerCase()} is ${memory[2]} [M1].`
     : '';

@@ -50,6 +50,14 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
   lists active and earlier stops, and lets the AI answer again.
 - **Runs.** A table of outcome, version, model, tokens, time taken and start time, with filters.
   A side sheet shows one run's steps. No message text is shown.
+- **Decision rules** (board 12). Routing mode (shadow by default), the inbox's teams with their
+  topics, languages and translation languages for the brand (adding a team here creates an inbox
+  team in the brand's workspace), the rubric editor (provider and pinned Jev version, time limit, topics with keywords,
+  what Jev may see, a threshold per language), a panel to try a message, recent decisions with
+  human review, and Jev compared with the fixed rules.
+- **Answer caching** (board 25). What is cached per tier and for how long, a question inspector,
+  stored answers by fingerprint and sources, stopping reuse after a correction, and use and health
+  per day, tier and language. Questions and answers are never listed.
 - **Account security.** Turn two-factor authentication on or off, and add passkeys.
 - **Inbox** (boards 07–10). Staff answer customers here instead of in Chatwoot.
   - Queues: mine, waiting for a person, AI answering, my teams and all, with counts. Filters by
@@ -97,7 +105,8 @@ colour alone. Studio works from the keyboard, returns focus after dialogs, and a
 
 ## Languages
 
-English is the source language. Arabic, Hindi and Urdu are complete but await review by native
+`pnpm --filter @hamnivo/console test` checks that every locale has every key, the same
+placeholders and no empty text. English is the source language. Arabic, Hindi and Urdu are complete but await review by native
 speakers; the interface says so in each of them. Arabic and Urdu use right-to-left layout. Pick a
 language in the header, or add `?lang=ar` (or `hi`, `ur`) to a link.
 
@@ -163,6 +172,8 @@ pnpm --filter @hamnivo/console test:e2e
   - a Markdown upload that becomes ready, and a search preview;
   - stopping the AI for a brand, then resuming;
   - runs after a widget conversation, with the run's steps;
+  - a routing rubric edited, published and tried in Arabic, with shadow decisions (`e2e/decisions.spec.ts`);
+  - answer caching turned on, inspected, reused and stopped in Urdu;
   - the inbox (`e2e/inbox.spec.ts`): taking over a customer who asked for a person, replying,
     an internal note the customer never sees, resolving; a colleague's takeover and typing
     arriving live; Arabic; a 390 px phone; keyboard only; an AI suggestion that is not sent;
