@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import type { AgentConfig } from '@hamnivo/contracts';
 import {
   type AuthorityMessage,
-  CUSTOMER_REPLY_RULES,
   type CommunicationStyle,
+  CUSTOMER_REPLY_RULES,
   LANGUAGE_NAMES,
   type ReplyLanguage,
   styleInstructions,
