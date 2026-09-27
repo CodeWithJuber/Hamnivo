@@ -1,0 +1,322 @@
+{
+  "type": "conversation.list",
+  "conversations": [
+    {
+      "type": "conversation",
+      "id": "215468201",
+      "title": "Damaged parcel",
+      "created_at": 1758186842,
+      "updated_at": 1758190442,
+      "waiting_since": null,
+      "snoozed_until": null,
+      "open": false,
+      "state": "closed",
+      "read": true,
+      "priority": "not_priority",
+      "admin_assignee_id": 5017691,
+      "team_assignee_id": null,
+      "tags": {
+        "type": "tag.list",
+        "tags": [
+          {
+            "type": "tag",
+            "id": "7001",
+            "name": "damaged"
+          },
+          {
+            "type": "tag",
+            "id": "7002",
+            "name": "vip"
+          }
+        ]
+      },
+      "conversation_rating": {
+        "rating": 5,
+        "remark": "Great",
+        "created_at": 1758187242
+      },
+      "source": {
+        "type": "conversation",
+        "id": "2203119051",
+        "delivered_as": "customer_initiated",
+        "subject": "",
+        "body": "<p>Hi, my order <b>4821</b> arrived damaged.</p><p>Receipt attached &amp; photos soon.</p>",
+        "author": {
+          "type": "user",
+          "id": "6512f0c4a9e3b10c8d7e4f21",
+          "name": "Sara Nguyen",
+          "email": "sara.nguyen@example.com"
+        },
+        "attachments": [
+          {
+            "type": "upload",
+            "name": "receipt.pdf",
+            "url": "https://downloads.intercomcdn.com/i/o/882211/receipt.pdf?expires=1758190000&signature=abc",
+            "content_type": "application/pdf",
+            "filesize": 20391,
+            "width": null,
+            "height": null
+          }
+        ],
+        "url": "https://www.northline.example/orders",
+        "redacted": false
+      },
+      "contacts": {
+        "type": "contact.list",
+        "contacts": [
+          {
+            "type": "contact",
+            "id": "6512f0c4a9e3b10c8d7e4f21",
+            "external_id": null
+          }
+        ]
+      },
+      "teammates": {
+        "type": "admin.list",
+        "admins": []
+      },
+      "custom_attributes": {
+        "order": "4821",
+        "refund": false,
+        "details": {
+          "nested": true
+        }
+      },
+      "first_contact_reply": null,
+      "sla_applied": null,
+      "statistics": null,
+      "linked_objects": {
+        "type": "list",
+        "data": [],
+        "total_count": 0,
+        "has_more": false
+      },
+      "ai_agent_participated": false,
+      "conversation_parts": {
+        "type": "conversation_part.list",
+        "conversation_parts": [
+          {
+            "type": "conversation_part",
+            "id": "11001",
+            "part_type": "assignment",
+            "body": null,
+            "created_at": 1758186902,
+            "updated_at": 1758186902,
+            "notified_at": 1758186902,
+            "assigned_to": null,
+            "author": {
+              "type": "bot",
+              "id": "6200001",
+              "name": "Fin",
+              "email": ""
+            },
+            "attachments": [],
+            "external_id": null,
+            "redacted": false
+          },
+          {
+            "type": "conversation_part",
+            "id": "11002",
+            "part_type": "note",
+            "body": "<p>Courier confirmed the damage. <a href=\"https://tracking.example/4821\">Tracking</a></p>",
+            "created_at": 1758186962,
+            "updated_at": 1758186962,
+            "notified_at": 1758186962,
+            "assigned_to": null,
+            "author": {
+              "type": "admin",
+              "id": "5017691",
+              "name": "Liam Davies",
+              "email": "liam@northline.example"
+            },
+            "attachments": [],
+            "external_id": null,
+            "redacted": false
+          },
+          {
+            "type": "conversation_part",
+            "id": "11003",
+            "part_type": "comment",
+            "body": "<p>Sorry, Sara! A replacement ships today.</p><ul><li>Order 4821</li><li>Arrives Friday</li></ul>",
+            "created_at": 1758187022,
+            "updated_at": 1758187022,
+            "notified_at": 1758187022,
+            "assigned_to": null,
+            "author": {
+              "type": "admin",
+              "id": "5017691",
+              "name": "Liam Davies",
+              "email": "liam@northline.example"
+            },
+            "attachments": [],
+            "external_id": null,
+            "redacted": false
+          },
+          {
+            "type": "conversation_part",
+            "id": "11004",
+            "part_type": "comment",
+            "body": "<p>Thanks 🙏</p>",
+            "created_at": 1758187082,
+            "updated_at": 1758187082,
+            "notified_at": 1758187082,
+            "assigned_to": null,
+            "author": {
+              "type": "user",
+              "id": "6512f0c4a9e3b10c8d7e4f21",
+              "name": "Sara Nguyen",
+              "email": "sara.nguyen@example.com"
+            },
+            "attachments": [],
+            "external_id": null,
+            "redacted": false
+          },
+          {
+            "type": "conversation_part",
+            "id": "11005",
+            "part_type": "close",
+            "body": null,
+            "created_at": 1758187142,
+            "updated_at": 1758187142,
+            "notified_at": 1758187142,
+            "assigned_to": null,
+            "author": {
+              "type": "admin",
+              "id": "5017691",
+              "name": "Liam Davies",
+              "email": "liam@northline.example"
+            },
+            "attachments": [],
+            "external_id": null,
+            "redacted": false
+          }
+        ],
+        "total_count": 5
+      }
+    },
+    {
+      "type": "conversation",
+      "id": "215468202",
+      "title": null,
+      "created_at": 1758273242,
+      "updated_at": 1758276842,
+      "waiting_since": null,
+      "snoozed_until": null,
+      "open": true,
+      "state": "open",
+      "read": true,
+      "priority": "not_priority",
+      "admin_assignee_id": null,
+      "team_assignee_id": null,
+      "tags": {
+        "type": "tag.list",
+        "tags": []
+      },
+      "conversation_rating": null,
+      "source": {
+        "type": "email",
+        "id": "2203119052",
+        "delivered_as": "customer_initiated",
+        "subject": "Wholesale order",
+        "body": "<p>مرحبًا، أريد طلب 300 قطعة.</p>",
+        "author": {
+          "type": "lead",
+          "id": "6512f0c4a9e3b10c8d7e4f99",
+          "name": "بلال أحمد",
+          "email": "bilal@example.com"
+        },
+        "attachments": [],
+        "url": null,
+        "redacted": false
+      },
+      "contacts": {
+        "type": "contact.list",
+        "contacts": [
+          {
+            "type": "contact",
+            "id": "6512f0c4a9e3b10c8d7e4f99",
+            "external_id": null
+          }
+        ]
+      },
+      "teammates": {
+        "type": "admin.list",
+        "admins": []
+      },
+      "custom_attributes": {},
+      "first_contact_reply": null,
+      "sla_applied": null,
+      "statistics": null,
+      "linked_objects": {
+        "type": "list",
+        "data": [],
+        "total_count": 0,
+        "has_more": false
+      },
+      "ai_agent_participated": false,
+      "conversation_parts": {
+        "type": "conversation_part.list",
+        "conversation_parts": [
+          {
+            "type": "conversation_part",
+            "id": "12498",
+            "part_type": "comment",
+            "body": "<p>نعم، يمكننا ذلك.</p>",
+            "created_at": 1758323242,
+            "updated_at": 1758323242,
+            "notified_at": 1758323242,
+            "assigned_to": null,
+            "author": {
+              "type": "admin",
+              "id": "5017691",
+              "name": "Liam Davies",
+              "email": ""
+            },
+            "attachments": [],
+            "external_id": null,
+            "redacted": false
+          },
+          {
+            "type": "conversation_part",
+            "id": "12499",
+            "part_type": "comment",
+            "body": "",
+            "created_at": 1758323342,
+            "updated_at": 1758323342,
+            "notified_at": 1758323342,
+            "assigned_to": null,
+            "author": {
+              "type": "lead",
+              "id": "6512f0c4a9e3b10c8d7e4f99",
+              "name": "بلال أحمد",
+              "email": ""
+            },
+            "attachments": [],
+            "external_id": null,
+            "redacted": true
+          },
+          {
+            "type": "conversation_part",
+            "id": "12500",
+            "part_type": "comment",
+            "body": "<p>شكرًا</p>",
+            "created_at": 1758323442,
+            "updated_at": 1758323442,
+            "notified_at": 1758323442,
+            "assigned_to": null,
+            "author": {
+              "type": "lead",
+              "id": "6512f0c4a9e3b10c8d7e4f99",
+              "name": "بلال أحمد",
+              "email": ""
+            },
+            "attachments": [],
+            "external_id": null,
+            "redacted": false
+          }
+        ],
+        "total_count": 503
+      }
+    }
+  ]
+}

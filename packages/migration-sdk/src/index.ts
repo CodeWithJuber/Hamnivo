@@ -1,5 +1,8 @@
 export * from './adapters/chatwoot.js';
+export { htmlToText } from './adapters/common.js';
+export * from './adapters/intercom.js';
 export * from './adapters/tawk.js';
+export * from './adapters/zendesk.js';
 export * from './checkpoint.js';
 export * from './fields.js';
 export * from './keys.js';

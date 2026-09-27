@@ -28,6 +28,8 @@ const QUARANTINE = new Set<string>([
   'missing_contact',
   'empty_message',
   'parent_failed',
+  'too_large',
+  'truncated',
 ]);
 
 const asReason = (code: string): Reason =>

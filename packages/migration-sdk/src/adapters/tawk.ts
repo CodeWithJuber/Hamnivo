@@ -9,6 +9,7 @@ import type {
   SourceDescriptor,
 } from '../types.js';
 import { PackageError, utf8 } from '../zip.js';
+import { isClutter, isObject, isoTime, type Json, jsonError, numberOf, text } from './common.js';
 
 /**
  * tawk.to JSON export (M03). The dashboard sends a ZIP with one or more JSON files, each holding a
@@ -75,27 +76,6 @@ export const tawkDescriptor: SourceDescriptor = {
   ],
 };
 
-type Json = Record<string, unknown>;
-const isObject = (value: unknown): value is Json =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-const text = (value: unknown, max = 255): string | undefined =>
-  typeof value === 'string' && value.trim() !== '' ? value.slice(0, max) : undefined;
-const numberOf = (value: unknown): number | undefined =>
-  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-
-function isoTime(value: unknown): string | null {
-  if (typeof value !== 'string' && typeof value !== 'number') return null;
-  const time = new Date(value);
-  return Number.isNaN(time.getTime()) ? null : time.toISOString();
-}
-
-function jsonError(error: unknown): 'truncated_file' | 'invalid_json' {
-  const message = error instanceof Error ? error.message : '';
-  return /end of (json )?(data|input)|unterminated|unexpected end/i.test(message)
-    ? 'truncated_file'
-    : 'invalid_json';
-}
-
 const SENDERS = { v: 'customer', a: 'agent', s: 'system' } as const;
 
 export function parseTawkExport(files: Map<string, Uint8Array>): ParsedSource {
@@ -113,18 +93,19 @@ export function parseTawkExport(files: Map<string, Uint8Array>): ParsedSource {
   const names = [...files.keys()].sort();
   for (const file of names) {
     if (!/\.json$/i.test(file)) {
-      // Operating-system clutter inside archives (for example macOS resource forks).
-      if (!/(^|\/)(__MACOSX\/|\.DS_Store$)/.test(file)) {
+      if (!isClutter(file)) {
         issues.push({ severity: 'warning', code: 'unknown_file', location: file });
       }
       continue;
     }
     jsonFiles += 1;
     let value: unknown;
+    let content: string | undefined;
     try {
-      value = JSON.parse(utf8(files.get(file) as Uint8Array));
+      content = utf8(files.get(file) as Uint8Array);
+      value = JSON.parse(content);
     } catch (error) {
-      const code = error instanceof PackageError ? 'invalid_json' : jsonError(error);
+      const code = error instanceof PackageError ? 'invalid_json' : jsonError(error, content);
       if (code === 'truncated_file') truncated = true;
       issues.push({ severity: 'error', code, location: file });
       continue;

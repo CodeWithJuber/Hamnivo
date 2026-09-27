@@ -17,6 +17,41 @@ export function tawkFiles(): Map<string, Uint8Array> {
   return files;
 }
 
+/**
+ * Zendesk fixtures follow its full JSON export: NDJSON with `{"ticket": {…}}` per line (Support API
+ * ticket and comment fields), the users export, and an error file for tickets over 1 MB (its exact
+ * shape is not documented: a line with the ticket ID and an error). Intercom fixtures are
+ * conversations and contacts as its REST API returns them. People and IDs are made up.
+ */
+export const ZENDESK_DIR = join(import.meta.dirname, 'fixtures', 'zendesk');
+export const INTERCOM_DIR = join(import.meta.dirname, 'fixtures', 'intercom');
+
+/** The files of a fixture folder, optionally without some of them. */
+export function fixtureFiles(dir: string, except: string[] = []): Map<string, Uint8Array> {
+  const files = new Map<string, Uint8Array>();
+  for (const name of readdirSync(dir).sort()) {
+    if (except.some((part) => name.includes(part))) continue;
+    files.set(`export/${name}`, readFileSync(join(dir, name)));
+  }
+  return files;
+}
+
+/**
+ * The Zendesk export as Zendesk names its files: NDJSON with a `.json` extension. (The fixtures are
+ * stored as `.ndjson` so formatters leave them line by line.)
+ */
+export function zendeskFiles(except: string[] = []): Map<string, Uint8Array> {
+  return new Map(
+    [...fixtureFiles(ZENDESK_DIR, except)].map(([name, bytes]) => [
+      name.replace(/\.ndjson$/, '.json'),
+      bytes,
+    ]),
+  );
+}
+
+export const ndjson = (values: unknown[]) =>
+  new TextEncoder().encode(values.map((value) => `${JSON.stringify(value)}\n`).join(''));
+
 export function zip(files: Map<string, Uint8Array>): Uint8Array {
   return zipSync(Object.fromEntries(files));
 }
