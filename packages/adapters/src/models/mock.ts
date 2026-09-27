@@ -93,14 +93,23 @@ function mockMemoryExtraction(text: string): string {
   return JSON.stringify({ memories: mockExtractMemories(input) });
 }
 
+/** The first customer memory in the instructions: "[M1] Label: value (source, date)". */
+const FIRST_MEMORY = /^\[M1\] ([^:\n]+): ([^\n]+) \([^()\n]*\)$/m;
+
 /**
  * Default reply: answers in the customer's script, returns a greeting of peace, says plainly that
- * it is an AI and asks for details. It claims no facts it does not have.
+ * it is an AI and asks for details. It claims no facts it does not have; in English it mentions
+ * the first customer memory it was given, citing it as a memory ([M1]).
  */
 export const defaultMockReply: MockReply = ({ system, text }) => {
   if (system.includes(MEMORY_EXTRACTION_MARKER)) return mockMemoryExtraction(text);
-  const reply = REPLIES[scriptOf(text)];
-  return `${GREETING.test(text) ? reply.greeting : ''}${reply.body}`;
+  const script = scriptOf(text);
+  const reply = REPLIES[script];
+  const memory = script === 'latin' ? system.match(FIRST_MEMORY) : null;
+  const remembered = memory
+    ? ` You told us before that your ${memory[1]?.toLowerCase()} is ${memory[2]} [M1].`
+    : '';
+  return `${GREETING.test(text) ? reply.greeting : ''}${reply.body}${remembered}`;
 };
 
 /**

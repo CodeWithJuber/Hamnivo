@@ -94,4 +94,19 @@ describe('hamnivo-mock', () => {
     ]);
     expect((await extract([{ ref: 'msg_1', text: 'Thanks!' }])).output.memories).toEqual([]);
   });
+
+  it('mentions a customer memory it was given as a memory, with its citation', () => {
+    const system = [
+      'Be kind.',
+      '<customer_memories>',
+      '[M1] Preferred language: Urdu (customer message, 2026-09-20)',
+      '</customer_memories>',
+    ].join('\n');
+    expect(defaultMockReply({ system, text: 'Where is my parcel?', turn: 1 })).toMatch(
+      / You told us before that your preferred language is Urdu \[M1\]\.$/,
+    );
+    expect(
+      defaultMockReply({ system: 'Be kind.', text: 'Where is my parcel?', turn: 1 }),
+    ).not.toContain('[M1]');
+  });
 });
