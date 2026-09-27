@@ -61,6 +61,8 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     agentId: newId(),
     agentVersionId: newId(),
     runId: newId(),
+    memoryId: newId(),
+    memoryDeletionId: newId(),
   };
 
   await withTenant(db, { tenantId, actorId: 'seed' }, async (tx) => {
@@ -404,6 +406,76 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       kind: 'model',
       name: 'generate',
       status: 'ok',
+    });
+    await tx.insert(s.learningConsents).values({
+      tenantId,
+      brandId: ids.brandId,
+      subjectId: ids.principalId,
+      scope: 'personal_memory',
+      state: 'granted',
+      noticeVersion: 'memory-notice/1',
+      actorType: 'customer',
+    });
+    const observedAt = new Date(Date.now() - 3_600_000);
+    await tx.insert(s.memoryRecords).values({
+      id: ids.memoryId,
+      tenantId,
+      workspaceId: ids.workspaceId,
+      brandId: ids.brandId,
+      subjectId: ids.principalId,
+      conversationId: ids.conversationId,
+      scope: 'person',
+      kind: 'preference',
+      key: 'preferred_language',
+      payload: { value: 'Urdu' },
+      contentHash: bytes(),
+      sourceType: 'customer_statement',
+      sourceEventIds: ['msg_seed'],
+      evidenceStatus: 'supported',
+      writtenByType: 'ai',
+      writeReason: 'extracted_from_message',
+      purpose: 'Reply in the language the customer prefers',
+      allowedPurposes: ['ai_replies', 'staff_context'],
+      allowedRoles: ['customer', 'staff', 'ai'],
+      sensitivity: 'normal',
+      retentionClass: 'long',
+      expiresAt: inDays(365),
+      policyVersion: 'memory-write/1',
+      status: 'active',
+      reviewStatus: 'auto',
+      observedAt,
+      validFrom: observedAt,
+    });
+    await tx.insert(s.memoryEmbeddings).values({
+      tenantId,
+      memoryId: ids.memoryId,
+      subjectId: ids.principalId,
+      embedding: Array.from({ length: 768 }, (_, i) => (i === 0 ? 1 : 0)),
+      embeddingModel: 'hamnivo:seed',
+      contentHash: bytes(),
+    });
+    await tx.insert(s.memoryDeletions).values({
+      id: ids.memoryDeletionId,
+      tenantId,
+      brandId: ids.brandId,
+      subjectId: ids.principalId,
+      scope: 'record',
+      reason: 'customer_request',
+      requestedByType: 'customer',
+      recordCount: 1,
+      status: 'completed',
+      steps: { records: 'done', embeddings: 'done', caches: 'done' },
+      completedAt: new Date(),
+    });
+    await tx.insert(s.deletionTombstones).values({
+      tenantId,
+      deletionId: ids.memoryDeletionId,
+      subjectId: ids.principalId,
+      targetType: 'memory_record',
+      targetId: newId(),
+      memoryKey: 'delivery_note',
+      sourceEventIds: ['msg_seed_deleted'],
+      observedAt,
     });
     await appendAudit(tx, {
       actorType: 'system',

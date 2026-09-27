@@ -296,6 +296,38 @@ export async function purgeExpired(db: Db, batch = 5000): Promise<Record<string,
   return Object.fromEntries(rows.map((row) => [row.relation, Number(row.deleted)]));
 }
 
+export interface ExpiredMemorySubject {
+  tenantId: string;
+  subjectId: string;
+  brandId: string;
+}
+
+/** Customers with memory past its retention, across tenants (deleted by the worker per tenant). */
+export async function expiredMemorySubjects(
+  db: Db,
+  limit = 200,
+): Promise<ExpiredMemorySubject[]> {
+  const { rows } = await db.execute<{ tenant_id: string; subject_id: string; brand_id: string }>(
+    sql`select * from app.expired_memory_subjects(${limit}::int)`,
+  );
+  return rows.map((row) => ({
+    tenantId: row.tenant_id,
+    subjectId: row.subject_id,
+    brandId: row.brand_id,
+  }));
+}
+
+/**
+ * Replays memory deletion tombstones: removes any record they cover (and its vectors). Run after a
+ * restore, before serving; the worker also runs it daily. Returns how many records it removed.
+ */
+export async function applyMemoryTombstones(db: Db): Promise<number> {
+  const { rows } = await db.execute<{ removed: string }>(
+    sql`select app.apply_memory_tombstones() as removed`,
+  );
+  return Number(rows[0]?.removed ?? 0);
+}
+
 /** Pre-creates monthly audit partitions; the worker runs this daily. */
 export async function ensureAuditPartitions(db: Db, monthsAhead = 2): Promise<number> {
   const { rows } = await db.execute<{ created: number }>(
