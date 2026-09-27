@@ -287,6 +287,8 @@ function RefundDrawer({
   const requestId = useRef<string | null>(null);
   const dir = directionOf(isLocale(i18n.language) ? i18n.language : 'en');
   const max = BigInt(order.refundable.maxMinor);
+  // Some providers refund only the whole payment (E02): the amount is then fixed.
+  const fullOnly = !order.refundable.partial;
   const policy =
     order.refundable.policy.approval === 'always'
       ? t('commerce.refunds.policyAlways')
@@ -307,7 +309,7 @@ function RefundDrawer({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setFailure(null);
-    let minor: string | null = choice || null;
+    let minor: string | null = fullOnly ? max.toString() : choice || null;
     if (!minor) {
       const parsed = parseAmountInput(amount, currency);
       if (parsed.kind === 'invalid') {
@@ -381,21 +383,30 @@ function RefundDrawer({
           onSubmit={(event) => void submit(event)}
           noValidate
         >
-          <TextField
-            id="refund-amount"
-            label={t('commerce.refunds.amount', { currency })}
-            hint={t('commerce.refunds.amountHint')}
-            error={error}
-            value={amount}
-            inputMode="decimal"
-            dir="ltr"
-            autoComplete="off"
-            onChange={(event) => {
-              setAmount(event.target.value);
-              setChoices([]);
-              setChoice('');
-            }}
-          />
+          {fullOnly ? (
+            <p className="text-sm text-text" data-testid="refund-full-only">
+              {t('commerce.refunds.fullOnly', {
+                amount: formatAmount(order.refundable.maxMinor, currency),
+              })}
+            </p>
+          ) : (
+            <TextField
+              id="refund-amount"
+              label={t('commerce.refunds.amount', { currency })}
+              hint={t('commerce.refunds.amountHint')}
+              error={error}
+              value={amount}
+              inputMode="decimal"
+              dir="ltr"
+              autoComplete="off"
+              onChange={(event) => {
+                setAmount(event.target.value);
+                setChoices([]);
+                setChoice('');
+              }}
+            />
+          )}
+          {fullOnly && error ? <p className="text-sm text-danger">{error}</p> : null}
           {choices.length > 0 ? (
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-sm font-medium text-text">

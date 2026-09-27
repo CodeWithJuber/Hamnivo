@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { createDb } from '@hamnivo/db';
+import { createDb, fromPublicId } from '@hamnivo/db';
 import { type BrowserContext, expect, test } from '@playwright/test';
 import { audit, PASSWORD, SHOP, seedWorkspace, stack, totp, uniqueEmail } from './support';
 
@@ -282,6 +282,51 @@ test('HNV-21-04 HNV-21-05 · a refund waits for a second person, then shows refu
 
   await requesterContext.close();
   await approverContext.close();
+});
+
+test('E02 · a shop that refunds only whole payments is offered the full amount', async ({
+  browser,
+}) => {
+  const { workspace, owner } = await stripeShop('Noor Gifts');
+  const { orderId } = await paidOrder(workspace.brand.widgetId);
+  // As if the provider account could not refund part of a payment (its capability manifest).
+  const db = createDb(stack().databaseUrl, { max: 1 });
+  const connection = await db.$client.connect();
+  try {
+    await connection.query('begin');
+    await connection.query("select set_config('app.tenant_id', $1, true)", [
+      fromPublicId('tenant', owner.tenantId),
+    ]);
+    await connection.query(
+      `update merchant_connections
+          set capabilities = jsonb_set(capabilities, '{refunds,partial}', 'false')
+        where brand_id = $1`,
+      [fromPublicId('brand', workspace.brand.id)],
+    );
+    await connection.query('commit');
+  } finally {
+    connection.release();
+    await db.$client.end();
+  }
+
+  const context = await browser.newContext();
+  await owner.signIn(context);
+  const page = await context.newPage();
+  await page.goto(`/orders/${orderId}`);
+  await page.getByRole('button', { name: 'Request a refund' }).click();
+  const sheet = page.getByTestId('refund-sheet');
+  await expect(sheet.getByTestId('refund-full-only')).toHaveText(
+    'This shop can only refund the full amount: AED 80.00.',
+  );
+  await expect(sheet.getByLabel('Amount in AED')).toHaveCount(0);
+  expect(await audit(page, 'full refund only')).toEqual([]);
+  await sheet.getByLabel('Reason').selectOption('not_delivered');
+  await sheet.getByRole('button', { name: 'Request refund' }).click();
+  await expect(sheet).toBeHidden();
+  const refund = page.locator('[data-refund]').first();
+  await expect(refund.getByTestId('refund-state')).toHaveText('Waiting for approval');
+  await expect(refund).toContainText('80.00');
+  await context.close();
 });
 
 test('HNV-21-02 · a delay is recorded with the shop’s estimate; paid and delayed stay distinct', async ({

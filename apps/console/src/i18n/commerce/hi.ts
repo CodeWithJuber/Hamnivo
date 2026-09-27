@@ -116,6 +116,7 @@ export const commerceHi: CommerceTranslation = {
     policyAlways: 'हर रिफ़ंड के लिए किसी दूसरे व्यक्ति की मंज़ूरी चाहिए।',
     policyThreshold: '{{amount}} से ज़्यादा के रिफ़ंड के लिए किसी दूसरे व्यक्ति की मंज़ूरी चाहिए।',
     amount: '{{currency}} में राशि',
+    fullOnly: 'यह दुकान सिर्फ़ पूरी रकम लौटा सकती है: {{amount}}।',
     amountHint: 'जैसे 35.00',
     ambiguous: 'आपका मतलब कौन-सी राशि है?',
     invalid: {

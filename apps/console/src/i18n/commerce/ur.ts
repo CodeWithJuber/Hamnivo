@@ -119,6 +119,7 @@ export const commerceUr: CommerceTranslation = {
     policyAlways: 'ہر واپسی کے لیے کسی دوسرے فرد کی منظوری درکار ہے۔',
     policyThreshold: '{{amount}} سے زیادہ کی واپسی کے لیے کسی دوسرے فرد کی منظوری درکار ہے۔',
     amount: '{{currency}} میں رقم',
+    fullOnly: 'یہ دکان صرف پوری رقم واپس کر سکتی ہے: {{amount}}۔',
     amountHint: 'مثلاً 35.00',
     ambiguous: 'آپ کی مراد کون سی رقم ہے؟',
     invalid: {

@@ -116,6 +116,7 @@ export const commerceEn = {
     policyAlways: 'Every refund needs approval by a second person.',
     policyThreshold: 'Refunds above {{amount}} need approval by a second person.',
     amount: 'Amount in {{currency}}',
+    fullOnly: 'This shop can only refund the full amount: {{amount}}.',
     amountHint: 'For example 35.00',
     ambiguous: 'Which amount do you mean?',
     invalid: {

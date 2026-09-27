@@ -902,6 +902,88 @@ describe('refunds need approval and a separate approver (C12, C19)', () => {
   });
 });
 
+describe('capability negotiation (E02)', () => {
+  /** Changes the stored capability manifest, as a provider account without a feature would. */
+  async function withCapabilities(change: (caps: Record<string, Record<string, unknown>>) => void) {
+    await withTenant(slice.app, { tenantId }, async (tx) => {
+      const id = fromPublicId('merchant', merchantId);
+      const [row] = await tx
+        .select()
+        .from(schema.merchantConnections)
+        .where(eq(schema.merchantConnections.id, id));
+      const caps = structuredClone(row?.capabilities ?? {}) as Record<
+        string,
+        Record<string, unknown>
+      >;
+      change(caps);
+      await tx
+        .update(schema.merchantConnections)
+        .set({ capabilities: caps })
+        .where(eq(schema.merchantConnections.id, id));
+    });
+  }
+
+  it('refuses a checkout the shop cannot do, before calling it, and keeps the cart', async () => {
+    const { visitor, conversationId } = await newCustomer();
+    const cart = await cartWith(visitor, conversationId, [
+      { productId: 'prod_notebook', quantity: 1 },
+    ]);
+    const sessionsBefore = store.sessions.size;
+    await withCapabilities((caps) => {
+      (caps.checkout as Record<string, unknown>).hosted = false;
+    });
+    try {
+      const refused = await visitor.call('POST', commerce(conversationId, 'cart/quote'), {
+        cartRevision: cart.revision,
+      });
+      expect(refused.status).toBe(422);
+      expect(refused.body).toMatchObject({
+        code: 'CAPABILITY_UNSUPPORTED',
+        detail: 'The shop does not support this in chat. Please contact the team.',
+      });
+      expect(store.sessions.size).toBe(sessionsBefore);
+    } finally {
+      await withCapabilities((caps) => {
+        (caps.checkout as Record<string, unknown>).hosted = true;
+      });
+    }
+    const kept = await visitor.call('GET', commerce(conversationId, 'cart'));
+    expect(kept.body.cart).toMatchObject({ status: 'open', revision: cart.revision });
+    const quote = await quoted(visitor, conversationId, cart.revision);
+    expect(quote.status).toBe('ready');
+  });
+
+  it('offers the full refund when the shop cannot refund part of a payment', async () => {
+    const paid = await paidOrder();
+    const orderId = paid.purchase.order.id as string;
+    await withCapabilities((caps) => {
+      (caps.refunds as Record<string, unknown>).partial = false;
+    });
+    try {
+      const partial = await admin.post(`/v1/admin/commerce/orders/${orderId}/refunds`, {
+        clientRequestId: randomUUID(),
+        amountMinor: '100',
+        reason: 'customer_request',
+      });
+      expect(partial.status).toBe(422);
+      expect(JSON.stringify(partial.body)).toContain('This shop can only refund the full amount.');
+      const detail = await admin.get(`/v1/admin/commerce/orders/${orderId}`);
+      expect(detail.body.refundable.partial).toBe(false);
+      const full = await admin.post(`/v1/admin/commerce/orders/${orderId}/refunds`, {
+        clientRequestId: randomUUID(),
+        amountMinor: detail.body.refundable.maxMinor,
+        reason: 'customer_request',
+      });
+      expect(full.status, JSON.stringify(full.body)).toBe(201);
+      expect(full.body.state).toBe('awaiting_approval');
+    } finally {
+      await withCapabilities((caps) => {
+        (caps.refunds as Record<string, unknown>).partial = true;
+      });
+    }
+  });
+});
+
 describe('order and fulfilment lifecycle (C10, HNV-21-02)', () => {
   it('keeps paid, delayed, shipped and delivered distinct and tells the customer each step', async () => {
     const paid = await paidOrder();

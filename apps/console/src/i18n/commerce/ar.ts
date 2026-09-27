@@ -117,6 +117,7 @@ export const commerceAr: CommerceTranslation = {
     policyAlways: 'كل استرداد يحتاج إلى موافقة شخص ثانٍ.',
     policyThreshold: 'الاسترداد الذي يزيد على {{amount}} يحتاج إلى موافقة شخص ثانٍ.',
     amount: 'المبلغ بعملة {{currency}}',
+    fullOnly: 'يستطيع هذا المتجر رد المبلغ كاملًا فقط: {{amount}}.',
     amountHint: 'مثل 35.00',
     ambiguous: 'أي مبلغ تقصد؟',
     invalid: {
