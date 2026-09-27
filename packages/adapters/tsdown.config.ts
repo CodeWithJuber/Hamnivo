@@ -6,6 +6,8 @@ export default defineConfig({
     'jev/index': 'src/jev/index.ts',
     'commerce/index': 'src/commerce/index.ts',
     'commerce/testing': 'src/commerce/testing.ts',
+    'net/index': 'src/net/index.ts',
+    'billing/index': 'src/billing/index.ts',
   },
   format: 'esm',
   dts: true,
