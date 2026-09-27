@@ -51,6 +51,19 @@ enforce the rest:
   describes;
 - the RLS suite fails when a new table is missing its policy, forced RLS or seed data.
 
+## Decisions, language and cache tables
+
+| File | Tables |
+|---|---|
+| `src/schema/decisions.ts` | `routing_teams` (intents, languages, reviewed translation languages, linked Chatwoot team), `decision_rubrics` (versioned questions and thresholds; published versions are immutable), `decision_tasks` (off, shadow or live per brand), `decision_records` (append-only except applying and reviewing; no delete for the application role), `conversation_routes` |
+| `src/schema/language.ts` | `language_preferences`: interface locale, explicit reply language, last detection, one-time prompt, script, style and time zone per customer principal |
+| `src/schema/cache.ts` | `cache_policies`, `cache_dependency_versions`, `cache_entry_index` (fingerprints and references, never content), `cache_metrics_daily` (counts only) |
+
+Triggers raise `cache_dependency_versions` in the same transaction as the change: a knowledge
+source's status, visibility or review cycle, a document's current version, status, title, URL or
+source, an agent's published version and a brand's name. `test/decisions.int.test.ts` covers the
+rubric and record guards and the triggers, including rollback and tenant isolation.
+
 ## Tests
 
 ```bash

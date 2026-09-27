@@ -170,6 +170,16 @@ describe('two-tenant isolation', () => {
     'knowledge_documents',
     'document_versions',
     'knowledge_chunks',
+    'routing_teams',
+    'decision_rubrics',
+    'decision_tasks',
+    'decision_records',
+    'conversation_routes',
+    'language_preferences',
+    'cache_policies',
+    'cache_dependency_versions',
+    'cache_entry_index',
+    'cache_metrics_daily',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -185,9 +195,10 @@ describe('two-tenant isolation', () => {
       );
     });
 
-    // The audit log is append-only; kill switches are cleared, never deleted.
+    // The audit log is append-only; kill switches are cleared, never deleted; decision records
+    // stay as the decision audit.
     const updatable = table !== 'audit_events';
-    const deletable = updatable && table !== 'kill_switches';
+    const deletable = updatable && table !== 'kill_switches' && table !== 'decision_records';
     if (updatable) {
       // Updates and deletes aimed at tenant B affect nothing.
       await withTenant(h.app, { tenantId: a.tenantId }, async (tx) => {
@@ -280,6 +291,16 @@ describe('two-tenant isolation', () => {
       'knowledge_documents',
       'document_versions',
       'knowledge_chunks',
+      'routing_teams',
+      'decision_rubrics',
+      'decision_tasks',
+      'decision_records',
+      'conversation_routes',
+      'language_preferences',
+      'cache_policies',
+      'cache_dependency_versions',
+      'cache_entry_index',
+      'cache_metrics_daily',
       'audit_heads',
       'audit_events',
     ]);

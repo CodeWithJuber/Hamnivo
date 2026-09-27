@@ -24,6 +24,12 @@ export interface SeededTenant {
   agentId: string;
   /** Version 1, published. Version 2 is a draft. */
   agentVersionId: string;
+  knowledgeSourceId: string;
+  documentId: string;
+  routingTeamId: string;
+  /** Team-routing rubric version 1, published. Version 2 is a draft. */
+  rubricId: string;
+  decisionId: string;
 }
 
 const bytes = (n = 32) => randomBytes(n);
@@ -61,6 +67,9 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     agentId: newId(),
     agentVersionId: newId(),
     runId: newId(),
+    routingTeamId: newId(),
+    rubricId: newId(),
+    decisionId: newId(),
   };
 
   await withTenant(db, { tenantId, actorId: 'seed' }, async (tx) => {
@@ -405,6 +414,118 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       name: 'generate',
       status: 'ok',
     });
+    // Decisions, language and cache.
+    await tx.insert(s.routingTeams).values({
+      id: ids.routingTeamId,
+      tenantId,
+      brandId: ids.brandId,
+      name: 'Billing',
+      intents: ['billing'],
+      languages: ['en', 'ur', 'roman-urdu'],
+      isDefault: true,
+    });
+    const definition = {
+      intents: [{ key: 'billing', description: 'Payments and refunds', keywords: ['refund'] }],
+      inputs: { recentMessages: 2 },
+      thresholds: { en: { intent: 0.7 } },
+    };
+    await tx.insert(s.decisionRubrics).values({
+      id: ids.rubricId,
+      tenantId,
+      brandId: ids.brandId,
+      task: 'team-routing',
+      version: 1,
+      state: 'published',
+      definition,
+      provider: 'jev',
+      modelVersion: 'jev-1.13.0',
+      configHash: bytes(),
+      publishedAt: new Date(),
+    });
+    await tx.insert(s.decisionRubrics).values({
+      tenantId,
+      brandId: ids.brandId,
+      task: 'team-routing',
+      version: 2,
+      definition,
+    });
+    await tx.insert(s.decisionTasks).values({
+      tenantId,
+      brandId: ids.brandId,
+      task: 'team-routing',
+      mode: 'shadow',
+    });
+    await tx.insert(s.decisionRecords).values({
+      id: ids.decisionId,
+      tenantId,
+      brandId: ids.brandId,
+      conversationId: ids.conversationId,
+      task: 'team-routing',
+      trigger: 'new_conversation',
+      triggerRef: `new:${suffix}`,
+      rubricId: ids.rubricId,
+      rubricVersion: 1,
+      mode: 'shadow',
+      provider: 'jev',
+      modelVersion: 'jev-1.13.0',
+      status: 'decided',
+      providerIntent: 'billing',
+      confidence: 0.82,
+      baselineIntent: 'billing',
+      finalIntent: 'billing',
+      finalSource: 'provider',
+      teamId: ids.routingTeamId,
+      teamBasis: 'intent',
+      languageMatch: 'native',
+      language: 'en',
+      latencyMs: 140,
+      offered: ['billing', 'other'],
+    });
+    await tx.insert(s.conversationRoutes).values({
+      tenantId,
+      conversationId: ids.conversationId,
+      brandId: ids.brandId,
+      teamId: ids.routingTeamId,
+      decisionId: ids.decisionId,
+      source: 'provider',
+    });
+    await tx.insert(s.languagePreferences).values({
+      tenantId,
+      principalId: ids.principalId,
+      uiLocale: 'ur',
+      lastLanguage: 'ur-Latn',
+      lastSource: 'detected',
+      lastDetected: ['ur-Latn'],
+    });
+    await tx.insert(s.cachePolicies).values({
+      tenantId,
+      brandId: ids.brandId,
+      tiers: { exact_answer: { enabled: true, ttlSeconds: 3600 } },
+    });
+    await tx.insert(s.cacheDependencyVersions).values({
+      tenantId,
+      dependency: `cache_policy:${ids.brandId}`,
+      version: 1,
+    });
+    await tx.insert(s.cacheEntryIndex).values({
+      tenantId,
+      brandId: ids.brandId,
+      tier: 'exact_answer',
+      fingerprint: randomBytes(32).toString('hex'),
+      dependencies: { [`knowledge:source:${ids.knowledgeSourceId}`]: 1 },
+      language: 'en',
+      audience: 'public',
+      expiresAt: inDays(1),
+    });
+    await tx.insert(s.cacheMetricsDaily).values({
+      tenantId,
+      brandId: ids.brandId,
+      day: new Date().toISOString().slice(0, 10),
+      tier: 'exact_answer',
+      language: 'en',
+      hits: 3,
+      misses: 1,
+    });
     await appendAudit(tx, {
       actorType: 'system',
       actorId: 'seed',
@@ -432,5 +553,10 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     sessionId: ids.sessionId,
     agentId: ids.agentId,
     agentVersionId: ids.agentVersionId,
+    knowledgeSourceId: ids.knowledgeSourceId,
+    documentId: ids.documentId,
+    routingTeamId: ids.routingTeamId,
+    rubricId: ids.rubricId,
+    decisionId: ids.decisionId,
   };
 }
