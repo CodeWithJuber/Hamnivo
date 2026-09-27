@@ -118,4 +118,12 @@ describe('offline extraction (mock model)', () => {
     expect(extract('Where is my parcel?')).toEqual([]);
     expect(extract('Call me tomorrow')).toEqual([]);
   });
+
+  it('never proposes from earlier messages given as context', () => {
+    const proposals = mockExtractMemories({
+      context: [{ ref: 'msg_0', text: 'Email me the invoice', at: '2026-09-27T09:00:00Z' }],
+      messages: [{ ref: 'msg_1', text: 'Please answer in Urdu', at: '2026-09-27T10:00:00Z' }],
+    });
+    expect(proposals.map((p) => [p.key, p.sourceRef])).toEqual([['preferred_language', 'msg_1']]);
+  });
 });

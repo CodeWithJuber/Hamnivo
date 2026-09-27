@@ -30,6 +30,14 @@ import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { KnowledgeController } from './knowledge/knowledge.controller.js';
 import { KnowledgeService } from './knowledge/knowledge.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
+import { AdminMemoryController } from './memory/admin-memory.controller.js';
+import { AdminMemoryService } from './memory/admin-memory.service.js';
+import { MemoryCache } from './memory/cache.js';
+import { CustomerMemoryService } from './memory/customer-memory.service.js';
+import { MemoryDeletionService } from './memory/deletion.service.js';
+import { MemoryFingerprints } from './memory/fingerprints.js';
+import { WidgetMemoryController } from './memory/widget-memory.controller.js';
+import { MemoryWriter } from './memory/writer.service.js';
 import { HealthController } from './platform/health.controller.js';
 import type { Mailer } from './platform/mailer.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
@@ -77,6 +85,8 @@ export class ApiModule {
         KillSwitchesController,
         RunsController,
         KnowledgeController,
+        WidgetMemoryController,
+        AdminMemoryController,
       ],
       providers: [
         {
@@ -112,6 +122,12 @@ export class ApiModule {
         AuthorityContactsService,
         WidgetConversationsService,
         WidgetEventsService,
+        MemoryFingerprints,
+        MemoryCache,
+        MemoryWriter,
+        MemoryDeletionService,
+        CustomerMemoryService,
+        AdminMemoryService,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

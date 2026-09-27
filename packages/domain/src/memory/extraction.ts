@@ -1,10 +1,10 @@
 import type { MemorySlotKey } from './slots.js';
 
 /**
- * The contract between the extraction job and a model. The job sends the customer's recent
- * messages as JSON (`ExtractionInput`) after instructions that start with this marker; the model
- * answers with `{ "memories": ProposedMemoryJson[] }`. The answer is only a proposal: the write
- * policy decides what is stored.
+ * The contract between the extraction job and a model. The job sends the customer's new message,
+ * with a few earlier ones for context, as JSON (`ExtractionInput`) after instructions that start
+ * with this marker; the model answers with `{ "memories": ProposedMemoryJson[] }`. The answer is
+ * only a proposal: the write policy decides what is stored.
  */
 export const MEMORY_EXTRACTION_MARKER = 'hamnivo:memory-extraction:v1';
 
@@ -17,6 +17,9 @@ export interface ExtractionMessage {
 }
 
 export interface ExtractionInput {
+  /** Earlier messages, only to understand the new ones; never cited. */
+  context?: ExtractionMessage[];
+  /** The messages to propose from (each is processed once). */
   messages: ExtractionMessage[];
 }
 

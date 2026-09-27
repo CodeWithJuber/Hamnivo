@@ -173,6 +173,11 @@ export const MEMORY_SLOTS = {
 } as const satisfies Record<string, MemorySlot>;
 
 export type MemorySlotKey = keyof typeof MEMORY_SLOTS;
+
+/** The longest any customer memory is kept, in days. */
+export const MEMORY_MAX_RETENTION_DAYS = Math.max(
+  ...Object.values(MEMORY_SLOTS).map((slot) => slot.retentionDays),
+);
 export const MEMORY_SLOT_KEYS = Object.keys(MEMORY_SLOTS) as MemorySlotKey[];
 
 export function isMemorySlot(key: string): key is MemorySlotKey {

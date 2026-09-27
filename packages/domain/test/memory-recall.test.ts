@@ -164,6 +164,12 @@ describe('deletion tombstones', () => {
   });
 
   it('does not cover evidence observed after the deletion', () => {
-    expect(coveringTombstone({ ...probe, observedAt: now }, [tombstone])).toBeNull();
+    expect(
+      coveringTombstone({ ...probe, sourceRefs: ['msg_2'], observedAt: now }, [tombstone]),
+    ).toBeNull();
+  });
+
+  it('never takes the deleted memory’s own message as evidence again, even with clock skew', () => {
+    expect(coveringTombstone({ ...probe, key: 'x', observedAt: now }, [tombstone])).toBe(tombstone);
   });
 });

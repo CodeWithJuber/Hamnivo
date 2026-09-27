@@ -1,5 +1,7 @@
-import { generateText, streamText } from 'ai';
+import { MEMORY_EXTRACTION_MARKER } from '@hamnivo/domain';
+import { generateText, Output, streamText } from 'ai';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { createMockModel, defaultMockReply } from '../src/models/index.js';
 
 describe('hamnivo-mock', () => {
@@ -47,5 +49,49 @@ describe('hamnivo-mock', () => {
     await expect(
       generateText({ model, prompt: 'x', abortSignal: controller.signal, maxRetries: 0 }),
     ).rejects.toThrow();
+  });
+
+  it('answers memory extraction with explicit statements only, as structured output', async () => {
+    const schema = z.object({
+      memories: z.array(
+        z.object({
+          key: z.string(),
+          value: z.string(),
+          evidence: z.string(),
+          sourceRef: z.string(),
+          confidence: z.enum(['high', 'medium', 'low']),
+          basis: z.enum(['stated', 'inferred']),
+        }),
+      ),
+    });
+    const extract = (messages: Array<{ ref: string; text: string }>) =>
+      generateText({
+        model: createMockModel(),
+        instructions: `${MEMORY_EXTRACTION_MARKER}\nFind what the customer asked to be remembered.`,
+        messages: [
+          {
+            role: 'user',
+            content: JSON.stringify({
+              messages: messages.map((m) => ({ ...m, at: '2026-09-27T10:00:00Z' })),
+            }),
+          },
+        ],
+        output: Output.object({ schema }),
+      });
+    const found = await extract([
+      { ref: 'msg_1', text: 'Where is my parcel?' },
+      { ref: 'msg_2', text: 'Please answer in Urdu from now on.' },
+    ]);
+    expect(found.output.memories).toEqual([
+      {
+        key: 'preferred_language',
+        value: 'Urdu',
+        evidence: 'answer in Urdu',
+        sourceRef: 'msg_2',
+        confidence: 'high',
+        basis: 'stated',
+      },
+    ]);
+    expect((await extract([{ ref: 'msg_1', text: 'Thanks!' }])).output.memories).toEqual([]);
   });
 });

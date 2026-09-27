@@ -84,6 +84,11 @@ export interface ExistingMemory {
   status: MemoryStatus;
   version: number;
   validFrom: Date;
+  /** When its evidence was observed, or when the customer or staff set it. */
+  observedAt?: Date;
+  lastConfirmedAt?: Date | null;
+  /** When it was superseded or marked outdated. */
+  supersededAt?: Date | null;
 }
 
 export interface MemoryWriteInput {
@@ -141,6 +146,7 @@ export const MEMORY_REFUSALS = [
   'low_confidence',
   'evidence_expired',
   'deleted_before',
+  'evidence_superseded',
   'subject_limit',
   'review_pending',
   'target_not_current',
@@ -208,6 +214,8 @@ export interface MemoryWriteDecision {
   relatedId: string | null;
   /** What the content checks found (categories and rules only). */
   findings: TextFinding[];
+  /** When the newest cited evidence was observed (proposals). */
+  evidenceAt: Date | null;
 }
 
 const REFUSAL_TEXT: Record<MemoryRefusal, string> = {
@@ -234,6 +242,8 @@ const REFUSAL_TEXT: Record<MemoryRefusal, string> = {
   low_confidence: 'The proposal was not confident enough.',
   evidence_expired: 'The message is older than this memory may be kept.',
   deleted_before: 'It was deleted before, so it is not remembered again from the same evidence.',
+  evidence_superseded:
+    'It was said before this memory last changed, so it does not change it again.',
   subject_limit: 'This customer already has as many memories as allowed.',
   review_pending: 'A different value for this already waits for review.',
   target_not_current: 'This memory is no longer current.',
@@ -246,6 +256,24 @@ const isSensitive = (category: string): category is SensitiveCategory =>
 
 function describe(findings: readonly TextFinding[]): string {
   return [...new Set(findings.map((f) => CATEGORY_NAMES[f.category]))].join(', ');
+}
+
+/** Conversation authorities keep whole seconds, so times are compared by the second. */
+const second = (date: Date) => Math.floor(date.getTime() / 1000);
+
+/**
+ * The last time anything settled a slot: evidence behind a value, a confirmation, a correction,
+ * or marking a value outdated.
+ */
+function settledAt(existing: readonly ExistingMemory[], key: string): Date | null {
+  let found: Date | null = null;
+  for (const row of existing) {
+    if (row.key !== key) continue;
+    for (const at of [row.observedAt ?? row.validFrom, row.lastConfirmedAt, row.supersededAt]) {
+      if (at && (!found || at.getTime() > found.getTime())) found = at;
+    }
+  }
+  return found;
 }
 
 function newest(sources: readonly EvidenceSource[]): Date | null {
@@ -419,11 +447,12 @@ export function evaluateMemoryWrite(input: MemoryWriteInput): MemoryWriteDecisio
       pass('confidence');
     } else fail('confidence', 'low_confidence');
 
-    const decidedAt = input.consent.decidedAt?.getTime();
+    // Evidence counts as earlier only when it is from an earlier second than the agreement.
+    const decidedAt = input.consent.decidedAt;
     if (
       input.consent.state === 'granted' &&
-      decidedAt !== undefined &&
-      cited.some((s) => s.observedAt.getTime() < decidedAt)
+      decidedAt &&
+      cited.some((s) => second(s.observedAt) < second(decidedAt))
     ) {
       fail('consent', 'evidence_before_consent');
     }
@@ -465,6 +494,7 @@ export function evaluateMemoryWrite(input: MemoryWriteInput): MemoryWriteDecisio
       record,
       relatedId,
       findings,
+      evidenceAt: extractor ? newest(cited) : null,
     };
   };
 
@@ -475,17 +505,25 @@ export function evaluateMemoryWrite(input: MemoryWriteInput): MemoryWriteDecisio
   const pending = input.existing.find((r) => r.status === 'pending' && r.key === slot.key) ?? null;
   switch (input.operation) {
     case 'propose': {
-      if (pending) {
-        if (sameMemoryValue(pending.value, value)) {
-          pass('state');
-          return decide('unchanged', null, pending.id);
-        }
-        fail('state', 'review_pending');
-        return decide('refuse', null, null);
+      if (pending && sameMemoryValue(pending.value, value)) {
+        pass('state');
+        return decide('unchanged', null, pending.id);
       }
       if (active && sameMemoryValue(active.value, value)) {
         pass('state');
         return decide('unchanged', null, active.id);
+      }
+      // Words from before the slot last changed were already weighed (a newer statement, a
+      // correction, a confirmation or marking it outdated came later): they do not reopen it.
+      const settled = settledAt(input.existing, slot.key);
+      const latest = newest(cited);
+      if (settled && latest && second(latest) < second(settled)) {
+        fail('state', 'evidence_superseded');
+        return decide('refuse', null, null);
+      }
+      if (pending) {
+        fail('state', 'review_pending');
+        return decide('refuse', null, null);
       }
       if (active) {
         // New evidence disagrees: nothing is replaced until the customer or staff confirm it.

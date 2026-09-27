@@ -151,6 +151,19 @@ describe('memory write policy: consent', () => {
     expect(decision.explanation).toContain('before agreeing to be remembered');
   });
 
+  it('treats a message from the same second as the agreement as after it', () => {
+    // Conversation authorities keep whole seconds: 10:00:00.900 is stored as 10:00:00.
+    const decision = decide(
+      proposal({
+        consent: { state: 'granted', decidedAt: new Date('2026-09-27T10:00:00.500Z') },
+        sources: [
+          message('Please answer in Urdu', { observedAt: new Date('2026-09-27T10:00:00.000Z') }),
+        ],
+      }),
+    );
+    expect(decision.outcome).toBe('write');
+  });
+
   it('refuses corrections too once memory is off', () => {
     const decision = decide(
       proposal({
@@ -394,8 +407,11 @@ describe('memory write policy: deletions', () => {
   });
 
   it('judges a statement made after the deletion on its own', () => {
-    const decision = decide(proposal({ tombstones: [tombstone({ deletedAt: minutesAgo(10) })] }));
-    expect(decision.outcome).toBe('write');
+    const earlier = tombstone({ deletedAt: minutesAgo(10), sourceRefs: ['msg_0'] });
+    expect(decide(proposal({ tombstones: [earlier] })).outcome).toBe('write');
+    // The deleted memory's own message never counts again, even if the clocks disagree.
+    const skewed = tombstone({ deletedAt: minutesAgo(10) });
+    expect(decide(proposal({ tombstones: [skewed] })).refusals).toEqual(['deleted_before']);
   });
 });
 
@@ -432,6 +448,34 @@ describe('memory write policy: what is already remembered', () => {
       }),
     );
     expect(decision.refusals).toEqual(['review_pending']);
+  });
+
+  it('does not let older words reopen a slot that changed since', () => {
+    // The message is from five minutes ago.
+    const changed = (overrides: Record<string, unknown>) =>
+      decide(proposal({ existing: [{ ...active, value: 'English', ...overrides }] }));
+    // Corrected to English one minute ago (by the customer or staff).
+    expect(changed({ observedAt: minutesAgo(1) }).refusals).toEqual(['evidence_superseded']);
+    // Confirmed one minute ago after a review.
+    expect(
+      changed({ observedAt: minutesAgo(30), lastConfirmedAt: minutesAgo(1) }).refusals,
+    ).toEqual(['evidence_superseded']);
+    // Marked outdated one minute ago: the old words do not bring it back either.
+    const outdated = decide(
+      proposal({
+        existing: [
+          { ...active, status: 'outdated', observedAt: daysAgo(10), supersededAt: minutesAgo(1) },
+        ],
+      }),
+    );
+    expect(outdated.refusals).toEqual(['evidence_superseded']);
+    expect(outdated.explanation).toContain('before this memory last changed');
+    // Words from after the change, or from the same second, are weighed as usual.
+    expect(changed({ observedAt: minutesAgo(10) }).outcome).toBe('review');
+    expect(changed({ observedAt: new Date(minutesAgo(5).getTime() + 400) }).outcome).toBe('review');
+    // Repeating the current value is never refused; it only reconfirms it.
+    const again = decide(proposal({ existing: [{ ...active, observedAt: minutesAgo(1) }] }));
+    expect(again).toMatchObject({ outcome: 'unchanged', evidenceAt: minutesAgo(5) });
   });
 });
 

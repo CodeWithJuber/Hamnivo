@@ -255,3 +255,4 @@ export const MemoryExport = z
     deletions: z.array(MemoryDeletionReceipt),
   })
   .meta({ id: 'MemoryExport' });
+export type MemoryExport = z.infer<typeof MemoryExport>;

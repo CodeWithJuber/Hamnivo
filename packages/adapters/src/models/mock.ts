@@ -6,6 +6,11 @@ import type {
   LanguageModelV4StreamPart,
   LanguageModelV4Usage,
 } from '@ai-sdk/provider';
+import {
+  type ExtractionInput,
+  MEMORY_EXTRACTION_MARKER,
+  mockExtractMemories,
+} from '@hamnivo/domain';
 
 export interface MockTurn {
   /** System instructions, joined. */
@@ -74,10 +79,26 @@ const REPLIES: Record<Script, { greeting: string; body: string }> = {
 };
 
 /**
+ * Memory extraction (instructions carry MEMORY_EXTRACTION_MARKER): proposes only what the
+ * customer stated explicitly, deterministically, as the JSON the extraction job expects.
+ */
+function mockMemoryExtraction(text: string): string {
+  let input: ExtractionInput = { messages: [] };
+  try {
+    const parsed = JSON.parse(text) as Partial<ExtractionInput>;
+    if (Array.isArray(parsed.messages)) input = { messages: parsed.messages };
+  } catch {
+    // Not the extraction input: nothing to propose.
+  }
+  return JSON.stringify({ memories: mockExtractMemories(input) });
+}
+
+/**
  * Default reply: answers in the customer's script, returns a greeting of peace, says plainly that
  * it is an AI and asks for details. It claims no facts it does not have.
  */
-export const defaultMockReply: MockReply = ({ text }) => {
+export const defaultMockReply: MockReply = ({ system, text }) => {
+  if (system.includes(MEMORY_EXTRACTION_MARKER)) return mockMemoryExtraction(text);
   const reply = REPLIES[scriptOf(text)];
   return `${GREETING.test(text) ? reply.greeting : ''}${reply.body}`;
 };
