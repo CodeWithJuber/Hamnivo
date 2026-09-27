@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { adminRoutes, identityRoutes } from './admin-routes.js';
 import { agentRoutes } from './agent-routes.js';
+import { cacheRoutes } from './cache-routes.js';
 import {
   CustomerConversation,
   FeedbackRequest,
@@ -12,8 +13,10 @@ import {
   SendMessageResponse,
   StartConversationRequest,
 } from './conversations.js';
+import { decisionRoutes } from './decision-routes.js';
 import { HamnivoEvent, StreamControl } from './events.js';
 import { knowledgeRoutes } from './knowledge-routes.js';
+import { languageRoutes } from './language-routes.js';
 import { AttachmentPart } from './parts.js';
 import {
   StaffConversation,
@@ -351,4 +354,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...knowledgeRoutes,
   ...integrationRoutes,
   ...conversationRoutes,
+  ...decisionRoutes,
+  ...cacheRoutes,
+  ...languageRoutes,
 };

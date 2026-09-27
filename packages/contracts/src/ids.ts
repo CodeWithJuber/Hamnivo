@@ -51,6 +51,8 @@ export const ID_PREFIX = {
   connection: 'acn',
   modelConnection: 'mcn',
   killSwitch: 'ksw',
+  routingTeam: 'rtm',
+  rubric: 'rbc',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;
