@@ -93,6 +93,13 @@ export const Role = z
     permissions: z.array(z.string()),
     isPreset: z.boolean(),
     version: z.number().int(),
+    /** People holding the role through an active grant. */
+    memberCount: z.number().int().nonnegative(),
+    /**
+     * The caller may edit this role: a custom role whose permissions are all within the caller's
+     * own tenant-wide access (A12). Built-in roles are never editable.
+     */
+    editable: z.boolean(),
   })
   .meta({ id: 'Role' });
 
@@ -142,13 +149,48 @@ export const Member = z
     email: z.email(),
     status: StaffStatus,
     grants: z.array(GrantView),
+    teams: z.array(z.object({ id: typeId('team'), name: z.string() })),
     lastActiveAt: Timestamp.nullable(),
+    /**
+     * The caller may change, suspend or remove this person: their access is within the caller's
+     * own (A02, A03). The server checks again on every change.
+     */
+    manageable: z.boolean(),
   })
   .meta({ id: 'Member' });
 
 export const UpdateMemberRequest = z
   .object({ status: z.enum(['active', 'suspended']), reason: z.string().max(400).optional() })
   .meta({ id: 'UpdateMemberRequest' });
+
+export const RemoveMemberRequest = z
+  .object({ reason: z.string().trim().max(400).optional() })
+  .meta({ id: 'RemoveMemberRequest' });
+
+/** What removing a person affects, shown before it happens (HNV-22-05). */
+export const MemberOffboarding = z
+  .object({
+    member: Member,
+    /** Open conversations the person holds; they wait for them until reassigned. */
+    openConversations: z.object({
+      total: z.number().int().nonnegative(),
+      ids: z.array(typeId('conversation')).max(50),
+    }),
+    /** The caller may reassign them (conversations.bulk). */
+    canReassign: z.boolean(),
+    /** The person cannot be removed while they are the only owner. */
+    lastOwner: z.boolean(),
+  })
+  .meta({ id: 'MemberOffboarding' });
+
+export const ReplaceGrantRequest = z
+  .object({
+    roleId: typeId('role'),
+    scope: GrantScope,
+    expiresAt: Timestamp.nullable().default(null),
+    reason: z.string().trim().max(400).optional(),
+  })
+  .meta({ id: 'ReplaceGrantRequest' });
 
 export const CreateGrantRequest = z
   .object({
@@ -180,8 +222,11 @@ export const Invitation = z
     role: RoleRef,
     scope: GrantScope,
     status: z.enum(['pending', 'accepted', 'revoked']),
+    /** The link stops working at this time; a pending invitation past it is expired. */
     expiresAt: Timestamp,
     createdAt: Timestamp,
+    invitedBy: z.object({ id: typeId('staff'), displayName: z.string() }).nullable(),
+    acceptedAt: Timestamp.nullable(),
   })
   .meta({ id: 'Invitation' });
 
@@ -201,8 +246,57 @@ export const PermissionInfo = z
     scopes: z.array(z.string()),
     stepUp: z.boolean(),
     mfa: z.boolean(),
+    /** The caller holds it across the tenant, so may put it into a role (A12). */
+    grantable: z.boolean(),
   })
   .meta({ id: 'PermissionInfo' });
+
+export const RolePreviewRequest = z
+  .object({
+    /** The role being edited; omit when building a new one. */
+    roleId: typeId('role').optional(),
+    permissions: z.array(PermissionPattern).max(200),
+  })
+  .meta({ id: 'RolePreviewRequest' });
+
+/** What saving a role would change, before it is saved (A12, HNV-22-03, HNV-22-04). */
+export const RolePreview = z
+  .object({
+    added: z.array(z.string()),
+    removed: z.array(z.string()),
+    /** Added permissions that need two-step verification or a fresh sign-in. */
+    addedSensitive: z.array(z.string()),
+    /** Permissions the caller cannot put into a role (outside their tenant-wide access). */
+    outsideReach: z.array(z.string()),
+    /** People holding the role, and what each gains or loses. */
+    impact: z.array(
+      z.object({
+        staffMemberId: typeId('staff'),
+        displayName: z.string(),
+        gains: z.array(z.string()),
+        loses: z.array(z.string()),
+      }),
+    ),
+    /** The role's current version (for VERSION_CONFLICT on save). */
+    version: z.number().int().nullable(),
+  })
+  .meta({ id: 'RolePreview' });
+
+export const AuditFilters = z.object({
+  action: z.string().max(80).optional(),
+  actorType: z
+    .enum(['staff', 'service_account', 'customer', 'ai', 'system', 'platform'])
+    .optional(),
+  actorId: z.string().max(80).optional(),
+  targetType: z.string().max(80).optional(),
+  targetId: z.string().max(120).optional(),
+  from: Timestamp.optional(),
+  to: Timestamp.optional(),
+});
+
+export const AuditExportQuery = AuditFilters.extend({
+  format: z.enum(['csv', 'ndjson']).default('ndjson'),
+}).meta({ id: 'AuditExportQuery' });
 
 export const SecretMetadata = z
   .object({

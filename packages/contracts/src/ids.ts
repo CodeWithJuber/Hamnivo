@@ -55,6 +55,11 @@ export const ID_PREFIX = {
   savedReply: 'srp',
   review: 'rev',
   link: 'lnk',
+  ssoDomain: 'sdom',
+  ssoConnection: 'ssoc',
+  supportGrant: 'sgr',
+  operator: 'opr',
+  incident: 'inc',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

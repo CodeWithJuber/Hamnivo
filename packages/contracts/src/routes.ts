@@ -17,6 +17,8 @@ import { inboxRoutes } from './inbox-routes.js';
 import { knowledgeRoutes } from './knowledge-routes.js';
 import { adminMemoryRoutes, widgetMemoryRoutes } from './memory-routes.js';
 import { AttachmentPart } from './parts.js';
+import { platformRoutes } from './platform-routes.js';
+import { securityRoutes } from './security-routes.js';
 import {
   StaffConversation,
   StaffMessageRequest,
@@ -356,4 +358,6 @@ export const allRoutes: Record<string, RouteDef> = {
   ...integrationRoutes,
   ...conversationRoutes,
   ...inboxRoutes,
+  ...securityRoutes,
+  ...platformRoutes,
 };
