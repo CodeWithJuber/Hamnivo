@@ -1,0 +1,42 @@
+{
+  "401": {
+    "error": {
+      "message": "Invalid API Key",
+      "type": "invalid_request_error",
+      "param": null,
+      "code": "invalid_api_key"
+    }
+  },
+  "429": {
+    "error": {
+      "message": "Rate limit reached for model qwen3:8b. Please try again later.",
+      "type": "rate_limit_error",
+      "param": null,
+      "code": "rate_limit_exceeded"
+    }
+  },
+  "500": {
+    "error": {
+      "message": "model runner has unexpectedly stopped",
+      "type": "api_error",
+      "param": null,
+      "code": null
+    }
+  },
+  "503": {
+    "error": {
+      "message": "server busy, please try again. maximum pending requests exceeded",
+      "type": "api_error",
+      "param": null,
+      "code": null
+    }
+  },
+  "529": {
+    "error": {
+      "message": "upstream overloaded",
+      "type": "api_error",
+      "param": null,
+      "code": null
+    }
+  }
+}

@@ -1,0 +1,12 @@
+data: {"id":"chatcmpl-313","object":"chat.completion.chunk","created":1790467200,"model":"qwen3:8b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"role":"assistant","content":"Order 1042 left"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-313","object":"chat.completion.chunk","created":1790467200,"model":"qwen3:8b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"role":"assistant","content":" our warehouse today."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-313","object":"chat.completion.chunk","created":1790467200,"model":"qwen3:8b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"role":"assistant","content":" It should arrive on Thursday."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-313","object":"chat.completion.chunk","created":1790467200,"model":"qwen3:8b","system_fingerprint":"fp_ollama","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":"stop"}]}
+
+data: {"id":"chatcmpl-313","object":"chat.completion.chunk","created":1790467200,"model":"qwen3:8b","system_fingerprint":"fp_ollama","choices":[],"usage":{"prompt_tokens":51,"completion_tokens":16,"total_tokens":67}}
+
+data: [DONE]
+
