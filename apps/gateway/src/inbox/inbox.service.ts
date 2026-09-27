@@ -301,7 +301,6 @@ export class InboxService {
 
     // Contact attributes come from Chatwoot, read as the staff member; internal keys stay out.
     const attributes: { key: string; value: string }[] = [];
-    let unverifiedEmail: string | null = null;
     if (context.contact?.externalContactId) {
       try {
         const runtime = await this.registry.get(principal.tenantId, control.connectionId);
@@ -311,10 +310,6 @@ export class InboxService {
           { kind: 'staff', userRef: String(userRef) },
         );
         for (const [key, value] of Object.entries(found.attributes)) {
-          if (key === 'hv_unverified_email' && typeof value === 'string') {
-            unverifiedEmail = value.slice(0, 320);
-            continue;
-          }
           if (key.startsWith('hv_') || value === null || value === undefined) continue;
           const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
           attributes.push({ key: key.slice(0, 100), value: text.slice(0, 200) });
@@ -329,8 +324,10 @@ export class InboxService {
       displayName: principalRow?.displayName?.trim() || 'Visitor',
       identity: principalRow ? (verified ? 'verified' : 'anonymous') : 'unknown',
       externalId: verified ? (principalRow?.externalSubject ?? null) : null,
+      // An address the website did not verify is shown as such, never as the customer's.
       email: principalRow?.emailVerifiedAt ? (principalRow.email ?? null) : null,
-      unverifiedEmail,
+      unverifiedEmail:
+        principalRow && !principalRow.emailVerifiedAt ? (principalRow.email ?? null) : null,
       language: principalRow?.locale ?? null,
       brand: brand ? { id: toPublicId('brand', brand.id), name: brand.name } : null,
       customerSince: principalRow?.createdAt.toISOString() ?? null,

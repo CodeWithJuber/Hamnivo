@@ -3,7 +3,7 @@ import type { LanguageModelV4 } from '@ai-sdk/provider';
 import { createMockModel } from '@hamnivo/adapters/models';
 import { fromPublicId, schema, withTenant } from '@hamnivo/db';
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import type { Client } from './harness.js';
 import { audits, authority, customerStarts, join, type Shop } from './inbox-support.js';
 import {
@@ -208,6 +208,7 @@ describe('assignment and ownership (H02, H08)', () => {
 
   it('keeps internal notes out of the customer lane, and shows them to staff as notes', async () => {
     const stream = v2.stream(c2);
+    onTestFinished(() => stream.close());
     await stream.ready;
     const note = await amina.client.post(`/v1/conversations/${c2}/messages`, {
       clientMessageId: randomUUID(),
@@ -229,7 +230,6 @@ describe('assignment and ownership (H02, H08)', () => {
     );
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(JSON.stringify(stream.messages)).not.toContain('courier delayed');
-    stream.close();
     const history = await v2.call('GET', `/v1/widget/conversations/${c2}/messages?limit=50`);
     expect(JSON.stringify(history.body)).not.toContain('courier delayed');
 
@@ -462,6 +462,7 @@ describe('resolve, reopen and snooze (H10)', () => {
   it('changes status as the staff member, tells the customer, and audits every change', async () => {
     expect((await ana.client.post(inbox(c2, '/status'), { status: 'resolved' })).status).toBe(403);
     const stream = v2.stream(c2);
+    onTestFinished(() => stream.close());
     await stream.ready;
     const resolved = await amina.client.post(inbox(c2, '/status'), { status: 'resolved' });
     expect(resolved.status, JSON.stringify(resolved.body)).toBe(200);
@@ -478,7 +479,6 @@ describe('resolve, reopen and snooze (H10)', () => {
       owner: { kind: 'staff', displayName: 'Amina Agent' },
     });
     await stream.until((s) => s.events.some((e) => e.type === 'conversation.reopened'));
-    stream.close();
 
     const past = await amina.client.post(inbox(c2, '/status'), {
       status: 'snoozed',
