@@ -902,6 +902,74 @@ describe('refunds need approval and a separate approver (C12, C19)', () => {
   });
 });
 
+describe('payment challenge resume (C06)', () => {
+  it('resumes the same purchase on the same page after a bank challenge, with one charge', async () => {
+    const { visitor, conversationId } = await newCustomer();
+    const cart = await cartWith(visitor, conversationId, [
+      { productId: 'prod_notebook', quantity: 1 },
+    ]);
+    const quote = await quoted(visitor, conversationId, cart.revision);
+    const approved = await approve(visitor, conversationId, quote);
+    expect(approved.status, JSON.stringify(approved.body)).toBe(200);
+    const purchaseId = approved.body.id as string;
+    const session = await sessionOf(purchaseId);
+    const sessionsBefore = store.countCalls('createCheckout');
+
+    // The bank asks the customer to confirm; they leave the page before doing it.
+    const challenged = store.challenge(session);
+    await deliverAll(challenged);
+    await settle();
+    const waiting = await visitor.call('GET', commerce(conversationId, `purchases/${purchaseId}`));
+    expect(waiting.body).toMatchObject({
+      outcome: 'awaiting_payment',
+      payment: { state: 'requires_action' },
+      checkout: { url: approved.body.checkout.url },
+    });
+    // The same event again changes nothing.
+    await deliverAll(challenged);
+    await settle();
+
+    // Back in the chat, another tap does not start a second purchase or payment page.
+    const again = await approve(visitor, conversationId, quote);
+    expect(again.status).toBe(409);
+    expect(store.countCalls('createCheckout')).toBe(sessionsBefore);
+
+    // They confirm with the bank on the same page, and the purchase completes once.
+    await deliverAll(store.pay(session));
+    await settle();
+    const done = await visitor.call('GET', commerce(conversationId, `purchases/${purchaseId}`));
+    expect(done.body).toMatchObject({ outcome: 'paid', payment: { state: 'captured' } });
+    expect([...store.payments.values()].filter((p) => p.sessionId === session)).toHaveLength(1);
+    const receipts = await withTenant(slice.app, { tenantId }, async (tx) => {
+      const [payment] = await tx
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.purchaseIntentId, fromPublicId('purchase', purchaseId)));
+      const [intent] = await tx
+        .select()
+        .from(schema.purchaseIntents)
+        .where(eq(schema.purchaseIntents.id, fromPublicId('purchase', purchaseId)));
+      return {
+        payment,
+        rows: await tx
+          .select()
+          .from(schema.operationReceipts)
+          .where(eq(schema.operationReceipts.operationId, intent?.checkoutOperationId ?? ''))
+          .orderBy(asc(schema.operationReceipts.createdAt)),
+      };
+    });
+    expect(receipts.payment?.paymentRef).toBe(challenged[0]?.data.object.id);
+    expect(
+      receipts.rows
+        .filter((r) => r.evidence.subject === 'payment')
+        .map((r) => [r.kind, r.outcome, r.evidence.status ?? null]),
+    ).toEqual([
+      ['webhook', 'pending', 'requires_action'],
+      ['webhook', 'succeeded', 'captured'],
+    ]);
+  });
+});
+
 describe('capability negotiation (E02)', () => {
   /** Changes the stored capability manifest, as a provider account without a feature would. */
   async function withCapabilities(change: (caps: Record<string, Record<string, unknown>>) => void) {

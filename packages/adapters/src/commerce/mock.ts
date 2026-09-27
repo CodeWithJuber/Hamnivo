@@ -302,13 +302,38 @@ export class MockCommerceStore {
     if (session.status !== 'open') throw new Error(`Session ${sessionId} is ${session.status}`);
     if (seconds(this.clock()) >= session.expires_at)
       throw new Error(`Session ${sessionId} expired`);
-    const paymentId = this.nextId('pi');
+    // After a bank challenge the same payment continues; otherwise one starts now.
+    const paymentId =
+      typeof session.payment_intent === 'string' ? session.payment_intent : this.nextId('pi');
     session.status = 'complete';
     session.payment_intent = paymentId;
     session.payment_status = options.async ? 'unpaid' : 'paid';
     const events = [this.emit('checkout.session.completed', { ...session })];
     if (!options.async) events.push(this.capture(session, paymentId));
     return events;
+  }
+
+  /**
+   * The customer's bank asks them to confirm the payment (for example 3-D Secure) while the
+   * hosted page is open. Nothing is charged yet and the page stays open, so the same session is
+   * paid afterwards (C06). Returns the events the provider sends.
+   */
+  challenge(sessionId: string): StripeEventLike[] {
+    const session = this.session(sessionId);
+    if (session.status !== 'open') throw new Error(`Session ${sessionId} is ${session.status}`);
+    const paymentId =
+      typeof session.payment_intent === 'string' ? session.payment_intent : this.nextId('pi');
+    session.payment_intent = paymentId;
+    return [
+      this.emit('payment_intent.requires_action', {
+        id: paymentId,
+        object: 'payment_intent',
+        amount: session.amount_total,
+        currency: session.currency,
+        status: 'requires_action',
+        metadata: session.metadata,
+      }),
+    ];
   }
 
   private capture(session: MockSession, paymentId: string): StripeEventLike {

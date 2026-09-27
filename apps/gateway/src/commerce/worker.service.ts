@@ -288,6 +288,17 @@ export class CommerceWorker implements OnApplicationBootstrap, OnApplicationShut
             effects,
           );
         }
+        if (event.type === 'payment.requires_action') {
+          // The bank asks the customer to confirm (C06). The payment page stays open, so the
+          // same purchase resumes there; the payment machine ignores this once it has moved on.
+          return this.purchases.applySignal(
+            tx,
+            rows,
+            { target: 'requires_action', paymentRef: event.paymentRef ?? null },
+            obs,
+            effects,
+          );
+        }
         // A payment event carries no checkout totals: the session is read from the provider.
         if (!['captured', 'failed', 'cancelled'].includes(rows.payment.state)) {
           followUps.push(rows.payment.id);

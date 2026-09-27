@@ -41,6 +41,8 @@ export interface FakeStripe {
   setPrice(productId: string, unitAmount: number): void;
   /** The customer pays on the hosted page; events are delivered to the webhook endpoints. */
   pay(sessionId: string): Promise<Json[]>;
+  /** The customer's bank asks them to confirm the payment; the page stays open (C06). */
+  challenge(sessionId: string): Promise<Json>;
   expire(sessionId: string): Promise<Json>;
   settleRefund(refundId: string, outcome: 'succeeded' | 'failed'): Promise<Json>;
   /** Events created so far (delivered or not). */
@@ -196,10 +198,35 @@ export async function startFakeStripe(
     }
   };
 
+  /** The customer's bank asks them to confirm (3-D Secure); the page stays open to finish. */
+  const challenge = async (sessionId: string): Promise<Json> => {
+    const session = sessions.get(sessionId);
+    if (session?.status !== 'open') throw new Error(`Session ${sessionId} is not open`);
+    const intentId = typeof session.payment_intent === 'string' ? session.payment_intent : id('pi');
+    const intent: Json = {
+      id: intentId,
+      object: 'payment_intent',
+      amount: session.amount_total,
+      amount_received: 0,
+      currency: session.currency,
+      created: now(),
+      livemode: false,
+      metadata: session.metadata,
+      status: 'requires_action',
+      refunded: 0,
+    };
+    paymentIntents.set(intentId, intent);
+    session.payment_intent = intentId;
+    const created = event('payment_intent.requires_action', intent);
+    await deliver([created]);
+    return created;
+  };
+
   const pay = async (sessionId: string): Promise<Json[]> => {
     const session = sessions.get(sessionId);
     if (session?.status !== 'open') throw new Error(`Session ${sessionId} is not open`);
-    const intentId = id('pi');
+    // After a bank challenge the same payment continues; otherwise one starts now.
+    const intentId = typeof session.payment_intent === 'string' ? session.payment_intent : id('pi');
     const intent: Json = {
       id: intentId,
       object: 'payment_intent',
@@ -535,6 +562,10 @@ ${
         send(response, 200, { ok: true });
       } else if (parts[1] === 'sessions' && parts[3] === 'expire') {
         send(response, 200, await expire(parts[2] ?? ''));
+      } else if (parts[1] === 'sessions' && parts[3] === 'challenge') {
+        send(response, 200, await challenge(parts[2] ?? ''));
+      } else if (parts[1] === 'payment-intents' && request.method === 'GET') {
+        send(response, 200, { data: [...paymentIntents.values()] });
       } else if (parts[1] === 'refunds' && parts[3] === 'settle') {
         const outcome = url.searchParams.get('outcome') === 'failed' ? 'failed' : 'succeeded';
         send(response, 200, await settleRefund(parts[2] ?? '', outcome));
@@ -576,6 +607,7 @@ ${
       product.unitAmount = unitAmount;
     },
     pay,
+    challenge,
     expire,
     settleRefund,
     close: () =>

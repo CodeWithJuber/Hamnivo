@@ -184,7 +184,10 @@ function Quote(props: { card: QuoteCard; commerce: Commerce; locale: string }) {
       case 'preparing_checkout':
         return t('shop.preparing');
       case 'awaiting_payment':
-        return t('shop.awaitingPayment');
+        // A bank challenge (C06): the same payment page is opened again to finish.
+        return purchase.payment?.state === 'requires_action'
+          ? t('shop.challenge')
+          : t('shop.awaitingPayment');
       case 'confirming':
         return t('shop.confirming');
       case 'paid':

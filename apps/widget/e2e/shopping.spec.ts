@@ -15,6 +15,7 @@ interface Stack {
   consoleOrigin: string;
   tenantId: string;
   cookie: string;
+  stripeUrl: string;
 }
 
 const stack = (): Stack =>
@@ -173,6 +174,54 @@ test.describe('Shopping in the chat', () => {
     await expect(quote).toContainText('طلبك من Noor Books');
     await expect(quote).toContainText('الإجمالي');
     await audit(page);
+  });
+
+  test('C06 · after a bank challenge the same payment page finishes the order, once', async ({
+    page,
+    context,
+  }) => {
+    const frame = await openWidget(page);
+    await startChat(frame, 'I need pens');
+    await frame.getByRole('button', { name: 'Browse products' }).click();
+    const catalog = frame.locator('[data-card="catalog"]').last();
+    await catalog.getByRole('button', { name: 'Add Black Pen Set to the cart' }).click();
+    await expect(frame.getByTestId('cart-summary')).toContainText('1 item in your cart');
+    await frame.getByRole('button', { name: 'Review order' }).click();
+    const quote = frame.locator('[data-card="quote"]').last();
+    await quote.getByRole('button', { name: 'Approve and continue to payment' }).click();
+    const pay = quote.getByRole('link', { name: 'Pay on the secure page' });
+    await expect(pay).toBeVisible({ timeout: 20_000 });
+    const href = (await pay.getAttribute('href')) ?? '';
+    const sessionId = href.split('/pay/')[1] ?? '';
+
+    // On the payment page the bank asks for a confirmation; the customer comes back to the chat.
+    const challenge = await fetch(`${stack().stripeUrl}/__fake/sessions/${sessionId}/challenge`, {
+      method: 'POST',
+    });
+    const challenged = (await challenge.json()) as {
+      data: { object: { id: string; metadata: { hv_reference: string } } };
+    };
+    await expect(quote.getByTestId('quote-status')).toContainText(
+      'Your bank asked you to confirm this payment. Open the secure page again to finish it.',
+      { timeout: 30_000 },
+    );
+    await expect(pay).toHaveAttribute('href', href);
+    await audit(page);
+
+    // The same page finishes the payment.
+    const [provider] = await Promise.all([context.waitForEvent('page'), pay.click()]);
+    await provider.getByRole('button', { name: /^Pay AED/ }).click();
+    await provider.waitForURL(/checkout-return\.html\?purchase=pur_/);
+    await provider.close();
+    await page.bringToFront();
+    await expect(quote.getByTestId('quote-status')).toContainText('Paid', { timeout: 30_000 });
+    const intents = (await (await fetch(`${stack().stripeUrl}/__fake/payment-intents`)).json()) as {
+      data: { id: string; status: string; metadata: { hv_reference?: string } }[];
+    };
+    const mine = intents.data.filter(
+      (i) => i.metadata.hv_reference === challenged.data.object.metadata.hv_reference,
+    );
+    expect(mine.map((i) => [i.id, i.status])).toEqual([[challenged.data.object.id, 'succeeded']]);
   });
 
   test('the approval button is disabled once the quote expires', async ({ page }) => {

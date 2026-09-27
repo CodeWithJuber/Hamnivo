@@ -39,6 +39,8 @@ const en = {
   approving: 'Approving…',
   preparing: 'Preparing the secure payment page…',
   awaitingPayment: 'Your order is ready to pay.',
+  challenge:
+    'Your bank asked you to confirm this payment. Open the secure page again to finish it.',
   payNow: 'Pay on the secure page',
   payNote: 'It opens in a new tab. Come back here when you are done.',
   orderRef: 'Order {{reference}}',
@@ -126,6 +128,7 @@ const ar: Loose<Copy> & Record<string, unknown> = {
   approving: 'جارٍ تسجيل الموافقة…',
   preparing: 'جارٍ تجهيز صفحة الدفع الآمنة…',
   awaitingPayment: 'طلبك جاهز للدفع.',
+  challenge: 'طلب مصرفك تأكيد هذه الدفعة. افتح الصفحة الآمنة مرة أخرى لإكمالها.',
   payNow: 'ادفع في الصفحة الآمنة',
   payNote: 'تُفتح في علامة تبويب جديدة. عد إلى هنا عند الانتهاء.',
   orderRef: 'الطلب {{reference}}',
@@ -205,6 +208,7 @@ const hi: Loose<Copy> = {
   approving: 'मंज़ूरी दर्ज हो रही है…',
   preparing: 'सुरक्षित भुगतान पेज तैयार हो रहा है…',
   awaitingPayment: 'आपका ऑर्डर भुगतान के लिए तैयार है।',
+  challenge: 'आपके बैंक ने इस भुगतान की पुष्टि करने को कहा है। इसे पूरा करने के लिए सुरक्षित पेज फिर से खोलें।',
   payNow: 'सुरक्षित पेज पर भुगतान करें',
   payNote: 'यह नए टैब में खुलता है। पूरा होने पर यहाँ लौट आएँ।',
   orderRef: 'ऑर्डर {{reference}}',
@@ -286,6 +290,8 @@ const ur: Loose<Copy> = {
   approving: 'منظوری درج ہو رہی ہے…',
   preparing: 'محفوظ ادائیگی کا صفحہ تیار ہو رہا ہے…',
   awaitingPayment: 'آپ کا آرڈر ادائیگی کے لیے تیار ہے۔',
+  challenge:
+    'آپ کے بینک نے اس ادائیگی کی تصدیق کرنے کو کہا ہے۔ اسے مکمل کرنے کے لیے محفوظ صفحہ دوبارہ کھولیں۔',
   payNow: 'محفوظ صفحے پر ادائیگی کریں',
   payNote: 'یہ نئے ٹیب میں کھلتا ہے۔ مکمل ہونے پر یہاں واپس آئیں۔',
   orderRef: 'آرڈر {{reference}}',
