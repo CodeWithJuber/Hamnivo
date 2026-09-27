@@ -177,6 +177,60 @@ websites. A website taken off the list stops working at once:
 
 The audit entry `brand.updated` records the websites added and removed and how many chats ended.
 
+## Commerce (wave Q)
+
+Customers buy in the chat and pay on the provider's hosted page (Stripe Checkout). Chatwoot stays
+the conversation authority; everything about money is a Hamnivo record.
+
+| Area | Where |
+|---|---|
+| Merchant connections: provider, currencies, refund policy, capability manifest (C01, E02) | `src/commerce/merchants.service.ts`, `providers.service.ts` |
+| Catalog, versioned cart, exact quote priced live by the provider (C02, C03) | `src/commerce/carts.service.ts` |
+| Approval bound to the quote hash and cart revision, hosted checkout (C04, C05) | `src/commerce/checkout.service.ts` |
+| Provider answers applied through the state machines: payment, order, cart, quote (C06, C10) | `src/commerce/purchases.service.ts` |
+| Operation ledger and receipts: one business key, one idempotency key (C07) | `src/commerce/ledger.ts`, `packages/db/src/schema/operations.ts` |
+| Webhooks: raw-body signature, account check, stored once, applied by the worker (C08) | `src/commerce/webhooks.*`, `worker.service.ts` |
+| Reconciliation of unknown outcomes and payment checks (C09, R07) | `checkout.service.ts`, `refunds.service.ts`, `worker.service.ts` |
+| Orders, fulfilment, refunds with a second approver, finance exceptions (C10, C12, C19) | `orders.service.ts`, `refunds.service.ts`, `exceptions*.ts` |
+| Cards in the conversation (catalog, quote, receipt, order status) | `cards.ts`, `card-publisher.service.ts` |
+| No payment claim without a receipt (X10) | `claims.ts`, used by `src/runtime/replies.service.ts` |
+
+The rules:
+
+- **Merchant secrets.** A brand's API key and webhook secret are stored only in the secret broker.
+  Responses show them masked; they never reach logs, audit data or the browser. Connecting and
+  rotating keys need `commerce.merchants.manage`, two-step verification and a recent sign-in.
+- **Exact money.** Amounts are integer minor units (`bigint`). A quote is priced by the provider
+  at the time it is made, and the customer approves its canonical hash (RFC 8785, SHA-256). A
+  changed cart, another hash or an expired quote is refused.
+- **Never twice.** Each provider call is an operation with a durable business key
+  (`checkout:{purchase}`, `refund:{refund}`) and one idempotency key, and the exact request is
+  stored. A call whose answer was lost is `unknown` until the provider is asked by its reference.
+  It is sent again under the same key only while the provider still remembers the key (refunds:
+  under 23 hours; checkout: while the page would stay open 31 minutes or more). After that, a
+  finance exception asks a person.
+- **Only the provider says "paid".** Payment, refund and order states move only on a provider
+  answer, webhook or check, and each observation is an append-only receipt. The customer sees
+  "confirming" until then, and the AI may not say "paid" or "refunded" without a receipt.
+- **Takeover.** When a person takes over, a private note lists the payments and refunds still owed
+  an outcome. The worker keeps checking them whoever owns the conversation.
+- **Staff actions** use `@hamnivo/policy` (`commerce.read`, `commerce.carts.manage`,
+  `commerce.orders.manage`, `commerce.refunds.request`, `commerce.refunds.approve`,
+  `commerce.exceptions.resolve`, `commerce.merchants.manage`) and are audited. The person who
+  asked for a refund can never approve it.
+- **No caching.** Every commerce response is sent with `Cache-Control: no-store`.
+
+Settings: `COMMERCE_PROVIDER_TIMEOUT_MS` (default 10000), `COMMERCE_CHECKOUT_MINUTES` (how long
+a payment page stays open, 30 to 1440, default 60), `COMMERCE_ALLOW_MOCK` (in-memory `mock`
+merchants outside development, for demos) and `COMMERCE_STRIPE_API_BASE` (tests only: stripe-mock
+or the fake Stripe server; refused in production).
+
+`test/commerce.int.test.ts` covers the whole flow with the `mock` provider and, at the end, the
+Stripe adapter against the fake Stripe server: quote, approval, payment page, webhook, receipt,
+replays, timeouts before and after the provider acted, a bank challenge, refunds with a second
+approver, finance exceptions, fulfilment, a takeover with a payment in flight and cross-tenant
+denial. Nothing calls the real Stripe API.
+
 ## Security rules enforced here
 
 - **Delegation ceiling (A03).** Grants and invitations may only hand out permissions the grantor
