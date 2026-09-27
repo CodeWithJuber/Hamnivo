@@ -3,6 +3,8 @@ import type { LanguageModel } from 'ai';
 import { JournalService } from './authority/journal.service.js';
 import { OwnershipService } from './authority/ownership.service.js';
 import { InboxProcessor } from './authority/processor.service.js';
+import { PublicationsService } from './authority/publications.service.js';
+import { ReconcilerService } from './authority/reconciler.service.js';
 import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
 import { AuthoritySyncService } from './authority/sync.service.js';
@@ -45,7 +47,8 @@ export interface WorkerOverrides extends PlatformOverrides {
 
 /**
  * Background process: outbox relay (owner sync to Chatwoot, AI replies), the integration-inbox
- * processor for Chatwoot webhooks, and scheduled maintenance.
+ * processor for Chatwoot webhooks, the reconciler that catches what webhooks missed, and
+ * scheduled maintenance.
  */
 @Module({})
 export class WorkerModule {
@@ -60,7 +63,9 @@ export class WorkerModule {
         OwnershipService,
         StaffLinksService,
         AuthoritySyncService,
+        PublicationsService,
         InboxProcessor,
+        ReconcilerService,
         ...(overrides.model ? [{ provide: LANGUAGE_MODEL, useValue: overrides.model }] : []),
         ModelFactory,
         KillSwitchesService,
@@ -84,6 +89,7 @@ export class WorkerModule {
             new Map<string, OutboxHandler>([
               ...defaultOutboxHandlers(),
               ['conversation.owner_changed', (event) => sync.applyOwnerChange(event)],
+              ['conversation.note', (event) => sync.applyNote(event)],
               ['conversation.customer_message', (event) => replies.onCustomerMessage(event)],
               ['knowledge.ingest', (event) => ingestion.onIngest(event)],
             ]),
@@ -91,7 +97,14 @@ export class WorkerModule {
         OutboxRelay,
         MaintenanceService,
       ],
-      exports: [OutboxRelay, MaintenanceService, InboxProcessor, RepliesService, JournalService],
+      exports: [
+        OutboxRelay,
+        MaintenanceService,
+        InboxProcessor,
+        ReconcilerService,
+        RepliesService,
+        JournalService,
+      ],
     };
   }
 }

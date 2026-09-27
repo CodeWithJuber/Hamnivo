@@ -115,6 +115,34 @@ missing kill-switch check and a disabled honesty guard.
 replacement, visibility and freshness rules, Urdu and Hindi search, cited answers and tenant
 isolation. `test/knowledge.test.ts` covers the parsers, the ClamAV client, chunking and citations.
 
+## Reconciler (M10)
+
+Chatwoot does not retry most webhooks, so webhooks only make Hamnivo fast. The worker's
+reconciler makes it complete:
+
+- **What it follows.** Each conversation is followed from its first message. A maintenance job
+  every ten minutes picks up any conversation without a cursor (`app.ensure_reconcile_cursors()`).
+- **Each poll.** It reads the conversation's state and the messages after the last one it saw,
+  then applies them through the same processor as webhooks.
+- **Idempotent.** A message seen by both paths is journaled once. A staff reply acts as a takeover
+  only on its first sighting, so a replay never takes a conversation back from the AI.
+- **Timing.** Polls come 15 s after news, then back off to 1 minute (AI or waiting), 2 minutes
+  (a person), 10 minutes (snoozed) or 1 hour (resolved). A resolved conversation is dropped after
+  a week without activity.
+- **Cross-tenant leasing.** Cursors are leased across tenants by `app.claim_reconcile_cursors()`.
+  Suspended tenants and disabled connections are skipped.
+
+Late publication (R06):
+
+- **Fences.** An AI reply is fenced when it is reserved, by the Chatwoot pre-flight check, and
+  again against Hamnivo's own ownership right before it is posted. That last check catches a
+  takeover that has not reached Chatwoot yet.
+- **Detection.** A reply that still races a takeover while it is being posted stays visible,
+  because nothing is deleted. It is marked `late_publication` and audited
+  (`conversation.late_publication`), and the new owner gets a private note.
+- **Conservative timing.** Chatwoot's timestamps have one-second resolution, so a reply stored
+  within a second before the takeover is also reported.
+
 ## Widget framing
 
 `GET /v1/widget/frame-policy?widgetId=wid_…` names the websites that may frame a brand's widget

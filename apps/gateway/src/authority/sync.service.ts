@@ -8,6 +8,13 @@ import { AuthorityRegistry } from './registry.js';
 import { StaffLinksService } from './staff-links.service.js';
 import { uuidV5 } from './uuid.js';
 
+interface NoteRequested {
+  conversationId: string;
+  /** `hv1:n:…`, so a repeated delivery finds the note instead of posting it twice. */
+  key: string;
+  text: string;
+}
+
 interface OwnerChanged {
   conversationId: string;
   epoch: number;
@@ -31,6 +38,28 @@ export class AuthoritySyncService {
     private readonly registry: AuthorityRegistry,
     private readonly staffLinks: StaffLinksService,
   ) {}
+
+  /** Posts a private note for the people handling a conversation (outbox `conversation.note`). */
+  async applyNote(event: ClaimedOutboxEvent): Promise<void> {
+    const payload = event.payload as NoteRequested;
+    const [control] = await withTenant(this.db, { tenantId: event.tenantId }, (tx) =>
+      tx
+        .select()
+        .from(schema.conversationControls)
+        .where(eq(schema.conversationControls.id, payload.conversationId)),
+    );
+    if (!control) return;
+    const runtime = await this.registry.get(event.tenantId, control.connectionId);
+    const ref = String(control.externalConversationId);
+    if (await runtime.authority.findByKey(ref, payload.key)) return;
+    await runtime.authority.appendMessage({
+      conversationRef: ref,
+      key: payload.key,
+      author: { kind: 'integration' },
+      visibility: 'private',
+      text: payload.text,
+    });
+  }
 
   async applyOwnerChange(event: ClaimedOutboxEvent): Promise<void> {
     const payload = event.payload as OwnerChanged;

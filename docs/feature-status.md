@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 179 · in-progress: 51 · implemented: 2
+**Blueprint features (232):** planned: 178 · in-progress: 52 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -23,7 +23,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | W04 | Clear responder identity | P0 | C | in-progress | `apps/gateway/src/authority/views.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx` — Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested). |
 | W05 | Conversation history | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/useChat.ts` — Customer history from Chatwoot's customer view (private notes and activity excluded) with an older-page cursor, shown when the widget reopens; unread markers pending. |
 | W06 | Delivery states | P0 | C | in-progress | `apps/gateway/src/authority/outbound.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `packages/client/src/outbox.ts`, `packages/client/test/client.test.ts` — Queued, sending, accepted and failed (with retry) states in the widget, backed by the SDK outbox; 'accepted' only after the authority committed. Delivered/read states pending. |
-| W07 | Reconnect and draft preservation | P0 | C | in-progress | `apps/gateway/src/authority/journal.service.ts`, `apps/gateway/src/widget/events.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `packages/client/src/outbox.ts`, `packages/client/src/stream.ts`, `packages/client/test/client.test.ts` — Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. |
+| W07 | Reconnect and draft preservation | P0 | C | in-progress | `apps/gateway/src/authority/journal.service.ts`, `apps/gateway/src/authority/reconciler.service.ts`, `apps/gateway/src/widget/events.service.ts`, `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `packages/client/src/outbox.ts`, `packages/client/src/stream.ts`, `packages/client/test/client.test.ts` — Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. Server side, the worker's reconciler recovers messages and state changes whose Chatwoot webhooks were lost (tested with every webhook dropped). |
 | W08 | Rich content | P0 | C | in-progress | `apps/widget/src/components/Chat.tsx`, `apps/widget/src/markdown.ts` — Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers. Structured cards pending. |
 | W09 | Attachments | P0 | C | planned |  |
 | W10 | Human handoff | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/components/Chat.tsx` — 'Talk to a person' in the widget creates a durable waiting state and a private handoff note for staff, so the customer does not repeat themselves (tested); context summary by AI pending. |
@@ -54,7 +54,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | H05 | Saved replies | P0 | C | planned |  |
 | H06 | Customer context | P0 | C | planned |  |
 | H07 | Search | P0 | C | planned |  |
-| H08 | Ownership and collisions | P0 | C | in-progress | `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/conversations/staff-conversations.service.ts`, `apps/gateway/test/slice.int.test.ts` — Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending. |
+| H08 | Ownership and collisions | P0 | C | in-progress | `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/authority/processor.service.ts`, `apps/gateway/src/conversations/staff-conversations.service.ts`, `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending. |
 | H09 | Drafts and failed sends | P0 | C | planned |  |
 | H10 | Resolve, reopen and snooze | P0 | C | planned |  |
 | H11 | AI copilot | P0 | C | planned |  |
@@ -186,7 +186,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | R03 | History grants | P0 | C | planned |  |
 | R04 | Three conversation lanes | P0 | C | planned |  |
 | R05 | Public response ownership | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/test/slice.int.test.ts` — One public AI speaker per conversation fenced by the ownership epoch; the lease with expiry (columns present) is not used yet. |
-| R06 | Human takeover fencing | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/slice.int.test.ts` — Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, and by a Chatwoot pre-flight owner check (mutation-tested). Undispatched tool actions follow with the tool gateway. |
+| R06 | Human takeover fencing | P0 | C | in-progress | `apps/gateway/src/authority/publications.service.ts`, `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, by a Chatwoot pre-flight owner check and by a re-check of Hamnivo's own fence right before posting (each mutation-tested). A reply that still races a takeover while it is posted is marked late_publication, audited and reported to the new owner in a private note (tested). Undispatched tool actions follow with the tool gateway. |
 | R07 | In-flight action reconciliation | P0 | Q | planned |  |
 | R08 | Bounded parallel specialists | P1 | C | planned |  |
 | R09 | Pause remove replace agents | P0 | C | planned |  |
@@ -262,7 +262,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | X10 | Receipt-based completion | P0 | Q | planned |  |
 | X11 | Privacy-safe trace records | P0 | C | in-progress | `apps/gateway/src/runtime/runs.service.ts`, `apps/gateway/test/agents.int.test.ts` — Run and step records hold versions, counts, hashes and error kinds but no prompt or reply text (tested); staff read them through the API with analytics.read. |
 | X12 | Prompt and memory injection tests | P0 | L | planned |  |
-| X13 | Crash and replay tests | P0 | Q | planned |  |
+| X13 | Crash and replay tests | P0 | Q | in-progress | `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/src/authority/processor.service.ts` — Replaying a whole conversation through the reconciler neither duplicates messages nor repeats a takeover, and repeated webhook deliveries are applied once (tested). Commerce and tool crash cases are pending. |
 | X14 | Policy release controls | P0 | C | planned |  |
 
 ### Language and behavior

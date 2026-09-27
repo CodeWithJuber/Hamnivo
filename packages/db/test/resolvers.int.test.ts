@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   claimIntegrationInbox,
   claimOutbox,
+  claimReconcileCursors,
+  ensureReconcileCursors,
   purgeExpired,
   resolveApiKey,
   resolveAuthorityConnection,
@@ -143,5 +145,30 @@ describe('worker maintenance', () => {
       tx.select().from(schema.conversationJournal),
     );
     expect(remaining.map((r) => r.seq)).toEqual([1]);
+  });
+
+  it('leases due reconciler cursors across tenants and follows conversations without one', async () => {
+    const first = await claimReconcileCursors(h.app, { limit: 10, leaseSeconds: 60 });
+    expect(new Set(first.map((c) => c.tenantId))).toEqual(new Set([a.tenantId, b.tenantId]));
+    expect(first.find((c) => c.tenantId === a.tenantId)).toMatchObject({
+      connectionId: a.connectionId,
+      conversationRef: '11',
+      lastExternalId: null,
+    });
+    expect(await claimReconcileCursors(h.app, { limit: 10, leaseSeconds: 60 })).toEqual([]);
+
+    // Conversations without a cursor are followed from the newest message already journaled.
+    await withTenant(h.app, { tenantId: b.tenantId }, async (tx) => {
+      await tx.delete(schema.reconcileCursors);
+      await tx.update(schema.conversationJournal).set({ authorityId: 41 });
+    });
+    expect(await ensureReconcileCursors(h.app)).toBe(1);
+    const followed = await withTenant(h.app, { tenantId: b.tenantId }, (tx) =>
+      tx.select().from(schema.reconcileCursors),
+    );
+    expect(followed).toEqual([
+      expect.objectContaining({ scope: 'conversation', scopeRef: '11', lastExternalId: 41 }),
+    ]);
+    expect(await ensureReconcileCursors(h.app)).toBe(0);
   });
 });

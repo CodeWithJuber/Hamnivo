@@ -27,6 +27,7 @@ import {
   type OutboundResult,
 } from '../authority/outbound.service.js';
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
+import { RECONCILE_MIN_SECONDS } from '../authority/reconcile-policy.js';
 import { AuthorityRegistry } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage, publicationFacts } from '../authority/views.js';
@@ -165,6 +166,16 @@ export class WidgetConversationsService {
         ownerBotId: aiOwned ? (runtime.primaryBot?.id ?? null) : null,
         authorityStatus: status,
         authorityUpdatedAt: version,
+      });
+      // The reconciler follows the conversation from its first message (webhooks can be lost).
+      await tx.insert(schema.reconcileCursors).values({
+        tenantId: claims.tenantId,
+        connectionId: inbox.connectionId,
+        scope: 'conversation',
+        scopeRef: conversationRef,
+        lastExternalId: 0,
+        intervalSeconds: RECONCILE_MIN_SECONDS,
+        nextPollAt: new Date(this.clock().getTime() + RECONCILE_MIN_SECONDS * 1000),
       });
       if (!aiOwned) return [];
       // Without a published answering agent (or with the AI stopped), people answer from the start.

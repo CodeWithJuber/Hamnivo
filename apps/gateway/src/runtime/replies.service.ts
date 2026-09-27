@@ -17,6 +17,7 @@ import canonicalize from 'canonicalize';
 import { and, eq } from 'drizzle-orm';
 import { type JournalEntry, JournalService } from '../authority/journal.service.js';
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
+import { PublicationsService } from '../authority/publications.service.js';
 import { AuthorityRegistry, type ConnectionRuntime } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage, type PublicationFacts, type SourceRef } from '../authority/views.js';
@@ -125,6 +126,7 @@ export class RepliesService {
     private readonly models: ModelFactory,
     private readonly contacts: AuthorityContactsService,
     private readonly retrieval: RetrievalService,
+    private readonly publications: PublicationsService,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -304,6 +306,25 @@ export class RepliesService {
     if (state.owner.kind !== 'bot' || state.owner.botRef !== String(bot.externalBotId)) {
       await this.abort(tenantId, sourceKey, 'preflight_owner_mismatch', {
         authorityOwner: state.owner,
+      });
+      await this.tx(tenantId, (tx) =>
+        this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry }),
+      );
+      return;
+    }
+    // A takeover committed in Hamnivo reaches Chatwoot through the outbox, so the pre-flight can
+    // still show the bot: check Hamnivo's own fence once more, right before posting.
+    const current = await this.tx(tenantId, (tx) =>
+      tx
+        .select()
+        .from(schema.conversationControls)
+        .where(eq(schema.conversationControls.id, payload.conversationId)),
+    );
+    const latest = current[0];
+    const lateReason = latest ? this.fenced(latest, payload.epoch) : 'not_ai_owned';
+    if (lateReason) {
+      await this.abort(tenantId, sourceKey, lateReason, {
+        currentEpoch: latest?.ownershipEpoch ?? null,
       });
       await this.tx(tenantId, (tx) =>
         this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry }),
@@ -727,16 +748,8 @@ export class RepliesService {
   ): Promise<void> {
     const authorityId = Number(posted.ref);
     const entries: JournalEntry[] = await this.tx(tenantId, async (tx) => {
-      await this.ownership.lock(tx, conversationId);
-      await tx
-        .update(schema.publications)
-        .set({
-          state: 'sent',
-          authorityMessageId: authorityId,
-          sentAt: this.clock(),
-          updatedAt: this.clock(),
-        })
-        .where(eq(schema.publications.sourceKey, sourceKey));
+      const control = await this.ownership.lock(tx, conversationId);
+      await this.publications.confirm(tx, tenantId, control, sourceKey, posted);
       if (await this.journal.hasMessage(tx, conversationId, 'customer', authorityId)) return [];
       return this.journal.append(tx, tenantId, conversationId, [
         {

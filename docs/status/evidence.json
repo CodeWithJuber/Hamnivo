@@ -224,14 +224,16 @@
     "status": "in-progress",
     "evidence": [
       "apps/gateway/src/authority/journal.service.ts",
+      "apps/gateway/src/authority/reconciler.service.ts",
       "apps/gateway/src/widget/events.service.ts",
+      "apps/gateway/test/reconciler.int.test.ts",
       "apps/gateway/test/slice.int.test.ts",
       "apps/widget/e2e/journey.spec.ts",
       "packages/client/src/outbox.ts",
       "packages/client/src/stream.ts",
       "packages/client/test/client.test.ts"
     ],
-    "note": "Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending."
+    "note": "Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. Server side, the worker's reconciler recovers messages and state changes whose Chatwoot webhooks were lost (tested with every webhook dropped)."
   },
   "W12": {
     "status": "in-progress",
@@ -246,7 +248,9 @@
     "status": "in-progress",
     "evidence": [
       "apps/gateway/src/authority/ownership.service.ts",
+      "apps/gateway/src/authority/processor.service.ts",
       "apps/gateway/src/conversations/staff-conversations.service.ts",
+      "apps/gateway/test/reconciler.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
     "note": "Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending."
@@ -263,10 +267,12 @@
   "R06": {
     "status": "in-progress",
     "evidence": [
+      "apps/gateway/src/authority/publications.service.ts",
       "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/reconciler.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
-    "note": "Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, and by a Chatwoot pre-flight owner check (mutation-tested). Undispatched tool actions follow with the tool gateway."
+    "note": "Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, by a Chatwoot pre-flight owner check and by a re-check of Hamnivo's own fence right before posting (each mutation-tested). A reply that still races a takeover while it is posted is marked late_publication, audited and reported to the new owner in a private note (tested). Undispatched tool actions follow with the tool gateway."
   },
   "R12": {
     "status": "in-progress",
@@ -553,5 +559,13 @@
       "docs/self-hosting.md"
     ],
     "note": "hamnivo.sh backup dumps both databases (pg_dump), Chatwoot files, certificates and settings with checksums and keeps the newest N; restore checks the checksums, refuses a backup made with other secrets, replaces data and files, then runs pending migrations. The production smoke test runs a drill (tested: a brand made after the backup is gone and the conversation history is back). Point-in-time recovery, off-site copies and a deletion replay after restore are pending."
+  },
+  "X13": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/test/reconciler.int.test.ts",
+      "apps/gateway/src/authority/processor.service.ts"
+    ],
+    "note": "Replaying a whole conversation through the reconciler neither duplicates messages nor repeats a takeover, and repeated webhook deliveries are applied once (tested). Commerce and tool crash cases are pending."
   }
 }
