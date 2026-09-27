@@ -2387,6 +2387,408 @@
         }
       }
     },
+    "/v1/admin/brands/{brandId}": {
+      "patch": {
+        "operationId": "updateBrand",
+        "summary": "Rename a brand or change the websites allowed to embed its chat (brands.manage)",
+        "tags": [
+          "Administration"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBrandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Brand",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brand"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/business-hours": {
+      "put": {
+        "operationId": "setBusinessHours",
+        "summary": "Set or remove the hours when people answer (widget.configure)",
+        "tags": [
+          "Administration"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetBusinessHoursRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Brand",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brand"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/identity-keys": {
+      "get": {
+        "operationId": "listIdentityKeys",
+        "summary": "Keys that verify the brand’s customer identity assertions (widget.identity_keys)",
+        "tags": [
+          "Administration"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Identity keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/IdentityKey"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createIdentityKey",
+        "summary": "Register a public key, or generate an HS256 secret shown once (widget.identity_keys, two-step verification and a fresh sign-in)",
+        "tags": [
+          "Administration"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdentityKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Key registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedIdentityKey"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/identity-keys/{kid}/retire": {
+      "post": {
+        "operationId": "retireIdentityKey",
+        "summary": "Mark a key as retiring: it still verifies while you switch to a new one",
+        "tags": [
+          "Administration"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "kid",
+            "schema": {
+              "type": "string",
+              "description": "Key id"
+            },
+            "required": true,
+            "description": "Key id"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Key retiring",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityKey"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/identity-keys/{kid}/revoke": {
+      "post": {
+        "operationId": "revokeIdentityKey",
+        "summary": "Revoke a key at once: assertions signed with it are refused from now on",
+        "tags": [
+          "Administration"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "kid",
+            "schema": {
+              "type": "string",
+              "description": "Key id"
+            },
+            "required": true,
+            "description": "Key id"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Key revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityKey"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/authority/connections": {
       "get": {
         "operationId": "listAuthorityConnections",
@@ -5050,6 +5452,277 @@
           "workspaceId",
           "name"
         ]
+      },
+      "UpdateBrandRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "allowedOrigins": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300,
+              "pattern": "^https?:\\/\\/[^/?#\\s]+$"
+            }
+          }
+        }
+      },
+      "SetBusinessHoursRequest": {
+        "type": "object",
+        "properties": {
+          "businessHours": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BusinessHours"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "businessHours"
+        ]
+      },
+      "BusinessHours": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "weekly": {
+            "type": "object",
+            "properties": {
+              "sun": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ]
+                }
+              },
+              "mon": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ]
+                }
+              },
+              "tue": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ]
+                }
+              },
+              "wed": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ]
+                }
+              },
+              "thu": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ]
+                }
+              },
+              "fri": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ]
+                }
+              },
+              "sat": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "sun",
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri",
+              "sat"
+            ]
+          },
+          "closedDates": {
+            "default": [],
+            "maxItems": 366,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        },
+        "required": [
+          "timezone",
+          "weekly"
+        ]
+      },
+      "CreateIdentityKeyRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "alg": {
+                "type": "string",
+                "enum": [
+                  "ES256",
+                  "EdDSA",
+                  "RS256"
+                ]
+              },
+              "publicJwk": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "kid": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,64}$"
+              }
+            },
+            "required": [
+              "alg",
+              "publicJwk"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "alg": {
+                "type": "string",
+                "const": "HS256"
+              },
+              "kid": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,64}$"
+              }
+            },
+            "required": [
+              "alg"
+            ]
+          }
+        ],
+        "type": "object"
       },
       "ConnectChatwootRequest": {
         "type": "object",
@@ -9730,6 +10403,16 @@
               "type": "string"
             }
           },
+          "businessHours": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BusinessHoursOutput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -9750,8 +10433,146 @@
           "name",
           "widgetId",
           "allowedOrigins",
+          "businessHours",
           "status",
           "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "IdentityKey": {
+        "type": "object",
+        "properties": {
+          "kid": {
+            "type": "string"
+          },
+          "alg": {
+            "type": "string",
+            "enum": [
+              "ES256",
+              "EdDSA",
+              "RS256",
+              "HS256"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "retiring",
+              "revoked"
+            ]
+          },
+          "publicJwk": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "retiredAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kid",
+          "alg",
+          "status",
+          "publicJwk",
+          "createdAt",
+          "retiredAt"
+        ],
+        "additionalProperties": false
+      },
+      "CreatedIdentityKey": {
+        "type": "object",
+        "properties": {
+          "kid": {
+            "type": "string"
+          },
+          "alg": {
+            "type": "string",
+            "enum": [
+              "ES256",
+              "EdDSA",
+              "RS256",
+              "HS256"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "retiring",
+              "revoked"
+            ]
+          },
+          "publicJwk": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "retiredAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "secret": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kid",
+          "alg",
+          "status",
+          "publicJwk",
+          "createdAt",
+          "retiredAt"
         ],
         "additionalProperties": false
       },
@@ -11062,6 +11883,201 @@
           }
         ],
         "type": "object"
+      },
+      "BusinessHoursOutput": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "weekly": {
+            "type": "object",
+            "properties": {
+              "sun": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "mon": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "tue": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "wed": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "thu": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "fri": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "sat": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "open": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    },
+                    "close": {
+                      "type": "string",
+                      "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$"
+                    }
+                  },
+                  "required": [
+                    "open",
+                    "close"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "sun",
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri",
+              "sat"
+            ],
+            "additionalProperties": false
+          },
+          "closedDates": {
+            "default": [],
+            "maxItems": 366,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          }
+        },
+        "required": [
+          "timezone",
+          "weekly",
+          "closedDates"
+        ],
+        "additionalProperties": false
       },
       "AgentConfigOutput": {
         "type": "object",

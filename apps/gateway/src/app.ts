@@ -48,7 +48,7 @@ export async function createApiApp(
   const consoleCors = {
     origin: [config.PUBLIC_CONSOLE_ORIGIN],
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['content-type', 'x-hamnivo-tenant', 'idempotency-key', 'x-request-id'],
     exposedHeaders: ['x-request-id', 'idempotent-replayed', 'retry-after'],
   };

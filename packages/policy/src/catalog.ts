@@ -59,6 +59,12 @@ export const PERMISSIONS = {
   'audit.export': { description: 'Export the audit log', scopes: TENANT, stepUp: true },
   'brands.manage': { description: 'Create brands and set allowed websites', scopes: WORKSPACE },
   'widget.configure': { description: 'Configure the chat widget', scopes: BRAND },
+  'widget.identity_keys': {
+    description: 'Register the keys that verify customer identity',
+    scopes: BRAND,
+    stepUp: true,
+    mfa: true,
+  },
   'agents.read': { description: 'View AI agents and their versions', scopes: ALL, reference: true },
   'agents.manage': { description: 'Edit AI agent drafts', scopes: BRAND },
   'agents.publish': { description: 'Publish or roll back AI agents', scopes: BRAND, stepUp: true },

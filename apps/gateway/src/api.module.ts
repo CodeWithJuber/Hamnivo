@@ -5,6 +5,8 @@ import { AdminController } from './admin/admin.controller.js';
 import { AdminService } from './admin/admin.service.js';
 import { BrandsController } from './admin/brands.controller.js';
 import { BrandsService } from './admin/brands.service.js';
+import { IdentityKeysController } from './admin/identity-keys.controller.js';
+import { IdentityKeysService } from './admin/identity-keys.service.js';
 import { AuditController } from './audit/audit.controller.js';
 import { ConnectionsController } from './authority/connections.controller.js';
 import { ConnectionsService } from './authority/connections.service.js';
@@ -65,6 +67,7 @@ export class ApiModule {
         SecretsController,
         AuditController,
         BrandsController,
+        IdentityKeysController,
         ConnectionsController,
         ChatwootIngressController,
         WidgetController,
@@ -87,6 +90,7 @@ export class ApiModule {
         IdempotencyService,
         SecretBroker,
         BrandsService,
+        IdentityKeysService,
         ConnectionsService,
         AuthorityRegistry,
         IngressService,

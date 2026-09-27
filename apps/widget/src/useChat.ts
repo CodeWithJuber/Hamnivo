@@ -18,6 +18,8 @@ export interface ChatState {
   outgoing: readonly OutgoingMessage[];
   connection: Connection;
   error: string | null;
+  /** The server's answer to "talk to a person", such as when people are back (W11). */
+  handoffNotice: string | null;
 }
 
 const byTime = (a: Message, b: Message) =>
@@ -41,6 +43,7 @@ export function useChat(client: HamnivoClient) {
     outgoing: [],
     connection: 'idle',
     error: null,
+    handoffNotice: null,
   });
   const stream = useRef<EventStream | null>(null);
   const outbox = useRef<Outbox | null>(null);
@@ -180,11 +183,12 @@ export function useChat(client: HamnivoClient) {
     const conversation = stream.current ? state.conversation : null;
     const id = conversation?.id ?? (await client.listConversations()).items[0]?.id;
     if (!id) return;
-    await client.requestHandoff(id, crypto.randomUUID());
+    const outcome = await client.requestHandoff(id, crypto.randomUUID());
     setState((s) =>
       s.conversation
         ? {
             ...s,
+            handoffNotice: outcome.message,
             conversation: { ...s.conversation, status: 'waiting_for_person', responder: 'none' },
           }
         : s,

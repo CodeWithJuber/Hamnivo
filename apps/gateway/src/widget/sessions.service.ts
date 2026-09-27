@@ -22,6 +22,7 @@ import type { AppConfig } from '../config.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { widgetConfig } from './copy.js';
+import { LOCAL_ANCESTORS, originAllowed, sessionOrigin } from './origins.js';
 import {
   newRefreshSecret,
   sameHash,
@@ -32,14 +33,6 @@ import {
 import { principalConversations } from './views.js';
 
 const REFRESH_GRACE_MS = 30_000;
-const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-/** CSP form of LOCAL_ORIGIN (CSP host sources cannot name IPv6 addresses). */
-const LOCAL_ANCESTORS = [
-  'http://localhost:*',
-  'https://localhost:*',
-  'http://127.0.0.1:*',
-  'https://127.0.0.1:*',
-];
 
 type SessionRow = typeof schema.widgetSessions.$inferSelect;
 type PrincipalRow = typeof schema.customerPrincipals.$inferSelect;
@@ -61,12 +54,7 @@ export class WidgetSessionsService {
   ) {}
 
   private checkOrigin(allowed: string[], hostOrigin: string | undefined) {
-    if (allowed.length === 0) {
-      // Not configured yet: only local development pages may embed the widget.
-      if (hostOrigin === undefined || LOCAL_ORIGIN.test(hostOrigin)) return;
-    } else if (hostOrigin !== undefined && allowed.includes(new URL(hostOrigin).origin)) {
-      return;
-    }
+    if (originAllowed(allowed, hostOrigin)) return;
     throw new AppError('ORIGIN_NOT_ALLOWED', {
       detail: 'Add this website to the brand’s allowed websites to use the chat here.',
     });
@@ -182,7 +170,7 @@ export class WidgetSessionsService {
         verified: principal.kind === 'verified',
         displayName: principal.displayName,
       },
-      config: widgetConfig(brand as BrandRow),
+      config: widgetConfig(brand as BrandRow, this.clock()),
       conversations: await principalConversations(tx, principal.id),
     };
   }
@@ -228,6 +216,10 @@ export class WidgetSessionsService {
         .from(schema.brands)
         .where(eq(schema.brands.id, session.brandId));
       if (brand?.status !== 'active' || (widgetId && brand.widgetPublicId !== widgetId)) {
+        return { error: true as const };
+      }
+      // A website removed from the brand's list can no longer keep its chats going.
+      if (!originAllowed(brand.allowedOrigins, sessionOrigin(session.hostOrigin))) {
         return { error: true as const };
       }
       const next = newRefreshSecret();

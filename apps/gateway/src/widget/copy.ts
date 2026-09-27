@@ -1,5 +1,6 @@
-import type { WidgetConfig } from '@hamnivo/contracts';
+import type { HandoffResponse, WidgetConfig } from '@hamnivo/contracts';
 import type { schema } from '@hamnivo/db';
+import { isOpen, nextOpening } from '@hamnivo/domain';
 
 type Locale = 'en' | 'ar' | 'hi' | 'ur';
 
@@ -35,7 +36,47 @@ const COPY: Record<Locale, WidgetConfig['copy'][Locale]> = {
   },
 };
 
-export function widgetConfig(brand: typeof schema.brands.$inferSelect): WidgetConfig {
+/** "People are away" with the time they are back; translations await native review. */
+const AWAY: Record<Locale, (when: string) => string> = {
+  en: (when) =>
+    `Our team is away right now and answers again ${when}. Your messages are kept here, and you can keep chatting with the AI assistant.`,
+  ar: (when) =>
+    `فريقنا غير متاح الآن ويعود للرد ${when}. رسائلك محفوظة هنا، ويمكنك متابعة الحديث مع المساعد الذكي.`,
+  hi: (when) =>
+    `हमारी टीम अभी उपलब्ध नहीं है और ${when} फिर से जवाब देगी। आपके संदेश यहाँ सुरक्षित हैं, और आप एआई सहायक से बात जारी रख सकते हैं।`,
+  ur: (when) =>
+    `ہماری ٹیم ابھی موجود نہیں ہے اور ${when} دوبارہ جواب دے گی۔ آپ کے پیغامات یہاں محفوظ ہیں، اور آپ اے آئی اسسٹنٹ سے بات جاری رکھ سکتے ہیں۔`,
+};
+const AWAY_UNKNOWN: Record<Locale, string> = {
+  en: 'Our team is away right now. Your messages are kept here, and a person will read them.',
+  ar: 'فريقنا غير متاح الآن. رسائلك محفوظة هنا، وسيقرؤها شخص من الفريق.',
+  hi: 'हमारी टीम अभी उपलब्ध नहीं है। आपके संदेश यहाँ सुरक्षित हैं, और कोई व्यक्ति उन्हें पढ़ेगा।',
+  ur: 'ہماری ٹیم ابھی موجود نہیں ہے۔ آپ کے پیغامات یہاں محفوظ ہیں، اور کوئی شخص انہیں پڑھے گا۔',
+};
+
+const localeOf = (locale: string | null | undefined): Locale =>
+  (['en', 'ar', 'hi', 'ur'] as const).find((l) => l === locale) ?? 'en';
+
+/** Whether people are working now and when they are back, from the brand's hours (W11). */
+export function availabilityOf(
+  brand: typeof schema.brands.$inferSelect,
+  now: Date,
+): WidgetConfig['availability'] {
+  const hours = brand.businessHours;
+  // Without hours there is no way to know: never claim a person is standing by.
+  if (!hours) return { humanAvailable: false, nextOpenAt: null, timezone: 'UTC' };
+  const open = isOpen(hours, now);
+  return {
+    humanAvailable: open,
+    nextOpenAt: open ? null : (nextOpening(hours, now)?.toISOString() ?? null),
+    timezone: hours.timezone,
+  };
+}
+
+export function widgetConfig(
+  brand: typeof schema.brands.$inferSelect,
+  now: Date = new Date(),
+): WidgetConfig {
   const theme = brand.theme ?? {};
   const copy = Object.fromEntries(
     (Object.keys(COPY) as Locale[]).map((locale) => [
@@ -56,8 +97,7 @@ export function widgetConfig(brand: typeof schema.brands.$inferSelect): WidgetCo
     },
     locales: { default: 'en', available: ['en', 'ar', 'hi', 'ur'] },
     copy,
-    // No availability model yet: never claim a person is standing by (W11).
-    availability: { humanAvailable: false, nextOpenAt: null, timezone: 'UTC' },
+    availability: availabilityOf(brand, now),
     features: {
       attachments: false,
       helpCenter: false,
@@ -73,7 +113,34 @@ export function widgetConfig(brand: typeof schema.brands.$inferSelect): WidgetCo
   };
 }
 
-export function handoffMessage(locale: string | null | undefined): string {
-  const key = (['en', 'ar', 'hi', 'ur'] as const).find((l) => l === locale) ?? 'en';
-  return COPY[key].offlineMessage;
+/**
+ * The honest answer to "talk to a person" (W11, R12): queued while people work, otherwise away,
+ * with when they are back in the customer's language and the brand's time zone.
+ */
+export function handoffOutcome(
+  brand: typeof schema.brands.$inferSelect | undefined,
+  locale: string | null | undefined,
+  now: Date,
+): Pick<HandoffResponse, 'availability' | 'message' | 'followUp'> {
+  const lang = localeOf(locale);
+  const hours = brand?.businessHours;
+  if (!hours || isOpen(hours, now)) {
+    return { availability: 'queued', message: COPY[lang].offlineMessage, followUp: null };
+  }
+  const back = nextOpening(hours, now);
+  if (!back) {
+    return { availability: 'offline', message: AWAY_UNKNOWN[lang], followUp: null };
+  }
+  const when = new Intl.DateTimeFormat(lang, {
+    weekday: 'long',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: hours.timezone,
+    timeZoneName: 'short',
+  }).format(back);
+  return {
+    availability: 'offline',
+    message: AWAY[lang](when),
+    followUp: { channel: 'this_chat', expectedBy: back.toISOString() },
+  };
 }

@@ -14,9 +14,10 @@ import { type AuthorityMessage, detectHumanRequest } from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { generateText, isStepCount } from 'ai';
 import canonicalize from 'canonicalize';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { type JournalEntry, JournalService } from '../authority/journal.service.js';
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
+import { PublicationsService } from '../authority/publications.service.js';
 import { AuthorityRegistry, type ConnectionRuntime } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage, type PublicationFacts, type SourceRef } from '../authority/views.js';
@@ -125,6 +126,7 @@ export class RepliesService {
     private readonly models: ModelFactory,
     private readonly contacts: AuthorityContactsService,
     private readonly retrieval: RetrievalService,
+    private readonly publications: PublicationsService,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -136,6 +138,44 @@ export class RepliesService {
     if (control.ownershipEpoch !== epoch || control.ownerSyncedEpoch !== control.ownershipEpoch)
       return 'owner_changed';
     return null;
+  }
+
+  /**
+   * Ends the run when the customer wrote again after the message that started it; the newer
+   * message's own job then answers with the whole conversation in view.
+   */
+  private async skipIfSuperseded(
+    tenantId: string,
+    runId: string,
+    payload: CustomerMessageEvent,
+    telemetry: Omit<Parameters<RunsService['finish']>[2], 'outcome' | 'state'> = {},
+  ): Promise<boolean> {
+    return this.tx(tenantId, async (tx) => {
+      const l = schema.messageLedger;
+      // Compared in SQL: timestamps read into JavaScript lose their microseconds.
+      const [newer] = await tx
+        .select({ id: l.id })
+        .from(l)
+        .where(
+          and(
+            eq(l.conversationId, payload.conversationId),
+            eq(l.senderKind, 'customer'),
+            eq(l.state, 'committed'),
+            ne(l.id, payload.ledgerId),
+            sql`${l.createdAt} > (select m.created_at from message_ledger m where m.id = ${payload.ledgerId})`,
+          ),
+        )
+        .limit(1);
+      if (!newer) return false;
+      await this.runs.step(tx, tenantId, runId, {
+        kind: 'decision',
+        name: 'superseded',
+        status: 'ok',
+        detail: { reason: 'newer_customer_message' },
+      });
+      await this.runs.finish(tx, runId, { outcome: 'skipped', state: 'skipped', ...telemetry });
+      return true;
+    });
   }
 
   /** Outbox handler for `conversation.customer_message`. Safe to run more than once. */
@@ -207,6 +247,7 @@ export class RepliesService {
       await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'fenced' }));
       return;
     }
+    if (await this.skipIfSuperseded(tenantId, run.id, payload)) return;
     if (agent?.config.mode !== 'answer') {
       await this.handOff(
         tenantId,
@@ -259,6 +300,9 @@ export class RepliesService {
       outputTokens: generated.outputTokens,
       latencyMs: generated.latencyMs,
     };
+    // The customer may have written again while the model was working: that message's job
+    // answers both, so this reply is dropped (R05: one AI reply per burst of messages).
+    if (await this.skipIfSuperseded(tenantId, run.id, payload, telemetry)) return;
 
     const facts: PublicationFacts = {
       sources: generated.sources,
@@ -304,6 +348,25 @@ export class RepliesService {
     if (state.owner.kind !== 'bot' || state.owner.botRef !== String(bot.externalBotId)) {
       await this.abort(tenantId, sourceKey, 'preflight_owner_mismatch', {
         authorityOwner: state.owner,
+      });
+      await this.tx(tenantId, (tx) =>
+        this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry }),
+      );
+      return;
+    }
+    // A takeover committed in Hamnivo reaches Chatwoot through the outbox, so the pre-flight can
+    // still show the bot: check Hamnivo's own fence once more, right before posting.
+    const current = await this.tx(tenantId, (tx) =>
+      tx
+        .select()
+        .from(schema.conversationControls)
+        .where(eq(schema.conversationControls.id, payload.conversationId)),
+    );
+    const latest = current[0];
+    const lateReason = latest ? this.fenced(latest, payload.epoch) : 'not_ai_owned';
+    if (lateReason) {
+      await this.abort(tenantId, sourceKey, lateReason, {
+        currentEpoch: latest?.ownershipEpoch ?? null,
       });
       await this.tx(tenantId, (tx) =>
         this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry }),
@@ -727,16 +790,8 @@ export class RepliesService {
   ): Promise<void> {
     const authorityId = Number(posted.ref);
     const entries: JournalEntry[] = await this.tx(tenantId, async (tx) => {
-      await this.ownership.lock(tx, conversationId);
-      await tx
-        .update(schema.publications)
-        .set({
-          state: 'sent',
-          authorityMessageId: authorityId,
-          sentAt: this.clock(),
-          updatedAt: this.clock(),
-        })
-        .where(eq(schema.publications.sourceKey, sourceKey));
+      const control = await this.ownership.lock(tx, conversationId);
+      await this.publications.confirm(tx, tenantId, control, sourceKey, posted);
       if (await this.journal.hasMessage(tx, conversationId, 'customer', authorityId)) return [];
       return this.journal.append(tx, tenantId, conversationId, [
         {

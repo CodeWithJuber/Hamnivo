@@ -16,7 +16,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { retryDelayMs } from '../outbox/relay.service.js';
@@ -24,6 +24,7 @@ import { APP_DB, CLOCK, type Clock, REDIS } from '../tokens.js';
 import { INBOX_SIGNAL } from './ingress.service.js';
 import { type JournalEntry, JournalService } from './journal.service.js';
 import { type ControlRow, OwnershipService, type OwnerTarget } from './ownership.service.js';
+import { PublicationsService } from './publications.service.js';
 import { authorityMessageUuid } from './uuid.js';
 import { contractMessage, laneOf, publicationFacts } from './views.js';
 
@@ -31,7 +32,7 @@ const BATCH = 50;
 const LEASE_SECONDS = 60;
 const MAX_ATTEMPTS = 10;
 
-interface Notification {
+export interface Notification {
   tenantId: string;
   conversationId: string;
   entries: JournalEntry[];
@@ -57,6 +58,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly journal: JournalService,
     private readonly ownership: OwnershipService,
+    private readonly publications: PublicationsService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -233,19 +235,13 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
         }
       }
     } else if (message.key?.startsWith('hv1:p:')) {
-      await tx
-        .update(schema.publications)
-        .set({ state: 'sent', authorityMessageId: authorityId, sentAt: now, updatedAt: now })
-        .where(
-          and(
-            eq(schema.publications.sourceKey, message.key),
-            inArray(schema.publications.state, ['reserved', 'unknown']),
-          ),
-        );
+      await this.publications.confirm(tx, tenantId, control, message.key, message);
     }
 
     const entries: JournalEntry[] = [];
     const lane = laneOf(message);
+    // Webhooks and the reconciler can both deliver a message; only its first sighting acts on it.
+    let fresh = false;
     if (lane) {
       const facts = (await publicationFacts(tx, control.id, [message])).get(message.ref);
       const view = contractMessage({
@@ -258,7 +254,8 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
         ...(facts ? { facts } : {}),
       });
       if (type === 'message.created') {
-        if (!(await this.journal.hasMessage(tx, control.id, lane, authorityId))) {
+        fresh = !(await this.journal.hasMessage(tx, control.id, lane, authorityId));
+        if (fresh) {
           entries.push(
             ...(await this.journal.append(tx, tenantId, control.id, [
               {
@@ -296,7 +293,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
 
     // A person replying publicly in Chatwoot takes the conversation over from the AI.
     if (
-      type === 'message.created' &&
+      fresh &&
       lane === 'customer' &&
       message.sender.kind === 'user' &&
       control.ownerMode !== 'HUMAN_ACTIVE' &&

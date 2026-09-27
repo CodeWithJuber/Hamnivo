@@ -1,0 +1,233 @@
+/**
+ * End-to-end stack for the Studio journey (run by Playwright's webServer):
+ *   throwaway database · fake Chatwoot · gateway API and worker (built, as separate processes)
+ *   · widget and loader (what the install snippet points to) · Studio's static build.
+ * Studio is served with the gateway behind its own origin: /v1 and /api/auth are passed on to the
+ * gateway, the same-origin set-up the README describes. Nothing is seeded; the tests sign up in
+ * the browser. Writes e2e/.stack.json for the tests and stops everything on SIGTERM/SIGINT.
+ */
+import { type ChildProcess, spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { createReadStream, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
+import { extname, join, normalize, resolve } from 'node:path';
+import { startFakeChatwoot } from '@hamnivo/chatwoot/fake';
+import {
+  createTestDatabase,
+  dropDatabase,
+  loadLocalEnv,
+  prepareTemplateDatabase,
+} from '@hamnivo/db/testing';
+
+const root = resolve(import.meta.dirname, '../../..');
+const ports = {
+  api: Number(process.env.E2E_STUDIO_API_PORT ?? 5185),
+  studio: Number(process.env.E2E_STUDIO_PORT ?? 5186),
+  widget: Number(process.env.E2E_STUDIO_WIDGET_PORT ?? 5187),
+};
+const origin = (port: number) => `http://127.0.0.1:${port}`;
+const children: ChildProcess[] = [];
+const servers: Server[] = [];
+const cleanups: Array<() => Promise<void>> = [];
+
+const TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.map': 'application/json',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+};
+
+function sendFile(response: ServerResponse, file: string) {
+  response.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
+  createReadStream(file).pipe(response);
+}
+
+function findFile(dirs: string[], pathname: string): string | null {
+  for (const dir of dirs) {
+    const file = normalize(join(dir, pathname === '/' ? 'index.html' : pathname));
+    if (file.startsWith(dir) && existsSync(file) && statSync(file).isFile()) return file;
+  }
+  return null;
+}
+
+/** Passes a request on to the gateway unchanged, as a reverse proxy in front of Studio would. */
+function proxy(request: IncomingMessage, response: ServerResponse) {
+  const upstream = httpRequest(
+    {
+      hostname: '127.0.0.1',
+      port: ports.api,
+      method: request.method,
+      path: request.url,
+      headers: { ...request.headers, host: `127.0.0.1:${ports.api}` },
+    },
+    (reply) => {
+      response.writeHead(reply.statusCode ?? 502, reply.headers);
+      reply.pipe(response);
+    },
+  );
+  upstream.on('error', () => {
+    if (!response.headersSent) response.writeHead(502);
+    response.end();
+  });
+  request.pipe(upstream);
+}
+
+function listen(server: Server, port: number): Promise<void> {
+  servers.push(server);
+  return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok()));
+}
+
+function widgetServer(): Promise<void> {
+  const dirs = [join(root, 'apps/widget/dist'), join(root, 'packages/widget-loader/dist')];
+  return listen(
+    createServer((request, response) => {
+      const url = new URL(request.url ?? '/', 'http://x');
+      const file = findFile(dirs, url.pathname);
+      if (file) sendFile(response, file);
+      else response.writeHead(404).end();
+    }),
+    ports.widget,
+  );
+}
+
+function studioServer(): Promise<void> {
+  const dist = join(root, 'apps/console/dist');
+  // Runtime settings (see src/lib/config.ts): same-origin API, and the snippet's origins.
+  const settings = [
+    '<meta name="hamnivo-api" content="">',
+    `<meta name="hamnivo-gateway-origin" content="${origin(ports.api)}">`,
+    `<meta name="hamnivo-widget-origin" content="${origin(ports.widget)}">`,
+  ].join('');
+  // Read on every request, so a rebuild while the stack runs is served at once.
+  const index = () =>
+    readFileSync(join(dist, 'index.html'), 'utf8').replace('</head>', `${settings}</head>`);
+  return listen(
+    createServer((request, response) => {
+      const url = new URL(request.url ?? '/', 'http://x');
+      if (url.pathname === '/health') {
+        response.end('ok');
+        return;
+      }
+      if (url.pathname.startsWith('/v1/') || url.pathname.startsWith('/api/auth/')) {
+        proxy(request, response);
+        return;
+      }
+      const file = url.pathname === '/' ? null : findFile([dist], url.pathname);
+      if (file) {
+        sendFile(response, file);
+        return;
+      }
+      // Single-page app: every other path renders index.html.
+      response.writeHead(200, { 'content-type': TYPES['.html'] ?? 'text/html' });
+      response.end(index());
+    }),
+    ports.studio,
+  );
+}
+
+async function waitFor(url: string, timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return;
+    } catch {
+      // not up yet
+    }
+    if (Date.now() > deadline) throw new Error(`${url} did not come up`);
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
+async function shutdown(code = 0) {
+  for (const child of children) child.kill('SIGTERM');
+  for (const server of servers) server.close();
+  for (const cleanup of cleanups.reverse()) await cleanup().catch(() => undefined);
+  process.exit(code);
+}
+process.on('SIGTERM', () => void shutdown());
+process.on('SIGINT', () => void shutdown());
+
+try {
+  loadLocalEnv();
+  // No default: a missing setting must not fall through to someone's everyday Valkey.
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) throw new Error('Set REDIS_URL (and DATABASE_URL, DATABASE_OWNER_URL).');
+  const template = `hamnivo_tpl_studio_${process.pid}`;
+  await prepareTemplateDatabase(template);
+  cleanups.push(() => dropDatabase(template));
+  const database = await createTestDatabase(template);
+  cleanups.push(() => database.drop());
+
+  const fake = await startFakeChatwoot();
+  cleanups.push(() => fake.close());
+
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    NODE_ENV: 'development',
+    HOST: '127.0.0.1',
+    PORT: String(ports.api),
+    LOG_LEVEL: process.env.E2E_LOG_LEVEL ?? 'warn',
+    DATABASE_URL: database.app,
+    REDIS_URL: redisUrl,
+    HAMNIVO_KEK_BASE64: randomBytes(32).toString('base64'),
+    BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
+    PUBLIC_API_ORIGIN: origin(ports.api),
+    PUBLIC_CONSOLE_ORIGIN: origin(ports.studio),
+    PUBLIC_WIDGET_ORIGIN: origin(ports.widget),
+    // Sign-up goes straight in; the "check your email" state is covered separately.
+    REQUIRE_EMAIL_VERIFICATION: 'false',
+    STEP_UP_MAX_AGE_MINUTES: '10',
+    CHATWOOT_URL: fake.url,
+    CHATWOOT_PLATFORM_TOKEN: fake.platformToken,
+    CHATWOOT_WEBHOOK_BASE_URL: origin(ports.api),
+    STREAM_HEARTBEAT_SECONDS: '5',
+    RATE_LIMIT_PER_MINUTE: '100000',
+    EMBEDDING_PROVIDER: 'mock',
+  };
+  delete env.WIDGET_SIGNING_KEY;
+  const gatewayDist = join(root, 'apps/gateway/dist');
+  for (const entry of ['main.api.js', 'main.worker.js']) {
+    const child = spawn(process.execPath, ['--enable-source-maps', join(gatewayDist, entry)], {
+      env,
+      stdio: 'inherit',
+    });
+    child.on('exit', (code) => {
+      if (code && code !== 143) void shutdown(1);
+    });
+    children.push(child);
+  }
+  await waitFor(`${origin(ports.api)}/health/ready`);
+  await widgetServer();
+  await studioServer();
+
+  writeFileSync(
+    join(root, 'apps/console/e2e/.stack.json'),
+    JSON.stringify(
+      {
+        studioUrl: origin(ports.studio),
+        apiBase: origin(ports.api),
+        widgetOrigin: origin(ports.widget),
+        databaseUrl: database.app,
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(`[e2e] stack ready: studio ${origin(ports.studio)}, api ${origin(ports.api)}`);
+} catch (error) {
+  console.error('[e2e] stack failed:', error);
+  await shutdown(1);
+}

@@ -115,6 +115,50 @@ missing kill-switch check and a disabled honesty guard.
 replacement, visibility and freshness rules, Urdu and Hindi search, cited answers and tenant
 isolation. `test/knowledge.test.ts` covers the parsers, the ClamAV client, chunking and citations.
 
+## Reconciler (M10)
+
+Chatwoot does not retry most webhooks, so webhooks only make Hamnivo fast. The worker's
+reconciler makes it complete:
+
+- **What it follows.** Each conversation is followed from its first message. A maintenance job
+  every ten minutes picks up any conversation without a cursor (`app.ensure_reconcile_cursors()`).
+- **Each poll.** It reads the conversation's state and the messages after the last one it saw,
+  then applies them through the same processor as webhooks.
+- **Idempotent.** A message seen by both paths is journaled once. A staff reply acts as a takeover
+  only on its first sighting, so a replay never takes a conversation back from the AI.
+- **Timing.** Polls come 15 s after news, then back off to 1 minute (AI or waiting), 2 minutes
+  (a person), 10 minutes (snoozed) or 1 hour (resolved). A resolved conversation is dropped after
+  a week without activity.
+- **Cross-tenant leasing.** Cursors are leased across tenants by `app.claim_reconcile_cursors()`.
+  Suspended tenants and disabled connections are skipped.
+
+Late publication (R06):
+
+- **Fences.** An AI reply is fenced when it is reserved, by the Chatwoot pre-flight check, and
+  again against Hamnivo's own ownership right before it is posted. That last check catches a
+  takeover that has not reached Chatwoot yet.
+- **Detection.** A reply that still races a takeover while it is being posted stays visible,
+  because nothing is deleted. It is marked `late_publication` and audited
+  (`conversation.late_publication`), and the new owner gets a private note.
+- **Conservative timing.** Chatwoot's timestamps have one-second resolution, so a reply stored
+  within a second before the takeover is also reported.
+
+## Customer flows (M11)
+
+- **Identity keys** (`/v1/admin/brands/{brandId}/identity-keys`). Brands register the keys that
+  verify their customers' identity assertions: an ES256, EdDSA or RS256 public key, or an HS256
+  secret generated and shown once. Registering needs `widget.identity_keys`, two-step
+  verification and a recent sign-in. A key can be retired (it still verifies during a rotation)
+  or revoked (refused at once).
+- **One reply per burst.** A reply job stops when the customer wrote again meanwhile. It checks
+  before and after generation. The newer message's job answers with both messages in view.
+- **Feedback and reopen.** `POST …/feedback` stores a rating of a resolved conversation, and staff
+  see it as a private note. `POST …/reopen` reopens it without writing. A customer who writes
+  again also reopens it, as in Chatwoot.
+- **Business hours** (`PUT /v1/admin/brands/{brandId}/business-hours`). These set the widget
+  configuration's `availability`, and the answer to "talk to a person": queued, or offline with
+  the time people are back. Without hours, the widget never claims someone is available.
+
 ## Widget framing
 
 `GET /v1/widget/frame-policy?widgetId=wid_…` names the websites that may frame a brand's widget
@@ -122,6 +166,14 @@ isolation. `test/knowledge.test.ts` covers the parsers, the ClamAV client, chunk
 `X-Hamnivo-Frame-Ancestors` header. It returns 404 for unknown or disabled widgets. The production
 web server asks it for every widget page and sends the answer as CSP `frame-ancestors`
 (`deploy/production/Caddyfile`), so other websites cannot embed a brand's chat.
+
+`PATCH /v1/admin/brands/{brandId}` (brands.manage) renames a brand or replaces its allowed
+websites. A website taken off the list stops working at once:
+- it gets no frame permission;
+- new chats from it are refused (`ORIGIN_NOT_ALLOWED`);
+- chats already open there end, because their sessions are revoked and cannot be refreshed.
+
+The audit entry `brand.updated` records the websites added and removed and how many chats ended.
 
 ## Security rules enforced here
 

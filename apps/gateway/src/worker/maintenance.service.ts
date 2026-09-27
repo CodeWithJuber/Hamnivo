@@ -1,4 +1,4 @@
-import { type Db, ensureAuditPartitions, purgeExpired } from '@hamnivo/db';
+import { type Db, ensureAuditPartitions, ensureReconcileCursors, purgeExpired } from '@hamnivo/db';
 import {
   Inject,
   Injectable,
@@ -12,7 +12,10 @@ import { APP_DB, REDIS } from '../tokens.js';
 
 const QUEUE = 'hamnivo-maintenance';
 
-/** Scheduled upkeep through BullMQ job schedulers: audit partitions daily, expiry purge often. */
+/**
+ * Scheduled upkeep through BullMQ job schedulers: audit partitions daily; expiry purge and
+ * reconciler cursors every ten minutes.
+ */
 @Injectable()
 export class MaintenanceService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(MaintenanceService.name);
@@ -30,6 +33,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         return { created: await ensureAuditPartitions(this.db, 3) };
       case 'purge-expired':
         return purgeExpired(this.db);
+      case 'reconcile-cursors':
+        return { followed: await ensureReconcileCursors(this.db) };
       default:
         throw new Error(`Unknown maintenance job ${job}`);
     }
@@ -46,6 +51,12 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       'purge-expired',
       { every: 10 * 60 * 1000 },
       { name: 'purge-expired' },
+    );
+    // Safety net: conversations are followed from their start; this catches any that are not.
+    await this.queue.upsertJobScheduler(
+      'reconcile-cursors',
+      { every: 10 * 60 * 1000 },
+      { name: 'reconcile-cursors' },
     );
     this.worker = new Worker(QUEUE, (job) => this.run(job.name), {
       connection: this.redis.duplicate(),

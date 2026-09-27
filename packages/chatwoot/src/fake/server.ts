@@ -148,6 +148,12 @@ export interface FakeChatwoot {
    * status instead, like a timeout after Chatwoot already committed. `null` clears it.
    */
   setResponseFault(fault: ((method: string, url: string) => number | null) | null): void;
+  /**
+   * Runs before each request is processed; resolve to let it through. Lets a test interleave
+   * another actor with a request in flight (for example, a takeover while a reply is posted).
+   * `null` clears it.
+   */
+  setRequestHook(hook: ((method: string, url: string) => Promise<void> | void) | null): void;
   close(): Promise<void>;
 }
 
@@ -242,8 +248,12 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
   let pumping: Promise<void> | null = null;
   let paused = false;
   let responseFault: ((method: string, url: string) => number | null) | null = null;
+  let requestHook: ((method: string, url: string) => Promise<void> | void) | null = null;
 
   const app = Fastify({ logger: false });
+  app.addHook('preHandler', async (request) => {
+    await requestHook?.(request.method, request.url);
+  });
   if (options.latencyMs) {
     const latency = options.latencyMs;
     app.addHook('onRequest', async () => {
@@ -1243,6 +1253,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
     setResponseFault(fault) {
       responseFault = fault;
+    },
+    setRequestHook(hook) {
+      requestHook = hook;
     },
     resumeDeliveries() {
       paused = false;

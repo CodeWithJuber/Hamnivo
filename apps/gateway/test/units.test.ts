@@ -2,6 +2,11 @@ import { randomBytes } from 'node:crypto';
 import { InvalidPublicIdError } from '@hamnivo/db';
 import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
+import {
+  nextReconcileInterval,
+  RECONCILE_MIN_SECONDS,
+  reconcileCeiling,
+} from '../src/authority/reconcile-policy.js';
 import { AppError } from '../src/common/app-error.js';
 import { toProblem } from '../src/common/problem.filter.js';
 import { requestIdFrom } from '../src/common/request-id.js';
@@ -130,5 +135,20 @@ describe('errors and identifiers', () => {
       expect(delay).toBeGreaterThanOrEqual(cap / 2);
       expect(delay).toBeLessThanOrEqual(cap);
     }
+  });
+});
+
+describe('reconciler polling', () => {
+  it('polls soon after news, then backs off up to a ceiling that depends on the conversation', () => {
+    expect(nextReconcileInterval(120, true, 60)).toBe(RECONCILE_MIN_SECONDS);
+    expect(nextReconcileInterval(15, false, 60)).toBe(30);
+    expect(nextReconcileInterval(30, false, 60)).toBe(60);
+    expect(nextReconcileInterval(60, false, 60)).toBe(60);
+    expect(nextReconcileInterval(0, false, 60)).toBe(30);
+    expect(reconcileCeiling('pending', 'AI_ACTIVE')).toBe(60);
+    expect(reconcileCeiling('open', 'WAITING_HUMAN')).toBe(60);
+    expect(reconcileCeiling('open', 'HUMAN_ACTIVE')).toBe(120);
+    expect(reconcileCeiling('snoozed', 'HUMAN_ACTIVE')).toBe(600);
+    expect(reconcileCeiling('resolved', 'AI_ACTIVE')).toBe(3600);
   });
 });

@@ -10,6 +10,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  smallint,
   text,
   unique,
   uniqueIndex,
@@ -437,6 +438,41 @@ export const publications = pgTable(
       'publications_state_ck',
       sql`${t.state} in ('reserved', 'sent', 'late_publication', 'aborted', 'unknown')`,
     ),
+    tenantIsolation(),
+  ],
+);
+
+/**
+ * Customer ratings of resolved conversations (W15): one per customer and conversation, and a new
+ * rating replaces the previous one. Staff also see each rating as a private note in Chatwoot.
+ */
+export const conversationFeedback = pgTable(
+  'conversation_feedback',
+  {
+    tenantId: tenantId(),
+    conversationId: uuid('conversation_id').notNull(),
+    principalId: uuid('principal_id').notNull(),
+    rating: smallint('rating').notNull(),
+    comment: text('comment'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({
+      name: 'conversation_feedback_pkey',
+      columns: [t.tenantId, t.conversationId, t.principalId],
+    }),
+    foreignKey({
+      name: 'conversation_feedback_conversation_fk',
+      columns: [t.tenantId, t.conversationId],
+      foreignColumns: [conversationControls.tenantId, conversationControls.id],
+    }),
+    foreignKey({
+      name: 'conversation_feedback_principal_fk',
+      columns: [t.tenantId, t.principalId],
+      foreignColumns: [customerPrincipals.tenantId, customerPrincipals.id],
+    }),
+    check('conversation_feedback_rating_ck', sql`${t.rating} between 1 and 5`),
     tenantIsolation(),
   ],
 );

@@ -1,0 +1,66 @@
+@import "@hamnivo/ui/globals.css";
+
+/* Scan Studio's own sources for utilities as well. */
+@source "./";
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+body {
+  @apply bg-bg;
+}
+:where([dir="rtl"]) body {
+  font-family: "Noto Sans Arabic", var(--font-sans, sans-serif);
+}
+:where(html[lang="hi"]) body {
+  font-family: "DM Sans Variable", "Noto Sans Devanagari", sans-serif;
+}
+:where(html[lang="ur"]) body {
+  font-family: "Noto Nastaliq Urdu", "Noto Sans Arabic", var(--font-sans, sans-serif);
+  line-height: 1.9;
+}
+
+@layer base {
+  /* Nastaliq needs tall lines; explicit leading-* utilities still win. */
+  :where(html[lang="ur"]) * {
+    --tw-leading: 1.9;
+  }
+}
+
+/*
+ * A few design-system parts place things on a physical side. Mirror them for right-to-left
+ * pages here rather than changing the shared components.
+ */
+[dir="rtl"] [data-slot="native-select"] {
+  padding-right: 0.75rem;
+  padding-left: 2.25rem;
+}
+[dir="rtl"] [data-slot="native-select-icon"] {
+  right: auto;
+  left: 0.875rem;
+}
+[dir="rtl"] [data-slot="table-head"] {
+  text-align: right;
+}
+
+/* Headings and main take focus only to move keyboard and screen reader users along. */
+:is(h1, h2, h3, main)[tabindex="-1"]:focus {
+  outline: none;
+}
+
+/* An ended session hides workspace content behind the sign-in dialog (Visual review note 2). */
+html[data-masked] [data-maskable] {
+  filter: blur(14px) saturate(0.4);
+  user-select: none;
+}
+
+/* Code and snippets keep their own direction and wrap instead of widening the page. */
+.hv-code {
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  direction: ltr;
+  text-align: left;
+}

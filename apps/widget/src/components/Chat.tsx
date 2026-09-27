@@ -239,7 +239,7 @@ export function Chat(props: {
 
   const banner =
     conversation?.status === 'waiting_for_person'
-      ? t('waitingForPerson')
+      ? (state.handoffNotice ?? t('waitingForPerson'))
       : conversation?.status === 'with_person'
         ? t('withPerson')
         : conversation?.status === 'resolved'

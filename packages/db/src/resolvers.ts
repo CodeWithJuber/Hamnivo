@@ -241,6 +241,50 @@ export async function claimIntegrationInbox(
   }));
 }
 
+export interface ClaimedReconcileCursor {
+  tenantId: string;
+  connectionId: string;
+  /** Chatwoot conversation display id. */
+  conversationRef: string;
+  /** Newest Chatwoot message id already seen; null means take a baseline first. */
+  lastExternalId: number | null;
+  intervalSeconds: number;
+}
+
+/**
+ * Leases due reconciler cursors across tenants (active tenants and connections only). Each lease
+ * moves the next poll forward by `leaseSeconds`, so a crashed poll is retried later.
+ */
+export async function claimReconcileCursors(
+  db: Db,
+  options: { limit: number; leaseSeconds: number },
+): Promise<ClaimedReconcileCursor[]> {
+  const { rows } = await db.execute<{
+    tenant_id: string;
+    connection_id: string;
+    scope_ref: string;
+    last_external_id: string | number | null;
+    interval_seconds: number;
+  }>(
+    sql`select * from app.claim_reconcile_cursors(${options.limit}::int, ${options.leaseSeconds}::int)`,
+  );
+  return rows.map((row) => ({
+    tenantId: row.tenant_id,
+    connectionId: row.connection_id,
+    conversationRef: row.scope_ref,
+    lastExternalId: row.last_external_id === null ? null : Number(row.last_external_id),
+    intervalSeconds: row.interval_seconds,
+  }));
+}
+
+/** Starts following open conversations that have no reconciler cursor yet; returns how many. */
+export async function ensureReconcileCursors(db: Db): Promise<number> {
+  const { rows } = await db.execute<{ ensure_reconcile_cursors: number }>(
+    sql`select app.ensure_reconcile_cursors()`,
+  );
+  return Number(rows[0]?.ensure_reconcile_cursors ?? 0);
+}
+
 /**
  * Deletes expired journal entries, identity nonces and idempotency keys, and integration-inbox
  * events processed more than seven days ago (per-table batch).

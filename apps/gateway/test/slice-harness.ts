@@ -8,6 +8,7 @@ import { NestFactory } from '@nestjs/core';
 import type { LanguageModel } from 'ai';
 import { type EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
 import { InboxProcessor } from '../src/authority/processor.service.js';
+import { ReconcilerService } from '../src/authority/reconciler.service.js';
 import { loadConfig } from '../src/config.js';
 import type { Scanner } from '../src/knowledge/scanner.js';
 import { OutboxRelay } from '../src/outbox/relay.service.js';
@@ -73,6 +74,7 @@ export async function startSlice(
   // Drive the worker by hand for deterministic tests.
   await worker.get(OutboxRelay).onApplicationShutdown();
   await worker.get(InboxProcessor).onApplicationShutdown();
+  await worker.get(ReconcilerService).onApplicationShutdown();
   const app = createDb(gw.database.app, { max: 2 });
   return {
     gw,

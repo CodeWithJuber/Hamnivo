@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { Client, type Gateway, signUp, startGateway } from './harness.js';
+import { Client, CONSOLE_ORIGIN, type Gateway, signUp, startGateway } from './harness.js';
 
 let gw: Gateway;
 
@@ -70,6 +70,38 @@ describe('platform endpoints', () => {
     const missing = await client.get('/v1/nothing-here');
     expect(missing.status).toBe(404);
     expect(missing.body).toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('lets Studio and the widget call across origins, with only what each one needs', async () => {
+    const preflight = (url: string, origin: string, method: string) =>
+      gw.app.inject({
+        method: 'OPTIONS',
+        url,
+        headers: {
+          origin,
+          'access-control-request-method': method,
+          'access-control-request-headers': 'content-type',
+        },
+      });
+    const studio = await preflight('/v1/admin/agents/agt_x/draft', CONSOLE_ORIGIN, 'PUT');
+    expect(studio.statusCode).toBe(204);
+    expect(studio.headers['access-control-allow-origin']).toBe(CONSOLE_ORIGIN);
+    expect(studio.headers['access-control-allow-credentials']).toBe('true');
+    const methods = (reply: { headers: Record<string, unknown> }) =>
+      String(reply.headers['access-control-allow-methods']).split(/,\s*/);
+    expect(methods(studio)).toEqual(
+      expect.arrayContaining(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
+    );
+
+    const widget = await preflight('/v1/widget/sessions', gw.config.PUBLIC_WIDGET_ORIGIN, 'POST');
+    expect(widget.headers['access-control-allow-origin']).toBe(gw.config.PUBLIC_WIDGET_ORIGIN);
+    expect(widget.headers['access-control-allow-credentials']).toBeUndefined();
+    expect(methods(widget)).toEqual(['GET', 'POST']);
+
+    const stranger = await preflight('/v1/admin/brands', 'https://evil.example', 'POST');
+    expect(stranger.headers['access-control-allow-origin']).toBeUndefined();
+    const crossed = await preflight('/v1/widget/sessions', CONSOLE_ORIGIN, 'POST');
+    expect(crossed.headers['access-control-allow-origin']).toBeUndefined();
   });
 
   it('answers errors as problem details with a request id', async () => {

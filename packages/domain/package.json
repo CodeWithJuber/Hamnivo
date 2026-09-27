@@ -25,5 +25,9 @@
     "tsdown": "0.23.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "dependencies": {
+    "@date-fns/tz": "1.5.0",
+    "date-fns": "4.4.0"
   }
 }

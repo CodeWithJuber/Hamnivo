@@ -1,0 +1,5 @@
+dist
+e2e/.stack.json
+e2e/screenshots
+test-results
+playwright-report

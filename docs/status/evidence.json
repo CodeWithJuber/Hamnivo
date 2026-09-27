@@ -64,8 +64,12 @@
   },
   "HNV-24-06": {
     "status": "partial",
-    "evidence": ["packages/ui/scripts/a11y-audit.ts", "packages/ui/src/components/live-region.tsx"],
-    "note": "Automated axe audit passes for every story in light/dark × LTR/RTL; manual screen-reader, 200% zoom and keyboard reviews are still required."
+    "evidence": [
+      "apps/console/e2e/audit.spec.ts",
+      "packages/ui/scripts/a11y-audit.ts",
+      "packages/ui/src/components/live-region.tsx"
+    ],
+    "note": "Automated axe audits pass for every Storybook story in light/dark × LTR/RTL and for every Studio screen and dialog in English and Arabic, with no sideways scrolling from 320 to 1920 px (tested). Manual screen-reader, 200% zoom and keyboard reviews are still required."
   },
   "D01": {
     "status": "in-progress",
@@ -224,29 +228,35 @@
     "status": "in-progress",
     "evidence": [
       "apps/gateway/src/authority/journal.service.ts",
+      "apps/gateway/src/authority/reconciler.service.ts",
       "apps/gateway/src/widget/events.service.ts",
+      "apps/gateway/test/reconciler.int.test.ts",
       "apps/gateway/test/slice.int.test.ts",
       "apps/widget/e2e/journey.spec.ts",
       "packages/client/src/outbox.ts",
       "packages/client/src/stream.ts",
       "packages/client/test/client.test.ts"
     ],
-    "note": "Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending."
+    "note": "Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. Server side, the worker's reconciler recovers messages and state changes whose Chatwoot webhooks were lost (tested with every webhook dropped)."
   },
   "W12": {
     "status": "in-progress",
     "evidence": [
+      "apps/gateway/src/admin/identity-keys.service.ts",
       "apps/gateway/src/widget/sessions.service.ts",
       "apps/gateway/src/widget/tokens.service.ts",
+      "apps/gateway/test/identity-keys.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
-    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending."
+    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending. Brands register their verification keys through the admin API (ES256, EdDSA or RS256 public keys, or a generated HS256 secret shown once), with two-step verification and a recent sign-in; keys retire (still verifying) or are revoked at once (tested)."
   },
   "H08": {
     "status": "in-progress",
     "evidence": [
       "apps/gateway/src/authority/ownership.service.ts",
+      "apps/gateway/src/authority/processor.service.ts",
       "apps/gateway/src/conversations/staff-conversations.service.ts",
+      "apps/gateway/test/reconciler.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
     "note": "Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending."
@@ -254,28 +264,32 @@
   "R05": {
     "status": "in-progress",
     "evidence": [
-      "apps/gateway/src/runtime/replies.service.ts",
       "apps/gateway/src/authority/ownership.service.ts",
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/conversation-flow.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
-    "note": "One public AI speaker per conversation fenced by the ownership epoch; the lease with expiry (columns present) is not used yet."
+    "note": "One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The lease with expiry (columns present) is not used yet."
   },
   "R06": {
     "status": "in-progress",
     "evidence": [
+      "apps/gateway/src/authority/publications.service.ts",
       "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/reconciler.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
-    "note": "Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, and by a Chatwoot pre-flight owner check (mutation-tested). Undispatched tool actions follow with the tool gateway."
+    "note": "Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, by a Chatwoot pre-flight owner check and by a re-check of Hamnivo's own fence right before posting (each mutation-tested). A reply that still races a takeover while it is posted is marked late_publication, audited and reported to the new owner in a private note (tested). Undispatched tool actions follow with the tool gateway."
   },
   "R12": {
     "status": "in-progress",
     "evidence": [
       "apps/gateway/src/widget/conversations.service.ts",
       "apps/gateway/src/widget/copy.ts",
+      "apps/gateway/test/conversation-flow.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
-    "note": "'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note and honest availability ('queued'); business hours and follow-up channels pending."
+    "note": "'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note, and answers honestly: queued during business hours, offline with the return time outside them (tested); follow-up channels pending."
   },
   "G02": {
     "status": "in-progress",
@@ -553,5 +567,128 @@
       "docs/self-hosting.md"
     ],
     "note": "hamnivo.sh backup dumps both databases (pg_dump), Chatwoot files, certificates and settings with checksums and keeps the newest N; restore checks the checksums, refuses a backup made with other secrets, replaces data and files, then runs pending migrations. The production smoke test runs a drill (tested: a brand made after the backup is gone and the conversation history is back). Point-in-time recovery, off-site copies and a deletion replay after restore are pending."
+  },
+  "X13": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/test/reconciler.int.test.ts",
+      "apps/gateway/src/authority/processor.service.ts"
+    ],
+    "note": "Replaying a whole conversation through the reconciler neither duplicates messages nor repeats a takeover, and repeated webhook deliveries are applied once (tested). Commerce and tool crash cases are pending."
+  },
+  "W15": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/conversations.service.ts",
+      "apps/gateway/test/conversation-flow.int.test.ts",
+      "packages/db/src/schema/authority.ts"
+    ],
+    "note": "Customers rate a resolved conversation (1 to 5 with an optional comment; a new rating replaces the old one) and reopen it without writing; staff see each rating as a private note, and a reopened AI conversation returns to people if the AI may no longer answer (tested). Rating and reopen controls in the widget are pending."
+  },
+  "W11": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/copy.ts",
+      "apps/gateway/test/conversation-flow.int.test.ts",
+      "packages/domain/src/business-hours.ts",
+      "packages/domain/test/business-hours.test.ts"
+    ],
+    "note": "Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; \"talk to a person\" answers queued or offline with the return time in the customer's language, shown in the widget (tested). Syncing Chatwoot working hours and follow-up by email are pending."
+  },
+  "A04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/admin/brands.service.ts",
+      "apps/gateway/src/widget/origins.ts",
+      "apps/gateway/test/brands.int.test.ts",
+      "apps/console/src/pages/BrandsPage.tsx",
+      "apps/console/e2e/journeys.spec.ts",
+      "deploy/production/Caddyfile"
+    ],
+    "note": "Each brand has its own widget ID, allowed websites and business hours. Studio creates and edits brands; a website taken off the list gets no frame permission (CSP frame-ancestors per brand), no new chats, and its open chats end at once (tested). Per-brand appearance editing (board 04) is next."
+  },
+  "HNV-02-01": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/console/src/pages/SignInPage.tsx",
+      "apps/console/src/components/SignIn.tsx",
+      "apps/console/e2e/journeys.spec.ts"
+    ],
+    "note": "Email and password sign-in with password-manager-friendly fields, and passkeys where the browser supports them (tested). The SSO choice comes with tenant SSO (A13)."
+  },
+  "HNV-02-03": {
+    "status": "implemented",
+    "evidence": ["apps/console/src/components/SignIn.tsx", "apps/console/e2e/journeys.spec.ts"],
+    "note": "Authenticator-app codes with a backup-code option; tested end to end: turn it on, sign out, sign in with a code."
+  },
+  "HNV-02-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/components/ReauthDialog.tsx",
+      "apps/console/e2e/journeys.spec.ts"
+    ],
+    "note": "Sensitive actions and ended sessions ask to sign in again over the page; unsaved work is kept and the save finishes afterwards (tested)."
+  },
+  "HNV-02-06": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/console/src/components/States.tsx",
+      "apps/console/src/pages/StudioLayout.tsx"
+    ],
+    "note": "Pages a person may not open say what access is missing and who can grant it."
+  },
+  "HNV-03-02": {
+    "status": "in-progress",
+    "evidence": ["apps/console/src/pages/OverviewPage.tsx", "apps/console/e2e/journeys.spec.ts"],
+    "note": "A new workspace’s overview says what to do first and links to creating a brand (tested); the test widget comes later."
+  },
+  "HNV-11-02": {
+    "status": "implemented",
+    "evidence": ["apps/console/src/pages/AgentEditorPage.tsx", "apps/console/e2e/journeys.spec.ts"],
+    "note": "Agent drafts are edited and saved by keyboard alone, and a draft someone else changed is shown as a conflict instead of being overwritten (tested)."
+  },
+  "HNV-11-06": {
+    "status": "in-progress",
+    "evidence": ["apps/console/src/pages/AgentEditorPage.tsx", "apps/console/e2e/journeys.spec.ts"],
+    "note": "Publishing asks for a fresh sign-in and then shows the live version (tested); rollback in Studio comes later."
+  },
+  "HNV-13-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/components/StopAiDialog.tsx",
+      "apps/console/src/pages/StopAiPage.tsx",
+      "apps/console/e2e/journeys.spec.ts"
+    ],
+    "note": "Stopping AI replies for a brand shows the scope first, is visible everywhere afterwards and can be undone (tested)."
+  },
+  "HNV-14-01": {
+    "status": "in-progress",
+    "evidence": ["apps/console/src/pages/KnowledgePage.tsx", "apps/console/e2e/journeys.spec.ts"],
+    "note": "The knowledge library lists sources with their status (tested)."
+  },
+  "HNV-14-02": {
+    "status": "in-progress",
+    "evidence": ["apps/console/src/pages/KnowledgePage.tsx", "apps/console/e2e/journeys.spec.ts"],
+    "note": "An uploaded file shows its progress until it is ready to search (tested); cancelling an import comes later."
+  },
+  "HNV-14-04": {
+    "status": "in-progress",
+    "evidence": ["apps/console/src/pages/KnowledgePage.tsx", "apps/console/e2e/journeys.spec.ts"],
+    "note": "Search preview shows the passages an answer could cite (tested)."
+  },
+  "HNV-17-02": {
+    "status": "implemented",
+    "evidence": ["apps/console/src/pages/BrandsPage.tsx", "apps/console/e2e/journeys.spec.ts"],
+    "note": "Connecting Chatwoot says what will be created, in which account, before anything happens (tested)."
+  },
+  "HNV-17-03": {
+    "status": "in-progress",
+    "evidence": ["apps/console/src/pages/BrandsPage.tsx", "apps/console/e2e/journeys.spec.ts"],
+    "note": "A connected brand shows its connection status and Chatwoot account (tested); capabilities and last sync come later."
+  },
+  "HNV-17-05": {
+    "status": "in-progress",
+    "evidence": ["apps/console/src/pages/BrandsPage.tsx", "apps/console/e2e/journeys.spec.ts"],
+    "note": "Each brand shows a copyable install snippet, and its allowed websites can be changed (tested); an event test comes later."
   }
 }

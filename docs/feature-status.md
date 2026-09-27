@@ -7,9 +7,9 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 179 · in-progress: 51 · implemented: 2
+**Blueprint features (232):** planned: 175 · in-progress: 55 · implemented: 2
 
-**Design states (168):** planned: 162 · implemented: 5 · partial: 1
+**Design states (168):** planned: 148 · in-progress: 9 · implemented: 10 · partial: 1
 
 ## Blueprint features
 
@@ -23,15 +23,15 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | W04 | Clear responder identity | P0 | C | in-progress | `apps/gateway/src/authority/views.ts`, `apps/gateway/test/knowledge.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx` — Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested). |
 | W05 | Conversation history | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/useChat.ts` — Customer history from Chatwoot's customer view (private notes and activity excluded) with an older-page cursor, shown when the widget reopens; unread markers pending. |
 | W06 | Delivery states | P0 | C | in-progress | `apps/gateway/src/authority/outbound.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `packages/client/src/outbox.ts`, `packages/client/test/client.test.ts` — Queued, sending, accepted and failed (with retry) states in the widget, backed by the SDK outbox; 'accepted' only after the authority committed. Delivered/read states pending. |
-| W07 | Reconnect and draft preservation | P0 | C | in-progress | `apps/gateway/src/authority/journal.service.ts`, `apps/gateway/src/widget/events.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `packages/client/src/outbox.ts`, `packages/client/src/stream.ts`, `packages/client/test/client.test.ts` — Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. |
+| W07 | Reconnect and draft preservation | P0 | C | in-progress | `apps/gateway/src/authority/journal.service.ts`, `apps/gateway/src/authority/reconciler.service.ts`, `apps/gateway/src/widget/events.service.ts`, `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/e2e/journey.spec.ts`, `packages/client/src/outbox.ts`, `packages/client/src/stream.ts`, `packages/client/test/client.test.ts` — Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. Server side, the worker's reconciler recovers messages and state changes whose Chatwoot webhooks were lost (tested with every webhook dropped). |
 | W08 | Rich content | P0 | C | in-progress | `apps/widget/src/components/Chat.tsx`, `apps/widget/src/markdown.ts` — Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers. Structured cards pending. |
 | W09 | Attachments | P0 | C | planned |  |
 | W10 | Human handoff | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/components/Chat.tsx` — 'Talk to a person' in the widget creates a durable waiting state and a private handoff note for staff, so the customer does not repeat themselves (tested); context summary by AI pending. |
-| W11 | Offline support | P0 | C | planned |  |
-| W12 | Identity lifecycle | P0 | C | in-progress | `apps/gateway/src/widget/sessions.service.ts`, `apps/gateway/src/widget/tokens.service.ts`, `apps/gateway/test/slice.int.test.ts` — Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending. |
+| W11 | Offline support | P0 | C | in-progress | `apps/gateway/src/widget/copy.ts`, `apps/gateway/test/conversation-flow.int.test.ts`, `packages/domain/src/business-hours.ts`, `packages/domain/test/business-hours.test.ts` — Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; "talk to a person" answers queued or offline with the return time in the customer's language, shown in the widget (tested). Syncing Chatwoot working hours and follow-up by email are pending. |
+| W12 | Identity lifecycle | P0 | C | in-progress | `apps/gateway/src/admin/identity-keys.service.ts`, `apps/gateway/src/widget/sessions.service.ts`, `apps/gateway/src/widget/tokens.service.ts`, `apps/gateway/test/identity-keys.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending. Brands register their verification keys through the admin API (ES256, EdDSA or RS256 public keys, or a generated HS256 secret shown once), with two-step verification and a recent sign-in; keys retire (still verifying) or are revoked at once (tested). |
 | W13 | Locale and RTL | P0 | C | in-progress | `apps/gateway/src/widget/copy.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/i18n.ts` — Language selector for English, Arabic, Hindi and Urdu with right-to-left layout for Arabic and Urdu (tested); translations pending native review. |
 | W14 | Accessibility controls | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `packages/widget-loader/src/loader.ts` — Keyboard operation, Escape to close with focus returned to the launcher, labelled controls, polite live announcements and an axe audit with no WCAG 2.2 AA violations (tested); manual screen-reader review pending. |
-| W15 | Feedback and reopen | P0 | C | planned |  |
+| W15 | Feedback and reopen | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/conversation-flow.int.test.ts`, `packages/db/src/schema/authority.ts` — Customers rate a resolved conversation (1 to 5 with an optional comment; a new rating replaces the old one) and reopen it without writing; staff see each rating as a private note, and a reopened AI conversation returns to people if the AI may no longer answer (tested). Rating and reopen controls in the widget are pending. |
 | W16 | Structured task and approval cards | P1 | C | planned |  |
 | W17 | Search/help home | P1 | C | planned |  |
 | W18 | Verified cross-device continuation | P1 | C | planned |  |
@@ -54,7 +54,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | H05 | Saved replies | P0 | C | planned |  |
 | H06 | Customer context | P0 | C | planned |  |
 | H07 | Search | P0 | C | planned |  |
-| H08 | Ownership and collisions | P0 | C | in-progress | `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/conversations/staff-conversations.service.ts`, `apps/gateway/test/slice.int.test.ts` — Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending. |
+| H08 | Ownership and collisions | P0 | C | in-progress | `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/authority/processor.service.ts`, `apps/gateway/src/conversations/staff-conversations.service.ts`, `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending. |
 | H09 | Drafts and failed sends | P0 | C | planned |  |
 | H10 | Resolve, reopen and snooze | P0 | C | planned |  |
 | H11 | AI copilot | P0 | C | planned |  |
@@ -73,7 +73,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | A01 | Guided onboarding | P0 | C | planned |  |
 | A02 | Members and role presets | P0 | F | in-progress | `packages/policy/src/presets.ts`, `apps/gateway/src/admin/admin.service.ts`, `apps/gateway/test/admin.int.test.ts` — Invitations (verified-email acceptance), scoped grants and eight role presets through the admin API with integration tests; Studio screens pending. |
 | A03 | Sub-admin delegation | P0 | F | implemented | `packages/policy/src/delegation.ts`, `packages/policy/test/policy.test.ts`, `apps/gateway/src/admin/admin.service.ts`, `apps/gateway/test/admin.int.test.ts` — Delegation ceiling (own permissions, own scope, own expiry, no self-grants) enforced for grants, invitations and custom roles; interfaces added later (SCIM) must reuse checkDelegation. |
-| A04 | Multi-brand settings | P0 | C | planned |  |
+| A04 | Multi-brand settings | P0 | C | in-progress | `apps/gateway/src/admin/brands.service.ts`, `apps/gateway/src/widget/origins.ts`, `apps/gateway/test/brands.int.test.ts`, `apps/console/src/pages/BrandsPage.tsx`, `apps/console/e2e/journeys.spec.ts`, `deploy/production/Caddyfile` — Each brand has its own widget ID, allowed websites and business hours. Studio creates and edits brands; a website taken off the list gets no frame permission (CSP frame-ancestors per brand), no new chats, and its open chats end at once (tested). Per-brand appearance editing (board 04) is next. |
 | A05 | Basic business hours | P0 | C | planned |  |
 | A06 | Secrets and API credentials | P0 | F | in-progress | `apps/gateway/src/secrets/envelope.ts`, `apps/gateway/src/secrets/secret-broker.service.ts`, `apps/gateway/test/secrets.int.test.ts`, `packages/db/src/schema/identity.ts` — Write-only, masked, envelope-encrypted secrets with rotation, revocation, KEK rotation and MFA + fresh sign-in; API keys for service accounts pending. |
 | A07 | Draft/publish configuration | P0 | C | in-progress | `apps/gateway/src/runtime/agents.service.ts`, `apps/gateway/test/agents.int.test.ts`, `packages/db/migrations/20260927021253_agents_runtime_security.sql`, `packages/db/test/agents.int.test.ts` — Saved drafts are not live; publishing freezes a version with its configuration hash (a database trigger rejects changes), one version is live at a time, and publishing an earlier version is the rollback (tested). Studio screens pending. |
@@ -185,14 +185,14 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | R02 | AI specialist invitation | P0 | C | planned |  |
 | R03 | History grants | P0 | C | planned |  |
 | R04 | Three conversation lanes | P0 | C | planned |  |
-| R05 | Public response ownership | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/test/slice.int.test.ts` — One public AI speaker per conversation fenced by the ownership epoch; the lease with expiry (columns present) is not used yet. |
-| R06 | Human takeover fencing | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/slice.int.test.ts` — Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, and by a Chatwoot pre-flight owner check (mutation-tested). Undispatched tool actions follow with the tool gateway. |
+| R05 | Public response ownership | P0 | C | in-progress | `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/conversation-flow.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The lease with expiry (columns present) is not used yet. |
+| R06 | Human takeover fencing | P0 | C | in-progress | `apps/gateway/src/authority/publications.service.ts`, `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, by a Chatwoot pre-flight owner check and by a re-check of Hamnivo's own fence right before posting (each mutation-tested). A reply that still races a takeover while it is posted is marked late_publication, audited and reported to the new owner in a private note (tested). Undispatched tool actions follow with the tool gateway. |
 | R07 | In-flight action reconciliation | P0 | Q | planned |  |
 | R08 | Bounded parallel specialists | P1 | C | planned |  |
 | R09 | Pause remove replace agents | P0 | C | planned |  |
 | R10 | Guest invitation | P1 | A | planned |  |
 | R11 | Review versus takeover | P0 | C | planned |  |
-| R12 | Human unavailable state | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/src/widget/copy.ts`, `apps/gateway/test/slice.int.test.ts` — 'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note and honest availability ('queued'); business hours and follow-up channels pending. |
+| R12 | Human unavailable state | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/src/widget/copy.ts`, `apps/gateway/test/conversation-flow.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — 'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note, and answers honestly: queued during business hours, offline with the return time outside them (tested); follow-up channels pending. |
 | R13 | Specialist result provenance | P0 | C | planned |  |
 | R14 | External agent gateway | P1 | A | planned |  |
 | R15 | Participant activity UX | P1 | C | planned |  |
@@ -262,7 +262,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | X10 | Receipt-based completion | P0 | Q | planned |  |
 | X11 | Privacy-safe trace records | P0 | C | in-progress | `apps/gateway/src/runtime/runs.service.ts`, `apps/gateway/test/agents.int.test.ts` — Run and step records hold versions, counts, hashes and error kinds but no prompt or reply text (tested); staff read them through the API with analytics.read. |
 | X12 | Prompt and memory injection tests | P0 | L | planned |  |
-| X13 | Crash and replay tests | P0 | Q | planned |  |
+| X13 | Crash and replay tests | P0 | Q | in-progress | `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/src/authority/processor.service.ts` — Replaying a whole conversation through the reconciler neither duplicates messages nor repeats a takeover, and repeated webhook deliveries are applied once (tested). Commerce and tool crash cases are pending. |
 | X14 | Policy release controls | P0 | C | planned |  |
 
 ### Language and behavior
@@ -337,19 +337,19 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-02-01 | Sign-in | Default | planned |  |
+| HNV-02-01 | Sign-in | Default | in-progress | `apps/console/src/pages/SignInPage.tsx`, `apps/console/src/components/SignIn.tsx`, `apps/console/e2e/journeys.spec.ts` — Email and password sign-in with password-manager-friendly fields, and passkeys where the browser supports them (tested). The SSO choice comes with tenant SSO (A13). |
 | HNV-02-02 | Sign-in | Submitting | planned |  |
-| HNV-02-03 | Verification | MFA required | planned |  |
+| HNV-02-03 | Verification | MFA required | implemented | `apps/console/src/components/SignIn.tsx`, `apps/console/e2e/journeys.spec.ts` — Authenticator-app codes with a backup-code option; tested end to end: turn it on, sign out, sign in with a code. |
 | HNV-02-04 | Verification | Expired challenge | planned |  |
-| HNV-02-05 | Session | Reauthentication required | planned |  |
-| HNV-02-06 | Access | Forbidden or revoked | planned |  |
+| HNV-02-05 | Session | Reauthentication required | implemented | `apps/console/src/components/ReauthDialog.tsx`, `apps/console/e2e/journeys.spec.ts` — Sensitive actions and ended sessions ask to sign in again over the page; unsaved work is kept and the save finishes afterwards (tested). |
+| HNV-02-06 | Access | Forbidden or revoked | in-progress | `apps/console/src/components/States.tsx`, `apps/console/src/pages/StudioLayout.tsx` — Pages a person may not open say what access is missing and who can grant it. |
 
 ### 03 · Workspace overview and navigation
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
 | HNV-03-01 | Overview | Healthy workspace | planned |  |
-| HNV-03-02 | Overview | No conversations yet | planned |  |
+| HNV-03-02 | Overview | No conversations yet | in-progress | `apps/console/src/pages/OverviewPage.tsx`, `apps/console/e2e/journeys.spec.ts` — A new workspace’s overview says what to do first and links to creating a brand (tested); the test widget comes later. |
 | HNV-03-03 | Overview | Loading | planned |  |
 | HNV-03-04 | Overview | Partial service degradation | planned |  |
 | HNV-03-05 | Command palette | Search and keyboard navigation | planned |  |
@@ -437,11 +437,11 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
 | HNV-11-01 | Agent directory | Configured agents | planned |  |
-| HNV-11-02 | Agent editor | Draft configuration | planned |  |
+| HNV-11-02 | Agent editor | Draft configuration | implemented | `apps/console/src/pages/AgentEditorPage.tsx`, `apps/console/e2e/journeys.spec.ts` — Agent drafts are edited and saved by keyboard alone, and a draft someone else changed is shown as a conflict instead of being overwritten (tested). |
 | HNV-11-03 | Agent editor | Tools and knowledge grants | planned |  |
 | HNV-11-04 | Agent test room | Simulation | planned |  |
 | HNV-11-05 | Agent release | Validation blocked | planned |  |
-| HNV-11-06 | Agent release | Published, paused or rolled back | planned |  |
+| HNV-11-06 | Agent release | Published, paused or rolled back | in-progress | `apps/console/src/pages/AgentEditorPage.tsx`, `apps/console/e2e/journeys.spec.ts` — Publishing asks for a fresh sign-in and then shows the live version (tested); rollback in Studio comes later. |
 
 ### 12 · Jev typed decisions
 
@@ -463,16 +463,16 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | HNV-13-03 | Action approval | Approval expired or changed | planned |  |
 | HNV-13-04 | Policy result | Denied action | planned |  |
 | HNV-13-05 | Tool activity | Unknown outcome after timeout | planned |  |
-| HNV-13-06 | Security controls | Emergency pause | planned |  |
+| HNV-13-06 | Security controls | Emergency pause | implemented | `apps/console/src/components/StopAiDialog.tsx`, `apps/console/src/pages/StopAiPage.tsx`, `apps/console/e2e/journeys.spec.ts` — Stopping AI replies for a brand shows the scope first, is visible everywhere afterwards and can be undone (tested). |
 
 ### 14 · Knowledge and NLP caching
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-14-01 | Knowledge library | Published sources | planned |  |
-| HNV-14-02 | Knowledge import | Ingesting and indexing | planned |  |
+| HNV-14-01 | Knowledge library | Published sources | in-progress | `apps/console/src/pages/KnowledgePage.tsx`, `apps/console/e2e/journeys.spec.ts` — The knowledge library lists sources with their status (tested). |
+| HNV-14-02 | Knowledge import | Ingesting and indexing | in-progress | `apps/console/src/pages/KnowledgePage.tsx`, `apps/console/e2e/journeys.spec.ts` — An uploaded file shows its progress until it is ready to search (tested); cancelling an import comes later. |
 | HNV-14-03 | Knowledge import | Parse failure or stale source | planned |  |
-| HNV-14-04 | Answer preview | Conflicting or insufficient sources | planned |  |
+| HNV-14-04 | Answer preview | Conflicting or insufficient sources | in-progress | `apps/console/src/pages/KnowledgePage.tsx`, `apps/console/e2e/journeys.spec.ts` — Search preview shows the passages an answer could cite (tested). |
 | HNV-14-05 | Cache console | Eligible FAQ cache hit | planned |  |
 | HNV-14-06 | Cache console | Bypass, invalidation or unavailable | planned |  |
 
@@ -503,10 +503,10 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
 | HNV-17-01 | Integration directory | Discover connector | planned |  |
-| HNV-17-02 | Connection setup | Authorization review | planned |  |
-| HNV-17-03 | Connection | Connected and healthy | planned |  |
+| HNV-17-02 | Connection setup | Authorization review | implemented | `apps/console/src/pages/BrandsPage.tsx`, `apps/console/e2e/journeys.spec.ts` — Connecting Chatwoot says what will be created, in which account, before anything happens (tested). |
+| HNV-17-03 | Connection | Connected and healthy | in-progress | `apps/console/src/pages/BrandsPage.tsx`, `apps/console/e2e/journeys.spec.ts` — A connected brand shows its connection status and Chatwoot account (tested); capabilities and last sync come later. |
 | HNV-17-04 | Connection | Expired or revoked token | planned |  |
-| HNV-17-05 | SDK setup | Install and event test | planned |  |
+| HNV-17-05 | SDK setup | Install and event test | in-progress | `apps/console/src/pages/BrandsPage.tsx`, `apps/console/e2e/journeys.spec.ts` — Each brand shows a copyable install snippet, and its allowed websites can be changed (tested); an event test comes later. |
 | HNV-17-06 | Plugin manager | Compatibility or permission denied | planned |  |
 
 ### 18 · Migration and imports
@@ -584,7 +584,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | HNV-24-03 | Async content | Loading, empty and skeleton | implemented | `packages/ui/src/components/async-states.tsx`, `packages/ui/src/stories/async.stories.tsx`, `packages/ui/test/components.test.tsx` |
 | HNV-24-04 | Dialog and menu | Open, focus trapped and dismissed | implemented | `packages/ui/src/components/alert-dialog.tsx`, `packages/ui/src/stories/overlays.stories.tsx`, `packages/ui/test/overlays.test.tsx` |
 | HNV-24-05 | Global error | Recoverable, offline and unsaved navigation | implemented | `packages/ui/src/components/async-states.tsx`, `packages/ui/src/components/unsaved-changes-dialog.tsx`, `packages/ui/src/stories/global-error.stories.tsx`, `packages/ui/test/overlays.test.tsx` |
-| HNV-24-06 | Accessible alternatives | Screen reader, zoom and reduced motion | partial | `packages/ui/scripts/a11y-audit.ts`, `packages/ui/src/components/live-region.tsx` — Automated axe audit passes for every story in light/dark × LTR/RTL; manual screen-reader, 200% zoom and keyboard reviews are still required. |
+| HNV-24-06 | Accessible alternatives | Screen reader, zoom and reduced motion | partial | `apps/console/e2e/audit.spec.ts`, `packages/ui/scripts/a11y-audit.ts`, `packages/ui/src/components/live-region.tsx` — Automated axe audits pass for every Storybook story in light/dark × LTR/RTL and for every Studio screen and dialog in English and Arabic, with no sideways scrolling from 320 to 1920 px (tested). Manual screen-reader, 200% zoom and keyboard reviews are still required. |
 
 ### 25 · NLP and semantic cache policy
 
