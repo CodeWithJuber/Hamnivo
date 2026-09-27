@@ -14,7 +14,7 @@ import { type AuthorityMessage, detectHumanRequest } from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { generateText, isStepCount } from 'ai';
 import canonicalize from 'canonicalize';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { type JournalEntry, JournalService } from '../authority/journal.service.js';
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
 import { PublicationsService } from '../authority/publications.service.js';
@@ -140,6 +140,44 @@ export class RepliesService {
     return null;
   }
 
+  /**
+   * Ends the run when the customer wrote again after the message that started it; the newer
+   * message's own job then answers with the whole conversation in view.
+   */
+  private async skipIfSuperseded(
+    tenantId: string,
+    runId: string,
+    payload: CustomerMessageEvent,
+    telemetry: Omit<Parameters<RunsService['finish']>[2], 'outcome' | 'state'> = {},
+  ): Promise<boolean> {
+    return this.tx(tenantId, async (tx) => {
+      const l = schema.messageLedger;
+      // Compared in SQL: timestamps read into JavaScript lose their microseconds.
+      const [newer] = await tx
+        .select({ id: l.id })
+        .from(l)
+        .where(
+          and(
+            eq(l.conversationId, payload.conversationId),
+            eq(l.senderKind, 'customer'),
+            eq(l.state, 'committed'),
+            ne(l.id, payload.ledgerId),
+            sql`${l.createdAt} > (select m.created_at from message_ledger m where m.id = ${payload.ledgerId})`,
+          ),
+        )
+        .limit(1);
+      if (!newer) return false;
+      await this.runs.step(tx, tenantId, runId, {
+        kind: 'decision',
+        name: 'superseded',
+        status: 'ok',
+        detail: { reason: 'newer_customer_message' },
+      });
+      await this.runs.finish(tx, runId, { outcome: 'skipped', state: 'skipped', ...telemetry });
+      return true;
+    });
+  }
+
   /** Outbox handler for `conversation.customer_message`. Safe to run more than once. */
   async onCustomerMessage(event: ClaimedOutboxEvent): Promise<void> {
     const payload = event.payload as CustomerMessageEvent;
@@ -209,6 +247,7 @@ export class RepliesService {
       await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'fenced' }));
       return;
     }
+    if (await this.skipIfSuperseded(tenantId, run.id, payload)) return;
     if (agent?.config.mode !== 'answer') {
       await this.handOff(
         tenantId,
@@ -261,6 +300,9 @@ export class RepliesService {
       outputTokens: generated.outputTokens,
       latencyMs: generated.latencyMs,
     };
+    // The customer may have written again while the model was working: that message's job
+    // answers both, so this reply is dropped (R05: one AI reply per burst of messages).
+    if (await this.skipIfSuperseded(tenantId, run.id, payload, telemetry)) return;
 
     const facts: PublicationFacts = {
       sources: generated.sources,

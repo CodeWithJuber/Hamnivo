@@ -69,6 +69,16 @@ export interface BrandTheme {
   logoUrl?: string | null;
 }
 
+/** Mirrors BusinessHours in @hamnivo/contracts (validated there before it is stored). */
+export interface BrandBusinessHours {
+  timezone: string;
+  weekly: Record<
+    'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat',
+    { open: string; close: string }[]
+  >;
+  closedDates: string[];
+}
+
 export const brands = pgTable(
   'brands',
   {
@@ -80,6 +90,8 @@ export const brands = pgTable(
     widgetPublicId: text('widget_public_id').notNull(),
     allowedOrigins: text('allowed_origins').array().notNull().default(sql`'{}'::text[]`),
     theme: jsonb('theme').$type<BrandTheme>().notNull().default({}),
+    /** When people answer (W11); null means no hours are set. */
+    businessHours: jsonb('business_hours').$type<BrandBusinessHours>(),
     configVersion: integer('config_version').notNull().default(1),
     status: text('status', { enum: ['active', 'disabled'] })
       .notNull()

@@ -143,6 +143,22 @@ Late publication (R06):
 - **Conservative timing.** Chatwoot's timestamps have one-second resolution, so a reply stored
   within a second before the takeover is also reported.
 
+## Customer flows (M11)
+
+- **Identity keys** (`/v1/admin/brands/{brandId}/identity-keys`). Brands register the keys that
+  verify their customers' identity assertions: an ES256, EdDSA or RS256 public key, or an HS256
+  secret generated and shown once. Registering needs `widget.identity_keys`, two-step
+  verification and a recent sign-in. A key can be retired (it still verifies during a rotation)
+  or revoked (refused at once).
+- **One reply per burst.** A reply job stops when the customer wrote again meanwhile. It checks
+  before and after generation. The newer message's job answers with both messages in view.
+- **Feedback and reopen.** `POST …/feedback` stores a rating of a resolved conversation, and staff
+  see it as a private note. `POST …/reopen` reopens it without writing. A customer who writes
+  again also reopens it, as in Chatwoot.
+- **Business hours** (`PUT /v1/admin/brands/{brandId}/business-hours`). These set the widget
+  configuration's `availability`, and the answer to "talk to a person": queued, or offline with
+  the time people are back. Without hours, the widget never claims someone is available.
+
 ## Widget framing
 
 `GET /v1/widget/frame-policy?widgetId=wid_…` names the websites that may frame a brand's widget

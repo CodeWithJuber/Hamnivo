@@ -260,11 +260,12 @@
   "R05": {
     "status": "in-progress",
     "evidence": [
-      "apps/gateway/src/runtime/replies.service.ts",
       "apps/gateway/src/authority/ownership.service.ts",
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/conversation-flow.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
-    "note": "One public AI speaker per conversation fenced by the ownership epoch; the lease with expiry (columns present) is not used yet."
+    "note": "One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The lease with expiry (columns present) is not used yet."
   },
   "R06": {
     "status": "in-progress",
@@ -281,9 +282,10 @@
     "evidence": [
       "apps/gateway/src/widget/conversations.service.ts",
       "apps/gateway/src/widget/copy.ts",
+      "apps/gateway/test/conversation-flow.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
-    "note": "'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note and honest availability ('queued'); business hours and follow-up channels pending."
+    "note": "'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note, and answers honestly: queued during business hours, offline with the return time outside them (tested); follow-up channels pending."
   },
   "G02": {
     "status": "in-progress",
@@ -569,5 +571,24 @@
       "apps/gateway/src/authority/processor.service.ts"
     ],
     "note": "Replaying a whole conversation through the reconciler neither duplicates messages nor repeats a takeover, and repeated webhook deliveries are applied once (tested). Commerce and tool crash cases are pending."
+  },
+  "W15": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/conversations.service.ts",
+      "apps/gateway/test/conversation-flow.int.test.ts",
+      "packages/db/src/schema/authority.ts"
+    ],
+    "note": "Customers rate a resolved conversation (1 to 5 with an optional comment; a new rating replaces the old one) and reopen it without writing; staff see each rating as a private note, and a reopened AI conversation returns to people if the AI may no longer answer (tested). Rating and reopen controls in the widget are pending."
+  },
+  "W11": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/widget/copy.ts",
+      "apps/gateway/test/conversation-flow.int.test.ts",
+      "packages/domain/src/business-hours.ts",
+      "packages/domain/test/business-hours.test.ts"
+    ],
+    "note": "Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; \"talk to a person\" answers queued or offline with the return time in the customer's language, shown in the widget (tested). Syncing Chatwoot working hours and follow-up by email are pending."
   }
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type {
   CustomerConversation,
+  FeedbackRequest,
   HandoffRequest,
   MessagePage,
   SendMessageRequest,
@@ -37,7 +38,7 @@ import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { AuthorityContactsService } from './contacts.service.js';
-import { handoffMessage } from './copy.js';
+import { handoffOutcome } from './copy.js';
 import { sha256, type WidgetClaims } from './tokens.service.js';
 import { customerConversation, lastPreview, principalConversations } from './views.js';
 
@@ -354,8 +355,14 @@ export class WidgetConversationsService {
       'handoff',
       uuidV5(conversationId, `handoff:${input.clientRequestId}`),
     );
+    const now = this.clock();
+    let outcome = handoffOutcome(undefined, locale, now);
     const entries = await this.tx(claims, async (tx) => {
       const control = await this.own(tx, claims, conversationId, true);
+      const [brand] = control.brandId
+        ? await tx.select().from(schema.brands).where(eq(schema.brands.id, control.brandId))
+        : [];
+      outcome = handoffOutcome(brand, locale, now);
       if (control.ownerMode !== 'AI_ACTIVE' && control.ownerMode !== 'PAUSED') return [];
       const note = input.note?.trim();
       const result = await this.ownership.transition(
@@ -374,18 +381,117 @@ export class WidgetConversationsService {
         {
           lane: 'customer',
           type: 'handoff.requested',
-          data: { handoffId, availability: 'queued' },
+          data: { handoffId, availability: outcome.availability },
         },
       ]);
       return [...result.journal, ...requested];
     });
     await this.journal.notify(claims.tenantId, conversationId, entries);
-    return {
-      handoffId,
-      availability: 'queued' as const,
-      message: handoffMessage(locale),
-      followUp: null,
-    };
+    return { handoffId, ...outcome };
+  }
+
+  /**
+   * Reopens a resolved conversation without writing (W15). Chatwoot's own rule applies: pending
+   * with the bot when the AI owned it, otherwise open for people. An AI that may no longer answer
+   * (agent unpublished, AI stopped) hands the conversation to people.
+   */
+  async reopen(claims: WidgetClaims, publicId: string): Promise<CustomerConversation> {
+    const conversationId = this.conversationId(publicId);
+    const before = await this.tx(claims, (tx) => this.own(tx, claims, conversationId));
+    if (before.authorityStatus !== 'resolved') return this.get(claims, publicId);
+    const runtime = await this.registry.get(claims.tenantId, before.connectionId);
+    const status = before.ownerMode === 'AI_ACTIVE' && runtime.primaryBot ? 'pending' : 'open';
+    try {
+      await runtime.authority.setStatus(String(before.externalConversationId), status, {
+        kind: 'integration',
+      });
+    } catch (error) {
+      throw authorityUnavailable(
+        error,
+        'The conversation could not be reopened. Please try again.',
+      );
+    }
+    const entries = await this.tx(claims, async (tx) => {
+      const control = await this.own(tx, claims, conversationId, true);
+      if (control.authorityStatus !== 'resolved') return [];
+      await tx
+        .update(schema.conversationControls)
+        .set({ authorityStatus: status, updatedAt: this.clock() })
+        .where(eq(schema.conversationControls.id, conversationId));
+      const out = await this.journal.append(tx, claims.tenantId, conversationId, [
+        { lane: 'customer', type: 'conversation.reopened', data: {} },
+      ]);
+      if (control.ownerMode === 'AI_ACTIVE' && control.brandId) {
+        const decision = await this.agents.answering(tx, control.brandId);
+        if (!decision.answering) {
+          const result = await this.ownership.transition(
+            tx,
+            claims.tenantId,
+            conversationId,
+            { kind: 'queue' },
+            {
+              origin: 'hamnivo',
+              reason: decision.reason,
+              actor: { type: 'system', id: 'ai' },
+              handoffNote: HANDOFF_NOTES[decision.reason],
+            },
+          );
+          out.push(...result.journal);
+        }
+      }
+      return out;
+    });
+    await this.journal.notify(claims.tenantId, conversationId, entries);
+    return this.get(claims, publicId);
+  }
+
+  /**
+   * Stores the customer's rating of a resolved conversation (W15); a new rating replaces the
+   * previous one. Staff see it as a private note in the conversation.
+   */
+  async feedback(
+    claims: WidgetClaims,
+    publicId: string,
+    input: z.output<typeof FeedbackRequest>,
+  ): Promise<void> {
+    const conversationId = this.conversationId(publicId);
+    await this.tx(claims, async (tx) => {
+      const control = await this.own(tx, claims, conversationId);
+      if (control.authorityStatus !== 'resolved') {
+        throw new AppError('VALIDATION_FAILED', {
+          detail: 'A conversation can be rated once it is resolved.',
+        });
+      }
+      const comment = input.comment?.trim() || null;
+      const now = this.clock();
+      await tx
+        .insert(schema.conversationFeedback)
+        .values({
+          tenantId: claims.tenantId,
+          conversationId,
+          principalId: claims.principalId,
+          rating: input.rating,
+          comment,
+        })
+        .onConflictDoUpdate({
+          target: [
+            schema.conversationFeedback.tenantId,
+            schema.conversationFeedback.conversationId,
+            schema.conversationFeedback.principalId,
+          ],
+          set: { rating: input.rating, comment, updatedAt: now },
+        });
+      await enqueueOutbox(tx, claims.tenantId, {
+        topic: 'conversation.note',
+        aggregateType: 'conversation',
+        aggregateId: conversationId,
+        payload: {
+          conversationId,
+          key: `hv1:n:${uuidV5(conversationId, `feedback:${claims.principalId}:${now.getTime()}`)}`,
+          text: `Customer rating: ${input.rating} out of 5.${comment ? ` Comment: “${comment}”` : ''}`,
+        },
+      });
+    });
   }
 
   /** Latest journal head for a conversation the principal owns (for streams). */

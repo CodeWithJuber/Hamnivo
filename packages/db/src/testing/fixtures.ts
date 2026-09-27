@@ -259,6 +259,13 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       event: { text: 'Assalamu alaikum' },
       expiresAt: inDays(7),
     });
+    await tx.insert(s.conversationFeedback).values({
+      tenantId,
+      conversationId: ids.conversationId,
+      principalId: ids.principalId,
+      rating: 5,
+      comment: 'Very helpful',
+    });
     await tx.insert(s.reconcileCursors).values({
       tenantId,
       connectionId: ids.connectionId,

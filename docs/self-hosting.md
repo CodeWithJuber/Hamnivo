@@ -184,7 +184,18 @@ any computer. Replace `example.com` with your domain.
    curl "${h[@]}" -d '{"alg":"HS256"}' $A/v1/admin/brands/brd_.../identity-keys   # secret shown once
    ```
 
-7. **Put the chat on your website** with the brand's widget ID:
+7. **Optional: set business hours.** Then the chat tells customers honestly when people are
+   away and when they are back. The AI keeps answering at any hour:
+
+   ```bash
+   curl "${h[@]}" -X PUT $A/v1/admin/brands/brd_.../business-hours -d '{"businessHours":
+     {"timezone":"Asia/Karachi","closedDates":[],"weekly":{"sun":[],"sat":[],
+      "mon":[{"open":"09:00","close":"17:00"}],"tue":[{"open":"09:00","close":"17:00"}],
+      "wed":[{"open":"09:00","close":"17:00"}],"thu":[{"open":"09:00","close":"17:00"}],
+      "fri":[{"open":"09:00","close":"12:30"},{"open":"14:30","close":"17:00"}]}}}'
+   ```
+
+8. **Put the chat on your website** with the brand's widget ID:
 
    ```html
    <script src="https://chat.example.com/loader.js" data-widget-id="wid_..."

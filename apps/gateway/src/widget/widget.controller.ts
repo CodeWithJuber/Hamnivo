@@ -1,5 +1,6 @@
 import {
   CreateWidgetSessionRequest,
+  FeedbackRequest,
   HandoffRequest,
   IdentifyRequest,
   ReadReceiptRequest,
@@ -159,6 +160,24 @@ export class WidgetController {
       parseInput(HandoffRequest, body),
       language,
     );
+  }
+
+  @Post('conversations/:conversationId/reopen')
+  @WidgetRoute()
+  @HttpCode(200)
+  reopen(@CurrentWidget() claims: WidgetClaims, @Param('conversationId') conversationId: string) {
+    return this.conversations.reopen(claims, conversationId);
+  }
+
+  @Post('conversations/:conversationId/feedback')
+  @WidgetRoute()
+  @HttpCode(204)
+  async feedback(
+    @CurrentWidget() claims: WidgetClaims,
+    @Param('conversationId') conversationId: string,
+    @Body() body: unknown,
+  ): Promise<void> {
+    await this.conversations.feedback(claims, conversationId, parseInput(FeedbackRequest, body));
   }
 
   @Get('conversations/:conversationId/events')

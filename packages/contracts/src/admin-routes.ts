@@ -31,6 +31,7 @@ import {
   CreatedIdentityKey,
   CreateIdentityKeyRequest,
   IdentityKey,
+  SetBusinessHoursRequest,
 } from './brands.js';
 import type { RouteDef } from './routes.js';
 
@@ -296,6 +297,17 @@ export const adminRoutes = {
     body: CreateBrandRequest,
     idempotent: true,
     success: { status: 201, description: 'Brand created', schema: Brand },
+  },
+  setBusinessHours: {
+    method: 'put',
+    path: '/v1/admin/brands/{brandId}/business-hours',
+    operationId: 'setBusinessHours',
+    summary: 'Set or remove the hours when people answer (widget.configure)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    params: brandParams,
+    body: SetBusinessHoursRequest,
+    success: { status: 200, description: 'Brand', schema: Brand },
   },
   listIdentityKeys: {
     method: 'get',

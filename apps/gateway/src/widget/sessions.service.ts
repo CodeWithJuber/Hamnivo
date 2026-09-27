@@ -182,7 +182,7 @@ export class WidgetSessionsService {
         verified: principal.kind === 'verified',
         displayName: principal.displayName,
       },
-      config: widgetConfig(brand as BrandRow),
+      config: widgetConfig(brand as BrandRow, this.clock()),
       conversations: await principalConversations(tx, principal.id),
     };
   }

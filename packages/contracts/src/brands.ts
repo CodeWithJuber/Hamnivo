@@ -20,6 +20,73 @@ export const CreateBrandRequest = z
   })
   .meta({ id: 'CreateBrandRequest' });
 
+const LocalTime = z
+  .string()
+  .regex(/^(([01]\d|2[0-3]):[0-5]\d|24:00)$/, 'Use 24-hour HH:MM, such as 09:30');
+
+/** One opening span in the brand's local time; it may not cross midnight (split it in two). */
+export const OpeningInterval = z
+  .object({ open: LocalTime, close: LocalTime })
+  .refine((v) => v.open !== '24:00' && v.open < v.close, {
+    message: 'Opening must come before closing',
+    path: ['close'],
+  });
+
+const OpeningDay = z
+  .array(OpeningInterval)
+  .max(6)
+  .refine(
+    (spans) =>
+      [...spans]
+        .sort((a, b) => (a.open < b.open ? -1 : 1))
+        .every((span, i, all) => i === 0 || (all[i - 1] as typeof span).close <= span.open),
+    { message: 'Opening spans on one day must not overlap' },
+  );
+
+/**
+ * When people answer (W11). The widget says honestly whether someone is working now and when
+ * people are back; the AI keeps answering at any hour.
+ */
+export const BusinessHours = z
+  .object({
+    /** IANA time zone, such as `Asia/Karachi`. */
+    timezone: z
+      .string()
+      .min(1)
+      .max(64)
+      .refine(
+        (tz) => {
+          try {
+            new Intl.DateTimeFormat('en', { timeZone: tz });
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { message: 'Unknown time zone' },
+      ),
+    weekly: z.object({
+      sun: OpeningDay,
+      mon: OpeningDay,
+      tue: OpeningDay,
+      wed: OpeningDay,
+      thu: OpeningDay,
+      fri: OpeningDay,
+      sat: OpeningDay,
+    }),
+    /** Whole local days without service, such as public holidays (YYYY-MM-DD). */
+    closedDates: z.array(z.iso.date()).max(366).default([]),
+  })
+  .meta({ id: 'BusinessHours' });
+export type BusinessHours = z.infer<typeof BusinessHours>;
+
+export const SetBusinessHoursRequest = z
+  .object({
+    /** `null` removes the hours: the widget then never claims a person is available. */
+    businessHours: BusinessHours.nullable(),
+  })
+  .meta({ id: 'SetBusinessHoursRequest' });
+
 export const Brand = z
   .object({
     id: typeId('brand'),
@@ -28,6 +95,7 @@ export const Brand = z
     /** Public widget identifier for the loader snippet; not a credential. */
     widgetId: typeId('widget'),
     allowedOrigins: z.array(z.string()),
+    businessHours: BusinessHours.nullable(),
     status: BrandStatus,
     createdAt: Timestamp,
   })

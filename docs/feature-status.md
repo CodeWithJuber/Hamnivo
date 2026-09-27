@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 178 · in-progress: 52 · implemented: 2
+**Blueprint features (232):** planned: 176 · in-progress: 54 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -27,11 +27,11 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | W08 | Rich content | P0 | C | in-progress | `apps/widget/src/components/Chat.tsx`, `apps/widget/src/markdown.ts` — Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers. Structured cards pending. |
 | W09 | Attachments | P0 | C | planned |  |
 | W10 | Human handoff | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/slice.int.test.ts`, `apps/widget/src/components/Chat.tsx` — 'Talk to a person' in the widget creates a durable waiting state and a private handoff note for staff, so the customer does not repeat themselves (tested); context summary by AI pending. |
-| W11 | Offline support | P0 | C | planned |  |
+| W11 | Offline support | P0 | C | in-progress | `apps/gateway/src/widget/copy.ts`, `apps/gateway/test/conversation-flow.int.test.ts`, `packages/domain/src/business-hours.ts`, `packages/domain/test/business-hours.test.ts` — Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; "talk to a person" answers queued or offline with the return time in the customer's language, shown in the widget (tested). Syncing Chatwoot working hours and follow-up by email are pending. |
 | W12 | Identity lifecycle | P0 | C | in-progress | `apps/gateway/src/admin/identity-keys.service.ts`, `apps/gateway/src/widget/sessions.service.ts`, `apps/gateway/src/widget/tokens.service.ts`, `apps/gateway/test/identity-keys.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, tenant-signed identity assertions (kid, audience, five-minute lifetime, single-use jti) and identity switch as a new principal that ends the old session and its streams (tested); widget UI pending. Brands register their verification keys through the admin API (ES256, EdDSA or RS256 public keys, or a generated HS256 secret shown once), with two-step verification and a recent sign-in; keys retire (still verifying) or are revoked at once (tested). |
 | W13 | Locale and RTL | P0 | C | in-progress | `apps/gateway/src/widget/copy.ts`, `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/i18n.ts` — Language selector for English, Arabic, Hindi and Urdu with right-to-left layout for Arabic and Urdu (tested); translations pending native review. |
 | W14 | Accessibility controls | P0 | C | in-progress | `apps/widget/e2e/journey.spec.ts`, `apps/widget/src/components/Chat.tsx`, `packages/widget-loader/src/loader.ts` — Keyboard operation, Escape to close with focus returned to the launcher, labelled controls, polite live announcements and an axe audit with no WCAG 2.2 AA violations (tested); manual screen-reader review pending. |
-| W15 | Feedback and reopen | P0 | C | planned |  |
+| W15 | Feedback and reopen | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/test/conversation-flow.int.test.ts`, `packages/db/src/schema/authority.ts` — Customers rate a resolved conversation (1 to 5 with an optional comment; a new rating replaces the old one) and reopen it without writing; staff see each rating as a private note, and a reopened AI conversation returns to people if the AI may no longer answer (tested). Rating and reopen controls in the widget are pending. |
 | W16 | Structured task and approval cards | P1 | C | planned |  |
 | W17 | Search/help home | P1 | C | planned |  |
 | W18 | Verified cross-device continuation | P1 | C | planned |  |
@@ -185,14 +185,14 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | R02 | AI specialist invitation | P0 | C | planned |  |
 | R03 | History grants | P0 | C | planned |  |
 | R04 | Three conversation lanes | P0 | C | planned |  |
-| R05 | Public response ownership | P0 | C | in-progress | `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/test/slice.int.test.ts` — One public AI speaker per conversation fenced by the ownership epoch; the lease with expiry (columns present) is not used yet. |
+| R05 | Public response ownership | P0 | C | in-progress | `apps/gateway/src/authority/ownership.service.ts`, `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/conversation-flow.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The lease with expiry (columns present) is not used yet. |
 | R06 | Human takeover fencing | P0 | C | in-progress | `apps/gateway/src/authority/publications.service.ts`, `apps/gateway/src/runtime/replies.service.ts`, `apps/gateway/test/reconciler.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — Stale AI replies are rejected after takeover: at job start, at reservation under the row lock, by a Chatwoot pre-flight owner check and by a re-check of Hamnivo's own fence right before posting (each mutation-tested). A reply that still races a takeover while it is posted is marked late_publication, audited and reported to the new owner in a private note (tested). Undispatched tool actions follow with the tool gateway. |
 | R07 | In-flight action reconciliation | P0 | Q | planned |  |
 | R08 | Bounded parallel specialists | P1 | C | planned |  |
 | R09 | Pause remove replace agents | P0 | C | planned |  |
 | R10 | Guest invitation | P1 | A | planned |  |
 | R11 | Review versus takeover | P0 | C | planned |  |
-| R12 | Human unavailable state | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/src/widget/copy.ts`, `apps/gateway/test/slice.int.test.ts` — 'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note and honest availability ('queued'); business hours and follow-up channels pending. |
+| R12 | Human unavailable state | P0 | C | in-progress | `apps/gateway/src/widget/conversations.service.ts`, `apps/gateway/src/widget/copy.ts`, `apps/gateway/test/conversation-flow.int.test.ts`, `apps/gateway/test/slice.int.test.ts` — 'Talk to a person' always moves the conversation to a durable waiting state with a private handoff note, and answers honestly: queued during business hours, offline with the return time outside them (tested); follow-up channels pending. |
 | R13 | Specialist result provenance | P0 | C | planned |  |
 | R14 | External agent gateway | P1 | A | planned |  |
 | R15 | Participant activity UX | P1 | C | planned |  |

@@ -1,6 +1,6 @@
-import { adminRoutes, CreateBrandRequest } from '@hamnivo/contracts';
+import { adminRoutes, CreateBrandRequest, SetBusinessHoursRequest } from '@hamnivo/contracts';
 import type { StaffPrincipal } from '@hamnivo/policy';
-import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { IdempotencyService, validIdempotencyKey } from '../common/idempotency.service.js';
 import { parseInput } from '../common/validation.js';
@@ -42,5 +42,16 @@ export class BrandsController {
     reply.status(result.status);
     if (result.replayed) reply.header('idempotent-replayed', 'true');
     return result.body;
+  }
+
+  @Put(':brandId/business-hours')
+  @StaffRoute({ tenant: true, permission: 'widget.configure' })
+  setBusinessHours(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('brandId') brandId: string,
+    @Body() body: unknown,
+  ) {
+    const input = parseInput(SetBusinessHoursRequest, body);
+    return this.brands.setBusinessHours(principal, brandId, input.businessHours);
   }
 }

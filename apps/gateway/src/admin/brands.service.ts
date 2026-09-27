@@ -1,4 +1,4 @@
-import type { Brand, CreateBrandRequest } from '@hamnivo/contracts';
+import type { Brand, CreateBrandRequest, SetBusinessHoursRequest } from '@hamnivo/contracts';
 import {
   appendAudit,
   type Db,
@@ -25,6 +25,7 @@ export function brandView(row: typeof schema.brands.$inferSelect): Brand {
     name: row.name,
     widgetId: row.widgetPublicId,
     allowedOrigins: row.allowedOrigins,
+    businessHours: row.businessHours ?? null,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
   };
@@ -100,6 +101,50 @@ export class BrandsService {
         targetId: toPublicId('brand', row.id),
         outcome: 'success',
         data: { name: row.name, allowedOrigins: row.allowedOrigins },
+      });
+      return brandView(row);
+    });
+  }
+
+  /** Sets or removes the hours when people answer (W11); the widget picks them up at once. */
+  async setBusinessHours(
+    principal: StaffPrincipal,
+    brandPublicId: string,
+    businessHours: z.output<typeof SetBusinessHoursRequest>['businessHours'],
+  ): Promise<Brand> {
+    let brandId: string;
+    try {
+      brandId = fromPublicId('brand', brandPublicId);
+    } catch {
+      throw new AppError('NOT_FOUND', { detail: 'Brand not found.' });
+    }
+    return this.tx(principal, async (tx) => {
+      const [brand] = await tx.select().from(schema.brands).where(eq(schema.brands.id, brandId));
+      if (!brand) throw new AppError('NOT_FOUND', { detail: 'Brand not found.' });
+      enforce(
+        this.allowed(principal, 'widget.configure', {
+          workspaceId: brand.workspaceId,
+          brandId: brand.id,
+        }),
+      );
+      const [row] = await tx
+        .update(schema.brands)
+        .set({
+          businessHours,
+          configVersion: brand.configVersion + 1,
+          updatedAt: this.clock(),
+        })
+        .where(eq(schema.brands.id, brandId))
+        .returning();
+      if (!row) throw new Error('brand update returned nothing');
+      await appendAudit(tx, {
+        actorType: 'staff',
+        actorId: toPublicId('staff', principal.staffMemberId),
+        action: 'brand.business_hours.updated',
+        targetType: 'brand',
+        targetId: toPublicId('brand', brand.id),
+        outcome: 'success',
+        data: { timezone: businessHours?.timezone ?? null },
       });
       return brandView(row);
     });
