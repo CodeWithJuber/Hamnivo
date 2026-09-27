@@ -74,7 +74,8 @@ export const cacheDependency = {
   knowledgeSource: (sourceId: string) => `knowledge:source:${sourceId}`,
   agent: (agentId: string) => `agent:${agentId}`,
   brand: (brandId: string) => `brand:${brandId}`,
-  cachePolicy: (brandId: string) => `cache_policy:${brandId}`,
+  /** Raised when the brand's policy for this tier changes or the tier is invalidated. */
+  cachePolicy: (brandId: string, tier: CacheTier) => `cache_policy:${brandId}:${tier}`,
   glossary: (glossaryId: string) => `glossary:${glossaryId}`,
 } as const;
 

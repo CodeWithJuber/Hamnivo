@@ -133,6 +133,18 @@ describe('chooseTeam (U07)', () => {
     });
   });
 
+  it('treats equally fitting languages of an ambiguous message as native', () => {
+    // "paise wapas kab milenge" fits Hinglish and Roman Urdu alike.
+    expect(
+      chooseTeam({ intent: 'billing', language: 'hinglish', alternatives: ['roman-urdu'], teams }),
+    ).toEqual({ teamId: 'billing-ur', languageMatch: 'native', basis: 'intent' });
+    expect(chooseTeam({ intent: 'billing', language: 'hinglish', teams })).toEqual({
+      teamId: 'billing-en',
+      languageMatch: 'none',
+      basis: 'intent',
+    });
+  });
+
   it('only routes to teams that are accepting conversations', () => {
     const paused = teams.map((t) => (t.id === 'billing-ur' ? { ...t, accepting: false } : t));
     expect(chooseTeam({ intent: 'billing', language: 'ur', teams: paused })).toEqual({

@@ -162,6 +162,15 @@ export interface ConversationAuthority {
     status: ConversationStatus,
     actor: ActorCredential,
   ): Promise<void>;
+  /**
+   * Puts the conversation in a team's queue; null clears the team. Optional: an authority without
+   * teams leaves routing to Hamnivo's own records.
+   */
+  assignTeam?(
+    conversationRef: string,
+    teamRef: string | null,
+    actor: ActorCredential,
+  ): Promise<void>;
   annotate(
     conversationRef: string,
     change: { attributes?: Record<string, unknown>; labels?: string[] },

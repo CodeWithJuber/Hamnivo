@@ -83,7 +83,17 @@ describe('resolveReplyLanguage', () => {
   });
 
   it('keeps the previous language when an ambiguous message fits it', () => {
-    expect(resolveReplyLanguage({ previous: 'ur-Latn', detection: ambiguous })).toEqual({
+    // Still unanswered: the question stays open, suggesting the language in use.
+    expect(
+      resolveReplyLanguage({ previous: 'ur-Latn', uiLocale: 'hi', detection: ambiguous }),
+    ).toEqual({
+      language: 'ur-Latn',
+      source: 'previous',
+      confirm: { suggested: 'ur-Latn', alternatives: ['hi-Latn'] },
+    });
+    expect(
+      resolveReplyLanguage({ previous: 'ur-Latn', detection: ambiguous, prompted: true }),
+    ).toEqual({
       language: 'ur-Latn',
       source: 'previous',
       confirm: null,

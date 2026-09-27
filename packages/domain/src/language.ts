@@ -308,16 +308,16 @@ export function resolveReplyLanguage(input: LanguagePreferenceInput): LanguageRe
     return { language: detection.language, source: 'detected', confirm: null };
   }
   if (candidates.length > 0) {
-    if (input.previous && candidates.includes(input.previous)) {
-      return { language: input.previous, source: 'previous', confirm: null };
-    }
+    // Keep the language already in use when it fits; otherwise suggest from the locale.
+    const kept = input.previous && candidates.includes(input.previous) ? input.previous : undefined;
     const fromLocale = input.uiLocale ? localeMatch(input.uiLocale, candidates) : undefined;
-    const suggested = fromLocale ?? (candidates[0] as ReplyLanguage);
+    const suggested = kept ?? fromLocale ?? (candidates[0] as ReplyLanguage);
     const alternatives = candidates.filter((c) => c !== suggested);
     return {
       language: suggested,
-      source: 'suggested',
-      confirm: input.prompted ? null : { suggested, alternatives },
+      source: kept ? 'previous' : 'suggested',
+      // The customer is asked until they choose or close the question, and then never again.
+      confirm: input.prompted || alternatives.length === 0 ? null : { suggested, alternatives },
     };
   }
   if (input.previous) return { language: input.previous, source: 'previous', confirm: null };

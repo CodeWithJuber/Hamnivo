@@ -138,7 +138,7 @@ team.
   prompt version, every dependency with its version, and a keyed digest of the input. The tenant
   and brand prefix the stored key. Keys never contain input text; incomplete envelopes throw.
 - `cacheDependency` names dependencies (`knowledge:source:<id>`, `agent:<id>`, `brand:<id>`,
-  `cache_policy:<brandId>`). Bumping a version changes the key, so stale entries stop being read.
+  `cache_policy:<brandId>:<tier>`). Bumping a version changes the key, so stale entries stop being read.
 - `cacheEligibility(request, policy, { rules, forStore })` checks, in order: the tier is on, no
   excluded data class (personal, identity, account, memory, live order, payment, approval and tool
   results are never cached), not personalized, no side effects, no personal data in the input,

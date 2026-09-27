@@ -110,33 +110,40 @@ export interface TeamChoice {
   basis: 'intent' | 'default' | 'none';
 }
 
-function languageRank(team: RoutingTeam, language: LanguageSlice | null): number {
-  if (!language) return 0;
-  if (team.languages.includes(language)) return 0;
-  if (team.translationLanguages?.includes(language)) return 1;
+/** The customer's language, and languages that serve them equally when detection was ambiguous. */
+type Wanted = { language: LanguageSlice | null; alternatives: readonly LanguageSlice[] };
+
+function languageRank(team: RoutingTeam, wanted: Wanted): number {
+  if (!wanted.language) return 0;
+  const acceptable = [wanted.language, ...wanted.alternatives];
+  if (acceptable.some((l) => team.languages.includes(l))) return 0;
+  if (acceptable.some((l) => team.translationLanguages?.includes(l))) return 1;
   return 2;
 }
 
-function matchOf(team: RoutingTeam, language: LanguageSlice | null): LanguageMatch {
-  if (!language) return 'unknown';
-  return (['native', 'translation', 'none'] as const)[languageRank(team, language)] ?? 'none';
+function matchOf(team: RoutingTeam, wanted: Wanted): LanguageMatch {
+  if (!wanted.language) return 'unknown';
+  return (['native', 'translation', 'none'] as const)[languageRank(team, wanted)] ?? 'none';
 }
 
 /**
  * Picks the team for an intent and language (U07). Only accepting teams are permitted. Among the
  * teams that handle the intent, one that speaks the language beats one with a reviewed translation
  * path, which beats a language gap. Without such a team, the default teams are considered the same
- * way. Ties keep the given order.
+ * way. Ties keep the given order. `alternatives` are languages that serve the customer as well,
+ * such as Roman Urdu for a message that could equally be Hinglish.
  */
 export function chooseTeam(input: {
   intent: string;
   language: LanguageSlice | null;
+  alternatives?: readonly LanguageSlice[];
   teams: readonly RoutingTeam[];
 }): TeamChoice {
+  const wanted: Wanted = { language: input.language, alternatives: input.alternatives ?? [] };
   const permitted = input.teams.filter((team) => team.accepting);
   const best = (teams: RoutingTeam[]) =>
     teams
-      .map((team, index) => ({ team, index, rank: languageRank(team, input.language) }))
+      .map((team, index) => ({ team, index, rank: languageRank(team, wanted) }))
       .sort((a, b) => a.rank - b.rank || a.index - b.index)[0]?.team;
   const forIntent =
     input.intent === OTHER_INTENT
@@ -146,7 +153,7 @@ export function chooseTeam(input: {
   if (byIntent) {
     return {
       teamId: byIntent.id,
-      languageMatch: matchOf(byIntent, input.language),
+      languageMatch: matchOf(byIntent, wanted),
       basis: 'intent',
     };
   }
@@ -154,7 +161,7 @@ export function chooseTeam(input: {
   if (byDefault) {
     return {
       teamId: byDefault.id,
-      languageMatch: matchOf(byDefault, input.language),
+      languageMatch: matchOf(byDefault, wanted),
       basis: 'default',
     };
   }
@@ -226,6 +233,7 @@ export function decideRoute(input: {
   baseline: BaselineIntent;
   offered: readonly string[];
   language: LanguageSlice | null;
+  alternatives?: readonly LanguageSlice[];
   teams: readonly RoutingTeam[];
   explicitRequest: boolean;
 }): RoutingDecision {
@@ -264,7 +272,12 @@ export function decideRoute(input: {
     source,
     fallback,
     unavailable,
-    team: chooseTeam({ intent, language: input.language, teams: input.teams }),
+    team: chooseTeam({
+      intent,
+      language: input.language,
+      alternatives: input.alternatives ?? [],
+      teams: input.teams,
+    }),
     explicitRequest: input.explicitRequest,
   };
 }

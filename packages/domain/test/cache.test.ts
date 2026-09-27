@@ -27,7 +27,7 @@ const base: CacheKeyEnvelope = {
   dependencies: {
     [cacheDependency.knowledgeSource('src-1')]: 12,
     [cacheDependency.agent('agent-1')]: 3,
-    [cacheDependency.cachePolicy('brand-a')]: 1,
+    [cacheDependency.cachePolicy('brand-a', 'exact_answer')]: 1,
   },
   inputDigest: sha256('how can i contact the team?'),
 };
