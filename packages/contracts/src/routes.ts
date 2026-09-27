@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { adminRoutes, identityRoutes } from './admin-routes.js';
 import { agentRoutes } from './agent-routes.js';
+import { analyticsRoutes, billingRoutes } from './billing-routes.js';
 import {
   commerceAdminRoutes,
   commerceIntegrationRoutes,
@@ -17,6 +18,7 @@ import {
   SendMessageResponse,
   StartConversationRequest,
 } from './conversations.js';
+import { apiKeyRoutes, networkRoutes, webhookRoutes } from './developer-routes.js';
 import { HamnivoEvent, StreamControl } from './events.js';
 import { inboxRoutes } from './inbox-routes.js';
 import { knowledgeRoutes } from './knowledge-routes.js';
@@ -44,6 +46,8 @@ export type RouteAuth =
   | 'widget_session'
   | 'staff_session'
   | 'api_key'
+  /** A staff session (with X-Hamnivo-Tenant) or an API key (its own tenant). */
+  | 'staff_or_api_key'
   | 'integration_signature'
   | 'provider_signature';
 
@@ -365,4 +369,9 @@ export const allRoutes: Record<string, RouteDef> = {
   ...commerceAdminRoutes,
   ...commerceWidgetRoutes,
   ...commerceIntegrationRoutes,
+  ...apiKeyRoutes,
+  ...webhookRoutes,
+  ...networkRoutes,
+  ...billingRoutes,
+  ...analyticsRoutes,
 };

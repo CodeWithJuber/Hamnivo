@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Timestamp } from './common.js';
 
 /**
  * Machine-readable error codes (blueprint §9). Messages shown to people are safe summaries; they
@@ -17,6 +18,7 @@ export const ErrorCode = z.enum([
   'VERSION_CONFLICT',
   'RATE_LIMITED',
   'QUOTA_EXCEEDED',
+  'PLAN_LIMIT_REACHED',
   'IDENTITY_REQUIRED',
   'ASSERTION_INVALID',
   'ACTION_REQUIRES_APPROVAL',
@@ -63,6 +65,11 @@ export const ERROR_DEFAULTS: Record<
   VERSION_CONFLICT: { status: 409, retryable: false, title: 'Someone else changed this first' },
   RATE_LIMITED: { status: 429, retryable: true, title: 'Too many requests' },
   QUOTA_EXCEEDED: { status: 429, retryable: false, title: 'Usage limit reached' },
+  PLAN_LIMIT_REACHED: {
+    status: 402,
+    retryable: false,
+    title: 'The plan limit for this is reached',
+  },
   IDENTITY_REQUIRED: { status: 403, retryable: false, title: 'Please sign in to continue' },
   ASSERTION_INVALID: { status: 401, retryable: false, title: 'Identity could not be verified' },
   ACTION_REQUIRES_APPROVAL: { status: 409, retryable: false, title: 'Approval required' },
@@ -103,6 +110,21 @@ export const ERROR_DEFAULTS: Record<
   INTERNAL: { status: 500, retryable: true, title: 'Something went wrong on our side' },
 };
 
+/** Which limit a 402 or 429 response is about, so a client can say so and back off correctly. */
+export const QuotaInfo = z
+  .object({
+    /** The plan, the workspace's own budget, one API key or one client address. */
+    scope: z.enum(['plan', 'budget', 'api_key', 'address']),
+    /** The limit reached, e.g. `conversations`, `aiTokens` or `requestsPerMinute`. */
+    limit: z.string(),
+    max: z.int().nonnegative().nullable(),
+    used: z.int().nonnegative().nullable(),
+    /** When the limit resets, if it does. */
+    resetsAt: Timestamp.nullable(),
+  })
+  .meta({ id: 'QuotaInfo' });
+export type QuotaInfo = z.infer<typeof QuotaInfo>;
+
 /** RFC 9457 problem details with Hamnivo extension members. */
 export const Problem = z
   .object({
@@ -117,6 +139,7 @@ export const Problem = z
     /** Seconds to wait before retrying, when known. */
     retryAfter: z.int().min(0).optional(),
     fields: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
+    quota: QuotaInfo.optional(),
   })
   .meta({ id: 'Problem', description: 'RFC 9457 problem details' });
 export type Problem = z.infer<typeof Problem>;
