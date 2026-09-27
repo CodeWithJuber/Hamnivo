@@ -328,9 +328,10 @@ consent or had their memory deleted after the backup keeps that choice, and the 
 deleted. Deletions that were still running finish once the worker starts.
 
 It refuses a backup made with other secrets, unless you move your `.env` away first. While it
-runs, it needs free disk space for a second copy of the Hamnivo database. If the current database
-cannot be read, it stops without changing anything; `--ignore-current-database` restores without
-the consent and deletions described above.
+runs, it needs free disk space for a second copy of the Hamnivo database. If it fails before step 6,
+nothing was replaced, and it starts the applications again. If the current database cannot be
+read, it stops at step 3; `--ignore-current-database` restores without the consent and deletions
+described above.
 
 On a new server, clone the code (A3), copy the backup folder over and run the same command. It
 installs the backup's `.env` and builds what it needs. A new server has no current database, so

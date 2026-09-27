@@ -476,6 +476,17 @@ SQL
   } | db_psql "$1"
 }
 
+# A restore that fails before the databases are switched has replaced nothing: start the
+# applications it stopped, so the server does not stay down. Runs on exit (see cmd_restore).
+# shellcheck disable=SC2317 # called by the EXIT trap
+restart_unchanged() {
+  local status=$?
+  ((status == 0)) && return 0
+  log 'The restore failed before replacing anything. Starting the current version again.'
+  "${compose[@]}" up -d >&2 || log "Could not start it: run $0 up --no-build"
+  return "$status"
+}
+
 cmd_restore() {
   need_docker
   local dir='' yes=0 answer='' current=1
@@ -509,6 +520,7 @@ cmd_restore() {
   fi
   mkdir -p "$state_dir/requests"
   log 'Stopping the applications'
+  trap restart_unchanged EXIT
   "${compose[@]}" stop api worker edge chatwoot-web chatwoot-sidekiq >&2 2>/dev/null || true
   "${compose[@]}" up -d hamnivo-db chatwoot-db >&2
   wait_healthy hamnivo-db chatwoot-db
@@ -532,6 +544,7 @@ was changed. Repair the database, or add --ignore-current-database to restore wi
   carry_privacy hamnivo_restore
   "${compose[@]}" exec -T hamnivo-db dropdb -U postgres --if-exists --force hamnivo
   db_psql postgres -c 'alter database hamnivo_restore rename to hamnivo'
+  trap - EXIT
   rm -f "$state_dir"/restore/carry-*.csv
 
   log 'Restoring the Chatwoot database'
