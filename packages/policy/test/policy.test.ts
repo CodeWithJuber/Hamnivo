@@ -358,3 +358,35 @@ describe('permission diff', () => {
     expect(diff.addedSensitive).toEqual(['conversations.export']);
   });
 });
+
+describe('migration permissions', () => {
+  it('lets reviewers read imports of their brand, and asks runners for a fresh sign-in', () => {
+    const reviewer = staff([
+      grant({ permissions: ['migration.review'], scope: { type: 'brand', id: 'B' } }),
+    ]);
+    expect(authorize(reviewer, 'migration.review', { brandId: 'B' }, { now }).allowed).toBe(true);
+    expect(authorize(reviewer, 'migration.review', { brandId: 'C' }, { now })).toMatchObject({
+      allowed: false,
+      reason: 'outside_scope',
+    });
+    expect(authorize(reviewer, 'migration.run', { brandId: 'B' }, { now })).toMatchObject({
+      reason: 'no_grant',
+    });
+    const runner = staff(
+      [grant({ permissions: ['migration.*'], scope: { type: 'brand', id: 'B' } })],
+      { authenticatedAt: minutesAgo(30) },
+    );
+    for (const permission of ['migration.run', 'migration.manage'] as const) {
+      expect(authorize(runner, permission, { brandId: 'B' }, { now })).toMatchObject({
+        reason: 'step_up_required',
+      });
+    }
+  });
+
+  it('gives admins every migration permission and support agents none', () => {
+    expect(presetPermissions('admin')).toEqual(
+      expect.arrayContaining(['migration.review', 'migration.run', 'migration.manage']),
+    );
+    expect(presetPermissions('agent').filter((p) => p.startsWith('migration.'))).toEqual([]);
+  });
+});

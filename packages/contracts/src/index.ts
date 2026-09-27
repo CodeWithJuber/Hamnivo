@@ -12,6 +12,8 @@ export * from './events.js';
 export * from './ids.js';
 export * from './knowledge.js';
 export * from './knowledge-routes.js';
+export * from './migration.js';
+export * from './migration-routes.js';
 export * from './participants.js';
 export * from './parts.js';
 export * from './routes.js';
