@@ -24,6 +24,11 @@ export interface AnswerContext {
   /** Customer-visible history, newest last. */
   history: AuthorityMessage[];
   question: string;
+  /**
+   * Personal context the reply uses, such as `personal_memory` when customer memory was
+   * recalled. Any code keeps the answer out of the shared cache.
+   */
+  personalContext?: readonly string[];
 }
 
 export interface CachedAnswer {
@@ -41,7 +46,15 @@ export interface CachedAnswer {
 
 export type AnswerLookup =
   | { kind: 'hit'; answer: CachedAnswer; fingerprint: string }
-  | { kind: 'fill'; fill: (answer: CachedAnswer) => Promise<void>; status: 'miss' | 'stale' }
+  | {
+      kind: 'fill';
+      /**
+       * Stores the answer when it is still eligible. Pass the personal context the generation
+       * ended up using (for example memory recalled after the lookup): any code prevents storing.
+       */
+      fill: (answer: CachedAnswer, used?: { personalContext?: readonly string[] }) => Promise<void>;
+      status: 'miss' | 'stale';
+    }
   | { kind: 'skip'; status: 'bypass' | 'unavailable'; reason: string | null };
 
 /**
@@ -59,7 +72,11 @@ export class AnswerCache {
     private readonly cache: CacheService,
   ) {}
 
-  spec(context: AnswerContext, complete = false): CacheSpec {
+  spec(
+    context: AnswerContext,
+    complete = false,
+    personalContext: readonly string[] = [],
+  ): CacheSpec {
     const incoming = context.history.filter((m) => m.direction === 'incoming' && !m.private);
     const answered = context.history.some(
       (m) => m.direction === 'outgoing' && !m.private && m.text?.trim(),
@@ -89,6 +106,7 @@ export class AnswerCache {
         texts: [context.question],
         // Only the opening question of a conversation is generic enough to share.
         personalized: incoming.length !== 1 || answered || config.mode !== 'answer',
+        personalContext: [...(context.personalContext ?? []), ...personalContext],
         complete,
         tags: { channel: 'widget' },
       },
@@ -167,8 +185,10 @@ export class AnswerCache {
     return {
       kind: 'fill',
       status: result.status,
-      fill: async (answer) => {
-        await this.cache.put(this.spec(context, true), result, answer, { sources: answer.refs });
+      fill: async (answer, used) => {
+        await this.cache.put(this.spec(context, true, used?.personalContext), result, answer, {
+          sources: answer.refs,
+        });
       },
     };
   }

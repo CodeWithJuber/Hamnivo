@@ -6,12 +6,15 @@ import { CacheAdminService } from './admin.service.js';
 import { AnswerCache } from './answers.js';
 import { CacheService } from './cache.service.js';
 import {
+  CACHE_PERSONAL_STORE,
   CACHE_STORE,
   CACHE_STORE_OVERRIDE,
   CacheConnection,
   CacheExclusions,
   CacheHealth,
   cacheStoreFactory,
+  PERSONAL_CACHE_SCOPE,
+  personalStoreFactory,
 } from './store.js';
 import { QueryVectors } from './vectors.js';
 
@@ -26,6 +29,13 @@ export function cacheProviders(overrides: PlatformOverrides): Provider[] {
       inject: [CONFIG, CacheHealth, CacheConnection, CACHE_STORE_OVERRIDE],
       useFactory: cacheStoreFactory,
     },
+    {
+      provide: CACHE_PERSONAL_STORE,
+      inject: [CONFIG, CacheHealth, CacheConnection, CACHE_STORE_OVERRIDE],
+      useFactory: personalStoreFactory,
+    },
+    // Per-customer caching stays off until the memory module provides a scope (merge wiring).
+    { provide: PERSONAL_CACHE_SCOPE, useValue: overrides.personalCacheScope ?? null },
     CacheExclusions,
     CacheService,
     AnswerCache,

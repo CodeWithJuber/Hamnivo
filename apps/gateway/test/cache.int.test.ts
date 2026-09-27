@@ -6,7 +6,9 @@ import { fromPublicId, schema, withTenant } from '@hamnivo/db';
 import { eq } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CacheExclusions } from '../src/cache/store.js';
+import { AnswerCache, type AnswerContext, type CachedAnswer } from '../src/cache/answers.js';
+import { CacheService, type CacheSpec } from '../src/cache/cache.service.js';
+import { CacheExclusions, type PersonalCacheScope } from '../src/cache/store.js';
 import { connectedTenant, type Slice, startSlice, Visitor } from './slice-harness.js';
 
 /** The mock model, counting the calls that actually reach it. */
@@ -42,6 +44,23 @@ interface Brand {
 
 const QUESTION = 'How can I contact the team?';
 const counted = countingModel();
+
+// Per-customer namespaces as memory keeps them (`…memory:c:{tenant}:{subject}:`), under a prefix
+// of this test run only, with a version the test can bump like a memory change would.
+const MEMORY = `hv:test:${process.pid}:${randomUUID().slice(0, 8)}:memory:c:`;
+const memoryVersions = new Map<string, number>();
+const personalCacheScope: PersonalCacheScope = {
+  async scope(tenantId, subjectId) {
+    // A broken provider that points at another tenant's namespace.
+    if (subjectId === INTRUDER)
+      return { prefix: `${MEMORY}${randomUUID()}:${subjectId}:`, version: '1' };
+    return {
+      prefix: `${MEMORY}${tenantId}:${subjectId}:`,
+      version: String(memoryVersions.get(subjectId) ?? 1),
+    };
+  },
+};
+const INTRUDER = randomUUID();
 let slice: Slice;
 let alpha: Brand;
 let alphaSecond: Brand;
@@ -99,7 +118,7 @@ async function withKnowledge(
 }
 
 beforeAll(async () => {
-  slice = await startSlice({ model: counted.model });
+  slice = await startSlice({ model: counted.model, personalCacheScope });
   const a = await connectedTenant(slice, 'cachealpha');
   alpha = await withKnowledge(a, a.brand, a.agentId, a.hostOrigin);
   // A second brand of the same tenant, with the same knowledge and settings.
@@ -125,6 +144,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  const personal = (await valkey?.keys(`${MEMORY}*`)) ?? [];
+  if (personal.length > 0) await valkey.del(...personal);
   valkey?.disconnect();
   await slice?.close();
 });
@@ -431,6 +452,156 @@ describe('inspection and metrics (board 25, K10)', () => {
           .where(eq(schema.cachePolicies.brandId, fromPublicId('brand', alpha.brandId))),
     );
     expect(control?.version).toBeGreaterThan(1);
+  });
+});
+
+describe('memory hooks: personal context and entries private to one customer', () => {
+  const answer: CachedAnswer = {
+    text: 'Your usual order was the blue notebook.',
+    sources: [],
+    refs: [],
+    provider: 'mock',
+    modelId: 'mock-1',
+    inputTokens: 10,
+    outputTokens: 8,
+    latencyMs: 5,
+  };
+  const ids = () => ({
+    tenantId: fromPublicId('tenant', alpha.tenantId),
+    brandId: fromPublicId('brand', alpha.brandId),
+  });
+  const spec = (over: Partial<CacheSpec> = {}): CacheSpec => ({
+    tier: 'exact_answer',
+    ...ids(),
+    audience: 'public',
+    language: 'en',
+    model: 'mock/mock-1',
+    promptVersion: 'memory-hook-test',
+    dependencies: [],
+    input: 'What did I order last time?',
+    request: {
+      tier: 'exact_answer',
+      dataClasses: ['general'],
+      texts: ['What did I order last time?'],
+      complete: true,
+    },
+    ...over,
+  });
+
+  it('keeps a reply built with personal context, such as memory, out of the shared cache', async () => {
+    const cache = slice.worker.get(CacheService);
+    const vetoed = await cache.lookup(
+      spec({ request: { ...spec().request, personalContext: ['personal_memory'] } }),
+    );
+    expect(vetoed).toMatchObject({
+      status: 'bypass',
+      reason: 'personal_context',
+      detail: 'personal_memory',
+    });
+
+    // Memory recalled after the lookup is passed when the answer is filled: nothing is stored.
+    const answers = slice.worker.get(AnswerCache);
+    const context: AnswerContext = {
+      ...ids(),
+      agentId: fromPublicId('agent', alpha.agentId),
+      agentVersionId: randomUUID(),
+      config: {
+        model: { provider: 'mock', modelId: 'mock-1' },
+        knowledgeSourceIds: [],
+        mode: 'answer',
+      } as unknown as AnswerContext['config'],
+      promptVersion: `memory-hook-${randomUUID()}`,
+      language: 'en',
+      history: [
+        {
+          ref: '1',
+          conversationRef: '1',
+          key: null,
+          direction: 'incoming',
+          private: false,
+          text: 'What are your opening hours?',
+          contentAttributes: {},
+          sender: { kind: 'contact', ref: '1', name: null },
+          attachments: [],
+          createdAt: new Date(),
+        },
+      ],
+      question: 'What are your opening hours?',
+    };
+    const first = await answers.lookup(context);
+    if (first.kind !== 'fill') throw new Error(`expected a fill, got ${first.kind}`);
+    await first.fill(answer, { personalContext: ['personal_memory'] });
+    const again = await answers.lookup(context);
+    if (again.kind !== 'fill') throw new Error(`expected nothing stored, got ${again.kind}`);
+    // The same answer without personal context is stored: the veto above is what kept it out.
+    await again.fill(answer);
+    expect(await answers.lookup(context)).toMatchObject({ kind: 'hit' });
+    expect((await answers.lookup({ ...context, personalContext: ['personal_memory'] })).kind).toBe(
+      'skip',
+    );
+  });
+
+  it('keeps entries private to one customer in their namespace, under their memory version', async () => {
+    const cache = slice.worker.get(CacheService);
+    const indexed = (await entries(alpha)).length;
+    const customer = randomUUID();
+    const other = randomUUID();
+    const mine = spec({
+      audience: 'customer',
+      subjectId: customer,
+      request: { ...spec().request, personalized: true, personalContext: ['personal_memory'] },
+    });
+
+    const first = await cache.lookup<CachedAnswer>(mine);
+    if (first.status !== 'miss') throw new Error(`expected a miss, got ${first.status}`);
+    expect(first.customer?.prefix).toBe(`${MEMORY}${ids().tenantId}:${customer}:`);
+    expect(await cache.put(mine, first, answer)).toBe(true);
+    // Stored in the customer's namespace, so deleting their memory namespace deletes it.
+    const stored = await valkey.keys(`${MEMORY}${ids().tenantId}:${customer}:*`);
+    expect(stored).toEqual([
+      `${MEMORY}${ids().tenantId}:${customer}:cache:exact_answer:${first.key.fingerprint}`,
+    ]);
+    expect(
+      await valkey.keys(`${slice.gw.config.CACHE_KEY_PREFIX}*${first.key.fingerprint}`),
+    ).toEqual([]);
+    expect(await cache.lookup<CachedAnswer>(mine)).toMatchObject({ status: 'hit', value: answer });
+
+    // Another customer never sees it.
+    expect(await cache.lookup({ ...mine, subjectId: other })).toMatchObject({ status: 'miss' });
+    // A memory change bumps the version: the old entry is no longer reachable.
+    memoryVersions.set(customer, 2);
+    expect(await cache.lookup(mine)).toMatchObject({ status: 'miss' });
+    // A namespace that does not belong to this tenant and customer is refused.
+    expect(await cache.lookup({ ...mine, subjectId: INTRUDER })).toMatchObject({
+      status: 'bypass',
+      reason: 'no_customer_scope',
+    });
+    // Private entries never appear in the shared index.
+    expect(await entries(alpha)).toHaveLength(indexed);
+  });
+
+  it('never caches per customer without a scope from the memory module', async () => {
+    const plain = await startSlice({ model: counted.model });
+    try {
+      const cache = plain.worker.get(CacheService);
+      const t = await connectedTenant(plain, 'cachenoscope');
+      const policy = await t.owner.put(`/v1/admin/brands/${t.brand.id}/cache/policy`, {
+        tiers: { exact_answer: { enabled: true, ttlSeconds: 3600 } },
+      });
+      expect(policy.status).toBe(200);
+      const found = await cache.lookup(
+        spec({
+          tenantId: fromPublicId('tenant', t.tenantId),
+          brandId: fromPublicId('brand', t.brand.id),
+          audience: 'customer',
+          subjectId: randomUUID(),
+          request: { ...spec().request, personalized: true },
+        }),
+      );
+      expect(found).toMatchObject({ status: 'bypass', reason: 'no_customer_scope' });
+    } finally {
+      await plain.close();
+    }
   });
 });
 

@@ -12,11 +12,19 @@ import {
   DEFAULT_CACHE_POLICY,
   NEVER_CACHED,
 } from '@hamnivo/domain';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { and, type Column, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { AppConfig } from '../config.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
-import { CACHE_STORE, CacheExclusions, CacheHealth } from './store.js';
+import {
+  CACHE_PERSONAL_STORE,
+  CACHE_STORE,
+  CacheExclusions,
+  CacheHealth,
+  type CustomerCacheScope,
+  PERSONAL_CACHE_SCOPE,
+  type PersonalCacheScope,
+} from './store.js';
 
 export type PolicyRow = typeof schema.cachePolicies.$inferSelect;
 export type EntryRow = typeof schema.cacheEntryIndex.$inferSelect;
@@ -26,7 +34,10 @@ export interface CacheSpec {
   tier: CacheTier;
   tenantId: string;
   brandId: string;
-  audience: 'public' | 'staff';
+  /** `customer`: private to {@link subjectId}, under their own namespace and personal version. */
+  audience: 'public' | 'staff' | 'customer';
+  /** The customer principal a `customer` entry belongs to. */
+  subjectId?: string;
   language: string | null;
   model: string | null;
   promptVersion: string;
@@ -61,6 +72,8 @@ export type Lookup<T> =
       ttlSeconds: number;
       /** The older entry for the same question (stale only). */
       previous: EntryRow | null;
+      /** Where a private entry goes; null for shared entries. */
+      customer: CustomerCacheScope | null;
       ms: number;
     }
   | { status: 'bypass'; reason: string; rule: string; detail: string | null; ms: number }
@@ -116,7 +129,43 @@ export class CacheService {
     @Inject(CACHE_STORE) private readonly store: CacheStore,
     private readonly health: CacheHealth,
     private readonly exclusions: CacheExclusions,
+    @Inject(CACHE_PERSONAL_STORE) private readonly personalStore: CacheStore,
+    @Optional()
+    @Inject(PERSONAL_CACHE_SCOPE)
+    private readonly personal: PersonalCacheScope | null = null,
   ) {}
+
+  /** The request as eligibility sees it: private entries may hold personalized results. */
+  private requestOf(spec: CacheSpec): CacheRequest {
+    return { ...spec.request, scope: spec.audience === 'customer' ? 'customer' : 'shared' };
+  }
+
+  /**
+   * The customer's namespace and version, checked to be theirs: the namespace must name this
+   * tenant and this customer, so an entry can never land in (or be read from) another's.
+   */
+  private async customerScope(spec: CacheSpec): Promise<CustomerCacheScope | null> {
+    if (!this.personal || !spec.subjectId) return null;
+    try {
+      const scope = await this.personal.scope(spec.tenantId, spec.subjectId);
+      if (!scope?.version || !scope.prefix.endsWith(':')) return null;
+      const parts = scope.prefix.split(':');
+      if (!parts.includes(spec.tenantId) || !parts.includes(spec.subjectId)) return null;
+      return scope;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Where an entry lives: the shared namespace, or the customer's own. */
+  private place(spec: CacheSpec, key: CacheKey, customer: CustomerCacheScope | null) {
+    return customer
+      ? {
+          store: this.personalStore,
+          key: `${customer.prefix}cache:${spec.tier}:${key.fingerprint}`,
+        }
+      : { store: this.store, key: key.key };
+  }
 
   /** HMAC of an input with a per-tenant key, so equal questions of two tenants never share a digest. */
   digest(tenantId: string, input: string): string {
@@ -151,7 +200,11 @@ export class CacheService {
     return Object.fromEntries(unique.map((name) => [name, found.get(name) ?? 0]));
   }
 
-  private keys(spec: CacheSpec, versions: Record<string, number>) {
+  private keys(
+    spec: CacheSpec,
+    versions: Record<string, number>,
+    customer: CustomerCacheScope | null = null,
+  ) {
     const envelope = {
       tier: spec.tier,
       tenantId: spec.tenantId,
@@ -162,6 +215,8 @@ export class CacheService {
       promptVersion: spec.promptVersion,
       dependencies: versions,
       inputDigest: this.digest(spec.tenantId, spec.input),
+      subject:
+        customer && spec.subjectId ? { id: spec.subjectId, version: customer.version } : undefined,
     };
     const key = cacheKey(envelope, sha256hex);
     // The same key with every version at 0: shared by entries for the same question over time.
@@ -190,7 +245,7 @@ export class CacheService {
       { tenantId: spec.tenantId, actorId: 'cache' },
       async (tx) => {
         const { policy } = await this.policy(tx, spec.brandId);
-        const eligibility = cacheEligibility(spec.request, policy, {
+        const eligibility = cacheEligibility(this.requestOf(spec), policy, {
           rules: this.exclusions.rules(),
         });
         if (!eligibility.eligible) return { eligibility, policy, versions: {} };
@@ -212,9 +267,24 @@ export class CacheService {
       await count({ errors: 1 });
       return { status: 'unavailable', ms: elapsed() };
     }
-    const { key, lookup } = this.keys(spec, versions);
+    let customer: CustomerCacheScope | null = null;
+    if (spec.audience === 'customer') {
+      customer = await this.customerScope(spec);
+      if (!customer) {
+        await count({ bypasses: 1 });
+        return {
+          status: 'bypass',
+          reason: 'no_customer_scope',
+          rule: 'core.customer_scope',
+          detail: null,
+          ms: elapsed(),
+        };
+      }
+    }
+    const { key, lookup } = this.keys(spec, versions, customer);
+    const place = this.place(spec, key, customer);
     const failuresBefore = this.health.recentFailures();
-    const raw = await this.store.get(key.key);
+    const raw = await place.store.get(place.key);
     if (raw === null && this.health.recentFailures() > failuresBefore) {
       // The read failed or timed out: answer fresh and do not try to store (K08).
       await count({ errors: 1 });
@@ -223,6 +293,24 @@ export class CacheService {
     const ttlSeconds = policy.tiers[spec.tier].ttlSeconds;
     const parsed = raw === null ? null : this.parse<T>(raw);
     const e = schema.cacheEntryIndex;
+    if (parsed !== null && customer) {
+      // Private entries are not indexed: they live and go with the customer's namespace.
+      await count({ hits: 1, lookupMs: elapsed() });
+      return { status: 'hit', value: parsed, key, entry: null, versions, ms: elapsed() };
+    }
+    if (customer) {
+      await count({ misses: 1 });
+      return {
+        status: 'miss',
+        key,
+        lookup,
+        versions,
+        ttlSeconds,
+        previous: null,
+        customer,
+        ms: elapsed(),
+      };
+    }
     if (parsed !== null) {
       const entry = await withTenant(
         this.db,
@@ -261,10 +349,28 @@ export class CacheService {
       } else {
         await count({ misses: 1 });
       }
-      return { status: 'stale', key, lookup, versions, ttlSeconds, previous, ms: elapsed() };
+      return {
+        status: 'stale',
+        key,
+        lookup,
+        versions,
+        ttlSeconds,
+        previous,
+        customer: null,
+        ms: elapsed(),
+      };
     }
     await count({ misses: 1 });
-    return { status: 'miss', key, lookup, versions, ttlSeconds, previous: null, ms: elapsed() };
+    return {
+      status: 'miss',
+      key,
+      lookup,
+      versions,
+      ttlSeconds,
+      previous: null,
+      customer: null,
+      ms: elapsed(),
+    };
   }
 
   private parse<T>(raw: string): T | null {
@@ -292,7 +398,7 @@ export class CacheService {
       { tenantId: spec.tenantId, actorId: 'cache' },
       async (tx) => {
         const { policy } = await this.policy(tx, spec.brandId);
-        const eligibility = cacheEligibility(spec.request, policy, {
+        const eligibility = cacheEligibility(this.requestOf(spec), policy, {
           rules: this.exclusions.rules(),
           forStore: true,
         });
@@ -302,8 +408,16 @@ export class CacheService {
     if (!stored || this.health.degraded()) return false;
     const payload: Stored<T> = { v: 1, complete: true, value };
     const ttlMs = miss.ttlSeconds * 1000;
-    await this.store.set(miss.key.key, JSON.stringify(payload), ttlMs);
+    const place = this.place(spec, miss.key, miss.customer);
+    await place.store.set(place.key, JSON.stringify(payload), ttlMs);
     if (this.health.degraded()) return false;
+    if (miss.customer) {
+      await this.count(spec, { stores: 1 });
+      return true;
+    }
+    // A private entry never enters the shared index (nor, above, the shared namespace).
+    const audience = spec.audience;
+    if (audience === 'customer') return false;
     await withTenant(this.db, { tenantId: spec.tenantId, actorId: 'cache' }, (tx) =>
       tx
         .insert(schema.cacheEntryIndex)
@@ -315,7 +429,7 @@ export class CacheService {
           lookup: miss.lookup,
           dependencies: miss.versions,
           language: spec.language,
-          audience: spec.audience,
+          audience,
           model: spec.model,
           sourceRefs: meta.sources ?? [],
           expiresAt: new Date(this.clock().getTime() + ttlMs),

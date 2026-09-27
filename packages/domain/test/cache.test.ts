@@ -72,6 +72,28 @@ describe('cacheKey (K01)', () => {
     expect(cacheKeyMaterial(base)).not.toContain('contact');
   });
 
+  it('keeps customer entries under the customer, versioned by their personal data', () => {
+    const mine: CacheKeyEnvelope = {
+      ...base,
+      audience: 'customer',
+      subject: { id: 'customer-1', version: '7' },
+    };
+    const { key, fingerprint } = cacheKey(mine, sha256);
+    expect(key).toBe(`t:tenant-a:b:brand-a:c:customer-1:exact_answer:${fingerprint}`);
+    expect(fingerprint).not.toBe(cacheKey(base, sha256).fingerprint);
+    // A memory change (new version) or another customer gives another key.
+    for (const subject of [
+      { id: 'customer-1', version: '8' },
+      { id: 'customer-2', version: '7' },
+    ]) {
+      expect(cacheKey({ ...mine, subject }, sha256).fingerprint).not.toBe(fingerprint);
+    }
+    expect(() => cacheKey({ ...mine, subject: undefined }, sha256)).toThrow(/customer/);
+    expect(() => cacheKey({ ...base, subject: { id: 'c', version: '1' } }, sha256)).toThrow(
+      /only customer entries/,
+    );
+  });
+
   it('refuses incomplete envelopes', () => {
     expect(envelopeProblem(base)).toBeUndefined();
     expect(() => cacheKey({ ...base, tenantId: '' }, sha256)).toThrow(/tenantId/);
@@ -149,6 +171,32 @@ describe('cacheEligibility (K01, K06)', () => {
     expect(
       cacheEligibility({ ...faq, texts: ['Email me at ayesha@example.com'] }, enabled),
     ).toMatchObject({ reason: 'personal_data', detail: 'email' });
+  });
+
+  it('never shares a result built with personal context, such as customer memory', () => {
+    expect(cacheEligibility({ ...faq, personalContext: ['personal_memory'] }, enabled)).toEqual({
+      eligible: false,
+      reason: 'personal_context',
+      rule: 'core.personal_context',
+      detail: 'personal_memory',
+    });
+    // Private to one customer (their own prefix and personal version), it may be cached.
+    expect(
+      cacheEligibility(
+        { ...faq, personalContext: ['personal_memory'], personalized: true, scope: 'customer' },
+        enabled,
+      ),
+    ).toEqual({ eligible: true });
+    // Personal data in the input and never-cached classes still veto, whoever the entry is for.
+    expect(
+      cacheEligibility(
+        { ...faq, scope: 'customer', texts: ['Email me at a@example.com'] },
+        enabled,
+      ),
+    ).toMatchObject({ reason: 'personal_data' });
+    expect(
+      cacheEligibility({ ...faq, scope: 'customer', dataClasses: ['live_order'] }, enabled),
+    ).toMatchObject({ reason: 'excluded_class' });
   });
 
   it('runs exclusion rules other modules add (the commerce hook)', () => {

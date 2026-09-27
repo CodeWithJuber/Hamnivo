@@ -9,6 +9,7 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { Redis } from 'ioredis';
+import type { PersonalCacheScope } from '../cache/store.js';
 import type { AppConfig } from '../config.js';
 import { APP_DB, CLOCK, CONFIG, MAILER, REDIS } from '../tokens.js';
 import { LogMailer, type Mailer, SmtpMailer } from './mailer.js';
@@ -20,6 +21,8 @@ export interface PlatformOverrides {
   decisionFetch?: typeof fetch;
   /** Replaces the cache store, for example with one that is down (tests). */
   cacheStore?: CacheStore;
+  /** Places entries private to one customer (tests; memory provides it in production). */
+  personalCacheScope?: PersonalCacheScope;
 }
 
 @Injectable()

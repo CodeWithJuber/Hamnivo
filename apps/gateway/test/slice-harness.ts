@@ -10,6 +10,7 @@ import type { LanguageModel } from 'ai';
 import { type EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
 import { InboxProcessor } from '../src/authority/processor.service.js';
 import { ReconcilerService } from '../src/authority/reconciler.service.js';
+import type { PersonalCacheScope } from '../src/cache/store.js';
 import { loadConfig } from '../src/config.js';
 import type { Scanner } from '../src/knowledge/scanner.js';
 import { OutboxRelay } from '../src/outbox/relay.service.js';
@@ -51,6 +52,8 @@ export async function startSlice(
     decisionFetch?: typeof fetch;
     /** A cache store to use instead of Valkey (for outage tests). */
     cacheStore?: CacheStore;
+    /** Places entries private to one customer (memory provides it in production). */
+    personalCacheScope?: PersonalCacheScope;
   } = {},
 ): Promise<Slice> {
   const fake = await startFakeChatwoot();
@@ -66,6 +69,7 @@ export async function startSlice(
   const shared = {
     ...(options.decisionFetch ? { decisionFetch: options.decisionFetch } : {}),
     ...(options.cacheStore ? { cacheStore: options.cacheStore } : {}),
+    ...(options.personalCacheScope ? { personalCacheScope: options.personalCacheScope } : {}),
   };
   const gw = await startGateway(env, undefined, {
     ...(options.clock ? { clock: options.clock } : {}),

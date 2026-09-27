@@ -49,13 +49,26 @@ export const NEVER_CACHED: readonly CacheDataClass[] = [
   'tool_result',
 ];
 
-export type CacheAudience = 'public' | 'staff';
+/**
+ * Who an entry is for: anyone of the brand (`public`), staff, or one customer (`customer`, only
+ * under that customer's own key prefix and personal version; see {@link CacheSubject}).
+ */
+export type CacheAudience = 'public' | 'staff' | 'customer';
+
+/**
+ * The customer an entry is private to, with the version of everything personal it may depend on
+ * (for example their memory). Changing the version makes all their older entries unreachable.
+ */
+export interface CacheSubject {
+  id: string;
+  version: string;
+}
 
 export interface CacheKeyEnvelope {
   tier: CacheTier;
   tenantId: string;
   brandId: string;
-  /** Who may see the result. Personal audiences are never cached. */
+  /** Who may see the result; `customer` entries live only under that customer's prefix. */
   audience: CacheAudience;
   /** BCP 47 language of the result (or of the input for NLP tiers); null when language-free. */
   language: string | null;
@@ -67,6 +80,8 @@ export interface CacheKeyEnvelope {
   dependencies: Readonly<Record<string, number>>;
   /** Keyed digest (HMAC with a tenant secret) of the exact input. Never the input itself. */
   inputDigest: string;
+  /** Required for the `customer` audience and refused for any other. */
+  subject?: CacheSubject | undefined;
 }
 
 /** Dependency names, so producers and invalidators agree on them. */
@@ -87,8 +102,15 @@ export function envelopeProblem(envelope: CacheKeyEnvelope): string | undefined 
   if (!CACHE_TIERS.includes(envelope.tier)) return `unknown tier "${String(envelope.tier)}"`;
   if (!envelope.tenantId) return 'tenantId is required';
   if (!envelope.brandId) return 'brandId is required';
-  if (envelope.audience !== 'public' && envelope.audience !== 'staff') {
-    return 'audience must be public or staff';
+  if (!['public', 'staff', 'customer'].includes(envelope.audience)) {
+    return 'audience must be public, staff or customer';
+  }
+  if (envelope.audience === 'customer') {
+    if (!envelope.subject?.id || !envelope.subject.version) {
+      return 'a customer entry needs the customer and their personal version';
+    }
+  } else if (envelope.subject) {
+    return 'only customer entries name a customer';
   }
   if (!envelope.promptVersion) return 'promptVersion is required';
   if (!DIGEST.test(envelope.inputDigest)) return 'inputDigest must be a hex digest';
@@ -122,6 +144,8 @@ export function cacheKeyMaterial(envelope: CacheKeyEnvelope): string {
     envelope.promptVersion,
     dependencies,
     envelope.inputDigest,
+    // Shared entries keep the material they always had; customer entries add who and which version.
+    ...(envelope.subject ? [envelope.subject.id, envelope.subject.version] : []),
   ]);
 }
 
@@ -138,8 +162,9 @@ export interface CacheKey {
  */
 export function cacheKey(envelope: CacheKeyEnvelope, hash: (material: string) => string): CacheKey {
   const fingerprint = hash(cacheKeyMaterial(envelope));
+  const customer = envelope.subject ? `c:${envelope.subject.id}:` : '';
   return {
-    key: `t:${envelope.tenantId}:b:${envelope.brandId}:${envelope.tier}:${fingerprint}`,
+    key: `t:${envelope.tenantId}:b:${envelope.brandId}:${customer}${envelope.tier}:${fingerprint}`,
     fingerprint,
   };
 }
@@ -152,6 +177,16 @@ export interface CacheRequest {
   texts?: readonly string[];
   /** The result depends on this conversation's history, a person's memory or identity. */
   personalized?: boolean;
+  /**
+   * Personal context the result used, as short codes such as `personal_memory` when customer
+   * memory was recalled. Any code vetoes sharing: such results may only be cached per customer.
+   */
+  personalContext?: readonly string[];
+  /**
+   * `customer` when the entry is private to one customer (their own key prefix and personal
+   * version). Only then may personalized results and personal context be cached. Default `shared`.
+   */
+  scope?: 'shared' | 'customer';
   /** Tools, sends or other side effects happened. Such results are never cached or replayed. */
   sideEffects?: boolean;
   /** For stores: the output is complete and passed validation (not cancelled, not blocked). */
@@ -193,6 +228,8 @@ export type CacheBypassReason =
   | 'excluded_class'
   | 'personal_data'
   | 'personalized'
+  | 'personal_context'
+  | 'no_customer_scope'
   | 'side_effects'
   | 'incomplete'
   | 'excluded_by_rule';
@@ -212,8 +249,9 @@ export type CacheEligibility =
 
 /**
  * Whether a computation may be read from or written to the cache. Checks, in order: the tier is on,
- * no excluded data class, not personalized, no side effects, no personal data in the input, every
- * added exclusion rule, and for writes that the output is complete.
+ * no excluded data class, not personalized and no personal context (unless the entry is private to
+ * one customer), no side effects, no personal data in the input, every added exclusion rule, and
+ * for writes that the output is complete.
  */
 export function cacheEligibility(
   request: CacheRequest,
@@ -231,7 +269,11 @@ export function cacheEligibility(
     (c) => NEVER_CACHED.includes(c) || policy.excludedClasses.includes(c),
   );
   if (excluded) return deny('excluded_class', 'policy.data_class', excluded);
-  if (request.personalized) return deny('personalized', 'core.personalized');
+  const shared = request.scope !== 'customer';
+  if (shared && request.personalized) return deny('personalized', 'core.personalized');
+  if (shared && request.personalContext && request.personalContext.length > 0) {
+    return deny('personal_context', 'core.personal_context', request.personalContext.join(','));
+  }
   if (request.sideEffects) return deny('side_effects', 'core.side_effects');
   for (const text of request.texts ?? []) {
     const kinds = findPersonalData(text);
