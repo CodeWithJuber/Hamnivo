@@ -75,12 +75,16 @@ rubrics. It never authorizes, never computes money or dates, and never writes re
 - `normalizeForMatching` folds spelling before matching: case, Arabic and Urdu letter variants,
   diacritics and tatweel, Devanagari nukta and virama forms, punctuation, spacing and doubled
   letters (insaan and insan match).
-- Negation stays within its clause. "I don't want a human" and "insaan nahi chahiye" are not
-  requests. "no bot, human please" and "bot nahi, insaan chahiye" are.
+- Negation stays within its clause. "I don't want a human", "insaan nahi chahiye", "banday se
+  baat nahi karni" and "insaan se baat karne ki zaroorat nahi" (no need) are not requests.
+  "no bot, human please" and "bot nahi, insaan chahiye" are.
+- A person word with "se" alone is a request when it is the whole message ("kisi insaan se",
+  "real person se"); "kisi se" (someone) is too vague on its own.
 - Look-alikes are not requests: "human resources", "are you human?", "agent number 5 delivered my
   order".
 - The language tag is a hint. In Latin script, phrases with English or Hindi person words are tagged
-  Hinglish, and phrases with Urdu words (insaan, banda) are tagged Roman Urdu.
+  Hinglish, and phrases with Urdu words (insaan, banda, banday) are tagged Roman Urdu. Words
+  both use (aadmi, real person) are tagged Hinglish, which is checked first.
 - The cases live in `test/fixtures/human-requests.json`, so evaluation can reuse them.
 
 ## Language preferences (`src/language.ts`)

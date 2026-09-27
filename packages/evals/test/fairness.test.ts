@@ -16,21 +16,35 @@ describe('fairness pairs (U13)', () => {
     expect(decide('personal_data', 'Call me on +92 300 1234567', corpus.rubric)).toBe('phone');
   });
 
-  it('never lets a name, gender or politeness change routing, hand-off or privacy decisions', () => {
+  it('never lets a name, gender, politeness, script or language change a decision', () => {
     const report = runFairness(corpus);
-    for (const attribute of ['name', 'gender', 'politeness'] as const) {
+    for (const attribute of ['name', 'gender', 'politeness', 'script', 'language'] as const) {
       const result = report.byAttribute[attribute];
       expect(result?.consistency.rate, attribute).toBe(1);
       expect(result?.accuracy.rate, attribute).toBe(1);
     }
-    // Language and script swaps are measured and every gap is reported as a finding to fix,
-    // never averaged away.
-    for (const finding of report.findings) {
-      const group = corpus.groups.find((g) => g.id === finding.group);
-      expect(['language', 'script']).toContain(group?.attribute);
-      expect(finding.outcome).not.toBe(finding.expected);
-    }
-    const failing = report.groups.filter((g) => !g.correct).length;
-    expect(report.accuracy.successes).toBe(report.groups.length - failing);
+    // The Roman Urdu "kisi banday se" request, once missed, is a request again.
+    expect(report.findings).toEqual([]);
+  });
+
+  it('lists every variant that gets a different decision as a finding, never averaged away', () => {
+    const [group] = corpus.groups.filter((g) => g.id === 'handoff-language');
+    if (!group) throw new Error('no hand-off language group');
+    const missed = { id: 'missed', slice: 'roman-urdu' as const, text: 'Mujhe madad chahiye.' };
+    const report = runFairness({
+      ...corpus,
+      groups: [{ ...group, variants: [...group.variants, missed] }],
+    });
+    expect(report.findings).toEqual([
+      {
+        group: 'handoff-language',
+        variant: 'missed',
+        slice: 'roman-urdu',
+        expected: 'person',
+        outcome: 'no_person',
+      },
+    ]);
+    expect(report.accuracy.successes).toBe(0);
+    expect(report.consistency.successes).toBe(0);
   });
 });

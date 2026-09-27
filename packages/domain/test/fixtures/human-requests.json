@@ -41,6 +41,25 @@
       "requested": true,
       "text": "Mujhe kisi insaan se baat karni hai, shukriya"
     },
+    { "language": "roman-urdu", "requested": true, "text": "Mujhe kisi banday se baat karni hai." },
+    { "language": "roman-urdu", "requested": true, "text": "kisi banday se baat karwa dein" },
+    { "language": "roman-urdu", "requested": true, "text": "banday se baat karao" },
+    { "language": "roman-urdu", "requested": true, "text": "Mujhe kisi banda se baat karni hai" },
+    { "language": "roman-urdu", "requested": true, "text": "kisi banday say baat krni h plz" },
+    { "language": "roman-urdu", "requested": true, "text": "mujhe kisi insan se baat karni hai" },
+    { "language": "roman-urdu", "requested": true, "text": "kisi insaan se" },
+    { "language": "roman-urdu", "requested": true, "text": "bot nahi, kisi insaan se" },
+    {
+      "language": "roman-urdu",
+      "requested": true,
+      "text": "mujhe kisi insaan se baat karne ki zaroorat hai"
+    },
+    { "language": "hinglish", "requested": true, "text": "Mujhe kisi aadmi se baat karni hai" },
+    { "language": "hinglish", "requested": true, "text": "kisi admi se baat karao" },
+    { "language": "hinglish", "requested": true, "text": "mujhe real person se baat karni hai" },
+    { "language": "hinglish", "requested": true, "text": "real person se" },
+    { "language": "hi", "requested": true, "text": "किसी इंसान से" },
+    { "language": "ur", "requested": true, "text": "کسی انسان سے" },
     { "language": "ar", "requested": true, "text": "أريد التحدث مع موظف" },
     { "language": "ar", "requested": true, "text": "موظف من فضلك" },
     { "language": "ar", "requested": true, "text": "مـــوظـــف مِنْ فَضْلِكَ" },
@@ -201,6 +220,78 @@
       "requested": false,
       "why": "agent as a courier",
       "text": "ایجنٹ نمبر 5 نے میرا آرڈر پہنچایا"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "negation",
+      "text": "banday se baat nahi karni"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "negation",
+      "text": "Mujhe kisi banday se baat nahi karni hai"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "negation",
+      "text": "kisi insaan se nahi"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "no need",
+      "text": "kisi insaan se baat karne ki zaroorat nahi"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "no need",
+      "text": "kisi insaan se baat karne ki koi zaroorat nahi"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "a person in a story",
+      "text": "banday ne order kiya tha"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "a saying about people",
+      "text": "insaan se galti hoti hai"
+    },
+    {
+      "language": "roman-urdu",
+      "requested": false,
+      "why": "too vague on its own",
+      "text": "kisi se"
+    },
+    {
+      "language": "hinglish",
+      "requested": false,
+      "why": "negation",
+      "text": "real person se baat nahi karni hai"
+    },
+    {
+      "language": "hinglish",
+      "requested": false,
+      "why": "negation",
+      "text": "mujhe kisi aadmi se baat nahi karni"
+    },
+    {
+      "language": "hi",
+      "requested": false,
+      "why": "no need",
+      "text": "मुझे किसी इंसान से बात करने की ज़रूरत नहीं"
+    },
+    {
+      "language": "ur",
+      "requested": false,
+      "why": "no need",
+      "text": "مجھے کسی انسان سے بات کرنے کی ضرورت نہیں"
     }
   ]
 }
