@@ -2,7 +2,7 @@
   "name": "@hamnivo/migration-sdk",
   "version": "0.1.0",
   "private": true,
-  "description": "Hamnivo migration SDK: the source adapter interface, the NDJSON package reader and writer with its JSON Schema, the tawk.to export adapter, and the preflight, checkpoint and reconciliation rules",
+  "description": "Hamnivo migration SDK: the source adapter interface, the NDJSON package reader and writer with its JSON Schema, adapters for tawk.to, Zendesk and Intercom exports, and the preflight, checkpoint and reconciliation rules",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

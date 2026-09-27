@@ -73,6 +73,18 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
     the connection is down the inbox says so and checks every 15 seconds.
   - Keys: ↑ ↓ or J K move through the queue, Enter opens, X selects, Esc goes back. On a phone
     the queue, the conversation and the details are steps.
+- **Imports** (board 18). Past conversations from tawk.to, Zendesk, Intercom, a Hamnivo package or
+  another Chatwoot.
+  - Choose the brand and the source. A file's type and size are checked before it is sent, and a
+    Chatwoot access token is never shown again.
+  - The check lists counts, every field and how it is imported, the source's known limits and the
+    records that need review. The dry run shows what would happen, with redacted sample
+    conversations, and writes nothing.
+  - The import runs in the background with its progress and last checkpoint, and can be paused,
+    resumed or cancelled. Records that were not imported are listed with their reason and can be
+    downloaded; only failed records are retried.
+  - Reconciliation per record type, samples beside the export, a cutover checklist, approval, and
+    rollback until then. A brand's history can be exported as a Hamnivo package.
 
 Every screen has loading, empty, error and permission-denied states. Status is never shown by
 colour alone. Studio works from the keyboard, returns focus after dialogs, and announces results.
