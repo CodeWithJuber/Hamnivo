@@ -33,6 +33,8 @@ let shop: Awaited<ReturnType<typeof connectedTenant>>;
 let tenantId: string;
 /** The tawk.to export checked in the preflight tests (left ready, never imported). */
 let checkedJobId: string;
+/** The import that survived lost answers; its contacts are reused by a later job. */
+let crashJobId: string;
 
 /** Runs the worker until the job reaches one of the states, letting retries become due. */
 async function settle(id: string, ...states: string[]) {
@@ -596,6 +598,7 @@ describe('resumable jobs (M07)', () => {
       'crash.zip',
       helpdeskPackage(),
     );
+    crashJobId = created.id;
     await settle(created.id, 'ready');
     await act(shop.owner, created.id, 'dry-run');
     await settle(created.id, 'dry_run_ready');
@@ -722,14 +725,31 @@ describe('resumable jobs (M07)', () => {
       reason: 'cancelled',
       count: 1,
     });
-    const snapshot = slice.fake.snapshot(shop.connection.accountId);
+    const { importer } = await chatwootOf(slice, shop.tenantId, shop.connection.id);
+    const kept = (await itemsOf(slice, shop.tenantId, created.id))
+      .filter((i) => i.kind === 'conversation' && i.status === 'imported')
+      .map((i) => Number(i.targetRef));
+    expect(kept).toHaveLength(2);
+
+    // Rolling back the earlier job keeps the people this job's conversations still use.
+    const start = slice.fake.snapshot(shop.connection.accountId);
+    await act(shop.owner, crashJobId, 'rollback');
+    const earlier = await settle(crashJobId, 'rolled_back');
+    expect(earlier.report.gate).toBe('failed');
+    expect(earlier.report.checks).toEqual([{ code: 'nothing_left', ok: false, detail: '2 kept' }]);
+    const middle = slice.fake.snapshot(shop.connection.accountId);
+    expect(start.conversations - middle.conversations).toBe(3);
+    expect(middle.contacts).toBe(start.contacts);
+    for (const id of kept) expect(await importer.getConversation(id)).not.toBeNull();
+
     await act(shop.owner, created.id, 'rollback');
     const rolledBack = await settle(created.id, 'rolled_back');
     expect(rolledBack.report).toMatchObject({ kind: 'rollback', gate: 'passed' });
     const after = slice.fake.snapshot(shop.connection.accountId);
-    expect(snapshot.conversations - after.conversations).toBe(2);
-    // The people were imported by an earlier job, whose conversations still use them: they stay.
-    expect(after.contacts).toBe(snapshot.contacts);
+    expect(middle.conversations - after.conversations).toBe(2);
+    for (const id of kept) expect(await importer.getConversation(id)).toBeNull();
+    // This job created no contacts (it reused the earlier job's), so it removes none.
+    expect(after.contacts).toBe(middle.contacts);
   });
 });
 
@@ -848,6 +868,26 @@ describe('access (cross-tenant and permissions)', () => {
 
 describe('export (M02)', () => {
   it('exports the brand’s history as a package in the import format', async () => {
+    // A staff note in the live conversation.
+    const { importer, runtime } = await chatwootOf(slice, shop.tenantId, shop.connection.id);
+    const [control] = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx.select().from(schema.conversationControls),
+    );
+    const note = await fetch(
+      `${runtime.baseUrl}/api/v1/accounts/${runtime.accountId}/conversations/${control?.externalConversationId}/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', api_access_token: runtime.integrationToken },
+        body: JSON.stringify({
+          content: 'Staff note: check with the courier.',
+          private: true,
+          message_type: 'outgoing',
+        }),
+      },
+    );
+    expect(note.status).toBe(200);
+    await slice.drain();
+
     const requested = await shop.owner.post('/v1/admin/migrations/exports', {
       brandId: shop.brand.id,
     });
@@ -871,16 +911,17 @@ describe('export (M02)', () => {
     const bytes = file?.raw as Buffer;
     const { parsed, detected } = readExport(bytes, 'export.zip', 'hamnivo');
     expect(detected).toBeNull();
-    const { importer } = await chatwootOf(slice, shop.tenantId, shop.connection.id);
     const { total } = await importer.listConversations({ page: 1 });
     expect(parsed.conversations).toHaveLength(total);
-    // Imported history keeps its original times, and private notes stay private.
-    const note = parsed.conversations
-      .flatMap((c) => c.messages)
-      .find((m) => m.text?.includes('approve a replacement'));
-    expect(note).toMatchObject({
+    const exported = parsed.conversations.flatMap((c) => c.messages);
+    // Private notes stay private, and imported history keeps its original times and authors.
+    expect(exported.find((m) => m.text === 'Staff note: check with the courier.')).toMatchObject({
       visibility: 'internal',
-      createdAt: '2026-08-01T09:02:00.000Z',
+    });
+    expect(exported.find((m) => m.text?.startsWith('مرحبًا، هل يمكنني'))).toMatchObject({
+      visibility: 'public',
+      createdAt: '2026-09-21T14:03:12.000Z',
+      author: { kind: 'customer' },
     });
 
     // The package imports again: its preflight reads it without errors.
