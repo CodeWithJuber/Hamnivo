@@ -7,6 +7,8 @@ export * from './bridge.js';
 export * from './cache.js';
 export * from './cache-routes.js';
 export * from './cards.js';
+export * from './commerce.js';
+export * from './commerce-routes.js';
 export * from './common.js';
 export * from './conversations.js';
 export * from './decision-routes.js';

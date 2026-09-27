@@ -1,4 +1,5 @@
 import { cachingHi } from './caching';
+import { commerceHi } from './commerce/hi';
 import { decisionsHi } from './decisions';
 import type { Translation } from './en';
 
@@ -1277,6 +1278,7 @@ export const hi: Translation = {
   },
   decisions: decisionsHi,
   caching: cachingHi,
+  commerce: commerceHi,
   memory: {
     title: 'ग्राहक मेमोरी',
     description: 'तय करें कि हम आपके ग्राहकों के बारे में क्या याद रखते हैं।',

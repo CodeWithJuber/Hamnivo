@@ -1,4 +1,5 @@
 import { cachingUr } from './caching';
+import { commerceUr } from './commerce/ur';
 import { decisionsUr } from './decisions';
 import type { Translation } from './en';
 
@@ -1298,6 +1299,7 @@ export const ur: Translation = {
   },
   decisions: decisionsUr,
   caching: cachingUr,
+  commerce: commerceUr,
   memory: {
     title: 'کسٹمر میموری',
     description: 'طے کریں کہ ہم آپ کے کسٹمرز کے بارے میں کیا یاد رکھتے ہیں۔',

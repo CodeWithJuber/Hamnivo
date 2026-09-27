@@ -20,6 +20,30 @@ let tables: CatalogTable[];
 
 const tenantColumn = (table: string) => (table === 'tenants' ? 'id' : 'tenant_id');
 
+/** Tables the application role may only insert into. */
+const APPEND_ONLY = new Set([
+  'audit_events',
+  'operation_receipts',
+  'learning_consents',
+  'deletion_tombstones',
+]);
+/** Tables whose rows the application role never deletes. */
+const NEVER_DELETED = new Set([
+  'kill_switches',
+  'memory_deletions',
+  'decision_records',
+  'operations',
+  'merchant_connections',
+  'quotes',
+  'purchase_intents',
+  'payments',
+  'orders',
+  'fulfillments',
+  'refunds',
+  'finance_exceptions',
+  'commerce_events',
+]);
+
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
 async function writableColumns(table: string): Promise<string[]> {
   const { rows } = await h.owner.execute<{ name: string }>(sql`
@@ -191,6 +215,19 @@ describe('two-tenant isolation', () => {
     'cache_dependency_versions',
     'cache_entry_index',
     'cache_metrics_daily',
+    'operations',
+    'operation_receipts',
+    'merchant_connections',
+    'catalog_snapshots',
+    'carts',
+    'quotes',
+    'purchase_intents',
+    'payments',
+    'orders',
+    'fulfillments',
+    'refunds',
+    'finance_exceptions',
+    'commerce_events',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -206,12 +243,11 @@ describe('two-tenant isolation', () => {
       );
     });
 
-    // The audit log, consent decisions and deletion tombstones are append-only; kill switches are
-    // cleared and deletion receipts completed, never deleted; decision records stay as the
-    // decision audit.
-    const updatable = !['audit_events', 'learning_consents', 'deletion_tombstones'].includes(table);
-    const deletable =
-      updatable && !['kill_switches', 'memory_deletions', 'decision_records'].includes(table);
+    // The audit log, operation receipts, consent decisions and deletion tombstones are append-only;
+    // kill switches are cleared, deletion receipts completed, decision records reviewed and
+    // financial records change state, but none of them is ever deleted.
+    const updatable = !APPEND_ONLY.has(table);
+    const deletable = updatable && !NEVER_DELETED.has(table);
     if (updatable) {
       // Updates and deletes aimed at tenant B affect nothing.
       await withTenant(h.app, { tenantId: a.tenantId }, async (tx) => {
@@ -325,6 +361,19 @@ describe('two-tenant isolation', () => {
       'cache_dependency_versions',
       'cache_entry_index',
       'cache_metrics_daily',
+      'operations',
+      'operation_receipts',
+      'merchant_connections',
+      'catalog_snapshots',
+      'carts',
+      'quotes',
+      'purchase_intents',
+      'payments',
+      'orders',
+      'fulfillments',
+      'refunds',
+      'finance_exceptions',
+      'commerce_events',
       'audit_heads',
       'audit_events',
     ]);

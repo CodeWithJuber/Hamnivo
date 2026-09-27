@@ -1,5 +1,7 @@
 import { cachingEn } from './caching';
+import { commerceEn } from './commerce/en';
 import { decisionsEn } from './decisions';
+
 /** Studio interface text in English (the source language). Keep sentences short and plain. */
 export const en = {
   app: {
@@ -1283,6 +1285,7 @@ export const en = {
   },
   decisions: decisionsEn,
   caching: cachingEn,
+  commerce: commerceEn,
   memory: {
     title: 'Customer memory',
     description: 'Manage what we remember about your customers.',

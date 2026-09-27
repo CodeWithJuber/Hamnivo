@@ -110,6 +110,40 @@ describe('cards', () => {
       expect(Card.options.some((option) => option.shape.kind.value === kind)).toBe(true);
     }
   });
+
+  it('keeps catalog prices as exact minor units and degrades an unknown card to its text', () => {
+    const item = {
+      productId: 'prod_pens',
+      variantId: null,
+      name: 'Black Pen Set',
+      description: null,
+      unitPriceMinor: '1500',
+      currency: 'AED',
+      availability: 'unknown',
+      stockQuantity: null,
+      imageUrl: null,
+    };
+    const card = {
+      kind: 'catalog',
+      version: 1,
+      snapshotId: 'cat_x',
+      merchant: { id: 'mrc_x', name: 'Northline Store' },
+      items: [item],
+      observedAt: '2026-09-27T10:21:00Z',
+      source: 'mock:catalog',
+    };
+    expect(Card.safeParse(card).success).toBe(true);
+    expect(Card.safeParse({ ...card, items: [{ ...item, unitPriceMinor: '15.00' }] }).success).toBe(
+      false,
+    );
+    expect(
+      parsePart({
+        type: 'card',
+        card: { ...card, kind: 'subscription_offer' },
+        fallbackText: 'Offer',
+      }),
+    ).toEqual({ type: 'unknown', originalType: 'card', fallbackText: 'Offer' });
+  });
 });
 
 describe('event envelope (forward compatibility, E04)', () => {

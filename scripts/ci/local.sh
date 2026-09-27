@@ -90,6 +90,28 @@ require() {
   done
 }
 
+# Unit tests, then the commerce adapter's contract tests against stripe-mock (Stripe's own API
+# mock) on a random local port; without it those tests are skipped. They run directly, not
+# through turbo, which would neither pass STRIPE_MOCK_URL on nor rerun a cached result. The
+# full run needs Docker for them; --quick leaves them out when Docker is not available.
+unit_tests() {
+  local stripe="hamnivo-check-stripe-$$" port
+  pnpm test || return 1
+  if ((quick == 1)) && ! docker info >/dev/null 2>&1; then
+    return 0
+  fi
+  docker run -d --rm --name "$stripe" -p 127.0.0.1::12111 stripe/stripe-mock:v0.205.0 >/dev/null ||
+    return 1
+  containers+=("$stripe")
+  port="$(docker port "$stripe" 12111/tcp | head -1 | awk -F: '{print $NF}')"
+  for _ in $(seq 1 30); do
+    curl -fsS -o /dev/null -u sk_test_123: "http://127.0.0.1:$port/v1/charges" && break
+    sleep 1
+  done
+  STRIPE_MOCK_URL="http://127.0.0.1:$port" pnpm --filter @hamnivo/adapters exec \
+    vitest run test/commerce/stripe-mock.test.ts
+}
+
 wait_for_postgres() {
   local container="$1"
   for _ in $(seq 1 120); do
@@ -209,7 +231,7 @@ require node pnpm git openssl
 step "Install dependencies (frozen lockfile)" pnpm install --frozen-lockfile
 step "Lint and format (Biome)" pnpm lint
 step "Typecheck" pnpm typecheck
-step "Unit tests" pnpm test
+step "Unit tests" unit_tests
 step "Shell scripts (shellcheck)" shell_scripts
 step "Feature status matrix is current" pnpm exec tsx scripts/feature-status/generate.ts --check
 step "Licence inventory is current and reviewed" pnpm exec tsx scripts/licenses/inventory.ts --check

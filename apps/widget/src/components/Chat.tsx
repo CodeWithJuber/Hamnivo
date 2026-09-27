@@ -18,6 +18,9 @@ import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { ParticipantBadge, type ParticipantKind } from '@hamnivo/ui/components/participant-badge';
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CommerceCard, type Part } from '../commerce/Cards.js';
+import { ShopBar } from '../commerce/ShopBar.js';
+import type { Commerce } from '../commerce/useCommerce.js';
 import { LANGUAGE_NAMES, LOCALES, type Locale, REPLY_LANGUAGE_NAMES } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
 import type { ChatState } from '../useChat.js';
@@ -41,16 +44,19 @@ interface Custom {
   clientMessageId?: string;
   /** Knowledge an AI answer cites, numbered as in its text (G06). */
   sources?: Source[];
+  /** A card (quote, receipt…) from Hamnivo's records, rendered instead of text. */
+  card?: Part;
   /** Memories an AI answer used (G19): shown as memories, never as something said now. */
   memories?: string[];
 }
 
 const textOf = (m: Message) =>
   m.parts
-    .map((p) => (p.type === 'text' ? p.text : ''))
+    .map((p) => (p.type === 'text' ? p.text : p.type === 'card' ? p.fallbackText : ''))
     .join('\n')
     .trim();
 
+const cardOf = (m: Message): Part | undefined => m.parts.find((p): p is Part => p.type === 'card');
 const memoriesOf = (m: Message): string[] =>
   m.parts.flatMap((p) => (p.type === 'memory' ? [p.key] : []));
 
@@ -80,6 +86,7 @@ function toThread(
           role: m.sender.roleLabel ?? '',
           state: 'accepted',
           sources: sourcesOf(m),
+          ...(cardOf(m) ? { card: cardOf(m) } : {}),
           memories: memoriesOf(m),
         } satisfies Custom,
       },
@@ -108,15 +115,28 @@ function toThread(
 function Bubble({
   message,
   onRetry,
+  commerce,
+  locale,
+  onHelp,
   onOpenMemory,
 }: {
   message: ThreadMessageLike;
   onRetry: (id: string) => void;
+  commerce: Commerce;
+  locale: Locale;
+  onHelp: (() => void) | undefined;
   onOpenMemory: () => void;
 }) {
   const { t } = useTranslation();
   const slotLabel = useSlotLabel();
   const custom = (message.metadata?.custom ?? {}) as unknown as Partial<Custom>;
+  if (custom.card) {
+    return (
+      <li className="flex flex-col items-start gap-1" data-sender="system">
+        <CommerceCard part={custom.card} commerce={commerce} locale={locale} onHelp={onHelp} />
+      </li>
+    );
+  }
   // While the AI is expected to answer, assistant-ui adds an optimistic placeholder message.
   if (!custom.kind) {
     return message.role === 'assistant' ? (
@@ -335,6 +355,7 @@ function Composer({ label, send }: { label: string; send: string }) {
 export function Chat(props: {
   session: WidgetSession;
   state: ChatState;
+  commerce: Commerce;
   pending: readonly OutgoingMessage[];
   locale: Locale;
   onLocale: (locale: Locale) => void;
@@ -378,6 +399,8 @@ export function Chat(props: {
     () => toThread(state.messages, props.pending, t('you')),
     [state.messages, props.pending, t],
   );
+  const canAskPerson =
+    conversation?.responder !== 'person' && conversation?.status !== 'waiting_for_person';
   const last = state.messages.at(-1);
   const aiWriting =
     conversation?.responder === 'ai' &&
@@ -518,6 +541,9 @@ export function Chat(props: {
                   <Bubble
                     message={message as unknown as ThreadMessageLike}
                     onRetry={props.onRetry}
+                    commerce={props.commerce}
+                    locale={locale}
+                    onHelp={canAskPerson ? () => void props.onHandoff() : undefined}
                     onOpenMemory={openMemory}
                   />
                 )}
@@ -525,8 +551,8 @@ export function Chat(props: {
             </ul>
           </ThreadPrimitive.Viewport>
           <div className="border-t border-border bg-surface px-3 pb-3 pt-2">
-            {conversation?.responder !== 'person' &&
-            conversation?.status !== 'waiting_for_person' ? (
+            <ShopBar commerce={props.commerce} locale={locale} />
+            {canAskPerson ? (
               <Button
                 variant="link"
                 className="mb-1 h-auto text-sm"

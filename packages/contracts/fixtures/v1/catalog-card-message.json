@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "1.0",
+  "eventId": "evt_01j9zk7w3xq8r4t2v6m5n1p0dd",
+  "type": "message.created",
+  "conversationId": "conv_01j9zk7w3xq8r4t2v6m5n1p0ce",
+  "sequence": 44,
+  "occurredAt": "2026-09-27T10:21:00Z",
+  "correlationId": null,
+  "lane": "customer",
+  "data": {
+    "message": {
+      "id": "msg_01j9zk7w3xq8r4t2v6m5n1p0de",
+      "conversationId": "conv_01j9zk7w3xq8r4t2v6m5n1p0ce",
+      "sequence": 44,
+      "sender": { "kind": "ai_agent", "displayName": "Hamnivo AI", "roleLabel": "AI assistant" },
+      "visibility": "public",
+      "parts": [
+        {
+          "type": "card",
+          "fallbackText": "Products from Northline Store: Everyday Notebook AED 35.00; Black Pen Set AED 15.00. Prices as of 27 Sep 2026 10:21 UTC.",
+          "card": {
+            "kind": "catalog",
+            "version": 1,
+            "snapshotId": "cat_01j9zk7w3xq8r4t2v6m5n1p0df",
+            "merchant": { "id": "mrc_01j9zk7w3xq8r4t2v6m5n1p0aa", "name": "Northline Store" },
+            "items": [
+              {
+                "productId": "prod_notebook",
+                "variantId": null,
+                "name": "Everyday Notebook",
+                "description": "Lined pages, A5, 160 pages",
+                "unitPriceMinor": "3500",
+                "currency": "AED",
+                "availability": "in_stock",
+                "stockQuantity": 25,
+                "imageUrl": null
+              },
+              {
+                "productId": "prod_pens",
+                "variantId": null,
+                "name": "Black Pen Set",
+                "description": "Set of 2 ballpoint pens",
+                "unitPriceMinor": "1500",
+                "currency": "AED",
+                "availability": "unknown",
+                "stockQuantity": null,
+                "imageUrl": null
+              }
+            ],
+            "observedAt": "2026-09-27T10:21:00Z",
+            "source": "mock:catalog"
+          }
+        }
+      ],
+      "createdAt": "2026-09-27T10:21:00Z",
+      "clientMessageId": null,
+      "delivery": null,
+      "language": "en"
+    }
+  }
+}

@@ -10,6 +10,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export type Connection = StreamStatus | 'idle' | 'offline';
 
+/** A live event of the conversation, as other parts of the widget see it. */
+export interface ChatEvent {
+  type: string;
+  data?: Record<string, unknown>;
+}
+
 export interface ChatState {
   phase: 'loading' | 'ready' | 'error';
   session: WidgetSession | null;
@@ -60,6 +66,14 @@ export function useChat(client: HamnivoClient) {
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   /** The person whose chats are on screen. */
   const shown = useRef<string | null>(null);
+  /** Other parts of the widget (the shop) that follow live events. */
+  const listeners = useRef(new Set<(event: ChatEvent) => void>());
+  const onEvent = useCallback((listener: (event: ChatEvent) => void) => {
+    listeners.current.add(listener);
+    return () => {
+      listeners.current.delete(listener);
+    };
+  }, []);
 
   /** Runs session changes (start, identify, reset) one at a time, in order. */
   const serial = useCallback(<T>(work: () => Promise<T>): Promise<T> => {
@@ -80,6 +94,7 @@ export function useChat(client: HamnivoClient) {
 
   const apply = useCallback((event: Record<string, unknown> & { type: string }) => {
     const data = (event.data ?? {}) as Record<string, unknown>;
+    for (const listener of listeners.current) listener({ type: event.type, data });
     setState((s) => {
       switch (event.type) {
         case 'message.created':
@@ -320,5 +335,5 @@ export function useChat(client: HamnivoClient) {
     [state.outgoing, state.messages],
   );
 
-  return { state, pending, send, retry, handoff, identify, reset };
+  return { state, pending, send, retry, handoff, identify, reset, onEvent };
 }

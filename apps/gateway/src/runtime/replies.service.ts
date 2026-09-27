@@ -28,6 +28,7 @@ import {
 } from '../authority/views.js';
 import { AnswerCache, type AnswerLookup } from '../cache/answers.js';
 import type { SourceRefRow } from '../cache/cache.service.js';
+import { CLAIM_CORRECTION, checkReplyClaims } from '../commerce/claims.js';
 import { AppError } from '../common/app-error.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
 import { LanguageService } from '../language/language.service.js';
@@ -718,7 +719,8 @@ export class RepliesService {
       (assist
         ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
         : '');
-    for (const correction of [null, CORRECTION]) {
+    let correction: string | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
       const system = correction ? `${base}\n\n${correction}` : base;
       const generated = await this.callModels(tenantId, runId, config, system, messages, {
         view,
@@ -757,10 +759,31 @@ export class RepliesService {
           detail: verdict.ok ? {} : { rule: verdict.rule },
         }),
       );
-      if (verdict.ok) {
-        if (!result.text) throw new EmptyReplyError('The model returned no text.');
-        return result;
+      if (!verdict.ok) {
+        correction = CORRECTION;
+        continue;
       }
+      // X10: "paid" or "refunded" only with a provider receipt in this conversation.
+      const claims = await this.tx(tenantId, (tx) =>
+        checkReplyClaims(tx, context.control.id, result.text),
+      );
+      if (claims.claimed.length > 0) {
+        await this.tx(tenantId, (tx) =>
+          this.runs.step(tx, tenantId, runId, {
+            kind: 'guard',
+            name: 'receipt_claims',
+            status: claims.verdict.ok ? 'ok' : 'blocked',
+            outputHash: sha256(result.text),
+            detail: { claims: claims.claimed },
+          }),
+        );
+      }
+      if (!claims.verdict.ok) {
+        correction = CLAIM_CORRECTION;
+        continue;
+      }
+      if (!result.text) throw new EmptyReplyError('The model returned no text.');
+      return result;
     }
     return null;
   }

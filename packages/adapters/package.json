@@ -2,7 +2,7 @@
   "name": "@hamnivo/adapters",
   "version": "0.1.0",
   "private": true,
-  "description": "Hamnivo provider adapters behind shared contracts: language and embedding models for Anthropic, OpenAI, Google Gemini and OpenAI-compatible servers (capability tables, error normalization, fallback, deterministic mocks) and the Jev decision provider; commerce, scanner, storage and network adapters follow",
+  "description": "Hamnivo provider adapters behind shared contracts: language and embedding models for Anthropic, OpenAI, Google Gemini and OpenAI-compatible servers (capability tables, error normalization, fallback, deterministic mocks), the Jev decision provider, and commerce providers (Stripe hosted checkout and refunds, an in-memory mock); scanner, storage and network adapters follow",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -18,6 +18,14 @@
     "./cache": {
       "types": "./dist/cache/index.d.ts",
       "import": "./dist/cache/index.js"
+    },
+    "./commerce": {
+      "types": "./dist/commerce/index.d.ts",
+      "import": "./dist/commerce/index.js"
+    },
+    "./commerce/testing": {
+      "types": "./dist/commerce/testing.d.ts",
+      "import": "./dist/commerce/testing.js"
     }
   },
   "files": [
@@ -36,6 +44,7 @@
     "@ai-sdk/provider": "4.0.18",
     "@hamnivo/domain": "workspace:*",
     "@typesafe-ai/sdk": "0.6.0",
+    "stripe": "22.6.2",
     "zod": "catalog:"
   },
   "devDependencies": {

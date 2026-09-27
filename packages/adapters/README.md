@@ -250,3 +250,41 @@ expire and never decides what may be cached.
 a fake with Valkey's `PX`, `NX` and `DEL` semantics), and checks prefix isolation, fail-open
 timeouts and errors, singleflight and bounded coalescing. The gateway's integration tests run the
 Valkey store against a real Valkey.
+
+## Commerce
+
+`@hamnivo/adapters/commerce` is the payment-provider port (`CommerceProvider` in `port.ts`) with two
+adapters:
+
+| Adapter | Use |
+|---|---|
+| `StripeCommerceProvider` | Stripe, through the official `stripe` SDK: prices as the catalog (a price is a variant), Checkout Sessions as the hosted payment page, refunds, and webhooks verified with `stripe.webhooks.constructEvent` over the raw body. |
+| `MockCommerceProvider` | An in-memory store with the same behaviour and Stripe-shaped, Stripe-signed events. Used by tests and demos; the gateway refuses `mock` connections in production unless `COMMERCE_ALLOW_MOCK` is set. |
+
+The gateway builds a Stripe adapter per merchant connection, with the key it reads from its
+secret broker; nothing here reads keys from the environment. Every write carries the caller's idempotency key and Hamnivo's
+reference in metadata, so a lost answer can be found by `findCheckout` or `findRefund` without
+creating anything. Errors are `CommerceProviderError` with `retryable` and `mayHaveApplied`:
+a timeout may have applied, so the caller treats it as unknown, never as a failure.
+
+`capabilities()` returns a versioned manifest (catalog, hosted checkout, full and partial
+refunds, currencies, recurring, provisioning). The gateway checks every operation against it
+before calling the provider.
+
+### Tests
+
+- `test/commerce/contract.ts` is one suite that both adapters pass: catalog, exact quotes,
+  checkout, payment events, expiry, refunds, lost answers and dropped requests found by reference,
+  webhook signatures (tampered, stale, other secret).
+- The Stripe adapter runs that suite against `startFakeStripe()` (`@hamnivo/adapters/commerce/testing`),
+  a stateful fake of the Stripe API and hosted page that the gateway and browser tests also use.
+- `test/commerce/stripe-mock.test.ts` sends the adapter's requests to the official stripe-mock,
+  which checks them against Stripe's OpenAPI description. It runs when `STRIPE_MOCK_URL` is set:
+
+  ```bash
+  docker run --rm -d --name stripe-mock -p 127.0.0.1:12111:12111 stripe/stripe-mock:latest
+  STRIPE_MOCK_URL=http://127.0.0.1:12111 pnpm --filter @hamnivo/adapters test
+  ```
+
+No test calls the real Stripe API. The adapter has not yet been run against Stripe's live test
+mode.

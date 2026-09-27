@@ -9,6 +9,9 @@ import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
 import { AuthoritySyncService } from './authority/sync.service.js';
 import { cacheProviders } from './cache/cache.providers.js';
+import { CARD_TOPIC, CommerceCardsService } from './commerce/card-publisher.service.js';
+import { COMMERCE_WORKER_PROVIDERS } from './commerce/commerce.module.js';
+import { CommerceWorker } from './commerce/worker.service.js';
 import type { AppConfig } from './config.js';
 import { decisionProviders } from './decisions/decisions.providers.js';
 import { RoutingService } from './decisions/routing.service.js';
@@ -57,7 +60,8 @@ export interface WorkerOverrides extends PlatformOverrides {
 }
 
 /**
- * Background process: outbox relay (owner sync to Chatwoot, AI replies), the integration-inbox
+ * Background process: outbox relay (owner sync to Chatwoot, AI replies, commerce cards), the
+ * commerce worker (provider events and reconciliation), the integration-inbox
  * processor for Chatwoot webhooks, the reconciler that catches what webhooks missed, and
  * scheduled maintenance.
  */
@@ -98,6 +102,7 @@ export class WorkerModule {
         ConversationHistory,
         MemoryExtractionService,
         RepliesService,
+        ...COMMERCE_WORKER_PROVIDERS,
         {
           provide: OUTBOX_HANDLERS,
           inject: [
@@ -108,6 +113,7 @@ export class WorkerModule {
             MemoryIndexService,
             MemoryDeletionService,
             RoutingService,
+            CommerceCardsService,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -117,6 +123,7 @@ export class WorkerModule {
             index: MemoryIndexService,
             deletions: MemoryDeletionService,
             routing: RoutingService,
+            cards: CommerceCardsService,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -137,6 +144,7 @@ export class WorkerModule {
               ['memory.embed', (event) => index.onEmbed(event)],
               ['memory.deleted', (event) => deletions.complete(event)],
               ['conversation.route', (event) => routing.onRoute(event)],
+              [CARD_TOPIC, (event) => cards.onCardEvent(event)],
             ]),
         },
         OutboxRelay,
@@ -151,6 +159,7 @@ export class WorkerModule {
         JournalService,
         MemoryExtractionService,
         MemoryDeletionService,
+        CommerceWorker,
       ],
     };
   }

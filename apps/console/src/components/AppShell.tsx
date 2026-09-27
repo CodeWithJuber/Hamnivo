@@ -23,7 +23,9 @@ import {
   LogOutIcon,
   MenuIcon,
   OctagonPauseIcon,
+  ReceiptIcon,
   ShieldCheckIcon,
+  ShoppingBagIcon,
   StoreIcon,
   WaypointsIcon,
   XIcon,
@@ -52,6 +54,8 @@ type NavPath =
   | '/runs'
   | '/decisions'
   | '/caching'
+  | '/orders'
+  | '/finance'
   | '/stop-ai'
   | '/account';
 
@@ -100,6 +104,18 @@ function useNavItems(): NavItem[] {
       label: t('caching.nav'),
       icon: DatabaseZapIcon,
       permission: 'knowledge.read',
+    },
+    {
+      to: '/orders',
+      label: t('commerce.nav.orders'),
+      icon: ShoppingBagIcon,
+      permission: 'commerce.read',
+    },
+    {
+      to: '/finance',
+      label: t('commerce.nav.finance'),
+      icon: ReceiptIcon,
+      permission: 'commerce.read',
     },
     { to: '/stop-ai', label: t('nav.stopAi'), icon: OctagonPauseIcon, permission: 'agents.read' },
   ];

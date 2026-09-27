@@ -3,6 +3,11 @@ import { adminRoutes, identityRoutes } from './admin-routes.js';
 import { agentRoutes } from './agent-routes.js';
 import { cacheRoutes } from './cache-routes.js';
 import {
+  commerceAdminRoutes,
+  commerceIntegrationRoutes,
+  commerceWidgetRoutes,
+} from './commerce-routes.js';
+import {
   CustomerConversation,
   FeedbackRequest,
   HandoffRequest,
@@ -42,7 +47,8 @@ export type RouteAuth =
   | 'widget_session'
   | 'staff_session'
   | 'api_key'
-  | 'integration_signature';
+  | 'integration_signature'
+  | 'provider_signature';
 
 export interface RouteDef {
   method: HttpMethod;
@@ -362,4 +368,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...cacheRoutes,
   ...languageRoutes,
   ...inboxRoutes,
+  ...commerceAdminRoutes,
+  ...commerceWidgetRoutes,
+  ...commerceIntegrationRoutes,
 };

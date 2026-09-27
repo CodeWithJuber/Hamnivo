@@ -4,7 +4,7 @@ import { appendAudit } from '../audit.js';
 import type { Db } from '../client.js';
 import { newId, toPublicId } from '../ids.js';
 import * as s from '../schema/index.js';
-import { withTenant } from '../tenant.js';
+import { type TenantTx, withTenant } from '../tenant.js';
 
 export interface SeededTenant {
   tenantId: string;
@@ -35,6 +35,214 @@ export interface SeededTenant {
 
 const bytes = (n = 32) => randomBytes(n);
 const inDays = (days: number) => new Date(Date.now() + days * 86_400_000);
+
+/** One paid demo order with a pending refund: a row in every commerce table. */
+async function seedCommerce(
+  tx: TenantTx,
+  tenantId: string,
+  suffix: string,
+  ref: {
+    workspaceId: string;
+    brandId: string;
+    secretId: string;
+    staffMemberId: string;
+    principalId: string;
+    conversationId: string;
+  },
+) {
+  const ids = {
+    merchantId: newId(),
+    cartId: newId(),
+    quoteId: newId(),
+    intentId: newId(),
+    operationId: newId(),
+    paymentId: newId(),
+    orderId: newId(),
+  };
+  const lines = [{ productId: 'prod_notebook', variantId: null, quantity: 1 }];
+  await tx.insert(s.merchantConnections).values({
+    id: ids.merchantId,
+    tenantId,
+    workspaceId: ref.workspaceId,
+    brandId: ref.brandId,
+    provider: 'mock',
+    displayName: 'Northline Store',
+    capabilities: { version: 1, provider: 'mock' },
+    config: {
+      currencies: ['AED'],
+      refundPolicy: {
+        approval: 'always',
+        autoApproveMaxMinor: '0',
+        requireSeparateApprover: true,
+        windowDays: null,
+      },
+      mockStoreId: `seed-${suffix}`,
+    },
+    apiKeySecretId: ref.secretId,
+    webhookSecretId: ref.secretId,
+    createdBy: ref.staffMemberId,
+  });
+  await tx.insert(s.catalogSnapshots).values({
+    tenantId,
+    merchantConnectionId: ids.merchantId,
+    conversationId: ref.conversationId,
+    query: 'notebook',
+    items: [{ productId: 'prod_notebook', unitPriceMinor: '3500', currency: 'AED' }],
+    itemCount: 1,
+    source: 'mock:catalog',
+    observedAt: new Date(),
+    createdByType: 'staff',
+  });
+  await tx.insert(s.carts).values({
+    id: ids.cartId,
+    tenantId,
+    conversationId: ref.conversationId,
+    principalId: ref.principalId,
+    merchantConnectionId: ids.merchantId,
+    status: 'completed',
+    revision: 2,
+    currency: 'AED',
+    lines,
+  });
+  await tx.insert(s.quotes).values({
+    id: ids.quoteId,
+    tenantId,
+    cartId: ids.cartId,
+    cartRevision: 2,
+    conversationId: ref.conversationId,
+    principalId: ref.principalId,
+    merchantConnectionId: ids.merchantId,
+    status: 'consumed',
+    currency: 'AED',
+    document: { v: 1, totalMinor: '4500' },
+    hash: bytes(),
+    subtotalMinor: 3500n,
+    discountMinor: 0n,
+    shippingMinor: 1000n,
+    totalMinor: 4500n,
+    expiresAt: inDays(1),
+    createdByType: 'customer',
+  });
+  await tx.insert(s.operations).values({
+    id: ids.operationId,
+    tenantId,
+    kind: 'commerce.checkout.create',
+    businessKey: `checkout:${ids.intentId}`,
+    requestHash: bytes(),
+    state: 'succeeded',
+    provider: 'mock',
+    resourceType: 'purchase_intent',
+    resourceId: ids.intentId,
+    conversationId: ref.conversationId,
+    ownerEpoch: 0,
+    actorType: 'customer',
+    providerIdempotencyKey: `hv:checkout:${ids.intentId}`,
+    providerRef: `cs_seed_${suffix}`,
+    attempts: 1,
+  });
+  await tx.insert(s.operationReceipts).values({
+    tenantId,
+    operationId: ids.operationId,
+    kind: 'webhook',
+    outcome: 'succeeded',
+    source: 'provider_webhook',
+    providerRef: `cs_seed_${suffix}`,
+    providerEventId: `evt_seed_${suffix}`,
+    evidence: { status: 'complete', paymentStatus: 'paid' },
+    observedAt: new Date(),
+  });
+  await tx.insert(s.purchaseIntents).values({
+    id: ids.intentId,
+    tenantId,
+    conversationId: ref.conversationId,
+    principalId: ref.principalId,
+    merchantConnectionId: ids.merchantId,
+    cartId: ids.cartId,
+    quoteId: ids.quoteId,
+    state: 'completed',
+    approvedHash: bytes(),
+    approvedCartRevision: 2,
+    approvedAt: new Date(),
+    approvalNonce: newId(),
+    checkoutOperationId: ids.operationId,
+    checkoutSessionRef: `cs_seed_${suffix}`,
+  });
+  await tx.insert(s.payments).values({
+    id: ids.paymentId,
+    tenantId,
+    purchaseIntentId: ids.intentId,
+    merchantConnectionId: ids.merchantId,
+    provider: 'mock',
+    sessionRef: `cs_seed_${suffix}`,
+    paymentRef: `pi_seed_${suffix}`,
+    state: 'captured',
+    amountMinor: 4500n,
+    currency: 'AED',
+    capturedMinor: 4500n,
+    capturedAt: new Date(),
+  });
+  await tx.insert(s.orders).values({
+    id: ids.orderId,
+    tenantId,
+    reference: `HV-${suffix.toUpperCase()}`,
+    conversationId: ref.conversationId,
+    principalId: ref.principalId,
+    merchantConnectionId: ids.merchantId,
+    brandId: ref.brandId,
+    purchaseIntentId: ids.intentId,
+    quoteId: ids.quoteId,
+    state: 'confirmed',
+    paymentState: 'captured',
+    currency: 'AED',
+    totalMinor: 4500n,
+    lines: [{ lineId: 'l1', name: 'Everyday Notebook', quantity: 1, totalMinor: '3500' }],
+    placedAt: new Date(),
+    confirmedAt: new Date(),
+  });
+  await tx.insert(s.fulfillments).values({
+    tenantId,
+    orderId: ids.orderId,
+    kind: 'shipment',
+    state: 'in_progress',
+    source: 'merchant',
+  });
+  await tx.insert(s.refunds).values({
+    tenantId,
+    orderId: ids.orderId,
+    paymentId: ids.paymentId,
+    amountMinor: 1000n,
+    currency: 'AED',
+    reason: 'customer_request',
+    state: 'awaiting_approval',
+    clientRequestId: newId(),
+    requestedBy: ref.staffMemberId,
+    requestedAt: new Date(),
+    policy: { eligible: true, needsApproval: true },
+  });
+  await tx.insert(s.financeExceptions).values({
+    tenantId,
+    kind: 'order_update_pending',
+    subjectType: 'order',
+    subjectId: ids.orderId,
+    orderId: ids.orderId,
+    operationId: ids.operationId,
+    sourceState: 'paid',
+    nextSafeAction: 'review_order',
+    openedAt: new Date(),
+  });
+  await tx.insert(s.commerceEvents).values({
+    tenantId,
+    merchantConnectionId: ids.merchantId,
+    providerEventId: `evt_seed_${suffix}`,
+    eventType: 'checkout.completed',
+    providerType: 'checkout.session.completed',
+    payload: { id: `evt_seed_${suffix}` },
+    bodyHash: bytes(),
+    occurredAt: new Date(),
+    processedAt: new Date(),
+    outcome: 'applied',
+  });
+}
 
 /**
  * Creates a tenant with at least one row in every tenant-owned table, through the application
@@ -663,6 +871,14 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       language: 'en',
       hits: 3,
       misses: 1,
+    });
+    await seedCommerce(tx, tenantId, suffix, {
+      workspaceId: ids.workspaceId,
+      brandId: ids.brandId,
+      secretId: ids.secretId,
+      staffMemberId: ids.staffMemberId,
+      principalId: ids.principalId,
+      conversationId: ids.conversationId,
     });
     await appendAudit(tx, {
       actorType: 'system',
