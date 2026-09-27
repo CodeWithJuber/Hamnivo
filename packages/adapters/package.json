@@ -10,6 +10,10 @@
     "./models": {
       "types": "./dist/models/index.d.ts",
       "import": "./dist/models/index.js"
+    },
+    "./jev": {
+      "types": "./dist/jev/index.d.ts",
+      "import": "./dist/jev/index.js"
     }
   },
   "files": [
@@ -21,7 +25,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ai-sdk/provider": "4.0.18"
+    "@ai-sdk/provider": "4.0.18",
+    "@hamnivo/domain": "workspace:*",
+    "@typesafe-ai/sdk": "0.6.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
