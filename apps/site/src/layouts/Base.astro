@@ -1,0 +1,71 @@
+---
+import nastaliq from '@fontsource/noto-nastaliq-urdu/files/noto-nastaliq-urdu-arabic-400-normal.woff2?url';
+import notoArabic from '@fontsource/noto-sans-arabic/files/noto-sans-arabic-arabic-400-normal.woff2?url';
+import notoDevanagari from '@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-devanagari-400-normal.woff2?url';
+import dmSansLatin from '@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2?url';
+import { palette } from '@hamnivo/brand';
+import { dictionaries, type Locale, localeInfo, localePath, locales } from '../i18n';
+import { inkBandCss } from '../lib/theme';
+import '../styles/global.css';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = dictionaries[locale];
+// `site` always comes from astro.config.ts (PUBLIC_SITE_URL or its default).
+const absolute = (path: string) => new URL(path, Astro.site).href;
+const ogImage = absolute('/og-image.png');
+
+// Body-text fonts only; headings and other weights load on demand.
+const preloadFonts: Record<Locale, string[]> = {
+  en: [dmSansLatin],
+  ar: [notoArabic],
+  hi: [dmSansLatin, notoDevanagari],
+  ur: [nastaliq],
+};
+---
+
+<!doctype html>
+<html lang={locale} dir={localeInfo[locale].dir} data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t.meta.title}</title>
+    <style is:inline set:html={inkBandCss}></style>
+    <meta name="description" content={t.meta.description} />
+    <link rel="canonical" href={absolute(localePath(locale))} />
+    {locales.map((l) => <link rel="alternate" hreflang={l} href={absolute(localePath(l))} />)}
+    <link rel="alternate" hreflang="x-default" href={absolute('/')} />
+    {preloadFonts[locale].map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content={palette.ink} />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Hamnivo" />
+    <meta property="og:title" content={t.meta.title} />
+    <meta property="og:description" content={t.meta.description} />
+    <meta property="og:url" content={absolute(localePath(locale))} />
+    <meta property="og:locale" content={localeInfo[locale].ogLocale} />
+    {
+      locales
+        .filter((l) => l !== locale)
+        .map((l) => <meta property="og:locale:alternate" content={localeInfo[l].ogLocale} />)
+    }
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={t.meta.ogImageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">{t.a11y.skipLink}</a>
+    <slot />
+  </body>
+</html>

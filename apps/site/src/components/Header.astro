@@ -1,0 +1,25 @@
+---
+import Lockup from '@hamnivo/brand/assets/hamnivo-lockup-on-dark.svg';
+import { dictionaries, type Locale, localePath } from '../i18n';
+import { links } from '../lib/links';
+import LanguageSwitcher from './LanguageSwitcher.astro';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = dictionaries[locale];
+---
+
+<header class="on-ink">
+  <div class="page-container flex flex-wrap items-center gap-x-3 gap-y-1 py-2 sm:py-3">
+    <a href={localePath(locale)} class="me-auto inline-flex min-h-11 items-center">
+      {/* Inline, so the logo paints with the first frame instead of waiting for a request. */}
+      <Lockup width="146" height="32" aria-hidden="true" focusable="false" class="h-7 w-auto sm:h-8" />
+      <span class="sr-only">Hamnivo</span>
+    </a>
+    <LanguageSwitcher locale={locale} class="order-last basis-full sm:order-none sm:basis-auto" />
+    <a href={links.repo} class="btn btn-secondary min-h-10 px-4 text-sm">{t.nav.github}</a>
+  </div>
+</header>

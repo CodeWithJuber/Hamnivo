@@ -1,0 +1,32 @@
+---
+import type { Locale } from '../i18n';
+import { type VisualId, visualSources } from '../lib/visuals';
+
+interface Props {
+  id: VisualId;
+  locale: Locale;
+  /** Rendered width at each breakpoint, matching the layout that holds the image. */
+  sizes: string;
+  /** Only the hero: it is the largest element in the first viewport. */
+  eager?: boolean;
+}
+
+const { id, locale, sizes, eager = false } = Astro.props;
+const v = visualSources(id, locale);
+---
+
+<picture class="block">
+  <source type="image/avif" srcset={v.avifSrcset} sizes={sizes} />
+  <img
+    src={v.src}
+    srcset={v.webpSrcset}
+    sizes={sizes}
+    width={v.width}
+    height={v.height}
+    alt={v.alt}
+    loading={eager ? 'eager' : 'lazy'}
+    decoding={eager ? undefined : 'async'}
+    fetchpriority={eager ? 'high' : undefined}
+    class="h-auto w-full"
+  />
+</picture>

@@ -1,0 +1,69 @@
+---
+import { type FeatureId, features, isComingSoon } from '../content/features';
+import { dictionaries, type Locale } from '../i18n';
+import Visual from './Visual.astro';
+
+interface Props {
+  id: FeatureId;
+  locale: Locale;
+  /** Puts the illustration on the start side on wide screens, alternating down the page. */
+  flip: boolean;
+}
+
+const { id, locale, flip } = Astro.props;
+const t = dictionaries[locale];
+const copy = t.features[id];
+const statuses = features[id].points;
+const wholeSectionComing = isComingSoon(id);
+---
+
+<section id={id} aria-labelledby={`${id}-title`} class="py-14 sm:py-20">
+  <div class="page-container grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+    <div class="max-w-xl">
+      <p class="eyebrow">{copy.eyebrow}</p>
+      <h2 id={`${id}-title`} class="heading-2 mt-3">
+        {copy.title}
+        {wholeSectionComing && <span class="badge ms-2">{t.coming}</span>}
+      </h2>
+      <p class="lead mt-4">{copy.lead}</p>
+      <ul class="mt-8 space-y-4">
+        {
+          copy.points.map((text, i) => {
+            const coming = statuses[i] === 'coming';
+            return (
+              <li class="flex gap-3">
+                <svg
+                  class:list={['mt-1 size-5 shrink-0', coming ? 'text-text-muted' : 'text-brand']}
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  {coming ? (
+                    <circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2.6" />
+                  ) : (
+                    <>
+                      <circle cx="10" cy="10" r="8.5" fill="currentColor" />
+                      <path d="m6.5 10.2 2.3 2.3 4.7-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                    </>
+                  )}
+                </svg>
+                <span>
+                  {coming && !wholeSectionComing && <span class="badge me-1">{t.coming}</span>}
+                  {text}
+                </span>
+              </li>
+            );
+          })
+        }
+      </ul>
+      {copy.note && <p class="mt-6 text-base text-text-muted">{copy.note}</p>}
+    </div>
+    <div class:list={['mx-auto w-full max-w-88 lg:max-w-lg', { 'lg:order-first': flip }]}>
+      <Visual
+        id={features[id].visual}
+        locale={locale}
+        sizes="(min-width: 64rem) 32rem, (min-width: 24rem) 22rem, calc(100vw - 2rem)"
+      />
+    </div>
+  </div>
+</section>

@@ -1,0 +1,49 @@
+---
+import lockupUrl from '@hamnivo/brand/assets/hamnivo-lockup-on-dark.svg?url';
+import { dictionaries, type Locale } from '../i18n';
+import { links } from '../lib/links';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = dictionaries[locale].footer;
+const projectLinks = [
+  { href: links.repo, label: t.source },
+  { href: links.selfHosting, label: t.guide },
+  { href: links.featureStatus, label: t.status },
+  { href: links.docs, label: t.docs },
+  { href: links.license, label: t.license },
+];
+---
+
+<footer class="on-ink">
+  <div class="page-container py-12 lg:py-16">
+    <div class="grid gap-10 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div class="max-w-md">
+        <img src={lockupUrl} alt="Hamnivo" width="146" height="32" loading="lazy" decoding="async" class="h-8 w-auto" />
+        <p class="mt-5 text-lg">{t.tagline}</p>
+        <p class="mt-2 text-on-ink-secondary">{t.about}</p>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-on-ink-secondary">{t.projectHeading}</h2>
+        <ul class="mt-2">
+          {
+            projectLinks.map((link) => (
+              <li>
+                <a class="site-link inline-flex min-h-11 items-center" href={link.href}>
+                  {link.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+    <div class="mt-10 flex flex-wrap justify-between gap-x-8 gap-y-2 border-t border-on-ink-border pt-6 text-sm leading-6 text-on-ink-secondary">
+      <p><bdi>© 2026 Juber Shaikh</bdi></p>
+      {t.reviewNote && <p>{t.reviewNote}</p>}
+    </div>
+  </div>
+</footer>
