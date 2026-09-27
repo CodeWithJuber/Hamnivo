@@ -89,6 +89,7 @@ export class WorkerModule {
             new Map<string, OutboxHandler>([
               ...defaultOutboxHandlers(),
               ['conversation.owner_changed', (event) => sync.applyOwnerChange(event)],
+              ['conversation.team_changed', (event) => sync.applyTeamChange(event)],
               ['conversation.note', (event) => sync.applyNote(event)],
               ['conversation.customer_message', (event) => replies.onCustomerMessage(event)],
               ['knowledge.ingest', (event) => ingestion.onIngest(event)],

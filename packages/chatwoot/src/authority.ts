@@ -156,10 +156,14 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
     return { conversationRef: String(conversation.id) };
   }
 
-  async getState(conversationRef: string): Promise<AuthorityConversationState> {
+  async getState(
+    conversationRef: string,
+    actor?: ActorCredential,
+  ): Promise<AuthorityConversationState> {
+    const client = actor ? await this.as(actor) : this.integration;
     const conversation = await call<Json>(
       'getConversation',
-      this.integration.GET('/api/v1/accounts/{account_id}/conversations/{conversation_id}', {
+      client.GET('/api/v1/accounts/{account_id}/conversations/{conversation_id}', {
         params: { path: this.conversationPath(conversationRef) },
       }) as never,
     );

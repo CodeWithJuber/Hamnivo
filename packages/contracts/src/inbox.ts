@@ -57,6 +57,7 @@ export const InboxOwner = z
     z.object({ kind: z.literal('none') }),
   ])
   .meta({ id: 'InboxOwner' });
+export type InboxOwner = z.infer<typeof InboxOwner>;
 
 export const CustomerIdentity = z.enum(['verified', 'anonymous', 'unknown']);
 
@@ -69,6 +70,7 @@ export const InboxCustomer = z
     language: LanguageTag.nullable(),
   })
   .meta({ id: 'InboxCustomer' });
+export type InboxCustomer = z.infer<typeof InboxCustomer>;
 
 export const InboxTeamRef = z.object({ id: typeId('team'), name: z.string() });
 
@@ -115,6 +117,7 @@ export const InboxCounts = z
     all: z.int().nonnegative(),
   })
   .meta({ id: 'InboxCounts' });
+export type InboxCounts = z.infer<typeof InboxCounts>;
 
 export const InboxListQuery = z.object({
   queue: InboxQueue.default('all'),
@@ -136,6 +139,7 @@ export const InboxPage = z
     counts: InboxCounts,
   })
   .meta({ id: 'InboxPage' });
+export type InboxPage = z.infer<typeof InboxPage>;
 
 export const PresenceLane = z.enum(['public', 'internal']);
 
@@ -148,6 +152,7 @@ export const PresenceEntry = z
     since: Timestamp,
   })
   .meta({ id: 'PresenceEntry' });
+export type PresenceEntry = z.infer<typeof PresenceEntry>;
 
 export const PresenceUpdate = z
   .object({
@@ -169,6 +174,7 @@ export const InboxPermissions = z
     bulk: z.boolean(),
   })
   .meta({ id: 'InboxPermissions' });
+export type InboxPermissions = z.infer<typeof InboxPermissions>;
 
 export const InboxConversationDetail = InboxConversation.extend({
   permissions: InboxPermissions,
@@ -195,6 +201,7 @@ export const InboxMessagePage = z
     olderCursor: Cursor.nullable(),
   })
   .meta({ id: 'InboxMessagePage' });
+export type InboxMessagePage = z.infer<typeof InboxMessagePage>;
 
 export const InboxMessagesQuery = z.object({
   before: Cursor.optional(),
@@ -237,6 +244,7 @@ export const AssigneeOptions = z
     ai: z.object({ available: z.boolean(), displayName: z.string().nullable() }),
   })
   .meta({ id: 'AssigneeOptions' });
+export type AssigneeOptions = z.infer<typeof AssigneeOptions>;
 
 export const TransferRequest = z
   .object({
@@ -265,6 +273,7 @@ export const LabelOption = z
     color: z.string().nullable(),
   })
   .meta({ id: 'LabelOption' });
+export type LabelOption = z.infer<typeof LabelOption>;
 
 export const ConversationTags = z
   .object({
@@ -273,6 +282,7 @@ export const ConversationTags = z
     options: z.array(LabelOption),
   })
   .meta({ id: 'ConversationTags' });
+export type ConversationTags = z.infer<typeof ConversationTags>;
 
 export const SetTagsRequest = z
   .object({ labels: z.array(z.string().trim().min(1).max(255)).max(30) })
@@ -301,6 +311,7 @@ export const CustomFieldDefinition = z
     options: z.array(z.string()),
   })
   .meta({ id: 'CustomFieldDefinition' });
+export type CustomFieldDefinition = z.infer<typeof CustomFieldDefinition>;
 
 export const ConversationFields = z
   .object({
@@ -308,6 +319,7 @@ export const ConversationFields = z
     values: z.record(z.string(), FieldValue),
   })
   .meta({ id: 'ConversationFields' });
+export type ConversationFields = z.infer<typeof ConversationFields>;
 
 export const SetFieldsRequest = z
   .object({
@@ -329,6 +341,7 @@ export const SavedReply = z
     missingVariables: z.array(z.string()),
   })
   .meta({ id: 'SavedReply' });
+export type SavedReply = z.infer<typeof SavedReply>;
 
 export const SavedReplyList = z
   .object({ items: z.array(SavedReply) })
@@ -375,6 +388,7 @@ export const CustomerContext = z
     ),
   })
   .meta({ id: 'CustomerContext' });
+export type CustomerContext = z.infer<typeof CustomerContext>;
 
 // ------------------------------------------------------------------ search (H07)
 
@@ -399,6 +413,7 @@ export const InboxSearchResult = z
     nextCursor: Cursor.nullable(),
   })
   .meta({ id: 'InboxSearchResult' });
+export type InboxSearchResult = z.infer<typeof InboxSearchResult>;
 
 // ------------------------------------------------------------------ drafts and failed sends (H09)
 
@@ -414,6 +429,7 @@ export const StaffDraft = z
     updatedAt: Timestamp,
   })
   .meta({ id: 'StaffDraft' });
+export type StaffDraft = z.infer<typeof StaffDraft>;
 
 /** A send that has not been confirmed. Retrying reuses its client message id, so it is safe. */
 export const OutgoingMessage = z
@@ -426,10 +442,12 @@ export const OutgoingMessage = z
     updatedAt: Timestamp,
   })
   .meta({ id: 'OutgoingMessage' });
+export type OutgoingMessage = z.infer<typeof OutgoingMessage>;
 
 export const DraftsView = z
   .object({ drafts: z.array(StaffDraft), outgoing: z.array(OutgoingMessage) })
   .meta({ id: 'DraftsView' });
+export type DraftsView = z.infer<typeof DraftsView>;
 
 export const SaveDraftRequest = z
   .object({
@@ -456,6 +474,7 @@ export const CopilotSuggestion = z
     createdAt: Timestamp,
   })
   .meta({ id: 'CopilotSuggestion' });
+export type CopilotSuggestion = z.infer<typeof CopilotSuggestion>;
 
 // ------------------------------------------------------------------ translation (H13)
 
@@ -474,6 +493,7 @@ export const MessageTranslation = z
     model: z.string(),
   })
   .meta({ id: 'MessageTranslation' });
+export type MessageTranslation = z.infer<typeof MessageTranslation>;
 
 // ------------------------------------------------------------------ supervisor review (H14)
 
@@ -496,6 +516,7 @@ export const ConversationReview = z
     createdAt: Timestamp,
   })
   .meta({ id: 'ConversationReview' });
+export type ConversationReview = z.infer<typeof ConversationReview>;
 
 // ------------------------------------------------------------------ bulk operations (H15)
 
@@ -544,6 +565,7 @@ export const BulkResult = z
     }),
   })
   .meta({ id: 'BulkResult' });
+export type BulkResult = z.infer<typeof BulkResult>;
 
 // ------------------------------------------------------------------ linked cases (H17)
 
@@ -568,6 +590,7 @@ export const ConversationLink = z
     createdAt: Timestamp,
   })
   .meta({ id: 'ConversationLink' });
+export type ConversationLink = z.infer<typeof ConversationLink>;
 
 // ------------------------------------------------------------------ teams (H02)
 
@@ -581,6 +604,7 @@ export const Team = z
     createdAt: Timestamp,
   })
   .meta({ id: 'Team' });
+export type Team = z.infer<typeof Team>;
 
 export const CreateTeamRequest = z
   .object({

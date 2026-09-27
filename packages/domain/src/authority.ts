@@ -141,7 +141,8 @@ export interface ConversationAuthority {
     contactSourceId: string;
     attributes?: Record<string, unknown>;
   }): Promise<{ conversationRef: string }>;
-  getState(conversationRef: string): Promise<AuthorityConversationState>;
+  /** Current state, read as the integration user unless an actor is given. */
+  getState(conversationRef: string, actor?: ActorCredential): Promise<AuthorityConversationState>;
   /** `customer` view excludes private notes and activity; newest last. */
   listMessages(
     conversationRef: string,

@@ -4,6 +4,7 @@ import { Inject, Injectable, Logger, type OnApplicationShutdown } from '@nestjs/
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
 import type { AppConfig } from '../config.js';
+import { inboxChannel } from '../inbox/projection.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, REDIS } from '../tokens.js';
 
 export type Lane = 'customer' | 'staff' | 'agent_work';
@@ -148,10 +149,27 @@ export class JournalService implements OnApplicationShutdown {
   async notify(tenantId: string, conversationId: string, entries: JournalEntry[]): Promise<void> {
     if (entries.length === 0) return;
     try {
-      await this.redis.publish(channelOf(tenantId, conversationId), String(entries.length));
+      await this.redis
+        .pipeline()
+        .publish(channelOf(tenantId, conversationId), String(entries.length))
+        // Staff inboxes reload the conversation; their streams check who may see it.
+        .publish(inboxChannel(tenantId), JSON.stringify({ c: conversationId, k: 'change' }))
+        .exec();
     } catch (error) {
       // Streams also poll, so a lost signal only adds latency.
       this.logger.warn(`journal notify failed: ${String(error)}`);
+    }
+  }
+
+  /** Tells staff inboxes a conversation changed in a way the journal does not carry. */
+  async signalInbox(tenantId: string, conversationId: string): Promise<void> {
+    try {
+      await this.redis.publish(
+        inboxChannel(tenantId),
+        JSON.stringify({ c: conversationId, k: 'change' }),
+      );
+    } catch (error) {
+      this.logger.warn(`inbox signal failed: ${String(error)}`);
     }
   }
 

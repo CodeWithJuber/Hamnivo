@@ -3,10 +3,10 @@ import { closeDb, createDb, type Db } from '@hamnivo/db';
 import { createTestDatabase, loadLocalEnv, type TestDatabase } from '@hamnivo/db/testing';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { inject } from 'vitest';
+import type { ApiOverrides } from '../src/api.module.js';
 import { createApiApp } from '../src/app.js';
 import { type AppConfig, loadConfig } from '../src/config.js';
 import { MemoryMailer } from '../src/platform/mailer.js';
-import type { PlatformOverrides } from '../src/platform/platform.module.js';
 
 export const CONSOLE_ORIGIN = 'http://localhost:5173';
 
@@ -42,7 +42,7 @@ export function testEnv(
 export async function startGateway(
   extraEnv: Record<string, string> = {},
   database?: TestDatabase,
-  overrides: PlatformOverrides = {},
+  overrides: ApiOverrides = {},
 ): Promise<Gateway> {
   loadLocalEnv();
   const db = database ?? (await createTestDatabase(inject('templateDatabase')));
@@ -74,6 +74,11 @@ export interface Reply<T = unknown> {
 export class Client {
   private readonly cookies = new Map<string, string>();
   tenant: string | undefined;
+
+  /** The session cookies, for requests over real HTTP (streams). */
+  cookieHeader(): string {
+    return [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ');
+  }
 
   constructor(private readonly app: NestFastifyApplication) {}
 
