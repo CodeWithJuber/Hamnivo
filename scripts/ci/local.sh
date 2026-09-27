@@ -152,6 +152,18 @@ widget_journey() {
   return "$status"
 }
 
+# Studio (the staff console) in a real browser: sign-up to install snippet, publishing with a fresh
+# sign-in, model keys, knowledge, stopping the AI and runs, with axe audits in English and Arabic.
+studio_journey() {
+  throwaway_services 18 || return 1
+  pnpm build >/dev/null || return 1
+  env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN -u WIDGET_SIGNING_KEY "${service_env[@]}" \
+    pnpm --filter @hamnivo/console test:e2e
+  local status=$?
+  docker rm -f "$service_pg" >/dev/null 2>&1 || true
+  return "$status"
+}
+
 free_port() {
   node -e 'const s = require("node:net").createServer().listen(0, "127.0.0.1", () => { console.log(s.address().port); s.close(); })'
 }
@@ -199,6 +211,7 @@ if ((quick == 0)); then
   fi
   if ((e2e == 1)); then
     step "Widget journey in a browser (Playwright + axe)" widget_journey
+    step "Studio in a browser (Playwright + axe)" studio_journey
     # The journey's build step also built the static website.
     step "Website in a browser (Playwright + axe, 4 languages)" pnpm --filter @hamnivo/site test:e2e
   fi
