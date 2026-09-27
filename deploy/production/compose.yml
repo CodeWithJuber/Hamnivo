@@ -210,6 +210,8 @@ services:
       HAMNIVO_SUPPORT_HOST: ${HAMNIVO_SUPPORT_HOST:?run hamnivo.sh setup}
       HAMNIVO_SITE_HOSTS: ${HAMNIVO_SITE_HOSTS:?run hamnivo.sh setup}
       HAMNIVO_API_ORIGIN: ${HAMNIVO_API_ORIGIN:?run hamnivo.sh setup}
+      # "webhook" turns on the route to deploy-hook (hamnivo.sh autodeploy enable).
+      HAMNIVO_AUTODEPLOY: ${HAMNIVO_AUTODEPLOY:-off}
     ports:
       - '${HAMNIVO_HTTP_PORT:-80}:80'
       - '${HAMNIVO_HTTPS_PORT:-443}:443'
@@ -227,6 +229,29 @@ services:
     depends_on:
       api:
         condition: service_started
+
+  # Receives GitHub's push webhooks for automatic deploys (hamnivo.sh autodeploy enable). It only
+  # drops a file in the state folder's requests/; the systemd service on the host deploys.
+  deploy-hook:
+    image: hamnivo/deploy-hook:local
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: deploy-hook
+    profiles: [autodeploy]
+    restart: unless-stopped
+    user: '${HAMNIVO_DEPLOY_UID:-65534}:${HAMNIVO_DEPLOY_GID:-65534}'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    mem_limit: 64m
+    pids_limit: 64
+    environment:
+      HAMNIVO_DEPLOY_WEBHOOK_SECRET: ${HAMNIVO_DEPLOY_WEBHOOK_SECRET:-}
+      HAMNIVO_DEPLOY_BRANCH: ${HAMNIVO_DEPLOY_BRANCH:-main}
+      HAMNIVO_DEPLOY_REPOSITORY: ${HAMNIVO_DEPLOY_REPOSITORY:-}
+    volumes:
+      - ${HAMNIVO_STATE_DIR:-./state}/requests:/requests
 
   # ---- Chatwoot CE v4.18.0 (conversation authority) ---------------------------------------------
   chatwoot-db:

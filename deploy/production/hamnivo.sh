@@ -8,67 +8,31 @@
 #   hamnivo.sh logs [service...]
 #   hamnivo.sh backup [--to DIR] [--keep N] [--no-secrets]
 #   hamnivo.sh restore DIR [--yes]
-#   hamnivo.sh update [--no-backup]   pull the code, back up, rebuild and restart
+#   hamnivo.sh update       deploy the latest commit of the deploy branch now (see deploy)
+#   hamnivo.sh deploy [--latest | REF] [--force]   check, build, start, and roll back on failure
+#   hamnivo.sh rollback [COMMIT]   run the previous (or a given) version again
+#   hamnivo.sh deploys      recent deploys and their results
+#   hamnivo.sh autodeploy enable|disable|pause|resume|status   deploy on every push to GitHub
 #   hamnivo.sh down         stop everything (data stays in Docker volumes)
 #   hamnivo.sh compose ...  any docker compose command with this stack's files and settings
 #
 # Setup options: --tls internal (Caddy's own CA instead of Let's Encrypt, for tests and private
-# networks), --https-port N and --http-port N (other ports than 443 and 80).
+# networks), --https-port N and --http-port N (other ports than 443 and 80), --quiet.
 # Environment: HAMNIVO_ENV_FILE (default deploy/production/.env), HAMNIVO_PROJECT (compose
 # project name), HAMNIVO_BUILD_CA (CA file for builds behind a TLS-inspecting proxy),
 # HAMNIVO_BUILD_NETWORK (docker build --network), HAMNIVO_WAIT_SECONDS (default 900).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-root="$(cd "$here/../.." && pwd)"
-env_file="${HAMNIVO_ENV_FILE:-$here/.env}"
-project="${HAMNIVO_PROJECT:-hamnivo-production}"
-compose=(docker compose --project-name "$project" --project-directory "$here"
-  -f "$here/compose.yml" --env-file "$env_file")
-
-log() { printf '\033[1;36m[hamnivo]\033[0m %s\n' "$*" >&2; }
-fail() {
-  printf '\033[1;31m[hamnivo]\033[0m %s\n' "$*" >&2
-  exit 1
-}
-
-# --- .env helpers (the file is read as data, never sourced) ------------------------------------
-get() {
-  local line
-  line="$(grep -E "^$1=" "$env_file" 2>/dev/null | tail -1 || true)"
-  line="${line#*=}"
-  line="${line#\"}"
-  printf '%s' "${line%\"}"
-}
-has() { grep -qE "^$1=" "$env_file" 2>/dev/null; }
-set_kv() {
-  local value="$2" tmp
-  [[ "$value" == *' '* ]] && value="\"$value\""
-  tmp="$(mktemp)"
-  K="$1" V="$value" awk 'BEGIN { k = ENVIRON["K"]; v = ENVIRON["V"] }
-    index($0, k "=") == 1 { if (!done) print k "=" v; done = 1; next }
-    { print }
-    END { if (!done) print k "=" v }' "$env_file" >"$tmp"
-  cat "$tmp" >"$env_file"
-  rm -f "$tmp"
-}
-ensure() { has "$1" || set_kv "$1" "$2"; }
-hex() { openssl rand -hex 24; }
-
-need_env() {
-  [[ -f "$env_file" ]] || fail "No settings yet. Run: $0 setup --domain example.com --email you@example.com"
-}
-
-need_docker() {
-  command -v docker >/dev/null || fail 'Docker is not installed (https://docs.docker.com/engine/install/).'
-  docker compose version >/dev/null 2>&1 || fail 'The Docker Compose plugin is missing.'
-}
+# shellcheck source=deploy/production/lib.sh
+source "$here/lib.sh"
 
 # --- setup ---------------------------------------------------------------------------------------
 cmd_setup() {
-  local domain='' tls='' https_port='' http_port=''
+  local domain='' tls='' https_port='' http_port='' quiet=0
   while (($#)); do
     case "$1" in
+      --quiet) quiet=1; shift ;;
       --domain) domain="${2:?--domain needs a value}"; shift 2 ;;
       --email) tls="${2:?--email needs a value}"; shift 2 ;;
       --tls) tls="${2:?--tls needs a value}"; shift 2 ;;
@@ -140,6 +104,11 @@ cmd_setup() {
   ensure COMPOSE_PROFILES scan
   ensure CLAMAV_URL tcp://clamav:3310
 
+  # Automatic deploys (hamnivo.sh autodeploy): the branch to follow; off until enabled.
+  ensure HAMNIVO_DEPLOY_BRANCH main
+  ensure HAMNIVO_AUTODEPLOY off
+
+  ((quiet == 1)) && return 0
   log "Settings are in $env_file (keep it private and back it up)."
   cat >&2 <<EOF
 
@@ -157,43 +126,60 @@ EOF
 }
 
 # --- build and start -----------------------------------------------------------------------------
-build_images() {
-  local tag="${HAMNIVO_IMAGE_TAG:-local}" args=()
+docker_build() {
+  local args=()
   [[ -n "${HAMNIVO_BUILD_CA:-}" ]] && args+=(--secret "id=extra_ca,src=$HAMNIVO_BUILD_CA")
   [[ -n "${HAMNIVO_BUILD_NETWORK:-}" ]] && args+=(--network "$HAMNIVO_BUILD_NETWORK")
+  docker build "${args[@]}" -f "$root/deploy/docker/Dockerfile" "$@" "$root"
+}
+
+# The commit being built, for the images' revision label: HAMNIVO_RELEASE, else git's HEAD.
+release_of() {
+  local release="${HAMNIVO_RELEASE:-}"
+  [[ -n "$release" ]] || release="$(git -C "$root" rev-parse HEAD 2>/dev/null || echo unknown)"
+  printf '%s' "$release"
+}
+
+build_images() {
+  local tag="${1:-$(image_tag)}" release
+  release="$(release_of)"
   log 'Building the gateway image (the first build takes several minutes)'
-  docker build "${args[@]}" -f "$root/deploy/docker/Dockerfile" --target gateway \
-    -t "hamnivo/gateway:$tag" "$root"
+  docker_build --target gateway --build-arg "HAMNIVO_RELEASE=$release" -t "hamnivo/gateway:$tag"
   log 'Building the edge image (static apps and HTTPS)'
-  docker build "${args[@]}" -f "$root/deploy/docker/Dockerfile" --target edge \
+  docker_build --target edge --build-arg "HAMNIVO_RELEASE=$release" \
     --build-arg "HAMNIVO_API_ORIGIN=$(get HAMNIVO_API_ORIGIN)" \
     --build-arg "HAMNIVO_CHAT_ORIGIN=$(get HAMNIVO_CHAT_ORIGIN)" \
     --build-arg "HAMNIVO_SITE_URL=$(get HAMNIVO_SITE_ORIGIN)" \
     --build-arg "HAMNIVO_DEMO_WIDGET_ID=$(get HAMNIVO_DEMO_WIDGET_ID)" \
-    -t "hamnivo/edge:$tag" "$root"
+    -t "hamnivo/edge:$tag"
+  if [[ "$(get HAMNIVO_AUTODEPLOY)" == webhook ]]; then
+    log 'Building the deploy webhook receiver'
+    docker_build --target deploy-hook -t hamnivo/deploy-hook:local
+  fi
 }
 
-container_of() { "${compose[@]}" ps -q "$1" 2>/dev/null | head -1; }
-
-wait_healthy() {
-  local service deadline=$((SECONDS + ${HAMNIVO_WAIT_SECONDS:-900})) id state
-  for service in "$@"; do
-    log "Waiting for $service"
-    while :; do
-      id="$(container_of "$service")"
-      state=''
-      if [[ -n "$id" ]]; then
-        state="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || true)"
-      fi
-      # Services without a health check count as ready once they run.
-      [[ "$state" == healthy || "$state" == running ]] && break
-      if [[ "$state" == exited || "$state" == dead ]] || ((SECONDS > deadline)); then
-        "${compose[@]}" logs --tail 80 "$service" >&2 || true
-        fail "$service did not become healthy (state: ${state:-missing})."
-      fi
-      sleep 3
-    done
+# hamnivo.sh build [--verify] [--tag TAG]: what a deploy runs for the version it deploys.
+# hamnivo.sh build --hook: only the deploy webhook receiver (autodeploy enable).
+cmd_build() {
+  need_docker
+  need_env
+  local verify=0 tag=''
+  while (($#)); do
+    case "$1" in
+      --verify) verify=1; shift ;;
+      --tag) tag="${2:?--tag needs a value}"; shift 2 ;;
+      --hook)
+        docker_build --target deploy-hook -t hamnivo/deploy-hook:local
+        return 0
+        ;;
+      *) fail "Unknown build option: $1" ;;
+    esac
   done
+  if ((verify == 1)); then
+    log 'Checking the code: Biome, type checks and unit tests'
+    docker_build --target verify -t hamnivo/verify:last
+  fi
+  build_images "${tag:-$(image_tag)}"
 }
 
 connect_chatwoot() {
@@ -213,12 +199,21 @@ connect_chatwoot() {
 cmd_up() {
   need_docker
   need_env
-  [[ "${1:-}" == --no-build ]] || build_images
-  log 'Starting the services'
-  "${compose[@]}" up -d >&2
+  local build=1 quiet=0
+  while (($#)); do
+    case "$1" in
+      --no-build) build=0; shift ;;
+      --quiet) quiet=1; shift ;;
+      *) fail "Unknown up option: $1" ;;
+    esac
+  done
+  ((build == 1)) && build_images
+  log "Starting the services (images: $(image_tag))"
+  "${compose[@]}" up -d --remove-orphans >&2
   wait_healthy api chatwoot-web
   connect_chatwoot
   wait_healthy api worker edge
+  ((quiet == 1)) && return 0
   cat >&2 <<EOF
 
 Hamnivo is running.
@@ -240,6 +235,7 @@ cmd_status() {
 cmd_backup() {
   need_docker
   need_env
+  take_lock
   local to="$here/backups" keep=14 secrets=1
   while (($#)); do
     case "$1" in
@@ -299,6 +295,7 @@ cmd_restore() {
     read -r -p 'This replaces all Hamnivo and Chatwoot data on this server. Type "restore" to go on: ' answer
     [[ "$answer" == restore ]] || fail 'Nothing was changed.'
   fi
+  take_lock
   log 'Stopping the applications'
   "${compose[@]}" stop api worker edge chatwoot-web chatwoot-sidekiq >&2 2>/dev/null || true
   "${compose[@]}" up -d hamnivo-db chatwoot-db >&2
@@ -330,16 +327,6 @@ cmd_restore() {
   log "Restored from $dir."
 }
 
-cmd_update() {
-  need_docker
-  need_env
-  [[ "${1:-}" == --no-backup ]] || cmd_backup
-  log 'Updating the code'
-  git -C "$root" pull --ff-only
-  cmd_setup
-  cmd_up
-}
-
 main() {
   local command="${1:-help}"
   shift || true
@@ -350,10 +337,12 @@ main() {
     logs) need_env; "${compose[@]}" logs --tail 200 -f "$@" ;;
     backup) cmd_backup "$@" ;;
     restore) cmd_restore "$@" ;;
-    update) cmd_update "$@" ;;
+    build) cmd_build "$@" ;;
+    update) exec bash "$here/deploy.sh" deploy --latest --trigger manual "$@" ;;
+    deploy | rollback | deploys | autodeploy) exec bash "$here/deploy.sh" "$command" "$@" ;;
     down) need_env; "${compose[@]}" down ;;
     compose) need_env; "${compose[@]}" "$@" ;;
-    help | -h | --help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
+    help | -h | --help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//' ;;
     *) fail "Unknown command: $command (try: $0 help)" ;;
   esac
 }

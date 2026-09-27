@@ -46,7 +46,7 @@ remove_chatwoot() {
     docker compose -p "$1" -f "$chatwoot_file" down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
 cleanup() {
-  ((${#containers[@]})) && docker rm -f "${containers[@]}" >/dev/null 2>&1
+  ((${#containers[@]})) && docker rm -f -v "${containers[@]}" >/dev/null 2>&1
   for project in "${compose_projects[@]}"; do remove_chatwoot "$project"; done
   true
 }
@@ -140,7 +140,7 @@ integration() {
   throwaway_services "$1" || return 1
   env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN "${service_env[@]}" pnpm test:int
   local status=$?
-  docker rm -f "$service_pg" >/dev/null 2>&1 || true
+  docker rm -f -v "$service_pg" >/dev/null 2>&1 || true
   return "$status"
 }
 
@@ -152,7 +152,7 @@ widget_journey() {
   env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN -u WIDGET_SIGNING_KEY "${service_env[@]}" \
     pnpm --filter @hamnivo/widget test:e2e
   local status=$?
-  docker rm -f "$service_pg" >/dev/null 2>&1 || true
+  docker rm -f -v "$service_pg" >/dev/null 2>&1 || true
   return "$status"
 }
 
@@ -164,7 +164,7 @@ studio_journey() {
   env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN -u WIDGET_SIGNING_KEY "${service_env[@]}" \
     pnpm --filter @hamnivo/console test:e2e
   local status=$?
-  docker rm -f "$service_pg" >/dev/null 2>&1 || true
+  docker rm -f -v "$service_pg" >/dev/null 2>&1 || true
   return "$status"
 }
 

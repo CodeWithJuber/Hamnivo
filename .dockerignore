@@ -23,7 +23,11 @@
 **/.env
 **/.env.*
 deploy/production/.env
+deploy/production/chatwoot.env
 deploy/production/backups
+deploy/production/state
+**/e2e/.stack.json
+**/e2e/.host.html
 .data
 
 # Not needed to build: design boards, documentation and the design originals.

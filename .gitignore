@@ -25,3 +25,4 @@ docs/design/.originals/
 # Production settings and backups on a server (deploy/production)
 deploy/production/chatwoot.env
 deploy/production/backups/
+deploy/production/state/

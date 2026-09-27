@@ -1,0 +1,13 @@
+# Installed by "hamnivo.sh autodeploy enable". GitHub never delivers a failed webhook again, so the
+# server also looks for new commits itself: 5 minutes after the last deploy run ended.
+[Unit]
+Description=Hamnivo deploy check every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=30s
+Unit=hamnivo-deploy.service
+
+[Install]
+WantedBy=timers.target
