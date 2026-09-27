@@ -78,6 +78,8 @@ export const ROLE_PRESETS = [
       'conversations.reply',
       'conversations.note',
       'conversations.takeover',
+      'conversations.status',
+      'conversations.tag',
       'members.read',
       'knowledge.read',
       'tools.approve',
@@ -137,4 +139,18 @@ export function presetPermissions(key: RolePresetKey): Permission[] {
   const preset = ROLE_PRESETS.find((p) => p.key === key);
   if (!preset) throw new RangeError(`Unknown role preset: ${key}`);
   return expandPatterns(preset.patterns);
+}
+
+/**
+ * The permission patterns a stored role grants. Built-in roles cannot be edited, so they follow
+ * the product's current definition: a permission added to a preset later (for example resolving
+ * conversations for agents) reaches workspaces created before the change too.
+ */
+export function rolePatterns(role: {
+  key: string;
+  isPreset: boolean;
+  permissions: readonly string[];
+}): string[] {
+  const preset = role.isPreset ? ROLE_PRESETS.find((p) => p.key === role.key) : undefined;
+  return [...(preset ? preset.patterns : role.permissions)];
 }

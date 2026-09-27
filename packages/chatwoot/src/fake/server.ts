@@ -87,6 +87,30 @@ interface Conversation {
   createdAt: number;
   updatedAt: number;
   waitingSince: number | null;
+  /** Unix seconds; set while snoozed with a time. */
+  snoozedUntil: number | null;
+}
+interface Label {
+  id: number;
+  accountId: number;
+  title: string;
+  description: string | null;
+  color: string;
+}
+interface FieldDefinition {
+  id: number;
+  accountId: number;
+  key: string;
+  name: string;
+  type: string;
+  model: 'conversation_attribute' | 'contact_attribute';
+  values: string[];
+}
+interface CannedResponse {
+  id: number;
+  accountId: number;
+  shortCode: string;
+  content: string;
 }
 interface Message {
   id: number;
@@ -222,7 +246,10 @@ class FakeState {
   contactInboxes = new Map<number, ContactInbox>();
   conversations = new Map<number, Conversation>();
   messages = new Map<number, Message>();
-  teams = new Map<number, { id: number; accountId: number; name: string }>();
+  teams = new Map<number, { id: number; accountId: number; name: string; members: Set<number> }>();
+  labels = new Map<number, Label>();
+  fieldDefinitions = new Map<number, FieldDefinition>();
+  cannedResponses = new Map<number, CannedResponse>();
 
   nextId(): number {
     this.seq += 1;
@@ -389,7 +416,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       inbox_id: c.inboxId,
       labels: c.labels,
       muted: false,
-      snoozed_until: null,
+      snoozed_until: c.snoozedUntil ? new Date(c.snoozedUntil * 1000).toISOString() : null,
       status: c.status,
       created_at: Math.floor(c.createdAt),
       updated_at: c.updatedAt,
@@ -426,7 +453,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       meta,
       status: c.status,
       custom_attributes: c.customAttributes,
-      snoozed_until: null,
+      snoozed_until: c.snoozedUntil ? new Date(c.snoozedUntil * 1000).toISOString() : null,
       unread_count: 0,
       first_reply_created_at: null,
       priority: null,
@@ -615,6 +642,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
   function setStatus(c: Conversation, status: Status) {
     const changed = c.status !== status;
     c.status = status;
+    if (status !== 'snoozed') c.snoozedUntil = null;
     if (status === 'open' && !c.waitingSince) c.waitingSince = s.clock();
     return changed;
   }
@@ -844,11 +872,224 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     };
   });
 
+  const teamJson = (team: { id: number; name: string; members: Set<number> }, userId?: number) => ({
+    id: team.id,
+    name: team.name,
+    description: null,
+    allow_auto_assign: true,
+    icon: '',
+    icon_color: '',
+    account_id: s.teams.get(team.id)?.accountId,
+    is_member: userId !== undefined && team.members.has(userId),
+  });
+
+  app.get('/api/v1/accounts/:account_id/teams', async (request) => {
+    const { accountId, principal } = accountAccess(request, 'teams#index');
+    const userId = principal.kind === 'user' ? principal.user.id : undefined;
+    return [...s.teams.values()]
+      .filter((t) => t.accountId === accountId)
+      .map((t) => teamJson(t, userId));
+  });
+
   app.post('/api/v1/accounts/:account_id/teams', async (request) => {
     const { accountId } = accountAccess(request, 'teams#create', true);
-    const team = { id: s.nextId(), accountId, name: String(body(request).name ?? 'Team') };
+    // Chatwoot keeps team names in lower case and unique per account.
+    const name = String(body(request).name ?? 'Team').toLowerCase();
+    if ([...s.teams.values()].some((t) => t.accountId === accountId && t.name === name)) {
+      throw new HttpError(422, { message: 'Name has already been taken', attributes: ['name'] });
+    }
+    const team = { id: s.nextId(), accountId, name, members: new Set<number>() };
     s.teams.set(team.id, team);
-    return { id: team.id, name: team.name, account_id: accountId };
+    return teamJson(team);
+  });
+
+  app.post('/api/v1/accounts/:account_id/teams/:team_id/team_members', async (request) => {
+    const { accountId } = accountAccess(request, 'team_members#create', true);
+    const team = s.teams.get(Number((request.params as Json).team_id));
+    if (!team || team.accountId !== accountId) throw notFound();
+    const added: User[] = [];
+    for (const id of (body(request).user_ids as unknown[]) ?? []) {
+      const user = s.users.get(Number(id));
+      if (!user?.roles.has(accountId)) throw new HttpError(422, { message: 'User must exist' });
+      if (!team.members.has(user.id)) {
+        team.members.add(user.id);
+        added.push(user);
+      }
+    }
+    // Like Chatwoot: only the users that were added (none on a repeat).
+    return added.map((u) => ({
+      id: u.id,
+      account_id: accountId,
+      availability_status: 'offline',
+      confirmed: true,
+      email: u.email,
+      available_name: u.name,
+      name: u.name,
+      role: u.roles.get(accountId),
+      thumbnail: '',
+    }));
+  });
+
+  // ---------------------------------------------------------------- Application API: tags, fields, saved replies
+
+  const labelJson = (l: Label) => ({
+    id: l.id,
+    title: l.title,
+    description: l.description,
+    color: l.color,
+    show_on_sidebar: true,
+  });
+
+  app.get('/api/v1/accounts/:account_id/labels', async (request) => {
+    const { accountId } = accountAccess(request, 'labels#index');
+    return {
+      payload: [...s.labels.values()].filter((l) => l.accountId === accountId).map(labelJson),
+    };
+  });
+
+  app.post('/api/v1/accounts/:account_id/labels', async (request) => {
+    const { accountId } = accountAccess(request, 'labels#create_account_label', true);
+    const input = body(request);
+    const title = String(input.title ?? '');
+    // Chatwoot: letters, numbers, - and _ only; stored in lower case and unique per account.
+    if (!/^[\p{L}\p{N}_-]+$/u.test(title)) {
+      throw new HttpError(422, { message: 'Title is invalid', attributes: ['title'] });
+    }
+    const lower = title.toLowerCase();
+    if ([...s.labels.values()].some((l) => l.accountId === accountId && l.title === lower)) {
+      throw new HttpError(422, { message: 'Title has already been taken', attributes: ['title'] });
+    }
+    const label: Label = {
+      id: s.nextId(),
+      accountId,
+      title: lower,
+      description: typeof input.description === 'string' ? input.description : null,
+      color: typeof input.color === 'string' ? input.color : '#1f93ff',
+    };
+    s.labels.set(label.id, label);
+    return labelJson(label);
+  });
+
+  const FIELD_TYPES = [
+    'text',
+    'number',
+    'currency',
+    'percent',
+    'link',
+    'date',
+    'list',
+    'checkbox',
+  ] as const;
+  const fieldJson = (d: FieldDefinition) => ({
+    id: d.id,
+    attribute_display_name: d.name,
+    attribute_display_type: d.type,
+    attribute_description: null,
+    attribute_key: d.key,
+    regex_pattern: null,
+    regex_cue: null,
+    attribute_values: d.values,
+    attribute_model: d.model,
+    default_value: null,
+  });
+
+  app.get('/api/v1/accounts/:account_id/custom_attribute_definitions', async (request) => {
+    const { accountId } = accountAccess(request, 'custom_attribute_definitions#index');
+    const model =
+      Number((request.query as Json).attribute_model ?? 0) === 1
+        ? 'contact_attribute'
+        : 'conversation_attribute';
+    return [...s.fieldDefinitions.values()]
+      .filter((d) => d.accountId === accountId && d.model === model)
+      .map(fieldJson);
+  });
+
+  app.post('/api/v1/accounts/:account_id/custom_attribute_definitions', async (request) => {
+    const { accountId } = accountAccess(request, 'custom_attribute_definitions#create', true);
+    const input = body(request);
+    const type = FIELD_TYPES[Number(input.attribute_display_type ?? 0)] ?? 'text';
+    const definition: FieldDefinition = {
+      id: s.nextId(),
+      accountId,
+      key: String(input.attribute_key),
+      name: String(input.attribute_display_name ?? input.attribute_key),
+      type,
+      model:
+        Number(input.attribute_model ?? 0) === 1 ? 'contact_attribute' : 'conversation_attribute',
+      values: Array.isArray(input.attribute_values) ? input.attribute_values.map(String) : [],
+    };
+    s.fieldDefinitions.set(definition.id, definition);
+    return fieldJson(definition);
+  });
+
+  const cannedJson = (c: CannedResponse) => ({
+    id: c.id,
+    account_id: c.accountId,
+    short_code: c.shortCode,
+    content: c.content,
+  });
+
+  app.get('/api/v1/accounts/:account_id/canned_responses', async (request) => {
+    const { accountId } = accountAccess(request, 'canned_responses#index');
+    const search = String((request.query as Json).search ?? '').toLowerCase();
+    return [...s.cannedResponses.values()]
+      .filter((c) => c.accountId === accountId)
+      .filter(
+        (c) =>
+          !search ||
+          c.shortCode.toLowerCase().includes(search) ||
+          c.content.toLowerCase().includes(search),
+      )
+      .map(cannedJson);
+  });
+
+  app.post('/api/v1/accounts/:account_id/canned_responses', async (request) => {
+    // Agents may add saved replies in Chatwoot, as administrators can.
+    const { accountId } = accountAccess(request, 'canned_responses#create');
+    const input = body(request);
+    const canned: CannedResponse = {
+      id: s.nextId(),
+      accountId,
+      shortCode: String(input.short_code ?? ''),
+      content: String(input.content ?? ''),
+    };
+    s.cannedResponses.set(canned.id, canned);
+    return cannedJson(canned);
+  });
+
+  app.get('/api/v1/accounts/:account_id/contacts/:id', async (request) => {
+    const { accountId } = accountAccess(request, 'contacts#show');
+    const contact = s.contacts.get(Number((request.params as Json).id));
+    if (!contact || contact.accountId !== accountId) throw notFound();
+    return {
+      payload: {
+        ...contactApi(contact),
+        created_at: Math.floor(s.lastClock),
+        last_activity_at: Math.floor(s.lastClock),
+      },
+    };
+  });
+
+  /** Conversations a user may read: administrators all of the account, agents their inboxes. */
+  function readable(principal: Principal, accountId: number, c: Conversation): boolean {
+    if (c.accountId !== accountId) return false;
+    if (principal.kind === 'bot') return principal.bot.accountId === accountId;
+    if (principal.user.roles.get(accountId) === 'administrator') return true;
+    const inbox = s.inboxes.get(c.inboxId) as Inbox;
+    return inbox.members.has(principal.user.id) || c.assigneeId === principal.user.id;
+  }
+
+  app.get('/api/v1/accounts/:account_id/search/messages', async (request) => {
+    const { accountId, principal } = accountAccess(request, 'search#messages');
+    const query = request.query as Json;
+    const q = String(query.q ?? '').toLowerCase();
+    const page = Math.max(1, Number(query.page ?? 1));
+    const hits = [...s.messages.values()]
+      .filter((m) => m.messageType !== 2 && (m.content ?? '').toLowerCase().includes(q))
+      .filter((m) => readable(principal, accountId, conversationOf(m)))
+      .sort((a, b) => b.id - a.id)
+      .slice((page - 1) * 15, page * 15);
+    return { payload: { messages: hits.map(messageApi) } };
   });
 
   // ---------------------------------------------------------------- Application API: conversations
@@ -1011,6 +1252,12 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       } else {
         changed = setStatus(conversation, previous === 'open' ? 'resolved' : 'open');
       }
+      // Like Chatwoot: a snooze without a time keeps an earlier time (null is ignored).
+      const until = body(request).snoozed_until;
+      if (conversation.status === 'snoozed' && typeof until === 'number') {
+        changed = changed || until !== conversation.snoozedUntil;
+        conversation.snoozedUntil = Math.floor(until);
+      }
       if (conversation.status === 'open' && principal.kind === 'user') {
         conversation.aiAssigneeId = null;
         if (principal.user.roles.get(conversation.accountId) === 'agent')
@@ -1021,8 +1268,11 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         meta: {},
         payload: {
           success: true,
-          current_status: conversation.status,
           conversation_id: conversation.displayId,
+          current_status: conversation.status,
+          snoozed_until: conversation.snoozedUntil
+            ? new Date(conversation.snoozedUntil * 1000).toISOString()
+            : null,
         },
       };
     },
@@ -1175,6 +1425,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         createdAt: now,
         updatedAt: now,
         waitingSince: now,
+        snoozedUntil: null,
       };
       s.conversations.set(conversation.id, conversation);
       emit(

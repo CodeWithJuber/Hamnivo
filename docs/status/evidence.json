@@ -264,15 +264,22 @@
     "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, and identity assertions signed by the tenant: kid, audience, a five-minute lifetime and a single-use jti. A new identity is a new principal: the old session and its streams end. Brands register their keys through the admin API, with two-step verification and a recent sign-in: ES256, EdDSA or RS256 public keys, or an HS256 secret shown once. Keys can be retired, or revoked, which also ends the chats they signed in. Assertions may be dated up to 5 seconds ahead. @hamnivo/server signs assertions. In the widget, identify shows the customer's own chats; reset clears the screen, ends the session in Hamnivo and in the browser, forgets unsent messages and clears other tabs; a late token renewal cannot undo either. All of this is tested, including in Chromium with a real key. The widget does not yet show the signed-in customer's name."
   },
   "H08": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/ConversationPane.tsx",
       "apps/gateway/src/authority/ownership.service.ts",
       "apps/gateway/src/authority/processor.service.ts",
       "apps/gateway/src/conversations/staff-conversations.service.ts",
+      "apps/gateway/src/inbox/assignment.service.ts",
+      "apps/gateway/src/inbox/live.service.ts",
+      "apps/gateway/src/inbox/signals.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "apps/gateway/test/inbox.int.test.ts",
       "apps/gateway/test/reconciler.int.test.ts",
       "apps/gateway/test/slice.int.test.ts"
     ],
-    "note": "Atomic takeover with epoch fencing and optional expected-epoch check (OWNERSHIP_CHANGED), takeovers made inside Chatwoot adopted from webhooks; the Studio warning for simultaneous human activity is pending."
+    "note": "Atomic claim and takeover through the ownership epoch; an AI reply still being written when staff take over is fenced, and takeovers made inside Chatwoot are adopted (all tested). A reply from an out-of-date view (expected epoch) or over a colleague is refused and nothing is sent. Taking a conversation from a colleague needs conversations.assign; others ask for a transfer. Studio shows who else is viewing or typing, and ownership changes, live over the staff stream."
   },
   "R05": {
     "status": "in-progress",
@@ -579,7 +586,7 @@
       "scripts/ci/production-smoke.ts",
       "docs/self-hosting.md"
     ],
-    "note": "hamnivo.sh backup dumps both databases (pg_dump), Chatwoot files, certificates and settings with checksums and keeps the newest N; restore checks the checksums, refuses a backup made with other secrets, replaces data and files, then runs pending migrations. The production smoke test runs a drill (tested: a brand made after the backup is gone and the conversation history is back). Point-in-time recovery, off-site copies and a deletion replay after restore are pending."
+    "note": "hamnivo.sh backup dumps both databases (pg_dump), Chatwoot files, certificates and settings with checksums and keeps the newest N. Restore checks the checksums and refuses a backup made with other secrets. It restores the Hamnivo database beside the current one, runs pending migrations and adds the memory consent, deletion receipts and tombstones made since the backup, replaying the tombstones. Only then does it swap databases, so a failed restore leaves the current one as it was. The production smoke test runs a drill (tested): a brand made after the backup is gone, and the conversation history is back. A consent withdrawn and a customer's memory erased after the backup both stay that way. Point-in-time recovery and off-site copies are pending."
   },
   "X13": {
     "status": "in-progress",
@@ -710,6 +717,398 @@
     "status": "in-progress",
     "evidence": ["examples/wordpress/hamnivo-chat.php", "examples/wordpress/README.md"],
     "note": "A WordPress plugin adds the chat loader and signs assertions for signed-in WordPress users. It passes php -l but is not yet tested against a real WordPress installation."
+  },
+  "L01": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/memory/envelope.ts",
+      "packages/domain/src/memory/slots.ts",
+      "packages/domain/src/memory/policy.ts",
+      "packages/domain/test/memory-policy.test.ts",
+      "packages/db/src/schema/memory.ts",
+      "apps/gateway/test/memory.int.test.ts"
+    ],
+    "note": "Memory records use the typed envelope (kind, scope, source, evidence status, purposes, roles, sensitivity, retention, policy version) and a closed catalogue of slots; the write policy sets every governing field and claims stay unverified (tested). Only preference, observation and claim slots exist so far; procedure, commitment and outcome kinds have no slots yet."
+  },
+  "L02": {
+    "status": "implemented",
+    "evidence": [
+      "packages/db/src/schema/memory.ts",
+      "packages/db/migrations/20260927084614_memory_security.sql",
+      "packages/db/test/memory.int.test.ts",
+      "apps/gateway/src/memory/customer-memory.service.ts",
+      "apps/gateway/src/memory/admin-memory.service.ts",
+      "apps/gateway/src/memory/recall.service.ts",
+      "apps/gateway/test/memory.int.test.ts"
+    ],
+    "note": "Records are bound to tenant (RLS), brand and customer principal, with source messages, conversation, writer and write reason; reads check the customer, brand, purpose and role, and staff actions are authorized per brand with memory.read, manage, delete, erase and export and audited without content (tested, including other customers of the same brand, other tenants and staff without permission)."
+  },
+  "L03": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/memory/temporal.ts",
+      "packages/domain/test/memory-temporal.test.ts",
+      "packages/domain/src/memory/policy.ts",
+      "packages/db/test/memory.int.test.ts",
+      "apps/gateway/test/memory.int.test.ts"
+    ],
+    "note": "Corrections supersede and never overwrite: content is immutable (enforced by a trigger), each record has event and transaction time, one current value per slot, and older words cannot reopen a slot that changed since. A disagreeing value waits for review and neither is used until the customer or staff confirm; the history stays inspectable (tested)."
+  },
+  "L04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/memory/widget-memory.controller.ts",
+      "apps/widget/src/components/MemoryPanel.tsx",
+      "apps/widget/src/components/MemoryConsent.tsx",
+      "apps/widget/e2e/memory.spec.ts",
+      "apps/gateway/test/memory.int.test.ts",
+      "apps/console/src/pages/CustomerMemoryPage.tsx",
+      "apps/console/e2e/memory.spec.ts"
+    ],
+    "note": "Customers agree or decline, see what is remembered with its source and expiry, correct, confirm, delete, forget everything and turn memory off in the widget; staff do the same in Studio within their grants (tested in the API and in browsers, including right to left). Retention is fixed per memory type; letting brands or customers configure it is pending."
+  },
+  "L05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/memory/deletion.service.ts",
+      "apps/gateway/src/memory/fingerprints.ts",
+      "packages/domain/src/memory/tombstones.ts",
+      "packages/db/src/schema/memory.ts",
+      "packages/db/migrations/20260927084614_memory_security.sql",
+      "packages/db/test/memory.int.test.ts",
+      "apps/gateway/test/memory.int.test.ts",
+      "deploy/production/hamnivo.sh",
+      "scripts/ci/production-smoke.ts"
+    ],
+    "note": "A deletion removes records, their vectors and memory citations in answers and the realtime journal, and leaves content-free tombstones (keyed fingerprints). Its receipt completes only after caches are purged and nothing covered is left; retention expiry uses the same path. Replayed jobs and restored rows cannot bring memory back: the write policy and a database trigger refuse them, recall skips them and the tombstones are replayed daily (tested). A restore carries over the receipts, tombstones and consent made after the backup from the current database and replays them before anything starts; deletions still running are queued again (tested in the production drill). Pending: learning datasets do not exist yet. A restore on a new server has no current database, so deletions made after its backup are lost with the old server."
+  },
+  "L07": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/memory/envelope.ts",
+      "packages/domain/src/memory/slots.ts",
+      "packages/domain/src/memory/policy.ts",
+      "packages/domain/test/memory-policy.test.ts",
+      "packages/domain/src/memory/sensitive.ts",
+      "packages/domain/test/memory-sensitive.test.ts",
+      "apps/gateway/src/memory/extraction.service.ts",
+      "apps/gateway/test/memory.int.test.ts"
+    ],
+    "note": "The model only proposes from the message that started the job; a pure, deterministic policy decides with an explanation that contains no content. It checks consent and its timing, the slot catalogue, sensitive categories (health, religion, ethnicity, sexual orientation, political views) and secrets (passwords, codes, card and account numbers) in English, Roman Urdu, Urdu, Hindi and Arabic, authority claims and instructions, provenance (quote must be in the customer message), confidence, identity for personal details, retention, tombstones and per-customer limits (tested, with mutation checks)."
+  },
+  "K09": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/memory/cache.ts",
+      "packages/domain/src/memory/recall.ts",
+      "apps/gateway/src/memory/widget-memory.controller.ts",
+      "apps/gateway/test/memory.int.test.ts"
+    ],
+    "note": "Memory is never cached: recall reads the database each reply, runs record that any reply built with memory may not enter a shared cache, and memory endpoints send no-store. Each customer has a memory version and a cache namespace in Valkey that is bumped on every change and purged on deletion (tested). The general reply cache (K lane) must key per-customer entries with this version and respect the shared-cache rule when it lands."
+  },
+  "G19": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/memory/recall.service.ts",
+      "apps/gateway/src/memory/prompt.ts",
+      "apps/gateway/src/runtime/replies.service.ts",
+      "packages/domain/src/memory/recall.ts",
+      "packages/domain/test/memory-recall.test.ts",
+      "apps/gateway/test/memory.int.test.ts",
+      "apps/widget/e2e/memory.spec.ts"
+    ],
+    "note": "Replies use only consented, current, in-scope memory of the conversation's own customer that allows AI use and is not under review, ranked by vectors and words within the agent's budget and fenced as data. Answers cite them as memories ([M1] becomes a memory part the widget shows as “based on what you told us before”), never as something said in the chat; turning memory off, outdated, expired and future values are never used (tested)."
+  },
+  "HNV-15-01": {
+    "status": "implemented",
+    "evidence": ["apps/widget/src/components/MemoryConsent.tsx", "apps/widget/e2e/memory.spec.ts"],
+    "note": "The chat asks before remembering anything: what, why, what is never kept and for how long, with two equal answers and nothing preselected (tested with an accessibility audit, also in Urdu and Arabic). Translations await native review."
+  },
+  "HNV-15-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CustomerMemoryPage.tsx",
+      "apps/console/e2e/memory.spec.ts",
+      "apps/console/src/pages/MemoryPage.tsx",
+      "apps/widget/src/components/MemoryPanel.tsx",
+      "apps/widget/e2e/memory.spec.ts"
+    ],
+    "note": "Studio lists customers with memory and shows each memory with purpose, source message, who recorded it, scope, expiry and history; customers see theirs in the widget (tested, including right to left)."
+  },
+  "HNV-15-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CustomerMemoryPage.tsx",
+      "apps/console/e2e/memory.spec.ts",
+      "apps/widget/src/components/MemoryPanel.tsx",
+      "apps/widget/e2e/memory.spec.ts"
+    ],
+    "note": "A newer, different value waits for review: Studio compares both and confirms the new one or keeps the current one with a reason (tested); the customer is asked to confirm it in the widget (tested)."
+  },
+  "HNV-15-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CustomerMemoryPage.tsx",
+      "apps/console/e2e/memory.spec.ts",
+      "apps/widget/src/components/MemoryPanel.tsx",
+      "apps/widget/e2e/memory.spec.ts"
+    ],
+    "note": "Corrections by staff (with a reason) and by customers replace the value and keep the old one in the history (tested)."
+  },
+  "HNV-15-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CustomerMemoryPage.tsx",
+      "apps/console/e2e/memory.spec.ts",
+      "apps/widget/src/components/MemoryPanel.tsx",
+      "apps/widget/e2e/memory.spec.ts"
+    ],
+    "note": "Deleting says what is removed and what stays (audit record, chat history), then shows progress until indexes and caches are cleared; erasing a customer works the same way (tested)."
+  },
+  "HNV-15-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/MemoryPage.tsx",
+      "apps/console/e2e/memory.spec.ts",
+      "apps/widget/src/components/MemoryPanel.tsx",
+      "apps/widget/e2e/memory.spec.ts"
+    ],
+    "note": "Staff without memory.read see an access-denied state and no navigation entry (tested); the widget says when memory is unavailable and the chat keeps working (tested)."
+  },
+  "H01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/InboxPage.tsx",
+      "apps/gateway/src/inbox/access.ts",
+      "apps/gateway/src/inbox/inbox.controller.ts",
+      "apps/gateway/src/inbox/inbox.service.ts",
+      "apps/gateway/test/inbox.int.test.ts"
+    ],
+    "note": "Queues for mine, waiting for a person, AI answering, my teams and all, with counts, keyset paging and filters by status (open or pending, snoozed, resolved), brand, channel, customer language and tag. Lists, counts, search and the staff stream all apply the same grant filter (workspace, brand, inbox or team): a conversation outside a person's grants is not found. Tested through the API and in the browser."
+  },
+  "H02": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/console/src/pages/inbox/ConversationPane.tsx",
+      "apps/gateway/src/authority/sync.service.ts",
+      "apps/gateway/src/inbox/assignment.service.ts",
+      "apps/gateway/src/inbox/teams.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "apps/gateway/test/inbox.int.test.ts"
+    ],
+    "note": "Manual routing: claim, assign to a colleague who may reply there, back to the queue, back to the AI, and team queues (teams belong to Hamnivo and are mirrored to Chatwoot with their members). Every owner change goes through the ownership epoch and is audited. Round-robin and capacity checks are not built yet."
+  },
+  "H03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/Composer.tsx",
+      "apps/console/src/pages/inbox/Timeline.tsx",
+      "apps/gateway/src/conversations/staff-conversations.service.ts",
+      "apps/gateway/src/inbox/messages.service.ts",
+      "apps/gateway/test/inbox.int.test.ts"
+    ],
+    "note": "Internal notes are Chatwoot private notes written as the staff member. They never reach the customer's stream or history, or the AI's prompt (tested through the API and through the widget in the browser). Studio shows them with a lock, a text label and a dashed border, and writes them in a separate composer lane."
+  },
+  "H04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/inbox/ContextPanel.tsx",
+      "apps/gateway/src/inbox/annotations.service.ts",
+      "apps/gateway/src/inbox/projection.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts"
+    ],
+    "note": "Only tags defined for the brand (Chatwoot labels) are accepted, and custom fields are checked against their definitions (text, number, list, date, link, checkbox); Chatwoot's other attributes are kept. Tags are copied into Hamnivo for queue filters. New tags and fields are still defined in Chatwoot."
+  },
+  "H05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/inbox/Composer.tsx",
+      "apps/gateway/src/inbox/annotations.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts"
+    ],
+    "note": "Chatwoot canned responses, searched as the staff member, with variables filled from verified facts only (an address nobody verified is never filled in) and missing variables listed. Adding one needs inbox.manage. Editing and deleting saved replies is still done in Chatwoot."
+  },
+  "H06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/ContextPanel.tsx",
+      "apps/gateway/src/inbox/inbox.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts"
+    ],
+    "note": "Verified or anonymous identity and what that means, a verified email apart from an address nobody verified, language, brand, Chatwoot contact attributes (Hamnivo's internal ones left out) and the other conversations the person can see. A third column on wide screens, a sheet otherwise."
+  },
+  "H07": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/InboxPage.tsx",
+      "apps/gateway/src/inbox/inbox.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "packages/chatwoot/src/authority.ts"
+    ],
+    "note": "Customers by name, email or conversation ID in Hamnivo, and message text (notes included) in Chatwoot as the staff member, in pages. Hits outside the person's grants are dropped, and Chatwoot accounts they cannot reach are not searched."
+  },
+  "H09": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/Composer.tsx",
+      "apps/gateway/src/conversations/staff-conversations.service.ts",
+      "apps/gateway/src/inbox/drafts.service.ts",
+      "apps/gateway/test/inbox.int.test.ts"
+    ],
+    "note": "Personal drafts per conversation and lane, with revisions: a save from an older revision is refused and shown as a choice. A copy stays in the browser while offline and is saved when the connection is back. A failed send is kept with its reason, and retrying it with the same message ID never posts twice (tested with a Chatwoot timeout after the message was stored)."
+  },
+  "H10": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/ConversationPane.tsx",
+      "apps/gateway/src/inbox/status.service.ts",
+      "apps/gateway/test/inbox.int.test.ts"
+    ],
+    "note": "Resolve, reopen and snooze (an hour, until tomorrow, until next week or a chosen time) in Chatwoot as the staff member; each change is audited and shown to the customer. Reopening makes the person the owner, as Chatwoot does."
+  },
+  "H11": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/Composer.tsx",
+      "apps/gateway/src/inbox/assist.service.ts",
+      "apps/gateway/test/inbox.int.test.ts"
+    ],
+    "note": "Suggested replies from the brand's agent with the knowledge it cited, built from customer-visible messages only, recorded as a draft run and never sent on their own. Copy, edit, or Send as me through the ownership-checked send (audited). Conversation summaries and next-step suggestions are not built yet."
+  },
+  "H13": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/Timeline.tsx",
+      "apps/gateway/src/inbox/assist.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts"
+    ],
+    "note": "A customer message can be translated into the staff member's language on demand through the brand's model, labelled as a machine translation under the unchanged original; the model is told to keep names, numbers and identifiers. Writing a reply in the customer's language is not built yet."
+  },
+  "H14": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/inbox/ContextPanel.tsx",
+      "apps/gateway/src/inbox/assignment.service.ts",
+      "apps/gateway/src/inbox/collaboration.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "apps/gateway/test/inbox.int.test.ts"
+    ],
+    "note": "Supervisors (conversations.review) rate a conversation and leave a coaching note about its owner. Taking over from a colleague is limited to people with conversations.assign; anyone else can ask for a transfer, which reaches the owner as an internal note."
+  },
+  "H15": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/BulkBar.tsx",
+      "apps/gateway/src/inbox/bulk.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts"
+    ],
+    "note": "Assign, team, status and tag changes for up to 50 conversations. A dry run says which ones the change would reach, each conversation is checked like a single change, and failures are listed with their reason and can be retried alone. There is no undo."
+  },
+  "H17": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/inbox/ContextPanel.tsx",
+      "apps/gateway/src/inbox/collaboration.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts"
+    ],
+    "note": "Conversations can be linked, with a note, and unlinked; both keep their own authors, times, notes and sources. Merging and splitting are left out on purpose: Chatwoot keeps the transcripts."
+  },
+  "HNV-07-05": {
+    "status": "implemented",
+    "evidence": ["apps/console/e2e/inbox.spec.ts", "apps/console/src/pages/inbox/Timeline.tsx"],
+    "note": "Staff inbox: machine translation labelled, under the original, with hide and show; a failed translation leaves the original as it was."
+  },
+  "HNV-07-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/ConversationPane.tsx"
+    ],
+    "note": "Staff inbox on a phone: queue, conversation and details as steps; the details sheet has a visible close button, Esc closes it and focus returns; Back returns to the row."
+  },
+  "HNV-08-01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/InboxPage.tsx",
+      "apps/gateway/test/inbox.int.test.ts"
+    ]
+  },
+  "HNV-08-02": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/ConversationPane.tsx",
+      "apps/gateway/test/inbox.int.test.ts"
+    ],
+    "note": "Atomic claim that shows the owner when someone else claimed first; the SLA status waits for H12."
+  },
+  "HNV-08-03": {
+    "status": "implemented",
+    "evidence": ["apps/console/e2e/inbox.spec.ts", "apps/console/src/pages/inbox/InboxPage.tsx"]
+  },
+  "HNV-08-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/BulkBar.tsx",
+      "apps/gateway/test/inbox-workspace.int.test.ts"
+    ]
+  },
+  "HNV-08-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/ConversationPane.tsx",
+      "apps/gateway/test/inbox.int.test.ts"
+    ]
+  },
+  "HNV-09-01": {
+    "status": "implemented",
+    "evidence": ["apps/console/e2e/inbox.spec.ts", "apps/console/src/pages/inbox/Composer.tsx"]
+  },
+  "HNV-09-02": {
+    "status": "implemented",
+    "evidence": ["apps/console/e2e/inbox.spec.ts", "apps/console/src/pages/inbox/Composer.tsx"]
+  },
+  "HNV-09-05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/Composer.tsx",
+      "apps/gateway/test/inbox.int.test.ts"
+    ],
+    "note": "On-demand suggestions with their sources, edit, dismiss or send as me. Drafts that an assist-mode agent prepares on its own are not shown yet."
+  },
+  "HNV-09-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/ConversationPane.tsx",
+      "apps/gateway/test/inbox.int.test.ts"
+    ]
+  },
+  "HNV-10-03": {
+    "status": "in-progress",
+    "evidence": ["apps/console/e2e/inbox.spec.ts", "apps/console/src/pages/inbox/Timeline.tsx"],
+    "note": "Hamnivo's handoff summary is shown to staff as a staff-only card and the conversation can be claimed; rejecting with a capacity reason is not built yet."
+  },
+  "HNV-10-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/ConversationPane.tsx",
+      "apps/gateway/test/inbox.int.test.ts"
+    ]
   },
   "C01": {
     "status": "implemented",

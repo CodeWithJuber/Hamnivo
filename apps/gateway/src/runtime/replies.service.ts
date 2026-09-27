@@ -20,10 +20,17 @@ import { type ControlRow, OwnershipService } from '../authority/ownership.servic
 import { PublicationsService } from '../authority/publications.service.js';
 import { AuthorityRegistry, type ConnectionRuntime } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
-import { contractMessage, type PublicationFacts, type SourceRef } from '../authority/views.js';
+import {
+  contractMessage,
+  type MemoryPartRef,
+  type PublicationFacts,
+  type SourceRef,
+} from '../authority/views.js';
 import { CLAIM_CORRECTION, checkReplyClaims } from '../commerce/claims.js';
 import { AppError } from '../common/app-error.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
+import { citeMemories, memoryBlock } from '../memory/prompt.js';
+import { MemoryRecallService } from '../memory/recall.service.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
 import { type ActiveAgent, AgentsService } from './agents.service.js';
@@ -56,6 +63,8 @@ interface Generated {
   latencyMs: number;
   /** Knowledge the reply cites, in citation order. */
   sources: SourceRef[];
+  /** Customer memories the reply relied on (G19). */
+  memories: MemoryPartRef[];
 }
 
 /** The customer's most recent words in a conversation. */
@@ -128,6 +137,7 @@ export class RepliesService {
     private readonly contacts: AuthorityContactsService,
     private readonly retrieval: RetrievalService,
     private readonly publications: PublicationsService,
+    private readonly memory: MemoryRecallService,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -239,6 +249,7 @@ export class RepliesService {
         await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted, {
           sources: stored.sources ?? [],
           ...(stored.displayName ? { displayName: stored.displayName } : {}),
+          ...(stored.memories?.length ? { memories: stored.memories } : {}),
         });
         await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'replied' }));
         return;
@@ -308,6 +319,7 @@ export class RepliesService {
     const facts: PublicationFacts = {
       sources: generated.sources,
       displayName: agent.config.displayName,
+      ...(generated.memories.length ? { memories: generated.memories } : {}),
     };
     const reserved = await this.tx(tenantId, async (tx) => {
       const locked = await this.ownership.lock(tx, payload.conversationId);
@@ -532,8 +544,16 @@ export class RepliesService {
     const messages = historyMessages(history, config.limits.historyMessages);
     const assist = config.mode === 'assist';
     const passages = await this.retrieve(tenantId, runId, context, config, history);
+    // Customer memory (G19): only with the customer's consent, in scope and currently valid.
+    const memories = await this.memory.recall(tenantId, {
+      runId,
+      control: context.control,
+      config,
+      history,
+    });
     const base =
       systemPrompt(config, context.brandName, passages) +
+      (memories.length ? `\n\n${memoryBlock(memories)}` : '') +
       (assist
         ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
         : '');
@@ -542,9 +562,11 @@ export class RepliesService {
       const system = correction ? `${base}\n\n${correction}` : base;
       const generated = await this.callModels(tenantId, runId, config, system, messages, view);
       const cited = applyCitations(generated.text, passages, (p) => p.documentId);
+      const remembered = citeMemories(cited.text, memories);
       const result: Generated = {
         ...generated,
-        text: cited.text,
+        text: remembered.text,
+        memories: remembered.memories,
         sources: cited.cited.map((p) => ({
           type: 'source',
           sourceId: toPublicId('document', p.documentId),
@@ -673,6 +695,7 @@ export class RepliesService {
           outputTokens: result.usage.outputTokens ?? null,
           latencyMs: Date.now() - started,
           sources: [],
+          memories: [],
         };
         await this.tx(tenantId, (tx) =>
           this.runs.step(tx, tenantId, runId, {
@@ -716,7 +739,7 @@ export class RepliesService {
     tenantId: string,
     runId: string,
     outcome: RunOutcome,
-    telemetry: Omit<Generated, 'text' | 'sources'>,
+    telemetry: Omit<Generated, 'text' | 'sources' | 'memories'>,
   ) {
     await this.runs.finish(tx, runId, { outcome, ...telemetry });
     const now = this.clock();

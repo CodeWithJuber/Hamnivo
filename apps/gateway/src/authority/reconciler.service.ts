@@ -178,7 +178,7 @@ export class ReconcilerService implements OnApplicationBootstrap, OnApplicationS
               : nextReconcileInterval(
                   claim.intervalSeconds,
                   // Only news counts: re-reading what was already applied keeps backing off.
-                  notifications.length > 0,
+                  notifications.some((n) => n.entries.length > 0),
                   reconcileCeiling(state.status, control.ownerMode),
                 );
           await tx
@@ -195,7 +195,8 @@ export class ReconcilerService implements OnApplicationBootstrap, OnApplicationS
       },
     );
     for (const n of outcome.notifications) {
-      await this.journal.notify(n.tenantId, n.conversationId, n.entries);
+      if (n.entries.length > 0) await this.journal.notify(n.tenantId, n.conversationId, n.entries);
+      else await this.journal.signalInbox(n.tenantId, n.conversationId);
     }
     return outcome.result;
   }

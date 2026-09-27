@@ -25,6 +25,8 @@ export interface TransitionOptions {
   reason:
     | 'staff_takeover'
     | 'staff_reply'
+    | 'staff_assign'
+    | 'staff_release'
     | 'return_to_ai'
     | 'customer_request'
     | 'authority_assignment'
@@ -41,6 +43,8 @@ export interface TransitionOptions {
   expectedEpoch?: number;
   /** Private note for the new owner (handoff packet). */
   handoffNote?: string;
+  /** The staff member who made the change, so Chatwoot records it as theirs. */
+  actorStaffMemberId?: string;
 }
 
 export interface TransitionResult {
@@ -131,6 +135,8 @@ export class OwnershipService {
               : null,
         ownerExternalUserId: target.kind === 'external' ? target.externalUserId : null,
         ownerBotId: target.kind === 'ai' ? target.botId : null,
+        ownerReason: options.reason,
+        ownerChangedAt: this.clock(),
         leaseHolder: null,
         leaseExpiresAt: null,
         updatedAt: this.clock(),
@@ -160,6 +166,7 @@ export class OwnershipService {
           target,
           reason: options.reason,
           ...(options.handoffNote ? { handoffNote: options.handoffNote } : {}),
+          ...(options.actorStaffMemberId ? { actorStaffMemberId: options.actorStaffMemberId } : {}),
         },
       });
     }

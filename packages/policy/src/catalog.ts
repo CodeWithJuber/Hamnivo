@@ -36,6 +36,22 @@ export const PERMISSIONS = {
     description: 'Take over a conversation from the AI or another person',
     scopes: ALL,
   },
+  'conversations.status': {
+    description: 'Resolve, reopen and snooze conversations',
+    scopes: ALL,
+  },
+  'conversations.tag': {
+    description: 'Tag conversations and fill in their custom fields',
+    scopes: ALL,
+  },
+  'conversations.bulk': {
+    description: 'Change many conversations at once',
+    scopes: ALL,
+  },
+  'conversations.review': {
+    description: 'Review and coach other people’s conversations',
+    scopes: ALL,
+  },
   'conversations.export': {
     description: 'Export conversation transcripts',
     scopes: BRAND,
@@ -85,6 +101,16 @@ export const PERMISSIONS = {
   'memory.read': { description: 'Read customer memory records', scopes: ALL },
   'memory.manage': { description: 'Correct or restrict memory records', scopes: BRAND },
   'memory.delete': { description: 'Delete memory records', scopes: BRAND, stepUp: true },
+  'memory.erase': {
+    description: 'Erase everything remembered about a customer',
+    scopes: BRAND,
+    stepUp: true,
+  },
+  'memory.export': {
+    description: 'Export everything remembered about a customer',
+    scopes: BRAND,
+    stepUp: true,
+  },
   'commerce.read': {
     description: 'See carts, quotes, orders, payments and refunds',
     scopes: ALL,

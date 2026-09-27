@@ -1,6 +1,10 @@
 import type {
   CustomerConversation,
+  CustomerMemory,
   HandoffResponse,
+  MemoryChange,
+  MemoryConsent,
+  MemoryDeletionReceipt,
   Message,
   MessagePage,
   WidgetSession,
@@ -211,6 +215,43 @@ export class HamnivoClient {
       clientRequestId,
       ...(note ? { note } : {}),
     });
+  }
+
+  /** What the assistant remembers about this customer, and their memory choice. */
+  getMemory(): Promise<CustomerMemory> {
+    return this.request('GET', '/v1/widget/memory');
+  }
+
+  /** Records the customer's choice about memory, with the explanation they saw. */
+  setMemoryConsent(
+    state: 'granted' | 'declined' | 'withdrawn',
+    noticeVersion: string,
+  ): Promise<MemoryConsent> {
+    return this.request('POST', '/v1/widget/memory/consent', { state, noticeVersion });
+  }
+
+  correctMemory(memoryId: string, value: string): Promise<MemoryChange> {
+    return this.request('POST', `/v1/widget/memory/${encodeURIComponent(memoryId)}/correct`, {
+      value,
+    });
+  }
+
+  /** Confirms a value that waits for the customer's review. */
+  confirmMemory(memoryId: string): Promise<MemoryChange> {
+    return this.request('POST', `/v1/widget/memory/${encodeURIComponent(memoryId)}/confirm`);
+  }
+
+  deleteMemory(memoryId: string): Promise<MemoryDeletionReceipt> {
+    return this.request('POST', `/v1/widget/memory/${encodeURIComponent(memoryId)}/delete`);
+  }
+
+  /** Deletes everything remembered about the customer. */
+  forgetMemory(): Promise<MemoryDeletionReceipt> {
+    return this.request('POST', '/v1/widget/memory/forget');
+  }
+
+  getMemoryDeletion(deletionId: string): Promise<MemoryDeletionReceipt> {
+    return this.request('GET', `/v1/widget/memory/deletions/${encodeURIComponent(deletionId)}`);
   }
 
   /**

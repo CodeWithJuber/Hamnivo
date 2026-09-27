@@ -7,6 +7,7 @@ import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
 import { applyLocale, type Locale } from './i18n.js';
 import { useChat } from './useChat.js';
+import { useMemory } from './useMemory.js';
 
 export interface WidgetParams {
   apiBase: string;
@@ -32,6 +33,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const commerce = useCommerce(client, chat.state.conversation?.id ?? null);
   const { onEvent } = chat;
   useEffect(() => onEvent(commerce.onEvent), [onEvent, commerce.onEvent]);
+  const memory = useMemory(client, chat.state.session?.principal.id ?? null);
 
   useEffect(() => {
     applyLocale(locale);
@@ -117,6 +119,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
         onSend={chat.send}
         onRetry={(id) => chat.retry(id)}
         onHandoff={chat.handoff}
+        memory={memory}
         onClose={
           params.hostOrigin
             ? () => bridge.post({ type: 'layout', open: false, width: 0, height: 0 })

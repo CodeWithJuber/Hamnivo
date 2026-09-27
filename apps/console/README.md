@@ -28,6 +28,14 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
     a conflict with the differing fields; nothing is overwritten silently.
   - Publishing asks for a recent sign-in. A banner says that saved is not live.
   - The version list shows each version's state and hash, with rollback.
+- **Customer memory** (board 15).
+  - Customers with memory or a memory choice, with search, their choice and what waits for review.
+  - Per customer: preferences and conversation facts with purpose, source message, who recorded
+    them, scope, expiry and history. A newer, different value is shown next to the current one to
+    confirm or reject.
+  - Correct with a reason, mark outdated, delete (a receipt shows when indexes and caches are
+    cleared), erase everything and export, each within the person's permissions.
+  - AI agents have a "Customer memory" section to turn memory on and set its limits.
 - **Model connections.** List, add (the API key is write-only; only its last characters are shown
   afterwards) and disable.
 - **Knowledge.**
@@ -43,6 +51,28 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
 - **Runs.** A table of outcome, version, model, tokens, time taken and start time, with filters.
   A side sheet shows one run's steps. No message text is shown.
 - **Account security.** Turn two-factor authentication on or off, and add passkeys.
+- **Inbox** (boards 07–10). Staff answer customers here instead of in Chatwoot.
+  - Queues: mine, waiting for a person, AI answering, my teams and all, with counts. Filters by
+    status, brand, channel, customer language and tag, and search over customers and message
+    text. Only conversations the person's grants reach are listed, counted or found.
+  - The conversation: customer messages, replies, internal notes (a lock and a dashed border),
+    Hamnivo's handoff summaries, sources of AI answers, and translation of a customer message on
+    demand, marked as machine translation next to the original.
+  - Reply and Internal note are separate lanes with separate drafts. Drafts save to the server
+    and stay in the browser while offline. Ctrl+Enter (⌘+Enter) sends; keys pressed while an
+    input method is composing are left alone.
+  - Take over, assign to a colleague or a team, back to the queue, back to the AI, or ask a
+    colleague to hand over. A reply from a view that is out of date is refused and kept as "not
+    sent", with a retry that never sends twice.
+  - Resolve, reopen and snooze. Saved replies with their variables filled from verified facts
+    only. An AI suggestion with its sources, which is never sent on its own.
+  - Details: who the customer is and what was verified, tags and custom fields, other
+    conversations, linked conversations and, for supervisors, reviews. Bulk changes with a dry
+    run and a result per conversation.
+  - Live: a colleague's takeover, new messages and "is typing" show up without reloading; while
+    the connection is down the inbox says so and checks every 15 seconds.
+  - Keys: ↑ ↓ or J K move through the queue, Enter opens, X selects, Esc goes back. On a phone
+    the queue, the conversation and the details are steps.
 - **Orders** (board 21, `commerce.read`).
   - Orders placed in chat, searchable by reference, with payment and fulfilment side by side and
     what needs attention (refunds waiting, open exceptions).
@@ -101,9 +131,9 @@ adding meta tags to `index.html`: `<meta name="hamnivo-api" content="">`,
 ### Serve Studio on the gateway's origin
 
 Put Studio behind the same origin as the API: serve `dist/` and pass `/v1` and `/api/auth` on to
-the gateway, then set the API to empty. Today this is needed, not only tidy: the gateway's CORS
-rules allow GET, POST, PATCH and DELETE but not PUT, and saving an agent draft is a PUT. The
-gateway's `PUBLIC_CONSOLE_ORIGIN` must be Studio's origin.
+the gateway, then set the API to empty. Cookies then stay first-party. Studio also works from its
+own origin: the gateway allows `PUBLIC_CONSOLE_ORIGIN` for every method Studio uses, so that
+setting must be Studio's origin.
 
 ## Browser tests (Playwright + axe)
 
@@ -133,6 +163,11 @@ pnpm --filter @hamnivo/console test:e2e
   - a Markdown upload that becomes ready, and a search preview;
   - stopping the AI for a brand, then resuming;
   - runs after a widget conversation, with the run's steps;
+  - the inbox (`e2e/inbox.spec.ts`): taking over a customer who asked for a person, replying,
+    an internal note the customer never sees, resolving; a colleague's takeover and typing
+    arriving live; Arabic; a 390 px phone; keyboard only; an AI suggestion that is not sent;
+    offline drafts; filters and a bulk change, with axe along the way;
+  - customer memory: review, correct, delete, export and erase, right to left, and access denied;
   - axe (WCAG 2.2 A and AA) on every main screen in English and Arabic;
   - no sideways scrolling from 320 to 1920 px;
   - `e2e/commerce.spec.ts`: a customer pays through the fake Stripe server, one person asks for a
@@ -146,9 +181,17 @@ pnpm --filter @hamnivo/console test:e2e
 These need gateway changes:
 
 - Allowed websites can't be changed after a brand is created (there is no brand update endpoint).
-- Saving a draft over PUT from another origin (CORS, above).
 - Runs can't be filtered by outcome or time on the server. Studio filters the loaded runs by
   outcome.
 - A draft has no revision number, so two saves of the same draft version can only be told apart
   by comparing their content. Studio checks for that before saving and publishing.
 - Nothing confirms that a website has installed the snippet.
+
+In the inbox, not yet:
+
+- Round-robin routing with capacity checks, SLA deadlines and skill-based routing.
+- Conversation summaries and next-step suggestions from the AI; only suggested replies exist.
+- Writing a reply in the customer's language with a translation to review before sending.
+- Defining tags and custom fields, and editing or deleting saved replies: still done in Chatwoot.
+- Merging and splitting conversations: linking is supported instead, and Chatwoot keeps the
+  transcripts.

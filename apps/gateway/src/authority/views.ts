@@ -1,4 +1,11 @@
-import type { CardPart, DeliveryState, Message, Sender, SourcePart } from '@hamnivo/contracts';
+import type {
+  CardPart,
+  DeliveryState,
+  MemoryPart,
+  Message,
+  Sender,
+  SourcePart,
+} from '@hamnivo/contracts';
 import { schema, type TenantTx } from '@hamnivo/db';
 import type { OwnerMode } from '@hamnivo/db/schema';
 import type { AuthorityMessage } from '@hamnivo/domain';
@@ -6,6 +13,7 @@ import { and, eq, inArray, or } from 'drizzle-orm';
 import type { z } from 'zod';
 
 export type SourceRef = z.infer<typeof SourcePart>;
+export type MemoryPartRef = z.infer<typeof MemoryPart>;
 
 /** What Hamnivo recorded about an AI answer it published. */
 export interface PublicationFacts {
@@ -14,6 +22,8 @@ export interface PublicationFacts {
   displayName?: string;
   /** A card post (`hv1:c:` key): the card as recorded, and the seller shown as its sender. */
   card?: { part: z.infer<typeof CardPart>; senderName: string };
+  /** Customer memories the answer relied on (G19); removed when a memory is deleted. */
+  memories?: MemoryPartRef[];
 }
 
 /**
@@ -58,6 +68,7 @@ export async function publicationFacts(
       kind?: string;
       part?: z.infer<typeof CardPart>;
       senderName?: string;
+      memories?: MemoryPartRef[];
     };
     const facts: PublicationFacts = {
       sources: detail.sources ?? [],
@@ -65,6 +76,7 @@ export async function publicationFacts(
       ...(detail.kind === 'card' && detail.part
         ? { card: { part: detail.part, senderName: detail.senderName ?? 'Shop' } }
         : {}),
+      ...(detail.memories?.length ? { memories: detail.memories } : {}),
     };
     const byKey = messages.find((m) => m.key === row.key);
     const ref = byKey?.ref ?? (row.authorityId === null ? null : String(row.authorityId));
@@ -162,6 +174,7 @@ export function contractMessage(input: {
         format: 'plain',
       },
       ...(input.facts?.sources ?? []),
+      ...(input.facts?.memories ?? []),
     ],
     createdAt: input.message.createdAt.toISOString(),
     clientMessageId: input.clientMessageId,

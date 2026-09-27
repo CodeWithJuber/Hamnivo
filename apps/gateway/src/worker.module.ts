@@ -16,6 +16,14 @@ import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
 import { type Scanner, scannerFromUrl } from './knowledge/scanner.js';
+import { MemoryCache } from './memory/cache.js';
+import { ConversationHistory } from './memory/conversation-history.js';
+import { MemoryDeletionService } from './memory/deletion.service.js';
+import { MemoryExtractionService } from './memory/extraction.service.js';
+import { MemoryFingerprints } from './memory/fingerprints.js';
+import { MemoryIndexService } from './memory/index.service.js';
+import { MemoryRecallService } from './memory/recall.service.js';
+import { MemoryWriter } from './memory/writer.service.js';
 import { OUTBOX_HANDLERS, type OutboxHandler, OutboxRelay } from './outbox/relay.service.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
 import { AgentsService } from './runtime/agents.service.js';
@@ -80,24 +88,54 @@ export class WorkerModule {
         RetrievalService,
         { provide: SCANNER, useValue: overrides.scanner ?? scannerFromUrl(config.CLAMAV_URL) },
         IngestionService,
+        MemoryFingerprints,
+        MemoryCache,
+        MemoryWriter,
+        MemoryDeletionService,
+        MemoryRecallService,
+        MemoryIndexService,
+        ConversationHistory,
+        MemoryExtractionService,
         RepliesService,
         ...COMMERCE_WORKER_PROVIDERS,
         {
           provide: OUTBOX_HANDLERS,
-          inject: [AuthoritySyncService, RepliesService, IngestionService, CommerceCardsService],
+          inject: [
+            AuthoritySyncService,
+            RepliesService,
+            IngestionService,
+            MemoryExtractionService,
+            MemoryIndexService,
+            MemoryDeletionService,
+            CommerceCardsService,
+          ],
           useFactory: (
             sync: AuthoritySyncService,
             replies: RepliesService,
             ingestion: IngestionService,
+            extraction: MemoryExtractionService,
+            index: MemoryIndexService,
+            deletions: MemoryDeletionService,
             cards: CommerceCardsService,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
               ...defaultOutboxHandlers(),
               ['conversation.owner_changed', (event) => sync.applyOwnerChange(event)],
+              ['conversation.team_changed', (event) => sync.applyTeamChange(event)],
               ['conversation.note', (event) => sync.applyNote(event)],
-              ['conversation.customer_message', (event) => replies.onCustomerMessage(event)],
+              [
+                'conversation.customer_message',
+                // The reply comes first; memory extraction is queued after it, never before.
+                async (event) => {
+                  await replies.onCustomerMessage(event);
+                  await extraction.afterCustomerMessage(event);
+                },
+              ],
               ['knowledge.ingest', (event) => ingestion.onIngest(event)],
+              ['memory.extract', async (event) => void (await extraction.onExtract(event))],
+              ['memory.embed', (event) => index.onEmbed(event)],
+              ['memory.deleted', (event) => deletions.complete(event)],
               [CARD_TOPIC, (event) => cards.onCardEvent(event)],
             ]),
         },
@@ -111,6 +149,8 @@ export class WorkerModule {
         ReconcilerService,
         RepliesService,
         JournalService,
+        MemoryExtractionService,
+        MemoryDeletionService,
         CommerceWorker,
       ],
     };

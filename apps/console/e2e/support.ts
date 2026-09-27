@@ -222,6 +222,10 @@ export const ageSessions = (email: string) =>
 export const endSessions = (email: string) =>
   sql(`DELETE FROM auth.session WHERE ${OWN_SESSIONS}`, [email]);
 
+/** Marks the address as confirmed, as following the link in the confirmation email would. */
+export const verifyEmail = (email: string) =>
+  sql(`UPDATE auth."user" SET email_verified = true WHERE email = $1`, [email]);
+
 function base32(input: string): Buffer {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   const bytes: number[] = [];
