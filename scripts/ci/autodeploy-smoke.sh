@@ -209,6 +209,7 @@ run_service
 check 'with nothing new, nothing is deployed' test "$(history_lines)" -eq 0
 
 say 'B: a push goes live'
+mkdir -p "$dev/apps/site/public"
 printf 'B\n' >"$dev/apps/site/public/autodeploy-smoke.txt"
 b="$(commit_push 'Autodeploy smoke B: a new website file')"
 check 'the push webhook is accepted' test "$(webhook push "$(push_body "$b")")" = 200

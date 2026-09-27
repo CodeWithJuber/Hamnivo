@@ -8,12 +8,15 @@
     "status": "in-progress",
     "evidence": [
       "deploy/postgres/init.sh",
+      "deploy/production/deploy.sh",
       "docs/adr/0007-self-hosted-verification.md",
+      "docs/adr/0008-automatic-deployment.md",
       "docs/self-hosting.md",
+      "scripts/ci/autodeploy-smoke.sh",
       "scripts/ci/local.sh",
       "scripts/ci/production-smoke.sh"
     ],
-    "note": "Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence and status checks, Chatwoot contract, accessibility, browser journeys) run with pnpm ci:local; --with-production also builds the images and checks the deployment. Versioned releases and rollback are pending."
+    "note": "Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence and status checks, Chatwoot contract, accessibility, browser journeys) run with pnpm ci:local; --with-production also builds the images and checks the deployment. Every push to main can deploy itself without hosted CI. A signed GitHub webhook and a 5-minute check trigger it. The server runs Biome, type checks and unit tests, builds commit-tagged images, backs up before migrations, and starts the new version behind health checks. A version that fails its health checks is rolled back to the previous one automatically, and failed commits are not retried. GitHub deployment statuses are reported when a token is set. All of this is tested end to end against a stand-in for GitHub."
   },
   "W03": {
     "status": "in-progress",
@@ -125,11 +128,12 @@
       "deploy/postgres/init.sh",
       "deploy/production/Caddyfile",
       "deploy/production/compose.yml",
+      "deploy/production/deploy.sh",
       "deploy/production/hamnivo.sh",
       "docs/self-hosting.md",
       "scripts/ci/production-smoke.sh"
     ],
-    "note": "One-server production stack: gateway and edge images built from source, compose file with PostgreSQL 18 + pgvector, Valkey, Chatwoot 4.18.0-ce, ClamAV and Caddy (automatic HTTPS, HTTP to HTTPS, HTTP/3); only the edge publishes ports. hamnivo.sh sets up generated secrets and runs up, status, logs, backup, restore and update. The smoke test deploys it with Caddy's internal CA and checks sign-up, a real Chatwoot connection, an AI reply over the stream, the website and a backup and restore (tested). Let's Encrypt issuance needs public DNS and was not exercised here; Studio joins the stack when it ships."
+    "note": "One-server production stack: gateway and edge images built from source, compose file with PostgreSQL 18 + pgvector, Valkey, Chatwoot 4.18.0-ce, ClamAV and Caddy (automatic HTTPS, HTTP to HTTPS, HTTP/3); only the edge publishes ports. hamnivo.sh sets up generated secrets and runs up, status, logs, backup, restore and update. The smoke test deploys it with Caddy's internal CA and checks sign-up, a real Chatwoot connection, an AI reply over the stream, the website and a backup and restore (tested). Studio is served at app.<domain> and used in a real browser by the smoke test. Let's Encrypt issuance needs public DNS and was not exercised here. Images are tagged and labelled with their commit, and the newest 3 versions are kept for rollback."
   },
   "A02": {
     "status": "in-progress",

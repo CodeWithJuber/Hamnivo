@@ -8,11 +8,13 @@
 #   pnpm ci:local --skip-e2e         skip the browser checks (widget journey and website)
 #   pnpm ci:local --with-production  also build the production images and check the real
 #                                    deployment with a backup and restore drill (10–20 minutes)
+#   pnpm ci:local --with-autodeploy  also check automatic deploys: webhook, checks, rollback
+#                                    against a stand-in for GitHub (20–40 minutes)
 #   PG_VERSIONS=18 pnpm ci:local     run integration tests on one PostgreSQL major only
 #
 # Integration tests run against throwaway PostgreSQL (+pgvector), Valkey and Chatwoot containers
 # with generated passwords, so your development data is never touched.
-# Needs: Node >= 22.12 (24 recommended), pnpm 10, Docker, openssl.
+# Needs: Node >= 22.12 (24 recommended), pnpm 10, Docker, openssl; shellcheck for the scripts.
 # Writes a summary to test-results/ci-local.md.
 set -euo pipefail
 
@@ -24,6 +26,7 @@ a11y=1
 chatwoot=1
 e2e=1
 production=0
+autodeploy=0
 for arg in "$@"; do
   case "$arg" in
     --quick) quick=1 ;;
@@ -31,7 +34,8 @@ for arg in "$@"; do
     --skip-chatwoot) chatwoot=0 ;;
     --skip-e2e) e2e=0 ;;
     --with-production) production=1 ;;
-    -h | --help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --with-autodeploy) autodeploy=1 ;;
+    -h | --help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -168,6 +172,15 @@ studio_journey() {
   return "$status"
 }
 
+# The deploy scripts run unattended on servers, so every shell script must pass shellcheck.
+shell_scripts() {
+  if ! command -v shellcheck >/dev/null; then
+    echo 'shellcheck is not installed (sudo apt-get install shellcheck): skipped.' >&2
+    return 0
+  fi
+  git ls-files -z '*.sh' .githooks/pre-push | xargs -0 shellcheck -x
+}
+
 free_port() {
   node -e 'const s = require("node:net").createServer().listen(0, "127.0.0.1", () => { console.log(s.address().port); s.close(); })'
 }
@@ -197,6 +210,7 @@ step "Install dependencies (frozen lockfile)" pnpm install --frozen-lockfile
 step "Lint and format (Biome)" pnpm lint
 step "Typecheck" pnpm typecheck
 step "Unit tests" pnpm test
+step "Shell scripts (shellcheck)" shell_scripts
 step "Feature status matrix is current" pnpm exec tsx scripts/feature-status/generate.ts --check
 step "Licence inventory is current and reviewed" pnpm exec tsx scripts/licenses/inventory.ts --check
 
@@ -224,6 +238,10 @@ fi
 if ((quick == 0 && production == 1)); then
   step "Production deployment smoke test (images, HTTPS, Chatwoot, backup and restore)" \
     bash "$root/scripts/ci/production-smoke.sh"
+fi
+if ((quick == 0 && autodeploy == 1)); then
+  step "Automatic deploy smoke test (webhook, checks, rollback)" \
+    bash "$root/scripts/ci/autodeploy-smoke.sh"
 fi
 
 summary

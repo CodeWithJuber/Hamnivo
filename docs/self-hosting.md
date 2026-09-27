@@ -13,6 +13,7 @@ this repository.
 | Production on one server: every service, automatic HTTPS, backups and restore | ready | Part A: `deploy/production/hamnivo.sh` |
 | Checks (lint, types, unit, integration on PostgreSQL 16 and 18, Chatwoot contract, accessibility, widget journey and website in a browser) | ready | `pnpm ci:local` |
 | Production smoke test (the real deployment on this machine, then a backup and restore drill) | ready | `bash scripts/ci/production-smoke.sh` |
+| Automatic deployment from GitHub: webhook and a 5-minute check, checks and build on the server, rollback when unhealthy | ready | A10; tested by `bash scripts/ci/autodeploy-smoke.sh` |
 | Infrastructure for development (PostgreSQL 18 + pgvector, Valkey) | ready | `pnpm services:up` |
 | Design system (Storybook) | ready | `pnpm --filter @hamnivo/ui storybook` |
 | Database schema, row-level security and audit log | ready | `pnpm db:migrate` |
@@ -39,7 +40,7 @@ this repository.
   | `api.example.com` | the API |
   | `chat.example.com` | the chat widget and its loader script |
   | `support.example.com` | Chatwoot, where staff can also answer |
-  | `app.example.com` | Studio, the staff console, when it ships |
+  | `app.example.com` | Studio, the staff console |
   | `example.com` and `www.example.com` | the public website |
 
   A wildcard record `*.example.com` covers the first four.
@@ -69,12 +70,30 @@ inside Docker's network.
 
 ## A3. Get the code
 
-```bash
-sudo mkdir -p /opt/hamnivo && sudo chown "$USER" /opt/hamnivo
-git clone https://github.com/CodeWithJuber/Hamnivo.git /opt/hamnivo
-cd /opt/hamnivo
-git checkout claude/hamnivo-app-implementation-bhb7rg   # until the work is merged to main
-```
+The repository is private, so the server reads it with its own key, a read-only deploy key.
+
+1. Create the key on the server:
+
+   ```bash
+   ssh-keygen -t ed25519 -N '' -C "hamnivo-deploy@$(hostname)" -f ~/.ssh/hamnivo_deploy_ed25519
+   cat ~/.ssh/hamnivo_deploy_ed25519.pub
+   ```
+
+2. On GitHub, open the repository's **Settings → Deploy keys → Add deploy key**. Paste the key and
+   leave "Allow write access" off.
+3. Clone:
+
+   ```bash
+   sudo mkdir -p /opt/hamnivo && sudo chown "$USER" /opt/hamnivo
+   GIT_SSH_COMMAND='ssh -i ~/.ssh/hamnivo_deploy_ed25519 -o IdentitiesOnly=yes' \
+     git clone git@github.com:CodeWithJuber/Hamnivo.git /opt/hamnivo
+   cd /opt/hamnivo
+   git config core.sshCommand 'ssh -i ~/.ssh/hamnivo_deploy_ed25519 -o IdentitiesOnly=yes'
+   ```
+
+The first connection asks you to confirm GitHub's host key. Its fingerprint must be
+`SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`, as GitHub publishes it on docs.github.com.
+`hamnivo.sh autodeploy enable` (A10) sets up the same key if you skip this step.
 
 ## A4. Configure
 
@@ -218,7 +237,8 @@ API reference is at `https://api.example.com/docs`; set `API_DOCS=false` to hide
 | Follow logs | `./deploy/production/hamnivo.sh logs [service…]` |
 | Back up now | `./deploy/production/hamnivo.sh backup` |
 | Restore a backup | `./deploy/production/hamnivo.sh restore deploy/production/backups/<time>` |
-| Update to the latest code | `./deploy/production/hamnivo.sh update` |
+| Deploy the latest code now (checks, build, health, rollback) | `./deploy/production/hamnivo.sh update` |
+| Deploy history, or go back one version | `./deploy/production/hamnivo.sh deploys`, `… rollback` |
 | Apply changed settings | `./deploy/production/hamnivo.sh up` |
 | Stop everything | `./deploy/production/hamnivo.sh down` (data stays in Docker volumes) |
 | Any compose command | `./deploy/production/hamnivo.sh compose <command>` |
@@ -240,7 +260,7 @@ server, for example with [restic](https://restic.net).
 Back up every night at 03:15:
 
 ```bash
-( crontab -l 2>/dev/null; echo '15 3 * * * /opt/hamnivo/deploy/production/hamnivo.sh backup >> /var/log/hamnivo-backup.log 2>&1' ) | crontab -
+( crontab -l 2>/dev/null; echo '15 3 * * * /opt/hamnivo/deploy/production/hamnivo.sh backup >> "$HOME/hamnivo-backup.log" 2>&1' ) | crontab -
 ```
 
 The two databases are dumped one after the other, a few seconds apart. Messages written in those
@@ -273,9 +293,23 @@ restore drill in its checks.
 ./deploy/production/hamnivo.sh update
 ```
 
-This backs up first, pulls the code, adds any new settings to `.env`, rebuilds the images and
-restarts. Database migrations run before the new API starts. The chat is unavailable for about a
-minute while containers restart.
+This deploys the newest commit of `main` (the branch in `HAMNIVO_DEPLOY_BRANCH`), the way automatic
+deploys do (A10):
+
+1. **Checks** the code: Biome, type checks and unit tests. A failure stops here and touches
+   nothing that runs.
+2. **Adds** new settings to `.env`, and **builds** images tagged with the commit.
+3. **Backs up** first when the new version changes the database, into `backups/before-deploy/`.
+4. **Starts** the new version. Database migrations run first. Then it waits until the new version
+   is healthy and answers over HTTPS.
+5. **Rolls back** if the new version is not healthy: the version that ran before starts again.
+
+While the API restarts, requests wait a few seconds for it, and open chats reconnect by
+themselves. `hamnivo.sh deploys` lists every deploy; `hamnivo.sh rollback` goes back to the
+version before.
+
+The first update from a version older than this one still runs the old procedure (backup, pull,
+rebuild, restart). Every later update runs the one above.
 
 ## A8. Security checklist
 
@@ -285,8 +319,13 @@ minute while containers restart.
 - `REQUIRE_EMAIL_VERIFICATION` stays `true`, and SMTP is configured.
 - Each brand lists only its real websites in `allowedOrigins`.
 - `CHATWOOT_ALLOW_PRIVATE_WEBHOOKS` stays `false`, so Chatwoot cannot call private addresses.
-- The operating system updates itself (`sudo apt-get install unattended-upgrades`), and you run
-  `hamnivo.sh update` for Hamnivo.
+- The operating system updates itself (`sudo apt-get install unattended-upgrades`). Hamnivo
+  deploys itself from GitHub (A10), or you run `hamnivo.sh update`.
+- With automatic deploys:
+  - `main` is protected on GitHub (pull requests only, no force pushes);
+  - the deploy key is read-only;
+  - the GitHub token, if you added one, is fine-grained, for this repository only, with
+    "Deployments" access only.
 - To collect metrics, set `METRICS_TOKEN` and scrape `https://api.example.com/metrics` with it.
 
 ## A9. Troubleshooting
@@ -306,6 +345,102 @@ minute while containers restart.
   ClamAV, or add memory.
 - **Building behind a proxy that inspects TLS:** set `HAMNIVO_BUILD_CA=/path/to/proxy-ca.pem`
   before `hamnivo.sh up`.
+- **A push was not deployed:**
+  - `hamnivo.sh autodeploy status` shows the mode, the git access and the last deploys.
+  - `journalctl -u hamnivo-deploy` shows each run.
+  - On GitHub, **Settings → Webhooks → Recent Deliveries** shows GitHub's calls. `403` means
+    another branch or repository; `500` means a wrong secret.
+  - The 5-minute check deploys even when a webhook is lost.
+  - A commit that failed is not retried. Push a fix, or run `hamnivo.sh deploy --force <commit>`.
+- **A deploy stopped or rolled back:** its full log is in `deploy/production/state/logs/`, and
+  `hamnivo.sh deploys` names the step.
+  - "local changes on the server": files tracked by git were edited on the server. Commit such
+    changes to the repository instead.
+  - "not enough disk space": free space for Docker, or lower `HAMNIVO_DEPLOY_BUILD_CACHE_GB`.
+
+## A10. Automatic deployment from GitHub
+
+With this on, every push to `main` goes live on your server within minutes, without GitHub
+Actions:
+
+```
+push to main ─► GitHub webhook (signed) ─► https://api.example.com/_deploy/github ─► Caddy
+  ─► deploy-hook (checks the signature, the branch and the repository) ─► systemd on the server
+  ─► hamnivo.sh deploy --latest
+```
+
+A timer also looks for new commits every 5 minutes, because GitHub never sends a failed webhook
+again.
+
+Each deploy runs like `hamnivo.sh update` (A7): the checks and the build come first, and a version
+that is not healthy is replaced by the one before. Two things are specific to automatic deploys:
+- A commit that failed is not tried again automatically; the next commit is.
+- With a GitHub token, each deploy appears on GitHub under **Environments → production**.
+
+### Turn it on
+
+1. **On the server:**
+
+   ```bash
+   ./deploy/production/hamnivo.sh autodeploy enable
+   ```
+
+   It needs `sudo` once, to install three systemd units. It:
+   - checks that the server can read the repository, and creates a read-only deploy key if needed
+     (A3);
+   - generates the webhook secret;
+   - starts the webhook receiver and turns on its route;
+   - prints what to enter on GitHub.
+2. **On GitHub,** in the repository's Settings:
+   - **Webhooks → Add webhook.** Enter the payload URL and the secret it printed. Choose content
+     type `application/json` and "Just the push event". GitHub sends a ping at once, and Recent
+     Deliveries should show `200`.
+   - **Branches.** Protect `main`: require a pull request and block force pushes, because whatever
+     reaches `main` goes live.
+3. **Optional: deployment statuses on GitHub.**
+   1. Create a fine-grained personal access token under **Settings → Developer settings →
+      Fine-grained tokens**. Limit it to this repository, with the permission **Deployments: Read
+      and write**.
+   2. Save it in a file and run `hamnivo.sh autodeploy enable --github-token-file <file>`.
+   3. Delete the file.
+
+Without a public webhook, for example behind NAT, run `hamnivo.sh autodeploy enable --mode poll`.
+The server then checks every 5 minutes.
+
+### Watch, pause, go back
+
+| Task | Command |
+|---|---|
+| Mode, git access and recent deploys | `hamnivo.sh autodeploy status` |
+| Deploy history | `hamnivo.sh deploys` |
+| Follow a deploy | `journalctl -u hamnivo-deploy -f` |
+| One deploy's full log | `ls deploy/production/state/logs/` |
+| Pause automatic deploys | `hamnivo.sh autodeploy pause` (and `resume`) |
+| Go back to the version before | `hamnivo.sh rollback` |
+| Deploy a given commit or tag | `hamnivo.sh deploy <commit>` |
+| Turn it off | `hamnivo.sh autodeploy disable` |
+
+After a `rollback`, the version you left is not redeployed automatically; the next new commit is.
+
+### Keep migrations reversible for one release
+
+A rollback starts the older code on the newer database. Change the schema in two steps:
+1. **Add first:** new tables, and new columns that may be empty.
+2. **Remove later:** drop old columns only in a later release, once nothing uses them.
+
+When a release changes the database, the deploy backs up first, into
+`deploy/production/backups/before-deploy/`. The newest 5 of those backups are kept.
+
+### Resources
+
+The checks and builds run on the server. With Docker's build cache they usually take a few
+minutes, because only changed packages are rebuilt and tested.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `HAMNIVO_DEPLOY_BUILD_CACHE_GB` | 8 | Maximum size of Docker's build cache |
+| `HAMNIVO_DEPLOY_KEEP` | 3 | How many versions' images are kept |
+| `HAMNIVO_DEPLOY_MIN_FREE_GB` | 8 | Free space a deploy needs |
 
 # Part B: Develop and run the checks
 

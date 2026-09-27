@@ -95,12 +95,13 @@ github_status() { # github_status STATE DESCRIPTION
 
 # --- checks --------------------------------------------------------------------------------------
 # Keeps Docker's build cache (dependency store, turbo cache, layers) under a size, least recently
-# used first: HAMNIVO_DEPLOY_BUILD_CACHE_GB, default 8. Older Docker versions have other flags.
+# used first: HAMNIVO_DEPLOY_BUILD_CACHE_GB, default 8. Without --all, Docker would only remove
+# dangling entries, which is almost nothing. Older Docker versions have other flags.
 prune_build_cache() { # prune_build_cache [GB]
   local limit="${1:-${HAMNIVO_DEPLOY_BUILD_CACHE_GB:-8}}gb"
-  docker builder prune -f --max-used-space "$limit" >/dev/null 2>&1 ||
-    docker builder prune -f --keep-storage "$limit" >/dev/null 2>&1 ||
-    docker builder prune -f --filter until=168h >/dev/null 2>&1 || true
+  docker builder prune --all -f --max-used-space "$limit" >/dev/null 2>&1 ||
+    docker builder prune --all -f --keep-storage "$limit" >/dev/null 2>&1 ||
+    docker builder prune --all -f --filter until=168h >/dev/null 2>&1 || true
 }
 
 check_disk() {
