@@ -43,6 +43,28 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
 - **Runs.** A table of outcome, version, model, tokens, time taken and start time, with filters.
   A side sheet shows one run's steps. No message text is shown.
 - **Account security.** Turn two-factor authentication on or off, and add passkeys.
+- **Inbox** (boards 07–10). Staff answer customers here instead of in Chatwoot.
+  - Queues: mine, waiting for a person, AI answering, my teams and all, with counts. Filters by
+    status, brand, channel, customer language and tag, and search over customers and message
+    text. Only conversations the person's grants reach are listed, counted or found.
+  - The conversation: customer messages, replies, internal notes (a lock and a dashed border),
+    Hamnivo's handoff summaries, sources of AI answers, and translation of a customer message on
+    demand, marked as machine translation next to the original.
+  - Reply and Internal note are separate lanes with separate drafts. Drafts save to the server
+    and stay in the browser while offline. Ctrl+Enter (⌘+Enter) sends; keys pressed while an
+    input method is composing are left alone.
+  - Take over, assign to a colleague or a team, back to the queue, back to the AI, or ask a
+    colleague to hand over. A reply from a view that is out of date is refused and kept as "not
+    sent", with a retry that never sends twice.
+  - Resolve, reopen and snooze. Saved replies with their variables filled from verified facts
+    only. An AI suggestion with its sources, which is never sent on its own.
+  - Details: who the customer is and what was verified, tags and custom fields, other
+    conversations, linked conversations and, for supervisors, reviews. Bulk changes with a dry
+    run and a result per conversation.
+  - Live: a colleague's takeover, new messages and "is typing" show up without reloading; while
+    the connection is down the inbox says so and checks every 15 seconds.
+  - Keys: ↑ ↓ or J K move through the queue, Enter opens, X selects, Esc goes back. On a phone
+    the queue, the conversation and the details are steps.
 
 Every screen has loading, empty, error and permission-denied states. Status is never shown by
 colour alone. Studio works from the keyboard, returns focus after dialogs, and announces results.
@@ -115,6 +137,10 @@ pnpm --filter @hamnivo/console test:e2e
   - a Markdown upload that becomes ready, and a search preview;
   - stopping the AI for a brand, then resuming;
   - runs after a widget conversation, with the run's steps;
+  - the inbox (`e2e/inbox.spec.ts`): taking over a customer who asked for a person, replying,
+    an internal note the customer never sees, resolving; a colleague's takeover and typing
+    arriving live; Arabic; a 390 px phone; keyboard only; an AI suggestion that is not sent;
+    offline drafts; filters and a bulk change, with axe along the way;
   - axe (WCAG 2.2 A and AA) on every main screen in English and Arabic;
   - no sideways scrolling from 320 to 1920 px.
 - The last test saves screenshots for review in `e2e/screenshots/` (not in git).
