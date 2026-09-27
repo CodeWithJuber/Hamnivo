@@ -303,3 +303,11 @@ export async function ensureAuditPartitions(db: Db, monthsAhead = 2): Promise<nu
   );
   return rows[0]?.created ?? 0;
 }
+
+/** Clears uploaded migration exports whose retention has passed; returns how many. */
+export async function purgeMigrationFiles(db: Db, batch = 100): Promise<number> {
+  const { rows } = await db.execute<{ purge_migration_files: number }>(
+    sql`select app.purge_migration_files(${batch}::int)`,
+  );
+  return Number(rows[0]?.purge_migration_files ?? 0);
+}

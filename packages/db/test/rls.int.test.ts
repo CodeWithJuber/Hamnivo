@@ -170,6 +170,11 @@ describe('two-tenant isolation', () => {
     'knowledge_documents',
     'document_versions',
     'knowledge_chunks',
+    'migration_jobs',
+    'migration_files',
+    'migration_items',
+    'external_id_mappings',
+    'reconciliation_reports',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -280,6 +285,11 @@ describe('two-tenant isolation', () => {
       'knowledge_documents',
       'document_versions',
       'knowledge_chunks',
+      'migration_jobs',
+      'migration_files',
+      'migration_items',
+      'external_id_mappings',
+      'reconciliation_reports',
       'audit_heads',
       'audit_events',
     ]);

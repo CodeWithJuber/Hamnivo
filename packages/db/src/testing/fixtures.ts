@@ -61,6 +61,7 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     agentId: newId(),
     agentVersionId: newId(),
     runId: newId(),
+    migrationJobId: newId(),
   };
 
   await withTenant(db, { tenantId, actorId: 'seed' }, async (tx) => {
@@ -404,6 +405,57 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       kind: 'model',
       name: 'generate',
       status: 'ok',
+    });
+    // Migration: a job with its quarantined export, one item, a mapping and a report.
+    await tx.insert(s.migrationJobs).values({
+      id: ids.migrationJobId,
+      tenantId,
+      workspaceId: ids.workspaceId,
+      brandId: ids.brandId,
+      connectionId: ids.connectionId,
+      sourceSystem: 'tawk.to',
+      sourceKind: 'file',
+      label: 'tawk-export.zip',
+      state: 'completed',
+      createdBy: ids.staffMemberId,
+    });
+    await tx.insert(s.migrationFiles).values({
+      tenantId,
+      jobId: ids.migrationJobId,
+      purpose: 'export',
+      name: 'tawk-export.zip',
+      mediaType: 'application/zip',
+      byteSize: 22,
+      sha256: bytes(),
+      state: 'clean',
+      raw: bytes(22),
+    });
+    await tx.insert(s.migrationItems).values({
+      tenantId,
+      jobId: ids.migrationJobId,
+      kind: 'conversation',
+      sourceId: `chat-${suffix}`,
+      conversationSourceId: `chat-${suffix}`,
+      status: 'imported',
+      targetRef: '41',
+      created: true,
+    });
+    await tx.insert(s.externalIdMappings).values({
+      tenantId,
+      connectionId: ids.connectionId,
+      brandId: ids.brandId,
+      sourceSystem: 'tawk.to',
+      kind: 'conversation',
+      sourceId: `chat-${suffix}`,
+      targetRef: '41',
+      jobId: ids.migrationJobId,
+    });
+    await tx.insert(s.reconciliationReports).values({
+      tenantId,
+      jobId: ids.migrationJobId,
+      kind: 'reconciliation',
+      gate: 'passed',
+      report: { checks: [] },
     });
     await appendAudit(tx, {
       actorType: 'system',

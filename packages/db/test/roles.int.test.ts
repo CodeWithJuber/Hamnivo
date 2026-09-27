@@ -95,6 +95,7 @@ describe('database roles', () => {
         'app.ensure_audit_partitions(integer)',
         'app.ensure_reconcile_cursors()',
         'app.purge_expired(integer)',
+        'app.purge_migration_files(integer)',
         'app.resolve_api_key(text)',
         'app.resolve_authority_connection(uuid)',
         'app.resolve_invitation(uuid)',

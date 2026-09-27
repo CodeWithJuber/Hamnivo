@@ -134,6 +134,20 @@
       "when": 1790488928890,
       "tag": "20260927060208_session_identity_key",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790504241533,
+      "tag": "20260927101721_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790504251317,
+      "tag": "20260927101731_migration_security",
+      "breakpoints": true
     }
   ]
 }
