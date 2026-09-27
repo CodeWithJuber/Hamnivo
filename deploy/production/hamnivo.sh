@@ -20,7 +20,8 @@
 # networks), --https-port N and --http-port N (other ports than 443 and 80), --quiet.
 # Environment: HAMNIVO_ENV_FILE (default deploy/production/.env), HAMNIVO_PROJECT (compose
 # project name), HAMNIVO_BUILD_CA (CA file for builds behind a TLS-inspecting proxy),
-# HAMNIVO_BUILD_NETWORK (docker build --network), HAMNIVO_WAIT_SECONDS (default 900).
+# HAMNIVO_BUILD_NETWORK (docker build --network), HAMNIVO_BUILD_CONCURRENCY (packages built at
+# once, default 2; also read from .env), HAMNIVO_WAIT_SECONDS (default 900).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -140,21 +141,37 @@ release_of() {
   printf '%s' "$release"
 }
 
+# How many packages are built and tested at once. Builds share the server with the live services,
+# so this bounds their memory: lower it (1) on small servers, raise it on big ones.
+concurrency() {
+  local n="${HAMNIVO_BUILD_CONCURRENCY:-}"
+  [[ -n "$n" ]] || n="$(get HAMNIVO_BUILD_CONCURRENCY)"
+  printf '%s' "${n:-2}"
+}
+
+# The webhook receiver; the month in a build argument reinstalls its package with Debian's fixes.
+build_hook() {
+  log 'Building the deploy webhook receiver'
+  docker_build --target deploy-hook --build-arg "HAMNIVO_APT_REFRESH=$(date -u +%Y-%m)" \
+    -t hamnivo/deploy-hook:local
+}
+
 build_images() {
   local tag="${1:-$(image_tag)}" release
   release="$(release_of)"
   log 'Building the gateway image (the first build takes several minutes)'
-  docker_build --target gateway --build-arg "HAMNIVO_RELEASE=$release" -t "hamnivo/gateway:$tag"
+  docker_build --target gateway --build-arg "HAMNIVO_RELEASE=$release" \
+    --build-arg "HAMNIVO_BUILD_CONCURRENCY=$(concurrency)" -t "hamnivo/gateway:$tag"
   log 'Building the edge image (static apps and HTTPS)'
   docker_build --target edge --build-arg "HAMNIVO_RELEASE=$release" \
+    --build-arg "HAMNIVO_BUILD_CONCURRENCY=$(concurrency)" \
     --build-arg "HAMNIVO_API_ORIGIN=$(get HAMNIVO_API_ORIGIN)" \
     --build-arg "HAMNIVO_CHAT_ORIGIN=$(get HAMNIVO_CHAT_ORIGIN)" \
     --build-arg "HAMNIVO_SITE_URL=$(get HAMNIVO_SITE_ORIGIN)" \
     --build-arg "HAMNIVO_DEMO_WIDGET_ID=$(get HAMNIVO_DEMO_WIDGET_ID)" \
     -t "hamnivo/edge:$tag"
   if [[ "$(get HAMNIVO_AUTODEPLOY)" == webhook ]]; then
-    log 'Building the deploy webhook receiver'
-    docker_build --target deploy-hook -t hamnivo/deploy-hook:local
+    build_hook
   fi
 }
 
@@ -169,7 +186,7 @@ cmd_build() {
       --verify) verify=1; shift ;;
       --tag) tag="${2:?--tag needs a value}"; shift 2 ;;
       --hook)
-        docker_build --target deploy-hook -t hamnivo/deploy-hook:local
+        build_hook
         return 0
         ;;
       *) fail "Unknown build option: $1" ;;
@@ -177,7 +194,8 @@ cmd_build() {
   done
   if ((verify == 1)); then
     log 'Checking the code: Biome, type checks and unit tests'
-    docker_build --target verify -t hamnivo/verify:last
+    docker_build --target verify --build-arg "HAMNIVO_BUILD_CONCURRENCY=$(concurrency)" \
+      -t hamnivo/verify:last
   fi
   build_images "${tag:-$(image_tag)}"
 }
@@ -207,9 +225,17 @@ cmd_up() {
       *) fail "Unknown up option: $1" ;;
     esac
   done
-  ((build == 1)) && build_images
+  local no_build=()
+  if ((build == 1)); then
+    build_images
+  else
+    # Only images already on this server: a missing one fails here instead of being built.
+    no_build=(--no-build)
+  fi
+  # The webhook receiver's folder, made by this user (Docker would make it as root).
+  mkdir -p "$state_dir/requests"
   log "Starting the services (images: $(image_tag))"
-  "${compose[@]}" up -d --remove-orphans >&2
+  "${compose[@]}" up -d --remove-orphans "${no_build[@]}" >&2
   wait_healthy api chatwoot-web
   connect_chatwoot
   wait_healthy api worker edge
@@ -296,6 +322,13 @@ cmd_restore() {
     [[ "$answer" == restore ]] || fail 'Nothing was changed.'
   fi
   take_lock
+  # A backup restored on another server names images that were never built there.
+  if ! docker image inspect "hamnivo/gateway:$(image_tag)" "hamnivo/edge:$(image_tag)" >/dev/null 2>&1; then
+    log "The images of $(image_tag) are not on this server; building this checkout's version instead"
+    set_kv HAMNIVO_IMAGE_TAG local
+    build_images local
+  fi
+  mkdir -p "$state_dir/requests"
   log 'Stopping the applications'
   "${compose[@]}" stop api worker edge chatwoot-web chatwoot-sidekiq >&2 2>/dev/null || true
   "${compose[@]}" up -d hamnivo-db chatwoot-db >&2

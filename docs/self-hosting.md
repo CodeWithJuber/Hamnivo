@@ -309,7 +309,9 @@ themselves. `hamnivo.sh deploys` lists every deploy; `hamnivo.sh rollback` goes 
 version before.
 
 The first update from a version older than this one still runs the old procedure (backup, pull,
-rebuild, restart). Every later update runs the one above.
+rebuild, restart). Every later update runs the one above. If you ran `git pull` yourself first,
+`update` still deploys the new version: older images do not say which commit they run, so it backs
+up and deploys.
 
 ## A8. Security checklist
 

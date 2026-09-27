@@ -8,10 +8,13 @@
 #   HAMNIVO_SUPPORT_HOST (Chatwoot)            HAMNIVO_SITE_HOSTS (website)
 # Only the edge publishes ports (80 and 443). Databases, Valkey, the API and Chatwoot are reachable
 # only inside this compose network.
+# Hamnivo's own images (hamnivo/*) are built on this server by hamnivo.sh and never pulled
+# (pull_policy: never): nobody else's image can run under their names.
 name: hamnivo-production
 
 x-gateway: &gateway
   image: hamnivo/gateway:${HAMNIVO_IMAGE_TAG:-local}
+  pull_policy: never
   build:
     context: ../..
     dockerfile: deploy/docker/Dockerfile
@@ -192,6 +195,7 @@ services:
   # ---- Edge: HTTPS and the static apps -----------------------------------------------------------
   edge:
     image: hamnivo/edge:${HAMNIVO_IMAGE_TAG:-local}
+    pull_policy: never
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
@@ -226,14 +230,17 @@ services:
       timeout: 5s
       start_period: 20s
       retries: 6
+    networks: [default, deploy-hook]
     depends_on:
       api:
         condition: service_started
 
   # Receives GitHub's push webhooks for automatic deploys (hamnivo.sh autodeploy enable). It only
-  # drops a file in the state folder's requests/; the systemd service on the host deploys.
+  # drops a file in the state folder's requests/; the systemd service on the host deploys. Its own
+  # network reaches the edge and nothing else (no database, no Valkey).
   deploy-hook:
     image: hamnivo/deploy-hook:local
+    pull_policy: never
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
@@ -248,10 +255,15 @@ services:
     pids_limit: 64
     environment:
       HAMNIVO_DEPLOY_WEBHOOK_SECRET: ${HAMNIVO_DEPLOY_WEBHOOK_SECRET:-}
-      HAMNIVO_DEPLOY_BRANCH: ${HAMNIVO_DEPLOY_BRANCH:-main}
       HAMNIVO_DEPLOY_REPOSITORY: ${HAMNIVO_DEPLOY_REPOSITORY:-}
+    networks: [deploy-hook]
     volumes:
-      - ${HAMNIVO_STATE_DIR:-./state}/requests:/requests
+      # hamnivo.sh creates the folder as the deploy user (Docker would create it as root).
+      - type: bind
+        source: ${HAMNIVO_STATE_DIR:-./state}/requests
+        target: /requests
+        bind:
+          create_host_path: false
 
   # ---- Chatwoot CE v4.18.0 (conversation authority) ---------------------------------------------
   chatwoot-db:
@@ -335,6 +347,10 @@ services:
       timeout: 10s
       start_period: 300s
       retries: 5
+
+networks:
+  default: {}
+  deploy-hook: {}
 
 volumes:
   hamnivo-db:

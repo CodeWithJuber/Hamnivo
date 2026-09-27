@@ -13,6 +13,7 @@ Group=@GROUP@
 Environment=HAMNIVO_ENV_FILE=@ENV_FILE@
 Environment=HAMNIVO_PROJECT=@PROJECT@
 Environment=HAMNIVO_STATE_DIR=@STATE@
+Environment=GIT_TERMINAL_PROMPT=0
 # Note whether a webhook asked for this run, then empty the request folder first: systemd starts
 # this service again at once while the folder is not empty, even after a failure.
 ExecStartPre=/bin/sh -c 'if [ -n "$$(ls -A "@STATE@/requests" 2>/dev/null)" ]; then echo webhook; else echo timer; fi >"@STATE@/trigger"; find "@STATE@/requests" -mindepth 1 -delete'

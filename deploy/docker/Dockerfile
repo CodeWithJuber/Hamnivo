@@ -11,6 +11,8 @@
 #   docker build ... --secret id=extra_ca,src=/path/to/ca.pem
 # HAMNIVO_RELEASE (the git commit) labels the images; deploy/production/deploy.sh passes it.
 # Turbo's cache lives in a build cache, so a rebuild redoes only the packages that changed.
+# HAMNIVO_BUILD_CONCURRENCY (default 2) is how many packages build or test at once: builds run on
+# the production server next to the live services, so memory stays bounded.
 
 ARG NODE_VERSION=24.21.0
 ARG CADDY_VERSION=2.11.4
@@ -52,8 +54,11 @@ COPY . .
 # ---- Checks -------------------------------------------------------------------------------------
 # What must pass before a version goes live: Biome, type checks and unit tests (no services).
 FROM source AS checks
+ARG HAMNIVO_BUILD_CONCURRENCY=2
 RUN --mount=type=cache,id=hamnivo-turbo,target=/turbo-cache,sharing=locked \
-    pnpm exec biome check . && pnpm exec turbo run typecheck test && touch /checks-passed
+    pnpm exec biome check . \
+ && pnpm exec turbo run typecheck test --concurrency="$HAMNIVO_BUILD_CONCURRENCY" \
+ && touch /checks-passed
 
 # The target a deploy builds: a marker only, so the source tree is never exported as an image.
 FROM scratch AS verify
@@ -61,8 +66,9 @@ COPY --from=checks /checks-passed /checks-passed
 
 # ---- Gateway ------------------------------------------------------------------------------------
 FROM source AS gateway-build
+ARG HAMNIVO_BUILD_CONCURRENCY=2
 RUN --mount=type=cache,id=hamnivo-turbo,target=/turbo-cache,sharing=locked \
-    pnpm exec turbo run build --filter=@hamnivo/gateway...
+    pnpm exec turbo run build --filter=@hamnivo/gateway... --concurrency="$HAMNIVO_BUILD_CONCURRENCY"
 # A self-contained copy with production dependencies only.
 RUN --mount=type=cache,id=hamnivo-pnpm-store,target=/pnpm/store \
     --mount=type=secret,id=extra_ca,required=false \
@@ -94,8 +100,9 @@ ARG HAMNIVO_SITE_URL
 ARG HAMNIVO_DEMO_WIDGET_ID=""
 RUN test -n "$HAMNIVO_API_ORIGIN" && test -n "$HAMNIVO_CHAT_ORIGIN" && test -n "$HAMNIVO_SITE_URL" || \
     { echo 'Set the HAMNIVO_API_ORIGIN, HAMNIVO_CHAT_ORIGIN and HAMNIVO_SITE_URL build arguments' >&2; exit 1; }
+ARG HAMNIVO_BUILD_CONCURRENCY=2
 RUN --mount=type=cache,id=hamnivo-turbo,target=/turbo-cache,sharing=locked \
-    pnpm exec turbo run build \
+    pnpm exec turbo run build --concurrency="$HAMNIVO_BUILD_CONCURRENCY" \
       --filter=@hamnivo/widget^... --filter=@hamnivo/site^... --filter=@hamnivo/console^... \
       --filter=@hamnivo/widget-loader
 RUN VITE_HAMNIVO_API="$HAMNIVO_API_ORIGIN" pnpm --filter @hamnivo/widget build
@@ -117,6 +124,8 @@ RUN mkdir -p /out/chat /out/site /out/studio \
 # adnanh/webhook from Debian. It checks GitHub's signature and drops a file for the host's deploy
 # service; see deploy/production/deploy-hook/hooks.yaml.
 FROM debian:trixie-slim AS deploy-hook
+# hamnivo.sh passes the current month, so the package is reinstalled with Debian's fixes monthly.
+ARG HAMNIVO_APT_REFRESH=""
 RUN apt-get update \
  && apt-get install -y --no-install-recommends webhook \
  && rm -rf /var/lib/apt/lists/*

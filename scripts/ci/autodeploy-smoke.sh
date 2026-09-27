@@ -6,12 +6,18 @@
 #   bash scripts/ci/autodeploy-smoke.sh [--keep]
 #
 # What a push goes through, end to end:
-#   A  the first install (hamnivo.sh up), then autodeploy enable (webhook mode, without systemd)
-#      the webhook, through Caddy: a wrong signature, then GitHub's ping
-#   B  a signed push is deployed: checks, build, start, health; GitHub hears each step
-#   C  a version that never gets healthy is rolled back to B, and not retried automatically
+#   A  the first install (hamnivo.sh up), then autodeploy enable (webhook mode, without systemd);
+#      the webhook through Caddy (signatures, events, repositories, branches), GitHub's published
+#      test vector, the deploy lock
+#   B  a signed push is deployed: checks, build, start, health; GitHub hears each step. Before
+#      that, a file changed on the server stops the deploy.
+#   C  a version with a new migration never gets healthy: backed up first, rolled back to B, not
+#      retried automatically
 #   D  a failing unit test stops the deploy before anything restarts
 #   E  the fix goes live; a rollback by hand brings B back, and E is not redeployed automatically
+#   G  a new version of other software is held for a deploy by hand
+#   H  the next commit goes live as usual
+#   F  an update after a `git pull` by hand, onto images that do not say which commit they run
 # The test does what the systemd units would (see run_service). HAMNIVO_BUILD_CA and
 # HAMNIVO_BUILD_NETWORK are passed to the image builds (see deploy/production/hamnivo.sh).
 set -euo pipefail
@@ -28,14 +34,19 @@ export HAMNIVO_PROJECT="hamnivo-autodeploy-$$"
 export HAMNIVO_ENV_FILE="$server/deploy/production/.env"
 export HAMNIVO_WAIT_SECONDS="${HAMNIVO_WAIT_SECONDS:-1200}"
 export HAMNIVO_DEPLOY_HEALTH_SECONDS=300
+export HAMNIVO_DEPLOY_SOAK_SECONDS=10
 export HAMNIVO_DEPLOY_MIN_FREE_GB="${HAMNIVO_DEPLOY_MIN_FREE_GB:-2}"
 state="$server/deploy/production/state"
+backups="$server/deploy/production/backups"
 hv=(bash "$server/deploy/production/hamnivo.sh")
 failures=0
 api_pid=''
+lock_pid=''
 
 cleanup() {
   [[ -n "$api_pid" ]] && kill "$api_pid" 2>/dev/null
+  [[ -n "$lock_pid" ]] && kill "$lock_pid" 2>/dev/null
+  docker rm -f "$HAMNIVO_PROJECT-vector" >/dev/null 2>&1 || true
   if ((keep == 1)); then
     printf 'Left running: HAMNIVO_ENV_FILE=%s HAMNIVO_PROJECT=%s %s status\n' \
       "$HAMNIVO_ENV_FILE" "$HAMNIVO_PROJECT" "${hv[1]}" >&2
@@ -44,9 +55,10 @@ cleanup() {
   if [[ -f "$HAMNIVO_ENV_FILE" ]]; then
     "${hv[@]}" compose --profile autodeploy down --volumes --remove-orphans >/dev/null 2>&1 || true
   fi
-  # The images this test built: the first install's and those of the commits it deployed.
+  # The images this test built: the first install's, the relabelled ones and those of the commits
+  # it deployed.
   local tag
-  for tag in autodeploy-a $(cut -f2 "$state/history.tsv" 2>/dev/null | sort -u); do
+  for tag in autodeploy-a unlabelled $(cut -f2 "$state/history.tsv" 2>/dev/null | sort -u); do
     docker image rm "hamnivo/gateway:$tag" "hamnivo/edge:$tag" >/dev/null 2>&1 || true
   done
   rm -rf "$work"
@@ -91,6 +103,7 @@ history_lines() { if [[ -f "$state/history.tsv" ]]; then wc -l <"$state/history.
 history_has() { grep -q "$1" "$state/history.tsv"; }
 api_id() { "${hv[@]}" compose ps -q api; }
 api_label() { docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$(api_id)"; }
+backup_count() { find "$backups/before-deploy" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l; }
 commit_push() { # commit_push MESSAGE → prints the new commit
   git -C "$dev" add -A
   git -C "$dev" commit -qm "$1"
@@ -109,18 +122,25 @@ site_file() {
   https_get "${host%% *}" /autodeploy-smoke.txt
 }
 
-# Posts a GitHub-style webhook through Caddy; prints the HTTP status.
+# Posts a GitHub-style webhook through Caddy; prints the HTTP status. SECRET "none" sends no
+# signature.
 webhook() { # webhook EVENT BODY [SECRET]
-  local secret="${3:-$(env_value HAMNIVO_DEPLOY_WEBHOOK_SECRET)}" signature host port
-  signature="sha256=$(printf '%s' "$2" | openssl dgst -sha256 -hmac "$secret" | sed 's/^.* //')"
+  local secret="${3:-$(env_value HAMNIVO_DEPLOY_WEBHOOK_SECRET)}" signature=() host port
+  if [[ "$secret" != none ]]; then
+    signature=(-H "X-Hub-Signature-256: sha256=$(printf '%s' "$2" | openssl dgst -sha256 -hmac "$secret" | sed 's/^.* //')")
+  fi
   host="$(env_value HAMNIVO_API_HOST)"
   port="$(env_value HAMNIVO_HTTPS_PORT)"
   curl -s -o /dev/null -w '%{http_code}' --max-time 10 --cacert "$work/ca.crt" \
     --resolve "$host:$port:127.0.0.1" -X POST -H 'content-type: application/json' \
-    -H "X-GitHub-Event: $1" -H "X-Hub-Signature-256: $signature" --data-binary "$2" \
+    -H "X-GitHub-Event: $1" "${signature[@]}" --data-binary "$2" \
     "https://$host:$port/_deploy/github"
 }
-push_body() { printf '{"ref":"refs/heads/main","after":"%s","repository":{"full_name":"smoke/hamnivo"}}' "$1"; }
+push_body() { # push_body COMMIT [BRANCH] [REPOSITORY]
+  printf '{"ref":"refs/heads/%s","after":"%s","repository":{"full_name":"%s"}}' \
+    "${2:-main}" "$1" "${3:-smoke/hamnivo}"
+}
+no_requests() { test -z "$(ls -A "$state/requests")"; }
 
 # A stand-in for GitHub's deployment API: records each call, answers with increasing ids.
 fake_github() {
@@ -168,6 +188,60 @@ github_saw() { # github_saw COMMIT STATE...
   ' "$work/github-api.log" "$1" "${@:2}"
 }
 
+# GitHub's published example (docs: "Validating webhook deliveries"), sent to a receiver of its
+# own: a secret with a quote in it must still work.
+github_test_vector() {
+  local port status
+  mkdir -p "$work/vector"
+  chmod 777 "$work/vector"
+  docker run -d --rm --name "$HAMNIVO_PROJECT-vector" -p 127.0.0.1::9000 --read-only --cap-drop ALL \
+    -e "HAMNIVO_DEPLOY_WEBHOOK_SECRET=It's a Secret to Everybody" -e HAMNIVO_DEPLOY_REPOSITORY=smoke/hamnivo \
+    -v "$work/vector:/requests" hamnivo/deploy-hook:local >/dev/null
+  for _ in $(seq 1 20); do
+    port="$(docker port "$HAMNIVO_PROJECT-vector" 9000/tcp 2>/dev/null | head -1 | sed 's/.*://')"
+    status="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: text/plain' \
+      -H 'X-GitHub-Event: ping' \
+      -H 'X-Hub-Signature-256: sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17' \
+      --data-binary 'Hello, World!' "http://127.0.0.1:${port:-1}/hooks/github" || true)"
+    [[ "$status" == 000 ]] || break
+    sleep 0.5
+  done
+  docker rm -f "$HAMNIVO_PROJECT-vector" >/dev/null 2>&1 || true
+  [[ "$status" == 200 && -n "$(ls -A "$work/vector")" ]]
+}
+
+# The units as hamnivo.sh autodeploy enable writes them, checked by systemd where it exists.
+units_valid() {
+  command -v systemd-analyze >/dev/null || return 0
+  local dir="$work/units" unit
+  mkdir -p "$dir"
+  for unit in hamnivo-deploy.service hamnivo-deploy.path hamnivo-deploy.timer; do
+    sed -e "s|@USER@|$(id -un)|g" -e "s|@GROUP@|$(id -gn)|g" -e "s|@ROOT@|$server|g" \
+      -e "s|@HAMNIVO@|$server/deploy/production/hamnivo.sh|g" -e "s|@ENV_FILE@|$HAMNIVO_ENV_FILE|g" \
+      -e "s|@PROJECT@|$HAMNIVO_PROJECT|g" -e "s|@STATE@|$state|g" \
+      "$server/deploy/production/systemd/$unit" >"$dir/$unit"
+  done
+  (cd "$dir" && systemd-analyze verify ./hamnivo-deploy.service ./hamnivo-deploy.path ./hamnivo-deploy.timer)
+}
+
+# Adds a migration that changes nothing to the developer's clone, the way drizzle-kit would.
+add_smoke_migration() {
+  local migrations="$dev/packages/db/migrations" stamp name
+  stamp="$(date -u +%Y%m%d%H%M%S)"
+  name="${stamp}_autodeploy_smoke"
+  printf -- '-- Autodeploy smoke test: changes nothing.\nSELECT 1;\n' >"$migrations/$name.sql"
+  cp "$(find "$migrations/meta" -name '*_snapshot.json' | sort | tail -1)" "$migrations/meta/${stamp}_snapshot.json"
+  # shellcheck disable=SC2016 # JavaScript template literals
+  node -e '
+    const fs = require("node:fs");
+    const [file, tag] = process.argv.slice(1);
+    const journal = JSON.parse(fs.readFileSync(file, "utf8"));
+    const last = journal.entries.at(-1);
+    journal.entries.push({ idx: last.idx + 1, version: last.version, when: Date.now(), tag, breakpoints: true });
+    fs.writeFileSync(file, `${JSON.stringify(journal, null, 2)}\n`);
+  ' "$migrations/meta/_journal.json" "$name"
+}
+
 say 'GitHub, the server and a developer'
 git clone --quiet --bare "$root" "$github"
 head="$(git -C "$root" rev-parse HEAD)"
@@ -198,22 +272,43 @@ for _ in $(seq 1 30); do
   sleep 2
 done
 check 'version A is recorded as live' test "$(current_commit)" = "$head"
+check 'the systemd units are valid' units_valid
 
 say 'The webhook, through Caddy'
-check 'a wrong signature is refused' test "$(webhook push "$(push_body x)" wrong-secret)" != 200
-check 'and requests nothing' test -z "$(ls -A "$state/requests")"
+check 'a wrong signature is refused (500)' test "$(webhook push "$(push_body x)" wrong-secret)" = 500
+check 'a missing signature is refused (403)' test "$(webhook push "$(push_body x)" none)" = 403
+check 'another repository is refused (403)' test "$(webhook push "$(push_body x main other/repo)")" = 403
+check 'another event is refused (403)' test "$(webhook issues "$(push_body x)")" = 403
+check 'and none of them requests anything' no_requests
 check "GitHub's ping is accepted" test "$(webhook ping '{"zen":"Design for failure."}')" = 200
-sleep 1
 check 'and requests a deploy check' test -n "$(ls -A "$state/requests")"
 run_service
 check 'with nothing new, nothing is deployed' test "$(history_lines)" -eq 0
+check 'a push to another branch is accepted' test "$(webhook push "$(push_body x feature/y)")" = 200
+run_service
+check 'and deploys nothing' test "$(history_lines)" -eq 0
+check "GitHub's published test vector passes" github_test_vector
+
+say 'The runner'
+# flock -o: the lock goes away with flock itself, not with the sleep it runs.
+flock -o "$state/deploy.lock" sleep 60 &
+lock_pid=$!
+sleep 1
+check 'a run while another holds the lock leaves at once' run_service
+kill "$lock_pid" 2>/dev/null
+wait "$lock_pid" 2>/dev/null || true
+lock_pid=''
 
 say 'B: a push goes live'
 mkdir -p "$dev/apps/site/public"
 printf 'B\n' >"$dev/apps/site/public/autodeploy-smoke.txt"
 b="$(commit_push 'Autodeploy smoke B: a new website file')"
+printf '\n' >>"$server/README.md"
+run_service || true
+check 'a file changed on the server stops the deploy' history_has "$(short "$b")	failed	timer	.*local changes"
+check 'and A keeps running' test "$(current_commit)" = "$head"
+git -C "$server" checkout -- README.md
 check 'the push webhook is accepted' test "$(webhook push "$(push_body "$b")")" = 200
-sleep 1
 run_service
 check 'B is live' test "$(current_commit)" = "$b"
 check 'the history says so, triggered by the webhook' history_has "$(short "$b")	live	webhook"
@@ -221,18 +316,22 @@ check 'the API runs the images of B' test "$(api_label)" = "$b"
 check '.env names the images of B' test "$(env_value HAMNIVO_IMAGE_TAG)" = "$(short "$b")"
 check 'the website serves B' test "$(site_file)" = B
 check 'GitHub heard: in progress, then success' github_saw "$b" in_progress success
+check 'nothing changed the database, so there is no backup' test "$(backup_count)" -eq 0
 
-say 'C: a version that never gets healthy'
+say 'C: a version with a new migration that never gets healthy'
+add_smoke_migration
 sed -i "s|    command: \['node', 'dist/main.api.js'\]|    command: ['node', '-e', 'process.exit(3)']|" \
   "$dev/deploy/production/compose.yml"
-c="$(commit_push 'Autodeploy smoke C: the API stops at once')"
+c="$(commit_push 'Autodeploy smoke C: a migration, and the API stops at once')"
 webhook push "$(push_body "$c")" >/dev/null
-sleep 1
 run_service || true
+check 'the database was backed up first' test "$(backup_count)" -eq 1
+check 'not into the nightly backups' test -z "$(find "$backups" -mindepth 1 -maxdepth 1 -name '20*')"
 check 'C was rolled back' history_has "$(short "$c")	rolled-back"
 check 'B is live again' test "$(current_commit)" = "$b"
-check 'the API runs B again' test "$(api_label)" = "$b"
+check 'the API runs B again, on the migrated database' test "$(api_label)" = "$b"
 check 'the website still serves B' test "$(site_file)" = B
+check '.env is as it was' test "$(env_value HAMNIVO_IMAGE_TAG)" = "$(short "$b")"
 check 'GitHub heard: in progress, then failure' github_saw "$c" in_progress failure
 lines="$(history_lines)"
 run_service
@@ -259,9 +358,9 @@ say 'E: the fix, then a rollback by hand'
 git -C "$dev" rm -q packages/domain/test/autodeploy-smoke.test.ts
 e="$(commit_push 'Autodeploy smoke E: the fix')"
 webhook push "$(push_body "$e")" >/dev/null
-sleep 1
 run_service
 check 'E is live' test "$(current_commit)" = "$e"
+check "it carries C's migration, so it backed up too" test "$(backup_count)" -eq 2
 check 'the images of the first install were pruned' \
   bash -c '! docker image inspect hamnivo/gateway:autodeploy-a >/dev/null 2>&1'
 "${hv[@]}" rollback
@@ -269,6 +368,44 @@ check 'the rollback by hand brings B back' test "$(current_commit)" = "$b"
 check 'the API runs B' test "$(api_label)" = "$b"
 run_service
 check 'E is not redeployed automatically after that' test "$(current_commit)" = "$b"
+
+say 'G: a new version of other software waits for a person'
+awk '/^  chatwoot-redis:/ { redis = 1 } redis && /image: valkey\/valkey:8-alpine/ { sub(/8-alpine/, "8.1-alpine"); redis = 0 } { print }' \
+  "$dev/deploy/production/compose.yml" >"$work/compose.yml"
+cp "$work/compose.yml" "$dev/deploy/production/compose.yml"
+g="$(commit_push 'Autodeploy smoke G: a newer Valkey for Chatwoot')"
+webhook push "$(push_body "$g")" >/dev/null
+run_service
+check 'G is held' history_has "$(short "$g")	held	webhook	.*valkey/valkey:8.1-alpine"
+check 'B is still live' test "$(current_commit)" = "$b"
+check 'GitHub heard: in progress, then pending' github_saw "$g" in_progress pending
+check 'the deploy list says it waits' bash -c '"$@" deploys | grep -q "Waiting for a deploy by hand"' _ "${hv[@]}"
+lines="$(history_lines)"
+run_service
+check 'G is not tried again automatically' test "$(history_lines)" -eq "$lines"
+
+say 'H: the next commit goes live as usual'
+git -C "$dev" checkout -q HEAD~1 -- deploy/production/compose.yml
+h="$(commit_push 'Autodeploy smoke H: Valkey as before')"
+webhook push "$(push_body "$h")" >/dev/null
+run_service
+check 'H is live' test "$(current_commit)" = "$h"
+check 'the API runs H' test "$(api_label)" = "$h"
+check "C's migration made another backup" test "$(backup_count)" -eq 3
+check 'the held version no longer waits' bash -c '! "$@" deploys | grep -q "Waiting for a deploy by hand"' _ "${hv[@]}"
+
+say 'F: an update after a git pull by hand, onto images that do not name their commit'
+printf 'FROM hamnivo/gateway:%s\nLABEL org.opencontainers.image.revision=""\n' "$(short "$h")" |
+  docker build -q -t hamnivo/gateway:unlabelled - >/dev/null
+docker tag "hamnivo/edge:$(short "$h")" hamnivo/edge:unlabelled
+set_env HAMNIVO_IMAGE_TAG unlabelled
+"${hv[@]}" up --no-build --quiet
+rm -f "$state/current" "$state/previous"
+git -C "$server" checkout -q -B main origin/main
+"${hv[@]}" update </dev/null
+check 'the update deployed H although HEAD was already H' test "$(current_commit)" = "$h"
+check 'the API runs images labelled H' test "$(api_label)" = "$h"
+check 'it backed up first' test "$(backup_count)" -eq 4
 "${hv[@]}" deploys
 
 if ((failures > 0)); then

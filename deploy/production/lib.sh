@@ -28,16 +28,22 @@ get() {
   printf '%s' "${line%\"}"
 }
 has() { grep -qE "^$1=" "$env_file" 2>/dev/null; }
+# Writes the new .env next to the old one and then replaces it in one step, so a full disk (a
+# build may have just filled it) can never leave .env half written. A symlinked .env stays a link.
 set_kv() {
-  local value="$2" tmp
+  local value="$2" file tmp
   [[ "$value" == *' '* ]] && value="\"$value\""
-  tmp="$(mktemp)"
-  K="$1" V="$value" awk 'BEGIN { k = ENVIRON["K"]; v = ENVIRON["V"] }
+  file="$(readlink -f "$env_file")"
+  tmp="$(mktemp "$file.XXXXXX")" || fail "Cannot write next to $file."
+  if ! K="$1" V="$value" awk 'BEGIN { k = ENVIRON["K"]; v = ENVIRON["V"] }
     index($0, k "=") == 1 { if (!done) print k "=" v; done = 1; next }
     { print }
-    END { if (!done) print k "=" v }' "$env_file" >"$tmp"
-  cat "$tmp" >"$env_file"
-  rm -f "$tmp"
+    END { if (!done) print k "=" v }' "$file" >"$tmp" || ! grep -q "^$1=" "$tmp"; then
+    rm -f "$tmp"
+    fail "Could not update $file (is the disk full?). It is unchanged."
+  fi
+  chmod 600 "$tmp"
+  mv -f "$tmp" "$file"
 }
 ensure() { has "$1" || set_kv "$1" "$2"; }
 hex() { openssl rand -hex 24; }
