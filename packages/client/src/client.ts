@@ -47,8 +47,38 @@ export class HamnivoClient {
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
-  private get refreshKey() {
+  /** Where this device keeps the refresh token (other tabs see it change through storage events). */
+  get refreshKey(): string {
     return `hamnivo:${this.options.widgetId}:refresh`;
+  }
+
+  /** Conversations whose outbox holds unsent messages on this device (so reset can find them). */
+  private get outboxIndexKey() {
+    return `hamnivo:${this.options.widgetId}:outboxes`;
+  }
+
+  /** Where the unsent messages of one conversation are kept. */
+  outboxKey(conversationId: string): string {
+    return `hamnivo:${this.options.widgetId}:outbox:${conversationId}`;
+  }
+
+  private outboxes(): string[] {
+    try {
+      const ids = JSON.parse(this.storage.getItem(this.outboxIndexKey) ?? '[]');
+      return Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Records whether a conversation has unsent messages stored on this device. */
+  trackOutbox(conversationId: string, stored: boolean): void {
+    const ids = new Set(this.outboxes());
+    if (stored === ids.has(conversationId)) return;
+    if (stored) ids.add(conversationId);
+    else ids.delete(conversationId);
+    if (ids.size) this.storage.setItem(this.outboxIndexKey, JSON.stringify([...ids]));
+    else this.storage.removeItem(this.outboxIndexKey);
   }
 
   get current(): WidgetSession | null {
@@ -183,20 +213,42 @@ export class HamnivoClient {
     });
   }
 
+  /**
+   * A renewal still in flight would bring back the session it started with after an identity
+   * change, so identity changes wait for it first.
+   */
+  private async settled(): Promise<void> {
+    await this.renewing?.catch(() => undefined);
+  }
+
   /** Signs the visitor in with an assertion minted by the website's backend (new principal). */
   async identify(assertion: string): Promise<WidgetSession> {
+    await this.settled();
     const session = await this.request<WidgetSession>('POST', '/v1/widget/identity', { assertion });
     this.adopt(session);
     return session;
   }
 
-  /** Ends the session on this device (for example when the website signs the customer out). */
+  /**
+   * Ends the session on this device (for example when the website signs the customer out): the
+   * server revokes it, and this device forgets it and any unsent messages. The device forgets them
+   * even when the server cannot be reached; the error is still thrown so the caller can tell.
+   */
   async reset(): Promise<void> {
+    await this.settled();
     try {
       if (this.session) await this.request('POST', '/v1/widget/sessions/reset');
     } finally {
+      // Unsent messages belong to the person leaving too; they are never sent as the next one.
+      for (const id of this.outboxes()) this.storage.removeItem(this.outboxKey(id));
+      this.storage.removeItem(this.outboxIndexKey);
       this.adopt(null);
     }
+  }
+
+  /** Forgets the session on this device only, for example after another tab signed out. */
+  forget(): void {
+    this.adopt(null);
   }
 
   /** Low-level streaming fetch with the current token (used by EventStream). */

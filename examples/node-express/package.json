@@ -1,0 +1,27 @@
+{
+  "name": "@hamnivo/example-node-express",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example: an Express 5 website that verifies its signed-in customers to Hamnivo Chat with @hamnivo/server",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "tsc -p tsconfig.build.json && node --env-file-if-exists=.env dist/server.js",
+    "keygen": "tsc -p tsconfig.build.json && node dist/keygen.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hamnivo/server": "workspace:*",
+    "express": "5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "catalog:",
+    "jose": "6.2.12",
+    "jsdom": "30.1.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

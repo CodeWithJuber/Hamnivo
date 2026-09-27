@@ -1,0 +1,32 @@
+{
+  "name": "@hamnivo/server",
+  "version": "0.1.0",
+  "description": "Hamnivo Connect for servers: sign the short-lived identity assertions that verify a website's signed-in customers to Hamnivo Chat, and make keys to register for them",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jose": "6.2.12"
+  },
+  "devDependencies": {
+    "@hamnivo/contracts": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "0.23.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

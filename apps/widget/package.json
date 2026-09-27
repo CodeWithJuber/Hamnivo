@@ -28,6 +28,7 @@
     "@axe-core/playwright": "4.13.0",
     "@hamnivo/chatwoot": "workspace:*",
     "@hamnivo/db": "workspace:*",
+    "@hamnivo/server": "workspace:*",
     "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "catalog:",

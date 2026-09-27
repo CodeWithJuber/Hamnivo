@@ -45,15 +45,20 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     return () => window.removeEventListener('keydown', onKey);
   }, [bridge]);
 
+  const { identify, reset } = chat;
   useEffect(() => {
     bridge.post({ type: 'ready', widgetVersion: '0.1.0' });
+    const identityChanged = (verified: boolean) =>
+      bridge.post({ type: 'event', event: 'identity.changed', payload: { verified } });
     return bridge.listen((message) => {
       if (message.type === 'set-locale')
         setLocale((message.locale.split('-')[0] as Locale) ?? 'en');
       if (message.type === 'identify') {
-        void client
-          .identify(message.assertion)
-          .then(() => bridge.post({ type: 'result', requestId: message.requestId, ok: true }))
+        void identify(message.assertion)
+          .then(() => {
+            identityChanged(true);
+            bridge.post({ type: 'result', requestId: message.requestId, ok: true });
+          })
           .catch(() =>
             bridge.post({
               type: 'result',
@@ -63,8 +68,24 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
             }),
           );
       }
+      if (message.type === 'reset') {
+        // The website signed the customer out: nothing of theirs stays on screen or on the device.
+        void reset().then((ended) => {
+          identityChanged(false);
+          bridge.post(
+            ended
+              ? { type: 'result', requestId: message.requestId, ok: true }
+              : {
+                  type: 'result',
+                  requestId: message.requestId,
+                  ok: false,
+                  error: 'reset_incomplete',
+                },
+          );
+        });
+      }
     });
-  }, [bridge, client]);
+  }, [bridge, identify, reset]);
 
   if (chat.state.phase === 'loading') {
     return (

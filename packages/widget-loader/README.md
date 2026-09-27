@@ -35,7 +35,12 @@ Hamnivo.open(); Hamnivo.close(); Hamnivo.toggle();
 await Hamnivo.identify(assertion); // a short-lived identity assertion signed by your server
 await Hamnivo.reset();             // sign the visitor out (for example on logout)
 const off = Hamnivo.on('ready', () => {});
+Hamnivo.on('identity.changed', ({ verified }) => {}); // after identify (true) or reset (false)
 ```
+
+`identify` and `reset` reject with `Error('timeout')` when the chat does not answer within 20
+seconds. `reset` clears the chat from the screen and ends the session in Hamnivo and in this
+browser, including other open tabs; see [`docs/guides/identity.md`](../../docs/guides/identity.md).
 
 Messages between the page and the iframe are accepted only when all three match:
 

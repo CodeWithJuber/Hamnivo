@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { fromPublicId, schema, withTenant } from '@hamnivo/db';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { exportJWK, generateKeyPair, type JWK, SignJWT } from 'jose';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, PASSWORD } from './harness.js';
@@ -148,5 +148,73 @@ describe('identity keys', () => {
     expect(actions.filter((a) => a === 'brand.identity_key.created')).toHaveLength(3);
     expect(actions).toContain('brand.identity_key.retired');
     expect(actions).toContain('brand.identity_key.revoked');
+  });
+
+  it('allows a few seconds of clock difference, and revoking a key ends the chats it signed in', async () => {
+    const leaked = await generateKeyPair('ES256');
+    const safe = await generateKeyPair('ES256');
+    for (const [kid, pair] of [
+      ['leaked', leaked],
+      ['safe', safe],
+    ] as const) {
+      const created = await admin.post(keysPath(), {
+        alg: 'ES256',
+        publicJwk: await exportJWK(pair.publicKey),
+        kid,
+      });
+      expect(created.status).toBe(201);
+    }
+    /** An assertion issued `ahead` seconds after this server's clock (the website's runs fast). */
+    const issuedAhead = (key: CryptoKey, kid: string, ahead: number) => {
+      const iat = Math.floor(Date.now() / 1000) + ahead;
+      return new SignJWT({ name: 'Fatima Noor' })
+        .setProtectedHeader({ alg: 'ES256', kid })
+        .setSubject(`customer-${randomUUID().slice(0, 8)}`)
+        .setAudience(shop.brand.widgetId)
+        .setIssuedAt(iat)
+        .setExpirationTime(iat + 120)
+        .setJti(randomUUID())
+        .sign(key);
+    };
+    const signedIn = async (key: CryptoKey, kid: string, ahead = 0) => {
+      const visitor = new Visitor(slice.baseUrl, shop.brand.widgetId, shop.hostOrigin);
+      await visitor.open();
+      const session = await visitor.call('POST', '/v1/widget/identity', {
+        assertion: await issuedAhead(key, kid, ahead),
+      });
+      if (session.status === 200) visitor.adopt(session.body);
+      return { visitor, status: session.status };
+    };
+
+    const fast = await signedIn(leaked.privateKey, 'leaked', 3);
+    expect(fast.status).toBe(200);
+    expect((await signedIn(leaked.privateKey, 'leaked', 60)).status).toBe(401);
+    const second = await signedIn(leaked.privateKey, 'leaked');
+    const other = await signedIn(safe.privateKey, 'safe');
+    const anonymous = new Visitor(slice.baseUrl, shop.brand.widgetId, shop.hostOrigin);
+    await anonymous.open();
+
+    const revoked = await admin.post(`${keysPath()}/leaked/revoke`, {});
+    expect(revoked.status).toBe(200);
+    for (const { visitor } of [fast, second]) {
+      expect((await visitor.call('GET', '/v1/widget/conversations')).status).toBe(401);
+      const refresh = await visitor.call('POST', '/v1/widget/sessions/refresh', {
+        refreshToken: visitor.refreshToken,
+      });
+      expect(refresh.status).toBe(401);
+    }
+    expect((await other.visitor.call('GET', '/v1/widget/conversations')).status).toBe(200);
+    expect((await anonymous.call('GET', '/v1/widget/conversations')).status).toBe(200);
+
+    const tenantId = fromPublicId('tenant', shop.tenantId);
+    const [entry] = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .select({ data: schema.auditEvents.data })
+        .from(schema.auditEvents)
+        .where(eq(schema.auditEvents.action, 'brand.identity_key.revoked'))
+        .orderBy(desc(schema.auditEvents.seq))
+        .limit(1),
+    );
+    expect(entry?.data).toEqual({ kid: 'leaked', endedSessions: 2 });
   });
 });

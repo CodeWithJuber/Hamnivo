@@ -1,6 +1,6 @@
 import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EventStream, HamnivoClient, MemoryStorage, Outbox } from '../src/index.js';
 
 const API = 'https://api.test';
@@ -81,6 +81,62 @@ describe('sessions', () => {
   });
 });
 
+describe('identity changes', () => {
+  it('are not undone by a token renewal still in flight', async () => {
+    let parked: (() => void) | null = null;
+    const resets: string[] = [];
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => HttpResponse.json(session(), { status: 201 })),
+      http.post(`${API}/v1/widget/sessions/refresh`, async () => {
+        await new Promise<void>((resolve) => {
+          parked = resolve;
+        });
+        return HttpResponse.json(
+          session({ accessToken: 'access-renewed', refreshToken: 'ses_x.renewed' }),
+        );
+      }),
+      http.post(`${API}/v1/widget/sessions/reset`, ({ request }) => {
+        resets.push(request.headers.get('authorization') ?? '');
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.post(`${API}/v1/widget/identity`, () =>
+        HttpResponse.json(session({ refreshToken: 'ses_x.verified' })),
+      ),
+    );
+    /** Lets the parked renewal answer, once it is really waiting. */
+    const finishRenewal = async () => {
+      await vi.waitFor(() => expect(parked).not.toBeNull());
+      const release = parked as unknown as () => void;
+      parked = null;
+      release();
+    };
+    const storage = new MemoryStorage();
+    const c = client(storage);
+    const key = 'hamnivo:wid_test:refresh';
+
+    // Signing out while a renewal is in flight ends the renewed session and forgets it.
+    await c.connect();
+    const renewal = c.renew();
+    const signedOut = c.reset();
+    await vi.waitFor(() => expect(parked).not.toBeNull());
+    expect(resets).toEqual([]);
+    await finishRenewal();
+    await Promise.all([renewal, signedOut]);
+    expect(resets).toEqual(['Bearer access-renewed']);
+    expect(storage.getItem(key)).toBeNull();
+    expect(c.current).toBeNull();
+
+    // Signing in while a renewal is in flight keeps the signed-in session.
+    await c.connect();
+    const second = c.renew();
+    const signedIn = c.identify('header.payload.signature-of-a-real-assertion');
+    await finishRenewal();
+    await Promise.all([second, signedIn]);
+    expect(storage.getItem(key)).toBe('ses_x.verified');
+    expect(c.current?.refreshToken).toBe('ses_x.verified');
+  });
+});
+
 describe('outbox', () => {
   it('retries retryable failures with the same message id and fails fast otherwise', async () => {
     const seen: string[] = [];
@@ -149,7 +205,32 @@ describe('outbox', () => {
     await expect.poll(() => after.messages[0]?.state).toBe('accepted');
     expect(seen).toEqual([draft.clientMessageId, draft.clientMessageId]);
     expect(storage.getItem('hamnivo:wid_test:outbox:conv_2')).toBeNull();
+    expect(storage.getItem('hamnivo:wid_test:outboxes')).toBeNull();
     after.dispose();
+  });
+
+  it('forgets unsent messages when the visitor is signed out, even after a reload', async () => {
+    const storage = new MemoryStorage();
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => HttpResponse.json(session(), { status: 201 })),
+      http.post(`${API}/v1/widget/conversations/:id/messages`, () => HttpResponse.error()),
+      http.post(`${API}/v1/widget/sessions/reset`, () => new HttpResponse(null, { status: 204 })),
+    );
+    const first = client(storage);
+    await first.connect();
+    const box = new Outbox(first, 'conv_3', () => 60_000);
+    box.enqueue('my address is 12 Garden Road');
+    await expect.poll(() => storage.getItem('hamnivo:wid_test:outbox:conv_3')).not.toBeNull();
+    box.dispose();
+    expect(JSON.parse(storage.getItem('hamnivo:wid_test:outboxes') ?? '[]')).toEqual(['conv_3']);
+
+    // A later page load on the same device signs the visitor out.
+    const reloaded = client(storage);
+    await reloaded.connect();
+    await reloaded.reset();
+    expect(storage.getItem('hamnivo:wid_test:outbox:conv_3')).toBeNull();
+    expect(storage.getItem('hamnivo:wid_test:outboxes')).toBeNull();
+    expect(storage.getItem('hamnivo:wid_test:refresh')).toBeNull();
   });
 });
 

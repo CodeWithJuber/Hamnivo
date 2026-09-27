@@ -10,6 +10,9 @@
 
 type Listener = (payload: Record<string, unknown>) => void;
 
+/** How long identify() and reset() wait for the chat before rejecting with Error('timeout'). */
+const REQUEST_TIMEOUT_MS = 20_000;
+
 interface HamnivoApi {
   loaded: true;
   open(): void;
@@ -128,10 +131,25 @@ declare global {
     else button.focus();
   };
 
+  // A chat that never answers (blocked, offline, still loading) must not keep the page waiting.
   const request = (message: Record<string, unknown>) =>
     new Promise<void>((resolve, reject) => {
       const requestId = Math.random().toString(36).slice(2, 12);
-      waiting.set(requestId, { resolve, reject });
+      const timer = setTimeout(() => {
+        waiting.delete(requestId);
+        reject(new Error('timeout'));
+      }, REQUEST_TIMEOUT_MS);
+      const settle = () => clearTimeout(timer);
+      waiting.set(requestId, {
+        resolve: () => {
+          settle();
+          resolve();
+        },
+        reject: (error) => {
+          settle();
+          reject(error);
+        },
+      });
       ensureFrame();
       send({ ...message, requestId });
     });

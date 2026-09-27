@@ -11,7 +11,7 @@ import {
 } from '@hamnivo/db';
 import { authorize, type Permission, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { importJWK, type JWK } from 'jose';
 import type { z } from 'zod';
 import { AppError } from '../common/app-error.js';
@@ -227,11 +227,26 @@ export class IdentityKeysService {
         .where(where)
         .returning();
       if (!updated) throw new Error('identity key update returned nothing');
-      if (status === 'revoked' && row.secretId) {
-        await tx
-          .update(schema.secrets)
-          .set({ revokedAt: now })
-          .where(eq(schema.secrets.id, row.secretId));
+      let endedSessions = 0;
+      if (status === 'revoked') {
+        if (row.secretId) {
+          await tx
+            .update(schema.secrets)
+            .set({ revokedAt: now })
+            .where(eq(schema.secrets.id, row.secretId));
+        }
+        // A revoked key may have leaked: the chats it signed customers into end now.
+        const ended = await tx
+          .update(schema.widgetSessions)
+          .set({ revokedAt: now, revokeReason: 'identity_key_revoked' })
+          .where(
+            and(
+              eq(schema.widgetSessions.identityKeyId, row.id),
+              isNull(schema.widgetSessions.revokedAt),
+            ),
+          )
+          .returning({ id: schema.widgetSessions.id });
+        endedSessions = ended.length;
       }
       await appendAudit(tx, {
         actorType: 'staff',
@@ -240,7 +255,7 @@ export class IdentityKeysService {
         targetType: 'brand',
         targetId: toPublicId('brand', brand.id),
         outcome: 'success',
-        data: { kid },
+        data: status === 'revoked' ? { kid, endedSessions } : { kid },
       });
       return view(updated);
     });

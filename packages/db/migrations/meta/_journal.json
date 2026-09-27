@@ -127,6 +127,13 @@
       "when": 1790485867646,
       "tag": "20260927051107_business_hours",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790488928890,
+      "tag": "20260927060208_session_identity_key",
+      "breakpoints": true
     }
   ]
 }

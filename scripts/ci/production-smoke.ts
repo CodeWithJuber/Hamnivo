@@ -311,6 +311,29 @@ await check('the website and Chatwoot answer', async () => {
   expect(String(chatwoot.body.version).startsWith('4.18'), `Chatwoot ${chatwoot.text}`);
 });
 
+await check('Studio is served with its own security policy', async () => {
+  const page = await call('GET', `${APP}/brands`);
+  expect(page.status === 200 && page.text.includes('<div id="root">'), `Studio ${page.status}`);
+  const csp = String(page.headers['content-security-policy'] ?? '');
+  expect(csp.includes("frame-ancestors 'none'"), `CSP was: ${csp}`);
+  expect(csp.includes(`connect-src 'self' ${API}`), `CSP was: ${csp}`);
+  expect(page.headers['x-frame-options'] === 'DENY', 'Studio may be framed');
+  expect(
+    page.headers['cache-control'] === 'no-cache',
+    `page cache: ${page.headers['cache-control']}`,
+  );
+  const script = /src="(\/assets\/[^"]+\.js)"/.exec(page.text)?.[1];
+  expect(script, 'no script in the Studio page');
+  const bundle = await call('GET', `${APP}${script}`);
+  expect(bundle.status === 200, `bundle ${bundle.status}`);
+  expect(
+    String(bundle.headers['cache-control']).includes('immutable'),
+    `bundle cache: ${bundle.headers['cache-control']}`,
+  );
+  const missing = await call('GET', `${APP}/assets/missing.js`);
+  expect(missing.status === 404, `a missing asset answered ${missing.status}`);
+});
+
 await check('a backup restores the data as it was', async () => {
   const backups = `${envFile}.backups`;
   execFileSync('bash', [hamnivo, 'backup', '--to', backups], { stdio: 'inherit' });
