@@ -15,6 +15,7 @@ import {
   BookOpenIcon,
   BotIcon,
   BuildingIcon,
+  FolderInputIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -42,6 +43,7 @@ type NavPath =
   | '/brands'
   | '/agents'
   | '/knowledge'
+  | '/migration'
   | '/models'
   | '/runs'
   | '/stop-ai'
@@ -66,6 +68,12 @@ function useNavItems(): NavItem[] {
       label: t('nav.knowledge'),
       icon: BookOpenIcon,
       permission: 'knowledge.read',
+    },
+    {
+      to: '/migration',
+      label: t('migration.nav'),
+      icon: FolderInputIcon,
+      permission: 'migration.review',
     },
     {
       to: '/models',
