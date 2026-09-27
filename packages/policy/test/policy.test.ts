@@ -116,20 +116,26 @@ describe('authorize', () => {
 
   it('requires MFA and a fresh sign-in for sensitive actions', () => {
     const admin = grant({ permissions: ['*'], scope: { type: 'tenant' } });
-    expect(authorize(staff([admin]), 'commerce.refund', { brandId: 'B' }, { now })).toMatchObject({
+    expect(
+      authorize(staff([admin]), 'commerce.refunds.approve', { brandId: 'B' }, { now }),
+    ).toMatchObject({
       reason: 'mfa_required',
     });
     expect(
       authorize(
         staff([admin], { mfa: true, authenticatedAt: minutesAgo(60) }),
-        'commerce.refund',
+        'commerce.refunds.approve',
         { brandId: 'B' },
         { now },
       ),
     ).toMatchObject({ reason: 'step_up_required' });
     expect(
-      authorize(staff([admin], { mfa: true }), 'commerce.refund', { brandId: 'B' }, { now })
-        .allowed,
+      authorize(
+        staff([admin], { mfa: true }),
+        'commerce.refunds.approve',
+        { brandId: 'B' },
+        { now },
+      ).allowed,
     ).toBe(true);
     // Non-sensitive actions don't need a fresh session.
     expect(
@@ -356,5 +362,64 @@ describe('permission diff', () => {
     expect(diff.removed).toEqual(['knowledge.manage']);
     expect(diff.added).toContain('conversations.export');
     expect(diff.addedSensitive).toEqual(['conversations.export']);
+  });
+});
+
+describe('commerce permissions', () => {
+  const at = (preset: Parameters<typeof presetPermissions>[0], scope: Grant['scope']) =>
+    staff([grant({ permissions: presetPermissions(preset), scope })], { mfa: true });
+
+  it('lets agents prepare carts and ask for refunds, but not approve them', () => {
+    const agent = at('agent', { type: 'team', id: 'T' });
+    expect(authorize(agent, 'commerce.refunds.request', { teamId: 'T' }, { now }).allowed).toBe(
+      true,
+    );
+    expect(authorize(agent, 'commerce.carts.manage', { teamId: 'T' }, { now }).allowed).toBe(true);
+    for (const permission of [
+      'commerce.refunds.approve',
+      'commerce.exceptions.resolve',
+      'commerce.merchants.manage',
+    ] as const) {
+      expect(authorize(agent, permission, { teamId: 'T', brandId: 'B' }, { now })).toMatchObject({
+        allowed: false,
+        reason: 'no_grant',
+      });
+    }
+  });
+
+  it('keeps refund approval to brand-level grants with MFA and a fresh sign-in', () => {
+    const lead = at('supervisor', { type: 'brand', id: 'B' });
+    expect(authorize(lead, 'commerce.refunds.approve', { brandId: 'B' }, { now }).allowed).toBe(
+      true,
+    );
+    // A team-scoped supervisor holds the permission, but it does not apply at team level.
+    const teamLead = at('supervisor', { type: 'team', id: 'T' });
+    expect(
+      authorize(teamLead, 'commerce.refunds.approve', { brandId: 'B', teamId: 'T' }, { now }),
+    ).toMatchObject({ allowed: false, reason: 'no_grant' });
+    const finance = at('finance', { type: 'tenant' });
+    expect(
+      authorize({ ...finance, mfa: false }, 'commerce.refunds.approve', { brandId: 'B' }, { now }),
+    ).toMatchObject({ reason: 'mfa_required' });
+    expect(
+      authorize(
+        { ...finance, authenticatedAt: minutesAgo(30) },
+        'commerce.exceptions.resolve',
+        { brandId: 'B' },
+        { now },
+      ),
+    ).toMatchObject({ reason: 'step_up_required' });
+    expect(
+      authorize(finance, 'commerce.exceptions.resolve', { brandId: 'B' }, { now }).allowed,
+    ).toBe(true);
+    expect(
+      authorize(finance, 'commerce.merchants.manage', { brandId: 'B' }, { now }),
+    ).toMatchObject({ reason: 'no_grant' });
+  });
+
+  it('gives administrators every commerce permission', () => {
+    const commerce = PERMISSION_KEYS.filter((p) => p.startsWith('commerce.'));
+    expect(commerce.length).toBeGreaterThanOrEqual(7);
+    expect(presetPermissions('admin')).toEqual(expect.arrayContaining(commerce));
   });
 });

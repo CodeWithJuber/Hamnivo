@@ -85,13 +85,33 @@ export const PERMISSIONS = {
   'memory.read': { description: 'Read customer memory records', scopes: ALL },
   'memory.manage': { description: 'Correct or restrict memory records', scopes: BRAND },
   'memory.delete': { description: 'Delete memory records', scopes: BRAND, stepUp: true },
-  'commerce.read': { description: 'See carts, quotes and orders', scopes: ALL },
-  'commerce.manage': {
-    description: 'Configure merchants and catalog sync',
+  'commerce.read': {
+    description: 'See carts, quotes, orders, payments and refunds',
+    scopes: ALL,
+  },
+  'commerce.carts.manage': {
+    description: 'Share products and prepare quotes in conversations',
+    scopes: ALL,
+  },
+  'commerce.orders.manage': { description: 'Record fulfilment updates on orders', scopes: ALL },
+  'commerce.refunds.request': { description: 'Ask for a refund for a customer', scopes: ALL },
+  'commerce.refunds.approve': {
+    description: 'Approve or reject refunds',
+    scopes: BRAND,
+    stepUp: true,
+    mfa: true,
+  },
+  'commerce.exceptions.resolve': {
+    description: 'Resolve payment and refund exceptions after checking with the provider',
     scopes: BRAND,
     stepUp: true,
   },
-  'commerce.refund': { description: 'Issue refunds', scopes: BRAND, stepUp: true, mfa: true },
+  'commerce.merchants.manage': {
+    description: 'Connect merchants and set their credentials and refund rules',
+    scopes: BRAND,
+    stepUp: true,
+    mfa: true,
+  },
   'analytics.read': { description: 'View analytics and reports', scopes: ALL },
   'billing.manage': {
     description: 'Manage plan, invoices and payment',
