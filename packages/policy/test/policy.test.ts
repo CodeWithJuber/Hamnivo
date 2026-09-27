@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   authorize,
+  authorizeAny,
   checkDelegation,
   diffPermissions,
   effectivePermissions,
   explain,
   type Grant,
+  inapplicablePermissions,
   PERMISSION_KEYS,
   presetPermissions,
   ROLE_PRESETS,
@@ -174,6 +176,23 @@ describe('authorize', () => {
   });
 });
 
+describe('authorizeAny', () => {
+  it('allows a scoped grant for list screens but keeps MFA and freshness rules', () => {
+    const scoped = staff([
+      grant({
+        permissions: ['conversations.read', 'secrets.manage'],
+        scope: { type: 'workspace', id: 'W' },
+      }),
+    ]);
+    expect(authorize(scoped, 'conversations.read', {}, { now }).allowed).toBe(false);
+    expect(authorizeAny(scoped, 'conversations.read', { now }).allowed).toBe(true);
+    expect(authorizeAny(scoped, 'secrets.manage', { now })).toMatchObject({
+      reason: 'mfa_required',
+    });
+    expect(authorizeAny(scoped, 'billing.manage', { now })).toMatchObject({ reason: 'no_grant' });
+  });
+});
+
 describe('delegation ceiling', () => {
   const supervisorGrant = grant({
     permissions: presetPermissions('supervisor'),
@@ -214,7 +233,6 @@ describe('delegation ceiling', () => {
       expect.arrayContaining([
         'not_allowed',
         'self_grant',
-        'scope_type_not_allowed',
         'outside_own_scope',
         'exceeds_own_permissions',
       ]),
@@ -266,6 +284,66 @@ describe('delegation ceiling', () => {
       now,
     );
     expect(tenantWide.map((p) => p.code)).toContain('outside_own_scope');
+  });
+});
+
+describe('scope levels', () => {
+  it('keeps permissions inert where they do not apply and lets reference data be read anywhere', () => {
+    const teamOwner = staff([grant({ permissions: ['*'], scope: { type: 'team', id: 'T' } })]);
+    expect(authorize(teamOwner, 'billing.manage', {}, { now })).toMatchObject({
+      reason: 'no_grant',
+    });
+    expect(authorize(teamOwner, 'conversations.reply', { teamId: 'T' }, { now }).allowed).toBe(
+      true,
+    );
+    expect(authorize(teamOwner, 'knowledge.read', { brandId: 'B' }, { now }).allowed).toBe(true);
+    expect(
+      authorize(teamOwner, 'commerce.read', { brandId: 'B', teamId: 'T' }, { now }).allowed,
+    ).toBe(true);
+    expect(authorize(teamOwner, 'commerce.read', { brandId: 'B' }, { now })).toMatchObject({
+      reason: 'outside_scope',
+    });
+    expect(effectivePermissions(teamOwner, now).has('billing.manage')).toBe(false);
+    expect(inapplicablePermissions(['audit.read', 'conversations.read'], 'team')).toEqual([
+      'audit.read',
+    ]);
+  });
+
+  it('lets a supervisor preset be delegated at team scope', () => {
+    const lead = staff(
+      [grant({ permissions: presetPermissions('supervisor'), scope: { type: 'team', id: 'T' } })],
+      {
+        staffMemberId: 'lead',
+      },
+    );
+    const problems = checkDelegation(
+      lead,
+      {
+        granteeStaffMemberId: 'x',
+        permissions: presetPermissions('agent'),
+        scope: { type: 'team', id: 'T' },
+        expiresAt: null,
+      },
+      hierarchy,
+      now,
+    );
+    expect(problems).toEqual([]);
+  });
+
+  it('uses the given manage permission for invitations', () => {
+    const inviter = staff([
+      grant({ permissions: ['members.invite', 'conversations.read'], scope: { type: 'tenant' } }),
+    ]);
+    const proposed = {
+      granteeStaffMemberId: 'x',
+      permissions: ['conversations.read'],
+      scope: { type: 'tenant' } as const,
+      expiresAt: null,
+    };
+    expect(checkDelegation(inviter, proposed, hierarchy, now).map((p) => p.code)).toEqual([
+      'not_allowed',
+    ]);
+    expect(checkDelegation(inviter, proposed, hierarchy, now, 'members.invite')).toEqual([]);
   });
 });
 

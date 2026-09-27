@@ -68,18 +68,27 @@ export function buildOpenApi(
         required: true,
         content: { 'application/json': { schema: route.body } },
       };
-    if (route.idempotent) {
-      operation.parameters = [
-        {
-          in: 'header',
-          name: 'Idempotency-Key',
-          required: false,
-          description:
-            'Retry-safe key bound to the request body hash; reuse with a different body returns 409',
-          schema: { type: 'string', maxLength: 255 },
-        },
-      ];
+    const parameters: Record<string, unknown>[] = [];
+    if (route.path.startsWith('/v1/admin/')) {
+      parameters.push({
+        in: 'header',
+        name: 'X-Hamnivo-Tenant',
+        required: true,
+        description: 'Tenant the request acts in (tnt_…); the caller must be an active member',
+        schema: { type: 'string' },
+      });
     }
+    if (route.idempotent) {
+      parameters.push({
+        in: 'header',
+        name: 'Idempotency-Key',
+        required: false,
+        description:
+          'Retry-safe key bound to the request body hash; reuse with a different body returns 409',
+        schema: { type: 'string', maxLength: 255 },
+      });
+    }
+    if (parameters.length > 0) operation.parameters = parameters;
     paths[route.path] ??= {};
     (paths[route.path] as Record<string, Operation>)[route.method] = operation;
   }

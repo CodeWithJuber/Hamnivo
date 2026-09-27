@@ -1,0 +1,1 @@
+ALTER TABLE "secrets" ADD COLUMN "hint" text DEFAULT '' NOT NULL;

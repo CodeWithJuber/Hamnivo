@@ -7,7 +7,7 @@ import {
   type StaffPrincipal,
   scopeContains,
 } from './authorize.js';
-import { expandPatterns, PERMISSIONS, type Permission } from './catalog.js';
+import { appliesAtScope, expandPatterns, type Permission } from './catalog.js';
 
 export interface ProposedGrant {
   granteeStaffMemberId: string;
@@ -19,7 +19,6 @@ export interface ProposedGrant {
 export type DelegationProblem =
   | { code: 'not_allowed'; detail: string }
   | { code: 'self_grant' }
-  | { code: 'scope_type_not_allowed'; permission: Permission }
   | { code: 'exceeds_own_permissions'; permissions: Permission[] }
   | { code: 'outside_own_scope' }
   | { code: 'expiry_beyond_own'; latest: Date };
@@ -34,22 +33,22 @@ export function checkDelegation(
   proposed: ProposedGrant,
   hierarchy: ScopeHierarchy,
   now = new Date(),
+  /** The permission that allows this kind of hand-out (`members.invite` for invitations). */
+  managePermission: Permission = 'grants.manage',
 ): DelegationProblem[] {
   const problems: DelegationProblem[] = [];
   const resource =
     proposed.scope.type === 'tenant' ? {} : hierarchyResource(proposed.scope, hierarchy);
 
-  const canManage = authorize(grantor, 'grants.manage', resource, { now });
+  const canManage = authorize(grantor, managePermission, resource, { now });
   if (!canManage.allowed) problems.push({ code: 'not_allowed', detail: canManage.reason });
   if (proposed.granteeStaffMemberId === grantor.staffMemberId)
     problems.push({ code: 'self_grant' });
 
-  const requested = expandPatterns(proposed.permissions);
-  for (const permission of requested) {
-    if (!(PERMISSIONS[permission].scopes as readonly string[]).includes(proposed.scope.type)) {
-      problems.push({ code: 'scope_type_not_allowed', permission });
-    }
-  }
+  // Only permissions that take effect at the proposed level count; the rest are inert there.
+  const requested = expandPatterns(proposed.permissions).filter((p) =>
+    appliesAtScope(p, proposed.scope.type),
+  );
 
   // Grants of the grantor whose scope contains the proposed scope.
   const containing = grantor.grants.filter(
@@ -57,7 +56,11 @@ export function checkDelegation(
   );
   if (containing.length === 0) problems.push({ code: 'outside_own_scope' });
 
-  const held = new Set(expandPatterns(containing.flatMap((g) => g.permissions)));
+  const held = new Set(
+    containing.flatMap((g) =>
+      expandPatterns(g.permissions).filter((p) => appliesAtScope(p, g.scope.type)),
+    ),
+  );
   const missing = requested.filter((p) => !held.has(p));
   if (missing.length > 0) problems.push({ code: 'exceeds_own_permissions', permissions: missing });
 
@@ -89,7 +92,11 @@ function hierarchyResource(scope: Exclude<Scope, { type: 'tenant' }>, hierarchy:
 function latestExpiry(grants: readonly Grant[], permissions: readonly Permission[]): Date | null {
   let bound: Date | null = null;
   for (const permission of permissions) {
-    const holders = grants.filter((g) => expandPatterns(g.permissions).includes(permission));
+    const holders = grants.filter(
+      (g) =>
+        appliesAtScope(permission, g.scope.type) &&
+        expandPatterns(g.permissions).includes(permission),
+    );
     if (holders.length === 0) continue;
     if (holders.some((g) => g.expiresAt === null)) continue;
     const best = new Date(Math.max(...holders.map((g) => g.expiresAt?.getTime() ?? 0)));

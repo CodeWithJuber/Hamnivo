@@ -15,6 +15,11 @@ export interface PermissionSpec {
   stepUp?: true;
   /** Requires a session that passed multi-factor authentication. */
   mfa?: true;
+  /**
+   * Shared reference data (not customer data): any grant holding the permission applies wherever
+   * the resource lives, e.g. an agent scoped to a team may read the brand's knowledge base.
+   */
+  reference?: true;
 }
 
 const ALL: readonly ScopeType[] = SCOPE_TYPES;
@@ -36,9 +41,12 @@ export const PERMISSIONS = {
     scopes: BRAND,
     stepUp: true,
   },
-  'inbox.manage': { description: 'Configure inboxes, routing and business hours', scopes: BRAND },
+  'inbox.manage': {
+    description: 'Configure inboxes, routing and business hours',
+    scopes: ['tenant', 'workspace', 'brand', 'inbox'],
+  },
   'teams.manage': { description: 'Create teams and manage membership', scopes: WORKSPACE },
-  'members.read': { description: 'See team members and their roles', scopes: ALL },
+  'members.read': { description: 'See team members and their roles', scopes: ALL, reference: true },
   'members.invite': { description: 'Invite members', scopes: WORKSPACE },
   'members.remove': { description: 'Suspend or remove members', scopes: WORKSPACE, stepUp: true },
   'roles.manage': { description: 'Create and edit custom roles', scopes: TENANT, stepUp: true },
@@ -51,10 +59,10 @@ export const PERMISSIONS = {
   'audit.export': { description: 'Export the audit log', scopes: TENANT, stepUp: true },
   'brands.manage': { description: 'Create brands and set allowed websites', scopes: WORKSPACE },
   'widget.configure': { description: 'Configure the chat widget', scopes: BRAND },
-  'agents.read': { description: 'View AI agents and their versions', scopes: BRAND },
+  'agents.read': { description: 'View AI agents and their versions', scopes: ALL, reference: true },
   'agents.manage': { description: 'Edit AI agent drafts', scopes: BRAND },
   'agents.publish': { description: 'Publish or roll back AI agents', scopes: BRAND, stepUp: true },
-  'knowledge.read': { description: 'Read knowledge sources', scopes: BRAND },
+  'knowledge.read': { description: 'Read knowledge sources', scopes: ALL, reference: true },
   'knowledge.manage': { description: 'Add, edit and retire knowledge', scopes: BRAND },
   'tools.manage': {
     description: 'Configure tools and action policies',
@@ -62,16 +70,16 @@ export const PERMISSIONS = {
     stepUp: true,
   },
   'tools.approve': { description: 'Approve actions proposed by AI agents', scopes: ALL },
-  'decisions.read': { description: 'Review routing and quality decisions', scopes: BRAND },
+  'decisions.read': { description: 'Review routing and quality decisions', scopes: ALL },
   'decisions.manage': {
     description: 'Edit decision rubrics and thresholds',
     scopes: BRAND,
     stepUp: true,
   },
-  'memory.read': { description: 'Read customer memory records', scopes: BRAND },
+  'memory.read': { description: 'Read customer memory records', scopes: ALL },
   'memory.manage': { description: 'Correct or restrict memory records', scopes: BRAND },
   'memory.delete': { description: 'Delete memory records', scopes: BRAND, stepUp: true },
-  'commerce.read': { description: 'See carts, quotes and orders', scopes: BRAND },
+  'commerce.read': { description: 'See carts, quotes and orders', scopes: ALL },
   'commerce.manage': {
     description: 'Configure merchants and catalog sync',
     scopes: BRAND,
@@ -140,6 +148,19 @@ export function isPermission(value: string): value is Permission {
 
 export function permissionSpec(permission: Permission): PermissionSpec {
   return PERMISSIONS[permission];
+}
+
+/** Whether a permission has an effect in a grant at this scope level. */
+export function appliesAtScope(permission: Permission, scopeType: ScopeType): boolean {
+  return (PERMISSIONS[permission].scopes as readonly ScopeType[]).includes(scopeType);
+}
+
+/** Permissions of a role that would be inactive if granted at this scope level (shown in the UI). */
+export function inapplicablePermissions(
+  patterns: readonly string[],
+  scopeType: ScopeType,
+): Permission[] {
+  return expandPatterns(patterns).filter((p) => !appliesAtScope(p, scopeType));
 }
 
 /**

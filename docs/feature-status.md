@@ -7,7 +7,7 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 224 · in-progress: 7 · implemented: 1
+**Blueprint features (232):** planned: 219 · in-progress: 11 · implemented: 2
 
 **Design states (168):** planned: 162 · implemented: 5 · partial: 1
 
@@ -71,14 +71,14 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
 | A01 | Guided onboarding | P0 | C | planned |  |
-| A02 | Members and role presets | P0 | F | planned |  |
-| A03 | Sub-admin delegation | P0 | F | planned |  |
+| A02 | Members and role presets | P0 | F | in-progress | `packages/policy/src/presets.ts`, `apps/gateway/src/admin/admin.service.ts`, `apps/gateway/test/admin.int.test.ts` — Invitations (verified-email acceptance), scoped grants and eight role presets through the admin API with integration tests; Studio screens pending. |
+| A03 | Sub-admin delegation | P0 | F | implemented | `packages/policy/src/delegation.ts`, `packages/policy/test/policy.test.ts`, `apps/gateway/src/admin/admin.service.ts`, `apps/gateway/test/admin.int.test.ts` — Delegation ceiling (own permissions, own scope, own expiry, no self-grants) enforced for grants, invitations and custom roles; interfaces added later (SCIM) must reuse checkDelegation. |
 | A04 | Multi-brand settings | P0 | C | planned |  |
 | A05 | Basic business hours | P0 | C | planned |  |
-| A06 | Secrets and API credentials | P0 | F | in-progress | `packages/db/src/schema/identity.ts`, `packages/db/src/resolvers.ts`, `packages/db/test/resolvers.int.test.ts`, `scripts/setup/env.sh` — Envelope-encrypted secret storage, hashed API keys with prefix lookup and generated installation secrets; the secret broker, masking UI and rotation flows follow with the gateway. |
+| A06 | Secrets and API credentials | P0 | F | in-progress | `apps/gateway/src/secrets/envelope.ts`, `apps/gateway/src/secrets/secret-broker.service.ts`, `apps/gateway/test/secrets.int.test.ts`, `packages/db/src/schema/identity.ts` — Write-only, masked, envelope-encrypted secrets with rotation, revocation, KEK rotation and MFA + fresh sign-in; API keys for service accounts pending. |
 | A07 | Draft/publish configuration | P0 | C | planned |  |
 | A08 | Usage limits | P0 | C | planned |  |
-| A09 | Audit trail | P0 | C | in-progress | `packages/db/src/audit.ts`, `packages/db/src/schema/audit.ts`, `packages/db/migrations/20260926232017_security.sql`, `packages/db/test/audit.int.test.ts` — Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection and transactional appends; search, export and Studio views pending. |
+| A09 | Audit trail | P0 | C | in-progress | `packages/db/src/audit.ts`, `packages/db/src/schema/audit.ts`, `packages/db/migrations/20260926232017_security.sql`, `packages/db/test/audit.int.test.ts`, `apps/gateway/src/audit/audit.controller.ts`, `apps/gateway/test/admin.int.test.ts` — Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection, list/filter/verify API and events for every administrative change; export and Studio views pending. |
 | A10 | Retention and exports | P0 | C | planned |  |
 | A11 | Channel setup | P0 | C | planned |  |
 | A12 | Custom role builder | P1 | C | planned |  |
@@ -137,7 +137,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| D01 | Public REST API | P0 | F | in-progress | `packages/contracts/src/routes.ts`, `packages/contracts/src/errors.ts`, `packages/contracts/openapi/hamnivo.v1.json`, `packages/contracts/scripts/openapi.ts` — OpenAPI 3.1 generated from Zod with RFC 9457 errors and cursor pagination; widget routes defined, staff/admin/server routes follow with their modules. |
+| D01 | Public REST API | P0 | F | in-progress | `packages/contracts/src/routes.ts`, `packages/contracts/src/errors.ts`, `packages/contracts/openapi/hamnivo.v1.json`, `packages/contracts/scripts/openapi.ts`, `packages/contracts/src/admin-routes.ts`, `apps/gateway/src/common/idempotency.service.ts` — OpenAPI 3.1 from Zod (widget, identity and admin routes), RFC 9457 errors, Idempotency-Key replay/conflict, cursor pagination; server API keys and remaining resources follow. |
 | D02 | Headless JS/TS client | P0 | C | planned |  |
 | D03 | React UI adapter | P0 | C | planned |  |
 | D04 | Framework wrappers | P1 | C | planned |  |
@@ -170,7 +170,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| O01 | Metrics and alerts | P0 | C | planned |  |
+| O01 | Metrics and alerts | P0 | C | in-progress | `apps/gateway/src/platform/metrics.ts`, `apps/gateway/src/platform/health.controller.ts`, `apps/gateway/test/identity.int.test.ts` — Prometheus metrics (request latency by route, process metrics) and liveness/readiness checks; alert rules and dashboards pending. |
 | O02 | Backups and recovery | P0 | C | planned |  |
 | O03 | CI/CD and versioning | P0 | F | in-progress | `scripts/ci/local.sh`, `deploy/postgres/init.sh`, `docs/self-hosting.md`, `docs/adr/0007-self-hosted-verification.md` — Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence/status checks, accessibility audit) run with pnpm ci:local; release and rollback automation pending. |
 | O04 | Product analytics | P1 | C | planned |  |
@@ -250,10 +250,10 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| X01 | Workload identity | P0 | F | planned |  |
+| X01 | Workload identity | P0 | F | in-progress | `apps/gateway/src/identity/principal.service.ts`, `apps/gateway/src/identity/staff.guard.ts`, `apps/gateway/test/identity.int.test.ts` — Staff principals come from server-verified sessions and per-request grant loading; service-account and workload identities pending. |
 | X02 | Tool precondition checks | P0 | C | planned |  |
 | X03 | Resource and fan-out limits | P0 | C | planned |  |
-| X04 | Secret broker | P0 | F | planned |  |
+| X04 | Secret broker | P0 | F | in-progress | `apps/gateway/src/secrets/secret-broker.service.ts`, `apps/gateway/test/secrets.int.test.ts` — Secret broker reveals credentials only to server code inside the owning tenant; scoped short-lived credentials for tools and agents pending. |
 | X05 | Network egress policy | P0 | C | planned |  |
 | X06 | Inter-agent authenticity | P0 | A | planned |  |
 | X07 | Plugin isolation | P0 | A | planned |  |

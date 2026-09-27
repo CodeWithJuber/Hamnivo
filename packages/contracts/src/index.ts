@@ -1,3 +1,5 @@
+export * from './admin.js';
+export * from './admin-routes.js';
 export * from './bridge.js';
 export * from './cards.js';
 export * from './common.js';

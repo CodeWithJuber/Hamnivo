@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { adminRoutes, identityRoutes } from './admin-routes.js';
 import {
   CustomerConversation,
   FeedbackRequest,
@@ -243,4 +244,8 @@ export const widgetRoutes = {
   },
 } as const satisfies Record<string, RouteDef>;
 
-export const allRoutes: Record<string, RouteDef> = { ...widgetRoutes };
+export const allRoutes: Record<string, RouteDef> = {
+  ...widgetRoutes,
+  ...identityRoutes,
+  ...adminRoutes,
+};

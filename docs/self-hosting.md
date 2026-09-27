@@ -11,7 +11,8 @@ this repository. This guide grows with the product. Each milestone adds its serv
 | Infrastructure (PostgreSQL 18 + pgvector, Valkey) | ready | `pnpm services:up` |
 | Design system (Storybook) | ready | `pnpm --filter @hamnivo/ui storybook` |
 | Database schema, row-level security and audit log | ready | `pnpm db:migrate` |
-| Gateway, worker, widget, Studio, website, Chatwoot | not yet built | added by later milestones, with a production compose file and TLS proxy |
+| Gateway API (staff sign-in, tenants, members, roles, grants, secrets, audit) and worker | ready | `pnpm api`, `pnpm worker` |
+| Widget, Studio, website, Chatwoot | not yet built | added by later milestones, with a production compose file and TLS proxy |
 
 ## 1. Server requirements
 
@@ -79,6 +80,30 @@ pnpm db:migrate       # idempotent: applies only pending migrations, all-or-noth
 
 Every table has row-level security enabled and forced. The application role only sees the tenant
 bound to its current transaction. See `packages/db/README.md` for the details.
+
+### Run the API and the worker
+
+```bash
+pnpm api       # builds and starts the gateway on http://localhost:4000 (reads .env.local)
+pnpm worker    # outbox relay and scheduled maintenance, in a second terminal
+```
+
+- Interactive API reference: `http://localhost:4000/docs`.
+- OpenAPI document: `http://localhost:4000/v1/openapi.json`.
+- Health checks: `/health/live` and `/health/ready` (database and Valkey).
+- Without `SMTP_URL`, verification and invitation emails are printed to the API log, so you can
+  open the links directly. On a server, set `SMTP_URL` (for example `smtps://user:pass@smtp.example.com:465`).
+
+First steps with the API, before the Studio exists:
+
+```bash
+curl -c jar -H 'origin: http://localhost:5173' -H 'content-type: application/json' \
+  -d '{"name":"Your Name","email":"you@example.com","password":"a long passphrase here"}' \
+  http://localhost:4000/api/auth/sign-up/email
+# open the verification link printed in the API log, then:
+curl -b jar -c jar -H 'origin: http://localhost:5173' -H 'content-type: application/json' \
+  -d '{"name":"My Company","slug":"my-company"}' http://localhost:4000/v1/tenants
+```
 
 ## 5. Run the checks
 

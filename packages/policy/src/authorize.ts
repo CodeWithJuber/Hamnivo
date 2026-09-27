@@ -1,4 +1,10 @@
-import { matchesPattern, PERMISSIONS, type Permission, type ScopeType } from './catalog.js';
+import {
+  appliesAtScope,
+  matchesPattern,
+  PERMISSIONS,
+  type Permission,
+  type ScopeType,
+} from './catalog.js';
 
 export type Scope = { type: 'tenant' } | { type: Exclude<ScopeType, 'tenant'>; id: string };
 
@@ -96,8 +102,15 @@ export function scopeContains(outer: Scope, inner: Scope, hierarchy: ScopeHierar
 /** Resolves where a scope sits (e.g. a brand's workspace, an inbox's brand and workspace). */
 export type ScopeHierarchy = (scope: Exclude<Scope, { type: 'tenant' }>) => ResourceScope;
 
-function grantsPermission(grant: Grant, permission: Permission): boolean {
-  return grant.permissions.some((pattern) => matchesPattern(pattern, permission));
+/**
+ * A grant gives a permission when one of its patterns matches and the permission applies at the
+ * grant's scope level; e.g. `billing.manage` inside a team-scoped grant is inert.
+ */
+export function grantsPermission(grant: Grant, permission: Permission): boolean {
+  return (
+    appliesAtScope(permission, grant.scope.type) &&
+    grant.permissions.some((pattern) => matchesPattern(pattern, permission))
+  );
 }
 
 /**
@@ -119,10 +132,11 @@ export function authorize(
   const holding = active.filter((g) => grantsPermission(g, permission));
   if (holding.length === 0) return deny('no_grant');
 
-  const covering = holding.find((g) => scopeCovers(g.scope, resource));
-  if (!covering) return deny('outside_scope');
-
   const spec = PERMISSIONS[permission];
+  // Reference data (knowledge, agents, colleagues) is readable from any scope that holds it.
+  const reference = 'reference' in spec && spec.reference === true;
+  const covering = reference ? holding[0] : holding.find((g) => scopeCovers(g.scope, resource));
+  if (!covering) return deny('outside_scope');
   if (principal.kind === 'service_account') {
     if (!principal.keyScopes.some((pattern) => matchesPattern(pattern, permission))) {
       return deny('key_scope');
@@ -140,6 +154,44 @@ export function authorize(
       return deny('step_up_required');
   }
   return { allowed: true, grantId: covering.id };
+}
+
+/** The resource location a grant's own scope stands for. */
+export function resourceOfScope(scope: Scope): ResourceScope {
+  switch (scope.type) {
+    case 'tenant':
+      return {};
+    case 'workspace':
+      return { workspaceId: scope.id };
+    case 'brand':
+      return { brandId: scope.id };
+    case 'inbox':
+      return { inboxId: scope.id };
+    case 'team':
+      return { teamId: scope.id };
+  }
+}
+
+/**
+ * Whether the principal can use a permission somewhere (any of its scopes), with the same MFA,
+ * freshness and key-scope rules. For list screens; actions on one resource use authorize().
+ */
+export function authorizeAny(
+  principal: Principal,
+  permission: Permission,
+  options: AuthorizeOptions = {},
+): Decision {
+  const now = options.now ?? new Date();
+  const holding = principal.grants.filter(
+    (g) => isGrantActive(g, now) && grantsPermission(g, permission),
+  );
+  if (holding.length === 0) return authorize(principal, permission, {}, options);
+  let last: Decision | undefined;
+  for (const grant of holding) {
+    last = authorize(principal, permission, resourceOfScope(grant.scope), options);
+    if (last.allowed) return last;
+  }
+  return last ?? authorize(principal, permission, {}, options);
 }
 
 /** Every permission the principal can currently use somewhere (for menus and UI state). */

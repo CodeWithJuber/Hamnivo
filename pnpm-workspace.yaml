@@ -13,6 +13,10 @@ onlyBuiltDependencies:
   - protobufjs
   - msw
 
+# Optional native accelerator for BullMQ's msgpack; the pure JS fallback is used.
+ignoredBuiltDependencies:
+  - msgpackr-extract
+
 catalog:
   typescript: 6.0.3
   vitest: 5.0.2

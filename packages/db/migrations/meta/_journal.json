@@ -50,6 +50,13 @@
       "when": 1790466129996,
       "tag": "20260926234209_invitations_security",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790466525574,
+      "tag": "20260926234845_secret_hint",
+      "breakpoints": true
     }
   ]
 }

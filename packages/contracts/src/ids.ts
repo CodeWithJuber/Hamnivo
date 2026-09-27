@@ -46,6 +46,8 @@ export const ID_PREFIX = {
   role: 'role',
   grant: 'grt',
   form: 'form',
+  inbox: 'inb',
+  secret: 'sec',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

@@ -33,6 +33,8 @@ export const secrets = pgTable(
     tenantId: tenantId(),
     kind: text('kind').notNull(),
     label: text('label').notNull(),
+    /** Last characters of the value for recognition in lists (e.g. `9f3a`); never more. */
+    hint: text('hint').notNull().default(''),
     ciphertext: bytea('ciphertext').notNull(),
     iv: bytea('iv').notNull(),
     wrappedKey: bytea('wrapped_key').notNull(),

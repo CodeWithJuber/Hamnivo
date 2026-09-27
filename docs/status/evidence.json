@@ -72,9 +72,11 @@
       "packages/contracts/src/routes.ts",
       "packages/contracts/src/errors.ts",
       "packages/contracts/openapi/hamnivo.v1.json",
-      "packages/contracts/scripts/openapi.ts"
+      "packages/contracts/scripts/openapi.ts",
+      "packages/contracts/src/admin-routes.ts",
+      "apps/gateway/src/common/idempotency.service.ts"
     ],
-    "note": "OpenAPI 3.1 generated from Zod with RFC 9457 errors and cursor pagination; widget routes defined, staff/admin/server routes follow with their modules."
+    "note": "OpenAPI 3.1 from Zod (widget, identity and admin routes), RFC 9457 errors, Idempotency-Key replay/conflict, cursor pagination; server API keys and remaining resources follow."
   },
   "E04": {
     "status": "in-progress",
@@ -93,19 +95,21 @@
       "packages/db/src/audit.ts",
       "packages/db/src/schema/audit.ts",
       "packages/db/migrations/20260926232017_security.sql",
-      "packages/db/test/audit.int.test.ts"
+      "packages/db/test/audit.int.test.ts",
+      "apps/gateway/src/audit/audit.controller.ts",
+      "apps/gateway/test/admin.int.test.ts"
     ],
-    "note": "Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection and transactional appends; search, export and Studio views pending."
+    "note": "Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection, list/filter/verify API and events for every administrative change; export and Studio views pending."
   },
   "A06": {
     "status": "in-progress",
     "evidence": [
-      "packages/db/src/schema/identity.ts",
-      "packages/db/src/resolvers.ts",
-      "packages/db/test/resolvers.int.test.ts",
-      "scripts/setup/env.sh"
+      "apps/gateway/src/secrets/envelope.ts",
+      "apps/gateway/src/secrets/secret-broker.service.ts",
+      "apps/gateway/test/secrets.int.test.ts",
+      "packages/db/src/schema/identity.ts"
     ],
-    "note": "Envelope-encrypted secret storage, hashed API keys with prefix lookup and generated installation secrets; the secret broker, masking UI and rotation flows follow with the gateway."
+    "note": "Write-only, masked, envelope-encrypted secrets with rotation, revocation, KEK rotation and MFA + fresh sign-in; API keys for service accounts pending."
   },
   "O05": {
     "status": "in-progress",
@@ -116,5 +120,50 @@
       ".env.example"
     ],
     "note": "Self-hosted infrastructure (PostgreSQL 18 + pgvector, Valkey), generated secrets, environment reference and server guide; versioned application containers follow with the gateway."
+  },
+  "A02": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/policy/src/presets.ts",
+      "apps/gateway/src/admin/admin.service.ts",
+      "apps/gateway/test/admin.int.test.ts"
+    ],
+    "note": "Invitations (verified-email acceptance), scoped grants and eight role presets through the admin API with integration tests; Studio screens pending."
+  },
+  "A03": {
+    "status": "implemented",
+    "evidence": [
+      "packages/policy/src/delegation.ts",
+      "packages/policy/test/policy.test.ts",
+      "apps/gateway/src/admin/admin.service.ts",
+      "apps/gateway/test/admin.int.test.ts"
+    ],
+    "note": "Delegation ceiling (own permissions, own scope, own expiry, no self-grants) enforced for grants, invitations and custom roles; interfaces added later (SCIM) must reuse checkDelegation."
+  },
+  "X01": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/identity/principal.service.ts",
+      "apps/gateway/src/identity/staff.guard.ts",
+      "apps/gateway/test/identity.int.test.ts"
+    ],
+    "note": "Staff principals come from server-verified sessions and per-request grant loading; service-account and workload identities pending."
+  },
+  "X04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/secrets/secret-broker.service.ts",
+      "apps/gateway/test/secrets.int.test.ts"
+    ],
+    "note": "Secret broker reveals credentials only to server code inside the owning tenant; scoped short-lived credentials for tools and agents pending."
+  },
+  "O01": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/platform/metrics.ts",
+      "apps/gateway/src/platform/health.controller.ts",
+      "apps/gateway/test/identity.int.test.ts"
+    ],
+    "note": "Prometheus metrics (request latency by route, process metrics) and liveness/readiness checks; alert rules and dashboards pending."
   }
 }
