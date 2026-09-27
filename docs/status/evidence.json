@@ -583,7 +583,7 @@
       "packages/domain/src/human-request.ts",
       "packages/domain/test/fixtures/human-requests.json"
     ],
-    "note": "Hinglish and Roman Urdu requests for a person are detected across spellings, transliterations and negation (74 fixture cases) and act end to end; identifiers pass through unchanged. Native-speaker review pending."
+    "note": "Hinglish and Roman Urdu requests for a person are detected across spellings (banday, bande, banda, insaan, insan, aadmi, admi, real person), transliterations and negation, including \"... ki zaroorat nahi\" (101 fixture cases), and act end to end; identifiers pass through unchanged. Native-speaker review pending."
   },
   "O02": {
     "status": "in-progress",
@@ -807,9 +807,12 @@
       "apps/gateway/src/memory/cache.ts",
       "packages/domain/src/memory/recall.ts",
       "apps/gateway/src/memory/widget-memory.controller.ts",
-      "apps/gateway/test/memory.int.test.ts"
+      "apps/gateway/test/memory.int.test.ts",
+      "apps/gateway/src/cache/cache.providers.ts",
+      "apps/gateway/src/cache/answers.ts",
+      "apps/gateway/test/cache.int.test.ts"
     ],
-    "note": "Memory is never cached: recall reads the database each reply, runs record that any reply built with memory may not enter a shared cache, and memory endpoints send no-store. Each customer has a memory version and a cache namespace in Valkey that is bumped on every change and purged on deletion (tested). The general reply cache (K lane) must key per-customer entries with this version and respect the shared-cache rule when it lands."
+    "note": "Memory is never put in a shared cache: memory is recalled before the answer cache is read, a reply built with any memory item carries personal_memory and shared entries refuse it, and memory endpoints send no-store. Per-customer answer entries live in the customer's memory namespace and are keyed by their memory version, so a memory change makes them unreachable and a deletion purges them (tested end to end with a correction and a deletion, mutation-checked). A scope that is missing, slow or not the customer's own means nothing is cached for them. Pending: cached values are stored unencrypted in Valkey."
   },
   "G19": {
     "status": "implemented",
@@ -1122,9 +1125,10 @@
       "packages/domain/src/routing.ts",
       "packages/domain/test/routing.test.ts",
       "apps/gateway/test/routing.int.test.ts",
-      "apps/console/e2e/decisions.spec.ts"
+      "apps/console/e2e/decisions.spec.ts",
+      "apps/gateway/src/decisions/team-routing.service.ts"
     ],
-    "note": "Routing runs on the first customer message and on every hand-off. Brands start in shadow mode: Jev and the deterministic baseline are both recorded and only the baseline is applied (no team assignment from Jev). Live mode applies Jev when it is sure enough per language, otherwise the baseline, within a 1.5 s deadline behind the circuit breaker. Explicit requests for a person are never overridden. Only accepting teams are chosen; live routing assigns the Chatwoot team. Tested against a fake Jev and the fake Chatwoot; no live Jev call has run."
+    "note": "Routing runs on the first customer message and on every hand-off. Brands start in shadow mode: Jev and the deterministic baseline are both recorded and only the baseline is applied (no team assignment from Jev). Live mode applies Jev when it is sure enough per language, otherwise the baseline, within a 1.5 s deadline behind the circuit breaker. Explicit requests for a person are never overridden. Routing chooses among the inbox's teams with active, accepting routing for the brand and applies the choice the inbox's way: the conversation joins the team's queue and the inbox sync sets the Chatwoot team; a team a person chose, or a person handling the conversation, is kept. Tested against a fake Jev and the fake Chatwoot; no live Jev call has run."
   },
   "J05": {
     "status": "implemented",
@@ -1184,9 +1188,12 @@
     "evidence": [
       "packages/domain/src/routing.ts",
       "packages/domain/test/routing.test.ts",
-      "apps/gateway/test/routing.int.test.ts"
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/gateway/src/decisions/team-routing.service.ts",
+      "packages/db/test/decisions.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
     ],
-    "note": "Teams list the languages they answer in and those they serve through a reviewed translation path. Routing prefers a team that speaks the customer's language, then a translation path, then a language gap (recorded as the language match), and treats Hinglish and Roman Urdu as alternatives when the words fit both. Staff can be ranked by language the same way."
+    "note": "Teams are the inbox's teams. Per brand, a team's routing lists the languages it answers in and those it serves through a reviewed translation path, with its topics and whether it is the default or accepting; a team routes only for brands of its own workspace (enforced in the database). Routing prefers a team that speaks the customer's language, then a translation path, then a language gap (recorded as the language match), and treats Hinglish and Roman Urdu as alternatives when the words fit both. Staff can be ranked by language the same way. Studio edits a team's routing per brand."
   },
   "U08": {
     "status": "implemented",
@@ -1232,9 +1239,10 @@
     "evidence": [
       "packages/evals/src/fairness.ts",
       "packages/evals/corpus/fairness.json",
-      "packages/evals/test/fairness.test.ts"
+      "packages/evals/test/fairness.test.ts",
+      "packages/domain/test/fixtures/human-requests.json"
     ],
-    "note": "Fairness groups swap names, gender markers, politeness, script and language and check the product's own routing baseline, hand-off detection and personal data check; name, gender and politeness swaps are gated at 100% in CI. Finding: a Roman Urdu request for a person using \"banday\" is not detected. Reply-level pairs with a model and native review are pending."
+    "note": "Fairness groups swap names, gender markers, politeness, script and language and check the product's own routing baseline, hand-off detection and personal data check; every swap is gated at 100% in CI and any variant that gets a different decision is listed as a finding. The Roman Urdu request for a person with \"banday\" that the pairs found is now detected. Reply-level pairs with a model and native review are pending."
   },
   "U14": {
     "status": "in-progress",
@@ -1255,7 +1263,7 @@
       "apps/gateway/test/cache.int.test.ts",
       "apps/console/e2e/decisions.spec.ts"
     ],
-    "note": "Exact answer cache, off until a brand turns it on. Only a first, public, complete answer without personal data, personal context or excluded classes is stored; keys bind tenant, brand, audience, language, model, prompt version, every dependency version and a per-tenant HMAC of the question, and hits are rechecked against the current knowledge. Never crosses tenants or brands (tested, mutation-checked). The index keeps fingerprints and references only."
+    "note": "Exact answer cache, off until a brand turns it on. Only a first, public, complete answer without personal data, personal context or excluded classes is stored in shared entries; keys bind tenant, brand, audience, language, model, prompt version, every dependency version and a per-tenant HMAC of the question, and hits are rechecked against the current knowledge. A reply built with customer memory never enters a shared entry: it is kept for that customer alone, in their memory namespace and keyed by their memory version. Never crosses tenants, brands or customers (tested, mutation-checked). The index keeps fingerprints and references only."
   },
   "K02": {
     "status": "implemented",
