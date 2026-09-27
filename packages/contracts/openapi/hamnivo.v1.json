@@ -5945,7 +5945,7 @@
           }
         }
       },
-      "put": {
+      "post": {
         "operationId": "updateCart",
         "summary": "Replace the cart lines; refused when another change came first (409)",
         "tags": [

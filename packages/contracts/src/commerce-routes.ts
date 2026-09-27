@@ -247,7 +247,7 @@ export const commerceWidgetRoutes = {
     },
   },
   updateCart: {
-    method: 'put',
+    method: 'post',
     path: '/v1/widget/conversations/{conversationId}/commerce/cart',
     operationId: 'updateCart',
     summary: 'Replace the cart lines; refused when another change came first (409)',
