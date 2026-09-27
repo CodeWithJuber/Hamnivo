@@ -6,6 +6,7 @@ import type { HostBridge } from './bridge.js';
 import { Chat } from './components/Chat.js';
 import { applyLocale, type Locale } from './i18n.js';
 import { useChat } from './useChat.js';
+import { useReplyLanguage } from './useReplyLanguage.js';
 
 export interface WidgetParams {
   apiBase: string;
@@ -28,6 +29,9 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     [params],
   );
   const chat = useChat(client);
+  const replies = chat.state.messages.filter((m) => m.sender.kind !== 'customer').length;
+  const language = useReplyLanguage(client, chat.state.session?.principal.id ?? null, replies);
+  const { saveLocale } = language;
 
   useEffect(() => {
     applyLocale(locale);
@@ -108,10 +112,14 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
         state={chat.state}
         pending={chat.pending}
         locale={locale}
-        onLocale={setLocale}
+        onLocale={(next) => {
+          setLocale(next);
+          void saveLocale(next);
+        }}
         onSend={chat.send}
         onRetry={(id) => chat.retry(id)}
         onHandoff={chat.handoff}
+        language={language}
         onClose={
           params.hostOrigin
             ? () => bridge.post({ type: 'layout', open: false, width: 0, height: 0 })

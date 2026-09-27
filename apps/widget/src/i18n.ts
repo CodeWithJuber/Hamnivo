@@ -1,8 +1,9 @@
+import type { ReplyLanguage } from '@hamnivo/contracts';
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 /** Widget chrome in the four launch languages (translations await native review). */
-const resources = {
+export const resources = {
   en: {
     translation: {
       title: 'Chat',
@@ -23,6 +24,9 @@ const resources = {
       startError: 'The chat could not start. Please try again.',
       typing: 'The assistant is writing…',
       sources: 'Sources',
+      languageQuestion: 'Which language should replies use?',
+      languageNotNow: 'Not now',
+      languageChosen: 'Replies will be in {{language}}.',
     },
   },
   ar: {
@@ -45,6 +49,9 @@ const resources = {
       startError: 'تعذّر بدء المحادثة. حاول مرة أخرى.',
       typing: 'المساعد يكتب…',
       sources: 'المصادر',
+      languageQuestion: 'بأي لغة تريد أن تصلك الردود؟',
+      languageNotNow: 'ليس الآن',
+      languageChosen: 'ستصلك الردود بهذه اللغة: {{language}}.',
     },
   },
   hi: {
@@ -67,6 +74,9 @@ const resources = {
       startError: 'चैट शुरू नहीं हो सकी। कृपया फिर कोशिश करें।',
       typing: 'सहायक लिख रहा है…',
       sources: 'स्रोत',
+      languageQuestion: 'जवाब किस भाषा में चाहिए?',
+      languageNotNow: 'अभी नहीं',
+      languageChosen: 'जवाब इस भाषा में आएँगे: {{language}}।',
     },
   },
   ur: {
@@ -89,6 +99,9 @@ const resources = {
       startError: 'چیٹ شروع نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔',
       typing: 'اسسٹنٹ لکھ رہا ہے…',
       sources: 'ذرائع',
+      languageQuestion: 'جوابات کس زبان میں چاہییں؟',
+      languageNotNow: 'ابھی نہیں',
+      languageChosen: 'جوابات اس زبان میں آئیں گے: {{language}}۔',
     },
   },
 } as const;
@@ -101,6 +114,19 @@ export const LANGUAGE_NAMES: Record<Locale, string> = {
   ar: 'العربية',
   hi: 'हिन्दी',
   ur: 'اردو',
+};
+
+/**
+ * Reply languages named in themselves, so customers recognise their own. Hinglish and Roman Urdu
+ * are Hindi and Urdu written in Latin letters, not English.
+ */
+export const REPLY_LANGUAGE_NAMES: Record<ReplyLanguage, string> = {
+  en: 'English',
+  ar: 'العربية',
+  hi: 'हिन्दी',
+  ur: 'اردو',
+  'hi-Latn': 'Hinglish',
+  'ur-Latn': 'Roman Urdu',
 };
 
 export function pickLocale(requested: string | null | undefined): Locale {
