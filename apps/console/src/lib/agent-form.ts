@@ -36,6 +36,10 @@ export interface AgentForm {
   historyMessages: string;
   maxSteps: string;
   knowledgeSourceIds: string[];
+  /** Customer memory (G19): only for customers who agree, within these limits. */
+  memoryEnabled: boolean;
+  memoryMaxItems: string;
+  memoryMaxChars: string;
 }
 
 const toRow = (choice: ModelChoice): ModelRow => ({
@@ -62,6 +66,9 @@ export function toForm(config: AgentConfig): AgentForm {
     historyMessages: String(config.limits.historyMessages),
     maxSteps: String(config.limits.maxSteps),
     knowledgeSourceIds: [...config.knowledgeSourceIds],
+    memoryEnabled: config.memory?.enabled ?? false,
+    memoryMaxItems: String(config.memory?.maxItems ?? 8),
+    memoryMaxChars: String(config.memory?.maxChars ?? 1200),
   };
 }
 
@@ -78,6 +85,9 @@ export const FIELD_IDS = {
   historyMessages: 'agent-historyMessages',
   maxSteps: 'agent-maxSteps',
   knowledge: 'agent-knowledge',
+  memoryEnabled: 'agent-memory-enabled',
+  memoryMaxItems: 'agent-memory-maxItems',
+  memoryMaxChars: 'agent-memory-maxChars',
 } as const;
 
 function choice(row: ModelRow): ModelChoice {
@@ -153,6 +163,8 @@ export function toConfig(
   const maxSteps = limit(FIELD_IDS.maxSteps, form.maxSteps, 1, 10);
   if (form.knowledgeSourceIds.length > 20)
     errors[FIELD_IDS.knowledge] = t('editor.errors.knowledge');
+  const memoryMaxItems = limit(FIELD_IDS.memoryMaxItems, form.memoryMaxItems, 1, 20);
+  const memoryMaxChars = limit(FIELD_IDS.memoryMaxChars, form.memoryMaxChars, 100, 4000);
 
   if (Object.keys(errors).length > 0) return { config: null, errors };
   return {
@@ -168,6 +180,11 @@ export function toConfig(
       fallbackModels: form.fallbacks.map(choice),
       limits: { maxOutputTokens, timeoutMs, historyMessages, maxSteps },
       knowledgeSourceIds: [...form.knowledgeSourceIds],
+      memory: {
+        enabled: form.memoryEnabled,
+        maxItems: memoryMaxItems,
+        maxChars: memoryMaxChars,
+      },
     },
   };
 }
@@ -186,7 +203,8 @@ export type SectionKey =
   | 'model'
   | 'fallback'
   | 'limits'
-  | 'knowledge';
+  | 'knowledge'
+  | 'memory';
 
 /** Which parts differ between two working copies, for the conflict message. */
 export function differences(mine: AgentForm, theirs: AgentForm): SectionKey[] {
@@ -213,6 +231,14 @@ export function differences(mine: AgentForm, theirs: AgentForm): SectionKey[] {
   if (!same([...mine.knowledgeSourceIds].sort(), [...theirs.knowledgeSourceIds].sort())) {
     result.push('knowledge');
   }
+  if (
+    !same(
+      [mine.memoryEnabled, mine.memoryMaxItems, mine.memoryMaxChars],
+      [theirs.memoryEnabled, theirs.memoryMaxItems, theirs.memoryMaxChars],
+    )
+  ) {
+    result.push('memory');
+  }
   return result;
 }
 
@@ -236,6 +262,8 @@ export function fieldForPath(path: string): string | undefined {
       return FIELD_IDS.maxOutputTokens;
     case 'knowledgeSourceIds':
       return FIELD_IDS.knowledge;
+    case 'memory':
+      return FIELD_IDS.memoryMaxItems;
     default:
       return undefined;
   }

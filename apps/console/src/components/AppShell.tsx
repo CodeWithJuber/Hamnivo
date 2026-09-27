@@ -14,8 +14,10 @@ import {
   ActivityIcon,
   BookOpenIcon,
   BotIcon,
+  BrainIcon,
   BuildingIcon,
   FolderInputIcon,
+  InboxIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -40,10 +42,12 @@ import { StopAiDialog } from './StopAiDialog';
 
 type NavPath =
   | '/overview'
+  | '/inbox'
   | '/brands'
   | '/agents'
   | '/knowledge'
   | '/migration'
+  | '/memory'
   | '/models'
   | '/runs'
   | '/stop-ai'
@@ -61,6 +65,12 @@ function useNavItems(): NavItem[] {
   const { can } = useTenant();
   const items: NavItem[] = [
     { to: '/overview', label: t('nav.overview'), icon: LayoutDashboardIcon },
+    {
+      to: '/inbox',
+      label: t('nav.inbox'),
+      icon: InboxIcon,
+      permission: 'conversations.read',
+    },
     { to: '/brands', label: t('nav.brands'), icon: StoreIcon, permission: 'brands.manage' },
     { to: '/agents', label: t('nav.agents'), icon: BotIcon, permission: 'agents.read' },
     {
@@ -69,6 +79,7 @@ function useNavItems(): NavItem[] {
       icon: BookOpenIcon,
       permission: 'knowledge.read',
     },
+    { to: '/memory', label: t('nav.memory'), icon: BrainIcon, permission: 'memory.read' },
     {
       to: '/migration',
       label: t('migration.nav'),

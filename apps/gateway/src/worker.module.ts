@@ -13,6 +13,14 @@ import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
 import { type Scanner, scannerFromUrl } from './knowledge/scanner.js';
+import { MemoryCache } from './memory/cache.js';
+import { ConversationHistory } from './memory/conversation-history.js';
+import { MemoryDeletionService } from './memory/deletion.service.js';
+import { MemoryExtractionService } from './memory/extraction.service.js';
+import { MemoryFingerprints } from './memory/fingerprints.js';
+import { MemoryIndexService } from './memory/index.service.js';
+import { MemoryRecallService } from './memory/recall.service.js';
+import { MemoryWriter } from './memory/writer.service.js';
 import { MigrationEngine } from './migration/engine.service.js';
 import { MigrationExporter } from './migration/export.service.js';
 import { OUTBOX_HANDLERS, type OutboxHandler, OutboxRelay } from './outbox/relay.service.js';
@@ -78,6 +86,14 @@ export class WorkerModule {
         RetrievalService,
         { provide: SCANNER, useValue: overrides.scanner ?? scannerFromUrl(config.CLAMAV_URL) },
         IngestionService,
+        MemoryFingerprints,
+        MemoryCache,
+        MemoryWriter,
+        MemoryDeletionService,
+        MemoryRecallService,
+        MemoryIndexService,
+        ConversationHistory,
+        MemoryExtractionService,
         RepliesService,
         MigrationEngine,
         MigrationExporter,
@@ -89,6 +105,9 @@ export class WorkerModule {
             IngestionService,
             MigrationEngine,
             MigrationExporter,
+            MemoryExtractionService,
+            MemoryIndexService,
+            MemoryDeletionService,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -96,19 +115,33 @@ export class WorkerModule {
             ingestion: IngestionService,
             migration: MigrationEngine,
             exporter: MigrationExporter,
+            extraction: MemoryExtractionService,
+            index: MemoryIndexService,
+            deletions: MemoryDeletionService,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
               ...defaultOutboxHandlers(),
               ['conversation.owner_changed', (event) => sync.applyOwnerChange(event)],
+              ['conversation.team_changed', (event) => sync.applyTeamChange(event)],
               ['conversation.note', (event) => sync.applyNote(event)],
-              ['conversation.customer_message', (event) => replies.onCustomerMessage(event)],
+              [
+                'conversation.customer_message',
+                // The reply comes first; memory extraction is queued after it, never before.
+                async (event) => {
+                  await replies.onCustomerMessage(event);
+                  await extraction.afterCustomerMessage(event);
+                },
+              ],
               ['knowledge.ingest', (event) => ingestion.onIngest(event)],
               ['migration.scan', (event) => migration.onScan(event)],
               ['migration.dry_run', (event) => migration.onDryRun(event)],
               ['migration.run', (event) => migration.onRun(event)],
               ['migration.rollback', (event) => migration.onRollback(event)],
               ['migration.export', (event) => exporter.onExport(event)],
+              ['memory.extract', async (event) => void (await extraction.onExtract(event))],
+              ['memory.embed', (event) => index.onEmbed(event)],
+              ['memory.deleted', (event) => deletions.complete(event)],
             ]),
         },
         OutboxRelay,
@@ -121,6 +154,8 @@ export class WorkerModule {
         ReconcilerService,
         RepliesService,
         JournalService,
+        MemoryExtractionService,
+        MemoryDeletionService,
       ],
     };
   }

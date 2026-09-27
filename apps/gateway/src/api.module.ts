@@ -1,6 +1,7 @@
 import type { Db } from '@hamnivo/db';
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import type { LanguageModel } from 'ai';
 import { AdminController } from './admin/admin.controller.js';
 import { AdminService } from './admin/admin.service.js';
 import { BrandsController } from './admin/brands.controller.js';
@@ -26,10 +27,32 @@ import { IdentityController } from './identity/identity.controller.js';
 import { PrincipalService } from './identity/principal.service.js';
 import { StaffGuard } from './identity/staff.guard.js';
 import { TenantsService } from './identity/tenants.service.js';
+import { InboxAccess } from './inbox/access.js';
+import { AnnotationsService } from './inbox/annotations.service.js';
+import { AssignmentService } from './inbox/assignment.service.js';
+import { AssistService } from './inbox/assist.service.js';
+import { BulkService } from './inbox/bulk.service.js';
+import { CollaborationService } from './inbox/collaboration.service.js';
+import { DraftsService } from './inbox/drafts.service.js';
+import { InboxController, TeamsController } from './inbox/inbox.controller.js';
+import { InboxService } from './inbox/inbox.service.js';
+import { InboxLiveService } from './inbox/live.service.js';
+import { InboxMessagesService } from './inbox/messages.service.js';
+import { InboxSignals } from './inbox/signals.service.js';
+import { StatusService } from './inbox/status.service.js';
+import { TeamsService } from './inbox/teams.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { KnowledgeController } from './knowledge/knowledge.controller.js';
 import { KnowledgeService } from './knowledge/knowledge.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
+import { AdminMemoryController } from './memory/admin-memory.controller.js';
+import { AdminMemoryService } from './memory/admin-memory.service.js';
+import { MemoryCache } from './memory/cache.js';
+import { CustomerMemoryService } from './memory/customer-memory.service.js';
+import { MemoryDeletionService } from './memory/deletion.service.js';
+import { MemoryFingerprints } from './memory/fingerprints.js';
+import { WidgetMemoryController } from './memory/widget-memory.controller.js';
+import { MemoryWriter } from './memory/writer.service.js';
 import { MigrationController } from './migration/migration.controller.js';
 import { MigrationService } from './migration/migration.service.js';
 import { HealthController } from './platform/health.controller.js';
@@ -41,7 +64,7 @@ import { KillSwitchesController } from './runtime/kill-switches.controller.js';
 import { KillSwitchesService } from './runtime/kill-switches.service.js';
 import { ModelConnectionsController } from './runtime/model-connections.controller.js';
 import { ModelConnectionsService } from './runtime/model-connections.service.js';
-import { ModelFactory } from './runtime/models.js';
+import { LANGUAGE_MODEL, ModelFactory } from './runtime/models.js';
 import { RunsController } from './runtime/runs.controller.js';
 import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
@@ -55,10 +78,15 @@ import { WidgetTokens } from './widget/tokens.service.js';
 import { WidgetController } from './widget/widget.controller.js';
 import { WidgetGuard } from './widget/widget.guard.js';
 
+export interface ApiOverrides extends PlatformOverrides {
+  /** Replaces every agent's model (tests); agents otherwise use their configured model. */
+  model?: LanguageModel;
+}
+
 /** HTTP API process: REST, staff authentication and administration. */
 @Module({})
 export class ApiModule {
-  static forRoot(config: AppConfig, overrides: PlatformOverrides = {}): DynamicModule {
+  static forRoot(config: AppConfig, overrides: ApiOverrides = {}): DynamicModule {
     return {
       module: ApiModule,
       imports: [PlatformModule.forRoot(config, overrides, 'gateway')],
@@ -80,6 +108,10 @@ export class ApiModule {
         RunsController,
         KnowledgeController,
         MigrationController,
+        WidgetMemoryController,
+        AdminMemoryController,
+        InboxController,
+        TeamsController,
       ],
       providers: [
         {
@@ -101,7 +133,21 @@ export class ApiModule {
         OwnershipService,
         OutboundMessagesService,
         StaffLinksService,
+        InboxAccess,
+        InboxSignals,
+        DraftsService,
         StaffConversationsService,
+        InboxService,
+        InboxMessagesService,
+        AssignmentService,
+        StatusService,
+        AnnotationsService,
+        AssistService,
+        CollaborationService,
+        BulkService,
+        TeamsService,
+        InboxLiveService,
+        ...(overrides.model ? [{ provide: LANGUAGE_MODEL, useValue: overrides.model }] : []),
         ModelFactory,
         KillSwitchesService,
         AgentsService,
@@ -116,6 +162,12 @@ export class ApiModule {
         AuthorityContactsService,
         WidgetConversationsService,
         WidgetEventsService,
+        MemoryFingerprints,
+        MemoryCache,
+        MemoryWriter,
+        MemoryDeletionService,
+        CustomerMemoryService,
+        AdminMemoryService,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

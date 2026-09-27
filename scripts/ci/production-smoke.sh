@@ -9,8 +9,10 @@
 #
 # Checks: HTTPS on every name, staff sign-up, a brand connected to the real Chatwoot, publishing
 # the AI agent, the widget's frame policy, a customer conversation answered by the AI over the live
-# stream, the website and Studio, then a backup and restore drill. Then a new owner uses Studio in
-# Chromium: sign-up, a brand, the Chatwoot connection and an agent draft, all across origins. Last,
+# stream, the website and Studio, then a backup and restore drill (which must keep a customer's
+# consent withdrawal and memory erasure made after the backup). Then a new owner uses Studio in
+# Chromium: sign-up, a brand, the Chatwoot connection and an agent draft, all across origins. Then
+# `hamnivo.sh mail`, which shows the emails written to the API log while SMTP is not set. Last,
 # visitor addresses: the API never believes an address a visitor claims, only one reported by a
 # trusted proxy (as with Cloudflare), and the edge runs with Cloudflare's ranges.
 # HAMNIVO_BUILD_CA and HAMNIVO_BUILD_NETWORK are passed to the image builds (see
@@ -82,6 +84,15 @@ echo 'Studio in a browser'
 SMOKE_APP_ORIGIN="$(env_value HAMNIVO_APP_ORIGIN)" SMOKE_API_ORIGIN="$(env_value HAMNIVO_API_ORIGIN)" \
   SMOKE_CHAT_ORIGIN="$(env_value HAMNIVO_CHAT_ORIGIN)" \
   pnpm --filter @hamnivo/console exec playwright test --config playwright.production.config.ts
+
+echo 'Emails without SMTP'
+# The smoke stack has no SMTP_URL, so sign-up emails went to the API log: `mail` must show them.
+if bash "$hamnivo" mail | grep -q '/api/auth/verify-email?token='; then
+  printf '  ok   hamnivo.sh mail shows the link that confirms an account\n'
+else
+  printf '  FAIL hamnivo.sh mail shows no link that confirms an account\n' >&2
+  exit 1
+fi
 
 echo 'Visitor addresses'
 api_origin="$(env_value HAMNIVO_API_ORIGIN)"

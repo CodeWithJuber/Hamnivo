@@ -1,5 +1,5 @@
 import { type Db, resolveStaffMemberships, schema, withTenant } from '@hamnivo/db';
-import type { Grant, Scope, StaffPrincipal } from '@hamnivo/policy';
+import { type Grant, rolePatterns, type Scope, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
 import { fromNodeHeaders } from 'better-auth/node';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -42,6 +42,8 @@ export class PrincipalService {
           expiresAt: schema.grants.expiresAt,
           revokedAt: schema.grants.revokedAt,
           permissions: schema.roleDefinitions.permissions,
+          roleKey: schema.roleDefinitions.key,
+          isPreset: schema.roleDefinitions.isPreset,
         })
         .from(schema.grants)
         .innerJoin(
@@ -60,7 +62,11 @@ export class PrincipalService {
     );
     const grants: Grant[] = rows.map((row) => ({
       id: row.id,
-      permissions: row.permissions,
+      permissions: rolePatterns({
+        key: row.roleKey,
+        isPreset: row.isPreset,
+        permissions: row.permissions,
+      }),
       scope: scopeFromRow(row.scopeType, row.scopeId),
       expiresAt: row.expiresAt,
       revokedAt: row.revokedAt,

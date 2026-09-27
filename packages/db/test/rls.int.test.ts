@@ -175,6 +175,18 @@ describe('two-tenant isolation', () => {
     'migration_items',
     'external_id_mappings',
     'reconciliation_reports',
+    'learning_consents',
+    'memory_records',
+    'memory_embeddings',
+    'memory_deletions',
+    'deletion_tombstones',
+    'teams',
+    'team_members',
+    'team_authority_links',
+    'conversation_inbox_state',
+    'staff_drafts',
+    'conversation_links',
+    'conversation_reviews',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -190,9 +202,10 @@ describe('two-tenant isolation', () => {
       );
     });
 
-    // The audit log is append-only; kill switches are cleared, never deleted.
-    const updatable = table !== 'audit_events';
-    const deletable = updatable && table !== 'kill_switches';
+    // The audit log, consent decisions and deletion tombstones are append-only; kill switches are
+    // cleared and deletion receipts completed, never deleted.
+    const updatable = !['audit_events', 'learning_consents', 'deletion_tombstones'].includes(table);
+    const deletable = updatable && !['kill_switches', 'memory_deletions'].includes(table);
     if (updatable) {
       // Updates and deletes aimed at tenant B affect nothing.
       await withTenant(h.app, { tenantId: a.tenantId }, async (tx) => {
@@ -290,6 +303,18 @@ describe('two-tenant isolation', () => {
       'migration_items',
       'external_id_mappings',
       'reconciliation_reports',
+      'learning_consents',
+      'memory_records',
+      'memory_embeddings',
+      'memory_deletions',
+      'deletion_tombstones',
+      'teams',
+      'team_members',
+      'team_authority_links',
+      'conversation_inbox_state',
+      'staff_drafts',
+      'conversation_links',
+      'conversation_reviews',
       'audit_heads',
       'audit_events',
     ]);

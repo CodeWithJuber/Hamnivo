@@ -45,6 +45,8 @@ export async function startSlice(
   options: {
     clock?: () => Date;
     model?: LanguageModel;
+    /** The model the API process uses (copilot, translation). */
+    apiModel?: LanguageModel;
     scanner?: Scanner;
     /** Extra settings for the gateway and the worker. */
     env?: Record<string, string>;
@@ -61,7 +63,10 @@ export async function startSlice(
     STREAM_HEARTBEAT_SECONDS: '1',
     ...options.env,
   };
-  const gw = await startGateway(env, undefined, options.clock ? { clock: options.clock } : {});
+  const gw = await startGateway(env, undefined, {
+    ...(options.clock ? { clock: options.clock } : {}),
+    ...(options.apiModel ? { model: options.apiModel } : {}),
+  });
   await gw.app.listen(port, '127.0.0.1');
   const config = loadConfig(
     testEnv(gw.database, {

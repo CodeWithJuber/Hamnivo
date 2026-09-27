@@ -115,6 +115,42 @@ missing kill-switch check and a disabled honesty guard.
 replacement, visibility and freshness rules, Urdu and Hindi search, cited answers and tenant
 isolation. `test/knowledge.test.ts` covers the parsers, the ClamAV client, chunking and citations.
 
+## Customer memory (release L)
+
+| Area | Where |
+|---|---|
+| Extraction after each customer message: the model proposes, the write policy decides (L07) | `src/memory/extraction.service.ts`, `writer.service.ts` |
+| Customer controls in the widget: see, agree, correct, confirm, delete, forget (L04) | `src/memory/widget-memory.controller.ts`, `customer-memory.service.ts` |
+| Studio: provenance, history, review, correct, outdated, delete, erase, export (L04) | `src/memory/admin-memory.controller.ts`, `admin-memory.service.ts` |
+| Deletion receipts, tombstones, citation scrubbing, retention and replay (L05) | `src/memory/deletion.service.ts`, `fingerprints.ts` |
+| Recall in replies within the agent's budget, cited as memories (G19) | `src/memory/recall.service.ts`, `prompt.ts`, `src/runtime/replies.service.ts` |
+| Per-customer memory version and cache namespace (K09) | `src/memory/cache.ts` |
+
+- **Off until both agree.** Nothing runs unless the brand's agent has `memory.enabled` and the
+  customer agreed (`POST /v1/widget/memory/consent`, stored in `learning_consents`). Only
+  messages written after the agreement reach a model for memory, and a job proposes only from the
+  message that started it (earlier ones are context).
+- **The policy decides.** `evaluateMemoryWrite` (`@hamnivo/domain`) sets every field of a record
+  and explains each decision without content. A value that disagrees with the current one waits
+  for review; neither is used in replies until the customer or staff confirm.
+- **Staff permissions.** `memory.read` to see, `memory.manage` to correct, confirm, reject or mark
+  outdated, `memory.delete`, `memory.erase` and `memory.export` (both need a recent sign-in), all
+  checked for the customer's brand and audited with keys and codes only.
+- **Deleting.** In one transaction: a receipt, content-free tombstones (HMAC fingerprints keyed
+  from the KEK), the records and their vectors, and the memory parts of published answers and
+  the realtime journal. The worker then purges the customer's cache namespace, checks that
+  nothing the tombstones cover is left and completes the receipt. Chat history in Chatwoot stays.
+- **Maintenance.** Hourly, memory past its retention is deleted the same way; daily, tombstones
+  are replayed (`app.apply_memory_tombstones()`), as after a restore. Recall also skips any row a
+  tombstone covers.
+- **Never cached, never logged.** Recall reads the database for every reply. Runs record counts,
+  a snapshot hash and that the reply may not enter a shared cache. Memory endpoints send
+  `Cache-Control: no-store`, and logs carry counts only.
+
+`test/memory.int.test.ts` covers consent, the refusals, corrections and review, deletion with its
+receipt, replayed jobs, erasure, retention, restores, access between customers, tenants and staff
+roles, recall in replies and the audit log.
+
 ## Reconciler (M10)
 
 Chatwoot does not retry most webhooks, so webhooks only make Hamnivo fast. The worker's

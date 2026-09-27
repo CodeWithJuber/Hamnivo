@@ -15,6 +15,13 @@ external-store runtime and the Hamnivo design tokens.
   - A message typed while offline is sent once when the connection returns.
 - **Handoff.** "Talk to a person" asks for a human, and the waiting state is shown until someone
   takes over.
+- **Customer memory** (when the brand's assistant uses it).
+  - Asks first: what would be remembered, why, what never is and for how long, with two equal
+    answers. Nothing is remembered without a yes.
+  - "Memory" shows what is remembered, with its source and how long it is kept. The customer can
+    confirm a newer value, correct or delete one, forget everything and turn memory off.
+    Deleting shows progress until it is removed everywhere.
+  - An answer that used a memory says so under the message, with a link to it.
 - **Languages.** English, Arabic, Hindi and Urdu. Arabic and Urdu use right-to-left layout, and
   message text uses `dir="auto"`.
 - **Accessibility.**
@@ -50,8 +57,11 @@ pnpm --filter @hamnivo/widget test:e2e
   - a host page on another origin.
 - It needs `DATABASE_URL`, `DATABASE_OWNER_URL` and `REDIS_URL`. `pnpm ci:local` provides them in
   throwaway containers, and that is the easiest way to run it.
-- The four tests cover:
+- `e2e/journey.spec.ts` covers:
   - host page → widget → AI reply → staff takeover → human reply;
   - an offline message sent once after reconnecting;
   - Arabic and Urdu right-to-left layout with an axe audit (WCAG 2.2 AA);
   - refusal on a website the brand did not allow.
+- `e2e/memory.spec.ts` turns customer memory on for the test brand (and off again) and covers the
+  memory question, "Memory" with confirm, correct, delete and the switch, an answer that used a
+  memory, memory being unavailable, and right-to-left layout, each with an axe audit.
