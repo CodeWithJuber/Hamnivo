@@ -55,6 +55,7 @@ type NavPath =
   | '/models'
   | '/runs'
   | '/decisions'
+  | '/checks'
   | '/caching'
   | '/orders'
   | '/finance'
@@ -105,6 +106,12 @@ function useNavItems(): NavItem[] {
       to: '/decisions',
       label: t('decisions.nav'),
       icon: WaypointsIcon,
+      permission: 'decisions.read',
+    },
+    {
+      to: '/checks',
+      label: t('checks.nav'),
+      icon: ShieldCheckIcon,
       permission: 'decisions.read',
     },
     {

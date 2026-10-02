@@ -1,4 +1,5 @@
 import { cachingUr } from './caching';
+import { checksUr } from './checks';
 import { commerceUr } from './commerce/ur';
 import { decisionsUr } from './decisions';
 import type { Translation } from './en';
@@ -1298,6 +1299,7 @@ export const ur: Translation = {
     },
   },
   decisions: decisionsUr,
+  checks: checksUr,
   caching: cachingUr,
   commerce: commerceUr,
   memory: {

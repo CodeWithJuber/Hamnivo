@@ -564,7 +564,8 @@ interface TopicRow {
 }
 
 /** Jev is chosen, but this server has no TypeSafe key: every Jev decision would be unavailable. */
-function JevNotConfigured() {
+/** Says plainly that this server has no TypeSafe key, so Jev decisions are unavailable. */
+export function JevNotConfigured() {
   const { t } = useTranslation();
   return (
     <div

@@ -1,4 +1,5 @@
 import { cachingAr } from './caching';
+import { checksAr } from './checks';
 import { commerceAr } from './commerce/ar';
 import { decisionsAr } from './decisions';
 import type { Translation } from './en';
@@ -1272,6 +1273,7 @@ export const ar: Translation = {
     },
   },
   decisions: decisionsAr,
+  checks: checksAr,
   caching: cachingAr,
   commerce: commerceAr,
   memory: {

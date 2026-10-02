@@ -1,4 +1,5 @@
 import { cachingHi } from './caching';
+import { checksHi } from './checks';
 import { commerceHi } from './commerce/hi';
 import { decisionsHi } from './decisions';
 import type { Translation } from './en';
@@ -1277,6 +1278,7 @@ export const hi: Translation = {
     },
   },
   decisions: decisionsHi,
+  checks: checksHi,
   caching: cachingHi,
   commerce: commerceHi,
   memory: {
