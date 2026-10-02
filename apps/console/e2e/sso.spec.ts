@@ -4,13 +4,22 @@
  * and joins with the chosen role; "SSO only" then turns passwords away for the domain.
  */
 import { randomBytes } from 'node:crypto';
-import { expect, type Page, test } from '@playwright/test';
-import { auditPage, overflowAt, ownerWithMfa, publishTxt } from './access';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import {
+  auditPage,
+  inviteByApi,
+  overflowAt,
+  ownerWithMfa,
+  publishTxt,
+  virtualAuthenticator,
+} from './access';
 import { ageSessions, audit, PASSWORD, type Staff, stack, verifyEmail } from './support';
 
 const domain = `sso-${randomBytes(3).toString('hex')}.example`;
 let owner: Staff;
 let tenantName: string;
+/** Omar's browser, whose virtual authenticator holds the passkey he added before SSO was required. */
+let omarBrowser: { context: BrowserContext; page: Page } | null = null;
 
 test.describe.configure({ mode: 'serial' });
 
@@ -119,6 +128,30 @@ test('A13 · an address the provider has not verified is turned away', async ({ 
   await context.close();
 });
 
+test('A13 · someone at the domain joins with a password and adds a passkey, before SSO is required', async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const token = await inviteByApi(owner, `omar@${domain}`, 'agent');
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await virtualAuthenticator(page);
+  await page.goto('/sign-in');
+  await page.getByLabel('Email address').fill(`omar@${domain}`);
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).not.toHaveURL(/\/sign-in/);
+  await page.goto(`/invitations/accept?token=${encodeURIComponent(token)}`);
+  await page.getByTestId('accept-invitation').click();
+  await expect(page).toHaveURL(/\/overview/);
+  await page.goto('/account');
+  await page.getByRole('button', { name: 'Add a passkey' }).click();
+  await expect(page.getByRole('region', { name: 'Passkeys' }).getByRole('status')).toHaveText(
+    'Passkey added.',
+  );
+  omarBrowser = { context, page };
+});
+
 test('HNV-02-01 A13 · with SSO required, a password sign-in is turned to SSO', async ({
   page,
   browser,
@@ -149,6 +182,22 @@ test('HNV-02-01 A13 · with SSO required, a password sign-in is turned to SSO', 
   await atProvider(visitor, `omar@${domain}`);
   await expect(visitor).toHaveURL(/\/(overview|tenants)/);
   await context.close();
+});
+
+test('A13 · with SSO required, a passkey is turned away too', async () => {
+  if (!omarBrowser) throw new Error('Omar has no passkey browser');
+  const { context, page } = omarBrowser;
+  await context.clearCookies();
+  await page.goto('/sign-in');
+  await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
+  await expect(
+    page.getByRole('main').getByText('Your organization requires single sign-on for this address.'),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/sign-in/);
+  // Refused before any session was created.
+  expect((await context.cookies()).filter((c) => c.name.includes('session_token'))).toEqual([]);
+  await context.close();
+  omarBrowser = null;
 });
 
 test('HNV-02-05 · after SSO, a sensitive action is confirmed at the provider, which asks again', async ({
