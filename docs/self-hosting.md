@@ -1037,8 +1037,37 @@ is never touched:
 
 - The built website in Chromium: every language at desktop and phone width, with an axe audit.
 
-The summary is written to `test-results/ci-local.md`. Paste it into the pull request when you
-review a change.
+The summary is written to `test-results/ci-local.md`. On GitHub it is kept as the run's
+`ci-results` artifact.
+
+### Run the checks on GitHub
+
+Every push runs this whole pipeline on GitHub Actions (ADR 0009), on a runner of your own. Set it
+up once:
+
+1. **Get a machine for it.** It needs 4 CPUs, 8 GB of memory, 40 GB of free disk and Docker. Don't
+   use the production server: the checks build images with the same names, and they would slow
+   the live service. A machine that already runs another project's runner will do.
+2. **Register the runner.** In the repository on GitHub, open **Settings → Actions → Runners →
+   New self-hosted runner** and choose Linux x64. Run the commands it shows on the machine, as a
+   user other than root. When `config.sh` asks for labels, enter `hamnivo`.
+3. **Give it Docker and run it as a service.** In the runner's folder:
+
+   ```bash
+   sudo usermod -aG docker "$USER"
+   sudo ./svc.sh install "$USER" && sudo ./svc.sh start
+   ```
+
+4. **Install Chromium's system libraries, once:** `sudo npx --yes playwright install-deps chromium`.
+5. **Make `main` wait for the checks.** Under **Settings → Branches**, in the rule for `main`, turn
+   on "Require status checks to pass" and pick `checks`.
+
+A newer push to the same branch cancels the run that is still going. Runs wait in the queue
+until a runner is online.
+
+To use GitHub's own runners instead, set the repository variable `HAMNIVO_CI_RUNNER` to
+`["ubuntu-latest"]`, under **Settings → Secrets and variables → Actions → Variables**. GitHub
+bills private repositories for those by the minute.
 
 To run the quick checks automatically before every `git push`:
 
