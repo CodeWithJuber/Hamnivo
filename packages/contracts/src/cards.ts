@@ -38,6 +38,11 @@ export const QuoteCard = z
   })
   .meta({ id: 'QuoteCard' });
 
+/**
+ * An AI action waiting for approval (G13, W16): plain wording of what will happen, the exact
+ * changes and amount, who approves and until when. `approvalId` is the action (`act_…`); clients
+ * read its live state and approve only when the served action hashes to `argumentsHash`.
+ */
 export const ApprovalCard = z
   .object({
     kind: z.literal('approval'),
@@ -45,9 +50,19 @@ export const ApprovalCard = z
     approvalId: z.string(),
     title: z.string().max(200),
     actionSummary: z.string().max(500),
-    resource: z.object({ type: z.string(), id: z.string(), label: z.string() }),
+    /** What will happen, one line each. */
+    effects: z.array(z.string().max(300)).max(10),
+    resource: z.object({ type: z.string(), id: z.string(), label: z.string() }).nullable(),
     changes: z.array(z.object({ field: z.string(), from: z.string().nullable(), to: z.string() })),
+    amount: z.object({ amountMinor: MinorUnits, currency: CurrencyCode }).nullable(),
+    risk: z.enum(['read', 'write', 'money', 'irreversible']),
     approver: z.enum(['customer', 'staff']),
+    /** Approving needs a fresh sign-in (staff) or a fresh identity check (customer). */
+    stepUp: z.boolean(),
+    /** SHA-256 of the canonical arguments the approval binds to. */
+    argumentsHash: z.string().regex(/^[a-f0-9]{64}$/),
+    /** Code for answering by text where cards are not shown ("APPROVE 4F2A9C"). */
+    code: z.string().max(12).nullable(),
     status: z.enum(['pending', 'approved', 'denied', 'expired', 'superseded']),
     expiresAt: Timestamp,
   })

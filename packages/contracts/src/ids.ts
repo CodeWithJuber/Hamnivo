@@ -63,6 +63,9 @@ export const ID_PREFIX = {
   savedReply: 'srp',
   review: 'rev',
   link: 'lnk',
+  mcpServer: 'mcp',
+  simulation: 'sim',
+  simulationRun: 'simr',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

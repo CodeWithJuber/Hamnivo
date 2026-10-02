@@ -44,6 +44,32 @@ export const AgentMemory = z
   })
   .meta({ id: 'AgentMemory' });
 
+/** One tool the agent may call (G07). The tool's own policy decides approval and autopilot. */
+export const AgentToolGrant = z
+  .object({
+    toolId: typeId('tool'),
+    /** Off: this agent always asks for approval, even where the tool may run on autopilot. */
+    autopilot: z.boolean().default(true),
+  })
+  .meta({ id: 'AgentToolGrant' });
+
+/** Tools granted to the agent and its action budgets (G15). */
+export const AgentTools = z
+  .object({
+    grants: z.array(AgentToolGrant).max(30).default([]),
+    /** Tool calls in one run, whatever their kind. */
+    maxCallsPerRun: z.int().min(1).max(10).default(4),
+    /** Autopilot actions in one conversation; beyond it, changes wait for approval. */
+    maxAutopilotPerConversation: z.int().min(0).max(50).default(5),
+  })
+  .superRefine((value, ctx) => {
+    const ids = value.grants.map((g) => g.toolId);
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: 'custom', path: ['grants'], message: 'Each tool can be granted once' });
+    }
+  })
+  .meta({ id: 'AgentTools' });
+
 /**
  * Everything that decides how an agent behaves. A published version of it never changes; edits
  * create a new draft (A07).
@@ -73,6 +99,8 @@ export const AgentConfig = z
     /** Knowledge the agent answers from. Customer answers use only public sources (G05). */
     knowledgeSourceIds: z.array(typeId('source')).max(20).default([]),
     memory: AgentMemory.prefault({}),
+    /** Tools the agent may call and its action budgets (G07, G15). */
+    tools: AgentTools.prefault({}),
   })
   .meta({ id: 'AgentConfig' });
 export type AgentConfig = z.output<typeof AgentConfig>;

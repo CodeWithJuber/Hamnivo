@@ -28,4 +28,6 @@ export * from './participants.js';
 export * from './parts.js';
 export * from './routes.js';
 export * from './staff-conversations.js';
+export * from './tool-routes.js';
+export * from './tools.js';
 export * from './widget.js';
