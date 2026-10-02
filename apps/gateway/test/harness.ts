@@ -34,6 +34,8 @@ export function testEnv(
     PUBLIC_API_ORIGIN: 'http://localhost:4000',
     PUBLIC_CONSOLE_ORIGIN: CONSOLE_ORIGIN,
     RATE_LIMIT_PER_MINUTE: '100000',
+    // Each test run keeps its cache entries apart on the shared Valkey.
+    CACHE_KEY_PREFIX: `hv:test:${process.pid}:${randomBytes(4).toString('hex')}:`,
     ...extra,
   };
 }

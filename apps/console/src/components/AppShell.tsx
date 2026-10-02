@@ -16,6 +16,7 @@ import {
   BotIcon,
   BrainIcon,
   BuildingIcon,
+  DatabaseZapIcon,
   InboxIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
@@ -26,6 +27,7 @@ import {
   ShieldCheckIcon,
   ShoppingBagIcon,
   StoreIcon,
+  WaypointsIcon,
   XIcon,
 } from 'lucide-react';
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from 'react';
@@ -50,6 +52,8 @@ type NavPath =
   | '/memory'
   | '/models'
   | '/runs'
+  | '/decisions'
+  | '/caching'
   | '/orders'
   | '/finance'
   | '/stop-ai'
@@ -89,6 +93,18 @@ function useNavItems(): NavItem[] {
       permission: 'integrations.manage',
     },
     { to: '/runs', label: t('nav.runs'), icon: ActivityIcon, permission: 'analytics.read' },
+    {
+      to: '/decisions',
+      label: t('decisions.nav'),
+      icon: WaypointsIcon,
+      permission: 'decisions.read',
+    },
+    {
+      to: '/caching',
+      label: t('caching.nav'),
+      icon: DatabaseZapIcon,
+      permission: 'knowledge.read',
+    },
     {
       to: '/orders',
       label: t('commerce.nav.orders'),

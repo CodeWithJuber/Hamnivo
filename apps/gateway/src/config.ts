@@ -67,6 +67,21 @@ const EnvSchema = z.object({
   CLAMAV_URL: z.url().optional(),
 
   /**
+   * Jev (TypeSafe) for routing decisions. Without a key, rubrics that name Jev record every
+   * decision as unavailable and the deterministic baseline decides.
+   */
+  JEV_API_KEY: z.string().min(8).optional(),
+  JEV_BASE_URL: z.url().optional(),
+
+  /** Prefix of every cache key in Valkey; separate deployments and test runs use their own. */
+  CACHE_KEY_PREFIX: z
+    .string()
+    .regex(/^[A-Za-z0-9:_-]{1,64}$/)
+    .default('hv:cache:'),
+  /** Deadline of one cache operation; slower answers count as misses (fail open). */
+  CACHE_TIMEOUT_MS: z.coerce.number().int().min(10).max(2000).default(150),
+
+  /**
    * Commerce (C01–C12). Another Stripe API origin, such as stripe-mock or a fake server: tests and
    * local demos only, refused in production.
    */

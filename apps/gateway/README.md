@@ -197,6 +197,80 @@ Late publication (R06):
   configuration's `availability`, and the answer to "talk to a person": queued, or offline with
   the time people are back. Without hours, the widget never claims someone is available.
 
+## Team routing decisions (J02, J05, J08)
+
+- **Team routing** (`GET /v1/admin/brands/{brandId}/routing/teams`,
+  `PUT /v1/admin/brands/{brandId}/routing/teams/{teamId}`): routing uses the inbox's teams
+  (`/v1/admin/teams`, in the brand's workspace or tenant-wide) and keeps, per brand, the topics a
+  team handles, the languages its people answer in and those served through a reviewed
+  translation path, whether it is the default, whether it accepts conversations, and whether
+  routing uses it at all. Reading needs `decisions.read`; changing needs `decisions.manage`; every
+  change is audited.
+- **Rubric** (`/v1/admin/brands/{brandId}/decisions/team-routing`, `…/draft`, `…/publish`,
+  `…/mode`, `…/test`): versioned topics with baseline keywords, the inputs shared with the
+  provider (recent customer messages with personal data redacted, conversation status), a
+  threshold per language slice and the provider (`none`, `mock` or `jev` with a pinned version).
+  Changing needs `decisions.manage`; every change is audited.
+- **When it runs.** The outbox topic `conversation.route` runs on a conversation's first customer
+  message and on every hand-off. Jev decides within the rubric's deadline (1.5 s on the chat path)
+  behind the circuit breaker; the deterministic baseline decides when Jev abstains, fails, is
+  too slow or is not sure enough for the language. A request for a person is never overridden.
+- **Modes.** Brands start in `shadow`: both decisions are recorded, the baseline's is final and no
+  team is assigned. `live` puts the conversation in the chosen team's inbox queue the way the
+  inbox does (`conversation_inbox_state.team_id`, then `conversation.team_changed` sets the
+  Chatwoot team, created on first use), so team queues and team-scoped grants see it. Only
+  accepting teams are chosen; a team a person set is kept, and so is a conversation a person
+  handles. Routing picks a team, never an owner.
+- **Records** (`…/records`, `/v1/admin/decisions/{decisionId}`, `…/review`) keep labels, versions,
+  latency and tokens, never customer text; confidence only when the provider gave one.
+  `…/experiment` compares Jev with the baseline per language from shadow and live records.
+
+## Reply language (U01, U07)
+
+- `GET /v1/widget/language` and `POST /v1/widget/language` (widget session): interface locale,
+  explicit reply language (`en`, `ar`, `hi`, `ur`, `hi-Latn`, `ur-Latn`), style, and closing the
+  language question. POST because the widget's cross-origin surface allows GET and POST only.
+- Replies follow the explicit choice, then the words of the latest message, then the interface
+  locale. Words that fit Hinglish and Roman Urdu equally keep the language in use, suggest one from
+  the locale and ask once. The choice and its source are recorded on the model step. Preferences
+  keep choices and detected candidates, never message text.
+
+## Answer cache (K01, K02, K06, K07, K08, K09, K10, K12)
+
+- **Store.** A dedicated Valkey connection with a key prefix (`CACHE_KEY_PREFIX`), a 150 ms
+  timeout (`CACHE_TIMEOUT_MS`) and no offline queue, wrapped fail-open: a failure reads as
+  unavailable, the cache is skipped for 30 s and work is done fresh.
+- **Exact answers.** Only a conversation's first message, public, complete, with no personal data,
+  personal context or excluded class is stored. Keys bind tenant, brand, audience, language, model,
+  prompt version, dependency versions and a per-tenant HMAC of the question. Hits are rechecked
+  against the current knowledge. Off until a brand turns it on.
+- **Query embeddings** for knowledge search are cached under the text, model, dimensions and
+  preprocessing version, and coalesced per process.
+- **Invalidation.** Database triggers bump dependency versions with knowledge, source, agent and
+  brand changes; policy changes and `POST …/cache/invalidate` bump the tier. Stale entries are
+  reported, then removed.
+- **Studio** (`/v1/admin/brands/{brandId}/cache/policy`, `inspect`, `entries`, `impact`,
+  `invalidate`, `metrics`): reading needs `knowledge.read`, changing `knowledge.manage`; changes
+  are audited. Metrics are counts only; health comes from a live probe of the store.
+- **Customer memory (K09, G19).** Memory is recalled before the cache is read. A reply built with
+  any memory item passes `personalContext: ['personal_memory']`, so it never enters a shared
+  entry; for the opening question it may be kept for that customer alone, under their memory
+  namespace (`MemoryCache.namespace()`, `hamnivo:memory:c:{tenant}:{subject}:`) with their memory
+  version (`MemoryCache.version()`) in the key. A memory change bumps the version, so their
+  entries are no longer reachable; a deletion purges the namespace. The run's `answer_cache` step
+  says whether an entry was `shared` or the customer's own (`scope`).
+- **Commerce data (K06).** Commerce registers its rule (`commerce.live_data`, deciding with
+  `answerCacheDecision()`) in both processes. A reply in a conversation that holds catalog, cart,
+  quote, payment, order or refund data is neither read from nor written to the cache, and a reply
+  whose receipt check read a payment or refund status (X10) is not stored. The run's
+  `answer_cache` step names the rule and the data classes.
+- **Hooks for other modules.** `CacheExclusions.register(rule)` excludes requests; a module names
+  its own data classes (`commerce.order_status`) and its rule decides them.
+  `personalContext` on a cache request keeps a result out of shared entries. `PERSONAL_CACHE_SCOPE`
+  places private entries (memory provides it; a scope that is missing, slow or not the
+  customer's own means the entry is not cached). A store call must match the lookup's audience,
+  or nothing is stored.
+
 ## Widget framing
 
 `GET /v1/widget/frame-policy?widgetId=wid_…` names the websites that may frame a brand's widget

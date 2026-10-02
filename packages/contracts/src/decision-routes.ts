@@ -1,0 +1,161 @@
+import { z } from 'zod';
+import { Cursor, page } from './common.js';
+import {
+  DecisionRecord,
+  DecisionRubric,
+  DecisionStatus,
+  DecisionTask,
+  ExperimentReport,
+  ReviewDecisionRequest,
+  RoutingTeam,
+  SaveRubricDraftRequest,
+  SetDecisionModeRequest,
+  SetTeamRoutingRequest,
+  TestRubricRequest,
+  TestRubricResult,
+} from './decisions.js';
+import type { RouteDef } from './routes.js';
+
+const brandParams = z.object({
+  brandId: z.string().meta({ description: 'Brand ID (brd_…)' }),
+});
+const taskParams = brandParams.extend({
+  task: z.string().meta({ description: 'Decision task, such as team-routing' }),
+});
+const teamParams = brandParams.extend({
+  teamId: z.string().meta({ description: 'Team ID (team_…)' }),
+});
+const decisionParams = z.object({
+  decisionId: z.string().meta({ description: 'Decision ID (dcs_…)' }),
+});
+
+/** Jev-assisted routing: teams, rubrics, shadow and live modes, records and experiments. */
+export const decisionRoutes = {
+  listRoutingTeams: {
+    method: 'get',
+    path: '/v1/admin/brands/{brandId}/routing/teams',
+    operationId: 'listRoutingTeams',
+    summary: 'Teams that can take a brand’s conversations, with their routing (decisions.read)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: brandParams,
+    success: {
+      status: 200,
+      description: 'Teams',
+      schema: z.object({ items: z.array(RoutingTeam) }),
+    },
+  },
+  setTeamRouting: {
+    method: 'put',
+    path: '/v1/admin/brands/{brandId}/routing/teams/{teamId}',
+    operationId: 'setTeamRouting',
+    summary: 'Set a team’s intents, languages and availability for a brand (decisions.manage)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: teamParams,
+    body: SetTeamRoutingRequest,
+    success: { status: 200, description: 'Team with its routing', schema: RoutingTeam },
+  },
+  getDecisionTask: {
+    method: 'get',
+    path: '/v1/admin/brands/{brandId}/decisions/{task}',
+    operationId: 'getDecisionTask',
+    summary: 'Mode, published rubric and draft of a decision task (decisions.read)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: taskParams,
+    success: { status: 200, description: 'Decision task', schema: DecisionTask },
+  },
+  saveRubricDraft: {
+    method: 'put',
+    path: '/v1/admin/brands/{brandId}/decisions/{task}/draft',
+    operationId: 'saveRubricDraft',
+    summary:
+      'Save the draft questions and thresholds; drafts are never used live (decisions.manage)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: taskParams,
+    body: SaveRubricDraftRequest,
+    success: { status: 200, description: 'Draft saved', schema: DecisionRubric },
+  },
+  publishRubric: {
+    method: 'post',
+    path: '/v1/admin/brands/{brandId}/decisions/{task}/publish',
+    operationId: 'publishRubric',
+    summary: 'Publish the draft as the next immutable version (decisions.manage)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: taskParams,
+    success: { status: 200, description: 'Published', schema: DecisionTask },
+  },
+  setDecisionMode: {
+    method: 'put',
+    path: '/v1/admin/brands/{brandId}/decisions/{task}/mode',
+    operationId: 'setDecisionMode',
+    summary: 'Turn routing off, run it in shadow or make it live (decisions.manage)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: taskParams,
+    body: SetDecisionModeRequest,
+    success: { status: 200, description: 'Mode set', schema: DecisionTask },
+  },
+  testRubric: {
+    method: 'post',
+    path: '/v1/admin/brands/{brandId}/decisions/{task}/test',
+    operationId: 'testRubric',
+    summary: 'Try a rubric on a synthetic message; nothing reaches a customer (decisions.manage)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: taskParams,
+    body: TestRubricRequest,
+    success: { status: 200, description: 'Test result', schema: TestRubricResult },
+  },
+  listDecisionRecords: {
+    method: 'get',
+    path: '/v1/admin/brands/{brandId}/decisions/{task}/records',
+    operationId: 'listDecisionRecords',
+    summary: 'Recorded decisions, newest first (decisions.read)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: taskParams,
+    query: z.object({
+      status: DecisionStatus.optional(),
+      conversationId: z.string().optional(),
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+      cursor: Cursor.optional(),
+    }),
+    success: { status: 200, description: 'Decisions', schema: page(DecisionRecord) },
+  },
+  getDecisionExperiment: {
+    method: 'get',
+    path: '/v1/admin/brands/{brandId}/decisions/{task}/experiment',
+    operationId: 'getDecisionExperiment',
+    summary: 'Provider versus baseline: agreement, abstention, latency and tokens (decisions.read)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: taskParams,
+    query: z.object({ days: z.coerce.number().int().min(1).max(90).default(30) }),
+    success: { status: 200, description: 'Report', schema: ExperimentReport },
+  },
+  getDecisionRecord: {
+    method: 'get',
+    path: '/v1/admin/decisions/{decisionId}',
+    operationId: 'getDecisionRecord',
+    summary: 'One recorded decision (decisions.read)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: decisionParams,
+    success: { status: 200, description: 'Decision', schema: DecisionRecord },
+  },
+  reviewDecision: {
+    method: 'post',
+    path: '/v1/admin/decisions/{decisionId}/review',
+    operationId: 'reviewDecision',
+    summary: 'Record a reviewer’s correction of a decision (decisions.manage)',
+    tags: ['Decisions'],
+    auth: 'staff_session',
+    params: decisionParams,
+    body: ReviewDecisionRequest,
+    success: { status: 200, description: 'Reviewed', schema: DecisionRecord },
+  },
+} as const satisfies Record<string, RouteDef>;

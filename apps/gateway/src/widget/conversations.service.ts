@@ -250,6 +250,15 @@ export class WidgetConversationsService {
           aggregateId: conversationId,
           payload: { conversationId, ledgerId, epoch: control.ownershipEpoch },
         });
+        // A new conversation is routed to a team once the customer's first words are in (J02).
+        if (control.lastCustomerMessageAt === null) {
+          await enqueueOutbox(tx, claims.tenantId, {
+            topic: 'conversation.route',
+            aggregateType: 'conversation',
+            aggregateId: conversationId,
+            payload: { conversationId, trigger: 'new_conversation', ref: `new:${ledgerId}` },
+          });
+        }
       },
     });
   }

@@ -68,6 +68,19 @@ enforce the rest:
 before a deletion loses that deletion's tombstone too, so the restore procedure must carry the
 tombstones of later deletions across (export them before restoring, insert them after).
 
+## Decisions, language and cache tables
+
+| File | Tables |
+|---|---|
+| `src/schema/decisions.ts` | `team_routing` (per inbox team and brand: intents, languages, reviewed translation languages, default, accepting; a team routes only for brands of its workspace), `decision_rubrics` (versioned questions and thresholds; published versions are immutable), `decision_tasks` (off, shadow or live per brand), `decision_records` (append-only except applying and reviewing; no delete for the application role) |
+| `src/schema/language.ts` | `language_preferences`: interface locale, explicit reply language, last detection, one-time prompt, script, style and time zone per customer principal |
+| `src/schema/cache.ts` | `cache_policies`, `cache_dependency_versions`, `cache_entry_index` (fingerprints and references, never content), `cache_metrics_daily` (counts only) |
+
+Triggers raise `cache_dependency_versions` in the same transaction as the change: a knowledge
+source's status, visibility or review cycle, a document's current version, status, title, URL or
+source, an agent's published version and a brand's name. `test/decisions.int.test.ts` covers the
+rubric and record guards and the triggers, including rollback and tenant isolation.
+
 ## Tests
 
 ```bash

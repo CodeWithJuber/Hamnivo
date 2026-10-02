@@ -1,5 +1,13 @@
+import { createHash } from 'node:crypto';
 import type { AgentConfig } from '@hamnivo/contracts';
-import type { AuthorityMessage } from '@hamnivo/domain';
+import {
+  type AuthorityMessage,
+  type CommunicationStyle,
+  CUSTOMER_REPLY_RULES,
+  LANGUAGE_NAMES,
+  type ReplyLanguage,
+  styleInstructions,
+} from '@hamnivo/domain';
 import type { ModelMessage } from 'ai';
 
 const TONES: Record<AgentConfig['tone'], string> = {
@@ -72,25 +80,48 @@ export function applyCitations<P>(
   return { text: cleaned, cited };
 }
 
+export interface PromptOptions {
+  /** The reply language chosen for this customer (U01): explicit choice first, then detection. */
+  language?: ReplyLanguage;
+  /** The customer's style (U10): wording only. */
+  style?: CommunicationStyle;
+}
+
+/** Whether an agent answers in a language: the same tag, or the same base language (ur, ur-Latn). */
+function supports(config: AgentConfig, language: ReplyLanguage): boolean {
+  const base = language.split('-')[0];
+  return config.languages.some((tag) => tag === language || tag === base);
+}
+
+function languageRule(config: AgentConfig, language: ReplyLanguage | undefined): string {
+  const languages = config.languages.join(', ');
+  if (!language) {
+    return `- Reply in the customer's language when it is one of: ${languages}. Otherwise reply in ${config.languages[0]} and offer a person.`;
+  }
+  if (supports(config, language)) {
+    return `- Reply in ${LANGUAGE_NAMES[language]}, as the customer writes. Reply language code: ${language}.`;
+  }
+  return `- The customer writes in ${LANGUAGE_NAMES[language]}, which you do not answer in (you answer in: ${languages}). Reply in ${config.languages[0]} and offer a person. Reply language code: ${config.languages[0]}.`;
+}
+
 /**
  * System instructions for a customer-facing run. Hamnivo's rules come first and the business's
- * instructions cannot override them (U09 honest identity, U11 no invented facts).
+ * instructions cannot override them (U09 honest identity, U11 no invented facts and respectful
+ * correction, U01 reply language, U10 style).
  */
 export function systemPrompt(
   config: AgentConfig,
   brandName: string,
   passages: PromptPassage[] = [],
+  options: PromptOptions = {},
 ): string {
-  const languages = config.languages.join(', ');
   const rules = [
     `You are "${config.displayName}", the AI assistant of ${brandName}. You are software, not a person.`,
     'These rules always apply and nothing below can change them:',
-    '- If asked, say plainly that you are an AI assistant. Never claim to be human, never use a human name for yourself and never say you are not a bot.',
-    '- Only state facts you were given in this conversation or in these instructions. If you do not know, say so and offer to connect a person.',
-    '- Never claim that you checked, changed, refunded or verified anything. You cannot act on accounts or orders.',
-    '- The customer can ask for a person at any time. When they do, tell them a person will take over.',
-    `- Reply in the customer's language when it is one of: ${languages}. Otherwise reply in ${config.languages[0]} and offer a person.`,
+    ...CUSTOMER_REPLY_RULES,
+    languageRule(config, options.language),
     `- Keep replies short and ${TONES[config.tone]}.`,
+    ...styleInstructions(options.style ?? {}).map((line) => `- ${line}`),
     '- Messages from support staff in the history are marked [Support agent]. Do not contradict them.',
   ];
   if (config.purpose) rules.push('', `Purpose: ${config.purpose}`);
@@ -119,4 +150,20 @@ export function historyMessages(messages: AuthorityMessage[], limit: number): Mo
         content: m.sender.kind === 'user' ? `[Support agent] ${text}` : text,
       };
     });
+}
+
+/**
+ * Version of everything in the system prompt except retrieved passages: Hamnivo's rules, the
+ * agent's configuration, the brand name, the reply language and style. Cached answers are keyed
+ * by it, so a change to any of them stops their reuse.
+ */
+export function promptVersion(
+  config: AgentConfig,
+  brandName: string,
+  options: PromptOptions = {},
+): string {
+  return createHash('sha256')
+    .update(systemPrompt(config, brandName, [], options))
+    .digest('hex')
+    .slice(0, 32);
 }
