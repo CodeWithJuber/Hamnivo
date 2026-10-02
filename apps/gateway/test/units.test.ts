@@ -1,4 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { EgressError, type Resolver } from '@hamnivo/adapters/net';
 import { InvalidPublicIdError } from '@hamnivo/db';
 import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
@@ -13,7 +16,7 @@ import { toProblem } from '../src/common/problem.filter.js';
 import { requestIdFrom } from '../src/common/request-id.js';
 import { loadConfig } from '../src/config.js';
 import { deterministicUuid } from '../src/identity/tenants.service.js';
-import { checkSourceUrl, guardedFetch, isPublicAddress } from '../src/migration/source-guard.js';
+import { checkSourceUrl, sourceFetch } from '../src/migration/source-guard.js';
 import { retryDelayMs } from '../src/outbox/relay.service.js';
 import { hintOf, type KeyRing, open, rewrap, seal, secretAad } from '../src/secrets/envelope.js';
 
@@ -197,43 +200,13 @@ describe('webhook intake of imported history', () => {
   });
 });
 
+/**
+ * Which addresses a source may be read at is decided by the one egress guard
+ * (`@hamnivo/adapters/net`, tested there: every address range, the URL rules, DNS rebinding). These
+ * tests are what the migration source adds: its error codes, development's trusted origin, and a
+ * redirect coming back as the response it is.
+ */
 describe('source addresses of imports (M04)', () => {
-  it('tells public addresses from internal ones, IPv4 and IPv6', () => {
-    for (const address of [
-      '93.184.215.14',
-      '8.8.8.8',
-      '2606:4700:4700::1111',
-      '2001:4860:4860::8888',
-    ]) {
-      expect(isPublicAddress(address), address).toBe(true);
-    }
-    for (const address of [
-      '127.0.0.1',
-      '10.1.2.3',
-      '172.16.0.1',
-      '192.168.1.1',
-      '169.254.169.254',
-      '100.64.0.1',
-      '0.0.0.0',
-      '224.0.0.1',
-      '::1',
-      '::',
-      'fc00::1',
-      'fe80::1',
-      '::ffff:10.0.0.1',
-      '::ffff:127.0.0.1',
-      '::ffff:0:10.0.0.1',
-      '64:ff9b::a00:1',
-      '2002:a00:1::1',
-      '2001:0:4136:e378:8000:63bf:3fff:fdd2',
-      '100::1',
-      'fec0::1',
-      'not-an-address',
-    ]) {
-      expect(isPublicAddress(address), address).toBe(false);
-    }
-  });
-
   it('accepts only https URLs without credentials that point outside the network', async () => {
     await expect(checkSourceUrl('https://93.184.215.14/app/', false)).resolves.toEqual(
       new URL('https://93.184.215.14'),
@@ -253,9 +226,90 @@ describe('source addresses of imports (M04)', () => {
     await expect(checkSourceUrl('http://127.0.0.1:3000', true)).resolves.toBeInstanceOf(URL);
   });
 
+  it('names a source that cannot be found, and one that resolves inside the network', async () => {
+    const gone: Resolver = async () => {
+      throw Object.assign(new Error('ENOTFOUND'), { code: 'ENOTFOUND' });
+    };
+    const inside: Resolver = async () => [
+      { address: '93.184.215.14', family: 4 },
+      { address: '10.0.0.7', family: 4 },
+    ];
+    await expect(checkSourceUrl('https://nowhere.example', false, gone)).rejects.toMatchObject({
+      code: 'unresolved',
+    });
+    await expect(checkSourceUrl('https://chat.example.com', false, inside)).rejects.toMatchObject({
+      code: 'private_address',
+    });
+  });
+
   it('refuses to connect to internal addresses, even when a URL got past the first check', async () => {
-    const guarded = guardedFetch(false);
-    await expect(guarded('http://127.0.0.1:9/api/v1/profile')).rejects.toThrow();
-    await expect(guarded('http://localhost:9/api/v1/profile')).rejects.toThrow(/fetch failed/);
+    const guarded = sourceFetch('https://chat.example.com', false);
+    for (const url of [
+      'https://127.0.0.1:9/api/v1/profile',
+      'https://localhost:9/api/v1/profile',
+      'https://[::ffff:127.0.0.1]:9/api/v1/profile',
+      'http://chat.example.com/api/v1/profile',
+    ]) {
+      await expect(guarded(url), url).rejects.toBeInstanceOf(EgressError);
+    }
+  });
+
+  it('checks the address again when it connects: a name that turns private after the check is refused', async () => {
+    const hits: string[] = [];
+    const server = createServer((request, response) => {
+      hits.push(request.url ?? '');
+      response.writeHead(200).end('{}');
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      // The first lookup, when the address is given, is public; the next, when connecting, is not.
+      let lookups = 0;
+      const rebinding: Resolver = async () => [
+        lookups++ === 0
+          ? { address: '93.184.215.14', family: 4 }
+          : { address: '127.0.0.1', family: 4 },
+      ];
+      const url = `https://chat.partner.example:${port}`;
+      await expect(checkSourceUrl(url, false, rebinding)).resolves.toBeInstanceOf(URL);
+      const fetchSource = sourceFetch(url, false, rebinding);
+      await expect(fetchSource(`${url}/api/v1/profile`)).rejects.toMatchObject({
+        problem: 'private_address',
+      });
+      expect(lookups).toBe(2);
+      expect(hits).toEqual([]);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('reads a local source only when development trusts it, and hands redirects back unfollowed', async () => {
+    const hits: string[] = [];
+    const server = createServer((request, response) => {
+      hits.push(request.url ?? '');
+      if (request.url === '/moved') response.writeHead(302, { location: '/elsewhere' }).end();
+      else response.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}');
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as AddressInfo;
+    const origin = `http://127.0.0.1:${port}`;
+    try {
+      await expect(sourceFetch(origin, false)(`${origin}/x`)).rejects.toBeInstanceOf(EgressError);
+      expect(hits).toEqual([]);
+      const local = sourceFetch(origin, true);
+      expect(await (await local(`${origin}/x`)).json()).toEqual({ ok: true });
+      // The importer follows its own redirects (against the source's base URL): it gets them back.
+      const moved = await local(`${origin}/moved`, { redirect: 'manual' });
+      expect(moved.status).toBe(302);
+      expect(moved.headers.get('location')).toBe('/elsewhere');
+      expect(hits).toEqual(['/x', '/moved']);
+      // Development trusts the source's own origin only.
+      await expect(local(`http://127.0.0.1:${port + 1}/x`)).rejects.toBeInstanceOf(EgressError);
+      await local.close();
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

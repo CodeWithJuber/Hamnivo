@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { GuardedFetch, Resolver } from '@hamnivo/adapters/net';
 import { ChatwootError, ChatwootImporter } from '@hamnivo/chatwoot';
 import {
   appendAudit,
@@ -33,7 +34,7 @@ import {
   type SampleVerification,
   writePackage,
 } from '@hamnivo/migration-sdk';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { fileTypeFromBuffer } from 'file-type';
 import { AuthorityRegistry } from '../authority/registry.js';
@@ -42,7 +43,7 @@ import { SCANNER } from '../knowledge/ingestion.service.js';
 import type { Scanner } from '../knowledge/scanner.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
-import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
+import { APP_DB, CLOCK, type Clock, CONFIG, EGRESS_RESOLVER } from '../tokens.js';
 import { readChatwootHistory } from './chatwoot-source.js';
 import {
   brandConnectionId,
@@ -52,7 +53,7 @@ import {
   readUpload,
   uploadFormat,
 } from './destination.js';
-import { checkSourceUrl, guardedFetch, SourceUrlError } from './source-guard.js';
+import { checkSourceUrl, SourceUrlError, sourceFetch } from './source-guard.js';
 import type { Checkpoint, ItemRow, JobRow, JobStats } from './views.js';
 
 /** Outbox attempts while the scanner is unreachable before an upload is refused. */
@@ -133,6 +134,7 @@ export class MigrationEngine {
     @Inject(SCANNER) private readonly scanner: Scanner,
     private readonly registry: AuthorityRegistry,
     private readonly secrets: SecretBroker,
+    @Optional() @Inject(EGRESS_RESOLVER) private readonly resolver?: Resolver,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -326,6 +328,7 @@ export class MigrationEngine {
     // Another worker is reading this source: try again once its lease has passed.
     if (!leased) throw new Transient('The source is being read by another worker');
     const allowPrivate = this.config.MIGRATION_SOURCE_ALLOW_PRIVATE;
+    let guard: GuardedFetch | null = null;
     try {
       const token = job.sourceSecretId
         ? await this.tx(tenantId, (tx) =>
@@ -337,18 +340,20 @@ export class MigrationEngine {
         return false;
       }
       try {
-        await checkSourceUrl(config.baseUrl, allowPrivate);
+        await checkSourceUrl(config.baseUrl, allowPrivate, this.resolver);
       } catch (error) {
         if (!(error instanceof SourceUrlError)) throw error;
         await this.refuse(tenantId, job, error.code);
         return false;
       }
+      // Every connection to the source is checked again, when it is made.
+      guard = sourceFetch(config.baseUrl, allowPrivate, this.resolver);
       const source = new ChatwootImporter({
         baseUrl: config.baseUrl,
         accountId: config.accountId,
         token,
         timeoutMs: this.config.CHATWOOT_TIMEOUT_MS,
-        fetch: guardedFetch(allowPrivate),
+        fetch: guard,
       });
       const namespace = this.namespaceOf(job, null);
       const known = await this.tx(tenantId, async (tx) => {
@@ -461,6 +466,7 @@ export class MigrationEngine {
       });
       return true;
     } finally {
+      await guard?.close().catch(() => undefined);
       await this.update(tenantId, job.id, { leaseUntil: null });
     }
   }

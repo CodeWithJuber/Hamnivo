@@ -31,9 +31,7 @@ const response = (status: number, headers: Record<string, string> = {}): EgressR
   body: Buffer.alloc(0),
   truncated: false,
   durationMs: 12,
-  remoteAddress: '93.184.216.34',
   url: 'https://hooks.example.com/hv',
-  redirects: 0,
 });
 
 describe('Standard Webhooks signatures', () => {

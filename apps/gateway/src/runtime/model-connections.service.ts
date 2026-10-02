@@ -1,3 +1,4 @@
+import { checkDestination, EgressError } from '@hamnivo/adapters/net';
 import type { CreateModelConnectionRequest, ModelConnection } from '@hamnivo/contracts';
 import {
   appendAudit,
@@ -14,6 +15,7 @@ import { asc, eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
+import { EgressService } from '../developer/egress.service.js';
 import { enforce } from '../identity/staff.guard.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
@@ -33,7 +35,26 @@ function view(row: Row, keyHint: string): ModelConnection {
   };
 }
 
-/** Tenant model credentials. The API key goes straight into the secret broker. */
+/** The words for a server address the egress guard refuses, as the base URL field's error. */
+function baseUrlProblem(error: EgressError): string {
+  switch (error.problem) {
+    case 'insecure_url':
+      return 'Use an https:// address.';
+    case 'host_not_allowed':
+      return 'This host is not on the list of allowed hosts. Add it under Allowed hosts first.';
+    case 'private_address':
+      return 'This address points to a private or local network. A server administrator can allow it.';
+    default:
+      return 'Enter the full address of the server, starting with https://.';
+  }
+}
+
+/**
+ * Tenant model credentials. The API key goes straight into the secret broker. The tenant's own
+ * server address (a base URL) is a request the server makes for the tenant, so it is held to the
+ * egress guard: public HTTPS, the workspace's allowed hosts, and EGRESS_TRUSTED_ORIGINS for a
+ * model server the administrator runs on the local network.
+ */
 @Injectable()
 export class ModelConnectionsService {
   constructor(
@@ -41,6 +62,7 @@ export class ModelConnectionsService {
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly secrets: SecretBroker,
+    private readonly egress: EgressService,
   ) {}
 
   private tx<T>(principal: StaffPrincipal, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -83,12 +105,30 @@ export class ModelConnectionsService {
     });
   }
 
+  /**
+   * Checks the server address now, so a person hears at once that it points to a private network.
+   * A name that does not resolve yet is accepted: it is checked again whenever a model is called.
+   */
+  private async checkBaseUrl(tx: TenantTx, baseUrl: string | undefined) {
+    if (!baseUrl) return;
+    try {
+      await checkDestination(baseUrl, await this.egress.policyIn(tx));
+    } catch (error) {
+      if (!(error instanceof EgressError)) throw error;
+      if (error.problem === 'unresolvable') return;
+      throw new AppError('VALIDATION_FAILED', {
+        fields: [{ path: 'baseUrl', message: baseUrlProblem(error) }],
+      });
+    }
+  }
+
   async create(
     principal: StaffPrincipal,
     input: z.output<typeof CreateModelConnectionRequest>,
   ): Promise<ModelConnection> {
     this.enforceManage(principal);
     return this.tx(principal, async (tx) => {
+      await this.checkBaseUrl(tx, input.baseUrl);
       const secretId = await this.secrets.storeIn(tx, principal.tenantId, {
         kind: 'model_api_key',
         label: `${input.provider}: ${input.label}`,

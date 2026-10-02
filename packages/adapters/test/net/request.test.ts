@@ -69,7 +69,7 @@ async function problemOf(promise: Promise<unknown>): Promise<string> {
 const loopback: Resolver = async () => [{ address: '127.0.0.1', family: 4 }];
 
 describe('safeRequest', () => {
-  it('delivers to a trusted origin and reports status, body, time and address', async () => {
+  it('delivers to a trusted origin and reports status, body and time', async () => {
     const target = await receiver((_request, response) => {
       response.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
     });
@@ -82,25 +82,61 @@ describe('safeRequest', () => {
       },
       { trustedOrigins: [target.origin] },
     );
-    expect(response).toMatchObject({ status: 200, truncated: false, redirects: 0 });
+    expect(response).toMatchObject({
+      status: 200,
+      truncated: false,
+      url: `${target.origin}/hook`,
+      headers: { 'content-type': 'text/plain' },
+    });
+    expect(response.durationMs).toBeGreaterThanOrEqual(0);
     expect(response.body.toString()).toBe('ok');
-    expect(response.remoteAddress).toBe('127.0.0.1');
     expect(target.hits).toEqual([
       expect.objectContaining({ method: 'POST', url: '/hook', body: '{"type":"webhook.test"}' }),
     ]);
     expect(target.hits[0]?.headers['webhook-id']).toBe('evt_1');
+    expect(target.hits[0]?.headers['content-length']).toBe('23');
+  });
+
+  it('sends GET without a body, and the method it is given', async () => {
+    const target = await receiver((_request, response) => {
+      response.writeHead(200).end('here');
+    });
+    const policy = { trustedOrigins: [target.origin] };
+    await safeRequest({ url: `${target.origin}/a`, timeoutMs: 5000 }, policy);
+    await safeRequest(
+      { url: `${target.origin}/b`, method: 'PUT', body: 'x', timeoutMs: 5000 },
+      policy,
+    );
+    const head = await safeRequest(
+      { url: `${target.origin}/c`, method: 'HEAD', timeoutMs: 5000 },
+      policy,
+    );
+    expect(head.body.length).toBe(0);
+    expect(target.hits.map((hit) => [hit.method, hit.url, hit.body])).toEqual([
+      ['GET', '/a', ''],
+      ['PUT', '/b', 'x'],
+      ['HEAD', '/c', ''],
+    ]);
   });
 
   it('reads at most the size limit of a response', async () => {
     const target = await receiver((_request, response) => {
       response.writeHead(200).end('x'.repeat(200_000));
     });
+    const policy = { trustedOrigins: [target.origin] };
     const response = await safeRequest(
       { url: `${target.origin}/big`, timeoutMs: 5000, maxResponseBytes: 1024 },
-      { trustedOrigins: [target.origin] },
+      policy,
     );
     expect(response.body.length).toBe(1024);
     expect(response.truncated).toBe(true);
+    // A body that fits is not truncated, even when it is exactly the limit.
+    const exact = await safeRequest(
+      { url: `${target.origin}/big`, timeoutMs: 5000, maxResponseBytes: 200_000 },
+      policy,
+    );
+    expect(exact.body.length).toBe(200_000);
+    expect(exact.truncated).toBe(false);
   });
 
   it('gives up at the deadline', async () => {
@@ -118,22 +154,69 @@ describe('safeRequest', () => {
     expect(Date.now() - started).toBeLessThan(3000);
   });
 
+  it('gives up at the deadline of a response that stops halfway', async () => {
+    const target = await receiver((_request, response) => {
+      response.writeHead(200, { 'content-length': '1000' });
+      response.write('partial');
+    });
+    const problem = await problemOf(
+      safeRequest(
+        { url: `${target.origin}/stall`, timeoutMs: 400 },
+        { trustedOrigins: [target.origin] },
+      ),
+    );
+    expect(problem).toBe('timeout');
+  });
+
+  it('reports a connection that fails, and a secure connection that cannot be made', async () => {
+    const target = await receiver();
+    const closed = target.origin;
+    await target.close();
+    expect(
+      await problemOf(
+        safeRequest({ url: `${closed}/`, timeoutMs: 2000 }, { trustedOrigins: [closed] }),
+      ),
+    ).toBe('network');
+    // TLS to a server that speaks plain HTTP.
+    const plain = await receiver();
+    const secure = `https://127.0.0.1:${plain.port}`;
+    expect(
+      await problemOf(
+        safeRequest({ url: `${secure}/`, timeoutMs: 2000 }, { trustedOrigins: [secure] }),
+      ),
+    ).toBe('tls');
+  });
+
   it('refuses a private address given directly, without connecting', async () => {
     const target = await receiver();
-    const policy: EgressPolicy = { requireHttps: false };
+    const policy: EgressPolicy = {};
+    expect(
+      await problemOf(
+        safeRequest({ url: `https://127.0.0.1:${target.port}/`, timeoutMs: 2000 }, policy),
+      ),
+    ).toBe('private_address');
+    // Plain HTTP is refused first, for a public address and a private one alike.
     expect(
       await problemOf(safeRequest({ url: `${target.origin}/`, timeoutMs: 2000 }, policy)),
-    ).toBe('private_address');
+    ).toBe('insecure_url');
     expect(target.hits).toHaveLength(0);
   });
 
   it('refuses a host name that resolves to a private address, without connecting', async () => {
     const target = await receiver();
-    const policy: EgressPolicy = { requireHttps: false, resolve: loopback };
-    const url = `http://receiver.example:${target.port}/hook`;
-    expect(await problemOf(safeRequest({ url, timeoutMs: 2000, body: 'x' }, policy))).toBe(
+    const url = `https://receiver.example:${target.port}/hook`;
+    const refused = (resolve: Resolver) =>
+      problemOf(safeRequest({ url, timeoutMs: 2000, body: 'x' }, { resolve }));
+    expect(await refused(loopback)).toBe('private_address');
+    expect(await refused(async () => [{ address: '::ffff:127.0.0.1', family: 6 }])).toBe(
       'private_address',
     );
+    expect(
+      await refused(async () => [
+        { address: '93.184.216.34', family: 4 },
+        { address: '127.0.0.1', family: 4 },
+      ]),
+    ).toBe('private_address');
     expect(target.hits).toHaveLength(0);
   });
 
@@ -147,8 +230,8 @@ describe('safeRequest', () => {
         ? [{ address: '93.184.216.34', family: 4 }]
         : [{ address: '127.0.0.1', family: 4 }];
     };
-    const policy: EgressPolicy = { requireHttps: false, resolve: rebinding };
-    const url = `http://rebind.example:${target.port}/hook`;
+    const policy: EgressPolicy = { resolve: rebinding };
+    const url = `https://rebind.example:${target.port}/hook`;
     await checkDestination(url, policy);
     expect(await problemOf(safeRequest({ url, timeoutMs: 2000, body: 'x' }, policy))).toBe(
       'private_address',
@@ -157,102 +240,77 @@ describe('safeRequest', () => {
     expect(target.hits).toHaveLength(0);
   });
 
-  describe('redirects', () => {
-    it('returns a redirect as it is by default, without following it', async () => {
-      const inside = await receiver();
-      const entry = await receiver((_request, response) => {
-        response.writeHead(302, { location: `${inside.origin}/steal` }).end();
-      });
-      const response = await safeRequest(
-        { url: `${entry.origin}/hook`, body: 'x', timeoutMs: 2000 },
-        { trustedOrigins: [entry.origin] },
-      );
-      expect(response.status).toBe(302);
-      expect(inside.hits).toHaveLength(0);
-    });
+  it('trusts an origin as a whole: its own address may be private, another port may not', async () => {
+    const target = await receiver((_request, response) => response.writeHead(204).end());
+    const named = `http://hooks.internal.example:${target.port}`;
+    const policy: EgressPolicy = { trustedOrigins: [named], resolve: loopback };
+    expect(await problemOf(safeRequest({ url: `${named}/ok`, timeoutMs: 2000 }, policy))).toBe(
+      'delivered',
+    );
+    expect(target.hits).toHaveLength(1);
+    // The same host on another port is another origin: refused, and nothing is sent.
+    const other = await receiver();
+    expect(
+      await problemOf(
+        safeRequest(
+          { url: `https://hooks.internal.example:${other.port}/`, timeoutMs: 2000 },
+          { ...policy, trustedOrigins: [named] },
+        ),
+      ),
+    ).toBe('private_address');
+    expect(other.hits).toHaveLength(0);
+  });
 
-    it('never follows a redirect to a private address or a metadata service', async () => {
+  it('reports a name that does not resolve', async () => {
+    const none: Resolver = async () => {
+      throw Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' });
+    };
+    expect(
+      await problemOf(
+        safeRequest({ url: 'https://nowhere.example/', timeoutMs: 2000 }, { resolve: none }),
+      ),
+    ).toBe('unresolvable');
+  });
+
+  it('applies the allowlist before any lookup', async () => {
+    let lookups = 0;
+    const counting: Resolver = async () => {
+      lookups += 1;
+      return loopback('x');
+    };
+    const policy = { allowedHosts: ['hooks.example.com'], resolve: counting };
+    expect(
+      await problemOf(safeRequest({ url: 'https://elsewhere.example/', timeoutMs: 2000 }, policy)),
+    ).toBe('host_not_allowed');
+    expect(lookups).toBe(0);
+  });
+
+  describe('redirects', () => {
+    it('are returned as they are and never followed, wherever they point', async () => {
       const inside = await receiver();
-      const targets = [`${inside.origin}/steal`, 'http://169.254.169.254/latest/meta-data/'];
+      const targets = [
+        `${inside.origin}/steal`,
+        'http://169.254.169.254/latest/meta-data/',
+        'https://hooks.example.com/elsewhere',
+        '/relative',
+      ];
       for (const location of targets) {
         const entry = await receiver((_request, response) => {
           response.writeHead(307, { location }).end();
         });
-        const problem = await problemOf(
-          safeRequest(
-            { url: `${entry.origin}/hook`, body: 'x', timeoutMs: 2000, maxRedirects: 3 },
-            { trustedOrigins: [entry.origin], requireHttps: false },
-          ),
+        // Even where every origin is trusted, a redirect is not followed.
+        const response = await safeRequest(
+          { url: `${entry.origin}/hook`, body: 'x', timeoutMs: 2000 },
+          { trustedOrigins: [entry.origin, inside.origin] },
         );
-        expect(problem, location).toBe('private_address');
+        expect(response, location).toMatchObject({
+          status: 307,
+          headers: { location },
+          url: `${entry.origin}/hook`,
+        });
+        expect(entry.hits, location).toHaveLength(1);
       }
       expect(inside.hits).toHaveLength(0);
-    });
-
-    it('never follows a redirect to a name that resolves privately, nor off the allowlist', async () => {
-      const inside = await receiver();
-      const toName = await receiver((_request, response) => {
-        response.writeHead(302, { location: `http://innocent.example:${inside.port}/` }).end();
-      });
-      expect(
-        await problemOf(
-          safeRequest(
-            { url: `${toName.origin}/`, timeoutMs: 2000, maxRedirects: 2 },
-            { trustedOrigins: [toName.origin], requireHttps: false, resolve: loopback },
-          ),
-        ),
-      ).toBe('private_address');
-      const offList = await receiver((_request, response) => {
-        response.writeHead(302, { location: 'https://elsewhere.example/' }).end();
-      });
-      expect(
-        await problemOf(
-          safeRequest(
-            { url: `${offList.origin}/`, timeoutMs: 2000, maxRedirects: 2 },
-            { trustedOrigins: [offList.origin], allowedHosts: ['hooks.example.com'] },
-          ),
-        ),
-      ).toBe('host_not_allowed');
-      const insecure = await receiver((_request, response) => {
-        response.writeHead(302, { location: 'http://hooks.example.com/' }).end();
-      });
-      expect(
-        await problemOf(
-          safeRequest(
-            { url: `${insecure.origin}/`, timeoutMs: 2000, maxRedirects: 2 },
-            { trustedOrigins: [insecure.origin] },
-          ),
-        ),
-      ).toBe('insecure_url');
-      expect(inside.hits).toHaveLength(0);
-    });
-
-    it('follows an allowed redirect, turning a POST into a GET on 302', async () => {
-      const final = await receiver((_request, response) => response.writeHead(200).end('here'));
-      const entry = await receiver((_request, response) => {
-        response.writeHead(302, { location: `${final.origin}/moved` }).end();
-      });
-      const response = await safeRequest(
-        { url: `${entry.origin}/hook`, body: 'x', timeoutMs: 2000, maxRedirects: 2 },
-        { trustedOrigins: [entry.origin, final.origin] },
-      );
-      expect(response).toMatchObject({ status: 200, redirects: 1, url: `${final.origin}/moved` });
-      expect(final.hits).toEqual([expect.objectContaining({ method: 'GET', url: '/moved' })]);
-    });
-
-    it('stops after the redirect limit', async () => {
-      const loop = await receiver((_request, response) => {
-        response.writeHead(302, { location: '/again' }).end();
-      });
-      expect(
-        await problemOf(
-          safeRequest(
-            { url: `${loop.origin}/`, timeoutMs: 2000, maxRedirects: 2 },
-            { trustedOrigins: [loop.origin] },
-          ),
-        ),
-      ).toBe('too_many_redirects');
-      expect(loop.hits).toHaveLength(3);
     });
   });
 });

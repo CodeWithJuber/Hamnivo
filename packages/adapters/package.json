@@ -2,7 +2,7 @@
   "name": "@hamnivo/adapters",
   "version": "0.1.0",
   "private": true,
-  "description": "Hamnivo provider adapters behind shared contracts: language and embedding models for Anthropic, OpenAI, Google Gemini and OpenAI-compatible servers (capability tables, error normalization, fallback, deterministic mocks), the Jev decision provider, commerce providers (Stripe hosted checkout and refunds, an in-memory mock), SSRF-safe outbound requests under an egress policy (net), the port for collecting platform invoice payments (billing), the MCP adapter for remote tools (Streamable HTTP through its own SSRF-safe egress guard) and an in-memory demo order service for the built-in demo tools; scanner and storage adapters follow",
+  "description": "Hamnivo provider adapters behind shared contracts: language and embedding models for Anthropic, OpenAI, Google Gemini and OpenAI-compatible servers (capability tables, error normalization, fallback, deterministic mocks), the Jev decision provider, commerce providers (Stripe hosted checkout and refunds, an in-memory mock), the one egress guard for every request made on a tenant's behalf (net: address rules, URL checks, a connection-time guarded undici dispatcher, a guarded fetch and request), the port for collecting platform invoice payments (billing), the MCP adapter for remote tools (Streamable HTTP through that guard) and an in-memory demo order service for the built-in demo tools; scanner and storage adapters follow",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -43,10 +43,6 @@
       "types": "./dist/mcp/testing.d.ts",
       "import": "./dist/mcp/testing.js"
     },
-    "./egress": {
-      "types": "./dist/egress/index.d.ts",
-      "import": "./dist/egress/index.js"
-    },
     "./tools": {
       "types": "./dist/tools/index.d.ts",
       "import": "./dist/tools/index.js"
@@ -71,6 +67,7 @@
     "@modelcontextprotocol/sdk": "1.30.1",
     "@typesafe-ai/sdk": "0.6.0",
     "stripe": "22.6.2",
+    "undici": "8.11.2",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { checkEgressUrl, EgressError } from '@hamnivo/adapters/egress';
 import { listMcpTools, type McpToolInfo } from '@hamnivo/adapters/mcp';
+import { checkDestination, checkUrl, EgressError } from '@hamnivo/adapters/net';
 import type {
   Action,
   ActionSettings,
@@ -46,12 +46,13 @@ import { Effects } from '../commerce/effects.js';
 import { AppError } from '../common/app-error.js';
 import { isUniqueViolation } from '../common/pg-error.js';
 import type { AppConfig } from '../config.js';
+import { EgressService } from '../developer/egress.service.js';
 import { enforce } from '../identity/staff.guard.js';
 import { InboxAccess } from '../inbox/access.js';
 import { KillSwitchesService } from '../runtime/kill-switches.service.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
-import { ToolAdapters, type ToolRow } from './adapters.js';
+import { mcpTrustedOrigins, ToolAdapters, type ToolRow } from './adapters.js';
 import { ActionApprovals } from './approvals.service.js';
 import { BUILTIN_KEYS, BUILTIN_TOOLS } from './builtins.js';
 import { serverView, toolView } from './views.js';
@@ -123,6 +124,7 @@ export class ToolsService {
     private readonly journal: JournalService,
     private readonly approvals: ActionApprovals,
     private readonly access: InboxAccess,
+    private readonly egress: EgressService,
   ) {}
 
   private tx<T>(principal: StaffPrincipal, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -519,20 +521,43 @@ export class ToolsService {
     });
   }
 
-  private checkUrl(url: string) {
+  /** The words for an address the egress guard refuses, as the field's error. */
+  private refused(error: unknown): never {
+    const message =
+      error instanceof EgressError
+        ? error.problem === 'host_not_allowed'
+          ? 'This host is not on the list of allowed hosts. Add it under Allowed hosts first.'
+          : error.message
+        : 'Enter the server’s full HTTPS address.';
+    throw new AppError('VALIDATION_FAILED', {
+      detail: message,
+      fields: [{ path: 'url', message }],
+    });
+  }
+
+  /** The address itself, before anything else is looked at: HTTPS, no credentials, public. */
+  private checkServerUrl(url: string) {
     try {
-      const parsed = new URL(url);
-      checkEgressUrl(parsed, {
-        allowedHosts: [parsed.hostname],
-        allowPrivate: this.config.TOOLS_EGRESS_ALLOW_PRIVATE,
-      });
+      checkUrl(url, { trustedOrigins: mcpTrustedOrigins(this.config, url) });
     } catch (error) {
-      const message =
-        error instanceof EgressError ? error.message : 'Enter the server’s full HTTPS address.';
-      throw new AppError('VALIDATION_FAILED', {
-        detail: message,
-        fields: [{ path: 'url', message }],
-      });
+      this.refused(error);
+    }
+  }
+
+  /**
+   * The workspace's side of an address (X05): its allowed hosts, and a name that resolves to a
+   * private network is refused now. A name that does not resolve yet is accepted: the server is
+   * reached through the same checks, again, when its tools are listed and called.
+   */
+  private async checkWorkspace(tx: TenantTx, url: string) {
+    try {
+      await checkDestination(
+        url,
+        await this.egress.policyIn(tx, mcpTrustedOrigins(this.config, url)),
+      );
+    } catch (error) {
+      if (error instanceof EgressError && error.problem === 'unresolvable') return;
+      this.refused(error);
     }
   }
 
@@ -540,7 +565,7 @@ export class ToolsService {
     principal: StaffPrincipal,
     input: z.output<typeof CreateMcpServerRequest>,
   ): Promise<McpServer> {
-    this.checkUrl(input.url);
+    this.checkServerUrl(input.url);
     return this.tx(principal, async (tx) => {
       const brand = await this.brand(tx, input.brandId);
       enforce(
@@ -549,6 +574,7 @@ export class ToolsService {
           brandId: brand.id,
         }),
       );
+      await this.checkWorkspace(tx, input.url);
       const tokenSecretId = input.token
         ? await this.secrets.storeIn(tx, principal.tenantId, {
             kind: 'mcp_token',
@@ -669,22 +695,31 @@ export class ToolsService {
       const token = row.tokenSecretId
         ? await this.secrets.reveal(tx, principal.tenantId, row.tokenSecretId)
         : null;
-      return { row, token };
+      // The workspace's allowed hosts apply to MCP servers like to every request made for it.
+      const policy = await this.egress.policyIn(tx, mcpTrustedOrigins(this.config, row.url));
+      return { row, token, policy };
     });
-    const { row } = loaded;
+    const { row, policy } = loaded;
     let listing: Awaited<ReturnType<typeof listMcpTools>>;
     try {
+      checkUrl(row.url, policy);
       listing = await listMcpTools({
         url: row.url,
         token: loaded.token,
-        allowPrivate: this.config.TOOLS_EGRESS_ALLOW_PRIVATE,
+        trustedOrigins: policy.trustedOrigins ?? [],
+        ...(policy.resolve ? { resolve: policy.resolve } : {}),
         timeoutMs: 10_000,
       });
     } catch (error) {
-      const message =
-        error instanceof Error && 'kind' in error
-          ? `The server could not be listed (${String((error as { kind: string }).kind)}).`
-          : 'The server could not be listed.';
+      const kind =
+        error instanceof EgressError
+          ? 'egress'
+          : error instanceof Error && 'kind' in error
+            ? String((error as { kind: string }).kind)
+            : null;
+      const message = kind
+        ? `The server could not be listed (${kind}).`
+        : 'The server could not be listed.';
       await this.tx(principal, (tx) =>
         tx
           .update(schema.mcpServers)

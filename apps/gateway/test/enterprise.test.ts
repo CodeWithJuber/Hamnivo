@@ -1,14 +1,9 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { EgressError, type Resolver } from '@hamnivo/adapters/net';
 import { describe, expect, it } from 'vitest';
 import { csvField, csvHeader, ndjsonLine } from '../src/audit/audit-export.js';
-import {
-  assertFetchable,
-  fetchJson,
-  isPublicAddress,
-  OutboundResponseError,
-  OutboundUrlError,
-} from '../src/common/outbound.js';
+import { fetchJson, OutboundResponseError } from '../src/common/outbound.js';
 import { discoverOidc } from '../src/identity/sso/discovery.js';
 import { checkVerificationRecord, verificationRecord } from '../src/identity/sso/dns.js';
 import { emailDomain } from '../src/identity/sso/sso-runtime.js';
@@ -16,11 +11,14 @@ import { supportState } from '../src/support/views.js';
 
 const noTrust = { trustedOrigins: [] as string[] };
 
+const PUBLIC = { address: '93.184.215.14', family: 4 } as const;
+const LOOPBACK = { address: '127.0.0.1', family: 4 } as const;
+
 async function problem(promise: Promise<unknown>): Promise<string> {
   try {
     await promise;
   } catch (error) {
-    if (error instanceof OutboundUrlError || error instanceof OutboundResponseError) {
+    if (error instanceof EgressError || error instanceof OutboundResponseError) {
       return error.problem;
     }
     throw error;
@@ -42,78 +40,62 @@ async function serve(
   return { origin, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
 }
 
+/**
+ * Which addresses an identity provider's server may be reached at is decided by the one egress
+ * guard (`@hamnivo/adapters/net`, tested there: address ranges, URL rules, DNS rebinding). These
+ * tests are what SSO adds: reading the discovery document under it.
+ */
 describe('outbound requests for tenants (SSRF)', () => {
-  it('knows which addresses are private', () => {
-    for (const address of [
-      '127.0.0.1',
-      '10.2.3.4',
-      '172.20.0.1',
-      '192.168.1.1',
-      '169.254.169.254',
-      '100.64.0.1',
-      '0.0.0.0',
-      '::1',
-      'fe80::1',
-      'fd00::1',
-      '::ffff:127.0.0.1',
-      '::ffff:10.0.0.1',
-    ]) {
-      expect(isPublicAddress(address), address).toBe(false);
-    }
-    for (const address of ['8.8.8.8', '1.1.1.1', '2606:4700:4700::1111', '::ffff:8.8.4.4']) {
-      expect(isPublicAddress(address), address).toBe(true);
-    }
-    expect(isPublicAddress('not-an-ip')).toBe(false);
-  });
-
-  it('allows only HTTPS to public addresses, or origins the administrator trusts', async () => {
-    const publicResolver = { ...noTrust, resolve: async () => ['93.184.215.14'] };
-    const rebinding = { ...noTrust, resolve: async () => ['93.184.215.14', '10.0.0.7'] };
-    expect(await problem(assertFetchable('https://idp.example.com/x', publicResolver))).toBe(
-      'none',
-    );
-    expect(await problem(assertFetchable('http://idp.example.com/x', publicResolver))).toBe(
-      'insecure_url',
-    );
-    expect(await problem(assertFetchable('https://idp.example.com/x', rebinding))).toBe(
-      'private_host',
-    );
-    expect(await problem(assertFetchable('https://169.254.169.254/latest', noTrust))).toBe(
-      'private_host',
-    );
-    expect(await problem(assertFetchable('https://[::1]/x', noTrust))).toBe('private_host');
-    expect(await problem(assertFetchable('https://sso.corp.internal/x', noTrust))).toBe(
-      'private_host',
-    );
-    expect(await problem(assertFetchable('https://user:pw@idp.example.com/', noTrust))).toBe(
-      'invalid_url',
-    );
-    expect(await problem(assertFetchable('not a url', noTrust))).toBe('invalid_url');
-    const failing = {
-      ...noTrust,
-      resolve: async () => {
-        throw new Error('ENOTFOUND');
-      },
-    };
-    expect(await problem(assertFetchable('https://nowhere.example/x', failing))).toBe(
-      'unresolvable',
-    );
-    const trusted = { trustedOrigins: ['http://127.0.0.1:9000'] };
-    expect(await problem(assertFetchable('http://127.0.0.1:9000/x', trusted))).toBe('none');
-    expect(await problem(assertFetchable('http://127.0.0.1:9001/x', trusted))).toBe('insecure_url');
-  });
-
   it('checks the address again when it connects, so a name cannot rebind to a private one', async () => {
     // The first lookup (when the URL is checked) is public, the next (when connecting) is not.
     let lookups = 0;
     const rebinding = {
       ...noTrust,
-      resolve: async () => (lookups++ === 0 ? ['93.184.215.14'] : ['127.0.0.1']),
+      resolve: async () => (lookups++ === 0 ? [PUBLIC] : [LOOPBACK]),
     };
     expect(await problem(fetchJson('https://idp.example.com/.well-known/x', rebinding))).toBe(
-      'private_host',
+      'private_address',
     );
     expect(lookups).toBe(2);
+  });
+
+  it('refuses an identity provider whose name turns private between the check and the connection', async () => {
+    // Two lookups check the issuer and the discovery URL; the third is the connection.
+    let lookups = 0;
+    const policy = {
+      ...noTrust,
+      resolve: async () => (++lookups <= 2 ? [PUBLIC] : [LOOPBACK]),
+    };
+    await expect(discoverOidc('https://idp.example.com', policy)).rejects.toMatchObject({
+      code: 'issuer_unreachable',
+    });
+    expect(lookups).toBe(3);
+  });
+
+  it('says why an issuer is refused', async () => {
+    const resolve: Resolver = async () => [PUBLIC];
+    const refused = async (issuer: string) => {
+      try {
+        await discoverOidc(issuer, { ...noTrust, resolve });
+        return null;
+      } catch (error) {
+        return error as { code: string; message: string };
+      }
+    };
+    expect(await refused('http://idp.example.com')).toMatchObject({
+      code: 'issuer_invalid',
+      message: 'The issuer must use HTTPS.',
+    });
+    expect(await refused('https://10.0.0.5')).toMatchObject({
+      code: 'issuer_invalid',
+      message: 'The issuer is on a private network. A server administrator can allow it.',
+    });
+    expect(await refused('https://sso.corp.internal')).toMatchObject({ code: 'issuer_invalid' });
+    expect(await refused('https://user:pw@idp.example.com')).toMatchObject({
+      code: 'issuer_invalid',
+      message: 'The issuer address could not be used.',
+    });
+    expect(await refused('not a url')).toMatchObject({ code: 'issuer_invalid' });
   });
 
   it('never follows redirects and limits the size of what it reads', async () => {
@@ -122,17 +104,43 @@ describe('outbound requests for tenants (SSRF)', () => {
         ? { status: 302, headers: { location: 'http://169.254.169.254/' } }
         : url === '/big'
           ? { status: 200, body: JSON.stringify({ pad: 'x'.repeat(300_000) }) }
-          : { status: 200, body: '{"ok":true}' },
+          : url === '/error'
+            ? { status: 503 }
+            : url === '/text'
+              ? { status: 200, body: 'not json' }
+              : { status: 200, body: '{"ok":true}' },
     );
     try {
       const policy = { trustedOrigins: [server.origin] };
       expect(await fetchJson(`${server.origin}/fine`, policy)).toEqual({ ok: true });
       expect(await problem(fetchJson(`${server.origin}/redirect`, policy))).toBe('redirect');
       expect(await problem(fetchJson(`${server.origin}/big`, policy))).toBe('too_large');
+      expect(await problem(fetchJson(`${server.origin}/big`, policy, { maxBytes: 400_000 }))).toBe(
+        'none',
+      );
+      expect(await problem(fetchJson(`${server.origin}/error`, policy))).toBe('status');
+      expect(await problem(fetchJson(`${server.origin}/text`, policy))).toBe('not_json');
       expect(await problem(fetchJson(`${server.origin}/fine`, noTrust))).toBe('insecure_url');
     } finally {
       await server.close();
     }
+  });
+
+  it('gives up on a provider that does not answer in time or cannot be reached', async () => {
+    const hanging = createServer(() => undefined);
+    await new Promise<void>((resolve) => hanging.listen(0, '127.0.0.1', resolve));
+    const origin = `http://127.0.0.1:${(hanging.address() as AddressInfo).port}`;
+    try {
+      const policy = { trustedOrigins: [origin] };
+      expect(await problem(fetchJson(`${origin}/slow`, policy, { timeoutMs: 200 }))).toBe(
+        'timeout',
+      );
+    } finally {
+      hanging.closeAllConnections();
+      await new Promise<void>((resolve) => hanging.close(() => resolve()));
+    }
+    const closed = 'http://127.0.0.1:1';
+    expect(await problem(fetchJson(`${closed}/x`, { trustedOrigins: [closed] }))).toBe('network');
   });
 
   it('checks that the discovery document names the issuer and safe endpoints', async () => {

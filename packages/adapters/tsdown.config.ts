@@ -11,14 +11,13 @@ export default defineConfig({
     'billing/index': 'src/billing/index.ts',
     'mcp/index': 'src/mcp/index.ts',
     'mcp/testing': 'src/mcp/testing.ts',
-    'egress/index': 'src/egress/index.ts',
     'tools/index': 'src/tools/index.ts',
   },
   format: 'esm',
   dts: true,
   clean: true,
   platform: 'neutral',
-  // The commerce mock, the fake Stripe and MCP servers, the egress guard and the MCP client run in
-  // Node only (tests, the API and the worker).
+  // The commerce mock, the fake Stripe and MCP servers, the egress guard (net) and the MCP client
+  // run in Node only (tests, the API and the worker).
   external: [/^node:/, /^@modelcontextprotocol\/sdk/],
 });

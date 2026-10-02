@@ -1,3 +1,4 @@
+import type { ResolvedAddress } from '@hamnivo/adapters/net';
 import { fromPublicId, schema, type TenantTx, withTenant } from '@hamnivo/db';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -19,6 +20,14 @@ const dns: DnsResolver = {
     const code = name.includes('servfail') ? 'ESERVFAIL' : 'ENOTFOUND';
     throw Object.assign(new Error(`${code} ${name}`), { code });
   },
+};
+
+/** Host names of identity providers the gateway resolves in these tests, by what each lookup answers. */
+const idpNames: Record<string, () => ResolvedAddress[]> = {};
+const egressResolver = async (host: string): Promise<ResolvedAddress[]> => {
+  const answer = idpNames[host];
+  if (!answer) throw Object.assign(new Error(`ENOTFOUND ${host}`), { code: 'ENOTFOUND' });
+  return answer();
 };
 
 let gw: Gateway;
@@ -78,7 +87,10 @@ async function auditOf(client: Client, action: string) {
 beforeAll(async () => {
   const port = await freePort();
   idp = await startTestIdp({ port, redirectPrefix: `${API_ORIGIN}/api/auth/sso/callback/` });
-  gw = await startGateway({ SSO_TRUSTED_IDP_ORIGINS: idp.issuer }, undefined, { dns });
+  gw = await startGateway({ SSO_TRUSTED_IDP_ORIGINS: idp.issuer }, undefined, {
+    dns,
+    egressResolver,
+  });
   const signedUp = await tenantWithOwner(gw, 'Nadia Owner', 'nadia@example.com', 'northline');
   owner = (await enrolTotp(gw, signedUp, 'nadia@example.com')).client;
   roles = await roleIds(owner);
@@ -221,6 +233,27 @@ describe('the OpenID Connect connection (A13)', () => {
       expect(reply.status, issuer).toBe(422);
       expect(reply.body.fields[0].path, issuer).toBe('issuer');
     }
+  });
+
+  it('refuses an identity provider whose name turns private between the check and the connection', async () => {
+    // Two lookups check the issuer and its discovery URL; the third is the connection itself.
+    let lookups = 0;
+    idpNames['rebind.idp.example'] = () => [
+      ++lookups <= 2
+        ? { address: '93.184.216.34', family: 4 }
+        : { address: '127.0.0.1', family: 4 },
+    ];
+    const reply = await owner.post('/v1/admin/sso/connections', {
+      domainId,
+      issuer: 'https://rebind.idp.example',
+      clientId: 'x',
+      clientSecret: 'a-secret-of-some-length',
+    });
+    expect(reply.status, JSON.stringify(reply.body)).toBe(422);
+    expect(reply.body.fields[0].path).toBe('issuer');
+    expect(reply.body.fields[0].message).toMatch(/discovery document could not be read/);
+    expect(lookups).toBe(3);
+    delete idpNames['rebind.idp.example'];
   });
 
   it('keeps the client secret write-only: stored sealed, shown masked, never audited', async () => {

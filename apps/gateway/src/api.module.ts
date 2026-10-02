@@ -1,3 +1,4 @@
+import type { EgressPolicy } from '@hamnivo/adapters/net';
 import type { Db } from '@hamnivo/db';
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
@@ -169,7 +170,10 @@ export class ApiModule {
         },
         {
           provide: OUTBOUND_POLICY,
-          useValue: { trustedOrigins: config.SSO_TRUSTED_IDP_ORIGINS },
+          useValue: {
+            trustedOrigins: config.SSO_TRUSTED_IDP_ORIGINS,
+            ...(overrides.egressResolver ? { resolve: overrides.egressResolver } : {}),
+          } satisfies EgressPolicy,
         },
         SsoRuntime,
         SsoService,

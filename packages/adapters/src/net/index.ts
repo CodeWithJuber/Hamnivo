@@ -1,4 +1,6 @@
 export { type AddressBlock, addressBlock, isPublicAddress, mappedIpv4 } from './address.js';
+export { guardedDispatcher, guardedLookup } from './dispatcher.js';
+export { type GuardedFetch, type GuardedFetchOptions, guardedFetch } from './fetch.js';
 export {
   checkDestination,
   checkUrl,
@@ -13,9 +15,4 @@ export {
   type Resolver,
   systemResolver,
 } from './policy.js';
-export {
-  type EgressRequest,
-  type EgressResponse,
-  guardedLookup,
-  safeRequest,
-} from './request.js';
+export { type EgressRequest, type EgressResponse, safeRequest } from './request.js';

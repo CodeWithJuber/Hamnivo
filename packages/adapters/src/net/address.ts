@@ -5,8 +5,13 @@ import { BlockList, isIP } from 'node:net';
  * unicast addresses: never loopback, the local network, link-local addresses (where cloud metadata
  * services live), shared carrier NAT space, documentation or benchmarking ranges, multicast or
  * reserved space. Taken from the IANA special-purpose address registries for IPv4 and IPv6.
- * Transition prefixes that embed an IPv4 address (NAT64, 6to4, Teredo) are refused outright:
- * the address they lead to cannot be judged from here.
+ *
+ * This is the one list every outbound request uses (webhooks, MCP servers, SSO discovery,
+ * migration sources, tenant model servers). It is the union of the lists those callers once kept
+ * apart, so nothing any of them refused is allowed now. Transition prefixes that embed an IPv4
+ * address (NAT64, 6to4, Teredo, IPv4-translated, the deprecated IPv4-compatible form) are refused
+ * outright: the address they lead to cannot be judged from here. Only an IPv4-mapped address
+ * (`::ffff:a.b.c.d`) is judged by the IPv4 address it carries.
  */
 
 type Block = readonly [network: string, prefix: number, label: AddressBlock];
@@ -49,6 +54,8 @@ const V6: readonly Block[] = [
   ['::1', 128, 'loopback'],
   // IPv4-compatible addresses (deprecated); the IPv4-mapped block is judged by its IPv4 address.
   ['::', 96, 'reserved'],
+  // IPv4-translated addresses (SIIT, RFC 2765): `::ffff:0:a.b.c.d`.
+  ['::ffff:0:0:0', 96, 'transition'],
   ['64:ff9b::', 96, 'transition'],
   ['64:ff9b:1::', 48, 'transition'],
   ['100::', 64, 'reserved'],

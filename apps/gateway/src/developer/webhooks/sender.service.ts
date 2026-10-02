@@ -106,7 +106,6 @@ export class WebhookSender {
           body,
           timeoutMs: this.config.WEBHOOK_TIMEOUT_MS,
           maxResponseBytes: MAX_RESPONSE_BYTES,
-          maxRedirects: 0,
         },
         prepared.policy,
       );
