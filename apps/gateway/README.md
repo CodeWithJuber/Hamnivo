@@ -297,9 +297,21 @@ a reply, drop a passage or hand the conversation to people.
 - **Within the run.** A check's deadline is what is left of the agent's time limit, and a draft is
   written again only when half of it is left. When Jev is unavailable, or a language has no
   thresholds, the reply goes on as it would without the check.
-- **Someone at risk.** The message guard's urgent result skips memory, cache and model: Hamnivo's
-  safety wording (`SAFE_REPLIES`) goes out through the usual fenced publication, then the
-  conversation is handed to people with an urgent note.
+- **Someone at risk.** The message guard's urgent result skips memory, cache and model. Hamnivo's
+  safety wording (`SAFE_REPLIES`) is fixed text, so the plan's limits and the AI budget never hold
+  it back: they only stop replies a model would write (`ai_limit` is decided after text approvals,
+  the request for a person and the guard, and with the allowance used up only the guard's safety
+  question is asked). While the AI has the conversation, the hand-off to people (with the urgent
+  note) and the reservation of the wording commit in one transaction, and the outbox posts the
+  wording (`conversation.safe_reply`) at least once, shown once, as the bot that held the
+  conversation. It goes out only while the conversation still waits for people at that hand-off's
+  epoch and Chatwoot shows no person on it: never over a person.
+- **A request for a person, and someone at risk.** The deterministic hand-off comes first, exactly
+  as before (J04): no provider is asked before it. Only then the guard's check runs (not the
+  escalation advice). Live, if it finds someone at risk, the urgent note is queued and, while
+  nobody has answered, the wording follows. Jev can only add; if it is unavailable, or the brand
+  has no message guard, the hand-off stands as it is. There is no deterministic detector of
+  self-harm or danger to fall back on.
 
 ## Reply language (U01, U07)
 

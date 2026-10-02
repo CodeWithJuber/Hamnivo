@@ -1,10 +1,11 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
 import { createMockModel } from '@hamnivo/adapters/models';
+import { call, createChatwootClient, provisionStaffUser } from '@hamnivo/chatwoot';
 import { fromPublicId, newId, schema, withTenant } from '@hamnivo/db';
 import { SAFE_REPLIES } from '@hamnivo/domain';
-import { and, eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { and, eq, isNull } from 'drizzle-orm';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AuthorityRegistry } from '../src/authority/registry.js';
 import { connectedTenant, type Slice, startSlice, Visitor } from './slice-harness.js';
 
@@ -32,20 +33,24 @@ type FakeAnswer =
 /**
  * A fake Jev (TypeSafe systemOne) behind the real adapter. `answer` decides each question from
  * the request body; `mode` makes it fail or never answer (ignoring cancellation, so only the
- * adapter's deadline ends the call).
+ * adapter's deadline ends the call); `before` runs when a request arrives.
  */
 function fakeJev() {
   const calls: Array<{ body: Record<string, any>; at: number }> = [];
   const state: {
     mode: 'answer' | 'hang' | 'error';
     answer: (question: string, body: Record<string, any>) => FakeAnswer;
+    /** Runs when a request arrives, before it is answered: to see the world as Jev would. */
+    before: ((body: Record<string, any>) => Promise<void>) | null;
   } = {
     mode: 'answer',
     answer: () => ({ type: 'choice', choice: 'supports', confidence: 0.95 }),
+    before: null,
   };
   const fetch = (async (_url: unknown, init?: RequestInit) => {
     const body = JSON.parse(String(init?.body)) as Record<string, any>;
     calls.push({ body, at: Date.now() });
+    await state.before?.(body);
     if (state.mode === 'hang') return new Promise<Response>(() => undefined);
     if (state.mode === 'error') {
       return new Response(JSON.stringify({ error: { message: 'unavailable' } }), {
@@ -159,6 +164,20 @@ function escalates(probabilities: Record<string, number>) {
 
 const escalationCalls = () =>
   jev.calls.filter((call) => Object.hasOwn(call.body.questions ?? {}, 'legal_threat'));
+
+/**
+ * Makes whatever waits in the outbox for a retry due now, as if its backoff had passed, and runs
+ * it.
+ */
+async function retryNow() {
+  await withTenant(slice.app, { tenantId }, (tx) =>
+    tx
+      .update(schema.outboxEvents)
+      .set({ availableAt: new Date(Date.now() - 1000) })
+      .where(isNull(schema.outboxEvents.processedAt)),
+  );
+  await slice.drain();
+}
 
 async function setMode(mode: 'off' | 'shadow' | 'live') {
   const set = await shop.owner.put(`${checksPath()}/answer-check/mode`, { mode });
@@ -1066,6 +1085,7 @@ describe('message guard', () => {
   const draftCalls = () =>
     jev.calls.filter((call) => Object.hasOwn(call.body.questions ?? {}, 'says_paid'));
   const atRisk = 'I cannot do this anymore. I want to end my life. My email is sana@example.com';
+  const asksAndAtRisk = 'I want to talk to a person. I cannot go on, I want to end my life.';
 
   beforeAll(async () => {
     const thresholds = Object.fromEntries(keys.map((key) => [key, band]));
@@ -1128,6 +1148,25 @@ describe('message guard', () => {
           unbacked: ['says_order_changed'],
           evidence: { paymentConfirmed: false, refundConfirmed: false, refundCommitted: false },
         }),
+      }),
+    ]);
+  });
+
+  it('shadow: records someone at risk after handing over a request for a person, and adds nothing', async () => {
+    escalates({ self_harm: 0.97 });
+    const { conversationId } = await chat(asksAndAtRisk);
+    const seen = await inspect(conversationId);
+    // Handed over at once, as before; shadow only records what the guard found.
+    expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+    expect(seen.control.ownerReason).toBe('customer_request');
+    expect(seen.botReplies).toEqual([]);
+    expect(seen.notes.join('\n')).not.toContain('URGENT');
+    expect(await guardRecords(conversationId, 'inbound')).toEqual([
+      expect.objectContaining({
+        mode: 'shadow',
+        verdict: 'at_risk',
+        action: 'urgent',
+        applied: false,
       }),
     ]);
   });
@@ -1312,6 +1351,334 @@ describe('message guard', () => {
         expect.objectContaining({ status: 'unavailable', action: 'continue', applied: false }),
       ]);
       jev.state.mode = 'answer';
+    });
+  });
+
+  // Safety is never skipped: not by the AI limit, not by a request for a person, not by a stop in
+  // the middle of it. The wording is fixed text that costs no tokens.
+  describe('is never skipped', () => {
+    beforeAll(async () => {
+      const set = await shop.owner.put(`${checksPath()}/message-guard/mode`, { mode: 'live' });
+      expect(set.status).toBe(200);
+    });
+
+    /** The workspace's own AI budget; none left stops the AI exactly as a used-up plan does. */
+    const budget = async (aiTokens: number | null) => {
+      const set = await shop.owner.put('/v1/admin/billing/budget', {
+        aiTokens,
+        alertThresholds: [],
+      });
+      expect(set.status, JSON.stringify(set.body)).toBe(200);
+    };
+    const stepsOf = async (conversationId: string) => {
+      const runs = await shop.owner.get(`/v1/admin/runs?conversationId=${conversationId}`);
+      const run = await shop.owner.get(`/v1/admin/runs/${runs.body.items[0].id}`);
+      return (run.body.steps as Array<Record<string, any>>).map((step) => step.name);
+    };
+    const handoffAudits = async (conversationId: string) => {
+      const audit = await shop.owner.get(
+        '/v1/admin/audit?action=conversation.owner_changed&limit=100',
+      );
+      return (audit.body.items as Array<Record<string, any>>).filter(
+        (item) => item.target?.id === conversationId,
+      );
+    };
+    const publicationsOf = (conversationId: string) =>
+      withTenant(slice.app, { tenantId }, (tx) =>
+        tx
+          .select({ state: schema.publications.state, detail: schema.publications.detail })
+          .from(schema.publications)
+          .where(
+            eq(schema.publications.conversationId, fromPublicId('conversation', conversationId)),
+          ),
+      );
+    const statesOf = async (conversationId: string) =>
+      (await publicationsOf(conversationId)).map((publication) => publication.state);
+
+    describe('with the AI limit used up', () => {
+      beforeEach(() => budget(0));
+      afterEach(() => budget(null));
+
+      it('still sends safe wording to someone at risk, and people take over with the urgent note', async () => {
+        escalates({ self_harm: 0.97 });
+        const { conversationId } = await chat(atRisk);
+        const seen = await inspect(conversationId);
+        expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+        expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+        expect(seen.control.ownerReason).toBe('ai_escalated');
+        expect(seen.notes).toContainEqual(expect.stringContaining('URGENT'));
+        // Fixed text: no model wrote it, and Jev was asked the safety question only.
+        expect(scripted.prompts).toEqual([]);
+        expect(inboundCalls()).toHaveLength(1);
+        expect(escalationCalls()).toEqual([]);
+        expect(await stepsOf(conversationId)).not.toContain('ai_limit');
+        expect(await guardRecords(conversationId, 'inbound')).toEqual([
+          expect.objectContaining({ verdict: 'at_risk', action: 'urgent', applied: true }),
+        ]);
+      });
+
+      it('records a threat the guard finds, and hands over for the limit all the same', async () => {
+        escalates({ threat: 0.93 });
+        const { conversationId } = await chat(
+          'If my parcel is not here tomorrow I will come to your shop and smash everything.',
+        );
+        const seen = await inspect(conversationId);
+        // People have it for the limit; the guard's finding is recorded, not acted on twice.
+        expect(seen.control.ownerReason).toBe('ai_limit');
+        expect(seen.notes.join('\n')).not.toContain('URGENT');
+        expect(await guardRecords(conversationId, 'inbound')).toEqual([
+          expect.objectContaining({
+            verdict: 'flagged',
+            action: 'continue',
+            applied: false,
+            detail: { direction: 'inbound', reasons: ['threat'] },
+          }),
+        ]);
+      });
+
+      it('still hands every other message to people for the limit, without a model', async () => {
+        escalates({});
+        const { conversationId } = await chat('Where is my order? It has not arrived yet.');
+        const seen = await inspect(conversationId);
+        expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+        expect(seen.control.ownerReason).toBe('ai_limit');
+        expect(seen.botReplies).toEqual([]);
+        expect(scripted.prompts).toEqual([]);
+        expect(await guardRecords(conversationId, 'inbound')).toEqual([
+          expect.objectContaining({ verdict: 'clear', action: 'continue', applied: false }),
+        ]);
+      });
+    });
+
+    describe('after a request for a person', () => {
+      /** How many hand-offs of the conversation were committed when Jev was asked. */
+      const handoffsWhenAsked: number[] = [];
+      const watch = (conversationId: string) => {
+        handoffsWhenAsked.length = 0;
+        jev.state.before = async () => {
+          handoffsWhenAsked.push((await handoffAudits(conversationId)).length);
+        };
+      };
+      afterEach(() => {
+        jev.state.before = null;
+        jev.state.mode = 'answer';
+      });
+
+      it('hands over at once, then sends safe wording and marks the hand-off urgent', async () => {
+        escalates({ self_harm: 0.97 });
+        const { conversationId } = await chatAfter(asksAndAtRisk, async (id) => watch(id));
+        // The hand-off was committed before Jev was asked, and is the one hand-off there is.
+        expect(handoffsWhenAsked).toEqual([1]);
+        const handoffs = await handoffAudits(conversationId);
+        expect(handoffs).toEqual([
+          expect.objectContaining({
+            data: expect.objectContaining({ reason: 'customer_request' }),
+          }),
+        ]);
+        for (const call of jev.calls) {
+          expect(call.at).toBeGreaterThanOrEqual(Date.parse(handoffs[0]?.occurredAt));
+        }
+        const seen = await inspect(conversationId);
+        expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+        expect(seen.control.ownerReason).toBe('customer_request');
+        expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+        expect(seen.notes).toContainEqual(expect.stringContaining('asked to talk to a person'));
+        expect(seen.notes).toContainEqual(expect.stringContaining('URGENT'));
+        expect(seen.notes).toContainEqual(
+          expect.stringContaining('The customer may be thinking of hurting themselves.'),
+        );
+        // No model; and the escalation advice has nothing to add to a hand-off already made.
+        expect(scripted.prompts).toEqual([]);
+        expect(inboundCalls()).toHaveLength(1);
+        expect(escalationCalls()).toEqual([]);
+        expect(await guardRecords(conversationId, 'inbound')).toEqual([
+          expect.objectContaining({ verdict: 'at_risk', action: 'urgent', applied: true }),
+        ]);
+        expect(await statesOf(conversationId)).toEqual(['sent']);
+      });
+
+      it('hands over at once, as before, when Jev is unavailable', async () => {
+        jev.state.mode = 'error';
+        const { conversationId } = await chatAfter(asksAndAtRisk, async (id) => watch(id));
+        // Jev was asked, after the hand-off, and could not answer.
+        expect(handoffsWhenAsked.length).toBeGreaterThan(0);
+        expect(handoffsWhenAsked.every((count) => count === 1)).toBe(true);
+        const seen = await inspect(conversationId);
+        expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+        expect(seen.control.ownerReason).toBe('customer_request');
+        expect(seen.botReplies).toEqual([]);
+        expect(seen.notes.join('\n')).not.toContain('URGENT');
+        expect(await guardRecords(conversationId, 'inbound')).toEqual([
+          expect.objectContaining({ status: 'unavailable', action: 'continue', applied: false }),
+        ]);
+      });
+
+      it('still tells a person who took over meanwhile that it is urgent, and leaves the wording unsaid', async () => {
+        escalates({ self_harm: 0.97 });
+        let takeover: number | null = null;
+        const { conversationId } = await chatAfter(asksAndAtRisk, async (id) => {
+          jev.state.before = async () => {
+            if (takeover !== null) return;
+            // A person takes the conversation while Jev is still answering.
+            takeover = (await shop.owner.post(`/v1/conversations/${id}/takeover`, {})).status;
+          };
+        });
+        expect(takeover).toBe(200);
+        const seen = await inspect(conversationId);
+        expect(seen.control.ownerMode).toBe('HUMAN_ACTIVE');
+        // Never said over a person, but they are told, and told that nothing was said.
+        expect(seen.botReplies).toEqual([]);
+        expect(seen.notes).toContainEqual(expect.stringContaining('URGENT'));
+        expect(seen.notes).toContainEqual(expect.stringContaining('No safety wording was sent'));
+        expect(await statesOf(conversationId)).toEqual(['aborted']);
+      });
+    });
+
+    describe('when the worker stops in the middle of it', () => {
+      afterEach(() => {
+        slice.fake.setResponseFault(null);
+        slice.fake.setRequestFault(null);
+      });
+
+      it('is completed after the wording was posted but its answer was lost: handed over, said once', async () => {
+        escalates({ self_harm: 0.97 });
+        let lost = 0;
+        const { conversationId } = await chatAfter(atRisk, async () => {
+          // Chatwoot stores the wording, but its answer never reaches the worker.
+          slice.fake.setResponseFault((method, url) => {
+            if (method !== 'POST' || !url.endsWith('/messages') || lost > 0) return null;
+            lost += 1;
+            return 504;
+          });
+        });
+        await retryNow();
+        expect(lost).toBe(1);
+        const seen = await inspect(conversationId);
+        expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+        expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+        expect(seen.control.ownerReason).toBe('ai_escalated');
+        expect(seen.notes).toContainEqual(expect.stringContaining('URGENT'));
+        expect(await handoffAudits(conversationId)).toHaveLength(1);
+        expect(await statesOf(conversationId)).toEqual(['sent']);
+      });
+
+      it('has people on the conversation before the wording is out, and the outbox completes it', async () => {
+        escalates({ self_harm: 0.97 });
+        const { conversationId } = await chatAfter(atRisk, async () => {
+          // Chatwoot refuses every post for now: nothing can be said yet.
+          slice.fake.setRequestFault((method, url) =>
+            method === 'POST' && url.endsWith('/messages') ? 503 : null,
+          );
+        });
+        // The hand-off did not wait for the wording: it was committed with its reservation.
+        let seen = await inspect(conversationId);
+        expect(seen.botReplies).toEqual([]);
+        expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+        expect(seen.control.ownerReason).toBe('ai_escalated');
+        expect(await statesOf(conversationId)).toEqual(['unknown']);
+        // Chatwoot is back and the relay retries: the wording is posted, once.
+        slice.fake.setRequestFault(null);
+        await retryNow();
+        seen = await inspect(conversationId);
+        expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+        expect(seen.notes).toContainEqual(expect.stringContaining('URGENT'));
+        expect(await handoffAudits(conversationId)).toHaveLength(1);
+        expect(await statesOf(conversationId)).toEqual(['sent']);
+      });
+
+      it('puts the wording in place of a reply that was reserved but never posted', async () => {
+        escalates({});
+        scripted.script.push('Happy to help with that.');
+        const { conversationId } = await chatAfter(atRisk, async () => {
+          // The reply is reserved, then Chatwoot refuses the post and the event waits to retry.
+          slice.fake.setRequestFault((method, url) =>
+            method === 'POST' && url.endsWith('/messages') ? 503 : null,
+          );
+        });
+        expect(await statesOf(conversationId)).toEqual(['unknown']);
+        // By the retry Jev reads the same words as a risk: the wording takes the reply's place.
+        escalates({ self_harm: 0.97 });
+        slice.fake.setRequestFault(null);
+        await retryNow();
+        const seen = await inspect(conversationId);
+        expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+        expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+        expect(seen.notes).toContainEqual(expect.stringContaining('URGENT'));
+        expect(await statesOf(conversationId)).toEqual(['sent']);
+      });
+
+      it('never says the wording over a person who took the conversation while it waited', async () => {
+        escalates({ self_harm: 0.97 });
+        const { conversationId } = await chatAfter(atRisk, async () => {
+          slice.fake.setRequestFault((method, url) =>
+            method === 'POST' && url.endsWith('/messages') ? 503 : null,
+          );
+        });
+        const takeover = await shop.owner.post(`/v1/conversations/${conversationId}/takeover`, {});
+        expect(takeover.status, JSON.stringify(takeover.body)).toBe(200);
+        slice.fake.setRequestFault(null);
+        await retryNow();
+        const seen = await inspect(conversationId);
+        expect(seen.control.ownerMode).toBe('HUMAN_ACTIVE');
+        expect(seen.botReplies).toEqual([]);
+        expect(await statesOf(conversationId)).toEqual(['aborted']);
+      });
+
+      it('never says the wording over a person already assigned in Chatwoot', async () => {
+        escalates({ self_harm: 0.97 });
+        const agent = await provisionStaffUser({
+          baseUrl: slice.fake.url,
+          platformToken: slice.fake.platformToken,
+          accountId: shop.connection.accountId,
+          name: 'Chatwoot Admin',
+          email: `cw-admin-${randomUUID()}@example.com`,
+          role: 'administrator',
+        });
+        let assigned = false;
+        const { conversationId } = await chatAfter(atRisk, async (id) => {
+          const { control } = await inspect(id);
+          slice.fake.setRequestHook(async (method, url) => {
+            // Right before the wording is posted, a person is assigned inside Chatwoot, which
+            // Hamnivo has not heard of yet.
+            if (
+              assigned ||
+              method !== 'GET' ||
+              !url.endsWith(`/conversations/${control.externalConversationId}`)
+            ) {
+              return;
+            }
+            assigned = true;
+            const client = createChatwootClient({ baseUrl: slice.fake.url, token: agent.token });
+            await call(
+              'assign',
+              client.POST(
+                '/api/v1/accounts/{account_id}/conversations/{conversation_id}/assignments',
+                {
+                  params: {
+                    path: {
+                      account_id: shop.connection.accountId,
+                      conversation_id: control.externalConversationId,
+                    },
+                  },
+                  body: { assignee_id: agent.userId } as never,
+                },
+              ) as never,
+            );
+          });
+        });
+        slice.fake.setRequestHook(null);
+        expect(assigned).toBe(true);
+        const seen = await inspect(conversationId);
+        expect(seen.botReplies).toEqual([]);
+        expect(await publicationsOf(conversationId)).toEqual([
+          expect.objectContaining({
+            state: 'aborted',
+            detail: expect.objectContaining({ reason: 'preflight_owner_mismatch' }),
+          }),
+        ]);
+        // The person is told all the same: the urgent hand-off note was posted.
+        expect(seen.notes).toContainEqual(expect.stringContaining('URGENT'));
+      });
     });
   });
 });

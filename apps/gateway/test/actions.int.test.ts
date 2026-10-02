@@ -407,6 +407,34 @@ describe('customer approvals (G13, W16)', () => {
     );
   });
 
+  it('records a typed approval even when the plan or the AI budget is used up', async () => {
+    const customer = await chat(changeAddress('NL-3601', '9 Palm Road'));
+    const proposed = await latestAction(shop, customer.conversationId);
+    expect(proposed.state).toBe('awaiting_approval');
+    // The workspace's AI budget runs out while the request waits; approving costs no tokens.
+    const budget = (aiTokens: number | null) =>
+      shop.owner.put('/v1/admin/billing/budget', { aiTokens, alertThresholds: [] });
+    expect((await budget(0)).status).toBe(200);
+    try {
+      await customer.say(`APPROVE ${proposed.code}`);
+      const done = await latestAction(shop, customer.conversationId);
+      expect(done).toMatchObject({ state: 'completed', decision: { approverKind: 'customer' } });
+      expect(effectsOf(done)).toBe(1);
+      // A decision, not a question: it is recorded, and nobody is handed over for the limit.
+      const view = await conversationView(slice, shop, customer.conversationId);
+      expect(view.control.ownerMode).toBe('AI_ACTIVE');
+      const runs = await runsWithSteps(shop, customer.conversationId);
+      expect(runs.at(-1)).toMatchObject({ outcome: 'skipped' });
+      expect(runs.at(-1)?.steps.map((s: { name: string }) => s.name)).toEqual(['text_approval']);
+      // What costs tokens is still held back: the next question goes to people.
+      await customer.say('Where is my parcel?');
+      const held = await conversationView(slice, shop, customer.conversationId);
+      expect(held.control).toMatchObject({ ownerMode: 'WAITING_HUMAN', ownerReason: 'ai_limit' });
+    } finally {
+      expect((await budget(null)).status).toBe(200);
+    }
+  });
+
   it('expires approvals nobody gave in time', async () => {
     const customer = await chat(changeAddress('NL-3401'));
     const proposed = await latestAction(shop, customer.conversationId);

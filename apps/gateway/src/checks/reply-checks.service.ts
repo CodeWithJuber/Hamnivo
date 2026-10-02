@@ -69,8 +69,9 @@ export type InboundVerdict =
   | { action: 'continue' }
   | { action: 'handoff'; reason: AiHandoffReason; note: string }
   /**
-   * Someone may be at risk: Hamnivo's safe wording (no model's) is published at once, through
-   * the usual fenced path, and the conversation is handed to people right after it.
+   * Someone may be at risk: Hamnivo's safe wording (no model's) is published at once, and the
+   * conversation is with people, with this note, from the moment the wording is reserved: the
+   * reply job commits the two together, so neither can be left without the other.
    */
   | { action: 'urgent'; reason: AiHandoffReason; note: string; text: string };
 
@@ -177,7 +178,7 @@ export class RunChecks {
    * Before a reply is written: whether someone may be at risk, or the customer threatens or
    * abuses (message guard), and whether the customer's messages need a person (escalation, J04).
    * Both read the same messages, side by side. They can only add a hand-off: a customer who asked
-   * for a person was handed over before this, without asking Jev.
+   * for a person was handed over before this, without asking Jev (see `inboundGuard`).
    */
   inbound(input: {
     messages: readonly AuthorityMessage[];
@@ -187,6 +188,17 @@ export class RunChecks {
     replyLanguage?: ReplyLanguage | undefined;
   }): Promise<InboundVerdict> {
     return this.service.inbound(this, input);
+  }
+
+  /**
+   * The message guard's check of what comes in, without the escalation advice, for the two cases
+   * where a hand-off to people is no news: a customer who asked for a person (handed over at
+   * once, before anything asked Jev, J04) and a workspace whose AI replies are used up. Only
+   * someone at risk changes anything there: safe wording, and for people an urgent note. A threat
+   * or abuse is recorded, never acted on.
+   */
+  inboundGuard(input: Parameters<RunChecks['inbound']>[0]): Promise<InboundVerdict> {
+    return this.service.inboundGuard(this, { ...input, urgentOnly: true });
   }
 
   /**
@@ -348,14 +360,17 @@ export class ReplyChecksService {
 
   /**
    * Message guard, what comes in: self-harm or danger now is urgent (safe wording, then people);
-   * a threat or abuse goes to people. Code decides from one exact question each.
+   * a threat or abuse goes to people. Code decides from one exact question each. `urgentOnly`:
+   * people have the conversation already (or will have it anyway), so a threat or abuse is only
+   * recorded, as found and not acted on.
    */
-  private async inboundGuard(
+  async inboundGuard(
     run: RunChecks,
     input: {
       messages: readonly AuthorityMessage[];
       language: ReplyLanguage | undefined;
       replyLanguage?: ReplyLanguage | undefined;
+      urgentOnly?: boolean;
     },
   ): Promise<InboundVerdict> {
     const setting = run.setting('message-guard');
@@ -387,7 +402,11 @@ export class ReplyChecksService {
     }
     const verdict = inboundGuardVerdict(asked.gated);
     const live = setting.mode === 'live';
-    const action = verdict.urgent ? 'urgent' : verdict.handoff ? 'handoff' : 'continue';
+    const action = verdict.urgent
+      ? 'urgent'
+      : verdict.handoff && !input.urgentOnly
+        ? 'handoff'
+        : 'continue';
     await this.record(
       run,
       asked,
