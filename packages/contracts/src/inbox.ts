@@ -41,6 +41,7 @@ export const OwnerReason = z.enum([
   'ai_stopped',
   'ai_unavailable',
   'ai_blocked',
+  'ai_escalated',
 ]);
 export type OwnerReason = z.infer<typeof OwnerReason>;
 

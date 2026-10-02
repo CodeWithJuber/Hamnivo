@@ -14,6 +14,7 @@ import type {
   WidgetSession,
 } from '@hamnivo/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { applyDraftEvent, DRAFT_EVENTS, type Draft } from './drafts.js';
 
 export type Connection = StreamStatus | 'idle' | 'offline';
 
@@ -46,6 +47,8 @@ export interface ChatState {
   firstUnreadId: string | null;
   /** When the chat last heard from the server, for the offline banner. */
   lastSync: string | null;
+  /** AI replies still being written or checked: provisional, never shown as messages. */
+  drafts: readonly Draft[];
 }
 
 /** A deleted message keeps its place and author, nothing of what it said (W23). */
@@ -107,6 +110,7 @@ const EMPTY: ChatState = {
   unread: 0,
   firstUnreadId: null,
   lastSync: null,
+  drafts: [],
 };
 
 const PAGE = 50;
@@ -161,6 +165,12 @@ export function useChat(client: HamnivoClient) {
     const data = (event.data ?? {}) as Record<string, unknown>;
     const sequence = Number(event.sequence);
     for (const listener of listeners.current) listener({ type: event.type, data });
+    if (DRAFT_EVENTS.has(event.type)) {
+      setState((s) => {
+        const drafts = applyDraftEvent(s.drafts, { type: event.type, data });
+        return drafts === s.drafts ? s : { ...s, drafts };
+      });
+    }
     setState((current) => {
       const s: ChatState = {
         ...current,
@@ -243,6 +253,7 @@ export function useChat(client: HamnivoClient) {
           ? s.conversations
           : [conversation, ...s.conversations],
         messages,
+        drafts: [],
         olderCursor,
         loadingOlder: false,
         latestSequence: after,

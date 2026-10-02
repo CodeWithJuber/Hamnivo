@@ -58,6 +58,9 @@ export class UnsubscribeTokens {
     if (!payload || !signature) return null;
     const expected = this.mac(payload);
     const given = Buffer.from(signature, 'base64url');
+    // Only the one spelling of the signature counts: the last of its 43 characters has spare bits
+    // that decoding ignores, so a link with another last character would still verify.
+    if (given.toString('base64url') !== signature) return null;
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
     try {
       const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));

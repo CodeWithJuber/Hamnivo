@@ -41,6 +41,7 @@ import { useTranslation } from 'react-i18next';
 import { CommerceCard, type Part } from '../commerce/Cards.js';
 import { ShopBar } from '../commerce/ShopBar.js';
 import type { Commerce } from '../commerce/useCommerce.js';
+import { type Draft, draftText } from '../drafts.js';
 import { LANGUAGE_NAMES, LOCALES, type Locale, REPLY_LANGUAGE_NAMES } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
 import type { ChatState } from '../useChat.js';
@@ -68,7 +69,8 @@ interface Custom {
   kind: ParticipantKind;
   name: string;
   role: string;
-  state: 'accepted' | OutgoingMessage['state'];
+  /** `provisional`: an AI reply still being written or checked, not a message yet. */
+  state: 'accepted' | 'provisional' | OutgoingMessage['state'];
   clientMessageId?: string;
   /** Knowledge an AI answer cites, numbered as in its text (G06). */
   sources?: Source[];
@@ -131,6 +133,7 @@ function toThread(
   pending: readonly OutgoingMessage[],
   you: string,
   firstUnreadId: string | null,
+  drafts: readonly Draft[] = [],
 ): ThreadMessageLike[] {
   const lastMine = messages.findLast(
     (m) => m.sender.kind === 'customer' && !deletedOf(m) && !reactionOf(m),
@@ -186,7 +189,17 @@ function toThread(
       },
     }),
   );
-  return [...confirmed, ...unsent];
+  const provisional = drafts.map(
+    (draft): ThreadMessageLike => ({
+      id: `draft-${draft.draftId}`,
+      role: 'assistant',
+      content: [{ type: 'text', text: draftText(draft) }],
+      metadata: {
+        custom: { kind: 'ai_primary', name: '', role: '', state: 'provisional' } satisfies Custom,
+      },
+    }),
+  );
+  return [...confirmed, ...unsent, ...provisional];
 }
 
 interface BubbleContext {
@@ -325,6 +338,26 @@ function Bubble({ message, ctx }: { message: ThreadMessageLike; ctx: BubbleConte
     typeof message.content === 'string'
       ? message.content
       : message.content.map((p) => ('text' in p ? p.text : '')).join('');
+  // A draft is shown as an answer being checked, plain text, never as a final message.
+  if (custom.state === 'provisional') {
+    return (
+      <li
+        className="flex flex-col items-start gap-1"
+        data-sender={custom.kind}
+        data-state="provisional"
+        data-testid="draft-reply"
+        aria-busy="true"
+      >
+        <p className="text-xs text-text-muted">{t('draftChecking')}</p>
+        <div
+          dir={directionOf(text)}
+          className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl border border-dashed border-border px-3 py-2 text-[15px] leading-relaxed text-text-muted"
+        >
+          <BidiText text={text} />
+        </div>
+      </li>
+    );
+  }
   const messageId = custom.messageId;
   const canDelete =
     mine &&
@@ -808,8 +841,8 @@ export function Chat(props: {
   const conversation = state.conversation;
   const offline = state.connection === 'offline';
   const messages = useMemo(
-    () => toThread(state.messages, props.pending, t('you'), state.firstUnreadId),
-    [state.messages, props.pending, t, state.firstUnreadId],
+    () => toThread(state.messages, props.pending, t('you'), state.firstUnreadId, state.drafts),
+    [state.messages, props.pending, t, state.firstUnreadId, state.drafts],
   );
   const canAskPerson =
     conversation?.responder !== 'person' && conversation?.status !== 'waiting_for_person';

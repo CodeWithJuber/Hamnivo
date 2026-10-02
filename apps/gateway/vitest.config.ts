@@ -15,6 +15,7 @@ export default defineConfig({
   oxc: false,
   test: {
     include: ['test/**/*.test.ts'],
-    exclude: ['test/**/*.int.test.ts'],
+    // Integration tests need PostgreSQL and Valkey; live tests call real providers (opt-in).
+    exclude: ['test/**/*.int.test.ts', 'test/**/*.live.test.ts'],
   },
 });

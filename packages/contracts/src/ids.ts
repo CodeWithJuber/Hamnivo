@@ -25,6 +25,7 @@ export const ID_PREFIX = {
   run: 'run',
   draft: 'drf',
   decision: 'dcs',
+  check: 'chk',
   tool: 'tool',
   action: 'act',
   approval: 'apr',

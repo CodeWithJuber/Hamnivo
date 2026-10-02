@@ -3,6 +3,7 @@ import { adminRoutes, identityRoutes } from './admin-routes.js';
 import { agentRoutes } from './agent-routes.js';
 import { analyticsRoutes, billingRoutes } from './billing-routes.js';
 import { cacheRoutes } from './cache-routes.js';
+import { checkRoutes } from './check-routes.js';
 import {
   commerceAdminRoutes,
   commerceIntegrationRoutes,
@@ -397,6 +398,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...integrationRoutes,
   ...conversationRoutes,
   ...decisionRoutes,
+  ...checkRoutes,
   ...cacheRoutes,
   ...languageRoutes,
   ...inboxRoutes,

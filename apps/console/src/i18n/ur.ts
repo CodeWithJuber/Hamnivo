@@ -1,4 +1,5 @@
 import { cachingUr } from './caching';
+import { checksUr } from './checks';
 import { commerceUr } from './commerce/ur';
 import { decisionsUr } from './decisions';
 import { developerUr } from './developer/ur';
@@ -1316,6 +1317,7 @@ export const ur: Translation = {
     },
   },
   decisions: decisionsUr,
+  checks: checksUr,
   caching: cachingUr,
   tools: toolsUr,
   commerce: commerceUr,

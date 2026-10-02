@@ -250,19 +250,58 @@ conversation's language. Without Jev, a fixed keyword rule routes.
 3. The brand starts in **shadow** mode. Every conversation records both Jev's choice and the fixed
    rule's, but only the fixed rule routes. **Jev compared with the fixed rules** shows how often
    they agree, per language.
-4. Switch to **live** when the comparison looks right. Set a minimum confidence per language;
-   below it, the fixed rule routes. Jev is most accurate in English. Look at Hinglish, Roman Urdu,
-   Arabic, Hindi and Urdu on your own conversations before you rely on it there.
+4. Switch to **live** when the comparison looks right. Each language has a minimum confidence;
+   below it, the fixed rule routes. Choosing Jev fills in the values Hamnivo measured for
+   `jev-1.13.0` (0.50 in every language). In that test Jev chose the right topic for 260 of 266
+   messages in the six languages; the keyword rule chose it for 188
+   ([report](evals/jev-1.13.0-2026-10-02.md)). Those were test messages, not your customers', so
+   look at each language on your own conversations before you rely on it there.
 
 Rules that always hold:
 - A customer who asks for a person gets one; Jev never decides that.
 - If TypeSafe is slow or down, the fixed rule routes once the rubric's deadline passes (1.5 s by
   default).
 - Each decision sends TypeSafe only the customer's latest messages and the conversation's status, as
-  the rubric chooses. That is a few hundred tokens, at $0.042 per million input tokens (TypeSafe's
-  price in October 2026).
+  the rubric chooses. In the test that was about 670 tokens, at $0.042 per million input tokens
+  (TypeSafe's price in October 2026): about $0.00003 per decision. Half of the decisions took 148 ms
+  or less, and 95% took 214 ms or less.
 - TypeSafe says it does not train Jev on requests or responses
   ([data handling](https://docs.typesafe.ai/models)).
+
+### Reply checks with Jev
+
+Jev can also check AI replies. Open **Reply checks** in Studio and choose the brand. Each check
+works like routing: choose Jev and a fixed version, set how sure Jev must be in each language,
+publish, and start in **comparison only** mode, which records what Jev finds and changes nothing.
+Switch a check to **live** when its records look right.
+
+- **Answer check:** before an AI reply is sent, Jev checks each sentence that cites your knowledge
+  against the passage it cites. When live, a reply with a sentence the passage does not support is
+  written again once without it; if that fails too, a person takes over with a note.
+- **Escalation advice:** before the AI answers, Jev checks whether the customer needs a person: a
+  request it may have missed, a risk to health or safety, a legal threat, a complaint, or
+  frustration with a problem that is still not solved. When live, a person takes over with the
+  reason in the note. A customer who asks for a person always gets one, without Jev.
+- **Passage relevance:** before the AI writes, Jev reads each passage found in your knowledge
+  with the customer's question. When live, passages that are off topic, answer nothing, or try
+  to give the assistant instructions are left out, and the record says which.
+- **Reply language:** when a customer's words fit more than one language (often Hinglish and
+  Roman Urdu), Jev picks one. When live, its choice is used if Jev is sure enough for that
+  language; otherwise the customer is asked once, as before. Choosing Jev fills in the thresholds
+  Hamnivo measured. A customer's own choice always wins.
+- **Message guard:** Jev reads what comes in and what goes out. When live, a customer who says
+  they want to hurt themselves, or that someone is in danger now, gets safety wording at once in
+  their language, pointing to local emergency help, and a person takes over with an urgent note.
+  A threat or abuse goes to a person. A draft reply that says or promises a payment, refund or
+  order change without a receipt or a submitted refund is written again once, then passed to a
+  person. The receipt check runs first and keeps the final say. These questions have no measured
+  thresholds yet: set them from what comparison mode records. The safety wording in languages
+  other than English is waiting for review by native speakers.
+
+If Jev is slow or unavailable, or a language has no threshold, the reply goes out as it would
+without the check, and the check is recorded. A check sends TypeSafe only what it needs: the
+customer's latest messages or the draft reply, with personal data replaced by its kind, and the
+knowledge passages it checks.
 
 ### Bring your old chats
 

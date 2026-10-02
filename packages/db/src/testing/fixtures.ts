@@ -1259,6 +1259,26 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       latencyMs: 140,
       offered: ['billing', 'other'],
     });
+    await tx.insert(s.decisionChecks).values({
+      tenantId,
+      brandId: ids.brandId,
+      conversationId: ids.conversationId,
+      runId: ids.runId,
+      task: 'answer-check',
+      triggerRef: `run:${ids.runId}:answer:1`,
+      mode: 'shadow',
+      provider: 'jev',
+      modelVersion: 'jev-1.13.0',
+      status: 'decided',
+      language: 'en',
+      verdict: 'pass',
+      action: 'publish',
+      answers: { c1_p1: { type: 'choice', label: 'supports', confidence: 0.94, kept: true } },
+      detail: { claims: [{ sentence: 0, verdict: 'supported' }] },
+      latencyMs: 150,
+      inputTokens: 420,
+      outputTokens: 12,
+    });
     await tx.insert(s.languagePreferences).values({
       tenantId,
       principalId: ids.principalId,

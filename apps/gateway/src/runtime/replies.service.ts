@@ -43,6 +43,7 @@ import {
 import { EntitlementsService } from '../billing/entitlements.service.js';
 import { AnswerCache, type AnswerLookup } from '../cache/answers.js';
 import type { SourceRefRow } from '../cache/cache.service.js';
+import { ReplyChecksService, type RunChecks } from '../checks/reply-checks.service.js';
 import { claimedLiveData, conversationLiveData } from '../commerce/answer-cache.js';
 import { CLAIM_CORRECTION, checkReplyClaims } from '../commerce/claims.js';
 import { AppError } from '../common/app-error.js';
@@ -96,8 +97,18 @@ interface Generated {
   liveData: ModuleDataClass[];
 }
 
-/** Prompt options, and why the reply language was chosen (recorded with the model step). */
-type GenerateOptions = PromptOptions & { languageSource?: string };
+/**
+ * Prompt options, why the reply language was chosen (recorded with the model step), and the
+ * checks that run around this reply (none for staff suggestions).
+ */
+type GenerateOptions = PromptOptions & { languageSource?: string; checks?: RunChecks | null };
+
+/** Why `generate` returned no reply, and whether the reply it returned may be cached. */
+interface GenerateOutcome {
+  /** A live check held the reply back; the hand-off carries this note. */
+  blocked?: { note: string };
+  cacheable?: boolean;
+}
 
 /** The customer's most recent words in a conversation. */
 function latestCustomerText(history: AuthorityMessage[]): string {
@@ -176,6 +187,7 @@ export class RepliesService {
     private readonly toolGateway: ToolGateway,
     private readonly approvals: ActionApprovals,
     private readonly handoffs: HandoffPackets,
+    private readonly checks: ReplyChecksService,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -360,42 +372,98 @@ export class RepliesService {
       return;
     }
 
+    // Checks around this reply, as the brand set them (shadow records, live acts).
+    const checks = await this.checks.forRun({
+      tenantId,
+      brandId: control.brandId,
+      conversationId: control.id,
+      runId: run.id,
+      budgetMs: agent.config.limits.timeoutMs,
+    });
+
     // Reply in the customer's language (U01): their explicit choice, otherwise their words.
-    const chosen = await this.language.forReply(tenantId, control.principalId, question);
+    const chosen = await this.language.forReply(
+      tenantId,
+      control.principalId,
+      question,
+      checks?.languageDecider(),
+    );
     const options: GenerateOptions = {
       language: chosen.resolution.language,
       style: chosen.style,
       languageSource: chosen.resolution.source,
       tools: agent.config.tools.grants.length > 0,
+      checks,
     };
     const handoffContext = { request: question, language: chosen.resolution.language ?? null };
+    // Jev's checks of the customer's messages (message guard, escalation): they can only hand the
+    // conversation to people, never answer, approve or unlock anything.
+    const inbound = await checks?.inbound({
+      messages: history.messages,
+      language: chosen.detection.language ?? chosen.resolution.language,
+      replyLanguage: chosen.resolution.language,
+    });
+    if (inbound?.action === 'handoff') {
+      await this.handOff(
+        tenantId,
+        control,
+        run.id,
+        payload.epoch,
+        inbound.reason,
+        undefined,
+        handoffContext,
+        inbound.note,
+      );
+      return;
+    }
+    // Someone may be at risk: Hamnivo's safe wording goes out at once, without a model, memory or
+    // cache, and people take over right after it.
+    const urgent = inbound?.action === 'urgent' ? inbound : null;
     // Customer memory (G19) is recalled before the cache: a reply built with it never enters a
     // shared entry, only the customer's own (keyed by their memory version, K09).
-    const memories = await this.memory.recall(tenantId, {
-      runId: run.id,
-      control: context.control,
-      config: agent.config,
-      history: history.messages,
-    });
+    const memories = urgent
+      ? []
+      : await this.memory.recall(tenantId, {
+          runId: run.id,
+          control: context.control,
+          config: agent.config,
+          history: history.messages,
+        });
     const shared = sharedCacheEligibility({ memoryItems: memories.length });
     const personalContext = shared.eligible ? [] : [shared.reason];
     // Commerce data the conversation holds (K06): a reply built from it is never cached. Nor is
     // the reply of an agent that may call tools (G15): it may rest on a tool's answer.
     const liveData = await this.tx(tenantId, (tx) => conversationLiveData(tx, control.id));
-    const cached = await this.cachedAnswer(
-      tenantId,
-      run.id,
-      context,
-      agent,
-      history,
-      question,
-      options,
-      personalContext,
-      options.tools ? [...liveData, TOOL_DATA_CLASS] : liveData,
-    );
+    const cached: AnswerLookup = urgent
+      ? { kind: 'skip', status: 'bypass', reason: 'message_guard' }
+      : await this.cachedAnswer(
+          tenantId,
+          run.id,
+          context,
+          agent,
+          history,
+          question,
+          options,
+          personalContext,
+          options.tools ? [...liveData, TOOL_DATA_CLASS] : liveData,
+        );
 
     let generated: Generated | null;
-    if (cached.kind === 'hit') {
+    const outcome: GenerateOutcome = {};
+    if (urgent) {
+      generated = {
+        text: urgent.text,
+        provider: 'hamnivo',
+        modelId: 'safe-reply',
+        inputTokens: 0,
+        outputTokens: 0,
+        latencyMs: 0,
+        sources: [],
+        refs: [],
+        memories: [],
+        liveData: [],
+      };
+    } else if (cached.kind === 'hit') {
       generated = {
         text: cached.answer.text,
         provider: 'cache',
@@ -436,6 +504,7 @@ export class RepliesService {
           options,
           memories,
           tools,
+          outcome,
         );
       } catch (error) {
         if (tools?.signal.aborted) {
@@ -470,13 +539,16 @@ export class RepliesService {
           'ai_blocked',
           undefined,
           handoffContext,
+          outcome.blocked?.note,
         );
         return;
       }
-      // Only complete answers that passed the honesty guard, from the configured model, are kept.
+      // Only complete answers that passed the honesty guard and the live checks, from the
+      // configured model, are kept.
       const config = agent.config;
       if (
         cached.kind === 'fill' &&
+        outcome.cacheable !== false &&
         generated.provider === config.model.provider &&
         generated.modelId === config.model.modelId
       ) {
@@ -599,6 +671,19 @@ export class RepliesService {
       throw error;
     }
     await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted, facts);
+    if (urgent) {
+      await this.handOff(
+        tenantId,
+        control,
+        run.id,
+        payload.epoch,
+        urgent.reason,
+        undefined,
+        handoffContext,
+        urgent.note,
+      );
+      return;
+    }
     await this.tx(tenantId, (tx) =>
       this.finishWithUsage(tx, tenantId, run.id, 'replied', telemetry),
     );
@@ -763,7 +848,9 @@ export class RepliesService {
       agentId: agent.profile.id,
       agentVersionId: agent.version.id,
       config: agent.config,
-      promptVersion: promptVersion(agent.config, context.brandName, options),
+      promptVersion:
+        promptVersion(agent.config, context.brandName, options) +
+        (options.checks?.cacheScope ?? ''),
       language: options.language,
       history: history.messages,
       question,
@@ -809,6 +896,7 @@ export class RepliesService {
     options: GenerateOptions = {},
     recalled?: RecalledMemory[],
     tools?: RunTools | null,
+    outcome?: GenerateOutcome,
   ): Promise<Generated | null> {
     const runtime = await this.registry.get(tenantId, context.control.connectionId);
     const { messages: history, view } =
@@ -816,7 +904,14 @@ export class RepliesService {
     const config: AgentConfig = agent.config;
     const messages = historyMessages(history, config.limits.historyMessages);
     const assist = config.mode === 'assist';
-    const passages = await this.retrieve(tenantId, runId, context, config, history);
+    const retrieved = await this.retrieve(tenantId, runId, context, config, history);
+    // Passages that do not help are dropped before the model sees them (live check only).
+    const passages =
+      (await options.checks?.passages({
+        messages: history,
+        passages: retrieved,
+        language: options.language,
+      })) ?? retrieved;
     // Customer memory (G19): only with the customer's consent, in scope and currently valid.
     const memories =
       recalled ??
@@ -833,6 +928,7 @@ export class RepliesService {
         ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
         : '');
     let correction: string | null = null;
+    let deadlineAt: number | undefined;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const system = correction ? `${base}\n\n${correction}` : base;
       const generated = await this.callModels(
@@ -847,6 +943,7 @@ export class RepliesService {
           ...(options.languageSource ? { languageSource: options.languageSource } : {}),
         },
         tools,
+        deadlineAt,
       );
       const cited = applyCitations(generated.text, passages, (p) => p.documentId);
       const remembered = citeMemories(cited.text, memories);
@@ -932,6 +1029,25 @@ export class RepliesService {
         }
       }
       if (!result.text) throw new EmptyReplyError('The model returned no text.');
+      // Before publication: each sentence that cites a passage, against that passage. The model's
+      // own text is read, so its citation numbers still point at the passages it saw.
+      const checked = await options.checks?.reply({
+        text: generated.text,
+        passages,
+        language: options.language,
+        attempt,
+        lastAttempt: attempt === 1,
+      });
+      if (checked?.action === 'regenerate') {
+        correction = checked.correction;
+        deadlineAt = checked.deadlineAt;
+        continue;
+      }
+      if (checked?.action === 'handoff') {
+        if (outcome) outcome.blocked = { note: checked.note };
+        return null;
+      }
+      if (outcome && checked) outcome.cacheable = checked.cacheable;
       return { ...result, liveData: claimedLiveData(claims.claimed) };
     }
     return null;
@@ -992,6 +1108,8 @@ export class RepliesService {
     messages: ReturnType<typeof historyMessages>,
     context: { view: string; language?: string; languageSource?: string },
     tools?: RunTools | null,
+    /** A draft written again after a check must still finish within the run's time limit. */
+    deadlineAt?: number,
   ): Promise<Generated> {
     const choices: ModelChoice[] = [config.model, ...config.fallbackModels];
     const inputHash = sha256(canonicalize({ system, messages }) ?? '');
@@ -1000,7 +1118,11 @@ export class RepliesService {
       const started = Date.now();
       try {
         const resolved = await this.models.resolve(tenantId, choice);
-        const timeout = AbortSignal.timeout(config.limits.timeoutMs);
+        const timeout = AbortSignal.timeout(
+          deadlineAt === undefined
+            ? config.limits.timeoutMs
+            : Math.max(1, Math.min(config.limits.timeoutMs, deadlineAt - Date.now())),
+        );
         const result = await generateText({
           model: resolved.model,
           instructions: system,
@@ -1115,6 +1237,8 @@ export class RepliesService {
     reason: AiHandoffReason,
     errorKind?: string,
     handoff: { request?: string | null; language?: string | null } = {},
+    /** A note that says more than the reason's own (a check that held the reply back). */
+    note?: string,
   ) {
     const outcome: RunOutcome = reason === 'ai_blocked' ? 'blocked' : 'handoff';
     let journal: JournalEntry[] = [];
@@ -1124,7 +1248,7 @@ export class RepliesService {
           control,
           runId,
           reason,
-          reasonText: HANDOFF_NOTES[reason],
+          reasonText: note ?? HANDOFF_NOTES[reason],
           request: handoff.request?.trim() || null,
           replyLanguage: handoff.language ?? null,
         });

@@ -7,6 +7,7 @@ export * from './billing.js';
 export * from './cache.js';
 export * from './commerce.js';
 export * from './customer-surface.js';
+export * from './decision-checks.js';
 export * from './decisions.js';
 export * from './developer.js';
 export { appRole, platformRole } from './helpers.js';

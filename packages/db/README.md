@@ -73,6 +73,7 @@ tombstones of later deletions across (export them before restoring, insert them 
 | File | Tables |
 |---|---|
 | `src/schema/decisions.ts` | `team_routing` (per inbox team and brand: intents, languages, reviewed translation languages, default, accepting; a team routes only for brands of its workspace), `decision_rubrics` (versioned questions and thresholds; published versions are immutable), `decision_tasks` (off, shadow or live per brand), `decision_records` (append-only except applying and reviewing; no delete for the application role) |
+| `src/schema/decision-checks.ts` | `decision_checks`: one record per check Jev ran around an AI reply (answer check and the checks that follow), with labels, numbers and document ids but never text; written once (no update or delete for the application role) |
 | `src/schema/language.ts` | `language_preferences`: interface locale, explicit reply language, last detection, one-time prompt, script, style and time zone per customer principal |
 | `src/schema/cache.ts` | `cache_policies`, `cache_dependency_versions`, `cache_entry_index` (fingerprints and references, never content), `cache_metrics_daily` (counts only) |
 

@@ -1,4 +1,5 @@
 import { cachingHi } from './caching';
+import { checksHi } from './checks';
 import { commerceHi } from './commerce/hi';
 import { decisionsHi } from './decisions';
 import { developerHi } from './developer/hi';
@@ -1295,6 +1296,7 @@ export const hi: Translation = {
     },
   },
   decisions: decisionsHi,
+  checks: checksHi,
   caching: cachingHi,
   tools: toolsHi,
   commerce: commerceHi,

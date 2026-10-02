@@ -29,7 +29,7 @@ import {
 import type { StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
 import canonicalize from 'canonicalize';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { JournalService } from '../authority/journal.service.js';
 import { AuthorityRegistry } from '../authority/registry.js';
@@ -368,6 +368,18 @@ export class RoutingService {
     const texts = await this.customerTexts(tenantId, control, 5);
     // Without the customer's words there is nothing to route on yet; their first message will.
     if (texts.length === 0) return;
+    const latest = texts.at(-1) ?? '';
+    const explicitRequest = detectHumanRequest(latest).requested;
+    // A customer who asks for a person while the AI still owns the conversation is handed over
+    // by the AI job, and that hand-off routes. Routing the new conversation now would record a
+    // state that is about to change (a second worker may run this before the AI job).
+    if (
+      payload.trigger === 'new_conversation' &&
+      control.ownerMode === 'AI_ACTIVE' &&
+      explicitRequest
+    ) {
+      return;
+    }
     const mode = context.mode === 'live' ? 'live' : 'shadow';
     const definition = definitionOf(rubric);
     const state = minimizedState(
@@ -379,18 +391,17 @@ export class RoutingService {
         : null,
     );
     // A handoff with nothing new since the last decision reuses it instead of asking again.
+    const stateHash = sha256(canonicalize(state) ?? '');
+    const reusable = (record: RecordRow | undefined): record is RecordRow =>
+      record !== undefined &&
+      record.mode === mode &&
+      record.rubricId === rubric.id &&
+      record.stateHash?.equals(stateHash) === true;
     const last = context.existing[0];
-    if (
-      last &&
-      last.mode === mode &&
-      last.rubricId === rubric.id &&
-      last.stateHash?.equals(sha256(canonicalize(state) ?? ''))
-    ) {
-      if (mode === 'live' && !last.applied) await this.apply(tenantId, control, last);
+    if (reusable(last)) {
+      if (last.mode === 'live' && !last.applied) await this.apply(tenantId, control, last);
       return;
     }
-    const latest = texts.at(-1) ?? '';
-    const explicitRequest = detectHumanRequest(latest).requested;
     const language = await this.tx(tenantId, (tx) =>
       this.language.forRouting(tx, control.principalId, texts.join('\n')),
     );
@@ -419,11 +430,36 @@ export class RoutingService {
       providerId: provider?.id ?? 'none',
       totalMs: Math.round(performance.now() - started),
     });
-    const [record] = await this.tx(tenantId, (tx) =>
-      tx.insert(schema.decisionRecords).values(values).onConflictDoNothing().returning(),
-    );
-    if (!record) return;
-    if (mode === 'live') await this.apply(tenantId, control, record);
+    // Two route events of one conversation can run at once (two workers, or an old and a new one
+    // during a deploy). The provider is asked outside the lock; the checks above are repeated
+    // under it, so running them together gives what running them one after the other would.
+    const record = await this.tx(tenantId, async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`route:${control.id}`}, 0))`,
+      );
+      const existing = await tx
+        .select()
+        .from(schema.decisionRecords)
+        .where(
+          and(
+            eq(schema.decisionRecords.conversationId, control.id),
+            eq(schema.decisionRecords.task, ROUTING_TASK),
+          ),
+        )
+        .orderBy(desc(schema.decisionRecords.createdAt));
+      const sameRef = existing.find((r) => r.triggerRef === payload.ref);
+      if (sameRef) return sameRef;
+      if (payload.trigger === 'new_conversation' && existing.length > 0) return null;
+      const newest = existing[0];
+      if (reusable(newest)) return newest;
+      const [inserted] = await tx
+        .insert(schema.decisionRecords)
+        .values(values)
+        .onConflictDoNothing()
+        .returning();
+      return inserted ?? null;
+    });
+    if (record?.mode === 'live' && !record.applied) await this.apply(tenantId, control, record);
   }
 
   /**

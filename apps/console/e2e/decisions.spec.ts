@@ -53,8 +53,24 @@ test('HNV-12-01 HNV-12-02 HNV-12-03 HNV-12-05 · edit, publish and try a routing
   await expect(routing).toBeHidden();
   await expect(team).toContainText('بالترجمة: الأردية');
 
+  // Choosing Jev pins the version the thresholds were evaluated on, fills the empty languages
+  // with the thresholds measured for it, and says plainly that this server has no TypeSafe key
+  // (the test stack never has one).
+  const providerSelect = page.getByRole('combobox', { name: 'من يقترح الفريق' });
+  const modelField = page.getByRole('textbox', { name: 'إصدار Jev المثبّت' });
+  await expect(page.getByTestId('jev-not-configured')).toHaveCount(0);
+  await expect(page.getByRole('spinbutton', { name: 'الأردية', exact: true })).toHaveValue('');
+  await providerSelect.selectOption('jev');
+  await expect(modelField).toHaveValue('jev-1.13.0');
+  await expect(page.getByRole('spinbutton', { name: 'الأردية', exact: true })).toHaveValue('0.5');
+  await expect(page.getByTestId('thresholds-evaluated')).toContainText('jev-1.13.0');
+  await expect(page.getByTestId('jev-not-configured')).toContainText('TYPESAFE_API_KEY');
+  const jevViolations = await audit(page, 'decisions with Jev unconfigured (ar)');
+  await modelField.fill('');
+
   // The rubric: a malformed topic key is refused before anything goes live (HNV-12-01).
-  await page.getByRole('combobox', { name: 'من يقترح الفريق' }).selectOption('mock');
+  await providerSelect.selectOption('mock');
+  await expect(page.getByTestId('jev-not-configured')).toHaveCount(0);
   const first = page.getByRole('group', { name: 'الموضوع 1' });
   await first.getByRole('textbox', { name: 'المفتاح' }).fill('Billing!');
   await first.getByRole('textbox', { name: 'ما يشمله' }).fill('Payments, invoices and refunds');
@@ -103,7 +119,11 @@ test('HNV-12-01 HNV-12-02 HNV-12-03 HNV-12-05 · edit, publish and try a routing
   await tryMessage(page, 'I want to talk to a person please');
   await expect(result(page)).toContainText('تطلب الرسالة التحدث إلى شخص');
 
-  const violations = [...dialogViolations, ...(await audit(page, 'decisions (ar)'))];
+  const violations = [
+    ...dialogViolations,
+    ...jevViolations,
+    ...(await audit(page, 'decisions (ar)')),
+  ];
 
   // Every brand starts in shadow mode (J02): real conversations record Jev next to the fixed
   // rules, and no team is assigned from Jev's choice.

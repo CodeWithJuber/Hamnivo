@@ -23,7 +23,15 @@ export const WidgetLanguageState = z
   .object({
     uiLocale: SupportedLocale.nullable(),
     replyLanguage: ReplyLanguage,
-    source: z.enum(['explicit', 'detected', 'suggested', 'previous', 'locale', 'default']),
+    source: z.enum([
+      'explicit',
+      'detected',
+      'decided',
+      'suggested',
+      'previous',
+      'locale',
+      'default',
+    ]),
     confirm: z
       .object({ suggested: ReplyLanguage, alternatives: z.array(ReplyLanguage) })
       .nullable(),

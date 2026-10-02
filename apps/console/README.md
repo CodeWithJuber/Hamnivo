@@ -59,9 +59,12 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
   A side sheet shows one run's steps. No message text is shown.
 - **Decision rules** (board 12). Routing mode (shadow by default), the inbox's teams with their
   topics, languages and translation languages for the brand (adding a team here creates an inbox
-  team in the brand's workspace), the rubric editor (provider and pinned Jev version, time limit, topics with keywords,
-  what Jev may see, a threshold per language), a panel to try a message, recent decisions with
-  human review, and Jev compared with the fixed rules.
+  team in the brand's workspace), the rubric editor (provider and pinned Jev version, time limit,
+  topics with keywords, what Jev may see, a threshold per language), a panel to try a message,
+  recent decisions with human review, and Jev compared with the fixed rules. Choosing Jev fills in
+  the recommended version (`JEV_RECOMMENDED_MODEL`, currently `jev-1.13.0`), and Studio warns when
+  the server has no TypeSafe key (`TYPESAFE_API_KEY`), pointing to "Decisions with Jev" in the
+  self-hosting guide.
 - **Answer caching** (board 25). What is cached per tier and for how long, a question inspector,
   stored answers by fingerprint and sources, stopping reuse after a correction, and use and health
   per day, tier and language. Questions and answers are never listed.

@@ -58,6 +58,10 @@ rubrics. It never authorizes, never computes money or dates, and never writes re
   - Thresholds hold only for the provider, model and rubric they were evaluated with. A task,
     language or question without thresholds abstains ("not evaluated for this language").
   - An abstained result keeps the observed answers for audit. Never route on them.
+- `src/decision-questions.ts` holds the questions the product and `run-suite decisions` share
+  (`PERSON_REQUEST_QUESTION`, `LANGUAGE_QUESTION`) and `DEFAULT_DECISION_THRESHOLDS`: the
+  thresholds measured live for `jev-1.13.0` per language slice
+  (`docs/evals/jev-1.13.0-2026-10-02.md`). They are starting values for that version only.
 - `ROUTING_OUTCOMES` lists what policy may choose: `AI_CONTINUE`, `ASK_CLARIFICATION`,
   `INVITE_SPECIALIST`, `HUMAN_REVIEW`, `HUMAN_TAKEOVER` and `BLOCK_ACTION`. It is separate from the
   provider status.

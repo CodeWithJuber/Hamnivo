@@ -21,6 +21,7 @@ import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
 import { CacheController } from './cache/cache.controller.js';
 import { cacheAdminProviders, cacheProviders } from './cache/cache.providers.js';
+import { ChecksController } from './checks/checks.controller.js';
 import { COMMERCE_API_CONTROLLERS, COMMERCE_API_PROVIDERS } from './commerce/commerce.module.js';
 import { IdempotencyService } from './common/idempotency.service.js';
 import type { AppConfig } from './config.js';
@@ -140,6 +141,7 @@ export class ApiModule {
         KnowledgeController,
         MigrationController,
         DecisionsController,
+        ChecksController,
         CacheController,
         LanguageController,
         WidgetMemoryController,

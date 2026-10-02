@@ -16,7 +16,8 @@
     "billing": "node --env-file-if-exists=../../.env.local dist/main.billing.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:int": "vitest run --config vitest.int.config.ts"
+    "test:int": "vitest run --config vitest.int.config.ts",
+    "test:live": "vitest run --config vitest.live.config.ts"
   },
   "dependencies": {
     "@ai-sdk/provider": "4.0.18",

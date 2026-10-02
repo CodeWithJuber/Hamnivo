@@ -8434,6 +8434,416 @@
         }
       }
     },
+    "/v1/admin/brands/{brandId}/checks": {
+      "get": {
+        "operationId": "listCheckTasks",
+        "summary": "Checks around AI replies, with their modes and rubrics (decisions.read)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CheckTask"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/checks/{task}/draft": {
+      "put": {
+        "operationId": "saveCheckDraft",
+        "summary": "Save a check’s draft thresholds; drafts are never used (decisions.manage)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Check, such as answer-check"
+            },
+            "required": true,
+            "description": "Check, such as answer-check"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCheckDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Draft saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckRubric"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/checks/{task}/publish": {
+      "post": {
+        "operationId": "publishCheck",
+        "summary": "Publish a check’s draft as its next immutable version (decisions.manage)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Check, such as answer-check"
+            },
+            "required": true,
+            "description": "Check, such as answer-check"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckTask"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/checks/{task}/mode": {
+      "put": {
+        "operationId": "setCheckMode",
+        "summary": "Turn a check off, run it in shadow or make it live (decisions.manage)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Check, such as answer-check"
+            },
+            "required": true,
+            "description": "Check, such as answer-check"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDecisionModeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mode set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckTask"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/checks/{task}/records": {
+      "get": {
+        "operationId": "listCheckRecords",
+        "summary": "Recorded checks, newest first (decisions.read)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Check, such as answer-check"
+            },
+            "required": true,
+            "description": "Check, such as answer-check"
+          },
+          {
+            "in": "query",
+            "name": "conversationId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "Opaque pagination cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CheckRecord"
+                      }
+                    },
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512,
+                          "description": "Opaque pagination cursor"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/brands/{brandId}/cache/policy": {
       "get": {
         "operationId": "getCachePolicy",
@@ -21563,6 +21973,100 @@
           "reason"
         ]
       },
+      "SaveCheckDraftRequest": {
+        "type": "object",
+        "properties": {
+          "thresholds": {
+            "default": {},
+            "$ref": "#/components/schemas/CheckThresholds"
+          },
+          "provider": {
+            "default": "none",
+            "$ref": "#/components/schemas/DecisionProviderKind"
+          },
+          "modelVersion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "\\d"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deadlineMs": {
+            "default": 1500,
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 10000
+          }
+        }
+      },
+      "CheckThresholds": {
+        "type": "object",
+        "propertyNames": {
+          "$ref": "#/components/schemas/LanguageSlice"
+        },
+        "additionalProperties": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/components/schemas/CheckThreshold"
+          }
+        }
+      },
+      "CheckThreshold": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "choice"
+              },
+              "minConfidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "type",
+              "minConfidence"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "noul"
+              },
+              "trueAtLeast": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "falseAtMost": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "type",
+              "trueAtLeast",
+              "falseAtMost"
+            ]
+          }
+        ],
+        "type": "object"
+      },
       "UpdateCachePolicyRequest": {
         "type": "object",
         "properties": {
@@ -26725,7 +27229,8 @@
                       "takeover",
                       "cancelled",
                       "failed",
-                      "superseded"
+                      "superseded",
+                      "check_failed"
                     ]
                   }
                 },
@@ -33286,6 +33791,9 @@
                 "type": "null"
               }
             ]
+          },
+          "jev": {
+            "$ref": "#/components/schemas/JevStatus"
           }
         },
         "required": [
@@ -33294,7 +33802,8 @@
           "mode",
           "published",
           "draft",
-          "updatedAt"
+          "updatedAt",
+          "jev"
         ],
         "additionalProperties": false
       },
@@ -33402,6 +33911,34 @@
           "createdAt",
           "publishedAt",
           "publishedBy"
+        ],
+        "additionalProperties": false
+      },
+      "JevStatus": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "recommendedModel": {
+            "type": "string"
+          },
+          "recommendedThresholds": {
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/LanguageSlice"
+            },
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "required": [
+          "configured",
+          "recommendedModel",
+          "recommendedThresholds"
         ],
         "additionalProperties": false
       },
@@ -33903,6 +34440,439 @@
           "latencyP95Ms",
           "inputTokens",
           "outputTokens"
+        ],
+        "additionalProperties": false
+      },
+      "CheckTask": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "task": {
+            "$ref": "#/components/schemas/CheckTaskName"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/DecisionMode"
+          },
+          "published": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckRubric"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckRubric"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckQuestion"
+            }
+          },
+          "recommendedThresholds": {
+            "$ref": "#/components/schemas/CheckThresholdsOutput"
+          },
+          "jev": {
+            "$ref": "#/components/schemas/JevStatus"
+          }
+        },
+        "required": [
+          "brandId",
+          "task",
+          "mode",
+          "published",
+          "draft",
+          "updatedAt",
+          "questions",
+          "recommendedThresholds",
+          "jev"
+        ],
+        "additionalProperties": false
+      },
+      "CheckTaskName": {
+        "type": "string",
+        "enum": [
+          "answer-check",
+          "escalation",
+          "passage-relevance",
+          "language",
+          "message-guard"
+        ]
+      },
+      "CheckRubric": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "rubric identifier (TypeID with prefix \"rbc\")",
+            "example": "rbc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "task": {
+            "$ref": "#/components/schemas/CheckTaskName"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "retired"
+            ]
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/CheckThresholdsOutput"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/DecisionProviderKind"
+          },
+          "modelVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deadlineMs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "configHash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publishedBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "staff identifier (TypeID with prefix \"stf\")",
+                "example": "stf_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "task",
+          "version",
+          "state",
+          "thresholds",
+          "provider",
+          "modelVersion",
+          "deadlineMs",
+          "configHash",
+          "createdAt",
+          "publishedAt",
+          "publishedBy"
+        ],
+        "additionalProperties": false
+      },
+      "CheckQuestion": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "choice",
+              "noul"
+            ]
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "required": [
+          "key",
+          "type",
+          "instructions",
+          "options"
+        ],
+        "additionalProperties": false
+      },
+      "CheckRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "check identifier (TypeID with prefix \"chk\")",
+            "example": "chk_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "conversationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "conversation identifier (TypeID with prefix \"conv\")",
+                "example": "conv_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "run identifier (TypeID with prefix \"run\")",
+                "example": "run_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task": {
+            "$ref": "#/components/schemas/CheckTaskName"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "shadow",
+              "live",
+              "test"
+            ]
+          },
+          "provider": {
+            "type": "string"
+          },
+          "modelVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rubricVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "decided",
+              "abstained",
+              "unavailable",
+              "invalid",
+              "skipped"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retryable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LanguageSlice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "answers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "detail": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "latencyMs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "totalMs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "conversationId",
+          "runId",
+          "task",
+          "mode",
+          "provider",
+          "modelVersion",
+          "rubricVersion",
+          "status",
+          "reason",
+          "retryable",
+          "language",
+          "verdict",
+          "action",
+          "applied",
+          "answers",
+          "detail",
+          "latencyMs",
+          "totalMs",
+          "inputTokens",
+          "outputTokens",
+          "createdAt"
         ],
         "additionalProperties": false
       },
@@ -34445,6 +35415,7 @@
             "enum": [
               "explicit",
               "detected",
+              "decided",
               "suggested",
               "previous",
               "locale",
@@ -34663,7 +35634,8 @@
                   "assist_mode",
                   "ai_stopped",
                   "ai_unavailable",
-                  "ai_blocked"
+                  "ai_blocked",
+                  "ai_escalated"
                 ]
               },
               {
@@ -35238,7 +36210,8 @@
                   "assist_mode",
                   "ai_stopped",
                   "ai_unavailable",
-                  "ai_blocked"
+                  "ai_blocked",
+                  "ai_escalated"
                 ]
               },
               {
@@ -46766,6 +47739,70 @@
           "minConfidence"
         ],
         "additionalProperties": false
+      },
+      "CheckThresholdsOutput": {
+        "type": "object",
+        "propertyNames": {
+          "$ref": "#/components/schemas/LanguageSlice"
+        },
+        "additionalProperties": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/components/schemas/CheckThresholdOutput"
+          }
+        }
+      },
+      "CheckThresholdOutput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "choice"
+              },
+              "minConfidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "type",
+              "minConfidence"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "noul"
+              },
+              "trueAtLeast": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "falseAtMost": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "type",
+              "trueAtLeast",
+              "falseAtMost"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "type": "object"
       },
       "CacheTierPolicyOutput": {
         "type": "object",

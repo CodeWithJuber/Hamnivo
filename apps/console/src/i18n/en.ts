@@ -1,4 +1,5 @@
 import { cachingEn } from './caching';
+import { checksEn } from './checks';
 import { commerceEn } from './commerce/en';
 import { decisionsEn } from './decisions';
 import { developerEn } from './developer/en';
@@ -1302,6 +1303,7 @@ export const en = {
     },
   },
   decisions: decisionsEn,
+  checks: checksEn,
   caching: cachingEn,
   tools: toolsEn,
   commerce: commerceEn,

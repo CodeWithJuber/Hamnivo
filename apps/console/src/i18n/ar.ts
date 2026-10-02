@@ -1,4 +1,5 @@
 import { cachingAr } from './caching';
+import { checksAr } from './checks';
 import { commerceAr } from './commerce/ar';
 import { decisionsAr } from './decisions';
 import { developerAr } from './developer/ar';
@@ -1290,6 +1291,7 @@ export const ar: Translation = {
     },
   },
   decisions: decisionsAr,
+  checks: checksAr,
   caching: cachingAr,
   tools: toolsAr,
   commerce: commerceAr,

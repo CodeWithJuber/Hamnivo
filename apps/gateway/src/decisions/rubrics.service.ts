@@ -24,6 +24,7 @@ import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { authorizedBrand, authorizedBrandById, type BrandRow, idOf } from './access.js';
+import { DecisionProviders } from './providers.js';
 import {
   intentsOf,
   type RecordRow,
@@ -66,6 +67,7 @@ export class RubricsService {
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly providers: DecisionProviders,
   ) {}
 
   private tx<T>(principal: StaffPrincipal, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -128,6 +130,7 @@ export class RubricsService {
       published: published ? rubricView(published) : null,
       draft: draft ? rubricView(draft) : null,
       updatedAt: settings?.updatedAt.toISOString() ?? null,
+      jev: this.providers.jevStatus(),
     };
   }
 

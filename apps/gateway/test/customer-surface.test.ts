@@ -247,6 +247,23 @@ describe('previews and emails (W05, W25)', () => {
     expect(otherKey.verify(token)).toBeNull();
   });
 
+  it('refuses another spelling of the same signature', () => {
+    const tokens = new UnsubscribeTokens({ kek: { key: Buffer.alloc(32, 7) } } as AppConfig);
+    const claims = { t: 'tenant', p: 'principal', k: 'transcript' } as const;
+    const [payload, mac] = tokens.sign(claims).split('.') as [string, string];
+    // The last of the 43 characters carries four bits and two spare ones, which decoding skips:
+    // four spellings are the same 32 bytes, and only the one the gateway wrote may verify.
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const spellings = [...alphabet].filter((c) =>
+      Buffer.from(`${mac.slice(0, -1)}${c}`, 'base64url').equals(Buffer.from(mac, 'base64url')),
+    );
+    expect(spellings).toHaveLength(4);
+    for (const c of spellings) {
+      const verified = tokens.verify(`${payload}.${mac.slice(0, -1)}${c}`);
+      expect(verified).toEqual(c === mac.slice(-1) ? claims : null);
+    }
+  });
+
   it('shortens help passages at a word', () => {
     expect(excerptOf('short  text\n here')).toBe('short text here');
     const long = `${'word '.repeat(200)}end`;
