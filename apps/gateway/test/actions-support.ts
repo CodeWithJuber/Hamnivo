@@ -16,14 +16,21 @@ export interface ModelHooks {
   plan: MockToolOptions['plan'];
   batch: ToolPlan[] | null;
   replies: string[];
+  /** Name and description of every tool the model was offered, as it saw them. */
+  offered: { name: string; description: string }[];
 }
 
 export function actionsModel(): { model: LanguageModelV4; hooks: ModelHooks } {
-  const hooks: ModelHooks = { plan: undefined, batch: null, replies: [] };
+  const hooks: ModelHooks = { plan: undefined, batch: null, replies: [], offered: [] };
   const base = createMockModel({ tools: { plan: (input) => hooks.plan?.(input) } });
   const model: LanguageModelV4 = {
     ...base,
     async doGenerate(call) {
+      for (const tool of call.tools ?? []) {
+        if (tool.type === 'function') {
+          hooks.offered.push({ name: tool.name, description: tool.description ?? '' });
+        }
+      }
       const result = await base.doGenerate(call);
       const batch = hooks.batch;
       if (batch && call.prompt.at(-1)?.role === 'user') {

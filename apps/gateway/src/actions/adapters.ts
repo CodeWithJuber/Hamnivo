@@ -1,3 +1,4 @@
+import { checkEgressUrl, EgressError } from '@hamnivo/adapters/egress';
 import { callMcpTool, McpCallError } from '@hamnivo/adapters/mcp';
 import { DemoActionsStore, DemoToolError } from '@hamnivo/adapters/tools';
 import { type Db, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo/db';
@@ -208,6 +209,16 @@ export class ToolAdapters {
         .where(eq(schema.mcpServers.id, tool.mcpServerId as string));
       if (server?.status !== 'active') {
         throw new ToolCallFailure('server_disabled', 'The tool’s server is disabled.', false);
+      }
+      // The tool may reach only the hosts on its own allowlist, its server's included (D10).
+      try {
+        checkEgressUrl(new URL(server.url), {
+          allowedHosts: tool.egressHosts,
+          allowPrivate: this.config.TOOLS_EGRESS_ALLOW_PRIVATE,
+        });
+      } catch (error) {
+        if (error instanceof EgressError) throw new ToolCallFailure('egress', error.message, false);
+        throw error;
       }
       const token = server.tokenSecretId
         ? await this.secrets.reveal(tx, scope.tenantId, server.tokenSecretId)
