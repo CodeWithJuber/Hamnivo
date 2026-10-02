@@ -25316,7 +25316,8 @@
         "enum": [
           "answer-check",
           "escalation",
-          "passage-relevance"
+          "passage-relevance",
+          "language"
         ]
       },
       "CheckRubric": {
@@ -26208,6 +26209,7 @@
             "enum": [
               "explicit",
               "detected",
+              "decided",
               "suggested",
               "previous",
               "locale",

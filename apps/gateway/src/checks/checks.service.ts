@@ -111,6 +111,8 @@ export class ChecksService {
       language: LanguageSlice | null;
       deadlineMs?: number;
       keyOf?: (question: string) => string;
+      /** The slice whose thresholds apply, read from the answer (the language check). */
+      sliceOf?: (result: DecisionResult<DecisionAnswers>) => LanguageSlice | null;
     },
   ): Promise<Asked> {
     const started = performance.now();
@@ -144,9 +146,8 @@ export class ChecksService {
           retryable: false,
           reason: 'error',
         };
-    const thresholds = request.language
-      ? checkDefinitionOf(rubric).thresholds[request.language]
-      : undefined;
+    const language = request.sliceOf ? request.sliceOf(result) : request.language;
+    const thresholds = language ? checkDefinitionOf(rubric).thresholds[language] : undefined;
     const gated = gateCheck(
       result,
       {
@@ -164,7 +165,7 @@ export class ChecksService {
       setting,
       result,
       gated,
-      language: request.language,
+      language,
       stateHash,
       totalMs: Math.round(performance.now() - started),
     };

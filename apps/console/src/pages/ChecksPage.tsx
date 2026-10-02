@@ -60,8 +60,19 @@ const VERDICTS = [
   'keep',
   'escalate',
   'continue',
+  'decided',
+  'ask',
 ] as const;
-const ACTIONS = ['publish', 'regenerate', 'handoff', 'drop', 'keep', 'continue'] as const;
+const ACTIONS = [
+  'publish',
+  'regenerate',
+  'handoff',
+  'drop',
+  'keep',
+  'continue',
+  'use',
+  'ask',
+] as const;
 const known = <T extends string>(list: readonly T[], value: string): value is T =>
   (list as readonly string[]).includes(value);
 

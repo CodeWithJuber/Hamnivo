@@ -1,4 +1,8 @@
-import { DEFAULT_DECISION_THRESHOLDS, PERSON_REQUEST_QUESTION } from './decision-questions.js';
+import {
+  DEFAULT_DECISION_THRESHOLDS,
+  LANGUAGE_QUESTION,
+  PERSON_REQUEST_QUESTION,
+} from './decision-questions.js';
 import {
   type AnyAnswer,
   type ChoiceAnswer,
@@ -12,6 +16,7 @@ import {
   type NoulQuestion,
   type QuestionThreshold,
 } from './decisions.js';
+import { LANGUAGE_OF_SLICE, type ReplyLanguage } from './language.js';
 
 /**
  * Checks a decision provider (Jev) runs around an AI reply (blueprint §12). Each asks bounded
@@ -24,7 +29,7 @@ import {
  * usage and latency. A language without thresholds was not evaluated: the check abstains there
  * and Hamnivo behaves as it does without it.
  */
-export const CHECK_TASKS = ['answer-check', 'escalation', 'passage-relevance'] as const;
+export const CHECK_TASKS = ['answer-check', 'escalation', 'passage-relevance', 'language'] as const;
 export type CheckTask = (typeof CHECK_TASKS)[number];
 
 export const isCheckTask = (value: unknown): value is CheckTask =>
@@ -40,8 +45,11 @@ export interface CheckTaskSpec {
    * their kind's threshold: every claim of an answer check uses `relation`.
    */
   thresholds: Readonly<Record<string, ThresholdKind>>;
-  /** Whose language picks the thresholds: the customer's message, or the reply being checked. */
-  slice: 'message' | 'reply';
+  /**
+   * Whose language picks the thresholds: the customer's message, the reply being checked, or
+   * (for the language itself, which is what is being decided) the language answered.
+   */
+  slice: 'message' | 'reply' | 'answer';
 }
 
 export const CHECK_TASK_SPECS: Readonly<Record<CheckTask, CheckTaskSpec>> = {
@@ -67,6 +75,7 @@ export const CHECK_TASK_SPECS: Readonly<Record<CheckTask, CheckTaskSpec>> = {
     },
     slice: 'message',
   },
+  language: { questionsVersion: 1, thresholds: { language: 'choice' }, slice: 'answer' },
 };
 
 /** Thresholds of a check rubric: by language slice, then threshold key. */
@@ -84,6 +93,15 @@ export const DEFAULT_CHECK_THRESHOLDS: Readonly<Partial<Record<CheckTask, CheckT
     LANGUAGE_SLICES.flatMap((slice) => {
       const band = DEFAULT_DECISION_THRESHOLDS.personRequest[slice];
       return band ? [[slice, { wants_person: { type: 'noul' as const, ...band } }]] : [];
+    }),
+  ),
+  // By the language answered; a Hinglish answer has none, so it is never acted on.
+  language: Object.fromEntries(
+    LANGUAGE_SLICES.flatMap((slice) => {
+      const minConfidence = DEFAULT_DECISION_THRESHOLDS.language[slice];
+      return minConfidence === undefined
+        ? []
+        : [[slice, { language: { type: 'choice' as const, minConfidence } }]];
     }),
   ),
 };
@@ -557,4 +575,35 @@ export function passageVerdict(gated: GatedAnswers): { keep: boolean; reason: Pa
   if (verdict('contains_answer_evidence') === true) return { keep: true, reason: null };
   if (verdict('contains_answer_evidence') === false) return { keep: false, reason: 'no_evidence' };
   return { keep: true, reason: null };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The reply language (U01), when the customer's words fit more than one
+
+/** The evaluated language question (docs/evals); its thresholds are by the language answered. */
+export const LANGUAGE_CHECK_QUESTIONS = { language: LANGUAGE_QUESTION } as const;
+
+/** The language slice whose thresholds apply: the one Jev answered (it is what is decided). */
+export function answeredSlice(result: DecisionResult<DecisionAnswers>): LanguageSlice | null {
+  const answer = result.status === 'decided' ? result.value.language : undefined;
+  return answer?.type === 'choice' && Object.hasOwn(LANGUAGE_OF_SLICE, answer.label)
+    ? (answer.label as LanguageSlice)
+    : null;
+}
+
+/**
+ * The reply language Jev settles on, or null: only an answer that met the threshold for the
+ * language it named, and only one of the languages the words fit. Anything else is asked as
+ * before.
+ */
+export function languageDecision(
+  gated: GatedAnswers,
+  candidates: readonly ReplyLanguage[],
+): ReplyLanguage | null {
+  const answer = gated.kept.language as ChoiceAnswer | null | undefined;
+  if (gated.status !== 'decided' || !answer || !Object.hasOwn(LANGUAGE_OF_SLICE, answer.label)) {
+    return null;
+  }
+  const language = LANGUAGE_OF_SLICE[answer.label as LanguageSlice];
+  return candidates.includes(language) ? language : null;
 }

@@ -240,4 +240,44 @@ describe.skipIf(!key)('reply checks with live Jev', () => {
       );
     });
   });
+
+  describe('reply language', () => {
+    beforeAll(async () => {
+      // The thresholds measured for jev-1.13.0 (docs/evals), by the language answered.
+      const tasks = await shop.owner.get(path());
+      const language = (tasks.body.items as Array<Record<string, any>>).find(
+        (task) => task.task === 'language',
+      );
+      const draft = await shop.owner.put(`${path()}/language/draft`, {
+        provider: 'jev',
+        modelVersion: 'jev-1.13.0',
+        deadlineMs: 1500,
+        thresholds: language?.recommendedThresholds,
+      });
+      expect(draft.status, JSON.stringify(draft.body)).toBe(200);
+      expect((await shop.owner.post(`${path()}/language/publish`, {})).status).toBe(200);
+      expect((await shop.owner.put(`${path()}/language/mode`, { mode: 'live' })).status).toBe(200);
+    });
+
+    it('settles a Latin-script message the words leave open, or asks, consistently', async () => {
+      scripted.script.push('Aap ka order number kya hai?');
+      const visitor = new Visitor(slice.baseUrl, shop.brand.widgetId, shop.hostOrigin);
+      await visitor.open();
+      const started = await visitor.call('POST', '/v1/widget/conversations', {
+        firstMessage: 'order abhi tak nahi aaya, kab aayega?',
+        clientMessageId: randomUUID(),
+      });
+      expect(started.status).toBe(201);
+      await slice.drain();
+      const [record] = await records('language', started.body.id as string);
+      expect(record).toBeDefined();
+      seen.push(`language answered ${record?.detail.answered} (${record?.verdict})`);
+      const state = await visitor.call('GET', '/v1/widget/language');
+      if (record?.verdict === 'decided') {
+        expect(state.body).toMatchObject({ source: 'decided', confirm: null });
+      } else {
+        expect(state.body.confirm).not.toBeNull();
+      }
+    });
+  });
 });

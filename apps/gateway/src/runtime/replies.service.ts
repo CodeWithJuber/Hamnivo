@@ -338,7 +338,12 @@ export class RepliesService {
 
     // Reply in the customer's language (U01): their explicit choice, otherwise their words.
     const question = latestCustomerText(history.messages);
-    const chosen = await this.language.forReply(tenantId, control.principalId, question);
+    const chosen = await this.language.forReply(
+      tenantId,
+      control.principalId,
+      question,
+      checks?.languageDecider(),
+    );
     const options: GenerateOptions = {
       language: chosen.resolution.language,
       style: chosen.style,

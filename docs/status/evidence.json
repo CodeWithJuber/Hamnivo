@@ -1503,9 +1503,13 @@
       "packages/domain/test/language.test.ts",
       "apps/gateway/src/language/language.service.ts",
       "apps/gateway/test/language.int.test.ts",
-      "apps/widget/e2e/composer.spec.ts"
+      "apps/widget/e2e/composer.spec.ts",
+      "packages/domain/src/checks.ts",
+      "apps/gateway/src/checks/reply-checks.service.ts",
+      "apps/gateway/test/checks.int.test.ts",
+      "apps/gateway/test/checks.live.test.ts"
     ],
-    "note": "Interface locale, explicit reply language (BCP 47, including hi-Latn and ur-Latn), detected language with an ask-once rule for Hinglish/Roman Urdu ambiguity, and style are kept separately per customer; replies follow the explicit choice, then the words, then the locale. Hinglish and Roman Urdu are never treated as English. Messages are not stored. Timezone is not part of the model yet."
+    "note": "Interface locale, explicit reply language (BCP 47, including hi-Latn and ur-Latn), detected language with an ask-once rule for Hinglish/Roman Urdu ambiguity, and style are kept separately per customer; replies follow the explicit choice, then the words, then the locale. Hinglish and Roman Urdu are never treated as English. Messages are not stored. Timezone is not part of the model yet. When the words fit more than one language and the customer has not chosen, the language check asks Jev the evaluated language question; its thresholds are by the language Jev answered (measured live: 0.50 for English, Arabic, Hindi and Urdu, 0.55 for Roman Urdu, none for Hinglish). Live: a sure enough answer settles the language and the customer is not asked; otherwise the customer is asked once, as before; shadow (every brand's start) only records. The customer's own choice always wins, and Jev is not asked then (tested). Verified live on 2026-10-02 with jev-1.13.0: for \"order abhi tak nahi aaya, kab aayega?\" Jev answered Hinglish, which has no threshold, so the customer was asked (254 ms)."
   },
   "HNV-07-04": {
     "status": "implemented",

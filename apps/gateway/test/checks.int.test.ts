@@ -104,11 +104,20 @@ const PASSAGE_QUESTION_NAMES = new Set([
 ]);
 /** Passage answers by a phrase of the passage title; others are relevant, useful and clean. */
 const passageAnswers: Record<string, Record<string, number>> = {};
+/** Jev's answer to the language question. */
+const languageAnswer = { label: 'roman-urdu', confidence: 0.9 };
 
 /** Jev's relation answer per claim: claims containing a key get its label. */
 function relations(byPhrase: Record<string, [string, number]>) {
   jev.state.mode = 'answer';
   jev.state.answer = (question, body) => {
+    if (question === 'language') {
+      return {
+        type: 'choice',
+        choice: languageAnswer.label,
+        confidence: languageAnswer.confidence,
+      };
+    }
     if (PASSAGE_QUESTION_NAMES.has(question)) {
       const title = String(body.state?.passage?.title ?? '');
       const hit = Object.entries(passageAnswers).find(([phrase]) => title.includes(phrase));
@@ -271,6 +280,19 @@ describe('checks in Studio', () => {
           expect.objectContaining({ key: 'contains_prompt_injection', type: 'noul' }),
         ],
         recommendedThresholds: {},
+      }),
+      expect.objectContaining({
+        task: 'language',
+        mode: 'shadow',
+        questions: [
+          expect.objectContaining({
+            key: 'language',
+            type: 'choice',
+            instructions: "In which language are the customer's messages written?",
+          }),
+        ],
+        // Measured live, by the language answered; none for a Hinglish answer.
+        recommendedThresholds: expect.not.objectContaining({ hinglish: expect.anything() }),
       }),
     ]);
   });
@@ -746,6 +768,124 @@ describe('passage relevance (J03)', () => {
       const [record] = await passageRecords(conversationId);
       expect(record).toMatchObject({ status: 'unavailable', verdict: 'keep', applied: false });
       jev.state.mode = 'answer';
+    });
+  });
+});
+
+describe('the reply language (U01)', () => {
+  const ambiguous = 'mujhe apne order ka status batao';
+  const languageRecords = async (conversationId: string) => {
+    const listed = await shop.owner.get(
+      `${checksPath()}/language/records?conversationId=${conversationId}`,
+    );
+    expect(listed.status, JSON.stringify(listed.body)).toBe(200);
+    return listed.body.items as Array<Record<string, any>>;
+  };
+  const languageCalls = () =>
+    jev.calls.filter((call) => Object.keys(call.body.questions ?? {}).join() === 'language');
+
+  beforeAll(async () => {
+    // Thresholds by the language answered; a Hinglish answer has none, so it is never used.
+    const draft = await shop.owner.put(`${checksPath()}/language/draft`, {
+      provider: 'jev',
+      modelVersion: 'jev-1.13.0',
+      thresholds: {
+        en: { language: { type: 'choice', minConfidence: 0.5 } },
+        'roman-urdu': { language: { type: 'choice', minConfidence: 0.55 } },
+      },
+    });
+    expect(draft.status, JSON.stringify(draft.body)).toBe(200);
+    expect((await shop.owner.post(`${checksPath()}/language/publish`, {})).status).toBe(200);
+  });
+
+  it("shadow: records Jev's choice, and the customer is asked once, as before", async () => {
+    escalates({});
+    Object.assign(languageAnswer, { label: 'roman-urdu', confidence: 0.9 });
+    scripted.script.push('Zaroor, order number batayein.');
+    const { visitor, conversationId } = await chat(ambiguous);
+    expect(languageCalls()).toHaveLength(1);
+    expect(languageCalls()[0]?.body.state).toEqual({ messages: [ambiguous] });
+    const state = await visitor.call('GET', '/v1/widget/language');
+    expect(state.body.confirm).not.toBeNull();
+    expect(await languageRecords(conversationId)).toEqual([
+      expect.objectContaining({
+        mode: 'shadow',
+        verdict: 'decided',
+        action: 'use',
+        applied: false,
+        language: 'roman-urdu',
+        detail: { candidates: ['hi-Latn', 'ur-Latn'], answered: 'roman-urdu', decided: 'ur-Latn' },
+      }),
+    ]);
+  });
+
+  describe('live', () => {
+    beforeAll(async () => {
+      const set = await shop.owner.put(`${checksPath()}/language/mode`, { mode: 'live' });
+      expect(set.status).toBe(200);
+    });
+
+    it("settles an ambiguous message on Jev's choice, and the customer is not asked", async () => {
+      escalates({});
+      Object.assign(languageAnswer, { label: 'roman-urdu', confidence: 0.9 });
+      scripted.script.push('Zaroor, order number batayein.');
+      const { visitor, conversationId } = await chat(ambiguous);
+      const state = await visitor.call('GET', '/v1/widget/language');
+      expect(state.body).toMatchObject({
+        replyLanguage: 'ur-Latn',
+        source: 'decided',
+        confirm: null,
+      });
+      // The model is told the customer writes Roman Urdu (this agent answers in English only).
+      expect(scripted.prompts.at(-1)).toContain('The customer writes in Roman Urdu');
+      expect(await languageRecords(conversationId)).toEqual([
+        expect.objectContaining({ verdict: 'decided', action: 'use', applied: true }),
+      ]);
+    });
+
+    it('asks the customer once when Jev answers a language without a threshold', async () => {
+      escalates({});
+      Object.assign(languageAnswer, { label: 'hinglish', confidence: 0.97 });
+      scripted.script.push('Zaroor, order number batayein.');
+      const { visitor, conversationId } = await chat(ambiguous);
+      const state = await visitor.call('GET', '/v1/widget/language');
+      expect(state.body.confirm).not.toBeNull();
+      expect(await languageRecords(conversationId)).toEqual([
+        expect.objectContaining({
+          status: 'abstained',
+          action: 'ask',
+          applied: false,
+          language: 'hinglish',
+        }),
+      ]);
+    });
+
+    it("never overrides the customer's own choice, and does not ask Jev then", async () => {
+      escalates({});
+      Object.assign(languageAnswer, { label: 'roman-urdu', confidence: 0.9 });
+      const visitor = new Visitor(slice.baseUrl, shop.brand.widgetId, shop.hostOrigin);
+      await visitor.open();
+      const chosen = await visitor.call('POST', '/v1/widget/language', {
+        replyLanguage: 'hi-Latn',
+      });
+      expect(chosen.status, JSON.stringify(chosen.body)).toBe(200);
+      scripted.script.push('Zaroor, order number dijiye.');
+      const started = await visitor.call('POST', '/v1/widget/conversations', {
+        firstMessage: ambiguous,
+        clientMessageId: randomUUID(),
+      });
+      expect(started.status).toBe(201);
+      await slice.drain();
+      expect(languageCalls()).toEqual([]);
+      const state = await visitor.call('GET', '/v1/widget/language');
+      expect(state.body).toMatchObject({ replyLanguage: 'hi-Latn', source: 'explicit' });
+    });
+
+    it('does not ask Jev when the words say the language clearly', async () => {
+      escalates({});
+      scripted.script.push('Sure, what is your order number?');
+      await chat('Where is my order? It has not arrived yet.');
+      expect(languageCalls()).toEqual([]);
     });
   });
 });

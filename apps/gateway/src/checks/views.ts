@@ -10,6 +10,7 @@ import { toPublicId } from '@hamnivo/db';
 import {
   type CheckTask,
   ESCALATION_QUESTIONS,
+  LANGUAGE_CHECK_QUESTIONS,
   LANGUAGE_SLICES,
   type NoulQuestion,
   PASSAGE_QUESTIONS,
@@ -32,6 +33,17 @@ export function checkQuestions(task: CheckTask): CheckQuestion[] {
       return Object.entries(ESCALATION_QUESTIONS).map(([key, question]) => noulView(key, question));
     case 'passage-relevance':
       return Object.entries(PASSAGE_QUESTIONS).map(([key, question]) => noulView(key, question));
+    case 'language': {
+      const question = LANGUAGE_CHECK_QUESTIONS.language;
+      return [
+        {
+          key: 'language',
+          type: 'choice',
+          instructions: question.instructions,
+          options: { ...question.labels },
+        },
+      ];
+    }
     case 'answer-check': {
       const question = relationQuestion(1, 1);
       return [

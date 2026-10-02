@@ -5,6 +5,7 @@ import {
   answerCheckRequest,
   answerCheckThresholdKey,
   answerCheckVerdict,
+  answeredSlice,
   answersRecord,
   type CitedClaim,
   citedClaims,
@@ -13,11 +14,13 @@ import {
   escalationVerdict,
   type GatedAnswers,
   gateCheck,
+  languageDecision,
   PASSAGE_QUESTIONS,
   passageVerdict,
   splitSentences,
 } from '../src/checks.js';
 import type { ChoiceAnswer, DecisionAnswers, DecisionResult } from '../src/decisions.js';
+import { detectLanguage, resolveReplyLanguage } from '../src/language.js';
 
 describe('sentences of a reply', () => {
   it('splits at the end of a sentence in every script, keeping citations with their sentence', () => {
@@ -391,5 +394,53 @@ describe('passage relevance (J03)', () => {
         contains_answer_evidence: null,
       }),
     ).toEqual({ keep: true, reason: null });
+  });
+});
+
+describe('the reply language with Jev (U01)', () => {
+  const answered = (label: string, kept: boolean): GatedAnswers => {
+    const answer = { type: 'choice' as const, label, confidence: 0.9, probabilities: {} };
+    return {
+      status: 'decided',
+      reason: null,
+      kept: { language: kept ? answer : null },
+      shortfalls: {},
+      observed: { language: answer },
+    };
+  };
+  const latin = ['hi-Latn', 'ur-Latn'] as const;
+
+  it('takes thresholds by the language Jev answered, since that is what is being decided', () => {
+    expect(answeredSlice(decided({ language: choice('roman-urdu', 0.8) }))).toBe('roman-urdu');
+    expect(answeredSlice(decided({ language: choice('klingon', 0.8) }))).toBeNull();
+    expect(DEFAULT_CHECK_THRESHOLDS.language?.['roman-urdu']).toEqual({
+      language: { type: 'choice', minConfidence: 0.55 },
+    });
+    // A Hinglish answer was not reliable enough in the evaluation: never acted on.
+    expect(DEFAULT_CHECK_THRESHOLDS.language?.hinglish).toBeUndefined();
+  });
+
+  it('settles only on a language the words fit, and only when sure enough for it', () => {
+    expect(languageDecision(answered('roman-urdu', true), latin)).toBe('ur-Latn');
+    expect(languageDecision(answered('roman-urdu', false), latin)).toBeNull();
+    expect(languageDecision(answered('en', true), latin)).toBeNull();
+  });
+
+  it('settles an ambiguous message without asking, and never overrides the customer', () => {
+    const detection = detectLanguage('mujhe order ka status batao');
+    expect(detection.ambiguous).toBe(true);
+    expect(resolveReplyLanguage({ detection, decided: 'ur-Latn' })).toEqual({
+      language: 'ur-Latn',
+      source: 'decided',
+      confirm: null,
+    });
+    expect(resolveReplyLanguage({ detection, decided: 'en' }).source).not.toBe('decided');
+    expect(resolveReplyLanguage({ detection, explicit: 'hi-Latn', decided: 'ur-Latn' })).toEqual({
+      language: 'hi-Latn',
+      source: 'explicit',
+      confirm: null,
+    });
+    // Without a decision the customer is asked once, as before.
+    expect(resolveReplyLanguage({ detection }).confirm).not.toBeNull();
   });
 });

@@ -17,6 +17,11 @@ export const checksEn = {
       description:
         'Before an AI reply is sent, Jev checks each sentence that cites the knowledge base against the passage it cites. When live, a reply with a sentence the passage does not support is written again without it, or passed to a person.',
     },
+    language: {
+      title: 'Reply language',
+      description:
+        "When the customer's words fit more than one language (often Hinglish and Roman Urdu), Jev picks one. When live, its choice is used if Jev is sure enough for the language it named; otherwise the customer is asked once, as before. Thresholds here are by the language Jev answered. The customer's own choice always wins.",
+    },
     'passage-relevance': {
       title: 'Passage relevance',
       description:
@@ -95,6 +100,8 @@ export const checksEn = {
     keep: 'All passages help',
     escalate: 'Needs a person',
     continue: 'No person needed',
+    decided: 'Language chosen',
+    ask: 'Not sure enough',
   },
   action: {
     publish: 'Send the reply',
@@ -103,6 +110,8 @@ export const checksEn = {
     drop: 'Leave passages out',
     keep: 'Use all passages',
     continue: 'Let the AI answer',
+    use: 'Reply in that language',
+    ask: 'Ask the customer',
   },
 };
 
@@ -120,6 +129,11 @@ export const checksAr: typeof checksEn = {
       title: 'فحص الإجابة',
       description:
         'قبل إرسال رد الذكاء الاصطناعي، يفحص Jev كل جملة تستشهد بقاعدة المعرفة مقابل المقطع الذي تستشهد به. عند التفعيل، يُعاد كتابة الرد الذي فيه جملة لا يدعمها المقطع بدونها، أو يُحال إلى شخص.',
+    },
+    language: {
+      title: 'لغة الرد',
+      description:
+        'عندما تناسب كلمات العميل أكثر من لغة (غالبًا الهندية والأردية بحروف لاتينية)، يختار Jev واحدة. عند التفعيل يُستخدم اختياره إذا كان متأكدًا بما يكفي للغة التي ذكرها، وإلا يُسأل العميل مرة واحدة كما من قبل. الحدود هنا حسب اللغة التي أجاب بها Jev. واختيار العميل نفسه يفوز دائمًا.',
     },
     'passage-relevance': {
       title: 'صلة المقاطع',
@@ -196,6 +210,8 @@ export const checksAr: typeof checksEn = {
     keep: 'كل المقاطع تفيد',
     escalate: 'يحتاج إلى شخص',
     continue: 'لا حاجة إلى شخص',
+    decided: 'اختيرت اللغة',
+    ask: 'غير متأكد بما يكفي',
   },
   action: {
     publish: 'إرسال الرد',
@@ -204,6 +220,8 @@ export const checksAr: typeof checksEn = {
     drop: 'استبعاد مقاطع',
     keep: 'استخدام كل المقاطع',
     continue: 'ترك الذكاء الاصطناعي يجيب',
+    use: 'الرد بتلك اللغة',
+    ask: 'سؤال العميل',
   },
 };
 
@@ -221,6 +239,11 @@ export const checksHi: typeof checksEn = {
       title: 'जवाब की जाँच',
       description:
         'AI का जवाब भेजने से पहले Jev नॉलेज बेस का हवाला देने वाले हर वाक्य को उस अंश से मिलाता है जिसका हवाला दिया गया है। चालू होने पर, जिस जवाब में कोई वाक्य अंश से साबित न हो, वह उस वाक्य के बिना दोबारा लिखा जाता है, या किसी व्यक्ति को सौंपा जाता है।',
+    },
+    language: {
+      title: 'जवाब की भाषा',
+      description:
+        'जब ग्राहक के शब्द एक से ज़्यादा भाषाओं में फिट हों (अक्सर हिंग्लिश और रोमन उर्दू), Jev एक चुनता है। चालू होने पर उसका चुनाव तभी इस्तेमाल होता है जब Jev उस भाषा के लिए काफ़ी पक्का हो; वरना ग्राहक से पहले की तरह एक बार पूछा जाता है। यहाँ सीमाएँ उस भाषा के हिसाब से हैं जो Jev ने बताई। ग्राहक का अपना चुनाव हमेशा जीतता है।',
     },
     'passage-relevance': {
       title: 'अंशों की प्रासंगिकता',
@@ -297,6 +320,8 @@ export const checksHi: typeof checksEn = {
     keep: 'सभी अंश काम के हैं',
     escalate: 'व्यक्ति की ज़रूरत',
     continue: 'व्यक्ति की ज़रूरत नहीं',
+    decided: 'भाषा चुनी गई',
+    ask: 'पूरा भरोसा नहीं',
   },
   action: {
     publish: 'जवाब भेजें',
@@ -305,6 +330,8 @@ export const checksHi: typeof checksEn = {
     drop: 'कुछ अंश छोड़ें',
     keep: 'सभी अंश इस्तेमाल करें',
     continue: 'AI को जवाब देने दें',
+    use: 'उसी भाषा में जवाब',
+    ask: 'ग्राहक से पूछें',
   },
 };
 
@@ -322,6 +349,11 @@ export const checksUr: typeof checksEn = {
       title: 'جواب کی جانچ',
       description:
         'AI کا جواب بھیجنے سے پہلے Jev نالج بیس کا حوالہ دینے والے ہر جملے کو اس حصے سے ملاتا ہے جس کا حوالہ دیا گیا ہے۔ فعال ہونے پر، جس جواب میں کوئی جملہ حصے سے ثابت نہ ہو، وہ اس جملے کے بغیر دوبارہ لکھا جاتا ہے، یا کسی شخص کے حوالے کیا جاتا ہے۔',
+    },
+    language: {
+      title: 'جواب کی زبان',
+      description:
+        'جب گاہک کے الفاظ ایک سے زیادہ زبانوں میں فٹ ہوں (اکثر ہنگلش اور رومن اردو)، Jev ایک چنتا ہے۔ فعال ہونے پر اس کا انتخاب تب استعمال ہوتا ہے جب Jev اس زبان کے لیے کافی پُریقین ہو؛ ورنہ گاہک سے پہلے کی طرح ایک بار پوچھا جاتا ہے۔ یہاں حدیں اس زبان کے حساب سے ہیں جو Jev نے بتائی۔ گاہک کا اپنا انتخاب ہمیشہ جیتتا ہے۔',
     },
     'passage-relevance': {
       title: 'حصوں کی مطابقت',
@@ -400,6 +432,8 @@ export const checksUr: typeof checksEn = {
     keep: 'تمام حصے کام کے ہیں',
     escalate: 'شخص کی ضرورت',
     continue: 'شخص کی ضرورت نہیں',
+    decided: 'زبان چنی گئی',
+    ask: 'پورا یقین نہیں',
   },
   action: {
     publish: 'جواب بھیجیں',
@@ -408,5 +442,7 @@ export const checksUr: typeof checksEn = {
     drop: 'کچھ حصے چھوڑیں',
     keep: 'تمام حصے استعمال کریں',
     continue: 'AI کو جواب دینے دیں',
+    use: 'اسی زبان میں جواب',
+    ask: 'گاہک سے پوچھیں',
   },
 };

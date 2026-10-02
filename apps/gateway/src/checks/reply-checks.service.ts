@@ -5,12 +5,15 @@ import {
   answerCheckRequest,
   answerCheckThresholdKey,
   answerCheckVerdict,
+  answeredSlice,
   type CheckTask,
   citedClaims,
   ESCALATION_MESSAGES,
   ESCALATION_QUESTIONS,
   type EscalationReason,
   escalationVerdict,
+  LANGUAGE_CHECK_QUESTIONS,
+  languageDecision,
   PASSAGE_CHECK_CHARS,
   PASSAGE_QUESTIONS,
   passageVerdict,
@@ -19,6 +22,7 @@ import {
   SLICE_OF_LANGUAGE,
 } from '@hamnivo/domain';
 import { Inject, Injectable } from '@nestjs/common';
+import type { LanguageDecider } from '../language/language.service.js';
 import {
   type AiHandoffReason,
   CHECK_HANDOFF_NOTES,
@@ -121,6 +125,16 @@ export class RunChecks {
     language: ReplyLanguage | undefined;
   }): Promise<InboundVerdict> {
     return this.service.inbound(this, input);
+  }
+
+  /**
+   * When the customer's words fit more than one language: Jev picks one (U01). Live: its choice is
+   * used when it met the threshold for the language it named; otherwise the customer is asked
+   * once, as before. Undefined when the check does not run for the brand.
+   */
+  languageDecider(): LanguageDecider | undefined {
+    if (!this.settings.has('language')) return undefined;
+    return (input) => this.service.language(this, input);
   }
 
   /**
@@ -297,6 +311,46 @@ export class ReplyChecksService {
     );
     if (!live || !verdict.escalate) return { action: 'continue' };
     return { action: 'handoff', reason: 'ai_escalated', note: escalationNote(verdict.reasons) };
+  }
+
+  async language(
+    run: RunChecks,
+    input: { text: string; candidates: readonly ReplyLanguage[] },
+  ): Promise<ReplyLanguage | null> {
+    const setting = run.setting('language');
+    if (!setting) return null;
+    const asked = await this.checks.ask(setting, {
+      state: { messages: [redactPersonalData(input.text.slice(0, 1000))] },
+      questions: LANGUAGE_CHECK_QUESTIONS,
+      language: null,
+      // Thresholds by the language answered: it is what is being decided.
+      sliceOf: answeredSlice,
+      deadlineMs: Math.max(1, run.remainingMs()),
+    });
+    const decided = languageDecision(asked.gated, input.candidates);
+    const live = setting.mode === 'live';
+    await this.record(
+      run,
+      asked,
+      `run:${run.context.runId}:language`,
+      {
+        verdict:
+          asked.gated.status !== 'decided' ? asked.gated.status : decided ? 'decided' : 'ask',
+        action: decided ? 'use' : 'ask',
+        applied: live && decided !== null,
+        detail: {
+          candidates: [...input.candidates],
+          answered: answeredSlice(asked.result),
+          decided,
+        },
+      },
+      {
+        kind: 'decision',
+        name: 'language',
+        status: asked.gated.status === 'decided' ? 'ok' : 'skipped',
+      },
+    );
+    return live ? decided : null;
   }
 
   async passages<P extends CheckedPassage>(

@@ -266,6 +266,8 @@ export function detectLanguage(text: string): LanguageDetection {
 export type LanguageSource =
   | 'explicit'
   | 'detected'
+  /** A decision provider chose among the languages the words fit, sure enough for that language. */
+  | 'decided'
   | 'suggested'
   | 'previous'
   | 'locale'
@@ -282,6 +284,12 @@ export interface LanguagePreferenceInput {
   detection?: LanguageDetection | null;
   /** The customer was already asked to confirm an ambiguous language; never ask twice. */
   prompted?: boolean;
+  /**
+   * A decision provider's choice among the detection's candidates, already held to its
+   * threshold. It settles an ambiguous message, so the customer is not asked; it never overrides
+   * an explicit choice.
+   */
+  decided?: ReplyLanguage | null;
 }
 
 export interface LanguageResolution {
@@ -306,6 +314,9 @@ export function resolveReplyLanguage(input: LanguagePreferenceInput): LanguageRe
   const candidates = detection?.candidates ?? [];
   if (detection?.language) {
     return { language: detection.language, source: 'detected', confirm: null };
+  }
+  if (input.decided && candidates.includes(input.decided)) {
+    return { language: input.decided, source: 'decided', confirm: null };
   }
   if (candidates.length > 0) {
     // Keep the language already in use when it fits; otherwise suggest from the locale.

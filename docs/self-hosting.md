@@ -281,6 +281,10 @@ Switch a check to **live** when its records look right.
 - **Passage relevance:** before the AI writes, Jev reads each passage found in your knowledge
   with the customer's question. When live, passages that are off topic, answer nothing, or try
   to give the assistant instructions are left out, and the record says which.
+- **Reply language:** when a customer's words fit more than one language (often Hinglish and
+  Roman Urdu), Jev picks one. When live, its choice is used if Jev is sure enough for that
+  language; otherwise the customer is asked once, as before. Choosing Jev fills in the thresholds
+  Hamnivo measured. A customer's own choice always wins.
 
 If Jev is slow or unavailable, or a language has no threshold, the reply goes out as it would
 without the check, and the check is recorded. A check sends TypeSafe only what it needs: the
