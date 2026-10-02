@@ -36,6 +36,7 @@
     "@hamnivo/adapters": "workspace:*",
     "@hamnivo/chatwoot": "workspace:*",
     "@hamnivo/db": "workspace:*",
+    "@hamnivo/policy": "workspace:*",
     "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",
     "@tanstack/router-generator": "1.167.38",

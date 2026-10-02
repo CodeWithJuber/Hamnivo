@@ -117,9 +117,7 @@ test('HNV-22-05 · removing someone shows what they hold and protects the last o
   expect(me.status).toBe(401);
 });
 
-test('HNV-22-03 HNV-22-04 · a custom role shows its diff and impact before saving', async ({
-  page,
-}) => {
+test('HNV-22-03 · a custom role shows its diff and impact before saving', async ({ page }) => {
   test.setTimeout(120_000);
   await owner.signIn(page.context());
   await page.goto('/team?tab=roles');
@@ -167,6 +165,52 @@ test('HNV-22-03 HNV-22-04 · a custom role shows its diff and impact before savi
     ),
   ).toBeVisible();
   await expect(editor.getByTestId('save-role')).toHaveCount(0);
+});
+
+test('HNV-22-04 · a role someone else saved meanwhile is compared, never overwritten', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await owner.signIn(page.context());
+  await page.goto('/team?tab=roles');
+  await page.locator('[data-role="triage"]').getByRole('button', { name: 'Open Triage' }).click();
+  const editor = page.getByTestId('role-editor');
+  await editor.getByLabel('Export conversation transcripts').uncheck();
+
+  // Meanwhile, another admin adds a permission to the role.
+  const roles = await owner.call<{ items: Array<{ id: string; key: string; version: number }> }>(
+    'GET',
+    '/v1/admin/roles',
+  );
+  const triage = roles.items.find((r) => r.key === 'triage');
+  if (!triage) throw new Error('no triage role');
+  await owner.call('PATCH', `/v1/admin/roles/${triage.id}`, {
+    permissions: ['conversations.read', 'conversations.export', 'conversations.assign'],
+    version: triage.version,
+  });
+
+  await editor.getByTestId('save-role').click();
+  const alert = editor.getByRole('alert').filter({ hasText: 'Someone else changed this role' });
+  await expect(alert).toBeVisible();
+  await editor.getByTestId('role-compare').click();
+  await expect(alert).toBeHidden();
+  // The change stays; the preview now shows what saving would undo of theirs.
+  await expect(editor.getByLabel('Export conversation transcripts')).not.toBeChecked();
+  await expect(editor.getByLabel('Assign and transfer conversations')).not.toBeChecked();
+  await expect(editor.getByTestId('preview-removed')).toContainText(
+    'Assign and transfer conversations',
+  );
+  await editor.getByLabel('Assign and transfer conversations').check();
+  await editor.getByTestId('save-role').click();
+  await expect(page.getByTestId('roles-notice')).toHaveText('Role Triage was saved.');
+  const saved = await owner.call<{ items: Array<{ key: string; permissions: string[] }> }>(
+    'GET',
+    '/v1/admin/roles',
+  );
+  expect(saved.items.find((r) => r.key === 'triage')?.permissions.sort()).toEqual([
+    'conversations.assign',
+    'conversations.read',
+  ]);
 });
 
 test('HNV-22-06 · the audit log filters, checks integrity and exports what it shows', async ({

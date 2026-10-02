@@ -1775,8 +1775,8 @@ export const en = {
       saved: 'Role {{name}} was saved.',
       created: 'Role {{name}} was created.',
       conflict:
-        'Someone else changed this role while you were editing. Reload it to see their changes, then make yours again.',
-      reload: 'Reload role',
+        'Someone else changed this role while you were editing. Compare with their version: your changes stay, and the preview shows what saving would change in theirs.',
+      reload: 'Compare with their version',
       archive: 'Retire role',
       archiveTitle: 'Retire {{name}}?',
       archiveBody:

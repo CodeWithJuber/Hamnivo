@@ -13,7 +13,7 @@ import {
 import { StatusBadge } from '@hamnivo/ui/components/status-badge';
 import { useQuery } from '@tanstack/react-query';
 import { ClockIcon, CopyIcon, LockIcon, ShieldCheckIcon, TriangleAlertIcon } from 'lucide-react';
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/AppDialog';
 import { TextareaField, TextField } from '../../components/Fields';
@@ -259,10 +259,17 @@ export function RoleEditor({
   const [conflict, setConflict] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  // After a conflict, the newer version becomes the base but the person's changes stay (HNV-22-04):
+  // the preview then compares them with that version, and saving needs a fresh look at it.
+  const keepDraft = useRef(false);
   useEffect(() => {
+    setConflict(false);
+    if (keepDraft.current) {
+      keepDraft.current = false;
+      return;
+    }
     setDraft(initial);
     setErrors({});
-    setConflict(false);
   }, [initial]);
 
   const readOnly = role !== null && (role.isPreset || !role.editable || !can('roles.manage'));
@@ -526,8 +533,12 @@ export function RoleEditor({
                       variant="secondary"
                       size="sm"
                       className="self-start"
+                      data-testid="role-compare"
                       onClick={() => {
                         save.reset();
+                        // The list reloads after a failed save; until it has, there is nothing new.
+                        if (!role || role === base) return;
+                        keepDraft.current = true;
                         setBase(role);
                       }}
                     >
