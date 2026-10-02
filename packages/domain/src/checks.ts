@@ -1,3 +1,4 @@
+import { DEFAULT_DECISION_THRESHOLDS, PERSON_REQUEST_QUESTION } from './decision-questions.js';
 import {
   type AnyAnswer,
   type ChoiceAnswer,
@@ -5,7 +6,10 @@ import {
   type DecisionAnswers,
   type DecisionResult,
   gateAnswer,
+  LANGUAGE_SLICES,
   type LanguageSlice,
+  type NoulAnswer,
+  type NoulQuestion,
   type QuestionThreshold,
 } from './decisions.js';
 
@@ -20,7 +24,7 @@ import {
  * usage and latency. A language without thresholds was not evaluated: the check abstains there
  * and Hamnivo behaves as it does without it.
  */
-export const CHECK_TASKS = ['answer-check'] as const;
+export const CHECK_TASKS = ['answer-check', 'escalation'] as const;
 export type CheckTask = (typeof CHECK_TASKS)[number];
 
 export const isCheckTask = (value: unknown): value is CheckTask =>
@@ -42,6 +46,18 @@ export interface CheckTaskSpec {
 
 export const CHECK_TASK_SPECS: Readonly<Record<CheckTask, CheckTaskSpec>> = {
   'answer-check': { questionsVersion: 1, thresholds: { relation: 'choice' }, slice: 'reply' },
+  escalation: {
+    questionsVersion: 1,
+    thresholds: {
+      wants_person: 'noul',
+      frustrated: 'noul',
+      unresolved: 'noul',
+      complaint: 'noul',
+      legal_threat: 'noul',
+      safety: 'noul',
+    },
+    slice: 'message',
+  },
 };
 
 /** Thresholds of a check rubric: by language slice, then threshold key. */
@@ -53,7 +69,15 @@ export type CheckThresholds = Readonly<
  * Starting thresholds measured live for the evaluated model (docs/evals), by task. A task or
  * language without them abstains until someone sets them from what shadow mode recorded.
  */
-export const DEFAULT_CHECK_THRESHOLDS: Readonly<Partial<Record<CheckTask, CheckThresholds>>> = {};
+export const DEFAULT_CHECK_THRESHOLDS: Readonly<Partial<Record<CheckTask, CheckThresholds>>> = {
+  // Only the request for a person was measured (docs/evals/jev-1.13.0-2026-10-02.md).
+  escalation: Object.fromEntries(
+    LANGUAGE_SLICES.flatMap((slice) => {
+      const band = DEFAULT_DECISION_THRESHOLDS.personRequest[slice];
+      return band ? [[slice, { wants_person: { type: 'noul' as const, ...band } }]] : [];
+    }),
+  ),
+};
 
 // ---------------------------------------------------------------------------------------------
 // Thresholds, one question at a time
@@ -382,4 +406,89 @@ export function answerCheckCorrection(sentences: readonly string[]): string {
     'Write the reply again without them. State only what a passage says, and cite it. If the ' +
       'passages do not answer the question, say that you do not have that information and offer a person.',
   ].join('\n');
+}
+
+// ---------------------------------------------------------------------------------------------
+// Escalation advice (J04): does this conversation need a person?
+
+/**
+ * The escalation questions, one exact condition each; code combines them. A request for a person
+ * is the evaluated question routing also asks: the deterministic detector answers first and always
+ * wins, so Jev only adds the hand-offs it missed.
+ */
+export const ESCALATION_QUESTIONS = {
+  wants_person: PERSON_REQUEST_QUESTION,
+  frustrated: {
+    type: 'noul',
+    instructions: 'Is the customer frustrated or angry?',
+    outcomes: {
+      true: 'The customer sounds frustrated, annoyed or angry',
+      false: 'The customer sounds calm, neutral or pleased',
+    },
+  },
+  unresolved: {
+    type: 'noul',
+    instructions: 'Does the customer say that a problem they reported before is still not solved?',
+    outcomes: {
+      true: 'The customer says the same problem is still happening, or is still not fixed after an earlier attempt or promise',
+      false: 'The customer does not say that an earlier problem is still not solved',
+    },
+  },
+  complaint: {
+    type: 'noul',
+    instructions: 'Does the customer say they want to make a complaint about the business?',
+    outcomes: {
+      true: 'The customer makes a complaint about the business or its service, or asks how to make one',
+      false: 'The customer does not make or ask to make a complaint',
+    },
+  },
+  legal_threat: {
+    type: 'noul',
+    instructions: 'Does the customer threaten legal action against the business?',
+    outcomes: {
+      true: 'The customer mentions a lawyer, a court case, suing, or reporting the business to a regulator or the police',
+      false: 'The customer does not threaten legal action',
+    },
+  },
+  safety: {
+    type: 'noul',
+    instructions: "Does the customer describe a risk to someone's health or safety?",
+    outcomes: {
+      true: 'The customer describes an injury, an illness, a fire, an allergic reaction or a product that is dangerous',
+      false: 'The customer does not describe a risk to health or safety',
+    },
+  },
+} as const satisfies Record<string, NoulQuestion>;
+
+export type EscalationReason =
+  | 'wants_person'
+  | 'safety'
+  | 'legal_threat'
+  | 'complaint'
+  | 'unresolved_and_frustrated';
+
+/** Customer messages the escalation check reads: the latest few, oldest first. */
+export const ESCALATION_MESSAGES = 3;
+
+const said = (gated: GatedAnswers, question: string) =>
+  (gated.kept[question] as NoulAnswer | null | undefined)?.verdict === true;
+
+/**
+ * What the answers mean, in code. Each of these alone needs a person: a request for one, a risk
+ * to health or safety, a legal threat or a complaint. Frustration alone does not; frustration
+ * with a problem that is still not solved does. Only answers that met their threshold count.
+ */
+export function escalationVerdict(gated: GatedAnswers): {
+  escalate: boolean;
+  reasons: EscalationReason[];
+} {
+  const reasons: EscalationReason[] = [];
+  if (said(gated, 'wants_person')) reasons.push('wants_person');
+  if (said(gated, 'safety')) reasons.push('safety');
+  if (said(gated, 'legal_threat')) reasons.push('legal_threat');
+  if (said(gated, 'complaint')) reasons.push('complaint');
+  if (said(gated, 'unresolved') && said(gated, 'frustrated')) {
+    reasons.push('unresolved_and_frustrated');
+  }
+  return { escalate: reasons.length > 0, reasons };
 }

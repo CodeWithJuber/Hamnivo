@@ -5,7 +5,8 @@ export type AiHandoffReason =
   | 'ai_stopped'
   | 'ai_unavailable'
   | 'ai_blocked'
-  | 'customer_request';
+  | 'customer_request'
+  | 'ai_escalated';
 
 /** Internal notes for staff (the staff lane), in the operator's language. */
 export const HANDOFF_NOTES: Record<AiHandoffReason, string> = {
@@ -16,6 +17,7 @@ export const HANDOFF_NOTES: Record<AiHandoffReason, string> = {
   ai_unavailable: 'The AI could not answer because the model was unavailable. Please answer.',
   ai_blocked: 'The AI reply was held back because it broke the honesty rules. Please answer.',
   customer_request: 'The customer asked to talk to a person, so the AI stepped back.',
+  ai_escalated: 'The escalation check passed this conversation to people. Please answer.',
 };
 
 /**
@@ -25,4 +27,13 @@ export const HANDOFF_NOTES: Record<AiHandoffReason, string> = {
 export const CHECK_HANDOFF_NOTES = {
   unsupported_answer:
     'The AI reply was held back: the knowledge it cited did not support it. Please answer.',
+} as const;
+
+/** Why the escalation check (J04) passed a conversation to people, one sentence per reason. */
+export const ESCALATION_NOTES = {
+  wants_person: 'The customer seems to ask for a person.',
+  safety: 'The customer describes a risk to health or safety.',
+  legal_threat: 'The customer threatens legal action.',
+  complaint: 'The customer wants to make a complaint.',
+  unresolved_and_frustrated: 'The customer is frustrated that a problem is still not solved.',
 } as const;

@@ -1,17 +1,27 @@
 import { type Db, toPublicId, withTenant } from '@hamnivo/db';
 import {
+  type AuthorityMessage,
   answerCheckCorrection,
   answerCheckRequest,
   answerCheckThresholdKey,
   answerCheckVerdict,
   type CheckTask,
   citedClaims,
+  ESCALATION_MESSAGES,
+  ESCALATION_QUESTIONS,
+  type EscalationReason,
+  escalationVerdict,
   type ReplyLanguage,
   redactPersonalData,
   SLICE_OF_LANGUAGE,
 } from '@hamnivo/domain';
 import { Inject, Injectable } from '@nestjs/common';
-import { CHECK_HANDOFF_NOTES } from '../runtime/handoff-notes.js';
+import {
+  type AiHandoffReason,
+  CHECK_HANDOFF_NOTES,
+  ESCALATION_NOTES,
+  HANDOFF_NOTES,
+} from '../runtime/handoff-notes.js';
 import { RunsService } from '../runtime/runs.service.js';
 import { APP_DB } from '../tokens.js';
 import { type Asked, type CheckSetting, ChecksService } from './checks.service.js';
@@ -35,6 +45,11 @@ export type ReplyVerdict =
   /** Hand the conversation to people with this note (the reply was held back). */
   | { action: 'handoff'; note: string };
 
+/** What to do before a reply is written. A check here can only add a hand-off. */
+export type InboundVerdict =
+  | { action: 'continue' }
+  | { action: 'handoff'; reason: AiHandoffReason; note: string };
+
 interface RunContext {
   tenantId: string;
   brandId: string;
@@ -48,6 +63,21 @@ interface RunContext {
 
 const passageText = (p: CheckedPassage) =>
   `${p.heading ? `${p.title} — ${p.heading}` : p.title}\n${p.text}`;
+
+/** The customer's latest public messages, oldest first. */
+function customerTexts(messages: readonly AuthorityMessage[], count: number): string[] {
+  return messages
+    .filter((m) => m.direction === 'incoming' && !m.private && m.text?.trim())
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || Number(a.ref) - Number(b.ref))
+    .slice(-count)
+    .map((m) => (m.text ?? '').trim().slice(0, 1000));
+}
+
+function escalationNote(reasons: readonly EscalationReason[]): string {
+  return [HANDOFF_NOTES.ai_escalated, ...reasons.map((reason) => ESCALATION_NOTES[reason])].join(
+    ' ',
+  );
+}
 
 /**
  * Checks around one AI reply, behind one handle so the reply path calls them from a few clear
@@ -76,6 +106,18 @@ export class RunChecks {
 
   remainingMs(now = Date.now()): number {
     return this.context.deadlineAt - now;
+  }
+
+  /**
+   * Before a reply is written: whether the customer's messages need a person (escalation, J04).
+   * It can only add a hand-off: a customer who asked for a person was handed over before this,
+   * without asking Jev.
+   */
+  inbound(input: {
+    messages: readonly AuthorityMessage[];
+    language: ReplyLanguage | undefined;
+  }): Promise<InboundVerdict> {
+    return this.service.inbound(this, input);
   }
 
   /**
@@ -144,7 +186,7 @@ export class ReplyChecksService {
       applied: boolean;
       detail?: Record<string, unknown>;
     },
-    step: { name: string; status: 'ok' | 'blocked' | 'skipped' },
+    step: { kind?: 'guard' | 'decision'; name: string; status: 'ok' | 'blocked' | 'skipped' },
   ): Promise<void> {
     const { context } = run;
     const values = this.checks.recordValues(
@@ -161,7 +203,7 @@ export class ReplyChecksService {
     await withTenant(this.db, { tenantId: context.tenantId, actorId: 'ai' }, async (tx) => {
       await this.checks.record(context.tenantId, values, tx);
       await this.runs.step(tx, context.tenantId, context.runId, {
-        kind: 'guard',
+        kind: step.kind ?? 'guard',
         name: step.name,
         status: step.status,
         provider: asked.result.provider,
@@ -179,6 +221,58 @@ export class ReplyChecksService {
         },
       });
     });
+  }
+
+  async inbound(
+    run: RunChecks,
+    input: { messages: readonly AuthorityMessage[]; language: ReplyLanguage | undefined },
+  ): Promise<InboundVerdict> {
+    return this.escalation(run, input);
+  }
+
+  /** Escalation advice (J04): the questions are combined in code; live hands over with why. */
+  private async escalation(
+    run: RunChecks,
+    input: { messages: readonly AuthorityMessage[]; language: ReplyLanguage | undefined },
+  ): Promise<InboundVerdict> {
+    const setting = run.setting('escalation');
+    if (!setting) return { action: 'continue' };
+    const texts = customerTexts(input.messages, ESCALATION_MESSAGES);
+    if (texts.length === 0) return { action: 'continue' };
+    const asked = await this.checks.ask(setting, {
+      state: { messages: texts.map(redactPersonalData) },
+      questions: ESCALATION_QUESTIONS,
+      language: input.language ? SLICE_OF_LANGUAGE[input.language] : null,
+      deadlineMs: Math.max(1, run.remainingMs()),
+    });
+    const triggerRef = `run:${run.context.runId}:escalation`;
+    if (asked.gated.status !== 'decided') {
+      // Jev could not answer, or the language was not evaluated: the reply goes on as today.
+      await this.record(
+        run,
+        asked,
+        triggerRef,
+        { verdict: asked.gated.status, action: 'continue', applied: false },
+        { kind: 'decision', name: 'escalation', status: 'skipped' },
+      );
+      return { action: 'continue' };
+    }
+    const verdict = escalationVerdict(asked.gated);
+    const live = setting.mode === 'live';
+    await this.record(
+      run,
+      asked,
+      triggerRef,
+      {
+        verdict: verdict.escalate ? 'escalate' : 'continue',
+        action: verdict.escalate ? 'handoff' : 'continue',
+        applied: live && verdict.escalate,
+        detail: { reasons: verdict.reasons },
+      },
+      { kind: 'decision', name: 'escalation', status: 'ok' },
+    );
+    if (!live || !verdict.escalate) return { action: 'continue' };
+    return { action: 'handoff', reason: 'ai_escalated', note: escalationNote(verdict.reasons) };
   }
 
   async answerCheck(

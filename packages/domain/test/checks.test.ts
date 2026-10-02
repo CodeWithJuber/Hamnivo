@@ -8,6 +8,9 @@ import {
   answersRecord,
   type CitedClaim,
   citedClaims,
+  DEFAULT_CHECK_THRESHOLDS,
+  ESCALATION_QUESTIONS,
+  escalationVerdict,
   type GatedAnswers,
   gateCheck,
   splitSentences,
@@ -260,5 +263,72 @@ describe('what the answer check decides', () => {
 
   it('tells the model which sentences to leave out', () => {
     expect(answerCheckCorrection(['Returns take 90 days.'])).toContain('- "Returns take 90 days."');
+  });
+});
+
+describe('escalation advice (J04)', () => {
+  const noul = (probability: number, verdict?: boolean) => ({
+    type: 'noul' as const,
+    probability,
+    ...(verdict === undefined ? {} : { verdict }),
+  });
+  const gatedWith = (kept: Record<string, ReturnType<typeof noul> | null>): GatedAnswers => ({
+    status: 'decided',
+    reason: null,
+    kept,
+    shortfalls: {},
+    observed: {},
+  });
+
+  it('asks each condition on its own, with criteria that say the same thing', () => {
+    expect(Object.keys(ESCALATION_QUESTIONS)).toEqual([
+      'wants_person',
+      'frustrated',
+      'unresolved',
+      'complaint',
+      'legal_threat',
+      'safety',
+    ]);
+    for (const question of Object.values(ESCALATION_QUESTIONS)) {
+      expect(question.type).toBe('noul');
+      expect(question.outcomes.true).toBeTruthy();
+      expect(question.outcomes.false).toBeTruthy();
+    }
+  });
+
+  it('hands over for a request, a safety risk, a legal threat or a complaint on its own', () => {
+    expect(escalationVerdict(gatedWith({ legal_threat: noul(0.95, true) }))).toEqual({
+      escalate: true,
+      reasons: ['legal_threat'],
+    });
+    expect(
+      escalationVerdict(gatedWith({ safety: noul(0.9, true), complaint: noul(0.9, true) })),
+    ).toEqual({ escalate: true, reasons: ['safety', 'complaint'] });
+  });
+
+  it('needs frustration and an unsolved problem together; frustration alone does not escalate', () => {
+    expect(escalationVerdict(gatedWith({ frustrated: noul(0.95, true) }))).toEqual({
+      escalate: false,
+      reasons: [],
+    });
+    expect(
+      escalationVerdict(gatedWith({ frustrated: noul(0.95, true), unresolved: noul(0.9, true) })),
+    ).toEqual({ escalate: true, reasons: ['unresolved_and_frustrated'] });
+  });
+
+  it('counts only answers that met their threshold', () => {
+    expect(escalationVerdict(gatedWith({ legal_threat: null, safety: noul(0.2, false) }))).toEqual({
+      escalate: false,
+      reasons: [],
+    });
+  });
+
+  it('starts from the evaluated thresholds for a request for a person, and nothing else', () => {
+    expect(DEFAULT_CHECK_THRESHOLDS.escalation?.en).toEqual({
+      wants_person: { type: 'noul', trueAtLeast: 0.8, falseAtMost: 0.5 },
+    });
+    expect(DEFAULT_CHECK_THRESHOLDS.escalation?.['roman-urdu']?.wants_person).toMatchObject({
+      trueAtLeast: 0.9,
+    });
   });
 });

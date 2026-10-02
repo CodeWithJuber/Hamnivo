@@ -547,14 +547,19 @@
     "note": "Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). Verified live on 2026-10-02 against jev-1.13.0: the opt-in adapter tests (`pnpm --filter @hamnivo/adapters test:live`, 5 of 5 passed) and 381 evaluation calls, all answered, p50 148 ms and p95 214 ms, about 673 input tokens per call, $0.0108 in all. Live tests are opt-in and never part of the default runs; the key is read from the environment only."
   },
   "J04": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/runtime/replies.service.ts",
       "apps/gateway/test/agents.int.test.ts",
       "packages/domain/src/human-request.ts",
-      "packages/domain/test/human-request.test.ts"
+      "packages/domain/test/human-request.test.ts",
+      "packages/domain/src/checks.ts",
+      "packages/domain/test/checks.test.ts",
+      "apps/gateway/src/checks/reply-checks.service.ts",
+      "apps/gateway/test/checks.int.test.ts",
+      "apps/gateway/test/checks.live.test.ts"
     ],
-    "note": "A typed request for a person (English, Hinglish, Roman Urdu, Arabic, Hindi, Urdu, with negation and look-alikes) hands the conversation to people before any model or decision provider runs (tested end to end); Jev escalation advice for other cases is pending."
+    "note": "A typed request for a person (English, Hinglish, Roman Urdu, Arabic, Hindi, Urdu, with negation and look-alikes) hands the conversation to people before any model or decision provider runs (tested end to end); For the rest, the escalation check asks Jev six questions about the customer's latest messages (personal data replaced by its kind), each one exact condition: asking for a person, frustrated or angry, a problem still not solved, a complaint, a legal threat, a risk to health or safety. Code combines them: a request, a safety risk, a legal threat or a complaint alone needs a person; frustration only together with an unsolved problem. Live: the conversation goes to people before any reply, with the reasons in the note; shadow (every brand's start): recorded only; Jev unavailable or a language without thresholds: the AI answers as today and the check is recorded. Jev can only add a hand-off, never block one. Verified live on 2026-10-02 with jev-1.13.0: a legal threat was handed over (139 ms) and a calm question went on to an answer (125 ms). Only the request for a person has evaluated thresholds (0.80, 0.90 for Roman Urdu); brands set the others from what shadow mode records."
   },
   "J06": {
     "status": "in-progress",

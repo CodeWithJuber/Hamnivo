@@ -94,16 +94,32 @@ let tenantId: string;
 
 const checksPath = () => `/v1/admin/brands/${shop.brand.id}/checks`;
 
+/** Escalation probabilities per question for the next calls (others: 0.05). */
+const escalation: Record<string, number> = {};
+
 /** Jev's relation answer per claim: claims containing a key get its label. */
 function relations(byPhrase: Record<string, [string, number]>) {
   jev.state.mode = 'answer';
   jev.state.answer = (question, body) => {
+    if (!/^c\d+_p\d+$/.test(question)) {
+      return { type: 'noul', noul: escalation[question] ?? 0.05 };
+    }
     const claim = String(body.state?.[`claim_${/^c(\d+)_/.exec(question)?.[1]}`] ?? '');
     const hit = Object.entries(byPhrase).find(([phrase]) => claim.includes(phrase));
     const [choice, confidence] = hit?.[1] ?? ['supports', 0.95];
     return { type: 'choice', choice, confidence };
   };
 }
+
+/** Jev's escalation answers for the next calls. */
+function escalates(probabilities: Record<string, number>) {
+  for (const key of Object.keys(escalation)) delete escalation[key];
+  Object.assign(escalation, probabilities);
+  relations({});
+}
+
+const escalationCalls = () =>
+  jev.calls.filter((call) => Object.hasOwn(call.body.questions ?? {}, 'legal_threat'));
 
 async function setMode(mode: 'off' | 'shadow' | 'live') {
   const set = await shop.owner.put(`${checksPath()}/answer-check/mode`, { mode });
@@ -212,6 +228,25 @@ describe('checks in Studio', () => {
           }),
         ],
         jev: expect.objectContaining({ configured: true, recommendedModel: 'jev-1.13.0' }),
+      }),
+      expect.objectContaining({
+        task: 'escalation',
+        mode: 'shadow',
+        questions: [
+          expect.objectContaining({ key: 'wants_person', type: 'noul' }),
+          expect.objectContaining({ key: 'frustrated', type: 'noul' }),
+          expect.objectContaining({ key: 'unresolved', type: 'noul' }),
+          expect.objectContaining({ key: 'complaint', type: 'noul' }),
+          expect.objectContaining({ key: 'legal_threat', type: 'noul' }),
+          expect.objectContaining({
+            key: 'safety',
+            instructions: "Does the customer describe a risk to someone's health or safety?",
+          }),
+        ],
+        // Only the request for a person was measured live, so only it is recommended.
+        recommendedThresholds: expect.objectContaining({
+          en: { wants_person: { type: 'noul', trueAtLeast: 0.8, falseAtMost: 0.5 } },
+        }),
       }),
     ]);
   });
@@ -439,6 +474,142 @@ describe('live mode', () => {
     expect(check?.latencyMs).toBeLessThan(2500);
     expect(Date.now() - started).toBeLessThan(20_000);
     jev.state.mode = 'answer';
+  });
+});
+
+describe('escalation advice (J04)', () => {
+  const band = { type: 'noul', trueAtLeast: 0.8, falseAtMost: 0.3 };
+  const escalationRecords = async (conversationId: string) => {
+    const listed = await shop.owner.get(
+      `${checksPath()}/escalation/records?conversationId=${conversationId}`,
+    );
+    expect(listed.status, JSON.stringify(listed.body)).toBe(200);
+    return listed.body.items as Array<Record<string, any>>;
+  };
+
+  beforeAll(async () => {
+    const draft = await shop.owner.put(`${checksPath()}/escalation/draft`, {
+      provider: 'jev',
+      modelVersion: 'jev-1.13.0',
+      thresholds: {
+        en: {
+          wants_person: band,
+          frustrated: band,
+          unresolved: band,
+          complaint: band,
+          legal_threat: band,
+          safety: band,
+        },
+      },
+    });
+    expect(draft.status, JSON.stringify(draft.body)).toBe(200);
+    expect((await shop.owner.post(`${checksPath()}/escalation/publish`, {})).status).toBe(200);
+  });
+
+  const angry =
+    'This is the third time I write. My refund still has not arrived and I will take you to court.';
+
+  it('shadow: records that a person is needed, and the AI answers as today', async () => {
+    escalates({ legal_threat: 0.95, unresolved: 0.9, frustrated: 0.92 });
+    scripted.script.push('I am sorry about the wait. Let me look into your refund.');
+    const { conversationId } = await chat(angry);
+    const seen = await inspect(conversationId);
+    expect(seen.botReplies).toEqual(['I am sorry about the wait. Let me look into your refund.']);
+    expect(seen.control.ownerMode).toBe('AI_ACTIVE');
+    // One call with the customer's words; every question answered in it.
+    expect(escalationCalls()).toHaveLength(1);
+    expect(escalationCalls()[0]?.body.state).toEqual({ messages: [angry] });
+    expect(await escalationRecords(conversationId)).toEqual([
+      expect.objectContaining({
+        mode: 'shadow',
+        verdict: 'escalate',
+        action: 'handoff',
+        applied: false,
+        detail: { reasons: ['legal_threat', 'unresolved_and_frustrated'] },
+        answers: expect.objectContaining({
+          legal_threat: expect.objectContaining({ probability: 0.95, verdict: true }),
+          safety: expect.objectContaining({ probability: 0.05, verdict: false }),
+        }),
+      }),
+    ]);
+  });
+
+  describe('live', () => {
+    beforeAll(async () => {
+      const set = await shop.owner.put(`${checksPath()}/escalation/mode`, { mode: 'live' });
+      expect(set.status).toBe(200);
+    });
+
+    it('hands over before any reply, with the reasons in the note', async () => {
+      escalates({ legal_threat: 0.95, unresolved: 0.9, frustrated: 0.92 });
+      const { conversationId } = await chat(angry);
+      const seen = await inspect(conversationId);
+      expect(seen.botReplies).toEqual([]);
+      expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+      expect(seen.control.ownerReason).toBe('ai_escalated');
+      expect(seen.notes).toContainEqual(
+        expect.stringContaining('The customer threatens legal action.'),
+      );
+      expect(seen.notes).toContainEqual(
+        expect.stringContaining('The customer is frustrated that a problem is still not solved.'),
+      );
+      // The model was never asked to write a reply.
+      expect(scripted.prompts).toEqual([]);
+      expect(await escalationRecords(conversationId)).toEqual([
+        expect.objectContaining({ verdict: 'escalate', action: 'handoff', applied: true }),
+      ]);
+    });
+
+    it('lets an explicit request for a person win without asking Jev', async () => {
+      escalates({});
+      const { conversationId } = await chat('I want to talk to a person please');
+      const seen = await inspect(conversationId);
+      expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+      expect(seen.control.ownerReason).toBe('customer_request');
+      expect(escalationCalls()).toEqual([]);
+      expect(await escalationRecords(conversationId)).toEqual([]);
+    });
+
+    it('lets frustration alone go on to an answer', async () => {
+      escalates({ frustrated: 0.95 });
+      scripted.script.push('I understand. Let me help with your order.');
+      const { conversationId } = await chat(
+        'Ugh, this website is so slow today. Where is my order?',
+      );
+      const seen = await inspect(conversationId);
+      expect(seen.botReplies).toEqual(['I understand. Let me help with your order.']);
+      expect(await escalationRecords(conversationId)).toEqual([
+        expect.objectContaining({ verdict: 'continue', action: 'continue', applied: false }),
+      ]);
+    });
+
+    it('answers as today, and records it, for a language without thresholds', async () => {
+      escalates({ legal_threat: 0.99 });
+      scripted.script.push('آپ کی شکایت کا شکریہ۔');
+      const { conversationId } = await chat('میں آپ کے خلاف عدالت جاؤں گا۔');
+      const seen = await inspect(conversationId);
+      expect(seen.control.ownerMode).toBe('AI_ACTIVE');
+      expect(await escalationRecords(conversationId)).toEqual([
+        expect.objectContaining({
+          status: 'abstained',
+          verdict: 'abstained',
+          action: 'continue',
+          language: 'ur',
+        }),
+      ]);
+    });
+
+    it('answers as today, and records it, when Jev is unavailable', async () => {
+      jev.state.mode = 'error';
+      scripted.script.push('Let me check your refund.');
+      const { conversationId } = await chat(angry);
+      const seen = await inspect(conversationId);
+      expect(seen.botReplies).toEqual(['Let me check your refund.']);
+      expect(await escalationRecords(conversationId)).toEqual([
+        expect.objectContaining({ status: 'unavailable', action: 'continue', applied: false }),
+      ]);
+      jev.state.mode = 'answer';
+    });
   });
 });
 

@@ -7,13 +7,28 @@ import type {
   LanguageSlice,
 } from '@hamnivo/contracts';
 import { toPublicId } from '@hamnivo/db';
-import { type CheckTask, LANGUAGE_SLICES, relationQuestion } from '@hamnivo/domain';
+import {
+  type CheckTask,
+  ESCALATION_QUESTIONS,
+  LANGUAGE_SLICES,
+  type NoulQuestion,
+  relationQuestion,
+} from '@hamnivo/domain';
 import { iso } from '../common/views.js';
 import { type CheckRow, checkDefinitionOf, type RubricRow } from './checks.service.js';
+
+const noulView = (key: string, question: NoulQuestion): CheckQuestion => ({
+  key,
+  type: 'noul',
+  instructions: question.instructions,
+  options: { true: question.outcomes?.true ?? null, false: question.outcomes?.false ?? null },
+});
 
 /** What each check asks, as staff see it in Studio (the wording Jev reads, numbers in code). */
 export function checkQuestions(task: CheckTask): CheckQuestion[] {
   switch (task) {
+    case 'escalation':
+      return Object.entries(ESCALATION_QUESTIONS).map(([key, question]) => noulView(key, question));
     case 'answer-check': {
       const question = relationQuestion(1, 1);
       return [

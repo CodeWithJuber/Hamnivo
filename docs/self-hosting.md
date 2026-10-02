@@ -274,6 +274,10 @@ Switch a check to **live** when its records look right.
 - **Answer check:** before an AI reply is sent, Jev checks each sentence that cites your knowledge
   against the passage it cites. When live, a reply with a sentence the passage does not support is
   written again once without it; if that fails too, a person takes over with a note.
+- **Escalation advice:** before the AI answers, Jev checks whether the customer needs a person: a
+  request it may have missed, a risk to health or safety, a legal threat, a complaint, or
+  frustration with a problem that is still not solved. When live, a person takes over with the
+  reason in the note. A customer who asks for a person always gets one, without Jev.
 
 If Jev is slow or unavailable, or a language has no threshold, the reply goes out as it would
 without the check, and the check is recorded. A check sends TypeSafe only what it needs: the

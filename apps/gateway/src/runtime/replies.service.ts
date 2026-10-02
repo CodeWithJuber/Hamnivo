@@ -345,6 +345,24 @@ export class RepliesService {
       languageSource: chosen.resolution.source,
       checks,
     };
+    // Jev's checks of the customer's messages (escalation): they can only hand the conversation
+    // to people, never answer, approve or unlock anything.
+    const inbound = await checks?.inbound({
+      messages: history.messages,
+      language: chosen.detection.language ?? chosen.resolution.language,
+    });
+    if (inbound?.action === 'handoff') {
+      await this.handOff(
+        tenantId,
+        control,
+        run.id,
+        payload.epoch,
+        inbound.reason,
+        undefined,
+        inbound.note,
+      );
+      return;
+    }
     // Customer memory (G19) is recalled before the cache: a reply built with it never enters a
     // shared entry, only the customer's own (keyed by their memory version, K09).
     const memories = await this.memory.recall(tenantId, {

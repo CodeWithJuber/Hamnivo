@@ -36,7 +36,8 @@ export interface TransitionOptions {
     | 'assist_mode'
     | 'ai_stopped'
     | 'ai_unavailable'
-    | 'ai_blocked';
+    | 'ai_blocked'
+    | 'ai_escalated';
   /** Audit actor (`stf_…`, `cus_…`, `authority`). */
   actor: { type: 'staff' | 'customer' | 'system'; id: string };
   /** The epoch the caller saw; a different current epoch fails with OWNERSHIP_CHANGED. */

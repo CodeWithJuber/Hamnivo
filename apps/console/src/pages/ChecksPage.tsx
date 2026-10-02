@@ -313,52 +313,63 @@ function RubricForm({ brandId, task }: { brandId: string; task: CheckTask }) {
             </p>
           ) : null}
           {task.questions.map((q) => (
-            <div key={q.key} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {SLICES.flatMap((slice) => {
-                const key = inputKey(slice, q.key);
-                const value = inputs[key] ?? { min: '', yes: '', no: '' };
-                const language = t(`decisions.slices.${slice}`);
-                const number = {
-                  type: 'number' as const,
-                  inputMode: 'decimal' as const,
-                  min: 0,
-                  max: 1,
-                  step: 0.05,
-                };
-                const error = errors.get(`thresholds.${slice}.${q.key}`);
-                return q.type === 'choice'
-                  ? [
-                      <TextField
-                        key={`${key}-min`}
-                        id={id(`${q.key}-${slice}-min`)}
-                        label={t('checks.rubric.minConfidence', { language, question: q.key })}
-                        value={value.min}
-                        onChange={(event) => setInput(key, 'min', event.target.value)}
-                        error={error}
-                        {...number}
-                      />,
-                    ]
-                  : [
-                      <TextField
-                        key={`${key}-yes`}
-                        id={id(`${q.key}-${slice}-yes`)}
-                        label={t('checks.rubric.trueAtLeast', { language, question: q.key })}
-                        value={value.yes}
-                        onChange={(event) => setInput(key, 'yes', event.target.value)}
-                        error={error}
-                        {...number}
-                      />,
-                      <TextField
-                        key={`${key}-no`}
-                        id={id(`${q.key}-${slice}-no`)}
-                        label={t('checks.rubric.falseAtMost', { language, question: q.key })}
-                        value={value.no}
-                        onChange={(event) => setInput(key, 'no', event.target.value)}
-                        {...number}
-                      />,
-                    ];
-              })}
-            </div>
+            <details
+              key={q.key}
+              className="rounded-lg border border-border p-3"
+              open={task.questions.length === 1}
+            >
+              <summary className="cursor-pointer text-sm font-medium text-text">
+                <bdi dir="ltr" className="font-mono text-[13px]">
+                  {q.key}
+                </bdi>
+              </summary>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {SLICES.flatMap((slice) => {
+                  const key = inputKey(slice, q.key);
+                  const value = inputs[key] ?? { min: '', yes: '', no: '' };
+                  const language = t(`decisions.slices.${slice}`);
+                  const number = {
+                    type: 'number' as const,
+                    inputMode: 'decimal' as const,
+                    min: 0,
+                    max: 1,
+                    step: 0.05,
+                  };
+                  const error = errors.get(`thresholds.${slice}.${q.key}`);
+                  return q.type === 'choice'
+                    ? [
+                        <TextField
+                          key={`${key}-min`}
+                          id={id(`${q.key}-${slice}-min`)}
+                          label={t('checks.rubric.minConfidence', { language, question: q.key })}
+                          value={value.min}
+                          onChange={(event) => setInput(key, 'min', event.target.value)}
+                          error={error}
+                          {...number}
+                        />,
+                      ]
+                    : [
+                        <TextField
+                          key={`${key}-yes`}
+                          id={id(`${q.key}-${slice}-yes`)}
+                          label={t('checks.rubric.trueAtLeast', { language, question: q.key })}
+                          value={value.yes}
+                          onChange={(event) => setInput(key, 'yes', event.target.value)}
+                          error={error}
+                          {...number}
+                        />,
+                        <TextField
+                          key={`${key}-no`}
+                          id={id(`${q.key}-${slice}-no`)}
+                          label={t('checks.rubric.falseAtMost', { language, question: q.key })}
+                          value={value.no}
+                          onChange={(event) => setInput(key, 'no', event.target.value)}
+                          {...number}
+                        />,
+                      ];
+                })}
+              </div>
+            </details>
           ))}
         </fieldset>
       </fieldset>

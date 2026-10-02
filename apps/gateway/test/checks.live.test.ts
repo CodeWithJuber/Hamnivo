@@ -141,4 +141,49 @@ describe.skipIf(!key)('reply checks with live Jev', () => {
       expect.objectContaining({ verdict: 'pass', action: 'publish', applied: true }),
     ]);
   });
+
+  describe('escalation', () => {
+    beforeAll(async () => {
+      const band = { type: 'noul', trueAtLeast: 0.8, falseAtMost: 0.5 };
+      const draft = await shop.owner.put(`${path()}/escalation/draft`, {
+        provider: 'jev',
+        modelVersion: 'jev-1.13.0',
+        deadlineMs: 1500,
+        thresholds: {
+          en: {
+            wants_person: band,
+            frustrated: band,
+            unresolved: band,
+            complaint: band,
+            legal_threat: band,
+            safety: band,
+          },
+        },
+      });
+      expect(draft.status, JSON.stringify(draft.body)).toBe(200);
+      expect((await shop.owner.post(`${path()}/escalation/publish`, {})).status).toBe(200);
+      expect((await shop.owner.put(`${path()}/escalation/mode`, { mode: 'live' })).status).toBe(
+        200,
+      );
+    });
+
+    it('hands over a legal threat, with the reason in the note', async () => {
+      const { conversationId, replies } = await chat(
+        'I have asked three times and my refund still has not arrived. My lawyer will file a claim against your company next week.',
+      );
+      expect(replies).toEqual([]);
+      const [record] = await records('escalation', conversationId);
+      expect(record).toMatchObject({ status: 'decided', verdict: 'escalate', applied: true });
+      expect(record?.detail.reasons).toContain('legal_threat');
+    });
+
+    it('lets a calm question go on to an answer', async () => {
+      scripted.script.push('You can return unworn items within 30 days of delivery [1].');
+      const { conversationId, replies } = await chat('Hi! What is your return policy for shoes?');
+      expect(replies).toHaveLength(1);
+      expect(await records('escalation', conversationId)).toEqual([
+        expect.objectContaining({ status: 'decided', verdict: 'continue', applied: false }),
+      ]);
+    });
+  });
 });

@@ -17,6 +17,11 @@ export const checksEn = {
       description:
         'Before an AI reply is sent, Jev checks each sentence that cites the knowledge base against the passage it cites. When live, a reply with a sentence the passage does not support is written again without it, or passed to a person.',
     },
+    escalation: {
+      title: 'Escalation advice',
+      description:
+        'Before the AI answers, Jev checks whether the customer needs a person: a request it may have missed, a risk to health or safety, a legal threat, a complaint, or frustration with a problem that is still not solved. Code combines the answers. When live, the conversation goes to a person with the reason in the note. A customer who asks for a person always gets one, without Jev.',
+    },
   },
   versions: {
     published: 'Published version {{version}}',
@@ -48,9 +53,9 @@ export const checksEn = {
     thresholds: 'How sure Jev must be, per language',
     thresholdsHint:
       'From 0 to 1. Leave a language empty if it was not evaluated: the check then only records there.',
-    minConfidence: '{{language}}: at least',
-    trueAtLeast: '{{language}}: yes from',
-    falseAtMost: '{{language}}: no up to',
+    minConfidence: '{{question}} · {{language}}: at least',
+    trueAtLeast: '{{question}} · {{language}}: yes from',
+    falseAtMost: '{{question}} · {{language}}: no up to',
     evaluated:
       'Filled in from Hamnivo’s test of {{model}}. Compare them on your own conversations first.',
     save: 'Save draft',
@@ -104,6 +109,11 @@ export const checksAr: typeof checksEn = {
       description:
         'قبل إرسال رد الذكاء الاصطناعي، يفحص Jev كل جملة تستشهد بقاعدة المعرفة مقابل المقطع الذي تستشهد به. عند التفعيل، يُعاد كتابة الرد الذي فيه جملة لا يدعمها المقطع بدونها، أو يُحال إلى شخص.',
     },
+    escalation: {
+      title: 'نصيحة الإحالة',
+      description:
+        'قبل أن يجيب الذكاء الاصطناعي، يفحص Jev هل يحتاج العميل إلى شخص: طلب ربما فاته، أو خطر على الصحة أو السلامة، أو تهديد قانوني، أو شكوى، أو استياء من مشكلة لم تُحل بعد. وتجمع الشيفرة الإجابات. عند التفعيل، تنتقل المحادثة إلى شخص مع السبب في الملاحظة. والعميل الذي يطلب شخصًا يحصل عليه دائمًا، دون Jev.',
+    },
   },
   versions: {
     published: 'الإصدار المنشور {{version}}',
@@ -134,9 +144,9 @@ export const checksAr: typeof checksEn = {
     deadline: 'المهلة بالملي ثانية',
     thresholds: 'مدى التأكد المطلوب من Jev لكل لغة',
     thresholdsHint: 'من 0 إلى 1. اترك اللغة فارغة إن لم تُقيَّم: عندها يسجّل الفحص فقط فيها.',
-    minConfidence: '{{language}}: على الأقل',
-    trueAtLeast: '{{language}}: نعم ابتداءً من',
-    falseAtMost: '{{language}}: لا حتى',
+    minConfidence: '{{question}} · {{language}}: على الأقل',
+    trueAtLeast: '{{question}} · {{language}}: نعم ابتداءً من',
+    falseAtMost: '{{question}} · {{language}}: لا حتى',
     evaluated: 'مأخوذة من اختبار Hamnivo للإصدار {{model}}. قارنها أولًا على محادثاتك.',
     save: 'حفظ المسودة',
     saved: 'حُفظت المسودة.',
@@ -188,6 +198,11 @@ export const checksHi: typeof checksEn = {
       description:
         'AI का जवाब भेजने से पहले Jev नॉलेज बेस का हवाला देने वाले हर वाक्य को उस अंश से मिलाता है जिसका हवाला दिया गया है। चालू होने पर, जिस जवाब में कोई वाक्य अंश से साबित न हो, वह उस वाक्य के बिना दोबारा लिखा जाता है, या किसी व्यक्ति को सौंपा जाता है।',
     },
+    escalation: {
+      title: 'व्यक्ति को सौंपने की सलाह',
+      description:
+        'AI के जवाब देने से पहले Jev जाँचता है कि ग्राहक को किसी व्यक्ति की ज़रूरत है या नहीं: ऐसा अनुरोध जो छूट गया हो, सेहत या सुरक्षा का खतरा, कानूनी धमकी, शिकायत, या किसी अनसुलझी समस्या से नाराज़गी। जवाबों को कोड जोड़ता है। चालू होने पर बातचीत वजह के नोट के साथ किसी व्यक्ति को जाती है। जो ग्राहक किसी व्यक्ति से बात करना चाहे, उसे हमेशा व्यक्ति मिलता है, Jev के बिना।',
+    },
   },
   versions: {
     published: 'प्रकाशित संस्करण {{version}}',
@@ -218,9 +233,9 @@ export const checksHi: typeof checksEn = {
     deadline: 'समय सीमा (मिलीसेकंड)',
     thresholds: 'हर भाषा में Jev को कितना पक्का होना चाहिए',
     thresholdsHint: '0 से 1 तक। जिस भाषा का मूल्यांकन नहीं हुआ, उसे खाली छोड़ें: वहाँ जाँच सिर्फ़ दर्ज करेगी।',
-    minConfidence: '{{language}}: कम से कम',
-    trueAtLeast: '{{language}}: हाँ, इतने से',
-    falseAtMost: '{{language}}: नहीं, इतने तक',
+    minConfidence: '{{question}} · {{language}}: कम से कम',
+    trueAtLeast: '{{question}} · {{language}}: हाँ, इतने से',
+    falseAtMost: '{{question}} · {{language}}: नहीं, इतने तक',
     evaluated: 'Hamnivo के {{model}} के परीक्षण से भरे गए। पहले अपनी बातचीत पर जाँचें।',
     save: 'ड्राफ़्ट सहेजें',
     saved: 'ड्राफ़्ट सहेजा गया।',
@@ -272,6 +287,11 @@ export const checksUr: typeof checksEn = {
       description:
         'AI کا جواب بھیجنے سے پہلے Jev نالج بیس کا حوالہ دینے والے ہر جملے کو اس حصے سے ملاتا ہے جس کا حوالہ دیا گیا ہے۔ فعال ہونے پر، جس جواب میں کوئی جملہ حصے سے ثابت نہ ہو، وہ اس جملے کے بغیر دوبارہ لکھا جاتا ہے، یا کسی شخص کے حوالے کیا جاتا ہے۔',
     },
+    escalation: {
+      title: 'شخص کے حوالے کرنے کا مشورہ',
+      description:
+        'AI کے جواب دینے سے پہلے Jev جانچتا ہے کہ گاہک کو کسی شخص کی ضرورت ہے یا نہیں: ایسی درخواست جو رہ گئی ہو، صحت یا حفاظت کا خطرہ، قانونی دھمکی، شکایت، یا کسی حل نہ ہونے والے مسئلے پر ناراضی۔ جوابات کو کوڈ جوڑتا ہے۔ فعال ہونے پر گفتگو وجہ کے نوٹ کے ساتھ کسی شخص کے پاس جاتی ہے۔ جو گاہک کسی شخص سے بات کرنا چاہے، اسے ہمیشہ شخص ملتا ہے، Jev کے بغیر۔',
+    },
   },
   versions: {
     published: 'شائع شدہ ورژن {{version}}',
@@ -303,9 +323,9 @@ export const checksUr: typeof checksEn = {
     thresholds: 'ہر زبان میں Jev کو کتنا یقین ہونا چاہیے',
     thresholdsHint:
       '0 سے 1 تک۔ جس زبان کی جانچ نہیں ہوئی اسے خالی چھوڑیں: وہاں جانچ صرف ریکارڈ کرے گی۔',
-    minConfidence: '{{language}}: کم از کم',
-    trueAtLeast: '{{language}}: ہاں، اتنے سے',
-    falseAtMost: '{{language}}: نہیں، اتنے تک',
+    minConfidence: '{{question}} · {{language}}: کم از کم',
+    trueAtLeast: '{{question}} · {{language}}: ہاں، اتنے سے',
+    falseAtMost: '{{question}} · {{language}}: نہیں، اتنے تک',
     evaluated: 'Hamnivo کے {{model}} کے ٹیسٹ سے بھرے گئے۔ پہلے اپنی گفتگو پر جانچیں۔',
     save: 'مسودہ محفوظ کریں',
     saved: 'مسودہ محفوظ ہو گیا۔',

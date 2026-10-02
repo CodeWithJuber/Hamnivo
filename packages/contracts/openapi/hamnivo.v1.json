@@ -25314,7 +25314,8 @@
       "CheckTaskName": {
         "type": "string",
         "enum": [
-          "answer-check"
+          "answer-check",
+          "escalation"
         ]
       },
       "CheckRubric": {
@@ -26424,7 +26425,8 @@
                   "assist_mode",
                   "ai_stopped",
                   "ai_unavailable",
-                  "ai_blocked"
+                  "ai_blocked",
+                  "ai_escalated"
                 ]
               },
               {
@@ -26999,7 +27001,8 @@
                   "assist_mode",
                   "ai_stopped",
                   "ai_unavailable",
-                  "ai_blocked"
+                  "ai_blocked",
+                  "ai_escalated"
                 ]
               },
               {

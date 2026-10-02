@@ -37,7 +37,7 @@ test('reply checks start in comparison mode, take thresholds per language, publi
   // The test provider runs without a key; English gets a threshold, the rest stay unevaluated.
   await provider.selectOption('mock');
   await answerCheck.getByRole('textbox', { name: 'مقرر Jev ورژن' }).fill('');
-  await answerCheck.getByRole('spinbutton', { name: 'انگریزی: کم از کم' }).fill('0.8');
+  await answerCheck.getByRole('spinbutton', { name: 'relation · انگریزی: کم از کم' }).fill('0.8');
   await answerCheck.getByRole('button', { name: 'مسودہ محفوظ کریں' }).click();
   await expect(page.getByTestId('check-versions-answer-check')).toContainText('مسودہ، ورژن 1');
 
@@ -46,9 +46,9 @@ test('reply checks start in comparison mode, take thresholds per language, publi
   await publish.getByRole('button', { name: 'مسودہ شائع کریں' }).click();
   await expect(publish).toBeHidden();
   await expect(page.getByTestId('check-versions-answer-check')).toContainText('شائع شدہ ورژن 1');
-  await expect(answerCheck.getByRole('spinbutton', { name: 'انگریزی: کم از کم' })).toHaveValue(
-    '0.8',
-  );
+  await expect(
+    answerCheck.getByRole('spinbutton', { name: 'relation · انگریزی: کم از کم' }),
+  ).toHaveValue('0.8');
 
   await answerCheck.getByRole('radio', { name: 'فعال' }).click();
   await answerCheck.getByRole('button', { name: 'موڈ محفوظ کریں' }).click();
@@ -57,7 +57,12 @@ test('reply checks start in comparison mode, take thresholds per language, publi
     'GET',
     `/v1/admin/brands/${workspace.brand.id}/checks`,
   );
-  expect(checks.items).toEqual([expect.objectContaining({ task: 'answer-check', mode: 'live' })]);
+  expect(checks.items).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ task: 'answer-check', mode: 'live' }),
+      expect.objectContaining({ task: 'escalation', mode: 'shadow' }),
+    ]),
+  );
 
   violations.push(...(await audit(page, 'reply checks (ur)')));
   expect(violations).toEqual([]);
