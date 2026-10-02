@@ -135,7 +135,13 @@ beforeAll(async () => {
   expect(draft.status, JSON.stringify(draft.body)).toBe(200);
   const published = await alpha.owner.post(`${routingPath()}/publish`, {});
   expect(published.status, JSON.stringify(published.body)).toBe(200);
-  expect(published.body).toMatchObject({ mode: 'shadow', published: { version: 1 }, draft: null });
+  expect(published.body).toMatchObject({
+    mode: 'shadow',
+    published: { version: 1 },
+    draft: null,
+    // The slice's fake Jev transport counts as configured; the version Studio suggests.
+    jev: { configured: true, recommendedModel: 'jev-1.13.0' },
+  });
 });
 
 afterAll(async () => {

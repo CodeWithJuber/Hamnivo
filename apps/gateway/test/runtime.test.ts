@@ -3,6 +3,7 @@ import { AgentConfig } from '@hamnivo/contracts';
 import type { AuthorityMessage } from '@hamnivo/domain';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config.js';
+import { DecisionProviders } from '../src/decisions/providers.js';
 import { checkHonesty } from '../src/runtime/honesty.js';
 import { ModelUnavailableError } from '../src/runtime/models.js';
 import { historyMessages, systemPrompt } from '../src/runtime/prompt.js';
@@ -168,5 +169,24 @@ describe('configuration', () => {
     });
     expect(both.JEV_API_KEY).toBe('typesafe-key');
     expect(loadConfig(base).JEV_API_KEY).toBeUndefined();
+  });
+
+  it('tells Studio whether Jev can run here, and which version to pin, never the key', () => {
+    const base = {
+      DATABASE_URL: 'postgres://localhost/x',
+      HAMNIVO_KEK_BASE64: Buffer.alloc(32, 1).toString('base64'),
+      BETTER_AUTH_SECRET: 'x'.repeat(32),
+    };
+    const without = new DecisionProviders(loadConfig(base));
+    expect(without.jevStatus()).toEqual({ configured: false, recommendedModel: 'jev-1.13.0' });
+    const withKey = new DecisionProviders(
+      loadConfig({ ...base, TYPESAFE_API_KEY: 'typesafe-secret-key' }),
+    );
+    expect(withKey.jevStatus()).toEqual({ configured: true, recommendedModel: 'jev-1.13.0' });
+    expect(JSON.stringify(withKey.jevStatus())).not.toContain('typesafe-secret-key');
+    // Without a key, a rubric that names Jev is honestly unavailable, never silently skipped.
+    expect(
+      without.forRubric({ provider: 'jev', modelVersion: 'jev-1.13.0', intents: [] })?.id,
+    ).toBe('jev');
   });
 });

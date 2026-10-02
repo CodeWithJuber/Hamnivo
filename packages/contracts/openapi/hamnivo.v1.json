@@ -20756,6 +20756,9 @@
                 "type": "null"
               }
             ]
+          },
+          "jev": {
+            "$ref": "#/components/schemas/JevStatus"
           }
         },
         "required": [
@@ -20764,7 +20767,8 @@
           "mode",
           "published",
           "draft",
-          "updatedAt"
+          "updatedAt",
+          "jev"
         ],
         "additionalProperties": false
       },
@@ -20872,6 +20876,22 @@
           "createdAt",
           "publishedAt",
           "publishedBy"
+        ],
+        "additionalProperties": false
+      },
+      "JevStatus": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "recommendedModel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "configured",
+          "recommendedModel"
         ],
         "additionalProperties": false
       },
