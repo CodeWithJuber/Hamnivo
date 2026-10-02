@@ -344,6 +344,25 @@ describe('customer approvals (G13, W16)', () => {
     });
     expect((await customer.decide(second)).status).toBe(409);
     expect(effectsOf(second)).toBe(0);
+
+    // The agent may no longer use the tool: an approval given afterwards does not run it.
+    await customer.say(changeAddress('NL-3203'));
+    const third = await latestAction(shop, customer.conversationId);
+    expect(third.state).toBe('awaiting_approval');
+    await agentTools(shop, [{ toolId: credit.id }]);
+    try {
+      const late = await customer.decide(third);
+      expect(late.status).toBe(409);
+      expect(await latestAction(shop, customer.conversationId)).toMatchObject({
+        state: 'superseded',
+        reason: 'The AI may no longer use this tool, so the request was cancelled.',
+      });
+      await slice.drain();
+      expect(effectsOf(third)).toBe(0);
+      expect(demoStore(shop).address('NL-3203').address).not.toBe('7 Harbour Street, Dubai');
+    } finally {
+      await agentTools(shop, [{ toolId: address.id }, { toolId: credit.id }]);
+    }
   });
 
   it('approves or declines by code where cards are not shown, and acknowledges it', async () => {

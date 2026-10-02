@@ -19,6 +19,7 @@ export const REASON_TEXT: Record<string, string> = {
   resource_not_found: 'What the action is about could not be found for this customer.',
   owner_changed: 'Someone else now handles this conversation, so the request was cancelled.',
   tool_changed: 'The tool changed after this was proposed, so it needs a new request.',
+  grant_removed: 'The AI may no longer use this tool, so the request was cancelled.',
   resource_changed: 'The details changed after this was proposed, so it needs a new request.',
   arguments_changed: 'The request changed after it was shown.',
   run_cancelled: 'The AI run was stopped before this was sent.',

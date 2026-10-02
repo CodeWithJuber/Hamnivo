@@ -33,7 +33,7 @@ import { enqueueOutbox } from '../outbox/outbox.js';
 import { KillSwitchesService } from '../runtime/kill-switches.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import type { WidgetClaims } from '../widget/tokens.service.js';
-import { ToolAdapters } from './adapters.js';
+import { stillGranted, ToolAdapters, toolReason } from './adapters.js';
 import { approvalPublication } from './cards.js';
 import { ACTION_EXECUTE_TOPIC } from './executor.service.js';
 import { type ActionRow, actionView } from './views.js';
@@ -127,16 +127,25 @@ export class ActionApprovals {
       .select()
       .from(schema.toolDefinitions)
       .where(eq(schema.toolDefinitions.id, action.toolId));
-    if (!tool)
-      return { toolRevision: -1, toolUsable: false, resourceRevision: null, ownerEpoch: -1 };
+    if (!tool) {
+      return {
+        toolRevision: -1,
+        toolUsable: false,
+        resourceRevision: null,
+        ownerEpoch: -1,
+        toolReason: 'tool_changed',
+      };
+    }
     const stopped = await this.switches.activeFor(tx, {
       brandId: tool.brandId,
       agentId: action.agentId,
       toolId: tool.id,
     });
+    const granted = await stillGranted(tx, action.agentId, tool.id);
     return {
       toolRevision: tool.revision,
-      toolUsable: tool.status === 'enabled' && stopped === null,
+      toolUsable: tool.status === 'enabled' && stopped === null && granted,
+      toolReason: toolReason(stopped !== null, granted),
       resourceRevision: await this.adapters.revision(tx, tool, action.arguments, {
         tenantId: action.tenantId,
         brandId: tool.brandId,
@@ -165,6 +174,17 @@ export class ActionApprovals {
     },
   ): Promise<ApprovalRefusal | null> {
     const now = this.clock();
+    // A decline needs no fresh binding: saying no is always allowed while it is pending.
+    const current =
+      input.decision === 'decline'
+        ? {
+            toolRevision: action.toolRevision,
+            toolUsable: true,
+            resourceRevision: action.resourceRevision,
+            ownerEpoch: action.ownerEpoch,
+            toolReason: 'tool_changed',
+          }
+        : await this.current(tx, action, control);
     const check = checkActionApproval(
       {
         state: action.state,
@@ -182,15 +202,7 @@ export class ActionApprovals {
         argumentsHash: input.argumentsHash,
         now,
       },
-      // A decline needs no fresh binding: saying no is always allowed while it is pending.
-      input.decision === 'decline'
-        ? {
-            toolRevision: action.toolRevision,
-            toolUsable: true,
-            resourceRevision: action.resourceRevision,
-            ownerEpoch: action.ownerEpoch,
-          }
-        : await this.current(tx, action, control),
+      current,
     );
     const publicId = toPublicId('action', action.id);
     const lane = action.approver === 'customer' ? ('customer' as const) : ('staff' as const);
@@ -198,9 +210,10 @@ export class ActionApprovals {
       if (check.reason === 'expired' && action.state === 'awaiting_approval') {
         await this.expire(tx, effects, action, now);
       } else if (SUPERSEDING.has(check.reason) && action.state === 'awaiting_approval') {
+        const reason = check.reason === 'tool_changed' ? current.toolReason : check.reason;
         await tx
           .update(schema.actions)
-          .set({ state: 'superseded', reason: check.reason, updatedAt: now })
+          .set({ state: 'superseded', reason, updatedAt: now })
           .where(eq(schema.actions.id, action.id));
         effects.add(
           action.tenantId,
@@ -221,7 +234,7 @@ export class ActionApprovals {
           targetId: publicId,
           outcome: 'success',
           occurredAt: now,
-          data: { tool: action.toolName, reason: check.reason },
+          data: { tool: action.toolName, reason },
         });
       } else {
         await appendAudit(tx, {

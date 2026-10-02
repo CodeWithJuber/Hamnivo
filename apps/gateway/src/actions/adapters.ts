@@ -1,7 +1,8 @@
 import { checkEgressUrl, EgressError } from '@hamnivo/adapters/egress';
 import { callMcpTool, McpCallError } from '@hamnivo/adapters/mcp';
 import { DemoActionsStore, DemoToolError } from '@hamnivo/adapters/tools';
-import { type Db, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo/db';
+import { AgentConfig } from '@hamnivo/contracts';
+import { type Db, fromPublicId, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo/db';
 import {
   type ContainedOutput,
   containToolOutput,
@@ -25,6 +26,38 @@ function outputSchemaOf(tool: ToolRow): PortableSchema | null | false {
   if (!tool.outputSchema) return null;
   const parsed = sanitizeToolSchema(tool.outputSchema, { trusted: tool.source === 'builtin' });
   return parsed.ok ? parsed.schema : false;
+}
+
+/**
+ * Whether the agent's live version still grants the tool (G08). Checked again when someone
+ * decides and right before a call is sent, so an approval never outlives the agent's access.
+ */
+export async function stillGranted(
+  tx: TenantTx,
+  agentId: string | null,
+  toolId: string,
+): Promise<boolean> {
+  if (!agentId) return false;
+  const [row] = await tx
+    .select({ config: schema.agentVersions.config })
+    .from(schema.agentProfiles)
+    .innerJoin(
+      schema.agentVersions,
+      eq(schema.agentVersions.id, schema.agentProfiles.publishedVersionId),
+    )
+    .where(eq(schema.agentProfiles.id, agentId))
+    .limit(1);
+  const config = AgentConfig.safeParse(row?.config);
+  if (!config.success) return false;
+  return config.data.tools.grants.some((grant) => fromPublicId('tool', grant.toolId) === toolId);
+}
+
+/**
+ * Why a tool can no longer be used for an action, in the words of `REASON_TEXT`: stopped by a
+ * kill switch, no longer granted to the agent, or changed (status or policy).
+ */
+export function toolReason(stopped: boolean, granted: boolean) {
+  return stopped ? 'tool_stopped' : granted ? 'tool_changed' : 'grant_removed';
 }
 
 /**

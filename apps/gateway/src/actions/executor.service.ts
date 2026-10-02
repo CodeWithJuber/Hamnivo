@@ -21,11 +21,13 @@ import { OperationReconcilers } from '../common/operation-reconcilers.js';
 import { KillSwitchesService } from '../runtime/kill-switches.service.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import {
+  stillGranted,
   ToolAdapters,
   ToolCallFailure,
   type ToolOutcome,
   type ToolRow,
   type ToolScope,
+  toolReason,
 } from './adapters.js';
 import { actionReceiptPublication } from './cards.js';
 import type { ActionRow, ReceiptRow } from './views.js';
@@ -224,6 +226,7 @@ export class ActionExecutor implements OnModuleInit {
         agentId: action.agentId,
         toolId: tool.id,
       });
+      const granted = await stillGranted(tx, action.agentId, tool.id);
       const binding = checkBinding(
         {
           state: action.state,
@@ -237,7 +240,7 @@ export class ActionExecutor implements OnModuleInit {
         },
         {
           toolRevision: tool.revision,
-          toolUsable: tool.status === 'enabled' && stopped === null,
+          toolUsable: tool.status === 'enabled' && stopped === null && granted,
           resourceRevision: await this.adapters.revision(
             tx,
             tool,
@@ -249,7 +252,9 @@ export class ActionExecutor implements OnModuleInit {
       );
       if (!binding.ok) {
         const reason =
-          binding.reason === 'tool_changed' && stopped ? 'tool_stopped' : binding.reason;
+          binding.reason === 'tool_changed'
+            ? toolReason(stopped !== null, granted)
+            : binding.reason;
         const [superseded] = await tx
           .update(schema.actions)
           .set({ state: 'superseded', reason, updatedAt: now })
