@@ -1,3 +1,6 @@
+import { cachingHi } from './caching';
+import { commerceHi } from './commerce/hi';
+import { decisionsHi } from './decisions';
 import type { Translation } from './en';
 
 /** Hindi. Pending review by native speakers, as the note in the interface says. */
@@ -1276,6 +1279,9 @@ export const hi: Translation = {
       loading: 'पासकी लोड हो रही हैं',
     },
   },
+  decisions: decisionsHi,
+  caching: cachingHi,
+  commerce: commerceHi,
   memory: {
     title: 'ग्राहक मेमोरी',
     description: 'तय करें कि हम आपके ग्राहकों के बारे में क्या याद रखते हैं।',
@@ -2269,9 +2275,15 @@ export const hi: Translation = {
       export: 'किसी ग्राहक के बारे में याद रखी हर चीज़ एक्सपोर्ट करें',
     },
     commerce: {
-      read: 'कार्ट, कोटेशन और ऑर्डर देखें',
-      manage: 'व्यापारी और कैटलॉग सिंक सेट करें',
-      refund: 'रिफ़ंड जारी करें',
+      read: 'कार्ट, कोटेशन, ऑर्डर, भुगतान और रिफ़ंड देखें',
+      carts: { manage: 'बातचीत में उत्पाद साझा करें और कोटेशन तैयार करें' },
+      orders: { manage: 'ऑर्डर पर डिलीवरी के अपडेट दर्ज करें' },
+      refunds: {
+        request: 'ग्राहक के लिए रिफ़ंड मांगें',
+        approve: 'रिफ़ंड मंज़ूर या अस्वीकार करें',
+      },
+      exceptions: { resolve: 'प्रदाता से जांच के बाद भुगतान और रिफ़ंड के अपवाद सुलझाएं' },
+      merchants: { manage: 'व्यापारी जोड़ें और उनके क्रेडेंशियल और रिफ़ंड नियम तय करें' },
     },
     analytics: { read: 'एनालिटिक्स और रिपोर्ट देखें' },
     billing: { manage: 'प्लान, इनवॉइस और भुगतान संभालें' },

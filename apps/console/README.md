@@ -50,6 +50,14 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
   lists active and earlier stops, and lets the AI answer again.
 - **Runs.** A table of outcome, version, model, tokens, time taken and start time, with filters.
   A side sheet shows one run's steps. No message text is shown.
+- **Decision rules** (board 12). Routing mode (shadow by default), the inbox's teams with their
+  topics, languages and translation languages for the brand (adding a team here creates an inbox
+  team in the brand's workspace), the rubric editor (provider and pinned Jev version, time limit, topics with keywords,
+  what Jev may see, a threshold per language), a panel to try a message, recent decisions with
+  human review, and Jev compared with the fixed rules.
+- **Answer caching** (board 25). What is cached per tier and for how long, a question inspector,
+  stored answers by fingerprint and sources, stopping reuse after a correction, and use and health
+  per day, tier and language. Questions and answers are never listed.
 - **Account security.** Turn two-factor authentication on or off, and add passkeys.
 - **Inbox** (boards 07–10). Staff answer customers here instead of in Chatwoot.
   - Queues: mine, waiting for a person, AI answering, my teams and all, with counts. Filters by
@@ -73,13 +81,32 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
     the connection is down the inbox says so and checks every 15 seconds.
   - Keys: ↑ ↓ or J K move through the queue, Enter opens, X selects, Esc goes back. On a phone
     the queue, the conversation and the details are steps.
+- **Orders** (board 21, `commerce.read`).
+  - Orders placed in chat, searchable by reference, with payment and fulfilment side by side and
+    what needs attention (refunds waiting, open exceptions).
+  - An order page shows items, the payment as the provider confirmed it, fulfilment, refunds,
+    every call to the payment provider with its receipts, and exceptions. It is read from the
+    records each time and re-checked while something is pending.
+  - "Record an update" (`commerce.orders.manage`): in progress, delayed with the shop's estimate,
+    shipped with a tracking reference, delivered, active or failed. The customer sees each update
+    in the chat.
+  - "Request a refund" (`commerce.refunds.request`) reads the amount in any digits and asks when
+    it is ambiguous ("1,500"). When the provider refunds only whole payments, the full amount is
+    offered instead. Approving (`commerce.refunds.approve`) needs two-step verification and a
+    second person: the requester's own buttons are disabled with the reason. A refund shows as
+    refunded only after the provider confirms it.
+- **Finance exceptions** (`commerce.read`; resolving needs `commerce.exceptions.resolve`). Unknown
+  or failed payments and refunds, amount mismatches and orders that could not be updated, each
+  with its evidence and the next safe step. "Check with the provider" asks again; "Resolve" needs a
+  reason, is audited and moves no money.
 
 Every screen has loading, empty, error and permission-denied states. Status is never shown by
 colour alone. Studio works from the keyboard, returns focus after dialogs, and announces results.
 
 ## Languages
 
-English is the source language. Arabic, Hindi and Urdu are complete but await review by native
+`pnpm --filter @hamnivo/console test` checks that every locale has every key, the same
+placeholders and no empty text. English is the source language. Arabic, Hindi and Urdu are complete but await review by native
 speakers; the interface says so in each of them. Arabic and Urdu use right-to-left layout. Pick a
 language in the header, or add `?lang=ar` (or `hi`, `ur`) to a link.
 
@@ -145,13 +172,19 @@ pnpm --filter @hamnivo/console test:e2e
   - a Markdown upload that becomes ready, and a search preview;
   - stopping the AI for a brand, then resuming;
   - runs after a widget conversation, with the run's steps;
+  - a routing rubric edited, published and tried in Arabic, with shadow decisions (`e2e/decisions.spec.ts`);
+  - answer caching turned on, inspected, reused and stopped in Urdu;
   - the inbox (`e2e/inbox.spec.ts`): taking over a customer who asked for a person, replying,
     an internal note the customer never sees, resolving; a colleague's takeover and typing
     arriving live; Arabic; a 390 px phone; keyboard only; an AI suggestion that is not sent;
     offline drafts; filters and a bulk change, with axe along the way;
   - customer memory: review, correct, delete, export and erase, right to left, and access denied;
   - axe (WCAG 2.2 A and AA) on every main screen in English and Arabic;
-  - no sideways scrolling from 320 to 1920 px.
+  - no sideways scrolling from 320 to 1920 px;
+  - `e2e/commerce.spec.ts`: a customer pays through the fake Stripe server, one person asks for a
+    refund and a second one, with two-step verification, approves it; it shows as refunded only
+    after the provider settles it (also in Arabic); a delay recorded with the shop's estimate,
+    then shipped (also in Urdu); and a shop that refunds only whole payments.
 - The last test saves screenshots for review in `e2e/screenshots/` (not in git).
 
 ## Not possible yet

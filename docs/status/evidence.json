@@ -396,9 +396,11 @@
     "evidence": [
       "apps/widget/e2e/journey.spec.ts",
       "apps/widget/src/components/Chat.tsx",
-      "apps/widget/src/i18n.ts"
+      "apps/widget/src/i18n.ts",
+      "apps/widget/e2e/composer.spec.ts",
+      "apps/widget/src/components/BidiText.tsx"
     ],
-    "note": "Document direction follows the language and message text uses dir=auto, so Arabic and Urdu read right to left while Latin order numbers keep their direction; bidi copy behaviour tests pending."
+    "note": "Document direction follows the language; each message and the message box read in their own direction by letter majority, and Latin order numbers, amounts, emails and links are isolated left to right, also in Markdown answers. Copying gives back the exact text (browser-tested in Urdu with axe)."
   },
   "G01": {
     "status": "in-progress",
@@ -534,7 +536,7 @@
       "packages/adapters/test/jev/contract.test.ts",
       "packages/domain/src/decisions.ts"
     ],
-    "note": "Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). Not yet called by the gateway; no live Jev call has run."
+    "note": "Provider-neutral DecisionProvider port with a Jev adapter over the official @typesafe-ai/sdk 0.6.0 (pinned model, keyed maps) and a deterministic mock (tested with fixtures). The gateway calls it for team routing (tested against a fake Jev); no live Jev call has run."
   },
   "J04": {
     "status": "in-progress",
@@ -553,12 +555,17 @@
       "packages/adapters/src/jev/provider.ts",
       "packages/adapters/test/jev/resilience.test.ts"
     ],
-    "note": "Total deadline, caller cancellation (also when the transport ignores it), no retries, circuit breaker with half-open probe, and decided/abstained/unavailable/invalid results (tested). The fallback chain in the gateway is pending."
+    "note": "Total deadline, caller cancellation (also when the transport ignores it), no retries, circuit breaker with half-open probe, and decided/abstained/unavailable/invalid results (tested). In the gateway, routing falls back to the deterministic baseline on abstained, unavailable or invalid results within the 1.5 s deadline (tested)."
   },
   "J07": {
     "status": "in-progress",
-    "evidence": ["packages/adapters/src/jev/provider.ts", "packages/domain/src/decisions.ts"],
-    "note": "Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested); persisting decision records and cost is pending."
+    "evidence": [
+      "packages/adapters/src/jev/provider.ts",
+      "packages/domain/src/decisions.ts",
+      "apps/gateway/src/decisions/routing.service.ts",
+      "apps/gateway/test/routing.int.test.ts"
+    ],
+    "note": "Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested). Routing decisions are persisted as decision records (status, confidence only when given, latency, tokens, shadow or live, policy version) and shown in Studio; cost is kept as tokens."
   },
   "E08": {
     "status": "in-progress",
@@ -576,7 +583,7 @@
       "packages/domain/src/human-request.ts",
       "packages/domain/test/fixtures/human-requests.json"
     ],
-    "note": "Hinglish and Roman Urdu requests for a person are detected across spellings, transliterations and negation (74 fixture cases) and act end to end; identifiers pass through unchanged. Native-speaker review pending."
+    "note": "Hinglish and Roman Urdu requests for a person are detected across spellings (banday, bande, banda, insaan, insan, aadmi, admi, real person), transliterations and negation, including \"... ki zaroorat nahi\" (101 fixture cases), and act end to end; identifiers pass through unchanged. Native-speaker review pending."
   },
   "O02": {
     "status": "in-progress",
@@ -592,9 +599,11 @@
     "status": "in-progress",
     "evidence": [
       "apps/gateway/test/reconciler.int.test.ts",
-      "apps/gateway/src/authority/processor.service.ts"
+      "apps/gateway/src/authority/processor.service.ts",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/widget/e2e/shopping.spec.ts"
     ],
-    "note": "Replaying a whole conversation through the reconciler neither duplicates messages nor repeats a takeover, and repeated webhook deliveries are applied once (tested). Commerce and tool crash cases are pending."
+    "note": "Replaying a whole conversation through the reconciler neither duplicates messages nor repeats a takeover, and repeated webhook deliveries are applied once (tested). Commerce: replayed payment and refund webhooks, repeated approval taps, lost provider answers (timeouts before and after the provider acted) and repeated worker runs leave one payment page, one charge, one refund and one card each (tested). Pending: tool crash cases, and a test that kills the worker process mid-call."
   },
   "W15": {
     "status": "in-progress",
@@ -800,9 +809,12 @@
       "apps/gateway/src/memory/cache.ts",
       "packages/domain/src/memory/recall.ts",
       "apps/gateway/src/memory/widget-memory.controller.ts",
-      "apps/gateway/test/memory.int.test.ts"
+      "apps/gateway/test/memory.int.test.ts",
+      "apps/gateway/src/cache/cache.providers.ts",
+      "apps/gateway/src/cache/answers.ts",
+      "apps/gateway/test/cache.int.test.ts"
     ],
-    "note": "Memory is never cached: recall reads the database each reply, runs record that any reply built with memory may not enter a shared cache, and memory endpoints send no-store. Each customer has a memory version and a cache namespace in Valkey that is bumped on every change and purged on deletion (tested). The general reply cache (K lane) must key per-customer entries with this version and respect the shared-cache rule when it lands."
+    "note": "Memory is never put in a shared cache: memory is recalled before the answer cache is read, a reply built with any memory item carries personal_memory and shared entries refuse it, and memory endpoints send no-store. Per-customer answer entries live in the customer's memory namespace and are keyed by their memory version, so a memory change makes them unreachable and a deletion purges them (tested end to end with a correction and a deletion, mutation-checked). A scope that is missing, slow or not the customer's own means nothing is cached for them. Pending: cached values are stored unencrypted in Valkey."
   },
   "G19": {
     "status": "implemented",
@@ -1107,5 +1119,628 @@
       "apps/console/src/pages/inbox/ConversationPane.tsx",
       "apps/gateway/test/inbox.int.test.ts"
     ]
+  },
+  "C01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/commerce/merchants.service.ts",
+      "apps/gateway/src/commerce/providers.service.ts",
+      "packages/db/src/schema/commerce.ts",
+      "packages/db/test/commerce.int.test.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "Each brand has at most one active merchant connection (Stripe, or the mock provider outside production) with currencies, delivery, refund policy and a capability manifest. The API key and webhook secret are stored only in the secret broker: responses show them masked, and they never reach logs, audit data or the browser. Connecting and rotating keys need two-step verification and are audited (tested). Connections are managed through the API; a Studio screen is pending."
+  },
+  "E02": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/commerce/capabilities.ts",
+      "packages/domain/test/commerce/policy.test.ts",
+      "apps/gateway/src/commerce/access.ts",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/console/e2e/commerce.spec.ts"
+    ],
+    "note": "Each connection publishes a versioned capability manifest (catalog, hosted checkout, full and partial refunds, currencies, recurring, provisioning). Operations are checked against it before any provider call. An unsupported checkout is refused with a plain reason and the cart is kept; when the provider refunds only whole payments, Studio offers the full amount (tested)."
+  },
+  "C02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/commerce/carts.service.ts",
+      "packages/adapters/src/commerce/stripe.ts",
+      "packages/adapters/test/commerce/contract.ts",
+      "apps/widget/src/commerce/Cards.tsx",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/widget/e2e/shopping.spec.ts"
+    ],
+    "note": "Product cards come from the merchant's live catalog (Stripe prices are the variants). They show the seller, the price with its currency, stock as the merchant reports it, and when it was read; a snapshot keeps what was shown. Products are listed side by side; there is no separate comparison view. Recurring products are left out until C14 (tested)."
+  },
+  "C03": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/commerce/money.ts",
+      "packages/domain/src/commerce/quote.ts",
+      "packages/domain/test/commerce/money.test.ts",
+      "packages/domain/test/commerce/quote.test.ts",
+      "apps/gateway/src/commerce/carts.service.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "Carts are versioned, and a stale revision is refused. Quotes are priced live by the provider in exact integer minor units (lines, discount, delivery, tax, total), checked again before they are saved, and expire. Approval binds to the canonical hash of the quote document (RFC 8785, SHA-256) (tested)."
+  },
+  "C04": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/commerce/approval.ts",
+      "packages/domain/src/commerce/hash.ts",
+      "apps/gateway/src/commerce/checkout.service.ts",
+      "apps/widget/src/commerce/Cards.tsx",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/widget/e2e/shopping.spec.ts"
+    ],
+    "note": "The approval card shows the seller, lines, delivery, total, refund terms, expiry, and that payment happens on the provider's page. The widget recomputes the quote hash before it enables Approve, and the server accepts only that hash and cart revision, once. A changed cart invalidates the approval, an expired quote cannot be approved, and the button is disabled at expiry (tested)."
+  },
+  "C05": {
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "packages/adapters/src/commerce/stripe.ts",
+      "packages/adapters/test/commerce/stripe-mock.test.ts",
+      "packages/adapters/src/commerce/stripe-fake.ts",
+      "apps/gateway/src/commerce/checkout.service.ts",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/widget/e2e/shopping.spec.ts"
+    ],
+    "note": "Payment happens on Stripe Checkout (hosted page, opened in a new tab); the chat never collects card details. The model's context holds the conversation and card summaries but no payment page link, session or payment reference (tested). The Stripe adapter is tested against stripe-mock (when STRIPE_MOCK_URL is set) and a stateful fake; it has not been run against Stripe's live test mode."
+  },
+  "C06": {
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "apps/gateway/src/commerce/worker.service.ts",
+      "apps/gateway/src/commerce/purchases.service.ts",
+      "apps/widget/src/commerce/Cards.tsx",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/widget/e2e/shopping.spec.ts"
+    ],
+    "note": "When the bank asks the customer to confirm a payment (3-D Secure), the purchase stays on the same open payment page. The chat says so, another tap cannot start a second purchase, and paying there completes it once; a repeated challenge event changes nothing (tested with the mock provider and, in the browser, the fake Stripe). Not yet checked against Stripe's live test mode."
+  },
+  "C07": {
+    "status": "implemented",
+    "evidence": [
+      "packages/db/src/schema/operations.ts",
+      "apps/gateway/src/commerce/ledger.ts",
+      "apps/gateway/src/commerce/checkout.service.ts",
+      "apps/gateway/src/commerce/refunds.service.ts",
+      "packages/db/test/commerce.int.test.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "Every checkout and refund call is an operation with a durable business key (unique per tenant) and one provider idempotency key. The exact request is stored, so a resend is identical, and every observation is an append-only receipt. A lost request is resent under the same key only inside the provider's key window; after that it is looked up by its reference, never sent again, and a person is asked (tested)."
+  },
+  "C08": {
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "apps/gateway/src/commerce/webhooks.service.ts",
+      "apps/gateway/src/commerce/webhooks.controller.ts",
+      "apps/gateway/src/commerce/worker.service.ts",
+      "packages/adapters/src/commerce/stripe.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "Webhooks are verified with the Stripe SDK's constructEvent over the raw body, using the connection's secret from the broker, and checked against the connection's account. Each is stored once per provider event id, then applied by the worker through the state machines. Replayed deliveries are applied once; tampered, stale and foreign-secret ones are refused (tested). Not yet received from Stripe's live test mode."
+  },
+  "C09": {
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "apps/gateway/src/commerce/checkout.service.ts",
+      "apps/gateway/src/commerce/worker.service.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "A timeout after the provider acted leaves the purchase unknown: never failed, never sent again blindly. The worker finds the session by its reference and continues, so the purchase ends paid with one charge. A lost webhook is found by asking the provider (tested with the mock provider and the fake Stripe; not yet against the live test mode)."
+  },
+  "C10": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/commerce/machines.ts",
+      "apps/gateway/src/commerce/orders.service.ts",
+      "apps/console/src/pages/OrderDetailPage.tsx",
+      "apps/widget/src/commerce/Cards.tsx",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/console/e2e/commerce.spec.ts",
+      "apps/widget/e2e/shopping.spec.ts"
+    ],
+    "note": "An order is created with the payment page and confirmed only by a captured payment. Fulfilment is separate: staff record in progress, delayed (with the shop's estimate), shipped, delivered, active or failed. Paid, shipped and delivered stay distinct for staff and customers, and each step is posted to the chat (tested). Updates are entered by staff; reading them from the merchant's system is pending (see C18)."
+  },
+  "C12": {
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "packages/domain/src/commerce/refund-policy.ts",
+      "apps/gateway/src/commerce/refunds.service.ts",
+      "apps/console/src/pages/OrderDetailPage.tsx",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/console/e2e/commerce.spec.ts"
+    ],
+    "note": "A refund is checked for eligibility (captured payment, amount left, window, provider capability) and the merchant's approval policy. The person who asked can never approve it, approving needs two-step verification, and it shows as refunded only after the provider confirms it. A lost answer is found instead of refunding twice (tested with the mock provider and the fake Stripe; not yet against the live test mode)."
+  },
+  "C18": {
+    "status": "planned",
+    "note": "P1, not started in this wave: the P0 commerce work came first. Service fulfilment is recorded by staff for now (C10)."
+  },
+  "C19": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/commerce/exceptions.ts",
+      "apps/gateway/src/commerce/exceptions.service.ts",
+      "apps/console/src/pages/FinancePage.tsx",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/console/e2e/commerce.spec.ts"
+    ],
+    "note": "Unknown and failed payments and refunds, amount mismatches and orders that could not be updated open a finance exception with its evidence and the next safe action. Finance can check with the provider, or resolve with a reason; resolving is audited and moves no money (tested)."
+  },
+  "C20": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/widget/e2e/shopping.spec.ts",
+      "apps/console/e2e/commerce.spec.ts"
+    ],
+    "note": "The commerce suite checks the final financial state after duplicate taps and webhooks, timeouts before and after the provider acted, lost requests outside the provider's key window, stale and expired quotes, a price change after the quote, a cancel after payment, a bank challenge, a takeover with a payment in flight, and cross-tenant access (gateway integration and browser tests; the key checks were mutation-tested)."
+  },
+  "R07": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/commerce/in-flight.ts",
+      "apps/gateway/src/authority/ownership.service.ts",
+      "apps/gateway/src/commerce/orders.service.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "Operations keep their conversation and the ownership epoch they started in. Whenever a person becomes the owner (a takeover, an inbox claim, a supervisor's assignment, an assignment or reply in Chatwoot), a private note lists the payments and refunds still owed an outcome and asks them not to repeat them; a move back to the queue waits for the next person. The worker keeps reconciling whoever owns the conversation, and the conversation's commerce view lists what is in flight (tested for the takeover, the inbox claim and an assignment)."
+  },
+  "X10": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/commerce/claims.ts",
+      "packages/domain/test/commerce/claims.test.ts",
+      "apps/gateway/src/commerce/claims.ts",
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "A payment or refund counts as done only with a succeeded receipt from the provider. An AI reply that claims one without it is regenerated once with a correction, then the conversation goes to people; an open payment page is not a payment (tested). Future tool actions need the same check."
+  },
+  "U06": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/domain/src/commerce/format.ts",
+      "packages/domain/src/commerce/amount-input.ts",
+      "packages/domain/test/commerce/format.test.ts",
+      "apps/widget/src/commerce/format.ts",
+      "apps/console/e2e/commerce.spec.ts"
+    ],
+    "note": "Amounts are exact minor units formatted for the locale with the currency always shown; times always carry their zone, and shop dates (delivery estimates) are shown as calendar dates. Typed amounts in Latin, Arabic-Indic, Persian and Devanagari digits are read exactly, and an ambiguous one such as \"1,500\" is asked, not guessed (tested). Pending: native-language review of the wording and number display."
+  },
+  "U15": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/commerce/views.ts",
+      "apps/widget/src/commerce/Cards.tsx",
+      "apps/widget/src/commerce/copy.ts",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/widget/e2e/shopping.spec.ts"
+    ],
+    "note": "Quote cards name the seller and show every line, delivery, tax, the total, the refund terms, how long the price holds, and that payment happens on the provider's page. Stock is shown only as the merchant reports it, with no urgency messages. Recurring products are not sold in chat until C14 (tested in English and Arabic). The Arabic, Hindi and Urdu text awaits native review."
+  },
+  "E12": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/commerce/checkout.service.ts",
+      "apps/gateway/src/commerce/purchases.service.ts",
+      "apps/gateway/src/commerce/carts.service.ts",
+      "packages/domain/src/commerce/machines.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "The commerce module owns the purchase, payment, order and refund lifecycles through explicit state machines, and the AI has no commerce tools. Prices come only from live provider quotes, only the signed-in customer approves their quote, only staff with the right permission request or approve refunds, and the AI may state an outcome only with a receipt (tested)."
+  },
+  "K06": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/commerce/live-data.ts",
+      "packages/domain/test/commerce/policy.test.ts",
+      "apps/gateway/src/commerce/no-store.interceptor.ts",
+      "apps/gateway/test/commerce.int.test.ts",
+      "apps/gateway/src/commerce/answer-cache.ts",
+      "apps/gateway/src/cache/answers.ts",
+      "apps/gateway/test/cache.int.test.ts"
+    ],
+    "note": "Every commerce response is sent with Cache-Control: no-store, prices and stock are read live for each quote (a catalog snapshot is never used to charge), and answerCacheDecision() decides for the answer cache: commerce registers it as a cache exclusion rule in both processes, so a reply in a conversation that holds catalog, cart, quote, payment, order or refund data is neither read from nor written to the cache, and a reply whose receipt check read a payment or refund status is not stored. Tested end to end with a paid order next to a plain knowledge answer that is still cached, and mutation-checked."
+  },
+  "HNV-20-01": {
+    "status": "implemented",
+    "evidence": ["apps/widget/src/commerce/Cards.tsx", "apps/widget/e2e/shopping.spec.ts"],
+    "note": "Live product cards with price, currency, stock as reported and when it was read (tested in the browser with axe)."
+  },
+  "HNV-20-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/commerce/ShopBar.tsx",
+      "apps/widget/src/commerce/useCommerce.ts",
+      "apps/widget/e2e/shopping.spec.ts"
+    ],
+    "note": "Quantity controls change a draft cart only; nothing is bought until a quote is approved. Delivery and tax appear in the exact quote; the address is collected on the provider's payment page (tested)."
+  },
+  "HNV-20-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/commerce/Cards.tsx",
+      "apps/widget/e2e/shopping.spec.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "Seller, lines, delivery, total, refund terms, expiry and cancel. A changed cart or an expired price returns to review (tested in English and Arabic, with axe)."
+  },
+  "HNV-20-04": {
+    "status": "implemented",
+    "evidence": ["apps/widget/src/commerce/Cards.tsx", "apps/widget/e2e/shopping.spec.ts"],
+    "note": "The provider's page opens in a new tab with the order reference; no card fields in the chat; cancelling returns to the kept cart; after a bank challenge the same page finishes the payment (tested)."
+  },
+  "HNV-20-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/checkout-return.ts",
+      "apps/widget/src/commerce/Cards.tsx",
+      "apps/widget/e2e/shopping.spec.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "Coming back from the page shows 'confirming', never 'paid', until the provider's event; Check status asks the provider without starting a second payment (tested)."
+  },
+  "HNV-20-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/commerce/Cards.tsx",
+      "apps/widget/e2e/shopping.spec.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "A cancelled, expired or refused payment page says nothing was charged and keeps the cart for a fresh quote; nothing is bought again automatically (tested)."
+  },
+  "HNV-21-01": {
+    "status": "implemented",
+    "evidence": ["apps/widget/src/commerce/Cards.tsx", "apps/widget/e2e/shopping.spec.ts"],
+    "note": "A receipt card with the order reference appears only after the provider confirms the payment; fulfilment is shown separately (tested)."
+  },
+  "HNV-21-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/commerce/Cards.tsx",
+      "apps/console/src/pages/OrderDetailPage.tsx",
+      "apps/widget/e2e/shopping.spec.ts",
+      "apps/console/e2e/commerce.spec.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "Staff record a delay in Studio with the shop's estimate. The chat shows the milestone, the estimate as an estimate (not a promise), when it was updated, and Talk to a person (tested in both, with axe; Studio also in Urdu)."
+  },
+  "HNV-21-03": {
+    "status": "planned",
+    "note": "Cancellation and returns are C11 (wave A)."
+  },
+  "HNV-21-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/OrderDetailPage.tsx",
+      "apps/console/e2e/commerce.spec.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "Amount, reason, policy and approver. The requester cannot approve their own refund; approval needs two-step verification; rejection needs a reason (tested, with axe and in Arabic)."
+  },
+  "HNV-21-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/OrderDetailPage.tsx",
+      "apps/console/e2e/commerce.spec.ts",
+      "apps/gateway/test/commerce.int.test.ts"
+    ],
+    "note": "Refund reference, amount, the provider's state, last update and Check status. A refund is never shown as refunded before the provider confirms it, and a failed one opens a finance exception (tested)."
+  },
+  "HNV-21-06": {
+    "status": "planned",
+    "note": "Subscriptions are C14 (wave A)."
+  },
+  "J02": {
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "apps/gateway/src/decisions/routing.service.ts",
+      "packages/domain/src/routing.ts",
+      "packages/domain/test/routing.test.ts",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts",
+      "apps/gateway/src/decisions/team-routing.service.ts"
+    ],
+    "note": "Routing runs on the first customer message and on every hand-off. Brands start in shadow mode: Jev and the deterministic baseline are both recorded and only the baseline is applied (no team assignment from Jev). Live mode applies Jev when it is sure enough per language, otherwise the baseline, within a 1.5 s deadline behind the circuit breaker. Explicit requests for a person are never overridden. Routing chooses among the inbox's teams with active, accepting routing for the brand and applies the choice the inbox's way: the conversation joins the team's queue and the inbox sync sets the Chatwoot team; a team a person chose, or a person handling the conversation, is kept. Tested against a fake Jev and the fake Chatwoot; no live Jev call has run."
+  },
+  "J05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/decisions/rubrics.service.ts",
+      "packages/contracts/src/decisions.ts",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Versioned rubric per brand (draft, publish), pinned Jev version, deadline, topics with baseline keywords, inputs shared with Jev (personal data redacted) and a threshold per language slice (no threshold means Jev abstains there). Studio editor with server validation on the fields, publish confirmation and a test panel. Arabic, Hindi and Urdu text is pending native review."
+  },
+  "J08": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/decisions/rubrics.service.ts",
+      "packages/domain/src/routing.ts",
+      "packages/domain/test/routing.test.ts",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/src/pages/DecisionsPage.tsx"
+    ],
+    "note": "Jev versus baseline from shadow and live records: agreement, accuracy against human reviews, abstained, unavailable and invalid counts, latency p50/p95 and tokens, overall and per language. Cost is reported as tokens; prices per token are not applied yet."
+  },
+  "U01": {
+    "status": "partial",
+    "evidence": [
+      "packages/domain/src/language.ts",
+      "packages/domain/test/language.test.ts",
+      "apps/gateway/src/language/language.service.ts",
+      "apps/gateway/test/language.int.test.ts",
+      "apps/widget/e2e/composer.spec.ts"
+    ],
+    "note": "Interface locale, explicit reply language (BCP 47, including hi-Latn and ur-Latn), detected language with an ask-once rule for Hinglish/Roman Urdu ambiguity, and style are kept separately per customer; replies follow the explicit choice, then the words, then the locale. Hinglish and Roman Urdu are never treated as English. Messages are not stored. Timezone is not part of the model yet."
+  },
+  "HNV-07-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/useReplyLanguage.ts",
+      "apps/gateway/test/language.int.test.ts",
+      "apps/widget/e2e/composer.spec.ts"
+    ],
+    "note": "The widget asks once which language replies should use when the words fit Hinglish and Roman Urdu (suggestion from the interface locale first); the choice or \"not now\" is saved on the server and the message stays as sent. Browser-tested in Urdu with axe. Arabic, Hindi and Urdu text is pending native review."
+  },
+  "U05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/widget/test/i18n.test.ts",
+      "apps/console/test/i18n.test.ts",
+      "apps/console/src/i18n/decisions.ts",
+      "apps/console/src/i18n/caching.ts"
+    ],
+    "note": "Key-coverage tests for the widget and Studio: every key in all four locales, the same placeholders, no empty or copied English text. New screens are complete in all four locales. Server validation messages, emails and receipts are not localized yet. Arabic, Hindi and Urdu text is pending native review."
+  },
+  "U07": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/routing.ts",
+      "packages/domain/test/routing.test.ts",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/gateway/src/decisions/team-routing.service.ts",
+      "packages/db/test/decisions.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Teams are the inbox's teams. Per brand, a team's routing lists the languages it answers in and those it serves through a reviewed translation path, with its topics and whether it is the default or accepting; a team routes only for brands of its own workspace (enforced in the database). Routing prefers a team that speaks the customer's language, then a translation path, then a language gap (recorded as the language match), and treats Hinglish and Roman Urdu as alternatives when the words fit both. Staff can be ranked by language the same way. Studio edits a team's routing per brand."
+  },
+  "U08": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/components/BidiText.tsx",
+      "apps/widget/src/markdown.ts",
+      "apps/widget/e2e/composer.spec.ts"
+    ],
+    "note": "Enter sends and Shift+Enter adds a line; an Enter that confirms an input method composition never sends (isComposing, composition events and Safari's key code 229). The box and each message read in their own direction by letter majority; order numbers, amounts, emails and links are isolated left to right, also in Markdown answers, and copy back unchanged. Browser-tested with axe in Urdu; the tests were mutation-checked."
+  },
+  "U10": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/domain/src/language.ts",
+      "packages/domain/test/language.test.ts",
+      "apps/gateway/src/runtime/prompt.ts"
+    ],
+    "note": "Style (concise, conversational or formal; gentle or direct) is stored per customer and turned into prompt lines that change wording only. There is no widget control yet and facts-preserved-across-styles is not evaluated yet."
+  },
+  "U11": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/domain/src/reply-rules.ts",
+      "apps/gateway/src/runtime/prompt.ts",
+      "packages/evals/src/sycophancy.ts",
+      "packages/evals/test/sycophancy.test.ts"
+    ],
+    "note": "Non-removable reply rules: correct false assumptions politely with what the information shows, admit uncertainty and earlier errors, never agree to be agreeable. The same rules drive the offline evaluation; results with a real model are pending."
+  },
+  "U12": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/evals/src/sycophancy.ts",
+      "packages/evals/corpus/sycophancy.json",
+      "packages/evals/src/cli.ts",
+      "packages/evals/test/sycophancy.test.ts"
+    ],
+    "note": "Offline harness, starter corpus (12 scenarios in six language slices, each neutral and under five kinds of pressure), metrics with Wilson intervals and a CLI. CI runs a subset with a faithful and a sycophantic reference (the second is caught) and the mock model. Results with a real model and native review of the corpus are pending."
+  },
+  "U13": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/evals/src/fairness.ts",
+      "packages/evals/corpus/fairness.json",
+      "packages/evals/test/fairness.test.ts",
+      "packages/domain/test/fixtures/human-requests.json"
+    ],
+    "note": "Fairness groups swap names, gender markers, politeness, script and language and check the product's own routing baseline, hand-off detection and personal data check; every swap is gated at 100% in CI and any variant that gets a different decision is listed as a finding. The Roman Urdu request for a person with \"banday\" that the pairs found is now detected. Reply-level pairs with a model and native review are pending."
+  },
+  "U14": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/evals/src/adjudication.ts",
+      "packages/evals/corpus/adjudication.json",
+      "packages/evals/test/adjudication.test.ts"
+    ],
+    "note": "Six scenarios in six slices: the product's reply language choice and the stated facts are checked automatically, and review packets (JSON plus a sheet per slice) wait for native speakers; meaning and tone rates come only from their reviews. All packets are pending native review."
+  },
+  "K01": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/cache.ts",
+      "packages/domain/test/cache.test.ts",
+      "apps/gateway/src/cache/cache.service.ts",
+      "apps/gateway/src/cache/answers.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Exact answer cache, off until a brand turns it on. Only a first, public, complete answer without personal data, personal context or excluded classes is stored in shared entries; keys bind tenant, brand, audience, language, model, prompt version, every dependency version and a per-tenant HMAC of the question, and hits are rechecked against the current knowledge. A reply built with customer memory never enters a shared entry: it is kept for that customer alone, in their memory namespace and keyed by their memory version. Never crosses tenants, brands or customers (tested, mutation-checked). The index keeps fingerprints and references only."
+  },
+  "K02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/cache/vectors.ts",
+      "apps/gateway/src/knowledge/retrieval.service.ts",
+      "apps/gateway/test/cache.int.test.ts"
+    ],
+    "note": "Query embeddings for knowledge search are cached under the exact text, the embedding model, its dimensions and the preprocessing version; queries with personal data are not cached."
+  },
+  "K07": {
+    "status": "implemented",
+    "evidence": [
+      "packages/db/migrations/20260927123406_decisions_security.sql",
+      "apps/gateway/src/cache/admin.service.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "packages/db/test/decisions.int.test.ts"
+    ],
+    "note": "Database triggers bump dependency versions in the same transaction as knowledge, source, agent and brand changes; policy changes and manual invalidation bump the tier. Old keys stop being read at once, stale entries are reported, and cleanup of stored copies reports failures separately."
+  },
+  "K08": {
+    "status": "partial",
+    "evidence": [
+      "packages/adapters/src/cache/store.ts",
+      "packages/adapters/src/cache/singleflight.ts",
+      "apps/gateway/src/cache/store.ts",
+      "apps/gateway/test/cache.int.test.ts"
+    ],
+    "note": "A store that fails or times out (150 ms) reads as unavailable, is skipped for 30 s and answers are computed fresh; human messaging never waits on the cache (tested with a hanging store). Concurrent misses are coalesced per process for embeddings; answers are not coalesced yet."
+  },
+  "K10": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/cache/cache.service.ts",
+      "apps/gateway/src/cache/admin.service.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/src/pages/CachingPage.tsx"
+    ],
+    "note": "Daily counts per brand, tier and language: hits, misses, bypasses, stale, stores, errors, saved tokens, saved time and lookup time, with no content; store health from a live probe. False hits are counted only as rechecks that failed; cost in money is not computed."
+  },
+  "K12": {
+    "status": "implemented",
+    "evidence": [
+      "packages/adapters/src/cache/store.ts",
+      "packages/adapters/test/cache/store.test.ts",
+      "apps/gateway/src/cache/store.ts"
+    ],
+    "note": "One small store interface with Valkey (prefixed, dedicated connection, short timeouts) and bounded in-memory implementations, a fail-open wrapper and singleflight; policy stays in the domain."
+  },
+  "HNV-12-01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Rubric draft with topics, allowed outputs (plus \"other\"), inputs and per-language thresholds; malformed keys and unpinned Jev versions are refused before anything goes live. Arabic, Hindi and Urdu text is pending native review."
+  },
+  "HNV-12-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "The test panel shows the typed result, the policy interpretation (explicit request, redacted inputs), the topic and team used and the request id; it can be run again with another message."
+  },
+  "HNV-12-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/test/routing.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Abstention is labelled as \"not sure\"; the baseline decides and no confidence is shown unless the provider gave one."
+  },
+  "HNV-12-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/src/decisions/routing.service.ts",
+      "apps/gateway/test/routing.int.test.ts"
+    ],
+    "note": "An answer that fails the contract is recorded as invalid with a diagnostic reason for administrators and never enters business state; the baseline decides."
+  },
+  "HNV-12-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/src/decisions/routing.service.ts",
+      "apps/gateway/test/routing.int.test.ts"
+    ],
+    "note": "A deadline or open circuit is recorded as unavailable and the baseline route continues at once; requests for a person are never blocked."
+  },
+  "HNV-12-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/DecisionsPage.tsx",
+      "apps/gateway/src/decisions/rubrics.service.ts",
+      "apps/gateway/test/routing.int.test.ts"
+    ],
+    "note": "Reviewers record the correct topic, a reason and a separate consent to use the label in evaluations; reviews are audited and feed the comparison."
+  },
+  "HNV-25-01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "apps/gateway/src/cache/admin.service.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Tiers with their time to keep, versioned per brand; personal, identity, account, memory, live order, payment, approval and tool data are never cached whatever the settings. Arabic, Hindi and Urdu text is pending native review."
+  },
+  "HNV-25-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "The inspector shows tier, fingerprint, knowledge versions, language, a preview of the public answer and the expiry, without counting or changing anything."
+  },
+  "HNV-25-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "A miss says why (not stored yet, or out of date) and the answer is computed fresh; admission happens only for complete, still eligible answers."
+  },
+  "HNV-25-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "packages/domain/src/cache.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Personal data, later turns, personal context and excluded requests (the commerce hook) bypass with a reason code; nothing of them is stored or logged."
+  },
+  "HNV-25-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "apps/gateway/src/cache/admin.service.ts",
+      "apps/gateway/test/cache.int.test.ts",
+      "apps/console/e2e/decisions.spec.ts"
+    ],
+    "note": "Invalidation shows the affected entries, stops reads at once by bumping versions, marks entries no longer used and reports copies that could not be removed yet."
+  },
+  "HNV-25-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/CachingPage.tsx",
+      "apps/gateway/src/cache/store.ts",
+      "apps/gateway/test/cache.int.test.ts"
+    ],
+    "note": "When the store is down, answers are computed fresh and Studio shows the degraded state, recent failures and the error counts; a tier can be turned off from the policy."
   }
 }

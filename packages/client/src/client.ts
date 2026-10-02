@@ -7,6 +7,8 @@ import type {
   MemoryDeletionReceipt,
   Message,
   MessagePage,
+  SetWidgetLanguageRequest,
+  WidgetLanguageState,
   WidgetSession,
 } from '@hamnivo/contracts';
 import { HamnivoApiError, problemOf } from './errors.js';
@@ -215,6 +217,16 @@ export class HamnivoClient {
       clientRequestId,
       ...(note ? { note } : {}),
     });
+  }
+
+  /** The customer's language settings (U01): interface locale, reply language, open question. */
+  language(): Promise<WidgetLanguageState> {
+    return this.request('GET', '/v1/widget/language');
+  }
+
+  /** Saves the customer's own choice: a reply language, the interface locale, or "don't ask". */
+  setLanguage(input: SetWidgetLanguageRequest): Promise<WidgetLanguageState> {
+    return this.request('POST', '/v1/widget/language', input);
   }
 
   /** What the assistant remembers about this customer, and their memory choice. */

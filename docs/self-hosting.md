@@ -227,8 +227,8 @@ password are in `.env` (`CHATWOOT_ADMIN_EMAIL` and `CHATWOOT_ADMIN_PASSWORD`).
 
 ### Settings that need the API for now
 
-Two settings have no Studio screen yet: **business hours** and **identity keys**. Set them through
-the API from any computer.
+Three settings have no Studio screen yet: **business hours**, **identity keys** and **selling in
+chat**. Set them through the API from any computer.
 
 1. **Sign in with curl.**
 
@@ -265,6 +265,35 @@ the API from any computer.
    ```bash
    curl "${h[@]}" -d '{"alg":"HS256"}' $A/v1/admin/brands/brd_.../identity-keys   # secret shown once
    ```
+
+4. **Selling in chat (Stripe).** Customers then pick products, approve an exact quote in the
+   chat, and pay on Stripe's own page. Orders, refunds and finance exceptions are in Studio.
+   - Use a secret key (`sk_…`) or a restricted key (`rk_…`) with access to Products, Prices,
+     Checkout Sessions, Payment Intents and Refunds. Hamnivo keeps it in its secret store and never
+     shows it again.
+   - Connecting needs two-step verification and a recent sign-in. Each brand has one connection.
+
+   ```bash
+   curl "${h[@]}" -d '{"brandId":"brd_...","provider":"stripe","displayName":"Noor Books",
+     "currencies":["AED"],"apiKey":"rk_live_...","shipping":{"amountMinor":"1000","label":"Delivery"},
+     "terms":{"refundSummary":"Refunds within 14 days of delivery."}}' $A/v1/admin/commerce/merchants
+   ```
+
+   The answer has a `webhookUrl`. In the Stripe Dashboard, add a webhook endpoint at that URL for
+   `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+   `checkout.session.async_payment_failed`, `checkout.session.expired`,
+   `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.processing`,
+   `payment_intent.requires_action`, `refund.created`, `refund.updated` and `refund.failed`. Then
+   give Hamnivo the endpoint's signing secret:
+
+   ```bash
+   curl "${h[@]}" -X PATCH -d '{"webhookSecret":"whsec_..."}' $A/v1/admin/commerce/merchants/mrc_...
+   ```
+
+   Until the secret is set, Stripe's deliveries are refused and payments are confirmed by asking
+   Stripe, which is slower. The catalog is the connection's active prices in its first currency;
+   subscriptions are not sold in chat yet. By default every refund needs a second person to
+   approve it (`refundPolicy`).
 
 `curl "${h[@]}" $A/v1/admin/brands` lists your brands with their ids (`brd_...`). The interactive
 API reference is at `https://api.example.com/docs`; set `API_DOCS=false` to hide it.

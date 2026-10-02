@@ -20,6 +20,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
+import { startFakeStripe } from '@hamnivo/adapters/commerce/testing';
 import { startFakeChatwoot } from '@hamnivo/chatwoot/fake';
 import {
   createTestDatabase,
@@ -182,6 +183,9 @@ try {
 
   const fake = await startFakeChatwoot();
   cleanups.push(() => fake.close());
+  // A stateful fake of Stripe's API and hosted payment page: nothing reaches the real Stripe.
+  const stripe = await startFakeStripe();
+  cleanups.push(() => stripe.close());
 
   // Single sign-on (A13): the identity provider sends people back through Studio's origin.
   const idp = await startE2eIdp(ports.idp, `${studioOrigin}/api/auth/sso/callback/`);
@@ -214,6 +218,7 @@ try {
     EMBEDDING_PROVIDER: 'mock',
     SSO_TRUSTED_IDP_ORIGINS: idp.issuer,
     SSO_DNS_SERVERS: `127.0.0.1:${ports.dns}`,
+    COMMERCE_STRIPE_API_BASE: stripe.url,
   };
   delete env.WIDGET_SIGNING_KEY;
   const gatewayDist = join(root, 'apps/gateway/dist');
@@ -242,6 +247,7 @@ try {
         ownerDatabaseUrl: database.owner,
         idp: { issuer: idp.issuer, clientId: idp.clientId, clientSecret: idp.clientSecret },
         dnsRecords,
+        stripe: { url: stripe.url, apiKey: stripe.apiKey },
       },
       null,
       2,

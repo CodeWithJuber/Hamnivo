@@ -1,3 +1,7 @@
+import { cachingEn } from './caching';
+import { commerceEn } from './commerce/en';
+import { decisionsEn } from './decisions';
+
 /** Studio interface text in English (the source language). Keep sentences short and plain. */
 export const en = {
   app: {
@@ -1282,6 +1286,9 @@ export const en = {
       loading: 'Loading passkeys',
     },
   },
+  decisions: decisionsEn,
+  caching: cachingEn,
+  commerce: commerceEn,
   memory: {
     title: 'Customer memory',
     description: 'Manage what we remember about your customers.',
@@ -2284,9 +2291,14 @@ export const en = {
       export: 'Export everything remembered about a customer',
     },
     commerce: {
-      read: 'See carts, quotes and orders',
-      manage: 'Configure merchants and catalog sync',
-      refund: 'Issue refunds',
+      read: 'See carts, quotes, orders, payments and refunds',
+      carts: { manage: 'Share products and prepare quotes in conversations' },
+      orders: { manage: 'Record fulfilment updates on orders' },
+      refunds: { request: 'Ask for a refund for a customer', approve: 'Approve or reject refunds' },
+      exceptions: {
+        resolve: 'Resolve payment and refund exceptions after checking with the provider',
+      },
+      merchants: { manage: 'Connect merchants and set their credentials and refund rules' },
     },
     analytics: { read: 'View analytics and reports' },
     billing: { manage: 'Manage plan, invoices and payment' },

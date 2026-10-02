@@ -10,12 +10,14 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 5174 --strictPort",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "test:e2e": "playwright test"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.22",
     "@hamnivo/client": "workspace:*",
     "@hamnivo/contracts": "workspace:*",
+    "@hamnivo/domain": "workspace:*",
     "@hamnivo/ui": "workspace:*",
     "dompurify": "3.4.16",
     "i18next": "26.4.2",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
+    "@hamnivo/adapters": "workspace:*",
     "@hamnivo/chatwoot": "workspace:*",
     "@hamnivo/db": "workspace:*",
     "@hamnivo/server": "workspace:*",
@@ -37,6 +40,7 @@
     "@vitejs/plugin-react": "6.1.1",
     "tailwindcss": "4.3.3",
     "typescript": "catalog:",
-    "vite": "8.3.1"
+    "vite": "8.3.1",
+    "vitest": "catalog:"
   }
 }

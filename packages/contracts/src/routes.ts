@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { adminRoutes, identityRoutes } from './admin-routes.js';
 import { agentRoutes } from './agent-routes.js';
+import { cacheRoutes } from './cache-routes.js';
+import {
+  commerceAdminRoutes,
+  commerceIntegrationRoutes,
+  commerceWidgetRoutes,
+} from './commerce-routes.js';
 import {
   CustomerConversation,
   FeedbackRequest,
@@ -12,9 +18,11 @@ import {
   SendMessageResponse,
   StartConversationRequest,
 } from './conversations.js';
+import { decisionRoutes } from './decision-routes.js';
 import { HamnivoEvent, StreamControl } from './events.js';
 import { inboxRoutes } from './inbox-routes.js';
 import { knowledgeRoutes } from './knowledge-routes.js';
+import { languageRoutes } from './language-routes.js';
 import { adminMemoryRoutes, widgetMemoryRoutes } from './memory-routes.js';
 import { AttachmentPart } from './parts.js';
 import { platformRoutes } from './platform-routes.js';
@@ -41,7 +49,8 @@ export type RouteAuth =
   | 'widget_session'
   | 'staff_session'
   | 'api_key'
-  | 'integration_signature';
+  | 'integration_signature'
+  | 'provider_signature';
 
 export interface RouteDef {
   method: HttpMethod;
@@ -357,7 +366,13 @@ export const allRoutes: Record<string, RouteDef> = {
   ...adminMemoryRoutes,
   ...integrationRoutes,
   ...conversationRoutes,
+  ...decisionRoutes,
+  ...cacheRoutes,
+  ...languageRoutes,
   ...inboxRoutes,
   ...securityRoutes,
   ...platformRoutes,
+  ...commerceAdminRoutes,
+  ...commerceWidgetRoutes,
+  ...commerceIntegrationRoutes,
 };

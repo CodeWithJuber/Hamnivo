@@ -16,6 +16,7 @@ import {
   BotIcon,
   BrainIcon,
   BuildingIcon,
+  DatabaseZapIcon,
   InboxIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
@@ -23,10 +24,13 @@ import {
   LogOutIcon,
   MenuIcon,
   OctagonPauseIcon,
+  ReceiptIcon,
   ServerCogIcon,
   ShieldCheckIcon,
+  ShoppingBagIcon,
   StoreIcon,
   UsersIcon,
+  WaypointsIcon,
   XIcon,
 } from 'lucide-react';
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from 'react';
@@ -54,6 +58,10 @@ type NavPath =
   | '/memory'
   | '/models'
   | '/runs'
+  | '/decisions'
+  | '/caching'
+  | '/orders'
+  | '/finance'
   | '/stop-ai'
   | '/team'
   | '/security'
@@ -95,6 +103,30 @@ function useNavItems(): NavItem[] {
       permission: 'integrations.manage',
     },
     { to: '/runs', label: t('nav.runs'), icon: ActivityIcon, permission: 'analytics.read' },
+    {
+      to: '/decisions',
+      label: t('decisions.nav'),
+      icon: WaypointsIcon,
+      permission: 'decisions.read',
+    },
+    {
+      to: '/caching',
+      label: t('caching.nav'),
+      icon: DatabaseZapIcon,
+      permission: 'knowledge.read',
+    },
+    {
+      to: '/orders',
+      label: t('commerce.nav.orders'),
+      icon: ShoppingBagIcon,
+      permission: 'commerce.read',
+    },
+    {
+      to: '/finance',
+      label: t('commerce.nav.finance'),
+      icon: ReceiptIcon,
+      permission: 'commerce.read',
+    },
     { to: '/stop-ai', label: t('nav.stopAi'), icon: OctagonPauseIcon, permission: 'agents.read' },
     { to: '/team', label: t('nav.team'), icon: UsersIcon, permission: 'members.read' },
     {

@@ -1,3 +1,6 @@
+import { cachingUr } from './caching';
+import { commerceUr } from './commerce/ur';
+import { decisionsUr } from './decisions';
 import type { Translation } from './en';
 
 /** Urdu. Pending review by native speakers, as the note in the interface says. */
@@ -1297,6 +1300,9 @@ export const ur: Translation = {
       loading: 'پاس کیز لوڈ ہو رہی ہیں',
     },
   },
+  decisions: decisionsUr,
+  caching: cachingUr,
+  commerce: commerceUr,
   memory: {
     title: 'کسٹمر میموری',
     description: 'طے کریں کہ ہم آپ کے کسٹمرز کے بارے میں کیا یاد رکھتے ہیں۔',
@@ -2309,9 +2315,15 @@ export const ur: Translation = {
       export: 'کسی کسٹمر کے بارے میں یاد رکھی ہر چیز ایکسپورٹ کریں',
     },
     commerce: {
-      read: 'کارٹس، کوٹیشنز اور آرڈرز دیکھیں',
-      manage: 'تاجر اور کیٹلاگ سنک سیٹ کریں',
-      refund: 'رقم کی واپسی جاری کریں',
+      read: 'کارٹس، کوٹیشنز، آرڈرز، ادائیگیاں اور رقم کی واپسیاں دیکھیں',
+      carts: { manage: 'گفتگو میں مصنوعات شیئر کریں اور کوٹیشن تیار کریں' },
+      orders: { manage: 'آرڈرز پر ترسیل کی تازہ کاری درج کریں' },
+      refunds: {
+        request: 'کسٹمر کے لیے رقم کی واپسی مانگیں',
+        approve: 'رقم کی واپسی منظور یا مسترد کریں',
+      },
+      exceptions: { resolve: 'فراہم کنندہ سے جانچ کے بعد ادائیگی اور واپسی کے استثنا حل کریں' },
+      merchants: { manage: 'تاجر جوڑیں اور ان کی اسناد اور واپسی کے اصول طے کریں' },
     },
     analytics: { read: 'تجزیات اور رپورٹس دیکھیں' },
     billing: { manage: 'پلان، انوائسز اور ادائیگی سنبھالیں' },

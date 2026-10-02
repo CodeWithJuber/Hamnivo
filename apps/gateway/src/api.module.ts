@@ -18,10 +18,15 @@ import { OutboundMessagesService } from './authority/outbound.service.js';
 import { OwnershipService } from './authority/ownership.service.js';
 import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
+import { CacheController } from './cache/cache.controller.js';
+import { cacheAdminProviders, cacheProviders } from './cache/cache.providers.js';
+import { COMMERCE_API_CONTROLLERS, COMMERCE_API_PROVIDERS } from './commerce/commerce.module.js';
 import { IdempotencyService } from './common/idempotency.service.js';
 import type { AppConfig } from './config.js';
 import { StaffConversationsController } from './conversations/staff-conversations.controller.js';
 import { StaffConversationsService } from './conversations/staff-conversations.service.js';
+import { DecisionsController } from './decisions/decisions.controller.js';
+import { decisionAdminProviders, decisionProviders } from './decisions/decisions.providers.js';
 import { createAuth } from './identity/auth.factory.js';
 import { IdentityController } from './identity/identity.controller.js';
 import { PrincipalService } from './identity/principal.service.js';
@@ -49,6 +54,7 @@ import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { KnowledgeController } from './knowledge/knowledge.controller.js';
 import { KnowledgeService } from './knowledge/knowledge.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
+import { LanguageController } from './language/language.controller.js';
 import { AdminMemoryController } from './memory/admin-memory.controller.js';
 import { AdminMemoryService } from './memory/admin-memory.service.js';
 import { MemoryCache } from './memory/cache.js';
@@ -117,6 +123,9 @@ export class ApiModule {
         KillSwitchesController,
         RunsController,
         KnowledgeController,
+        DecisionsController,
+        CacheController,
+        LanguageController,
         WidgetMemoryController,
         AdminMemoryController,
         InboxController,
@@ -124,6 +133,7 @@ export class ApiModule {
         SsoController,
         SupportController,
         PlatformController,
+        ...COMMERCE_API_CONTROLLERS,
       ],
       providers: [
         {
@@ -188,12 +198,17 @@ export class ApiModule {
         AuthorityContactsService,
         WidgetConversationsService,
         WidgetEventsService,
+        ...decisionProviders(overrides),
+        ...decisionAdminProviders,
+        ...cacheProviders(overrides),
+        ...cacheAdminProviders,
         MemoryFingerprints,
         MemoryCache,
         MemoryWriter,
         MemoryDeletionService,
         CustomerMemoryService,
         AdminMemoryService,
+        ...COMMERCE_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

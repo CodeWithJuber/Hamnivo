@@ -3,19 +3,29 @@ import {
   ComposerPrimitive,
   type ThreadMessageLike,
   ThreadPrimitive,
+  useAuiState,
   useExternalStoreRuntime,
 } from '@assistant-ui/react';
 import type { OutgoingMessage } from '@hamnivo/client';
-import type { Message, WidgetSession } from '@hamnivo/contracts';
+import type {
+  Message,
+  ReplyLanguage,
+  WidgetLanguageState,
+  WidgetSession,
+} from '@hamnivo/contracts';
 import { Button } from '@hamnivo/ui/components/button';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { ParticipantBadge, type ParticipantKind } from '@hamnivo/ui/components/participant-badge';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LANGUAGE_NAMES, LOCALES, type Locale } from '../i18n.js';
+import { CommerceCard, type Part } from '../commerce/Cards.js';
+import { ShopBar } from '../commerce/ShopBar.js';
+import type { Commerce } from '../commerce/useCommerce.js';
+import { LANGUAGE_NAMES, LOCALES, type Locale, REPLY_LANGUAGE_NAMES } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
 import type { ChatState } from '../useChat.js';
 import type { MemoryControls } from '../useMemory.js';
+import { BidiText, directionOf } from './BidiText.js';
 import { MemoryConsent } from './MemoryConsent.js';
 import { MemoryPanel, useSlotLabel } from './MemoryPanel.js';
 
@@ -34,16 +44,19 @@ interface Custom {
   clientMessageId?: string;
   /** Knowledge an AI answer cites, numbered as in its text (G06). */
   sources?: Source[];
+  /** A card (quote, receipt…) from Hamnivo's records, rendered instead of text. */
+  card?: Part;
   /** Memories an AI answer used (G19): shown as memories, never as something said now. */
   memories?: string[];
 }
 
 const textOf = (m: Message) =>
   m.parts
-    .map((p) => (p.type === 'text' ? p.text : ''))
+    .map((p) => (p.type === 'text' ? p.text : p.type === 'card' ? p.fallbackText : ''))
     .join('\n')
     .trim();
 
+const cardOf = (m: Message): Part | undefined => m.parts.find((p): p is Part => p.type === 'card');
 const memoriesOf = (m: Message): string[] =>
   m.parts.flatMap((p) => (p.type === 'memory' ? [p.key] : []));
 
@@ -73,6 +86,7 @@ function toThread(
           role: m.sender.roleLabel ?? '',
           state: 'accepted',
           sources: sourcesOf(m),
+          ...(cardOf(m) ? { card: cardOf(m) } : {}),
           memories: memoriesOf(m),
         } satisfies Custom,
       },
@@ -101,15 +115,28 @@ function toThread(
 function Bubble({
   message,
   onRetry,
+  commerce,
+  locale,
+  onHelp,
   onOpenMemory,
 }: {
   message: ThreadMessageLike;
   onRetry: (id: string) => void;
+  commerce: Commerce;
+  locale: Locale;
+  onHelp: (() => void) | undefined;
   onOpenMemory: () => void;
 }) {
   const { t } = useTranslation();
   const slotLabel = useSlotLabel();
   const custom = (message.metadata?.custom ?? {}) as unknown as Partial<Custom>;
+  if (custom.card) {
+    return (
+      <li className="flex flex-col items-start gap-1" data-sender="system">
+        <CommerceCard part={custom.card} commerce={commerce} locale={locale} onHelp={onHelp} />
+      </li>
+    );
+  }
   // While the AI is expected to answer, assistant-ui adds an optimistic placeholder message.
   if (!custom.kind) {
     return message.role === 'assistant' ? (
@@ -138,16 +165,18 @@ function Bubble({
       ) : null}
       {mine || custom.kind === 'system' ? (
         <div
-          dir="auto"
+          dir={directionOf(text)}
+          data-testid="message-text"
           className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-[15px] leading-relaxed ${
             mine ? 'bg-primary text-primary-foreground' : 'bg-transparent text-text-muted text-sm'
           }`}
         >
-          {text}
+          <BidiText text={text} />
         </div>
       ) : (
         <div
-          dir="auto"
+          dir={directionOf(text)}
+          data-testid="message-text"
           className="hv-markdown max-w-[85%] break-words rounded-2xl border border-border bg-surface px-3 py-2 text-[15px] leading-relaxed text-text"
           // Sanitized by renderMarkdown: a short allow-list of tags and http(s) links only.
           // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized above
@@ -212,9 +241,121 @@ function Bubble({
   );
 }
 
+/** Language tags for the reply language buttons, so screen readers use the right voice. */
+const LANG_TAGS: Record<ReplyLanguage, string> = {
+  en: 'en',
+  ar: 'ar',
+  hi: 'hi',
+  ur: 'ur',
+  'hi-Latn': 'hi-Latn',
+  'ur-Latn': 'ur-Latn',
+};
+
+/**
+ * Asks once which language replies should use when the customer's words fit two (HNV-07-04):
+ * Hinglish and Roman Urdu read the same. The suggestion comes first; the message stays as sent.
+ */
+function LanguageQuestion(props: {
+  state: WidgetLanguageState | null;
+  onChoose: (language: ReplyLanguage) => Promise<void>;
+  onDismiss: () => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const announce = useAnnouncer();
+  const [busy, setBusy] = useState(false);
+  const confirm = props.state?.confirm;
+  if (!confirm) return null;
+  const run = async (work: () => Promise<void>, done?: string) => {
+    setBusy(true);
+    try {
+      await work();
+      if (done) announce(done);
+    } catch {
+      // The question stays; the customer can try again.
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section
+      aria-labelledby="hv-language-question"
+      className="mb-2 rounded-xl border border-border bg-surface-sunken px-3 py-2"
+      data-testid="language-question"
+    >
+      <h2 id="hv-language-question" className="mb-2 text-sm font-medium text-text">
+        {t('languageQuestion')}
+      </h2>
+      <div className="flex flex-wrap items-center gap-2">
+        {[confirm.suggested, ...confirm.alternatives].map((language) => (
+          <Button
+            key={language}
+            size="sm"
+            variant={language === confirm.suggested ? 'default' : 'outline'}
+            lang={LANG_TAGS[language]}
+            dir="auto"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                () => props.onChoose(language),
+                t('languageChosen', { language: REPLY_LANGUAGE_NAMES[language] }),
+              )
+            }
+          >
+            {REPLY_LANGUAGE_NAMES[language]}
+          </Button>
+        ))}
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run(props.onDismiss)}>
+          {t('languageNotNow')}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The message box (U08). Enter sends and Shift+Enter starts a new line, but an Enter that
+ * confirms an input method composition (Hindi, Urdu, Arabic or Chinese keyboards) never sends:
+ * browsers flag it with isComposing, Safari only with key code 229 after the composition ends.
+ * The box follows the direction of what is typed, so Urdu typed in the English interface reads
+ * right to left.
+ */
+function Composer({ label, send }: { label: string; send: string }) {
+  const text = useAuiState((s) => s.composer.text);
+  const composing = useRef(false);
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    if (event.nativeEvent.isComposing || event.keyCode === 229 || composing.current) return;
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  };
+  return (
+    <ComposerPrimitive.Root className="flex items-end gap-2">
+      <ComposerPrimitive.Input
+        aria-label={label}
+        placeholder={label}
+        dir={directionOf(text)}
+        rows={1}
+        submitMode="none"
+        onKeyDown={onKeyDown}
+        onCompositionStart={() => {
+          composing.current = true;
+        }}
+        onCompositionEnd={() => {
+          composing.current = false;
+        }}
+        className="min-h-11 flex-1 resize-none rounded-xl border border-input bg-bg px-3 py-2.5 text-base text-text"
+      />
+      <ComposerPrimitive.Send asChild>
+        <Button className="min-h-11">{send}</Button>
+      </ComposerPrimitive.Send>
+    </ComposerPrimitive.Root>
+  );
+}
+
 export function Chat(props: {
   session: WidgetSession;
   state: ChatState;
+  commerce: Commerce;
   pending: readonly OutgoingMessage[];
   locale: Locale;
   onLocale: (locale: Locale) => void;
@@ -222,6 +363,11 @@ export function Chat(props: {
   onRetry: (clientMessageId: string) => void;
   onHandoff: () => Promise<void>;
   onClose?: () => void;
+  language: {
+    state: WidgetLanguageState | null;
+    choose: (language: ReplyLanguage) => Promise<void>;
+    dismiss: () => Promise<void>;
+  };
   memory: MemoryControls;
 }) {
   const { t } = useTranslation();
@@ -253,6 +399,8 @@ export function Chat(props: {
     () => toThread(state.messages, props.pending, t('you')),
     [state.messages, props.pending, t],
   );
+  const canAskPerson =
+    conversation?.responder !== 'person' && conversation?.status !== 'waiting_for_person';
   const last = state.messages.at(-1);
   const aiWriting =
     conversation?.responder === 'ai' &&
@@ -393,6 +541,9 @@ export function Chat(props: {
                   <Bubble
                     message={message as unknown as ThreadMessageLike}
                     onRetry={props.onRetry}
+                    commerce={props.commerce}
+                    locale={locale}
+                    onHelp={canAskPerson ? () => void props.onHandoff() : undefined}
                     onOpenMemory={openMemory}
                   />
                 )}
@@ -400,8 +551,8 @@ export function Chat(props: {
             </ul>
           </ThreadPrimitive.Viewport>
           <div className="border-t border-border bg-surface px-3 pb-3 pt-2">
-            {conversation?.responder !== 'person' &&
-            conversation?.status !== 'waiting_for_person' ? (
+            <ShopBar commerce={props.commerce} locale={locale} />
+            {canAskPerson ? (
               <Button
                 variant="link"
                 className="mb-1 h-auto text-sm"
@@ -410,18 +561,12 @@ export function Chat(props: {
                 {t('talkToPerson')}
               </Button>
             ) : null}
-            <ComposerPrimitive.Root className="flex items-end gap-2">
-              <ComposerPrimitive.Input
-                aria-label={t('placeholder')}
-                placeholder={t('placeholder')}
-                dir="auto"
-                rows={1}
-                className="min-h-11 flex-1 resize-none rounded-xl border border-input bg-bg px-3 py-2.5 text-base text-text"
-              />
-              <ComposerPrimitive.Send asChild>
-                <Button className="min-h-11">{t('send')}</Button>
-              </ComposerPrimitive.Send>
-            </ComposerPrimitive.Root>
+            <LanguageQuestion
+              state={props.language.state}
+              onChoose={props.language.choose}
+              onDismiss={props.language.dismiss}
+            />
+            <Composer label={t('placeholder')} send={t('send')} />
           </div>
         </ThreadPrimitive.Root>
       </section>

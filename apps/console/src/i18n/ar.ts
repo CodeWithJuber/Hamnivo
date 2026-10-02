@@ -1,3 +1,6 @@
+import { cachingAr } from './caching';
+import { commerceAr } from './commerce/ar';
+import { decisionsAr } from './decisions';
 import type { Translation } from './en';
 
 /** Arabic (Modern Standard). Pending review by native speakers, as the note in the interface says. */
@@ -1271,6 +1274,9 @@ export const ar: Translation = {
       loading: 'جارٍ تحميل مفاتيح المرور',
     },
   },
+  decisions: decisionsAr,
+  caching: cachingAr,
+  commerce: commerceAr,
   memory: {
     title: 'ذاكرة العملاء',
     description: 'أدِر ما نتذكره عن عملائك.',
@@ -2264,9 +2270,15 @@ export const ar: Translation = {
       export: 'تصدير كل ما يُتذكّر عن عميل',
     },
     commerce: {
-      read: 'رؤية السلال وعروض الأسعار والطلبات',
-      manage: 'إعداد التجّار ومزامنة الكتالوج',
-      refund: 'إصدار المبالغ المستردة',
+      read: 'رؤية السلال وعروض الأسعار والطلبات والمدفوعات والمبالغ المستردة',
+      carts: { manage: 'مشاركة المنتجات وإعداد عروض الأسعار في المحادثات' },
+      orders: { manage: 'تسجيل تحديثات تنفيذ الطلبات' },
+      refunds: {
+        request: 'طلب استرداد مبلغ لعميل',
+        approve: 'الموافقة على المبالغ المستردة أو رفضها',
+      },
+      exceptions: { resolve: 'حلّ استثناءات الدفع والاسترداد بعد التحقق لدى المزوّد' },
+      merchants: { manage: 'ربط التجّار وضبط بيانات اعتمادهم وقواعد الاسترداد' },
     },
     analytics: { read: 'عرض التحليلات والتقارير' },
     billing: { manage: 'إدارة الخطة والفواتير والدفع' },
