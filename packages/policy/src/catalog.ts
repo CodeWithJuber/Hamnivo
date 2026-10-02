@@ -86,6 +86,11 @@ export const PERMISSIONS = {
   'agents.publish': { description: 'Publish or roll back AI agents', scopes: BRAND, stepUp: true },
   'knowledge.read': { description: 'Read knowledge sources', scopes: ALL, reference: true },
   'knowledge.manage': { description: 'Add, edit and retire knowledge', scopes: BRAND },
+  'tools.read': {
+    description: 'See tools, action policies, AI actions and simulation results',
+    scopes: ALL,
+    reference: true,
+  },
   'tools.manage': {
     description: 'Configure tools and action policies',
     scopes: BRAND,
