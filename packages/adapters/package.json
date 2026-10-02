@@ -2,7 +2,7 @@
   "name": "@hamnivo/adapters",
   "version": "0.1.0",
   "private": true,
-  "description": "Hamnivo provider adapters behind shared contracts: language and embedding models for Anthropic, OpenAI, Google Gemini and OpenAI-compatible servers (capability tables, error normalization, fallback, deterministic mocks), the Jev decision provider, and commerce providers (Stripe hosted checkout and refunds, an in-memory mock); scanner, storage and network adapters follow",
+  "description": "Hamnivo provider adapters behind shared contracts: language and embedding models for Anthropic, OpenAI, Google Gemini and OpenAI-compatible servers (capability tables, error normalization, fallback, deterministic mocks), the Jev decision provider, commerce providers (Stripe hosted checkout and refunds, an in-memory mock), the MCP adapter for remote tools (Streamable HTTP through an SSRF-safe egress guard) and an in-memory demo order service for the built-in demo tools; scanner and storage adapters follow",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -26,6 +26,22 @@
     "./commerce/testing": {
       "types": "./dist/commerce/testing.d.ts",
       "import": "./dist/commerce/testing.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js"
+    },
+    "./mcp/testing": {
+      "types": "./dist/mcp/testing.d.ts",
+      "import": "./dist/mcp/testing.js"
+    },
+    "./egress": {
+      "types": "./dist/egress/index.d.ts",
+      "import": "./dist/egress/index.js"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "import": "./dist/tools/index.js"
     }
   },
   "files": [
@@ -43,6 +59,7 @@
     "@ai-sdk/openai-compatible": "3.0.57",
     "@ai-sdk/provider": "4.0.18",
     "@hamnivo/domain": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.30.1",
     "@typesafe-ai/sdk": "0.6.0",
     "stripe": "22.6.2",
     "zod": "catalog:"
