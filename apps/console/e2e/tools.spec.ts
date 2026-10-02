@@ -62,7 +62,7 @@ async function noSidewaysScroll(page: Page) {
   expect(overflow, `wider than the screen: ${wide.join(' | ')}`).toBeLessThanOrEqual(0);
 }
 
-test('HNV-13-01 HNV-13-02 HNV-13-04 · add a tool, open its inspector by keyboard and choose who approves; phone width and audits', async ({
+test('HNV-11-03 · add a tool, see what it can do and choose who approves, by keyboard; phone width, right to left and audits', async ({
   page,
   context,
 }) => {
@@ -187,7 +187,7 @@ test('HNV-11-03 HNV-11-04 HNV-11-05 · grant a tool, see the draft against the p
   expect(violations).toEqual([]);
 });
 
-test('HNV-13-02 HNV-13-05 HNV-10-03 · staff approve a money action after a fresh sign-in; a handoff carries its packet', async ({
+test('HNV-13-02 HNV-10-03 · staff approve a money action after a fresh sign-in; a handoff carries its packet', async ({
   page,
   context,
 }) => {
