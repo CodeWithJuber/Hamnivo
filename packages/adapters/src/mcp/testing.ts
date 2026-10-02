@@ -26,6 +26,8 @@ export interface FakeMcpTool {
   description?: string;
   title?: string;
   inputSchema?: Record<string, unknown>;
+  /** What the tool promises to return (the fake does not hold itself to it). */
+  outputSchema?: Record<string, unknown>;
   annotations?: Record<string, boolean>;
   /** Returns the tool result (text, structured content, or a raw MCP result). */
   handler?: (args: Record<string, unknown>, call: FakeToolCall) => unknown;
@@ -96,6 +98,7 @@ export async function startFakeMcpServer(initial: FakeMcpTool[] = []): Promise<F
         ...(tool.title ? { title: tool.title } : {}),
         description: tool.description ?? '',
         inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
+        ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
         ...(tool.annotations ? { annotations: tool.annotations } : {}),
       })),
     }));

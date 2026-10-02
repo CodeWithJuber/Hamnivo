@@ -321,15 +321,16 @@ work only with `TOOLS_EGRESS_ALLOW_PRIVATE`, which the gateway refuses in produc
 
 What a server says about its tools is never trusted. The gateway:
 
-- puts every new tool, and every tool whose name, description, schema or annotations changed, in
+- puts every new tool, and every tool whose name, description, schemas or annotations changed, in
   review. A tool in review cannot be called or granted to an agent, and open approvals for a
   changed tool are cancelled. Someone with `tools.manage` sets its risk, approver and limits,
   then enables it (Studio, Tools and permissions);
 - writes the tool's description itself. The server's description is kept as plain text for the
   reviewer; the model sees only the description that Hamnivo or the reviewer wrote;
-- reduces input schemas to a portable subset (`sanitizeToolSchema` in `@hamnivo/domain`): unknown
-  keywords are dropped, `pattern` is removed from untrusted schemas, and anything that cannot be
-  represented safely is refused;
+- reduces input and output schemas to a portable subset (`sanitizeToolSchema` in
+  `@hamnivo/domain`): unknown keywords are dropped, `pattern` is removed from untrusted schemas,
+  and a tool with a schema that cannot be represented safely is not added. A result that does not
+  match the tool's output schema is refused;
 - gives each tool its own egress allowlist, starting with the server's host. A call is refused
   unless that list covers the server;
 - treats results as data: size limited, cleaned to plain JSON, fenced in the prompt as untrusted,
@@ -342,6 +343,7 @@ What a server says about its tools is never trusted. The gateway:
   refusal of another.
 - `test/egress.test.ts`: address ranges, the allowlist, DNS rebinding, redirects and size limits.
 - The gateway's `test/tools.int.test.ts` connects a fake server, reviews its tools, and checks
-  that a changed listing goes back to review and that calls keep to the allowlist.
+  that results must match the output schema, that a changed listing goes back to review and that
+  calls keep to the allowlist.
 
 No test talks to a third-party MCP server.

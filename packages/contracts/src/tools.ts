@@ -57,6 +57,8 @@ export const ToolDefinition = z
     builtin: BuiltinToolKey.nullable(),
     mcpServerId: typeId('mcpServer').nullable(),
     inputSchema: ToolSchema,
+    /** What the tool promises to return; a result that does not match is refused. */
+    outputSchema: ToolSchema.nullable(),
     risk: RiskClass,
     approver: ActionApprover,
     /** A permission staff approvers need as well as tools.approve. */

@@ -28,6 +28,7 @@ import {
   plainText,
   type RiskClass,
   sanitizeToolSchema,
+  toJsonSchema,
   toolPolicyProblems,
 } from '@hamnivo/domain/actions';
 import {
@@ -90,9 +91,18 @@ const toolNameOf = (remote: string) =>
     .replace(/^[^a-z]+/, '')
     .slice(0, 64) || 'tool';
 
+/** What a review covers; a tool without an output schema keeps the digest it had before. */
 const digest = (info: McpToolInfo) =>
   createHash('sha256')
-    .update(JSON.stringify([info.name, info.description, info.inputSchema, info.annotations]))
+    .update(
+      JSON.stringify([
+        info.name,
+        info.description,
+        info.inputSchema,
+        info.annotations,
+        ...(info.outputSchema ? [info.outputSchema] : []),
+      ]),
+    )
     .digest();
 
 /**
@@ -703,6 +713,19 @@ export class ToolsService {
           skipped.push({ name: plainText(remoteName, 64), reason: parsed.problem });
           continue;
         }
+        // A promise about results that Hamnivo cannot check is refused like unusable arguments.
+        const output = info.outputSchema
+          ? sanitizeToolSchema(info.outputSchema, { trusted: false })
+          : null;
+        if (output && !output.ok) {
+          skipped.push({
+            name: plainText(remoteName, 64),
+            reason: `Output schema: ${output.problem}`,
+          });
+          continue;
+        }
+        // Kept as standard JSON Schema, so it reads back exactly (nullable fields included).
+        const outputSchema = output?.ok ? toJsonSchema(output.schema) : null;
         seen.add(remoteName);
         const remoteDescription = info.description ? plainText(info.description, 2000) : null;
         const hash = digest(info);
@@ -725,6 +748,7 @@ export class ToolsService {
               remoteName,
               remoteDigest: hash,
               inputSchema: parsed.schema as unknown as Record<string, unknown>,
+              outputSchema,
               ...defaults,
               autopilot: false,
               egressHosts: [host],
@@ -748,6 +772,7 @@ export class ToolsService {
               remoteDescription,
               remoteDigest: hash,
               inputSchema: parsed.schema as unknown as Record<string, unknown>,
+              outputSchema,
               status: 'review',
               revision: current.revision + 1,
               updatedBy: principal.staffMemberId,

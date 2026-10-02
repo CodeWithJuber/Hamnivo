@@ -2,6 +2,12 @@ import { checkEgressUrl, EgressError } from '@hamnivo/adapters/egress';
 import { callMcpTool, McpCallError } from '@hamnivo/adapters/mcp';
 import { DemoActionsStore, DemoToolError } from '@hamnivo/adapters/tools';
 import { type Db, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo/db';
+import {
+  type ContainedOutput,
+  containToolOutput,
+  type PortableSchema,
+  sanitizeToolSchema,
+} from '@hamnivo/domain/actions';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { moneyText } from '../commerce/common.js';
@@ -10,6 +16,26 @@ import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CONFIG } from '../tokens.js';
 
 export type ToolRow = typeof schema.toolDefinitions.$inferSelect;
+
+/**
+ * The tool's output schema (portable subset): null when the tool has none, `false` when the
+ * stored schema cannot be read, which refuses every result instead of passing it unchecked.
+ */
+function outputSchemaOf(tool: ToolRow): PortableSchema | null | false {
+  if (!tool.outputSchema) return null;
+  const parsed = sanitizeToolSchema(tool.outputSchema, { trusted: tool.source === 'builtin' });
+  return parsed.ok ? parsed.schema : false;
+}
+
+/**
+ * Contains what a tool returned (X09): the tool's size limit, plain data only, and its output
+ * schema when it has one. Used by live runs and by simulations alike.
+ */
+export function containOutput(tool: ToolRow, output: unknown): ContainedOutput {
+  const schema = outputSchemaOf(tool);
+  if (schema === false) return { ok: false, reason: 'schema_mismatch', bytes: 0 };
+  return containToolOutput(output, { maxBytes: tool.maxOutputBytes, schema });
+}
 
 /** Where a tool call happens: the conversation and the customer it is for. */
 export interface ToolScope {

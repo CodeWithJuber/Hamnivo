@@ -42,6 +42,7 @@ export function toolView(row: ToolRow, stopped: boolean): ToolDefinition {
     builtin: row.builtin,
     mcpServerId: row.mcpServerId ? toPublicId('mcpServer', row.mcpServerId) : null,
     inputSchema: row.inputSchema,
+    outputSchema: row.outputSchema,
     risk: row.risk,
     approver: row.approver,
     requiredPermission: row.requiredPermission,

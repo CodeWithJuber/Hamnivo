@@ -23,7 +23,6 @@ import {
   canonicalHash,
   checkActionClaims,
   compareCase,
-  containToolOutput,
   decideExecution,
   type FencedToolResult,
   fenceToolResult,
@@ -53,7 +52,7 @@ import { configHash } from '../runtime/agents.service.js';
 import { checkHonesty } from '../runtime/honesty.js';
 import { systemPrompt } from '../runtime/prompt.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
-import type { ToolRow } from './adapters.js';
+import { containOutput, type ToolRow } from './adapters.js';
 import { REASON_TEXT } from './views.js';
 
 type SuiteRow = typeof schema.simulationSuites.$inferSelect;
@@ -582,7 +581,7 @@ export class SimulationService {
         summary: `${tool.title}: the request was sent, but the result is not confirmed.`,
       });
     }
-    const contained = containToolOutput(fake.output ?? {}, { maxBytes: tool.maxOutputBytes });
+    const contained = containOutput(tool, fake.output ?? {});
     state.actions.push({
       tool: tool.name,
       decision: 'executed',

@@ -17,7 +17,6 @@ import {
   approvalExpiry,
   approvalNeedsStepUp,
   canonicalHash,
-  containToolOutput,
   decideExecution,
   type FencedToolResult,
   fenceToolResult,
@@ -37,7 +36,13 @@ import type { AppConfig } from '../config.js';
 import { KillSwitchesService } from '../runtime/kill-switches.service.js';
 import { RunsService } from '../runtime/runs.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
-import { ToolAdapters, ToolCallFailure, type ToolRow, type ToolScope } from './adapters.js';
+import {
+  containOutput,
+  ToolAdapters,
+  ToolCallFailure,
+  type ToolRow,
+  type ToolScope,
+} from './adapters.js';
 import { BUILTIN_TOOLS } from './builtins.js';
 import { approvalPublication } from './cards.js';
 import { ActionExecutor } from './executor.service.js';
@@ -582,8 +587,7 @@ export class ToolGateway {
     }
     if (tool.source === 'mcp') run.untrusted = true;
     run.called.push({ actionId, tool: tool.name, risk: tool.risk, state });
-    const contained =
-      output === undefined ? null : containToolOutput(output, { maxBytes: tool.maxOutputBytes });
+    const contained = output === undefined ? null : containOutput(tool, output);
     const status: ToolResultStatus =
       state === 'completed'
         ? action.risk === 'read'

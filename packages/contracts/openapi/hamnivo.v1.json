@@ -28524,6 +28524,16 @@
           "inputSchema": {
             "$ref": "#/components/schemas/ToolSchema"
           },
+          "outputSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "risk": {
             "$ref": "#/components/schemas/RiskClass"
           },
@@ -28642,6 +28652,7 @@
           "builtin",
           "mcpServerId",
           "inputSchema",
+          "outputSchema",
           "risk",
           "approver",
           "requiredPermission",
