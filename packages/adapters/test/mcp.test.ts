@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { callMcpTool, listMcpTools, McpCallError } from '../src/mcp/index.js';
+import {
+  callMcpTool,
+  listMcpTools,
+  MCP_SUPPORTED_PROTOCOLS,
+  McpCallError,
+} from '../src/mcp/index.js';
 import { type FakeMcpServer, startFakeMcpServer } from '../src/mcp/testing.js';
 
 let server: FakeMcpServer;
@@ -102,6 +107,47 @@ describe('MCP adapter', () => {
     await expect(
       listMcpTools({ url: server.url, timeoutMs: 1000, allowPrivate: false }),
     ).rejects.toMatchObject({ kind: 'egress', mayHaveApplied: false });
+  });
+
+  it.each([...MCP_SUPPORTED_PROTOCOLS])('works with a server on MCP %s', async (version) => {
+    server.protocolVersion = version;
+    try {
+      const listing = await listMcpTools(endpoint());
+      expect(listing.protocolVersion).toBe(version);
+      expect(listing.tools.map((t) => t.name)).toContain('lookup_booking');
+      const result = await callMcpTool(
+        endpoint(),
+        'lookup_booking',
+        { bookingReference: 'BK-777' },
+        { idempotencyKey: `hv-version-${version}` },
+      );
+      expect(result.structured).toEqual({ reference: 'BK-777', status: 'confirmed' });
+    } finally {
+      server.protocolVersion = null;
+    }
+  });
+
+  it('refuses a server on another MCP revision before calling anything', async () => {
+    const before = server.calls.length;
+    server.protocolVersion = '2024-11-05';
+    try {
+      await expect(listMcpTools(endpoint())).rejects.toMatchObject({
+        kind: 'protocol',
+        mayHaveApplied: false,
+      });
+      const error = await callMcpTool(
+        endpoint(),
+        'cancel_booking',
+        { bookingReference: 'BK-4' },
+        { idempotencyKey: 'hv-action-old' },
+      ).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(McpCallError);
+      expect(error).toMatchObject({ kind: 'protocol', mayHaveApplied: false });
+      expect((error as Error).message).toContain('2024-11-05');
+      expect(server.calls.length).toBe(before);
+    } finally {
+      server.protocolVersion = null;
+    }
   });
 
   it('honours the caller’s cancellation', async () => {

@@ -10,8 +10,15 @@ import { EgressError, type EgressPolicy, guardedFetch } from '../egress/fetch.js
  * MCP is an adapter for tools, not a source of authority: Hamnivo decides who may call what.
  */
 
-/** Protocol revisions this adapter is tested against (also documented in the README). */
-export const MCP_SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26'] as const;
+/**
+ * The MCP revisions Hamnivo accepts: the ones with Streamable HTTP. The SDK offers the newest; a
+ * server may answer with an older one from this list, and anything else is refused. Each one is
+ * tested in test/mcp.test.ts and documented in the README.
+ */
+export const MCP_SUPPORTED_PROTOCOLS = ['2025-11-25', '2025-06-18', '2025-03-26'] as const;
+
+const supported = (version: string | undefined): boolean =>
+  (MCP_SUPPORTED_PROTOCOLS as readonly string[]).includes(version ?? '');
 
 export interface McpEndpoint {
   url: string;
@@ -85,7 +92,11 @@ function policyOf(endpoint: McpEndpoint): EgressPolicy {
   };
 }
 
-async function connect(endpoint: McpEndpoint, signal: AbortSignal): Promise<Client> {
+/** Connects and checks the revision the server chose; returns the client and that revision. */
+async function connect(
+  endpoint: McpEndpoint,
+  signal: AbortSignal,
+): Promise<{ client: Client; protocolVersion: string }> {
   const url = new URL(endpoint.url);
   const transport = new StreamableHTTPClientTransport(url, {
     fetch: guardedFetch(policyOf(endpoint)),
@@ -101,7 +112,16 @@ async function connect(endpoint: McpEndpoint, signal: AbortSignal): Promise<Clie
   });
   const client = new Client({ name: 'hamnivo', version: '1.0.0' }, { capabilities: {} });
   await client.connect(transport, { signal, timeout: endpoint.timeoutMs });
-  return client;
+  const protocolVersion = transport.protocolVersion;
+  if (!protocolVersion || !supported(protocolVersion)) {
+    await client.close().catch(() => undefined);
+    throw new McpCallError(
+      'protocol',
+      `The server speaks MCP ${String(protocolVersion ?? 'without a version').slice(0, 40)}; Hamnivo supports ${MCP_SUPPORTED_PROTOCOLS.join(', ')}.`,
+      false,
+    );
+  }
+  return { client, protocolVersion };
 }
 
 /** Classifies a failure; `sent` is whether the tool call itself had been sent. */
@@ -140,7 +160,8 @@ export async function listMcpTools(
   const signal = withDeadline(endpoint.timeoutMs, outer);
   let client: Client | null = null;
   try {
-    client = await connect(endpoint, signal);
+    const connected = await connect(endpoint, signal);
+    client = connected.client;
     const tools: McpToolInfo[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < MAX_PAGES && tools.length < MAX_TOOLS; page += 1) {
@@ -176,9 +197,7 @@ export async function listMcpTools(
     }
     const version = client.getServerVersion();
     return {
-      protocolVersion:
-        (client as unknown as { _transport?: { protocolVersion?: string } })._transport
-          ?.protocolVersion ?? null,
+      protocolVersion: connected.protocolVersion,
       serverName: version?.name ? String(version.name).slice(0, 120) : null,
       tools,
     };
@@ -203,7 +222,7 @@ export async function callMcpTool(
   let client: Client | null = null;
   let sent = false;
   try {
-    client = await connect(endpoint, signal);
+    client = (await connect(endpoint, signal)).client;
     sent = true;
     const result = await client.callTool(
       {

@@ -40,6 +40,11 @@ export interface FakeMcpServer {
   tools: Map<string, FakeMcpTool>;
   /** Faults for the next calls of a tool, used in order. */
   faults: Map<string, FakeMcpFault[]>;
+  /**
+   * The MCP revision the server answers `initialize` with, as an older (or unknown) server would;
+   * null answers like the SDK, with the revision the client asked for.
+   */
+  protocolVersion: string | null;
   setTools(tools: FakeMcpTool[]): void;
   close(): Promise<void>;
 }
@@ -62,6 +67,23 @@ export async function startFakeMcpServer(initial: FakeMcpTool[] = []): Promise<F
   const faults = new Map<string, FakeMcpFault[]>();
   const calls: FakeToolCall[] = [];
   const authorizations: (string | null)[] = [];
+  const fake: FakeMcpServer = {
+    url: '',
+    calls,
+    authorizations,
+    tools,
+    faults,
+    protocolVersion: null,
+    setTools(next) {
+      tools.clear();
+      for (const tool of next) tools.set(tool.name, tool);
+    },
+    close: () =>
+      new Promise<void>((resolve) => {
+        http.closeAllConnections();
+        http.close(() => resolve());
+      }),
+  };
 
   const mcp = () => {
     const server = new Server(
@@ -120,6 +142,21 @@ export async function startFakeMcpServer(initial: FakeMcpTool[] = []): Promise<F
       res.writeHead(400).end();
       return;
     }
+    const initialize = body as { method?: unknown; id?: unknown };
+    if (fake.protocolVersion && initialize.method === 'initialize') {
+      res.writeHead(200, { 'content-type': 'application/json' }).end(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: initialize.id,
+          result: {
+            protocolVersion: fake.protocolVersion,
+            capabilities: { tools: {} },
+            serverInfo: { name: 'Fake orders service', version: '1.0.0' },
+          },
+        }),
+      );
+      return;
+    }
     const server = mcp();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
@@ -135,20 +172,6 @@ export async function startFakeMcpServer(initial: FakeMcpTool[] = []): Promise<F
   await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
   const address = http.address();
   const port = typeof address === 'object' && address ? address.port : 0;
-  return {
-    url: `http://127.0.0.1:${port}/mcp`,
-    calls,
-    authorizations,
-    tools,
-    faults,
-    setTools(next) {
-      tools.clear();
-      for (const tool of next) tools.set(tool.name, tool);
-    },
-    close: () =>
-      new Promise<void>((resolve) => {
-        http.closeAllConnections();
-        http.close(() => resolve());
-      }),
-  };
+  fake.url = `http://127.0.0.1:${port}/mcp`;
+  return fake;
 }

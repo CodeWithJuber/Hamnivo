@@ -288,3 +288,60 @@ before calling the provider.
 
 No test calls the real Stripe API. The adapter has not yet been run against Stripe's live test
 mode.
+
+## Tools: MCP and the egress guard
+
+`@hamnivo/adapters/mcp` lets the AI use tools on remote MCP servers (D10), through the official
+`@modelcontextprotocol/sdk`. MCP is only a way to reach tools: Hamnivo's gateway decides which
+tools exist, who may call them and who approves.
+
+| | Supported |
+|---|---|
+| Transport | Streamable HTTP to a remote server, over HTTPS. No local (stdio) servers and no fallback to the older HTTP with SSE transport. |
+| Protocol revisions | `2025-11-25`, `2025-06-18` and `2025-03-26` (`MCP_SUPPORTED_PROTOCOLS`). The client offers the newest; a server that answers with another revision is refused before any tool is listed or called. |
+| Authentication | None, or a bearer token per server (`Authorization: Bearer …`). The gateway keeps the token in its secret broker and reveals it only for the request. OAuth is not supported yet. |
+| Requests used | `initialize`, `tools/list` (at most 200 tools over 10 pages) and `tools/call`. Resources, prompts, sampling and elicitation are not used. |
+| Network | Every request goes through the egress guard below. |
+
+| Export | What it does |
+|---|---|
+| `listMcpTools(endpoint, signal?)` | The server's tools with their names, descriptions, schemas and annotations, all as untrusted data, plus the revision the server chose. |
+| `callMcpTool(endpoint, name, args, { idempotencyKey, signal })` | One call. The idempotency key goes in `_meta['hamnivo/idempotency-key']`, for servers that honour it. Returns `isError`, structured content and text. |
+| `McpCallError` | `kind` (`egress`, `timeout`, `network`, `refused`, `protocol`) and `mayHaveApplied`. A refusal did nothing; a timeout or lost connection after sending may have, so the gateway records the outcome as unknown and checks it rather than sending again. |
+| `startFakeMcpServer()` (`@hamnivo/adapters/mcp/testing`) | A real Streamable HTTP server on 127.0.0.1 with scripted tools, faults before or after a change, a chosen protocol revision, and a record of calls and tokens. |
+
+`@hamnivo/adapters/egress` (X05) is the only way tool calls reach the network. A request goes out
+only when it uses HTTPS, its host is on the allowlist (`orders.example.com`, or `*.example.com`
+for subdomains), and every address the host resolves to is public. The address check runs inside
+the socket's own DNS lookup, so the checked address is the connected address (no DNS rebinding).
+Redirects are not followed and responses stop at a size limit. Plain HTTP and loopback addresses
+work only with `TOOLS_EGRESS_ALLOW_PRIVATE`, which the gateway refuses in production.
+
+### The reviewed tool allowlist
+
+What a server says about its tools is never trusted. The gateway:
+
+- puts every new tool, and every tool whose name, description, schema or annotations changed, in
+  review. A tool in review cannot be called or granted to an agent, and open approvals for a
+  changed tool are cancelled. Someone with `tools.manage` sets its risk, approver and limits,
+  then enables it (Studio, Tools and permissions);
+- writes the tool's description itself. The server's description is kept as plain text for the
+  reviewer; the model sees only the description that Hamnivo or the reviewer wrote;
+- reduces input schemas to a portable subset (`sanitizeToolSchema` in `@hamnivo/domain`): unknown
+  keywords are dropped, `pattern` is removed from untrusted schemas, and anything that cannot be
+  represented safely is refused;
+- gives each tool its own egress allowlist, starting with the server's host. A call is refused
+  unless that list covers the server;
+- treats results as data: size limited, cleaned to plain JSON, fenced in the prompt as untrusted,
+  and never followed as instructions.
+
+### Tests and what is not verified
+
+- `test/mcp.test.ts`: listing as data, the bearer token, the idempotency key, a lost answer after
+  the change, a failed tool, refused servers, cancellation, each supported revision and the
+  refusal of another.
+- `test/egress.test.ts`: address ranges, the allowlist, DNS rebinding, redirects and size limits.
+- The gateway's `test/tools.int.test.ts` connects a fake server, reviews its tools, and checks
+  that a changed listing goes back to review and that calls keep to the allowlist.
+
+No test talks to a third-party MCP server.
