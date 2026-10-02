@@ -1,7 +1,9 @@
 import { cachingHi } from './caching';
 import { commerceHi } from './commerce/hi';
 import { decisionsHi } from './decisions';
+import { developerHi } from './developer/hi';
 import type { Translation } from './en';
+import { reportsHi } from './reports/hi';
 
 /** Hindi. Pending review by native speakers, as the note in the interface says. */
 export const hi: Translation = {
@@ -59,6 +61,8 @@ export const hi: Translation = {
     rateLimited: {
       title: 'बहुत ज़्यादा अनुरोध',
       description: 'थोड़ा रुकें, फिर से कोशिश करें।',
+      retryIn: 'आप {{seconds}} सेकंड बाद फिर कोशिश कर सकते हैं।',
+      retryNow: 'अब आप फिर कोशिश कर सकते हैं।',
     },
     unavailable: {
       title: 'कोई जुड़ी हुई सेवा जवाब नहीं दे रही',
@@ -85,6 +89,11 @@ export const hi: Translation = {
     internal: {
       title: 'हमारी तरफ़ से कुछ गड़बड़ हुई',
       description: 'कुछ नहीं बदला। फिर से कोशिश करें।',
+    },
+    planLimit: {
+      title: 'प्लान की सीमा पूरी हो गई',
+      description:
+        'आपके प्लान में इससे ज़्यादा शामिल नहीं है। कुछ जगह ख़ाली करें, या वर्कस्पेस के मालिक से बड़े प्लान के बारे में पूछें।',
     },
     unknown: { title: 'कुछ गड़बड़ हुई', description: 'फिर से कोशिश करें।' },
     page: {
@@ -1279,6 +1288,8 @@ export const hi: Translation = {
   decisions: decisionsHi,
   caching: cachingHi,
   commerce: commerceHi,
+  developer: developerHi,
+  reports: reportsHi,
   memory: {
     title: 'ग्राहक मेमोरी',
     description: 'तय करें कि हम आपके ग्राहकों के बारे में क्या याद रखते हैं।',

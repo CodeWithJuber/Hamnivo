@@ -12,10 +12,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useRouter, useRouterState } from '@tanstack/react-router';
 import {
   ActivityIcon,
+  BarChart3Icon,
   BookOpenIcon,
   BotIcon,
   BrainIcon,
   BuildingIcon,
+  CodeXmlIcon,
   DatabaseZapIcon,
   InboxIcon,
   KeyRoundIcon,
@@ -56,6 +58,8 @@ type NavPath =
   | '/caching'
   | '/orders'
   | '/finance'
+  | '/reports'
+  | '/developer'
   | '/stop-ai'
   | '/account';
 
@@ -63,7 +67,8 @@ interface NavItem {
   to: NavPath;
   label: string;
   icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
-  permission?: string;
+  /** Shown when the person holds this permission (or any of these). */
+  permission?: string | readonly string[];
 }
 
 function useNavItems(): NavItem[] {
@@ -117,10 +122,28 @@ function useNavItems(): NavItem[] {
       icon: ReceiptIcon,
       permission: 'commerce.read',
     },
+    {
+      to: '/reports',
+      label: t('reports.nav'),
+      icon: BarChart3Icon,
+      permission: ['analytics.read', 'billing.read'],
+    },
+    {
+      to: '/developer',
+      label: t('developer.nav'),
+      icon: CodeXmlIcon,
+      permission: ['api_keys.read', 'webhooks.read', 'network.manage'],
+    },
     { to: '/stop-ai', label: t('nav.stopAi'), icon: OctagonPauseIcon, permission: 'agents.read' },
   ];
   // Navigation is filtered by role; the gateway still checks every request (HNV-03-05).
-  return items.filter((item) => !item.permission || can(item.permission));
+  return items.filter(
+    (item) =>
+      !item.permission ||
+      (typeof item.permission === 'string'
+        ? can(item.permission)
+        : item.permission.some((permission) => can(permission))),
+  );
 }
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {

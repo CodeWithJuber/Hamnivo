@@ -1,7 +1,9 @@
 import { cachingUr } from './caching';
 import { commerceUr } from './commerce/ur';
 import { decisionsUr } from './decisions';
+import { developerUr } from './developer/ur';
 import type { Translation } from './en';
+import { reportsUr } from './reports/ur';
 
 /** Urdu. Pending review by native speakers, as the note in the interface says. */
 export const ur: Translation = {
@@ -59,6 +61,8 @@ export const ur: Translation = {
     rateLimited: {
       title: 'بہت زیادہ درخواستیں',
       description: 'تھوڑا انتظار کریں، پھر دوبارہ کوشش کریں۔',
+      retryIn: 'آپ {{seconds}} سیکنڈ بعد دوبارہ کوشش کر سکتے ہیں۔',
+      retryNow: 'اب آپ دوبارہ کوشش کر سکتے ہیں۔',
     },
     unavailable: {
       title: 'ایک منسلک سروس جواب نہیں دے رہی',
@@ -85,6 +89,11 @@ export const ur: Translation = {
     internal: {
       title: 'ہماری طرف سے کچھ غلط ہو گیا',
       description: 'کچھ تبدیل نہیں ہوا۔ دوبارہ کوشش کریں۔',
+    },
+    planLimit: {
+      title: 'پلان کی حد پوری ہو گئی',
+      description:
+        'آپ کے پلان میں اس سے زیادہ شامل نہیں۔ کچھ جگہ خالی کریں، یا ورک اسپیس کے مالک سے بڑے پلان کے بارے میں پوچھیں۔',
     },
     unknown: { title: 'کچھ غلط ہو گیا', description: 'دوبارہ کوشش کریں۔' },
     page: {
@@ -1300,6 +1309,8 @@ export const ur: Translation = {
   decisions: decisionsUr,
   caching: cachingUr,
   commerce: commerceUr,
+  developer: developerUr,
+  reports: reportsUr,
   memory: {
     title: 'کسٹمر میموری',
     description: 'طے کریں کہ ہم آپ کے کسٹمرز کے بارے میں کیا یاد رکھتے ہیں۔',

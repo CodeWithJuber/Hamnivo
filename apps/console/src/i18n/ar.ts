@@ -1,7 +1,9 @@
 import { cachingAr } from './caching';
 import { commerceAr } from './commerce/ar';
 import { decisionsAr } from './decisions';
+import { developerAr } from './developer/ar';
 import type { Translation } from './en';
+import { reportsAr } from './reports/ar';
 
 /** Arabic (Modern Standard). Pending review by native speakers, as the note in the interface says. */
 export const ar: Translation = {
@@ -59,6 +61,8 @@ export const ar: Translation = {
     rateLimited: {
       title: 'طلبات كثيرة جدًا',
       description: 'انتظر قليلًا ثم حاول مرة أخرى.',
+      retryIn: 'يمكنك المحاولة مرة أخرى بعد {{seconds}} ث.',
+      retryNow: 'يمكنك المحاولة مرة أخرى الآن.',
     },
     unavailable: {
       title: 'خدمة متصلة لا تستجيب',
@@ -85,6 +89,11 @@ export const ar: Translation = {
     internal: {
       title: 'حدث خطأ من جهتنا',
       description: 'لم يتغير شيء. حاول مرة أخرى.',
+    },
+    planLimit: {
+      title: 'تم بلوغ حد الخطة',
+      description:
+        'لا تتضمن خطتك المزيد من هذا. حرّر بعض الاستخدام، أو اسأل مالك مساحة العمل عن خطة أكبر.',
     },
     unknown: { title: 'حدث خطأ ما', description: 'حاول مرة أخرى.' },
     page: {
@@ -1274,6 +1283,8 @@ export const ar: Translation = {
   decisions: decisionsAr,
   caching: cachingAr,
   commerce: commerceAr,
+  developer: developerAr,
+  reports: reportsAr,
   memory: {
     title: 'ذاكرة العملاء',
     description: 'أدِر ما نتذكره عن عملائك.',
