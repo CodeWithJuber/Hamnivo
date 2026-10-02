@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
 import { createMockModel } from '@hamnivo/adapters/models';
 import { fromPublicId, schema, withTenant } from '@hamnivo/db';
+import { SAFE_REPLIES } from '@hamnivo/domain';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AuthorityRegistry } from '../src/authority/registry.js';
@@ -107,6 +108,16 @@ const passageAnswers: Record<string, Record<string, number>> = {};
 /** Jev's answer to the language question. */
 const languageAnswer = { label: 'roman-urdu', confidence: 0.9 };
 
+const DRAFT_QUESTION_NAMES = new Set([
+  'says_paid',
+  'says_refunded',
+  'says_order_changed',
+  'promises_refund',
+  'promises_order_change',
+]);
+/** Message guard answers about a draft, by a phrase of the draft; others: 0.05. */
+const draftAnswers: Record<string, Record<string, number>> = {};
+
 /** Jev's relation answer per claim: claims containing a key get its label. */
 function relations(byPhrase: Record<string, [string, number]>) {
   jev.state.mode = 'answer';
@@ -117,6 +128,11 @@ function relations(byPhrase: Record<string, [string, number]>) {
         choice: languageAnswer.label,
         confidence: languageAnswer.confidence,
       };
+    }
+    if (DRAFT_QUESTION_NAMES.has(question)) {
+      const draft = String(body.state?.reply ?? '');
+      const hit = Object.entries(draftAnswers).find(([phrase]) => draft.includes(phrase));
+      return { type: 'noul', noul: hit?.[1]?.[question] ?? 0.05 };
     }
     if (PASSAGE_QUESTION_NAMES.has(question)) {
       const title = String(body.state?.passage?.title ?? '');
@@ -293,6 +309,17 @@ describe('checks in Studio', () => {
         ],
         // Measured live, by the language answered; none for a Hinglish answer.
         recommendedThresholds: expect.not.objectContaining({ hinglish: expect.anything() }),
+      }),
+      expect.objectContaining({
+        task: 'message-guard',
+        mode: 'shadow',
+        questions: expect.arrayContaining([
+          expect.objectContaining({
+            key: 'self_harm',
+            instructions: 'Does the customer say they want to hurt or kill themselves?',
+          }),
+          expect.objectContaining({ key: 'promises_refund', type: 'noul' }),
+        ]),
       }),
     ]);
   });
@@ -886,6 +913,200 @@ describe('the reply language (U01)', () => {
       scripted.script.push('Sure, what is your order number?');
       await chat('Where is my order? It has not arrived yet.');
       expect(languageCalls()).toEqual([]);
+    });
+  });
+});
+
+describe('message guard', () => {
+  const band = { type: 'noul', trueAtLeast: 0.8, falseAtMost: 0.3 };
+  const keys = [
+    'self_harm',
+    'in_danger',
+    'threat',
+    'abuse',
+    'says_paid',
+    'says_refunded',
+    'says_order_changed',
+    'promises_refund',
+    'promises_order_change',
+  ];
+  const guardRecords = async (conversationId: string, direction: 'inbound' | 'outbound') => {
+    const listed = await shop.owner.get(
+      `${checksPath()}/message-guard/records?conversationId=${conversationId}`,
+    );
+    expect(listed.status, JSON.stringify(listed.body)).toBe(200);
+    // Oldest first, as they happened.
+    return (listed.body.items as Array<Record<string, any>>)
+      .filter((record) => record.detail?.direction === direction)
+      .reverse();
+  };
+  const inboundCalls = () =>
+    jev.calls.filter((call) => Object.hasOwn(call.body.questions ?? {}, 'self_harm'));
+  const draftCalls = () =>
+    jev.calls.filter((call) => Object.hasOwn(call.body.questions ?? {}, 'says_paid'));
+  const atRisk = 'I cannot do this anymore. I want to end my life. My email is sana@example.com';
+
+  beforeAll(async () => {
+    const thresholds = Object.fromEntries(keys.map((key) => [key, band]));
+    const draft = await shop.owner.put(`${checksPath()}/message-guard/draft`, {
+      provider: 'jev',
+      modelVersion: 'jev-1.13.0',
+      thresholds: { en: thresholds, ur: thresholds },
+    });
+    expect(draft.status, JSON.stringify(draft.body)).toBe(200);
+    expect((await shop.owner.post(`${checksPath()}/message-guard/publish`, {})).status).toBe(200);
+  });
+
+  afterAll(() => {
+    for (const key of Object.keys(draftAnswers)) delete draftAnswers[key];
+  });
+
+  it('shows what it asks in Studio: the messages first, then the draft', async () => {
+    const listed = await shop.owner.get(checksPath());
+    const guard = (listed.body.items as Array<Record<string, any>>).find(
+      (task) => task.task === 'message-guard',
+    );
+    expect(guard?.questions.map((q: { key: string }) => q.key)).toEqual(keys);
+    // Nothing was measured for these questions yet: no thresholds are recommended.
+    expect(guard?.recommendedThresholds).toEqual({});
+  });
+
+  it('shadow: records someone at risk and an unbacked claim, and the AI answers as today', async () => {
+    escalates({ self_harm: 0.97 });
+    draftAnswers['cancelled your order'] = { says_order_changed: 0.95 };
+    scripted.script.push('I have cancelled your order for you.');
+    const { conversationId } = await chat(atRisk);
+    const seen = await inspect(conversationId);
+    expect(seen.botReplies).toEqual(['I have cancelled your order for you.']);
+    expect(seen.control.ownerMode).toBe('AI_ACTIVE');
+    // Jev reads the customer's words with personal data replaced, and the draft alone.
+    expect(inboundCalls()).toHaveLength(1);
+    expect(JSON.stringify(inboundCalls()[0]?.body.state)).not.toContain('sana@example.com');
+    expect(Object.keys(inboundCalls()[0]?.body.state ?? {})).toEqual(['messages']);
+    expect(draftCalls()[0]?.body.state).toEqual({ reply: 'I have cancelled your order for you.' });
+    expect(await guardRecords(conversationId, 'inbound')).toEqual([
+      expect.objectContaining({
+        mode: 'shadow',
+        verdict: 'at_risk',
+        action: 'urgent',
+        applied: false,
+        detail: { direction: 'inbound', reasons: ['self_harm'] },
+      }),
+    ]);
+    expect(await guardRecords(conversationId, 'outbound')).toEqual([
+      expect.objectContaining({
+        mode: 'shadow',
+        verdict: 'unbacked',
+        action: 'regenerate',
+        applied: false,
+        detail: expect.objectContaining({
+          claims: ['says_order_changed'],
+          unbacked: ['says_order_changed'],
+          evidence: { paymentConfirmed: false, refundConfirmed: false, refundCommitted: false },
+        }),
+      }),
+    ]);
+  });
+
+  describe('live', () => {
+    beforeAll(async () => {
+      const set = await shop.owner.put(`${checksPath()}/message-guard/mode`, { mode: 'live' });
+      expect(set.status).toBe(200);
+    });
+
+    it('sends safe wording at once to someone at risk, then a person takes over', async () => {
+      escalates({ self_harm: 0.97 });
+      const { conversationId } = await chat(atRisk);
+      const seen = await inspect(conversationId);
+      expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+      expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+      expect(seen.control.ownerReason).toBe('ai_escalated');
+      expect(seen.notes).toContainEqual(expect.stringContaining('URGENT'));
+      expect(seen.notes).toContainEqual(
+        expect.stringContaining('The customer may be thinking of hurting themselves.'),
+      );
+      // No model wrote it.
+      expect(scripted.prompts).toEqual([]);
+      expect(await guardRecords(conversationId, 'inbound')).toEqual([
+        expect.objectContaining({ verdict: 'at_risk', action: 'urgent', applied: true }),
+      ]);
+    });
+
+    it("uses the customer's language for the safe wording", async () => {
+      escalates({ in_danger: 0.95 });
+      const { conversationId } = await chat('میرے گھر میں آگ لگ گئی ہے، مدد کریں۔');
+      const seen = await inspect(conversationId);
+      expect(seen.botReplies).toEqual([SAFE_REPLIES.ur]);
+      expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+      expect(seen.notes).toContainEqual(
+        expect.stringContaining('The customer says someone may be in danger now.'),
+      );
+    });
+
+    it('passes a threat to a person without any reply', async () => {
+      escalates({ threat: 0.93 });
+      const { conversationId } = await chat(
+        'If my parcel is not here tomorrow I will come to your shop and smash everything.',
+      );
+      const seen = await inspect(conversationId);
+      expect(seen.botReplies).toEqual([]);
+      expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+      expect(seen.control.ownerReason).toBe('ai_escalated');
+      expect(seen.notes).toContainEqual(
+        expect.stringContaining('The customer threatens to hurt someone or damage something.'),
+      );
+      expect(seen.notes.join('\n')).not.toContain('URGENT');
+      expect(scripted.prompts).toEqual([]);
+    });
+
+    it('never sends an order change it cannot back: the draft is written again without it', async () => {
+      escalates({});
+      draftAnswers['cancelled your order'] = { says_order_changed: 0.95 };
+      scripted.script.push('I have cancelled your order for you.');
+      scripted.script.push('A person from our team can cancel the order. I cannot do it here.');
+      const { conversationId } = await chat('Please cancel my order, I ordered the wrong size.');
+      const seen = await inspect(conversationId);
+      expect(seen.botReplies).toEqual([
+        'A person from our team can cancel the order. I cannot do it here.',
+      ]);
+      expect(scripted.prompts).toHaveLength(2);
+      expect(scripted.prompts[1]).toContain(
+        'Your previous draft said that an order was changed or cancelled.',
+      );
+      expect(await guardRecords(conversationId, 'outbound')).toEqual([
+        expect.objectContaining({ verdict: 'unbacked', action: 'regenerate', applied: true }),
+        expect.objectContaining({ verdict: 'clear', action: 'publish', applied: false }),
+      ]);
+    });
+
+    it('hands over with a note when the second draft makes the claim too', async () => {
+      escalates({});
+      draftAnswers['money is back'] = { says_refunded: 0.92 };
+      scripted.script.push('Good news: your money is back on your card.');
+      scripted.script.push('Good news: your money is back on your card already.');
+      const { conversationId } = await chat('Where is the money for my returned shoes?');
+      const seen = await inspect(conversationId);
+      expect(seen.botReplies).toEqual([]);
+      expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+      expect(seen.notes).toContainEqual(
+        expect.stringContaining('it said or promised a payment, refund or order change'),
+      );
+      expect(await guardRecords(conversationId, 'outbound')).toEqual([
+        expect.objectContaining({ verdict: 'unbacked', action: 'regenerate' }),
+        expect.objectContaining({ verdict: 'unbacked', action: 'handoff', applied: true }),
+      ]);
+    });
+
+    it('answers as today, and records it, when Jev is unavailable', async () => {
+      jev.state.mode = 'error';
+      scripted.script.push('Sorry to hear that. How can I help?');
+      const { conversationId } = await chat(atRisk);
+      const seen = await inspect(conversationId);
+      expect(seen.botReplies).toEqual(['Sorry to hear that. How can I help?']);
+      expect(await guardRecords(conversationId, 'inbound')).toEqual([
+        expect.objectContaining({ status: 'unavailable', action: 'continue', applied: false }),
+      ]);
+      jev.state.mode = 'answer';
     });
   });
 });

@@ -561,7 +561,7 @@
       "apps/gateway/test/checks.int.test.ts",
       "apps/gateway/test/checks.live.test.ts"
     ],
-    "note": "A typed request for a person (English, Hinglish, Roman Urdu, Arabic, Hindi, Urdu, with negation and look-alikes) hands the conversation to people before any model or decision provider runs (tested end to end); For the rest, the escalation check asks Jev six questions about the customer's latest messages (personal data replaced by its kind), each one exact condition: asking for a person, frustrated or angry, a problem still not solved, a complaint, a legal threat, a risk to health or safety. Code combines them: a request, a safety risk, a legal threat or a complaint alone needs a person; frustration only together with an unsolved problem. Live: the conversation goes to people before any reply, with the reasons in the note; shadow (every brand's start): recorded only; Jev unavailable or a language without thresholds: the AI answers as today and the check is recorded. Jev can only add a hand-off, never block one. Verified live on 2026-10-02 with jev-1.13.0: a legal threat was handed over (139 ms) and a calm question went on to an answer (125 ms). Only the request for a person has evaluated thresholds (0.80, 0.90 for Roman Urdu); brands set the others from what shadow mode records."
+    "note": "A typed request for a person (English, Hinglish, Roman Urdu, Arabic, Hindi, Urdu, with negation and look-alikes) hands the conversation to people before any model or decision provider runs (tested end to end); For the rest, the escalation check asks Jev six questions about the customer's latest messages (personal data replaced by its kind), each one exact condition: asking for a person, frustrated or angry, a problem still not solved, a complaint, a legal threat, a risk to health or safety. Code combines them: a request, a safety risk, a legal threat or a complaint alone needs a person; frustration only together with an unsolved problem. Live: the conversation goes to people before any reply, with the reasons in the note; shadow (every brand's start): recorded only; Jev unavailable or a language without thresholds: the AI answers as today and the check is recorded. Jev can only add a hand-off, never block one. Verified live on 2026-10-02 with jev-1.13.0: a legal threat was handed over (139 ms) and a calm question went on to an answer (125 ms). Only the request for a person has evaluated thresholds (0.80, 0.90 for Roman Urdu); brands set the others from what shadow mode records. The message guard reads the same messages side by side: someone who says they want to hurt themselves, or that someone is in danger now, gets Hamnivo's safety wording at once in the reply language (no model writes it; it points to local emergency help), then people take over with an urgent note; a threat or abuse goes to people with the reason. Shadow records only (tested; mutation-checked). Verified live on 2026-10-02 with jev-1.13.0: a message about ending one's life got the safety wording and was handed over (219 ms). Its thresholds were not evaluated: brands set them from what shadow mode records. Non-English safety wording is pending native review."
   },
   "J06": {
     "status": "in-progress",
@@ -1315,9 +1315,15 @@
       "packages/domain/test/commerce/claims.test.ts",
       "apps/gateway/src/commerce/claims.ts",
       "apps/gateway/src/runtime/replies.service.ts",
-      "apps/gateway/test/commerce.int.test.ts"
+      "apps/gateway/test/commerce.int.test.ts",
+      "packages/domain/src/checks.ts",
+      "packages/domain/test/checks.test.ts",
+      "apps/gateway/src/checks/reply-checks.service.ts",
+      "apps/gateway/test/checks.int.test.ts",
+      "apps/gateway/test/checks.live.test.ts",
+      "apps/gateway/src/checks/claim-evidence.ts"
     ],
-    "note": "A payment or refund counts as done only with a succeeded receipt from the provider. An AI reply that claims one without it is regenerated once with a correction, then the conversation goes to people; an open payment page is not a payment (tested). Future tool actions need the same check."
+    "note": "A payment or refund counts as done only with a succeeded receipt from the provider. An AI reply that claims one without it is regenerated once with a correction, then the conversation goes to people; an open payment page is not a payment (tested). Future tool actions need the same check. After the receipt check, which runs first and keeps the final say, the message guard asks Jev whether a draft says or promises a payment, refund or order change, in any wording or language. Each is held against Hamnivo's records, never the text: a payment or refund needs its receipt, a promised refund one submitted to the provider, and an order change is never backed yet. Live: the draft is written again once with a correction, then people take over with a note; a reply that states one is never cached; shadow records only (tested; mutation-checked). Verified live on 2026-10-02 with jev-1.13.0: a draft that cancelled an order and promised a refund was held back (121 ms) and the rewrite went out (166 ms). Thresholds not evaluated yet."
   },
   "U06": {
     "status": "in-progress",

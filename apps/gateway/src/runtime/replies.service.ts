@@ -350,11 +350,12 @@ export class RepliesService {
       languageSource: chosen.resolution.source,
       checks,
     };
-    // Jev's checks of the customer's messages (escalation): they can only hand the conversation
-    // to people, never answer, approve or unlock anything.
+    // Jev's checks of the customer's messages (message guard, escalation): they can only hand the
+    // conversation to people, never answer, approve or unlock anything.
     const inbound = await checks?.inbound({
       messages: history.messages,
       language: chosen.detection.language ?? chosen.resolution.language,
+      replyLanguage: chosen.resolution.language,
     });
     if (inbound?.action === 'handoff') {
       await this.handOff(
@@ -368,33 +369,53 @@ export class RepliesService {
       );
       return;
     }
+    // Someone may be at risk: Hamnivo's safe wording goes out at once, without a model, memory or
+    // cache, and people take over right after it.
+    const urgent = inbound?.action === 'urgent' ? inbound : null;
     // Customer memory (G19) is recalled before the cache: a reply built with it never enters a
     // shared entry, only the customer's own (keyed by their memory version, K09).
-    const memories = await this.memory.recall(tenantId, {
-      runId: run.id,
-      control: context.control,
-      config: agent.config,
-      history: history.messages,
-    });
+    const memories = urgent
+      ? []
+      : await this.memory.recall(tenantId, {
+          runId: run.id,
+          control: context.control,
+          config: agent.config,
+          history: history.messages,
+        });
     const shared = sharedCacheEligibility({ memoryItems: memories.length });
     const personalContext = shared.eligible ? [] : [shared.reason];
     // Commerce data the conversation holds (K06): a reply built from it is never cached.
     const liveData = await this.tx(tenantId, (tx) => conversationLiveData(tx, control.id));
-    const cached = await this.cachedAnswer(
-      tenantId,
-      run.id,
-      context,
-      agent,
-      history,
-      question,
-      options,
-      personalContext,
-      liveData,
-    );
+    const cached: AnswerLookup = urgent
+      ? { kind: 'skip', status: 'bypass', reason: 'message_guard' }
+      : await this.cachedAnswer(
+          tenantId,
+          run.id,
+          context,
+          agent,
+          history,
+          question,
+          options,
+          personalContext,
+          liveData,
+        );
 
     let generated: Generated | null;
     const outcome: GenerateOutcome = {};
-    if (cached.kind === 'hit') {
+    if (urgent) {
+      generated = {
+        text: urgent.text,
+        provider: 'hamnivo',
+        modelId: 'safe-reply',
+        inputTokens: 0,
+        outputTokens: 0,
+        latencyMs: 0,
+        sources: [],
+        refs: [],
+        memories: [],
+        liveData: [],
+      };
+    } else if (cached.kind === 'hit') {
       generated = {
         text: cached.answer.text,
         provider: 'cache',
@@ -570,6 +591,18 @@ export class RepliesService {
       throw error;
     }
     await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted, facts);
+    if (urgent) {
+      await this.handOff(
+        tenantId,
+        control,
+        run.id,
+        payload.epoch,
+        urgent.reason,
+        undefined,
+        urgent.note,
+      );
+      return;
+    }
     await this.tx(tenantId, (tx) =>
       this.finishWithUsage(tx, tenantId, run.id, 'replied', telemetry),
     );

@@ -19,7 +19,7 @@ import { typeId } from './ids.js';
  * before (U01); the customer's own choice always wins.
  */
 export const CheckTaskName = z
-  .enum(['answer-check', 'escalation', 'passage-relevance', 'language'])
+  .enum(['answer-check', 'escalation', 'passage-relevance', 'language', 'message-guard'])
   .meta({ id: 'CheckTaskName' });
 export type CheckTaskName = z.infer<typeof CheckTaskName>;
 

@@ -25317,7 +25317,8 @@
           "answer-check",
           "escalation",
           "passage-relevance",
-          "language"
+          "language",
+          "message-guard"
         ]
       },
       "CheckRubric": {

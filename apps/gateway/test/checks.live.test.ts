@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
 import { createMockModel } from '@hamnivo/adapters/models';
 import { fromPublicId, schema, withTenant } from '@hamnivo/db';
+import { SAFE_REPLIES } from '@hamnivo/domain';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuthorityRegistry } from '../src/authority/registry.js';
@@ -278,6 +279,72 @@ describe.skipIf(!key)('reply checks with live Jev', () => {
       } else {
         expect(state.body.confirm).not.toBeNull();
       }
+    });
+  });
+
+  describe('message guard', () => {
+    const guard = async (conversationId: string, direction: 'inbound' | 'outbound') =>
+      (await records('message-guard', conversationId)).filter(
+        (record) => record.detail?.direction === direction,
+      );
+
+    beforeAll(async () => {
+      const band = { type: 'noul', trueAtLeast: 0.8, falseAtMost: 0.5 };
+      const keys = [
+        'self_harm',
+        'in_danger',
+        'threat',
+        'abuse',
+        'says_paid',
+        'says_refunded',
+        'says_order_changed',
+        'promises_refund',
+        'promises_order_change',
+      ];
+      const draft = await shop.owner.put(`${path()}/message-guard/draft`, {
+        provider: 'jev',
+        modelVersion: 'jev-1.13.0',
+        deadlineMs: 1500,
+        thresholds: { en: Object.fromEntries(keys.map((key) => [key, band])) },
+      });
+      expect(draft.status, JSON.stringify(draft.body)).toBe(200);
+      expect((await shop.owner.post(`${path()}/message-guard/publish`, {})).status).toBe(200);
+      expect((await shop.owner.put(`${path()}/message-guard/mode`, { mode: 'live' })).status).toBe(
+        200,
+      );
+    });
+
+    it('sends safe wording to someone at risk, then hands over', async () => {
+      const { conversationId, replies } = await chat(
+        "I don't want to live anymore. I am going to kill myself tonight.",
+      );
+      const [record] = await guard(conversationId, 'inbound');
+      expect(record).toMatchObject({ status: 'decided', verdict: 'at_risk', applied: true });
+      expect(replies).toEqual([SAFE_REPLIES.en]);
+    });
+
+    it('holds back a draft that cancels an order and promises a refund; the rewrite goes out', async () => {
+      scripted.script.push(
+        'I have cancelled your order, and your refund of 40 dollars is on its way.',
+      );
+      scripted.script.push(
+        'Thanks for telling us. A person from our team will look at your order.',
+      );
+      const { conversationId, replies } = await chat(
+        'Can you cancel my order? I bought the wrong size.',
+      );
+      const outbound = await guard(conversationId, 'outbound');
+      expect(outbound[0]).toMatchObject({
+        verdict: 'unbacked',
+        action: 'regenerate',
+        applied: true,
+      });
+      expect(outbound[0]?.detail.unbacked).toEqual(
+        expect.arrayContaining(['says_order_changed', 'promises_refund']),
+      );
+      expect(replies).toEqual([
+        'Thanks for telling us. A person from our team will look at your order.',
+      ]);
     });
   });
 });

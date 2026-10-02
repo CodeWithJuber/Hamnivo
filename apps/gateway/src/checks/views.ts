@@ -10,9 +10,11 @@ import { toPublicId } from '@hamnivo/db';
 import {
   type CheckTask,
   ESCALATION_QUESTIONS,
+  INBOUND_GUARD_QUESTIONS,
   LANGUAGE_CHECK_QUESTIONS,
   LANGUAGE_SLICES,
   type NoulQuestion,
+  OUTBOUND_GUARD_QUESTIONS,
   PASSAGE_QUESTIONS,
   relationQuestion,
 } from '@hamnivo/domain';
@@ -33,6 +35,12 @@ export function checkQuestions(task: CheckTask): CheckQuestion[] {
       return Object.entries(ESCALATION_QUESTIONS).map(([key, question]) => noulView(key, question));
     case 'passage-relevance':
       return Object.entries(PASSAGE_QUESTIONS).map(([key, question]) => noulView(key, question));
+    case 'message-guard':
+      // About the customer's messages first, then about the draft reply.
+      return [
+        ...Object.entries(INBOUND_GUARD_QUESTIONS),
+        ...Object.entries(OUTBOUND_GUARD_QUESTIONS),
+      ].map(([key, question]) => noulView(key, question));
     case 'language': {
       const question = LANGUAGE_CHECK_QUESTIONS.language;
       return [

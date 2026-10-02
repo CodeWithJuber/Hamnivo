@@ -29,7 +29,13 @@ import { LANGUAGE_OF_SLICE, type ReplyLanguage } from './language.js';
  * usage and latency. A language without thresholds was not evaluated: the check abstains there
  * and Hamnivo behaves as it does without it.
  */
-export const CHECK_TASKS = ['answer-check', 'escalation', 'passage-relevance', 'language'] as const;
+export const CHECK_TASKS = [
+  'answer-check',
+  'escalation',
+  'passage-relevance',
+  'language',
+  'message-guard',
+] as const;
 export type CheckTask = (typeof CHECK_TASKS)[number];
 
 export const isCheckTask = (value: unknown): value is CheckTask =>
@@ -76,6 +82,22 @@ export const CHECK_TASK_SPECS: Readonly<Record<CheckTask, CheckTaskSpec>> = {
     slice: 'message',
   },
   language: { questionsVersion: 1, thresholds: { language: 'choice' }, slice: 'answer' },
+  'message-guard': {
+    questionsVersion: 1,
+    thresholds: {
+      self_harm: 'noul',
+      in_danger: 'noul',
+      threat: 'noul',
+      abuse: 'noul',
+      says_paid: 'noul',
+      says_refunded: 'noul',
+      says_order_changed: 'noul',
+      promises_refund: 'noul',
+      promises_order_change: 'noul',
+    },
+    // The customer's message for what comes in, the reply for what goes out.
+    slice: 'message',
+  },
 };
 
 /** Thresholds of a check rubric: by language slice, then threshold key. */
@@ -606,4 +628,208 @@ export function languageDecision(
   }
   const language = LANGUAGE_OF_SLICE[answer.label as LanguageSlice];
   return candidates.includes(language) ? language : null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Message guard: what comes in (risk, threats, abuse) and what goes out (unbacked claims)
+
+/** Questions about the customer's latest message, one exact condition each. */
+export const INBOUND_GUARD_QUESTIONS = {
+  self_harm: {
+    type: 'noul',
+    instructions: 'Does the customer say they want to hurt or kill themselves?',
+    outcomes: {
+      true: 'The customer talks about hurting themselves, killing themselves or ending their life',
+      false: 'The customer does not talk about hurting themselves',
+    },
+  },
+  in_danger: {
+    type: 'noul',
+    instructions: 'Does the customer say that someone is in danger right now?',
+    outcomes: {
+      true: 'The customer says they or someone else is in immediate danger, such as being attacked, a medical emergency or a fire',
+      false: 'The customer does not say that anyone is in danger right now',
+    },
+  },
+  threat: {
+    type: 'noul',
+    instructions: 'Does the customer threaten to hurt someone or damage something?',
+    outcomes: {
+      true: 'The customer threatens violence against a person, or damage to property',
+      false: 'The customer does not threaten violence or damage',
+    },
+  },
+  abuse: {
+    type: 'noul',
+    instructions: 'Does the customer insult or abuse the staff or the assistant?',
+    outcomes: {
+      true: 'The customer uses insults, slurs or harassment against the staff or the assistant',
+      false: 'The customer does not insult or abuse anyone',
+    },
+  },
+} as const satisfies Record<string, NoulQuestion>;
+
+export type InboundGuardReason = keyof typeof INBOUND_GUARD_QUESTIONS;
+
+/** Customer messages the guard reads: the latest few, oldest first, so a burst is covered. */
+export const GUARD_MESSAGES = 3;
+
+/**
+ * What comes in. Someone at risk (self-harm, or danger now) is urgent: safe wording at once, then
+ * a person. A threat or abuse goes to a person. Only answers that met their threshold count.
+ */
+export function inboundGuardVerdict(gated: GatedAnswers): {
+  urgent: boolean;
+  handoff: boolean;
+  reasons: InboundGuardReason[];
+} {
+  const reasons = (Object.keys(INBOUND_GUARD_QUESTIONS) as InboundGuardReason[]).filter(
+    (question) => said(gated, question),
+  );
+  const urgent = reasons.includes('self_harm') || reasons.includes('in_danger');
+  return { urgent, handoff: reasons.length > 0, reasons };
+}
+
+/**
+ * What Hamnivo says, in the reply language, when someone may be at risk: no model writes it.
+ * It points to local emergency help and says a person is taking over, which happens right after.
+ * Every language but English is pending native review.
+ */
+export const SAFE_REPLIES: Readonly<Record<ReplyLanguage, string>> = {
+  en:
+    "I'm sorry you are going through this. Your safety comes first. If you or someone else is " +
+    'in danger now, please call your local emergency number. If you are thinking of hurting ' +
+    'yourself, please talk to someone you trust or a crisis line now. I have passed this chat ' +
+    'to a person on our team.',
+  ar:
+    'أنا آسف لما تمر به. سلامتك هي الأهم. إذا كنت أنت أو أي شخص آخر في خطر الآن، فاتصل برقم ' +
+    'الطوارئ المحلي. إذا كنت تفكر في إيذاء نفسك، فتحدث الآن مع شخص تثق به أو مع خط مساعدة ' +
+    'للأزمات. لقد حوّلت هذه المحادثة إلى شخص من فريقنا.',
+  hi:
+    'मुझे दुख है कि आप इससे गुज़र रहे हैं। आपकी सुरक्षा सबसे ज़रूरी है। अगर आप या कोई और अभी ' +
+    'खतरे में है, तो कृपया अपने स्थानीय आपातकालीन नंबर पर कॉल करें। अगर आप खुद को नुकसान ' +
+    'पहुँचाने के बारे में सोच रहे हैं, तो कृपया अभी किसी भरोसेमंद व्यक्ति या संकट हेल्पलाइन से ' +
+    'बात करें। मैंने यह चैट हमारी टीम के एक व्यक्ति को सौंप दी है।',
+  ur:
+    'مجھے افسوس ہے کہ آپ اس سے گزر رہے ہیں۔ آپ کی حفاظت سب سے اہم ہے۔ اگر آپ یا کوئی اور ابھی ' +
+    'خطرے میں ہے تو براہ کرم اپنے مقامی ایمرجنسی نمبر پر کال کریں۔ اگر آپ خود کو نقصان پہنچانے ' +
+    'کا سوچ رہے ہیں تو براہ کرم ابھی کسی قابلِ اعتماد شخص یا کسی بحرانی ہیلپ لائن سے بات کریں۔ ' +
+    'میں نے یہ چیٹ ہماری ٹیم کے ایک فرد کو سونپ دی ہے۔',
+  'hi-Latn':
+    'Mujhe dukh hai ki aap is se guzar rahe hain. Aapki suraksha sabse zaroori hai. Agar aap ya ' +
+    'koi aur abhi khatre mein hai, to please apne local emergency number par call karein. Agar ' +
+    'aap khud ko nuksan pahunchane ke baare mein soch rahe hain, to please abhi kisi bharosemand ' +
+    'insaan ya crisis helpline se baat karein. Maine yeh chat hamari team ke ek vyakti ko saunp ' +
+    'di hai.',
+  'ur-Latn':
+    'Mujhe afsos hai ke aap is se guzar rahe hain. Aap ki hifazat sab se zaroori hai. Agar aap ' +
+    'ya koi aur abhi khatre mein hai to meharbani kar ke apne local emergency number par call ' +
+    'karein. Agar aap khud ko nuqsan pohanchane ka soch rahe hain to meharbani kar ke abhi kisi ' +
+    'qabil-e-aitmaad shakhs ya crisis helpline se baat karein. Main ne yeh chat hamari team ke ' +
+    'ek fard ke hawale kar di hai.',
+};
+
+/** Questions about the draft reply, one exact condition each. */
+export const OUTBOUND_GUARD_QUESTIONS = {
+  says_paid: {
+    type: 'noul',
+    instructions: 'Does the reply say that a payment has been made?',
+    outcomes: {
+      true: 'The reply says the customer has paid, was charged, or that a payment went through',
+      false: 'The reply does not say that a payment was made',
+    },
+  },
+  says_refunded: {
+    type: 'noul',
+    instructions: 'Does the reply say that a refund has been made?',
+    outcomes: {
+      true: 'The reply says money was refunded, returned or sent back to the customer',
+      false: 'The reply does not say that a refund was made',
+    },
+  },
+  says_order_changed: {
+    type: 'noul',
+    instructions: 'Does the reply say that an order has been changed or cancelled?',
+    outcomes: {
+      true: 'The reply says an order was cancelled, changed or updated, or its address was changed',
+      false: 'The reply does not say that an order was changed or cancelled',
+    },
+  },
+  promises_refund: {
+    type: 'noul',
+    instructions: 'Does the reply promise the customer a refund?',
+    outcomes: {
+      true: 'The reply says the customer will get a refund or their money back',
+      false: 'The reply does not promise a refund',
+    },
+  },
+  promises_order_change: {
+    type: 'noul',
+    instructions: 'Does the reply promise to change or cancel an order?',
+    outcomes: {
+      true: 'The reply says an order will be changed, cancelled or updated',
+      false: 'The reply does not promise to change or cancel an order',
+    },
+  },
+} as const satisfies Record<string, NoulQuestion>;
+
+export type OutboundClaim = keyof typeof OUTBOUND_GUARD_QUESTIONS;
+
+/** Characters of a draft reply the guard reads. */
+export const GUARD_REPLY_CHARS = 2000;
+
+/** What Hamnivo's own records show for a conversation: receipts and commitments, never text. */
+export interface ClaimEvidence {
+  /** A provider receipt shows a payment captured in this conversation. */
+  paymentConfirmed: boolean;
+  /** A provider receipt shows a refund succeeded in this conversation. */
+  refundConfirmed: boolean;
+  /** A refund was submitted to the provider (or succeeded): Hamnivo is committed to it. */
+  refundCommitted: boolean;
+}
+
+/** What goes out: the claims a draft makes. Only answers that met their threshold count. */
+export function outboundClaims(gated: GatedAnswers): OutboundClaim[] {
+  return (Object.keys(OUTBOUND_GUARD_QUESTIONS) as OutboundClaim[]).filter((claim) =>
+    said(gated, claim),
+  );
+}
+
+/**
+ * The claims Hamnivo's records do not back. A payment or a refund needs its receipt; a promised
+ * refund needs one submitted to the provider; an order change is never backed here, since order
+ * changes have no receipts yet.
+ */
+export function unbackedClaims(
+  claims: readonly OutboundClaim[],
+  evidence: ClaimEvidence,
+): OutboundClaim[] {
+  const backed: Record<OutboundClaim, boolean> = {
+    says_paid: evidence.paymentConfirmed,
+    says_refunded: evidence.refundConfirmed,
+    says_order_changed: false,
+    promises_refund: evidence.refundCommitted || evidence.refundConfirmed,
+    promises_order_change: false,
+  };
+  return claims.filter((claim) => !backed[claim]);
+}
+
+const CLAIM_WORDS: Record<OutboundClaim, string> = {
+  says_paid: 'that a payment was made',
+  says_refunded: 'that a refund was made',
+  says_order_changed: 'that an order was changed or cancelled',
+  promises_refund: 'a refund',
+  promises_order_change: 'a change to an order',
+};
+
+/** What the model is told when it writes the reply again without the unbacked claims. */
+export function outboundGuardCorrection(claims: readonly OutboundClaim[]): string {
+  const stated = claims.filter((c) => c.startsWith('says_')).map((c) => CLAIM_WORDS[c]);
+  const promised = claims.filter((c) => c.startsWith('promises_')).map((c) => CLAIM_WORDS[c]);
+  return [
+    ...(stated.length ? [`Your previous draft said ${stated.join(' and ')}.`] : []),
+    ...(promised.length ? [`Your previous draft promised ${promised.join(' and ')}.`] : []),
+    'Hamnivo has no receipt or commitment for that. Do not say it or promise it. Say it is not ' +
+      'confirmed yet, and offer a person.',
+  ].join(' ');
 }

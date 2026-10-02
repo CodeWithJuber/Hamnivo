@@ -62,6 +62,10 @@ const VERDICTS = [
   'continue',
   'decided',
   'ask',
+  'at_risk',
+  'flagged',
+  'clear',
+  'unbacked',
 ] as const;
 const ACTIONS = [
   'publish',
@@ -72,6 +76,7 @@ const ACTIONS = [
   'continue',
   'use',
   'ask',
+  'urgent',
 ] as const;
 const known = <T extends string>(list: readonly T[], value: string): value is T =>
   (list as readonly string[]).includes(value);

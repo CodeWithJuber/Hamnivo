@@ -32,6 +32,11 @@ export const checksEn = {
       description:
         'Before the AI answers, Jev checks whether the customer needs a person: a request it may have missed, a risk to health or safety, a legal threat, a complaint, or frustration with a problem that is still not solved. Code combines the answers. When live, the conversation goes to a person with the reason in the note. A customer who asks for a person always gets one, without Jev.',
     },
+    'message-guard': {
+      title: 'Message guard',
+      description:
+        'Jev reads what comes in and what goes out. Coming in: does someone want to hurt themselves, or is someone in danger now? Does the customer threaten or abuse? Going out: does the draft say or promise a payment, refund or order change? Code decides what the answers mean. When live, someone at risk gets safety wording at once, and a person takes over. A threat or abuse goes to a person. A draft that claims something without a receipt or commitment is written again, or passed to a person. The receipt check runs first and keeps the final say.',
+    },
   },
   versions: {
     published: 'Published version {{version}}',
@@ -102,6 +107,10 @@ export const checksEn = {
     continue: 'No person needed',
     decided: 'Language chosen',
     ask: 'Not sure enough',
+    at_risk: 'Someone may be at risk',
+    flagged: 'Threat or abuse',
+    clear: 'Nothing found',
+    unbacked: 'Claim without a receipt',
   },
   action: {
     publish: 'Send the reply',
@@ -112,6 +121,7 @@ export const checksEn = {
     continue: 'Let the AI answer',
     use: 'Reply in that language',
     ask: 'Ask the customer',
+    urgent: 'Safety wording, then a person',
   },
 };
 
@@ -144,6 +154,11 @@ export const checksAr: typeof checksEn = {
       title: 'نصيحة الإحالة',
       description:
         'قبل أن يجيب الذكاء الاصطناعي، يفحص Jev هل يحتاج العميل إلى شخص: طلب ربما فاته، أو خطر على الصحة أو السلامة، أو تهديد قانوني، أو شكوى، أو استياء من مشكلة لم تُحل بعد. وتجمع الشيفرة الإجابات. عند التفعيل، تنتقل المحادثة إلى شخص مع السبب في الملاحظة. والعميل الذي يطلب شخصًا يحصل عليه دائمًا، دون Jev.',
+    },
+    'message-guard': {
+      title: 'حارس الرسائل',
+      description:
+        'يقرأ Jev ما يصل وما يُرسَل. الوارد: هل يريد أحد إيذاء نفسه، أو هل أحد في خطر الآن؟ هل يهدد العميل أو يسيء؟ الصادر: هل تقول مسودة الرد أو تعد بدفعة أو استرداد أو تغيير في طلب؟ الكود هو الذي يقرر معنى الإجابات. عند التفعيل، يتلقى من قد يكون في خطر كلمات أمان فورًا، ويتولى شخص المحادثة. ويذهب التهديد أو الإساءة إلى شخص. وتُكتب المسودة التي تدّعي شيئًا بلا إيصال أو التزام من جديد، أو تُحال إلى شخص. يعمل فحص الإيصالات أولًا ويبقى القرار الأخير له.',
     },
   },
   versions: {
@@ -212,6 +227,10 @@ export const checksAr: typeof checksEn = {
     continue: 'لا حاجة إلى شخص',
     decided: 'اختيرت اللغة',
     ask: 'غير متأكد بما يكفي',
+    at_risk: 'قد يكون أحد في خطر',
+    flagged: 'تهديد أو إساءة',
+    clear: 'لم يُعثر على شيء',
+    unbacked: 'ادعاء بلا إيصال',
   },
   action: {
     publish: 'إرسال الرد',
@@ -222,6 +241,7 @@ export const checksAr: typeof checksEn = {
     continue: 'ترك الذكاء الاصطناعي يجيب',
     use: 'الرد بتلك اللغة',
     ask: 'سؤال العميل',
+    urgent: 'كلمات أمان ثم شخص',
   },
 };
 
@@ -254,6 +274,11 @@ export const checksHi: typeof checksEn = {
       title: 'व्यक्ति को सौंपने की सलाह',
       description:
         'AI के जवाब देने से पहले Jev जाँचता है कि ग्राहक को किसी व्यक्ति की ज़रूरत है या नहीं: ऐसा अनुरोध जो छूट गया हो, सेहत या सुरक्षा का खतरा, कानूनी धमकी, शिकायत, या किसी अनसुलझी समस्या से नाराज़गी। जवाबों को कोड जोड़ता है। चालू होने पर बातचीत वजह के नोट के साथ किसी व्यक्ति को जाती है। जो ग्राहक किसी व्यक्ति से बात करना चाहे, उसे हमेशा व्यक्ति मिलता है, Jev के बिना।',
+    },
+    'message-guard': {
+      title: 'संदेश गार्ड',
+      description:
+        'Jev आने वाले और जाने वाले संदेश पढ़ता है। आने वाले: क्या कोई खुद को नुकसान पहुँचाना चाहता है, या कोई अभी खतरे में है? क्या ग्राहक धमकी देता है या गाली देता है? जाने वाले: क्या जवाब का मसौदा किसी भुगतान, रिफ़ंड या ऑर्डर बदलाव की बात या वादा करता है? जवाबों का मतलब कोड तय करता है। चालू होने पर, खतरे में हो सकने वाले व्यक्ति को तुरंत सुरक्षा संदेश मिलता है, और एक व्यक्ति बातचीत संभालता है। धमकी या गाली किसी व्यक्ति के पास जाती है। बिना रसीद या प्रतिबद्धता के दावा करने वाला मसौदा दोबारा लिखा जाता है, या किसी व्यक्ति को दिया जाता है। रसीद जाँच पहले चलती है और आख़िरी फ़ैसला उसी का है।',
     },
   },
   versions: {
@@ -322,6 +347,10 @@ export const checksHi: typeof checksEn = {
     continue: 'व्यक्ति की ज़रूरत नहीं',
     decided: 'भाषा चुनी गई',
     ask: 'पूरा भरोसा नहीं',
+    at_risk: 'कोई खतरे में हो सकता है',
+    flagged: 'धमकी या गाली',
+    clear: 'कुछ नहीं मिला',
+    unbacked: 'बिना रसीद का दावा',
   },
   action: {
     publish: 'जवाब भेजें',
@@ -332,6 +361,7 @@ export const checksHi: typeof checksEn = {
     continue: 'AI को जवाब देने दें',
     use: 'उसी भाषा में जवाब',
     ask: 'ग्राहक से पूछें',
+    urgent: 'सुरक्षा संदेश, फिर व्यक्ति',
   },
 };
 
@@ -364,6 +394,11 @@ export const checksUr: typeof checksEn = {
       title: 'شخص کے حوالے کرنے کا مشورہ',
       description:
         'AI کے جواب دینے سے پہلے Jev جانچتا ہے کہ گاہک کو کسی شخص کی ضرورت ہے یا نہیں: ایسی درخواست جو رہ گئی ہو، صحت یا حفاظت کا خطرہ، قانونی دھمکی، شکایت، یا کسی حل نہ ہونے والے مسئلے پر ناراضی۔ جوابات کو کوڈ جوڑتا ہے۔ فعال ہونے پر گفتگو وجہ کے نوٹ کے ساتھ کسی شخص کے پاس جاتی ہے۔ جو گاہک کسی شخص سے بات کرنا چاہے، اسے ہمیشہ شخص ملتا ہے، Jev کے بغیر۔',
+    },
+    'message-guard': {
+      title: 'پیغام گارڈ',
+      description:
+        'Jev آنے والے اور جانے والے پیغامات پڑھتا ہے۔ آنے والے: کیا کوئی خود کو نقصان پہنچانا چاہتا ہے، یا کوئی ابھی خطرے میں ہے؟ کیا گاہک دھمکی دیتا ہے یا گالی دیتا ہے؟ جانے والے: کیا جواب کا مسودہ کسی ادائیگی، رقم کی واپسی یا آرڈر میں تبدیلی کی بات یا وعدہ کرتا ہے؟ جوابوں کا مطلب کوڈ طے کرتا ہے۔ فعال ہونے پر، خطرے میں ہو سکنے والے شخص کو فوراً حفاظتی پیغام ملتا ہے، اور ایک فرد بات چیت سنبھالتا ہے۔ دھمکی یا گالی کسی فرد کے پاس جاتی ہے۔ رسید یا وعدے کے بغیر دعویٰ کرنے والا مسودہ دوبارہ لکھا جاتا ہے، یا کسی فرد کو دیا جاتا ہے۔ رسید کی جانچ پہلے چلتی ہے اور آخری فیصلہ اسی کا ہے۔',
     },
   },
   versions: {
@@ -434,6 +469,10 @@ export const checksUr: typeof checksEn = {
     continue: 'شخص کی ضرورت نہیں',
     decided: 'زبان چنی گئی',
     ask: 'پورا یقین نہیں',
+    at_risk: 'کوئی خطرے میں ہو سکتا ہے',
+    flagged: 'دھمکی یا گالی',
+    clear: 'کچھ نہیں ملا',
+    unbacked: 'رسید کے بغیر دعویٰ',
   },
   action: {
     publish: 'جواب بھیجیں',
@@ -444,5 +483,6 @@ export const checksUr: typeof checksEn = {
     continue: 'AI کو جواب دینے دیں',
     use: 'اسی زبان میں جواب',
     ask: 'گاہک سے پوچھیں',
+    urgent: 'حفاظتی پیغام، پھر فرد',
   },
 };

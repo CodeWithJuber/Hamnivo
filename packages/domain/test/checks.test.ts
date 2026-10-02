@@ -14,13 +14,20 @@ import {
   escalationVerdict,
   type GatedAnswers,
   gateCheck,
+  INBOUND_GUARD_QUESTIONS,
+  inboundGuardVerdict,
   languageDecision,
+  OUTBOUND_GUARD_QUESTIONS,
+  outboundClaims,
+  outboundGuardCorrection,
   PASSAGE_QUESTIONS,
   passageVerdict,
+  SAFE_REPLIES,
   splitSentences,
+  unbackedClaims,
 } from '../src/checks.js';
 import type { ChoiceAnswer, DecisionAnswers, DecisionResult } from '../src/decisions.js';
-import { detectLanguage, resolveReplyLanguage } from '../src/language.js';
+import { detectLanguage, REPLY_LANGUAGES, resolveReplyLanguage } from '../src/language.js';
 
 describe('sentences of a reply', () => {
   it('splits at the end of a sentence in every script, keeping citations with their sentence', () => {
@@ -442,5 +449,104 @@ describe('the reply language with Jev (U01)', () => {
     });
     // Without a decision the customer is asked once, as before.
     expect(resolveReplyLanguage({ detection }).confirm).not.toBeNull();
+  });
+});
+
+describe('message guard', () => {
+  const yes = (probability = 0.95) => ({ type: 'noul' as const, probability, verdict: true });
+  const no = (probability = 0.05) => ({ type: 'noul' as const, probability, verdict: false });
+  const gatedWith = (kept: GatedAnswers['kept']): GatedAnswers => ({
+    status: 'decided',
+    reason: null,
+    kept,
+    shortfalls: {},
+    observed: {},
+  });
+  const none = { paymentConfirmed: false, refundConfirmed: false, refundCommitted: false };
+
+  it('asks each condition on its own, about the message or the reply', () => {
+    expect(Object.keys(INBOUND_GUARD_QUESTIONS)).toEqual([
+      'self_harm',
+      'in_danger',
+      'threat',
+      'abuse',
+    ]);
+    expect(Object.keys(OUTBOUND_GUARD_QUESTIONS)).toEqual([
+      'says_paid',
+      'says_refunded',
+      'says_order_changed',
+      'promises_refund',
+      'promises_order_change',
+    ]);
+    for (const question of [
+      ...Object.values(INBOUND_GUARD_QUESTIONS),
+      ...Object.values(OUTBOUND_GUARD_QUESTIONS),
+    ]) {
+      expect(question.type).toBe('noul');
+      expect(question.outcomes.true).toBeTruthy();
+      expect(question.outcomes.false).toBeTruthy();
+    }
+  });
+
+  it('treats self-harm or danger now as urgent, and a threat or abuse as a hand-off', () => {
+    expect(inboundGuardVerdict(gatedWith({ self_harm: yes(), threat: no() }))).toEqual({
+      urgent: true,
+      handoff: true,
+      reasons: ['self_harm'],
+    });
+    expect(inboundGuardVerdict(gatedWith({ in_danger: yes() })).urgent).toBe(true);
+    expect(inboundGuardVerdict(gatedWith({ threat: yes(), abuse: yes() }))).toEqual({
+      urgent: false,
+      handoff: true,
+      reasons: ['threat', 'abuse'],
+    });
+    // An answer short of its threshold decides nothing.
+    expect(inboundGuardVerdict(gatedWith({ self_harm: null, in_danger: no() }))).toEqual({
+      urgent: false,
+      handoff: false,
+      reasons: [],
+    });
+  });
+
+  it('has safe wording in every reply language that sends people to emergency help', () => {
+    for (const language of REPLY_LANGUAGES)
+      expect(SAFE_REPLIES[language].length).toBeGreaterThan(40);
+    expect(SAFE_REPLIES.en).toContain('emergency number');
+    expect(SAFE_REPLIES['ur-Latn']).toContain('emergency number');
+  });
+
+  it('lets a payment or refund stand only with its receipt, and a promised refund once submitted', () => {
+    const claims = outboundClaims(
+      gatedWith({ says_paid: yes(), says_refunded: no(), promises_refund: yes(), abuse: yes() }),
+    );
+    expect(claims).toEqual(['says_paid', 'promises_refund']);
+    expect(unbackedClaims(claims, none)).toEqual(['says_paid', 'promises_refund']);
+    expect(unbackedClaims(claims, { ...none, paymentConfirmed: true })).toEqual([
+      'promises_refund',
+    ]);
+    expect(
+      unbackedClaims(claims, { ...none, paymentConfirmed: true, refundCommitted: true }),
+    ).toEqual([]);
+    // A refund that succeeded backs the promise too; it does not back a payment.
+    expect(
+      unbackedClaims(['says_paid', 'promises_refund'], { ...none, refundConfirmed: true }),
+    ).toEqual(['says_paid']);
+  });
+
+  it('never backs an order change, which has no receipts yet', () => {
+    const all = { paymentConfirmed: true, refundConfirmed: true, refundCommitted: true };
+    expect(unbackedClaims(['says_order_changed', 'promises_order_change'], all)).toEqual([
+      'says_order_changed',
+      'promises_order_change',
+    ]);
+    // Unsure answers are not claims.
+    expect(outboundClaims(gatedWith({ says_order_changed: null }))).toEqual([]);
+  });
+
+  it('tells the model what it said or promised without a receipt', () => {
+    const correction = outboundGuardCorrection(['says_refunded', 'promises_order_change']);
+    expect(correction).toContain('said that a refund was made');
+    expect(correction).toContain('promised a change to an order');
+    expect(correction).toContain('not confirmed yet');
   });
 });

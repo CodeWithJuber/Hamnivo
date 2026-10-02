@@ -27,6 +27,21 @@ export const HANDOFF_NOTES: Record<AiHandoffReason, string> = {
 export const CHECK_HANDOFF_NOTES = {
   unsupported_answer:
     'The AI reply was held back: the knowledge it cited did not support it. Please answer.',
+  unbacked_claim:
+    'The AI reply was held back: it said or promised a payment, refund or order change that ' +
+    'Hamnivo has no receipt or commitment for. Please answer.',
+  guard: 'The message guard passed this conversation to people. Please answer.',
+  urgent:
+    'URGENT: the message guard found that someone may be at risk. The AI sent safety wording ' +
+    'and stepped back. Please answer now.',
+} as const;
+
+/** Why the message guard passed a conversation to people, one sentence per reason. */
+export const GUARD_NOTES = {
+  self_harm: 'The customer may be thinking of hurting themselves.',
+  in_danger: 'The customer says someone may be in danger now.',
+  threat: 'The customer threatens to hurt someone or damage something.',
+  abuse: 'The customer insults or abuses the team or the assistant.',
 } as const;
 
 /** Why the escalation check (J04) passed a conversation to people, one sentence per reason. */

@@ -285,10 +285,19 @@ Switch a check to **live** when its records look right.
   Roman Urdu), Jev picks one. When live, its choice is used if Jev is sure enough for that
   language; otherwise the customer is asked once, as before. Choosing Jev fills in the thresholds
   Hamnivo measured. A customer's own choice always wins.
+- **Message guard:** Jev reads what comes in and what goes out. When live, a customer who says
+  they want to hurt themselves, or that someone is in danger now, gets safety wording at once in
+  their language, pointing to local emergency help, and a person takes over with an urgent note.
+  A threat or abuse goes to a person. A draft reply that says or promises a payment, refund or
+  order change without a receipt or a submitted refund is written again once, then passed to a
+  person. The receipt check runs first and keeps the final say. These questions have no measured
+  thresholds yet: set them from what comparison mode records. The safety wording in languages
+  other than English is waiting for review by native speakers.
 
 If Jev is slow or unavailable, or a language has no threshold, the reply goes out as it would
 without the check, and the check is recorded. A check sends TypeSafe only what it needs: the
-sentences and the passages they cite.
+customer's latest messages or the draft reply, with personal data replaced by its kind, and the
+knowledge passages it checks.
 
 ### Bring your old chats
 

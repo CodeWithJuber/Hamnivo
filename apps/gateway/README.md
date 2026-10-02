@@ -278,6 +278,28 @@ Zendesk and Intercom exports.
   latency and tokens, never customer text; confidence only when the provider gave one.
   `…/experiment` compares Jev with the baseline per language from shadow and live records.
 
+## Reply checks (J03, J04, U01, X10)
+
+Jev checks around an AI reply live in `src/checks/`. `ReplyChecksService.forRun` loads a brand's
+check settings once per run and returns one handle (`RunChecks`); the reply path calls it from a
+few points: the inbound checks (message guard and escalation, side by side), the language
+decider, passage relevance, and the draft checks (answer check and message guard, side by side,
+after the receipt check). Each check asks exact questions about a minimized state (personal data
+replaced by its kind), and `@hamnivo/domain` decides what the answers mean. A check can only hold
+a reply, drop a passage or hand the conversation to people.
+
+- **Settings.** Studio's `/v1/admin/brands/{brandId}/checks` API: a versioned rubric per check with
+  thresholds per language, and the mode (`off`, `shadow`, `live`). Brands start in `shadow`.
+- **Records.** One `decision_checks` row and one run step per check, with labels, numbers and
+  document ids, never text. A run's check writes go one at a time, since run steps are numbered
+  in order.
+- **Within the run.** A check's deadline is what is left of the agent's time limit, and a draft is
+  written again only when half of it is left. When Jev is unavailable, or a language has no
+  thresholds, the reply goes on as it would without the check.
+- **Someone at risk.** The message guard's urgent result skips memory, cache and model: Hamnivo's
+  safety wording (`SAFE_REPLIES`) goes out through the usual fenced publication, then the
+  conversation is handed to people with an urgent note.
+
 ## Reply language (U01, U07)
 
 - `GET /v1/widget/language` and `POST /v1/widget/language` (widget session): interface locale,
@@ -424,7 +446,7 @@ pnpm --filter @hamnivo/gateway start:api      # or start:worker; reads ../../.en
 ```bash
 pnpm --filter @hamnivo/gateway test           # unit
 pnpm --filter @hamnivo/gateway test:int       # PostgreSQL + Valkey (services:up or ci:local)
-TYPESAFE_API_KEY=… pnpm --filter @hamnivo/gateway test:live   # opt-in: routing with the real Jev
+TYPESAFE_API_KEY=… pnpm --filter @hamnivo/gateway test:live   # opt-in: routing and checks with the real Jev
 ```
 
 `test:live` is never part of the other runs. Each live file skips itself when its key is not in
