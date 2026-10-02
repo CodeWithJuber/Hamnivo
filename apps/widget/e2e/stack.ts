@@ -7,7 +7,7 @@
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { createHmac, randomBytes } from 'node:crypto';
-import { createReadStream, existsSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
 import { startFakeStripe } from '@hamnivo/adapters/commerce/testing';
@@ -250,18 +250,34 @@ try {
   stripe.webhookEndpoints.push({ url: merchant.webhookUrl, secret: webhookSecret });
 
   const hostPage = join(root, 'apps/widget/e2e/.host.html');
+  const loader = (attributes = '') =>
+    `<script src="${origin(ports.widget)}/loader.js" data-widget-id="${brand.widgetId}" data-api="${origin(ports.api)}"${attributes} async></script>`;
+  const page = (body: string) =>
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Noor Books</title></head>
+<body>${body}</body></html>`;
   writeFileSync(
     hostPage,
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Noor Books</title></head>
-<body><main><h1>Noor Books</h1><p>Welcome to our store.</p></main>
-<script src="${origin(ports.widget)}/loader.js" data-widget-id="${brand.widgetId}" data-api="${origin(ports.api)}" async></script>
-</body></html>`,
+    page(`<main><h1>Noor Books</h1><p>Welcome to our store.</p></main>\n${loader()}`),
   );
+  // The other layouts (W02), each overriding the brand's choice with data-mode.
+  const hosts = join(root, 'apps/widget/e2e/.hosts');
+  mkdirSync(hosts, { recursive: true });
+  writeFileSync(
+    join(hosts, 'panel.html'),
+    page(`<main><h1>Noor Books</h1></main>\n${loader(' data-mode="panel"')}`),
+  );
+  writeFileSync(
+    join(hosts, 'inline.html'),
+    page(
+      `<main><h1>Help</h1><div id="chat"></div></main>\n${loader(' data-mode="inline" data-container="#chat" data-height="560px"')}`,
+    ),
+  );
+  writeFileSync(join(hosts, 'fullpage.html'), page(loader(' data-mode="fullpage"')));
   await staticServer(ports.widget, [
     join(root, 'apps/widget/dist'),
     join(root, 'packages/widget-loader/dist'),
   ]);
-  await staticServer(ports.host, [], hostPage);
+  await staticServer(ports.host, [hosts], hostPage);
   writeFileSync(
     join(root, 'apps/widget/e2e/.stack.json'),
     JSON.stringify(
@@ -271,6 +287,7 @@ try {
         widgetOrigin: origin(ports.widget),
         consoleOrigin: origin(ports.console),
         widgetId: brand.widgetId,
+        brandId: brand.id,
         tenantId,
         cookie,
         identityKey: { kid: identityKey.kid, secret: identityKey.secret },

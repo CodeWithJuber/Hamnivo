@@ -1113,6 +1113,9 @@ export const ur: Translation = {
         available: 'دستیاب',
         rejected: 'روک دی گئی',
       },
+      place: 'ایک جگہ شیئر کی: {{label}}',
+      contact: 'ایک رابطہ شیئر کیا: {{details}}',
+      reaction: '{{emoji}} سے ردعمل دیا',
     },
     translation: {
       translate: '{{language}} میں ترجمہ کریں',

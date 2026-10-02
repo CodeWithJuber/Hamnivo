@@ -1,3 +1,4 @@
+import { WidgetLayoutMode } from '@hamnivo/contracts';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
@@ -7,12 +8,14 @@ import './styles.css';
 
 const query = new URLSearchParams(window.location.search);
 const locale = pickLocale(query.get('locale') ?? navigator.language);
+const mode = WidgetLayoutMode.safeParse(query.get('mode'));
 const params = {
   // A production build pins its gateway; the loader's `api` parameter serves development builds.
   apiBase: import.meta.env.VITE_HAMNIVO_API ?? query.get('api') ?? 'http://localhost:4000',
   widgetId: query.get('widgetId') ?? '',
   hostOrigin: query.get('host'),
   locale,
+  mode: mode.success ? mode.data : null,
 };
 applyLocale(locale);
 await initI18n(locale);

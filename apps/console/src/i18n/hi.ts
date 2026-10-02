@@ -1095,6 +1095,9 @@ export const hi: Translation = {
         available: 'उपलब्ध',
         rejected: 'रोकी गई',
       },
+      place: 'एक जगह साझा की: {{label}}',
+      contact: 'एक संपर्क साझा किया: {{details}}',
+      reaction: '{{emoji}} से प्रतिक्रिया दी',
     },
     translation: {
       translate: '{{language}} में अनुवाद करें',

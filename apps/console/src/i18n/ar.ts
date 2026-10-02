@@ -1090,6 +1090,9 @@ export const ar: Translation = {
         available: 'متاح',
         rejected: 'محظور',
       },
+      place: 'شارك مكانًا: {{label}}',
+      contact: 'شارك جهة اتصال: {{details}}',
+      reaction: 'تفاعل بـ {{emoji}}',
     },
     translation: {
       translate: 'ترجمة إلى {{language}}',

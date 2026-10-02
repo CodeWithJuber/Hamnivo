@@ -1101,6 +1101,9 @@ export const en = {
         available: 'available',
         rejected: 'blocked',
       },
+      place: 'Shared a place: {{label}}',
+      contact: 'Shared a contact: {{details}}',
+      reaction: 'Reacted with {{emoji}}',
     },
     translation: {
       translate: 'Translate to {{language}}',
