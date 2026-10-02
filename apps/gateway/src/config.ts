@@ -68,7 +68,9 @@ const EnvSchema = z.object({
 
   /**
    * Jev (TypeSafe) for routing decisions. Without a key, rubrics that name Jev record every
-   * decision as unavailable and the deterministic baseline decides.
+   * decision as unavailable and the deterministic baseline decides. Set as TYPESAFE_API_KEY and
+   * TYPESAFE_BASE_URL, the names TypeSafe's SDK and docs use; JEV_API_KEY and JEV_BASE_URL are
+   * still read when those are unset.
    */
   JEV_API_KEY: z.string().min(8).optional(),
   JEV_BASE_URL: z.url().optional(),
@@ -109,9 +111,11 @@ export type AppConfig = z.infer<typeof EnvSchema> & {
 /** Parses and validates the environment once at start-up; misconfiguration stops the process. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   // `KEY=` in an env file means "not set", as in .env.example.
-  const parsed = EnvSchema.safeParse(
-    Object.fromEntries(Object.entries(env).filter(([, value]) => value !== '')),
-  );
+  const set = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ''));
+  // TypeSafe's own names for the Jev key and endpoint come first.
+  set.JEV_API_KEY = set.TYPESAFE_API_KEY ?? set.JEV_API_KEY;
+  set.JEV_BASE_URL = set.TYPESAFE_BASE_URL ?? set.JEV_BASE_URL;
+  const parsed = EnvSchema.safeParse(set);
   if (!parsed.success) {
     const problems = parsed.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)

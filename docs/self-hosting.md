@@ -156,6 +156,8 @@ Then edit `deploy/production/.env` for:
 - **AI models (optional):** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`,
   or `OPENAI_COMPATIBLE_BASE_URL` for a local model. Each company can also store its own keys
   later. `EMBEDDING_PROVIDER` chooses the model for knowledge search.
+- **Decisions with Jev (optional):** `TYPESAFE_API_KEY`, a key from [typesafe.ai](https://typesafe.ai).
+  It lets brands route conversations with Jev (A6, "Decisions with Jev").
 - **Other names:** change `HAMNIVO_*_HOST`, then run `setup` again to update the addresses derived
   from them.
 - **Behind Cloudflare's proxy:** run `setup --cloudflare on`. Caddy then believes the visitor
@@ -224,6 +226,39 @@ Open Studio, the staff console, at `https://app.example.com` (your domain in pla
 
 Staff can answer customers in Chatwoot at `https://support.example.com`. The super admin email and
 password are in `.env` (`CHATWOOT_ADMIN_EMAIL` and `CHATWOOT_ADMIN_PASSWORD`).
+
+### Decisions with Jev
+
+Jev is TypeSafe's decision model. It can route each conversation to the team that handles its topic.
+It answers a fixed question, "which of these topics is this?", with a confidence for each answer.
+Hamnivo acts on the answer only when that confidence reaches the threshold you set for the
+conversation's language. Without Jev, a fixed keyword rule routes.
+
+1. Put your key from typesafe.ai in `deploy/production/.env` as `TYPESAFE_API_KEY=...`, then run
+   `./deploy/production/hamnivo.sh up --no-build`.
+2. In Studio, open **Decision rules**, choose the brand, and edit its **Rubric**:
+   - **Provider:** Jev. **Model:** a fixed version, currently `jev-1.13.0`. Moving names such as
+     `jev-latest` are refused, so a new Jev release changes nothing until you try it and publish a
+     rubric that names it.
+   - **Topics:** the topics your teams handle, each with a few keywords for the fixed rule. Under
+     **Teams**, say which team takes which topics.
+   - Try a few messages under **Try a message**, then publish.
+3. The brand starts in **shadow** mode. Every conversation records both Jev's choice and the fixed
+   rule's, but only the fixed rule routes. **Jev compared with the fixed rules** shows how often
+   they agree, per language.
+4. Switch to **live** when the comparison looks right. Set a minimum confidence per language;
+   below it, the fixed rule routes. Jev is most accurate in English. Look at Hinglish, Roman Urdu,
+   Arabic, Hindi and Urdu on your own conversations before you rely on it there.
+
+Rules that always hold:
+- A customer who asks for a person gets one; Jev never decides that.
+- If TypeSafe is slow or down, the fixed rule routes once the rubric's deadline passes (1.5 s by
+  default).
+- Each decision sends TypeSafe only the customer's latest messages and the conversation's status, as
+  the rubric chooses. That is a few hundred tokens, at $0.042 per million input tokens (TypeSafe's
+  price in October 2026).
+- TypeSafe says it does not train Jev on requests or responses
+  ([data handling](https://docs.typesafe.ai/models)).
 
 ### Settings that need the API for now
 

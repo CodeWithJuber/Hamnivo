@@ -145,4 +145,28 @@ describe('configuration', () => {
     expect(config.ANTHROPIC_API_KEY).toBeUndefined();
     expect(config.CHATWOOT_PLATFORM_TOKEN).toBeUndefined();
   });
+
+  it('reads the Jev key under TypeSafe’s names first, then the JEV_ names', () => {
+    const base = {
+      DATABASE_URL: 'postgres://localhost/x',
+      HAMNIVO_KEK_BASE64: Buffer.alloc(32, 1).toString('base64'),
+      BETTER_AUTH_SECRET: 'x'.repeat(32),
+    };
+    const typesafe = loadConfig({
+      ...base,
+      TYPESAFE_API_KEY: 'typesafe-key',
+      TYPESAFE_BASE_URL: 'https://typesafe.example',
+    });
+    expect(typesafe.JEV_API_KEY).toBe('typesafe-key');
+    expect(typesafe.JEV_BASE_URL).toBe('https://typesafe.example');
+    const jev = loadConfig({ ...base, JEV_API_KEY: 'jev-key-1', TYPESAFE_API_KEY: '' });
+    expect(jev.JEV_API_KEY).toBe('jev-key-1');
+    const both = loadConfig({
+      ...base,
+      JEV_API_KEY: 'jev-key-1',
+      TYPESAFE_API_KEY: 'typesafe-key',
+    });
+    expect(both.JEV_API_KEY).toBe('typesafe-key');
+    expect(loadConfig(base).JEV_API_KEY).toBeUndefined();
+  });
 });

@@ -180,6 +180,11 @@ try {
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    // Tests never call the real Jev, even where the shell holds a TypeSafe key.
+    TYPESAFE_API_KEY: '',
+    TYPESAFE_BASE_URL: '',
+    JEV_API_KEY: '',
+    JEV_BASE_URL: '',
     NODE_ENV: 'development',
     HOST: '127.0.0.1',
     PORT: String(ports.api),
