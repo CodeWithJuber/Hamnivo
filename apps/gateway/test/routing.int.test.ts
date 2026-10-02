@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { fromPublicId, schema, toPublicId, withTenant } from '@hamnivo/db';
-import { and, eq } from 'drizzle-orm';
+import { type ClaimedOutboxEvent, fromPublicId, schema, toPublicId, withTenant } from '@hamnivo/db';
+import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AuthorityRegistry } from '../src/authority/registry.js';
+import { RoutingService } from '../src/decisions/routing.service.js';
 import { connectedTenant, type Slice, signUp, startSlice, Visitor } from './slice-harness.js';
 
 type Script =
-  | { kind: 'answer'; label: string; confidence: number }
+  | { kind: 'answer'; label: string; confidence: number; delayMs?: number }
   | { kind: 'hang' }
   | { kind: 'error'; status: number };
 
@@ -23,6 +24,9 @@ function fakeJev() {
     calls.push({ body, at: Date.now() });
     const current = script;
     if (current.kind === 'hang') return new Promise<Response>(() => undefined);
+    if (current.kind === 'answer' && current.delayMs) {
+      await new Promise((resolve) => setTimeout(resolve, current.delayMs));
+    }
     if (current.kind === 'error') {
       return new Response(JSON.stringify({ error: { message: 'unavailable' } }), {
         status: current.status,
@@ -231,6 +235,103 @@ async function setMode(mode: 'off' | 'shadow' | 'live') {
   expect(response.status, JSON.stringify(response.body)).toBe(200);
   expect(response.body.mode).toBe(mode);
 }
+
+// Before the circuit-breaker tests, so Jev is really asked here.
+describe('route events that run at once (two workers, or two versions during a deploy)', () => {
+  beforeAll(async () => {
+    await setMode('live');
+  });
+
+  afterAll(async () => {
+    // Every brand starts in shadow mode; the tests below expect it.
+    await setMode('shadow');
+  });
+
+  const routing = () => slice.worker.get(RoutingService);
+  const routeEvent = (
+    conversationId: string,
+    trigger: 'new_conversation' | 'handoff',
+    ref: string,
+  ): ClaimedOutboxEvent => {
+    const id = fromPublicId('conversation', conversationId);
+    return {
+      tenantId,
+      id: randomUUID(),
+      topic: 'conversation.route',
+      aggregateType: 'conversation',
+      aggregateId: id,
+      payload: { conversationId: id, trigger, ref },
+      headers: {},
+      attempts: 0,
+      createdAt: new Date(),
+    };
+  };
+
+  it('leaves a new conversation whose customer asks for a person to the hand-off', async () => {
+    jev.set({ kind: 'answer', label: 'billing', confidence: 0.95 });
+    const visitor = new Visitor(slice.baseUrl, alpha.brand.widgetId, alpha.hostOrigin);
+    await visitor.open();
+    const started = await visitor.call('POST', '/v1/widget/conversations', {
+      firstMessage: 'Please let me talk to a human about my refund',
+      clientMessageId: randomUUID(),
+    });
+    expect(started.status).toBe(201);
+    const conversationId = started.body.id as string;
+    // Another worker takes the route event before the AI job has handed the conversation over:
+    // nothing is recorded and Jev is not asked.
+    await routing().onRoute(routeEvent(conversationId, 'new_conversation', 'new:early'));
+    expect(jev.calls).toHaveLength(0);
+    expect(await recordsOf(conversationId)).toHaveLength(0);
+    // The AI job hands over, and the conversation is routed once, as waiting for a person.
+    await slice.drain();
+    const { control } = await authorityState(conversationId);
+    expect(control.ownerMode).toBe('WAITING_HUMAN');
+    const records = await recordsOf(conversationId);
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ explicitRequest: true, applied: true });
+  });
+
+  it('keeps one decision when two workers route the same conversation together', async () => {
+    // Made while routing is off, so none of its own route events has run: the customer asked
+    // for a person and the AI handed the conversation over.
+    await setMode('off');
+    const { conversationId } = await chat('I want to talk to a person about my invoice');
+    await setMode('live');
+    expect(await recordsOf(conversationId)).toHaveLength(0);
+    // Jev takes 200 ms, so both events pass their first checks before either records anything;
+    // each insert is also held for 300 ms, so without the lock both would find nothing.
+    jev.set({ kind: 'answer', label: 'billing', confidence: 0.95, delayMs: 200 });
+    const owner = slice.gw.owner;
+    try {
+      await owner.execute(
+        sql.raw(`create function test_hold_route_insert() returns trigger language plpgsql as $$
+          begin
+            if new.trigger_ref like '%:race' then perform pg_sleep(0.3); end if;
+            return new;
+          end $$`),
+      );
+      await owner.execute(
+        sql.raw(`create trigger test_hold_route_insert before insert on decision_records
+          for each row execute function test_hold_route_insert()`),
+      );
+      await Promise.all([
+        routing().onRoute(routeEvent(conversationId, 'new_conversation', 'new:race')),
+        routing().onRoute(routeEvent(conversationId, 'handoff', 'handoff:race')),
+      ]);
+    } finally {
+      await owner.execute(
+        sql.raw('drop trigger if exists test_hold_route_insert on decision_records'),
+      );
+      await owner.execute(sql.raw('drop function if exists test_hold_route_insert()'));
+    }
+    // Both asked Jev (outside the lock); one decision was kept and applied.
+    expect(jev.calls).toHaveLength(2);
+    const records = await recordsOf(conversationId);
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ finalIntent: 'billing', mode: 'live', applied: true });
+    expect(await inboxTeamOf(conversationId)).toBe(teams.Billing);
+  });
+});
 
 describe('shadow routing (J02)', () => {
   it('records the provider and the baseline decisions and routes nothing', async () => {
