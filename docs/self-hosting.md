@@ -264,6 +264,21 @@ Rules that always hold:
 - TypeSafe says it does not train Jev on requests or responses
   ([data handling](https://docs.typesafe.ai/models)).
 
+### Reply checks with Jev
+
+Jev can also check AI replies. Open **Reply checks** in Studio and choose the brand. Each check
+works like routing: choose Jev and a fixed version, set how sure Jev must be in each language,
+publish, and start in **comparison only** mode, which records what Jev finds and changes nothing.
+Switch a check to **live** when its records look right.
+
+- **Answer check:** before an AI reply is sent, Jev checks each sentence that cites your knowledge
+  against the passage it cites. When live, a reply with a sentence the passage does not support is
+  written again once without it; if that fails too, a person takes over with a note.
+
+If Jev is slow or unavailable, or a language has no threshold, the reply goes out as it would
+without the check, and the check is recorded. A check sends TypeSafe only what it needs: the
+sentences and the passages they cite.
+
 ### Bring your old chats
 
 Studio's **Import history** page brings a brand's conversations over from another tool. The

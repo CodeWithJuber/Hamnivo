@@ -7,6 +7,7 @@ import {
 } from '@hamnivo/client';
 import type { CustomerConversation, Message, WidgetSession } from '@hamnivo/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { applyDraftEvent, DRAFT_EVENTS, type Draft } from './drafts.js';
 
 export type Connection = StreamStatus | 'idle' | 'offline';
 
@@ -26,6 +27,8 @@ export interface ChatState {
   error: string | null;
   /** The server's answer to "talk to a person", such as when people are back (W11). */
   handoffNotice: string | null;
+  /** AI replies still being written or checked: provisional, never shown as messages. */
+  drafts: readonly Draft[];
 }
 
 const byTime = (a: Message, b: Message) =>
@@ -45,6 +48,7 @@ const EMPTY: ChatState = {
   connection: 'idle',
   error: null,
   handoffNotice: null,
+  drafts: [],
 };
 
 const messageOf = (error: unknown) => String((error as Error)?.message ?? error);
@@ -95,6 +99,12 @@ export function useChat(client: HamnivoClient) {
   const apply = useCallback((event: Record<string, unknown> & { type: string }) => {
     const data = (event.data ?? {}) as Record<string, unknown>;
     for (const listener of listeners.current) listener({ type: event.type, data });
+    if (DRAFT_EVENTS.has(event.type)) {
+      setState((s) => {
+        const drafts = applyDraftEvent(s.drafts, { type: event.type, data });
+        return drafts === s.drafts ? s : { ...s, drafts };
+      });
+    }
     setState((s) => {
       switch (event.type) {
         case 'message.created':
@@ -143,7 +153,7 @@ export function useChat(client: HamnivoClient) {
         after = page.latestSequence;
       }
       if (stale()) return;
-      setState((s) => ({ ...s, conversation, messages }));
+      setState((s) => ({ ...s, conversation, messages, drafts: [] }));
       const box = new Outbox(client, conversation.id);
       outbox.current = box;
       box.subscribe((items) => setState((s) => ({ ...s, outgoing: items })));

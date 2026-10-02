@@ -493,15 +493,21 @@
     "note": "Hybrid vector + keyword retrieval with eligibility filters applied before ranking: tenant (RLS), brand, agent's sources, audience (internal sources never reach customer answers), current ready version, expiry and review cycle (tested). Per-customer document scopes pending."
   },
   "G06": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/authority/views.ts",
       "apps/gateway/src/runtime/prompt.ts",
       "apps/gateway/test/knowledge.int.test.ts",
       "apps/gateway/test/knowledge.test.ts",
-      "apps/widget/src/components/Chat.tsx"
+      "apps/widget/src/components/Chat.tsx",
+      "packages/domain/src/checks.ts",
+      "packages/domain/test/checks.test.ts",
+      "apps/gateway/src/checks/reply-checks.service.ts",
+      "apps/gateway/test/checks.int.test.ts",
+      "apps/gateway/test/checks.live.test.ts",
+      "apps/widget/src/drafts.ts"
     ],
-    "note": "Answers cite retrieved passages; citation numbers that match nothing retrieved are removed and the rest renumbered per document; sources travel as source parts from Hamnivo's publication record and the widget lists them (tested). Source-support QA rubric (Jev) pending."
+    "note": "Answers cite retrieved passages; citation numbers that match nothing retrieved are removed and the rest renumbered per document; sources travel as source parts from Hamnivo's publication record and the widget lists them (tested). Before an AI reply is published, the answer check asks Jev, in one call, how each cited passage relates to each sentence that cites it (supports, contradicts or says nothing). Live: a reply with a sentence that is contradicted, unaddressed or below its threshold is never published; it is written again once without that sentence (within the run's time limit), then handed to people with a note. Shadow (every brand's start): recorded only. Jev unavailable or a language without thresholds: the reply goes out as before and the check is recorded; while the check is live, such replies are not cached and earlier cached answers are not reused. Verified live on 2026-10-02 with jev-1.13.0: a supported reply was published (231 ms) and a contradicted claim never reached the customer (147 ms, then 286 ms for the rewritten reply). No thresholds were evaluated for the answer check yet: each brand sets them per language. Replies are not streamed in this branch; the widget keeps any streamed draft provisional until it is published and drops it when it is withdrawn."
   },
   "G17": {
     "status": "in-progress",
@@ -565,9 +571,11 @@
       "packages/adapters/src/jev/provider.ts",
       "packages/domain/src/decisions.ts",
       "apps/gateway/src/decisions/routing.service.ts",
-      "apps/gateway/test/routing.int.test.ts"
+      "apps/gateway/test/routing.int.test.ts",
+      "packages/db/src/schema/decision-checks.ts",
+      "apps/gateway/src/checks/checks.service.ts"
     ],
-    "note": "Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested). Routing decisions are persisted as decision records (status, confidence only when given, latency, tokens, shadow or live, policy version) and shown in Studio; cost is kept as tokens."
+    "note": "Every decision result carries provider, model version, rubric version, answers, latency, token use and request id (tested). Routing decisions are persisted as decision records (status, confidence only when given, latency, tokens, shadow or live, policy version) and shown in Studio; cost is kept as tokens. Checks around AI replies are recorded in decision_checks (written once; labels, numbers and document ids, never text) with the same versions, latency and tokens, and as steps of the run."
   },
   "E08": {
     "status": "in-progress",
@@ -1460,9 +1468,12 @@
       "packages/contracts/src/decisions.ts",
       "apps/gateway/test/routing.int.test.ts",
       "apps/console/src/pages/DecisionsPage.tsx",
-      "apps/console/e2e/decisions.spec.ts"
+      "apps/console/e2e/decisions.spec.ts",
+      "apps/gateway/src/checks/checks-admin.service.ts",
+      "apps/console/src/pages/ChecksPage.tsx",
+      "apps/console/e2e/checks.spec.ts"
     ],
-    "note": "Versioned rubric per brand (draft, publish), pinned Jev version, deadline, topics with baseline keywords, inputs shared with Jev (personal data redacted) and a threshold per language slice (no threshold means Jev abstains there). Studio editor with server validation on the fields, publish confirmation and a test panel. Arabic, Hindi and Urdu text is pending native review."
+    "note": "Versioned rubric per brand (draft, publish), pinned Jev version, deadline, topics with baseline keywords, inputs shared with Jev (personal data redacted) and a threshold per language slice (no threshold means Jev abstains there). Studio editor with server validation on the fields, publish confirmation and a test panel. Arabic, Hindi and Urdu text is pending native review. Reply checks have the same versioned rubrics (provider, pinned version, deadline, thresholds per language and question) and shadow or live mode per brand, in Studio's Reply checks page."
   },
   "J08": {
     "status": "partial",

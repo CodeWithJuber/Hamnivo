@@ -17,3 +17,12 @@ export const HANDOFF_NOTES: Record<AiHandoffReason, string> = {
   ai_blocked: 'The AI reply was held back because it broke the honesty rules. Please answer.',
   customer_request: 'The customer asked to talk to a person, so the AI stepped back.',
 };
+
+/**
+ * Notes for hand-offs a live check decided (staff lane). The conversation's ownership reason stays
+ * one of the reasons above; the note says which check and why.
+ */
+export const CHECK_HANDOFF_NOTES = {
+  unsupported_answer:
+    'The AI reply was held back: the knowledge it cited did not support it. Please answer.',
+} as const;

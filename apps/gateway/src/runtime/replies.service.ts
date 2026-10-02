@@ -33,6 +33,7 @@ import {
 } from '../authority/views.js';
 import { AnswerCache, type AnswerLookup } from '../cache/answers.js';
 import type { SourceRefRow } from '../cache/cache.service.js';
+import { ReplyChecksService, type RunChecks } from '../checks/reply-checks.service.js';
 import { claimedLiveData, conversationLiveData } from '../commerce/answer-cache.js';
 import { CLAIM_CORRECTION, checkReplyClaims } from '../commerce/claims.js';
 import { AppError } from '../common/app-error.js';
@@ -86,8 +87,18 @@ interface Generated {
   liveData: ModuleDataClass[];
 }
 
-/** Prompt options, and why the reply language was chosen (recorded with the model step). */
-type GenerateOptions = PromptOptions & { languageSource?: string };
+/**
+ * Prompt options, why the reply language was chosen (recorded with the model step), and the
+ * checks that run around this reply (none for staff suggestions).
+ */
+type GenerateOptions = PromptOptions & { languageSource?: string; checks?: RunChecks | null };
+
+/** Why `generate` returned no reply, and whether the reply it returned may be cached. */
+interface GenerateOutcome {
+  /** A live check held the reply back; the hand-off carries this note. */
+  blocked?: { note: string };
+  cacheable?: boolean;
+}
 
 /** The customer's most recent words in a conversation. */
 function latestCustomerText(history: AuthorityMessage[]): string {
@@ -162,6 +173,7 @@ export class RepliesService {
     private readonly language: LanguageService,
     private readonly answers: AnswerCache,
     private readonly memory: MemoryRecallService,
+    private readonly checks: ReplyChecksService,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -315,6 +327,15 @@ export class RepliesService {
       return;
     }
 
+    // Checks around this reply, as the brand set them (shadow records, live acts).
+    const checks = await this.checks.forRun({
+      tenantId,
+      brandId: control.brandId,
+      conversationId: control.id,
+      runId: run.id,
+      budgetMs: agent.config.limits.timeoutMs,
+    });
+
     // Reply in the customer's language (U01): their explicit choice, otherwise their words.
     const question = latestCustomerText(history.messages);
     const chosen = await this.language.forReply(tenantId, control.principalId, question);
@@ -322,6 +343,7 @@ export class RepliesService {
       language: chosen.resolution.language,
       style: chosen.style,
       languageSource: chosen.resolution.source,
+      checks,
     };
     // Customer memory (G19) is recalled before the cache: a reply built with it never enters a
     // shared entry, only the customer's own (keyed by their memory version, K09).
@@ -348,6 +370,7 @@ export class RepliesService {
     );
 
     let generated: Generated | null;
+    const outcome: GenerateOutcome = {};
     if (cached.kind === 'hit') {
       generated = {
         text: cached.answer.text,
@@ -371,6 +394,7 @@ export class RepliesService {
           history,
           options,
           memories,
+          outcome,
         );
       } catch (error) {
         const failure = classifyModelError(error);
@@ -386,13 +410,23 @@ export class RepliesService {
         return;
       }
       if (!generated) {
-        await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_blocked');
+        await this.handOff(
+          tenantId,
+          control,
+          run.id,
+          payload.epoch,
+          'ai_blocked',
+          undefined,
+          outcome.blocked?.note,
+        );
         return;
       }
-      // Only complete answers that passed the honesty guard, from the configured model, are kept.
+      // Only complete answers that passed the honesty guard and the live checks, from the
+      // configured model, are kept.
       const config = agent.config;
       if (
         cached.kind === 'fill' &&
+        outcome.cacheable !== false &&
         generated.provider === config.model.provider &&
         generated.modelId === config.model.modelId
       ) {
@@ -670,7 +704,9 @@ export class RepliesService {
       agentId: agent.profile.id,
       agentVersionId: agent.version.id,
       config: agent.config,
-      promptVersion: promptVersion(agent.config, context.brandName, options),
+      promptVersion:
+        promptVersion(agent.config, context.brandName, options) +
+        (options.checks?.cacheScope ?? ''),
       language: options.language,
       history: history.messages,
       question,
@@ -715,6 +751,7 @@ export class RepliesService {
     fetched?: { messages: AuthorityMessage[]; view: 'customer' | 'staff_filtered' },
     options: GenerateOptions = {},
     recalled?: RecalledMemory[],
+    outcome?: GenerateOutcome,
   ): Promise<Generated | null> {
     const runtime = await this.registry.get(tenantId, context.control.connectionId);
     const { messages: history, view } =
@@ -739,13 +776,22 @@ export class RepliesService {
         ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
         : '');
     let correction: string | null = null;
+    let deadlineAt: number | undefined;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const system = correction ? `${base}\n\n${correction}` : base;
-      const generated = await this.callModels(tenantId, runId, config, system, messages, {
-        view,
-        ...(options.language ? { language: options.language } : {}),
-        ...(options.languageSource ? { languageSource: options.languageSource } : {}),
-      });
+      const generated = await this.callModels(
+        tenantId,
+        runId,
+        config,
+        system,
+        messages,
+        {
+          view,
+          ...(options.language ? { language: options.language } : {}),
+          ...(options.languageSource ? { languageSource: options.languageSource } : {}),
+        },
+        deadlineAt,
+      );
       const cited = applyCitations(generated.text, passages, (p) => p.documentId);
       const remembered = citeMemories(cited.text, memories);
       const result: Generated = {
@@ -803,6 +849,25 @@ export class RepliesService {
         continue;
       }
       if (!result.text) throw new EmptyReplyError('The model returned no text.');
+      // Before publication: each sentence that cites a passage, against that passage. The model's
+      // own text is read, so its citation numbers still point at the passages it saw.
+      const checked = await options.checks?.reply({
+        text: generated.text,
+        passages,
+        language: options.language,
+        attempt,
+        lastAttempt: attempt === 1,
+      });
+      if (checked?.action === 'regenerate') {
+        correction = checked.correction;
+        deadlineAt = checked.deadlineAt;
+        continue;
+      }
+      if (checked?.action === 'handoff') {
+        if (outcome) outcome.blocked = { note: checked.note };
+        return null;
+      }
+      if (outcome && checked) outcome.cacheable = checked.cacheable;
       return { ...result, liveData: claimedLiveData(claims.claimed) };
     }
     return null;
@@ -862,6 +927,8 @@ export class RepliesService {
     system: string,
     messages: ReturnType<typeof historyMessages>,
     context: { view: string; language?: string; languageSource?: string },
+    /** A draft written again after a check must still finish within the run's time limit. */
+    deadlineAt?: number,
   ): Promise<Generated> {
     const choices: ModelChoice[] = [config.model, ...config.fallbackModels];
     const inputHash = sha256(canonicalize({ system, messages }) ?? '');
@@ -877,7 +944,11 @@ export class RepliesService {
           maxOutputTokens: config.limits.maxOutputTokens,
           stopWhen: isStepCount(config.limits.maxSteps),
           maxRetries: 0,
-          abortSignal: AbortSignal.timeout(config.limits.timeoutMs),
+          abortSignal: AbortSignal.timeout(
+            deadlineAt === undefined
+              ? config.limits.timeoutMs
+              : Math.max(1, Math.min(config.limits.timeoutMs, deadlineAt - Date.now())),
+          ),
         });
         const generated: Generated = {
           text: result.text.trim(),
@@ -971,6 +1042,8 @@ export class RepliesService {
     epoch: number,
     reason: AiHandoffReason,
     errorKind?: string,
+    /** A note that says more than the reason's own (a check that held the reply back). */
+    note?: string,
   ) {
     const outcome: RunOutcome = reason === 'ai_blocked' ? 'blocked' : 'handoff';
     let journal: JournalEntry[] = [];
@@ -986,7 +1059,7 @@ export class RepliesService {
             reason,
             actor: { type: 'system', id: 'ai' },
             expectedEpoch: epoch,
-            handoffNote: HANDOFF_NOTES[reason],
+            handoffNote: note ?? HANDOFF_NOTES[reason],
           },
         );
         await this.runs.finish(tx, runId, {
