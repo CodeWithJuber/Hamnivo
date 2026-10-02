@@ -1,7 +1,7 @@
 {
   "name": "@hamnivo/server",
   "version": "0.1.0",
-  "description": "Hamnivo Connect for servers: sign the short-lived identity assertions that verify a website's signed-in customers to Hamnivo Chat, and make keys to register for them",
+  "description": "Hamnivo Connect for servers: sign the short-lived identity assertions that verify a website's signed-in customers to Hamnivo Chat, make keys to register for them, and verify signed webhooks",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

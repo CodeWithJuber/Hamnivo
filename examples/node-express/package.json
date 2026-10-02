@@ -2,7 +2,7 @@
   "name": "@hamnivo/example-node-express",
   "version": "0.1.0",
   "private": true,
-  "description": "Example: an Express 5 website that verifies its signed-in customers to Hamnivo Chat with @hamnivo/server",
+  "description": "Example: an Express 5 website that verifies its signed-in customers to Hamnivo Chat and receives signed webhooks with @hamnivo/server",
   "license": "MIT",
   "type": "module",
   "scripts": {

@@ -6,6 +6,8 @@ export interface Config {
   widgetOrigin: string;
   api: string;
   key: IdentitySigningKey;
+  /** Webhook signing secrets (HAMNIVO_WEBHOOK_SECRET, comma-separated while rotating). */
+  webhookSecret?: string[];
 }
 
 const ALGORITHM_BY_KEY_TYPE: Record<string, IdentityKeyAlg> = {
@@ -38,6 +40,13 @@ export function readConfig(env: Record<string, string | undefined>): Config {
   } else {
     throw new Error('Set HAMNIVO_IDENTITY_KEY (a private JWK) or HAMNIVO_IDENTITY_SECRET (HS256).');
   }
+  const webhookSecret = (env.HAMNIVO_WEBHOOK_SECRET ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (webhookSecret.some((value) => !/^whsec_[A-Za-z0-9+/]+={0,2}$/.test(value))) {
+    throw new Error('HAMNIVO_WEBHOOK_SECRET must be the whsec_… secret Hamnivo showed once.');
+  }
   const origin = (value: string | undefined, fallback: string) =>
     (value?.trim() || fallback).replace(/\/+$/, '');
   return {
@@ -46,6 +55,7 @@ export function readConfig(env: Record<string, string | undefined>): Config {
     widgetOrigin: origin(env.HAMNIVO_WIDGET_ORIGIN, 'http://localhost:5174'),
     api: origin(env.HAMNIVO_API, 'http://localhost:4000'),
     key,
+    ...(webhookSecret.length > 0 ? { webhookSecret } : {}),
   };
 }
 

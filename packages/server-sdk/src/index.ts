@@ -12,3 +12,14 @@ export {
   identityKeyRequest,
 } from './keys.js';
 export type { IdentityKeyAlg, PublicKeyAlg } from './rules.js';
+export {
+  HamnivoWebhookError,
+  type HamnivoWebhookEvent,
+  MemoryReplayStore,
+  signWebhook,
+  type VerifyWebhookOptions,
+  verifyWebhook,
+  type WebhookErrorCode,
+  type WebhookHeaders,
+  type WebhookReplayStore,
+} from './webhooks.js';

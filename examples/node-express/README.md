@@ -18,6 +18,13 @@ A small Express 5 website with a fake sign-in. It tells Hamnivo Chat who is sign
     cannot load never blocks sign-out.
 - **The fake sign-in.** A signed cookie holds the user id, and a restart signs everyone out. Use
   your website's real sign-in instead.
+- **`POST /hamnivo/webhooks`** in [`src/app.ts`](src/app.ts), mounted when
+  `HAMNIVO_WEBHOOK_SECRET` is set. It receives Hamnivo's webhooks
+  ([`docs/guides/webhooks.md`](../../docs/guides/webhooks.md)).
+  - It verifies the signature on the raw body with `verifyWebhook`, and refuses a request that is
+    forged, changed or older than five minutes (400).
+  - It handles each event id once: a retry of an event it already handled gets 200.
+  - When handling fails it answers 500 and forgets the id, so Hamnivo's retry is processed.
 
 ## Run it
 
@@ -51,6 +58,7 @@ with its widget ID.
    | `HAMNIVO_IDENTITY_SECRET` | Or the HS256 secret Hamnivo showed once. |
    | `HAMNIVO_WIDGET_ORIGIN` | Where Hamnivo Chat serves `loader.js`. Default `http://localhost:5174`. |
    | `HAMNIVO_API` | The Hamnivo API. Default `http://localhost:4000`. |
+   | `HAMNIVO_WEBHOOK_SECRET` | Optional: the `whsec_…` secret of a webhook endpoint for `/hamnivo/webhooks`. Both secrets, comma-separated, while rotating. |
    | `PORT` | This website's port. Default `8080`. |
 
 4. Start it:
@@ -78,7 +86,9 @@ The tests start the app on a free port and call it with `fetch`. They check that
 - no response ever contains the private key or the secret;
 - a missing or unreadable setting gives a clear message that never repeats the key;
 - `public/identity.js` (run in jsdom) identifies a signed-in customer once the loader is ready,
-  and signs out within 3 seconds even when the chat never answers.
+  and signs out within 3 seconds even when the chat never answers;
+- the webhook route handles a signed event once, accepts the previous secret during a rotation,
+  refuses forged, altered and stale requests, and processes a retry after a failure.
 
 ## In your own app
 
@@ -86,3 +96,5 @@ The tests start the app on a free port and call it with `fetch`. They check that
 - Copy the identity route. Put it behind your own sign-in, and take the customer from your session.
 - Keep the private key or secret in your secret store, not in code.
 - Copy `public/identity.js`, and change the sign-out part to match your pages.
+- For webhooks, copy the webhook route. With more than one server process, use a shared replay
+  store (Redis or your database), and store handled event ids so retries days later are skipped.
