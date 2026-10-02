@@ -99,6 +99,7 @@ describe('database roles', () => {
         'app.ensure_reconcile_cursors()',
         'app.expired_memory_subjects(integer)',
         'app.purge_expired(integer)',
+        'app.purge_widget_uploads(integer)',
         'app.resolve_api_key(text)',
         'app.resolve_authority_connection(uuid)',
         'app.resolve_invitation(uuid)',
