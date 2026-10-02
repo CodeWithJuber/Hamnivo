@@ -74,6 +74,7 @@ export const ContactPart = z
 /** Reactions a customer can add to a reply (W22). */
 export const REACTIONS = ['👍', '👎', '❤️', '🙏', '😊'] as const;
 export const ReactionEmoji = z.enum(REACTIONS);
+export type ReactionEmoji = z.infer<typeof ReactionEmoji>;
 
 /**
  * A reaction to an earlier message (W22). Authorities without reactions (Chatwoot CE) receive it
