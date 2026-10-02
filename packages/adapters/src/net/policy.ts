@@ -3,10 +3,13 @@ import { isIP } from 'node:net';
 import { addressBlock } from './address.js';
 
 /**
- * Egress policy (X05): where the server may send a request it makes for a tenant (a webhook, a
- * callback). Private and reserved addresses are always refused; the tenant may narrow the rest to
- * an allowlist of hosts; the server administrator may trust a few origins explicitly (a service
- * on the local network, or a test receiver), which are then reachable over plain HTTP too.
+ * Egress policy (X05): where the server may send a request it makes for a tenant (a webhook, an
+ * MCP tool call, an identity provider's discovery document, a migration source, a model server).
+ * Only HTTPS, no credentials in the address, and never a private or reserved address: those rules
+ * are fixed. The tenant may narrow the rest to an allowlist of hosts; the server administrator may
+ * trust a few origins explicitly (a service on the local network, or a test receiver), which are
+ * then reachable over plain HTTP and on private addresses too. Trusted origins are the only
+ * exception to the rules, and they never come from tenant input.
  */
 
 export type EgressProblem =
@@ -18,7 +21,8 @@ export type EgressProblem =
   | 'timeout'
   | 'network'
   | 'tls'
-  | 'too_many_redirects';
+  | 'redirect'
+  | 'response_too_large';
 
 /** A refused or failed outbound request. The message never contains response content. */
 export class EgressError extends Error {
@@ -32,6 +36,19 @@ export class EgressError extends Error {
   }
 }
 
+/**
+ * The refusal behind a failed request, if the guard refused it: `fetch` wraps what the connection
+ * guard throws in a TypeError, so the EgressError is looked for along the cause chain.
+ */
+export function refusalOf(error: unknown): EgressError | null {
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    if (current instanceof EgressError) return current;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return null;
+}
+
 export interface ResolvedAddress {
   address: string;
   family: 4 | 6;
@@ -42,8 +59,9 @@ export type Resolver = (hostname: string) => Promise<ResolvedAddress[]>;
 
 export interface EgressPolicy {
   /**
-   * The tenant's allowlist: exact hosts (`hooks.example.com`) or a wildcard for subdomains
-   * (`*.example.com`, which does not include `example.com` itself). Empty: any public host.
+   * The allowlist: exact hosts (`hooks.example.com`) or a wildcard for subdomains
+   * (`*.example.com`, which does not include `example.com` itself). Left out: any public host.
+   * Present, it is the whole list: an empty list allows no host at all.
    */
   allowedHosts?: readonly string[];
   /**
@@ -51,8 +69,6 @@ export interface EgressPolicy {
    * network and over plain HTTP. Never set from tenant input.
    */
   trustedOrigins?: readonly string[];
-  /** Plain HTTP is refused except for trusted origins (default true). */
-  requireHttps?: boolean;
   /** Host name resolution; the system resolver by default. */
   resolve?: Resolver;
 }
@@ -69,13 +85,13 @@ const LOCAL_NAMES =
 
 const LABEL = /^(?!-)[a-z0-9-]{1,63}(?<!-)$/;
 
-/** Lower case, without brackets or a trailing dot: how hosts are compared. */
+/** Lower case, without brackets or trailing dots: how hosts are compared. */
 export function normalizeHost(host: string): string {
   return host
     .trim()
     .toLowerCase()
     .replace(/^\[|\]$/g, '')
-    .replace(/\.$/, '');
+    .replace(/\.+$/, '');
 }
 
 /**
@@ -101,9 +117,12 @@ export function normalizeHostPattern(pattern: string): string | null {
   return wildcard ? `*.${ascii}` : ascii;
 }
 
-/** Whether `host` is on the allowlist (an empty allowlist allows every public host). */
+/**
+ * Whether `host` is on the allowlist. Without a list (`undefined`) every host is allowed; with
+ * one, only the hosts it names: an empty list allows none.
+ */
 export function hostAllowed(host: string, patterns: readonly string[] | undefined): boolean {
-  if (!patterns || patterns.length === 0) return true;
+  if (!patterns) return true;
   const value = normalizeHost(host);
   return patterns.some((raw) => {
     const pattern = normalizeHost(raw);
@@ -122,9 +141,9 @@ export interface Destination {
 }
 
 /**
- * Checks a URL without contacting it: syntax, scheme, the host name and the tenant allowlist,
- * and for an IP literal that it is public. Host names are checked again at connection time,
- * against the address actually used (see safeRequest).
+ * Checks a URL without contacting it: syntax, scheme, no credentials, the host name and the
+ * allowlist, and for an IP literal that it is public. Host names are checked again at connection
+ * time, against the address actually used (see guardedDispatcher).
  */
 export function checkUrl(input: string | URL, policy: EgressPolicy): Destination {
   let url: URL;
@@ -134,13 +153,13 @@ export function checkUrl(input: string | URL, policy: EgressPolicy): Destination
     throw new EgressError('invalid_url', 'The address is not a valid URL.');
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new EgressError('invalid_url', 'Only http and https addresses can be called.');
+    throw new EgressError('insecure_url', 'The address must use HTTPS.');
   }
   if (url.username || url.password) {
     throw new EgressError('invalid_url', 'The address must not contain a user name or password.');
   }
   if (policy.trustedOrigins?.includes(url.origin)) return { url, trusted: true };
-  if (url.protocol !== 'https:' && policy.requireHttps !== false) {
+  if (url.protocol !== 'https:') {
     throw new EgressError('insecure_url', 'The address must use HTTPS.');
   }
   const host = normalizeHost(url.hostname);

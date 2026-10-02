@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import type { EgressPolicy } from '@hamnivo/adapters/net';
 import type {
   AddSsoDomainRequest,
   CreateSsoConnectionRequest,
@@ -30,7 +31,6 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
 import { delegationError } from '../../admin/delegation-errors.js';
 import { AppError } from '../../common/app-error.js';
-import type { OutboundPolicy } from '../../common/outbound.js';
 import { isUniqueViolation } from '../../common/pg-error.js';
 import { iso } from '../../common/views.js';
 import type { AppConfig } from '../../config.js';
@@ -83,7 +83,7 @@ export class SsoService {
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(DNS_RESOLVER) private readonly dns: DnsResolver,
-    @Inject(OUTBOUND_POLICY) private readonly outbound: OutboundPolicy,
+    @Inject(OUTBOUND_POLICY) private readonly outbound: EgressPolicy,
     private readonly broker: SecretBroker,
   ) {}
 
@@ -340,7 +340,7 @@ export class SsoService {
 
   private assertIssuerProtocol(issuer: string) {
     const url = new URL(issuer);
-    if (url.protocol !== 'https:' && !this.outbound.trustedOrigins.includes(url.origin)) {
+    if (url.protocol !== 'https:' && !this.outbound.trustedOrigins?.includes(url.origin)) {
       throw new AppError('VALIDATION_FAILED', {
         fields: [{ path: 'issuer', message: 'The issuer must use HTTPS.' }],
       });

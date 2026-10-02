@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { Resolver } from '@hamnivo/adapters/net';
 import {
   type ApproveCutoverRequest,
   type CreateMigrationRequest,
@@ -33,7 +34,7 @@ import {
   zendeskDescriptor,
 } from '@hamnivo/migration-sdk';
 import { authorize, type Permission, type StaffPrincipal } from '@hamnivo/policy';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { AuthorityRegistry } from '../authority/registry.js';
@@ -42,7 +43,7 @@ import type { AppConfig } from '../config.js';
 import { enforce } from '../identity/staff.guard.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
-import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
+import { APP_DB, CLOCK, type Clock, CONFIG, EGRESS_RESOLVER } from '../tokens.js';
 import {
   brandConnectionId,
   destinationChecks,
@@ -97,6 +98,7 @@ export class MigrationService {
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly registry: AuthorityRegistry,
     private readonly secrets: SecretBroker,
+    @Optional() @Inject(EGRESS_RESOLVER) private readonly resolver?: Resolver,
   ) {}
 
   private tx<T>(principal: StaffPrincipal, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -284,6 +286,7 @@ export class MigrationService {
       origin = await checkSourceUrl(
         input.connection.baseUrl,
         this.config.MIGRATION_SOURCE_ALLOW_PRIVATE,
+        this.resolver,
       );
     } catch (error) {
       if (!(error instanceof SourceUrlError)) throw error;

@@ -2143,20 +2143,30 @@
     "evidence": [
       "packages/adapters/src/net/address.ts",
       "packages/adapters/src/net/policy.ts",
+      "packages/adapters/src/net/dispatcher.ts",
+      "packages/adapters/src/net/fetch.ts",
       "packages/adapters/src/net/request.ts",
       "packages/adapters/test/net/address.test.ts",
       "packages/adapters/test/net/policy.test.ts",
       "packages/adapters/test/net/request.test.ts",
+      "packages/adapters/test/net/fetch.test.ts",
       "apps/gateway/src/developer/egress.service.ts",
       "apps/gateway/src/developer/egress.controller.ts",
       "apps/gateway/test/webhooks.int.test.ts",
       "apps/console/e2e/developer.spec.ts",
-      "packages/adapters/src/egress/fetch.ts",
-      "packages/adapters/test/egress.test.ts",
+      "packages/adapters/src/mcp/client.ts",
+      "packages/adapters/test/mcp.test.ts",
       "apps/gateway/src/actions/adapters.ts",
-      "apps/gateway/test/tools.int.test.ts"
+      "apps/gateway/test/tools.int.test.ts",
+      "apps/gateway/src/common/outbound.ts",
+      "apps/gateway/src/identity/sso/discovery.ts",
+      "apps/gateway/test/enterprise.test.ts",
+      "apps/gateway/src/migration/source-guard.ts",
+      "apps/gateway/src/runtime/models.ts",
+      "apps/gateway/test/egress.test.ts",
+      "apps/gateway/test/egress.int.test.ts"
     ],
-    "note": "Outbound requests made for tenants reach public HTTPS hosts only: private, loopback, link-local and special-use addresses are refused at connect time (so DNS rebinding fails), redirects are not followed, and responses have size and time limits. Each workspace can restrict them further to listed hosts (with wildcards); endpoints the list would refuse are shown. Only the server administrator can trust extra origins (EGRESS_TRUSTED_ORIGINS). Tool calls to remote MCP servers go out through the MCP adapter’s own guard (HTTPS, the tool’s host allowlist, public addresses checked inside the socket’s DNS lookup, no redirects and a size limit); the workspace’s host list does not apply to them until the two guards are merged."
+    "note": "Every request the server makes at an address a tenant can name goes through one guard (@hamnivo/adapters/net): webhooks, tool calls to remote MCP servers, identity providers’ discovery documents, migration sources and a tenant’s own model servers. HTTPS only, no credentials in the address, public addresses only: private, loopback, link-local and special-use addresses (one list, the union of what the earlier guards refused) are refused at connect time, on the address actually connected to, so DNS rebinding fails; redirects are never followed; responses have size and time limits. Each workspace can restrict the rest to listed hosts (with wildcards), which MCP servers and model servers follow too; webhook endpoints the list would refuse are shown. Only the server administrator can trust extra origins, and each caller keeps its own setting (EGRESS_TRUSTED_ORIGINS for webhooks and model servers, SSO_TRUSTED_IDP_ORIGINS, and for development TOOLS_EGRESS_ALLOW_PRIVATE and MIGRATION_SOURCE_ALLOW_PRIVATE). One exception: Better Auth’s SSO plugin fetches an identity provider’s token, key and user-info endpoints itself with the global fetch and has no option to replace it. Those addresses are checked with the guard when a connection is saved, and the plugin refuses redirects and private addresses on its own, but its single lookup is not pinned to the connection, so DNS rebinding is not stopped for those three calls."
   },
   "A08": {
     "status": "partial",

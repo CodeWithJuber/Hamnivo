@@ -1,10 +1,12 @@
 import { createLanguageModel, ModelConfigError } from '@hamnivo/adapters/models';
+import { guardedFetch } from '@hamnivo/adapters/net';
 import type { ModelChoice, ModelProviderKind } from '@hamnivo/contracts';
 import { type Db, fromPublicId, schema, type TenantTx, withTenant } from '@hamnivo/db';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { LanguageModel } from 'ai';
 import { eq } from 'drizzle-orm';
 import type { AppConfig } from '../config.js';
+import { EgressService } from '../developer/egress.service.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CONFIG } from '../tokens.js';
 
@@ -16,6 +18,8 @@ export interface ModelSpec {
   modelId: string;
   apiKey?: string;
   baseURL?: string;
+  /** How the model is reached, for a server the tenant named (the egress guard). */
+  fetch?: typeof globalThis.fetch;
 }
 
 export interface ResolvedModel {
@@ -54,7 +58,9 @@ function languageModelFor(spec: ModelSpec): LanguageModel {
 /**
  * Turns an agent's model choice into a language model. Tenant connections supply their own
  * encrypted key; otherwise the platform key for that provider is used. Keys are revealed just in
- * time and never logged.
+ * time and never logged. A tenant connection with a server address of its own (a base URL) is
+ * called through the egress guard, never straight: the address is the tenant's input. The
+ * platform's own addresses (the administrator's settings) are not.
  */
 @Injectable()
 export class ModelFactory {
@@ -62,6 +68,7 @@ export class ModelFactory {
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CONFIG) private readonly config: AppConfig,
     private readonly secrets: SecretBroker,
+    private readonly egress: EgressService,
     @Optional() @Inject(LANGUAGE_MODEL) private readonly override?: LanguageModel,
   ) {}
 
@@ -136,13 +143,20 @@ export class ModelFactory {
   async resolve(tenantId: string, choice: ModelChoice): Promise<ResolvedModel> {
     const base = { provider: choice.provider, modelId: choice.modelId };
     if (this.override) return { ...base, model: this.override };
-    let credentials: { apiKey?: string; baseURL?: string } | null;
+    let credentials: Omit<ModelSpec, 'provider' | 'modelId'> | null;
     if (choice.connectionId) {
       credentials = await withTenant(this.db, { tenantId, actorId: 'ai' }, async (tx) => {
         const row = await this.connection(tx, choice);
         return {
           apiKey: await this.secrets.reveal(tx, tenantId, row.apiKeySecretId),
-          ...(row.baseUrl ? { baseURL: row.baseUrl } : {}),
+          ...(row.baseUrl
+            ? {
+                baseURL: row.baseUrl,
+                // The address is the tenant's: public HTTPS (or a trusted origin), the workspace's
+                // allowed hosts, checked again for every connection, no redirects.
+                fetch: guardedFetch(await this.egress.policyIn(tx), { refuseRedirects: true }),
+              }
+            : {}),
         };
       });
     } else {

@@ -323,12 +323,15 @@ tools exist, who may call them and who approves.
 | `McpCallError` | `kind` (`egress`, `timeout`, `network`, `refused`, `protocol`) and `mayHaveApplied`. A refusal did nothing; a timeout or lost connection after sending may have, so the gateway records the outcome as unknown and checks it rather than sending again. |
 | `startFakeMcpServer()` (`@hamnivo/adapters/mcp/testing`) | A real Streamable HTTP server on 127.0.0.1 with scripted tools, faults before or after a change, a chosen protocol revision, and a record of calls and tokens. |
 
-`@hamnivo/adapters/egress` (X05) is the only way tool calls reach the network. A request goes out
-only when it uses HTTPS, its host is on the allowlist (`orders.example.com`, or `*.example.com`
-for subdomains), and every address the host resolves to is public. The address check runs inside
-the socket's own DNS lookup, so the checked address is the connected address (no DNS rebinding).
-Redirects are not followed and responses stop at a size limit. Plain HTTP and loopback addresses
-work only with `TOOLS_EGRESS_ALLOW_PRIVATE`, which the gateway refuses in production.
+Tool calls reach the network only through the egress guard (X05, `@hamnivo/adapters/net`, described
+in the next section): a request goes out only over HTTPS to public addresses, to the server's own
+host or a host on the tool's allowlist (`orders.example.com`, or `*.example.com` for subdomains). The
+address check runs when the connection is made, so a name that turns private after it was checked
+is still refused (no DNS rebinding). Redirects are refused and responses stop at a size limit. The
+gateway also holds a server to the workspace's allowed hosts. Plain HTTP and loopback addresses work
+only for an origin listed in the endpoint's `trustedOrigins`, which the gateway fills, for the
+server's own origin, only with `TOOLS_EGRESS_ALLOW_PRIVATE` (development and tests; refused in
+production).
 
 ### The reviewed tool allowlist
 
@@ -354,9 +357,53 @@ What a server says about its tools is never trusted. The gateway:
 - `test/mcp.test.ts`: listing as data, the bearer token, the idempotency key, a lost answer after
   the change, a failed tool, refused servers, cancellation, each supported revision and the
   refusal of another.
-- `test/egress.test.ts`: address ranges, the allowlist, DNS rebinding, redirects and size limits.
+- `test/net/*.test.ts`: the egress guard itself (next section). `test/mcp.test.ts` also checks a
+  name that turns private between the check and the connection, redirects and answers over the size
+  limit.
 - The gateway's `test/tools.int.test.ts` connects a fake server, reviews its tools, and checks
   that results must match the output schema, that a changed listing goes back to review and that
   calls keep to the allowlist.
 
 No test talks to a third-party MCP server.
+
+## The egress guard: every request made on a tenant's behalf (X05)
+
+`@hamnivo/adapters/net` is the one place that decides where the server may send a request that a
+tenant can point at an address: a webhook, an MCP tool call, an identity provider's discovery
+document, a migration source, the tenant's own model server. Each of them once kept a list of
+private ranges of its own; there is one list now, and every caller goes through it.
+
+| Export | What it does |
+|---|---|
+| `isPublicAddress(address)`, `addressBlock(address)` | Only publicly routable unicast addresses. The union of every range any of the earlier guards refused (the IANA special-purpose registries, IPv4 and IPv6). An IPv4-mapped IPv6 address is judged by its IPv4 address; NAT64, 6to4, Teredo, IPv4-translated and IPv4-compatible forms are refused outright. |
+| `checkUrl(url, policy)`, `checkDestination(url, policy)` | The URL check: HTTPS only, no user name or password, no private IP literal, no local name (`localhost`, `.internal`, `.local`, a name without a dot and the like) and the allowlist. `checkDestination` also resolves the name, so a person setting an address up hears at once that it points inside the network. |
+| `guardedDispatcher(policy)` | An undici `Agent` that checks every address when it connects. Its `lookup` refuses the connection when any address the name resolves to is private, so DNS rebinding after the check does not help; an IP literal skips lookups, so the connector judges it by the same rules. |
+| `guardedFetch(policy, { maxResponseBytes, refuseRedirects })` | A `fetch` on that dispatcher, for SDKs (MCP, migration sources, model servers). A redirect is never followed: it is returned as it is, or refused with `refuseRedirects`. |
+| `safeRequest(request, policy)` | One request with a deadline for the whole exchange, a response size cap and a fresh connection, for webhooks and discovery documents. A redirect comes back as the response it is. |
+| `EgressError` | What a refusal or failure carries: `problem` is `invalid_url`, `insecure_url`, `host_not_allowed`, `private_address`, `unresolvable`, `timeout`, `network`, `tls`, `redirect` or `response_too_large`, and the message never holds response content. |
+
+A policy has `allowedHosts` (hosts, or `*.example.com`; left out, any public host is allowed; an
+empty list allows none), `trustedOrigins` and `resolve` (tests replace DNS with it). Trusted origins
+are the only exception to the rules: origins (exact scheme, host and port) that the server
+administrator trusts, reachable over plain HTTP and on private addresses. Tenants never supply them.
+
+Each caller keeps the trusted-origin setting it had:
+
+| Caller | Trusted origins |
+|---|---|
+| Webhooks, and the tenant's own model servers | `EGRESS_TRUSTED_ORIGINS` (a trusted origin passes the workspace's allowed hosts, too) |
+| MCP servers | None, but the server's own origin with `TOOLS_EGRESS_ALLOW_PRIVATE` (development and tests only); the workspace's allowed hosts and the tool's own list both apply |
+| SSO discovery | `SSO_TRUSTED_IDP_ORIGINS` |
+| Migration sources | None, but the source's own origin with `MIGRATION_SOURCE_ALLOW_PRIVATE` (development only) |
+
+Tests: `test/net/address.test.ts` holds every refused range, from its first to its last address
+and the addresses just outside it. `policy.test.ts`, `request.test.ts` and `fetch.test.ts` cover the
+URL rules, trusted origins, redirects, size and time limits, and a name that resolves to a public
+address when it is checked and to a private one when the connection is made. Each caller has a test
+of that last case: `test/mcp.test.ts` here, and in the gateway `test/egress.test.ts` (webhook
+deliveries), `test/enterprise.test.ts` (SSO discovery), `test/units.test.ts` (migration sources) and
+`test/egress.int.test.ts` (model servers and MCP servers added through the API).
+
+One request is not behind the guard: Better Auth's SSO plugin fetches an identity provider's token,
+key and user-info endpoints itself, with the global `fetch`, and has no option to replace it. The
+gateway checks those endpoints with the guard when a connection is saved; see the gateway README.

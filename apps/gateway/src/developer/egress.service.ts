@@ -13,16 +13,17 @@ import { asc, eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
-import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
-
-/** Replaces DNS resolution for outbound requests (tests only). */
-export const EGRESS_RESOLVER = Symbol('EGRESS_RESOLVER');
+import { APP_DB, CLOCK, type Clock, CONFIG, EGRESS_RESOLVER } from '../tokens.js';
 
 /**
  * The tenant's network egress allowlist (X05) and the policy every outbound request made for the
  * tenant is sent under: public addresses only (checked on the address actually connected to),
  * HTTPS, and, when the tenant keeps a list, only the hosts on it. The server administrator's
- * trusted origins (EGRESS_TRUSTED_ORIGINS) are the only exception, and tenants cannot add any.
+ * trusted origins are the only exception, and tenants cannot add any: webhooks and tenant model
+ * servers trust EGRESS_TRUSTED_ORIGINS; MCP servers, identity providers and migration sources keep
+ * the setting of their own (TOOLS_EGRESS_ALLOW_PRIVATE, SSO_TRUSTED_IDP_ORIGINS,
+ * MIGRATION_SOURCE_ALLOW_PRIVATE). All of them are checked by the same guard in
+ * `@hamnivo/adapters/net`.
  */
 @Injectable()
 export class EgressService {
@@ -38,20 +39,31 @@ export class EgressService {
     return row ?? null;
   }
 
-  /** The policy for a tenant's allowlist. */
-  policy(hosts: readonly string[]): EgressPolicy {
+  /**
+   * The policy for a tenant's allowlist (no list: any public host). `trustedOrigins` are the
+   * origins the caller's own administrator setting trusts; by default EGRESS_TRUSTED_ORIGINS.
+   */
+  policy(
+    hosts: readonly string[],
+    trustedOrigins: readonly string[] = this.config.EGRESS_TRUSTED_ORIGINS,
+  ): EgressPolicy {
     return {
-      allowedHosts: hosts,
-      trustedOrigins: this.config.EGRESS_TRUSTED_ORIGINS,
-      requireHttps: true,
+      ...(hosts.length > 0 ? { allowedHosts: hosts } : {}),
+      trustedOrigins,
       ...(this.resolver ? { resolve: this.resolver } : {}),
     };
   }
 
   /** The tenant's current policy (inside its transaction). */
-  async policyIn(tx: TenantTx): Promise<EgressPolicy> {
+  async policyIn(
+    tx: TenantTx,
+    trustedOrigins: readonly string[] = this.config.EGRESS_TRUSTED_ORIGINS,
+  ): Promise<EgressPolicy> {
     const row = await this.row(tx);
-    return this.policy((row?.hosts ?? []).map((entry) => entry.pattern));
+    return this.policy(
+      (row?.hosts ?? []).map((entry) => entry.pattern),
+      trustedOrigins,
+    );
   }
 
   /** Whether the tenant's allowlist lets a request reach this URL (trusted origins always pass). */

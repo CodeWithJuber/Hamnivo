@@ -1,5 +1,5 @@
-import { checkEgressUrl, EgressError } from '@hamnivo/adapters/egress';
 import { callMcpTool, McpCallError } from '@hamnivo/adapters/mcp';
+import { checkUrl, EgressError, type EgressPolicy, hostAllowed } from '@hamnivo/adapters/net';
 import { DemoActionsStore, DemoToolError } from '@hamnivo/adapters/tools';
 import { AgentConfig } from '@hamnivo/contracts';
 import { type Db, fromPublicId, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo/db';
@@ -13,10 +13,52 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { moneyText } from '../commerce/common.js';
 import type { AppConfig } from '../config.js';
+import { EgressService } from '../developer/egress.service.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CONFIG } from '../tokens.js';
 
 export type ToolRow = typeof schema.toolDefinitions.$inferSelect;
+
+/**
+ * The origins an MCP server may be reached at over plain HTTP and on a private address: none, but
+ * for development and tests (TOOLS_EGRESS_ALLOW_PRIVATE, refused in production), which trust the
+ * server's own origin. Every other server must be on public HTTPS, like any request made for a
+ * tenant (`@hamnivo/adapters/net`).
+ */
+export function mcpTrustedOrigins(
+  config: Pick<AppConfig, 'TOOLS_EGRESS_ALLOW_PRIVATE'>,
+  serverUrl: string,
+): string[] {
+  if (!config.TOOLS_EGRESS_ALLOW_PRIVATE) return [];
+  try {
+    return [new URL(serverUrl).origin];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Whether a tool may reach its MCP server (X05, D10); throws an EgressError when it may not. The
+ * address must pass the egress guard under the workspace's policy (public HTTPS, the workspace's
+ * allowed hosts, or an origin that is trusted), and the server's host must be on the tool's own
+ * allowlist whatever origin is trusted: a tool with an empty list reaches nothing.
+ */
+export function checkMcpServer(
+  url: string,
+  toolHosts: readonly string[],
+  workspace: EgressPolicy,
+): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new EgressError('invalid_url', 'The address is not a valid URL.');
+  }
+  if (!hostAllowed(parsed.hostname, toolHosts)) {
+    throw new EgressError('host_not_allowed', 'This host is not on the allowlist for the tool.');
+  }
+  checkUrl(parsed, workspace);
+}
 
 /**
  * The tool's output schema (portable subset): null when the tool has none, `false` when the
@@ -140,6 +182,7 @@ export class ToolAdapters {
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CONFIG) private readonly config: AppConfig,
     private readonly secrets: SecretBroker,
+    private readonly egress: EgressService,
   ) {}
 
   /** Demo tools are offered outside production, or where demos are switched on. */
@@ -269,12 +312,13 @@ export class ToolAdapters {
       if (server?.status !== 'active') {
         throw new ToolCallFailure('server_disabled', 'The tool’s server is disabled.', false);
       }
-      // The tool may reach only the hosts on its own allowlist, its server's included (D10).
+      // The tool may reach only the hosts on its own allowlist, its server's included (D10), and
+      // only what the workspace's allowed hosts let through (X05). Whatever the lists say, the
+      // address must be public HTTPS, and it is checked again when the connection is made.
+      const trustedOrigins = mcpTrustedOrigins(this.config, server.url);
+      const workspace = await this.egress.policyIn(tx, trustedOrigins);
       try {
-        checkEgressUrl(new URL(server.url), {
-          allowedHosts: tool.egressHosts,
-          allowPrivate: this.config.TOOLS_EGRESS_ALLOW_PRIVATE,
-        });
+        checkMcpServer(server.url, tool.egressHosts, workspace);
       } catch (error) {
         if (error instanceof EgressError) throw new ToolCallFailure('egress', error.message, false);
         throw error;
@@ -286,7 +330,8 @@ export class ToolAdapters {
         url: server.url,
         token,
         allowedHosts: tool.egressHosts,
-        allowPrivate: this.config.TOOLS_EGRESS_ALLOW_PRIVATE,
+        trustedOrigins,
+        ...(workspace.resolve ? { resolve: workspace.resolve } : {}),
         timeoutMs: tool.timeoutMs,
         maxResponseBytes: Math.max(tool.maxOutputBytes * 4, 65_536),
       };

@@ -1,10 +1,17 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { EgressError, type EgressPolicy, guardedFetch } from '../egress/fetch.js';
+import {
+  EgressError,
+  type EgressPolicy,
+  type GuardedFetch,
+  guardedFetch,
+  type Resolver,
+} from '../net/index.js';
 
 /**
  * MCP adapter (D10): remote MCP servers over Streamable HTTP only (no local processes, no SSE
- * fallback), every request through the egress guard, a bearer token when the tenant stored one.
+ * fallback), every request through the egress guard (`../net`, the one guard for every request
+ * made on a tenant's behalf), a bearer token when the tenant stored one.
  * What a server says about its tools (names, descriptions, schemas) is untrusted data: callers
  * reduce schemas to the portable subset and never show descriptions to a model as instructions.
  * MCP is an adapter for tools, not a source of authority: Hamnivo decides who may call what.
@@ -26,8 +33,13 @@ export interface McpEndpoint {
   token?: string | null;
   /** Hosts the call may reach; the server's own host is added automatically. */
   allowedHosts?: readonly string[];
-  /** Development and tests only: plain HTTP and loopback servers. */
-  allowPrivate?: boolean;
+  /**
+   * Origins that may be reached over plain HTTP and on private addresses (loopback test servers).
+   * Development and tests only: never set from tenant input.
+   */
+  trustedOrigins?: readonly string[];
+  /** Host name resolution; the system resolver by default (tests replace it). */
+  resolve?: Resolver;
   timeoutMs: number;
   maxResponseBytes?: number;
 }
@@ -87,41 +99,61 @@ function hostOf(url: string): string {
 function policyOf(endpoint: McpEndpoint): EgressPolicy {
   return {
     allowedHosts: [hostOf(endpoint.url), ...(endpoint.allowedHosts ?? [])],
-    allowPrivate: endpoint.allowPrivate ?? false,
-    maxResponseBytes: endpoint.maxResponseBytes ?? 1_048_576,
+    trustedOrigins: endpoint.trustedOrigins ?? [],
+    ...(endpoint.resolve ? { resolve: endpoint.resolve } : {}),
   };
 }
 
+interface Connection {
+  client: Client;
+  protocolVersion: string;
+  /** The guarded fetch the connection runs on: close it with the client. */
+  guard: GuardedFetch;
+}
+
 /** Connects and checks the revision the server chose; returns the client and that revision. */
-async function connect(
-  endpoint: McpEndpoint,
-  signal: AbortSignal,
-): Promise<{ client: Client; protocolVersion: string }> {
+async function connect(endpoint: McpEndpoint, signal: AbortSignal): Promise<Connection> {
   const url = new URL(endpoint.url);
-  const transport = new StreamableHTTPClientTransport(url, {
-    fetch: guardedFetch(policyOf(endpoint)),
-    ...(endpoint.token
-      ? { requestInit: { headers: { authorization: `Bearer ${endpoint.token}` } } }
-      : {}),
-    reconnectionOptions: {
-      maxReconnectionDelay: 1000,
-      initialReconnectionDelay: 500,
-      reconnectionDelayGrowFactor: 1,
-      maxRetries: 0,
-    },
+  // Redirects are refused, and a response stops at the size limit.
+  const guard = guardedFetch(policyOf(endpoint), {
+    maxResponseBytes: endpoint.maxResponseBytes ?? 1_048_576,
+    refuseRedirects: true,
   });
-  const client = new Client({ name: 'hamnivo', version: '1.0.0' }, { capabilities: {} });
-  await client.connect(transport, { signal, timeout: endpoint.timeoutMs });
-  const protocolVersion = transport.protocolVersion;
-  if (!protocolVersion || !supported(protocolVersion)) {
-    await client.close().catch(() => undefined);
-    throw new McpCallError(
-      'protocol',
-      `The server speaks MCP ${String(protocolVersion ?? 'without a version').slice(0, 40)}; Hamnivo supports ${MCP_SUPPORTED_PROTOCOLS.join(', ')}.`,
-      false,
-    );
+  try {
+    const transport = new StreamableHTTPClientTransport(url, {
+      fetch: guard,
+      ...(endpoint.token
+        ? { requestInit: { headers: { authorization: `Bearer ${endpoint.token}` } } }
+        : {}),
+      reconnectionOptions: {
+        maxReconnectionDelay: 1000,
+        initialReconnectionDelay: 500,
+        reconnectionDelayGrowFactor: 1,
+        maxRetries: 0,
+      },
+    });
+    const client = new Client({ name: 'hamnivo', version: '1.0.0' }, { capabilities: {} });
+    await client.connect(transport, { signal, timeout: endpoint.timeoutMs });
+    const protocolVersion = transport.protocolVersion;
+    if (!protocolVersion || !supported(protocolVersion)) {
+      await client.close().catch(() => undefined);
+      throw new McpCallError(
+        'protocol',
+        `The server speaks MCP ${String(protocolVersion ?? 'without a version').slice(0, 40)}; Hamnivo supports ${MCP_SUPPORTED_PROTOCOLS.join(', ')}.`,
+        false,
+      );
+    }
+    return { client, protocolVersion, guard };
+  } catch (error) {
+    await guard.close().catch(() => undefined);
+    throw error;
   }
-  return { client, protocolVersion };
+}
+
+/** Ends a connection: the client first, then the connections the guard opened for it. */
+async function disconnect(connection: Connection | null): Promise<void> {
+  await connection?.client.close().catch(() => undefined);
+  await connection?.guard.close().catch(() => undefined);
 }
 
 /** Classifies a failure; `sent` is whether the tool call itself had been sent. */
@@ -129,7 +161,11 @@ function classify(error: unknown, sent: boolean): McpCallError {
   if (error instanceof McpCallError) return error;
   if (error instanceof EgressError) {
     // Refused before connecting, or a response cut at the size limit (the call ran).
-    return new McpCallError('egress', error.message, error.reason === 'response_too_large' && sent);
+    return new McpCallError(
+      'egress',
+      error.message,
+      error.problem === 'response_too_large' && sent,
+    );
   }
   const message = error instanceof Error ? error.message : String(error);
   const name = error instanceof Error ? error.name : '';
@@ -158,10 +194,10 @@ export async function listMcpTools(
   outer?: AbortSignal,
 ): Promise<McpListing> {
   const signal = withDeadline(endpoint.timeoutMs, outer);
-  let client: Client | null = null;
+  let connected: Connection | null = null;
   try {
-    const connected = await connect(endpoint, signal);
-    client = connected.client;
+    connected = await connect(endpoint, signal);
+    const { client } = connected;
     const tools: McpToolInfo[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < MAX_PAGES && tools.length < MAX_TOOLS; page += 1) {
@@ -204,7 +240,7 @@ export async function listMcpTools(
   } catch (error) {
     throw classify(error, false);
   } finally {
-    await client?.close().catch(() => undefined);
+    await disconnect(connected);
   }
 }
 
@@ -219,12 +255,12 @@ export async function callMcpTool(
   options: { signal?: AbortSignal; idempotencyKey: string },
 ): Promise<McpCallResult> {
   const signal = withDeadline(endpoint.timeoutMs, options.signal);
-  let client: Client | null = null;
+  let connected: Connection | null = null;
   let sent = false;
   try {
-    client = (await connect(endpoint, signal)).client;
+    connected = await connect(endpoint, signal);
     sent = true;
-    const result = await client.callTool(
+    const result = await connected.client.callTool(
       {
         name,
         arguments: args,
@@ -250,6 +286,6 @@ export async function callMcpTool(
   } catch (error) {
     throw classify(error, sent);
   } finally {
-    await client?.close().catch(() => undefined);
+    await disconnect(connected);
   }
 }

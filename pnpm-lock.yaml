@@ -261,9 +261,6 @@ importers:
       rxjs:
         specifier: 7.8.2
         version: 7.8.2
-      undici:
-        specifier: 8.11.2
-        version: 8.11.2
       unpdf:
         specifier: 1.8.1
         version: 1.8.1
@@ -500,6 +497,9 @@ importers:
       stripe:
         specifier: 22.6.2
         version: 22.6.2(@types/node@24.19.0)
+      undici:
+        specifier: 8.11.2
+        version: 8.11.2
       zod:
         specifier: 'catalog:'
         version: 4.6.5

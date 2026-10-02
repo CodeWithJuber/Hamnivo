@@ -189,7 +189,8 @@ refused until the host is added. Private and local addresses stay refused whatev
 
 The server administrator can trust some origins for every workspace, for example a service on the
 same private network: `EGRESS_TRUSTED_ORIGINS=http://10.0.0.5:8080` (comma-separated). Those may
-use plain HTTP and private addresses. Leave it empty unless you need it.
+use plain HTTP and private addresses. Leave it empty unless you need it. The same rules and the same
+list apply to a model server a workspace adds under Model connections.
 
 ## Settings
 

@@ -209,7 +209,7 @@ Chatwoot.
 | API under `/v1/admin/migrations`: upload or connect, check again, dry run, start, pause, resume, cancel, retry, roll back, approve, samples, records, export | `src/migration/migration.controller.ts`, `migration.service.ts` |
 | Worker: scan, read, plan, import in checkpointed slices, reconcile, roll back, purge | `src/migration/engine.service.ts`, `destination.ts`, `views.ts` |
 | Export of a brand's history as a Hamnivo package | `src/migration/export.service.ts` |
-| Another Chatwoot as the source (M04), and the source address guard | `src/migration/chatwoot-source.ts`, `source-guard.ts` |
+| Another Chatwoot as the source (M04), and its address rules (the shared egress guard) | `src/migration/chatwoot-source.ts`, `source-guard.ts` |
 | Export formats, the package, planning and reconciliation | `@hamnivo/migration-sdk` |
 
 - **Quarantine first.** An upload (tawk.to, Zendesk, Intercom or a Hamnivo package, up to 20 MB)
@@ -506,7 +506,14 @@ denial. Nothing calls the real Stripe API.
   verified and the account's address is verified too; otherwise sign-in fails with
   `sso_email_unverified` or `sso_unverified_local_account`. New people join with the chosen role
   (`member.joined_by_sso`). The callback carries no opener policy, so a sign-in in a small window
-  can report back to the page that opened it.
+  can report back to the page that opened it. The addresses of a connection (issuer and endpoints)
+  are checked with the egress guard (`@hamnivo/adapters/net`) when it is saved. The plugin itself
+  then calls the token, key and user-info endpoints with the global `fetch`: `SSOOptions` has no
+  option for another one, so those calls are not behind the guard's connection check. The plugin
+  refuses redirects and private addresses on its own, with a single lookup it does not pin to the
+  connection. Closing that gap takes a `fetch` or `dispatcher` option in the plugin (or a patch of
+  it), or running the code exchange here; replacing the global `fetch` would reach every other
+  request the process makes (X05 in `docs/status/evidence.json`).
 - **Support access** (A18). Platform operators ask (`POST /v1/platform/support-grants`) with a
   reason, scopes (`configuration`, `conversations` with status only, `audit`) and a duration. An
   owner with `support.grant` (two-step verification, fresh sign-in) approves it, possibly

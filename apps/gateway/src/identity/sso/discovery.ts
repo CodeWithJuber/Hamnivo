@@ -1,10 +1,5 @@
-import {
-  assertFetchable,
-  fetchJson,
-  type OutboundPolicy,
-  OutboundResponseError,
-  OutboundUrlError,
-} from '../../common/outbound.js';
+import { checkDestination, EgressError, type EgressPolicy } from '@hamnivo/adapters/net';
+import { fetchJson, OutboundResponseError } from '../../common/outbound.js';
 
 export interface DiscoveredEndpoints {
   authorization: string;
@@ -38,21 +33,21 @@ const trimSlash = (value: string) => value.replace(/\/+$/, '');
  * Reads an OpenID Connect provider's discovery document when a tenant saves a connection (A13),
  * checks it, and keeps the endpoints so sign-ins never need to discover again. The issuer must
  * name itself exactly, and every endpoint the server calls must pass the same outbound checks
- * (HTTPS, publicly routable, or an origin the server administrator trusts).
+ * (the egress guard: HTTPS, publicly routable, or an origin the server administrator trusts).
  */
 export async function discoverOidc(
   issuer: string,
-  policy: OutboundPolicy,
+  policy: EgressPolicy,
 ): Promise<DiscoveredEndpoints> {
   try {
-    await assertFetchable(issuer, policy);
+    await checkDestination(issuer, policy);
   } catch (error) {
-    if (error instanceof OutboundUrlError) {
+    if (error instanceof EgressError) {
       throw new DiscoveryProblem(
         'issuer_invalid',
         error.problem === 'insecure_url'
           ? 'The issuer must use HTTPS.'
-          : error.problem === 'private_host'
+          : error.problem === 'private_address'
             ? 'The issuer is on a private network. A server administrator can allow it.'
             : 'The issuer address could not be used.',
       );
@@ -68,7 +63,7 @@ export async function discoverOidc(
     document = raw as Record<string, unknown>;
   } catch (error) {
     if (error instanceof DiscoveryProblem) throw error;
-    if (error instanceof OutboundResponseError || error instanceof OutboundUrlError) {
+    if (error instanceof OutboundResponseError || error instanceof EgressError) {
       throw new DiscoveryProblem(
         'issuer_unreachable',
         'The identity provider’s discovery document could not be read. Check the issuer URL.',
@@ -98,9 +93,9 @@ export async function discoverOidc(
   }
   for (const url of [authorization, token, jwks, ...(userInfo ? [userInfo] : [])]) {
     try {
-      await assertFetchable(url, policy);
+      await checkDestination(url, policy);
     } catch (error) {
-      if (error instanceof OutboundUrlError) {
+      if (error instanceof EgressError) {
         throw new DiscoveryProblem(
           'endpoint_not_allowed',
           'An endpoint of the provider is not on HTTPS or is on a private network.',
