@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { InvalidPublicIdError } from '@hamnivo/db';
 import { NotFoundException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
+import { isImportEvent } from '../src/authority/ingress.service.js';
 import {
   nextReconcileInterval,
   RECONCILE_MIN_SECONDS,
@@ -12,6 +13,7 @@ import { toProblem } from '../src/common/problem.filter.js';
 import { requestIdFrom } from '../src/common/request-id.js';
 import { loadConfig } from '../src/config.js';
 import { deterministicUuid } from '../src/identity/tenants.service.js';
+import { checkSourceUrl, guardedFetch, isPublicAddress } from '../src/migration/source-guard.js';
 import { retryDelayMs } from '../src/outbox/relay.service.js';
 import { hintOf, type KeyRing, open, rewrap, seal, secretAad } from '../src/secrets/envelope.js';
 
@@ -150,5 +152,110 @@ describe('reconciler polling', () => {
     expect(reconcileCeiling('open', 'HUMAN_ACTIVE')).toBe(120);
     expect(reconcileCeiling('snoozed', 'HUMAN_ACTIVE')).toBe(600);
     expect(reconcileCeiling('resolved', 'AI_ACTIVE')).toBe(3600);
+  });
+});
+
+describe('webhook intake of imported history', () => {
+  const inboxes = new Set([42]);
+
+  it('drops events about import inboxes, imported conversations and imported contacts', () => {
+    expect(isImportEvent({ event: 'message_created', inbox: { id: 42 } }, inboxes)).toBe(true);
+    expect(
+      isImportEvent(
+        { event: 'message_created', conversation: { inbox_id: 42, custom_attributes: {} } },
+        inboxes,
+      ),
+    ).toBe(true);
+    // Before the intake knows the new import inbox, the conversation's key still gives it away.
+    expect(
+      isImportEvent(
+        {
+          event: 'conversation_status_changed',
+          inbox_id: 7,
+          custom_attributes: { hv_import_key: 'hv1:imp:mig_1:c:conv-1' },
+        },
+        inboxes,
+      ),
+    ).toBe(true);
+    expect(
+      isImportEvent({ event: 'contact_created', identifier: 'hv:imp:mig_1:abc' }, inboxes),
+    ).toBe(true);
+  });
+
+  it('keeps every other event', () => {
+    expect(isImportEvent({ event: 'message_created', inbox: { id: 7 } }, inboxes)).toBe(false);
+    expect(
+      isImportEvent(
+        { event: 'conversation_updated', inbox_id: 7, custom_attributes: { hv_import_key: 'x' } },
+        inboxes,
+      ),
+    ).toBe(false);
+    expect(isImportEvent({ event: 'contact_created', identifier: 'cust_881' }, inboxes)).toBe(
+      false,
+    );
+    expect(isImportEvent(null, inboxes)).toBe(false);
+  });
+});
+
+describe('source addresses of imports (M04)', () => {
+  it('tells public addresses from internal ones, IPv4 and IPv6', () => {
+    for (const address of [
+      '93.184.215.14',
+      '8.8.8.8',
+      '2606:4700:4700::1111',
+      '2001:4860:4860::8888',
+    ]) {
+      expect(isPublicAddress(address), address).toBe(true);
+    }
+    for (const address of [
+      '127.0.0.1',
+      '10.1.2.3',
+      '172.16.0.1',
+      '192.168.1.1',
+      '169.254.169.254',
+      '100.64.0.1',
+      '0.0.0.0',
+      '224.0.0.1',
+      '::1',
+      '::',
+      'fc00::1',
+      'fe80::1',
+      '::ffff:10.0.0.1',
+      '::ffff:127.0.0.1',
+      '::ffff:0:10.0.0.1',
+      '64:ff9b::a00:1',
+      '2002:a00:1::1',
+      '2001:0:4136:e378:8000:63bf:3fff:fdd2',
+      '100::1',
+      'fec0::1',
+      'not-an-address',
+    ]) {
+      expect(isPublicAddress(address), address).toBe(false);
+    }
+  });
+
+  it('accepts only https URLs without credentials that point outside the network', async () => {
+    await expect(checkSourceUrl('https://93.184.215.14/app/', false)).resolves.toEqual(
+      new URL('https://93.184.215.14'),
+    );
+    for (const [url, code] of [
+      ['http://93.184.215.14', 'insecure_url'],
+      ['ftp://93.184.215.14', 'insecure_url'],
+      ['https://user:pass@93.184.215.14', 'invalid_url'],
+      ['https://127.0.0.1', 'private_address'],
+      ['https://[::1]', 'private_address'],
+      ['https://localhost', 'private_address'],
+      ['not a url', 'invalid_url'],
+    ] as const) {
+      await expect(checkSourceUrl(url, false), url).rejects.toMatchObject({ code });
+    }
+    // Development and tests may read a Chatwoot on this machine.
+    await expect(checkSourceUrl('http://127.0.0.1:3000', true)).resolves.toBeInstanceOf(URL);
+  });
+
+  it('refuses to connect to internal addresses, even when a URL got past the first check', async () => {
+    const guarded = guardedFetch(false);
+    await expect(guarded('http://127.0.0.1:9/api/v1/profile')).rejects.toThrow();
+    await expect(guarded('http://localhost:9/api/v1/profile')).rejects.toThrow(/fetch failed/);
   });
 });

@@ -190,6 +190,20 @@
       "when": 1790512446726,
       "tag": "20260927123406_decisions_security",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790959855288,
+      "tag": "20261002165055_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1790959868741,
+      "tag": "20261002165108_migration_security",
+      "breakpoints": true
     }
   ]
 }

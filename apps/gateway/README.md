@@ -197,6 +197,59 @@ Late publication (R06):
   configuration's `availability`, and the answer to "talk to a person": queued, or offline with
   the time people are back. Without hours, the widget never claims someone is available.
 
+## Imports and exports (M01–M08)
+
+Staff bring a company's chat history from another tool into Chatwoot, and export a brand's
+history in the same format. Hamnivo keeps only the state of each job; the history itself lives in
+Chatwoot.
+
+| Area | Where |
+|---|---|
+| API under `/v1/admin/migrations`: upload or connect, check again, dry run, start, pause, resume, cancel, retry, roll back, approve, samples, records, export | `src/migration/migration.controller.ts`, `migration.service.ts` |
+| Worker: scan, read, plan, import in checkpointed slices, reconcile, roll back, purge | `src/migration/engine.service.ts`, `destination.ts`, `views.ts` |
+| Export of a brand's history as a Hamnivo package | `src/migration/export.service.ts` |
+| Another Chatwoot as the source (M04), and the source address guard | `src/migration/chatwoot-source.ts`, `source-guard.ts` |
+| Export formats, the package, planning and reconciliation | `@hamnivo/migration-sdk` |
+
+- **Quarantine first.** An upload (tawk.to, Zendesk, Intercom or a Hamnivo package, up to 20 MB)
+  is stored in `migration_files`, scanned (a scan that cannot run refuses it) and only then read.
+  A Chatwoot source is read once with a token that only the secret broker holds, which is revoked
+  right after. Its address must be public `https`, checked again for every connection
+  (`MIGRATION_SOURCE_ALLOW_PRIVATE` lifts this for development only).
+- **Checked before anything is written.** The preflight lists counts, fields and how each is
+  imported, known limits of the source and every record that needs review. It blocks while
+  Chatwoot is not connected, while the import inbox has anything that could notify people, while
+  an automation or integration would act on imports, or when the file comes from another source.
+  The dry run writes nothing.
+- **Nothing reaches customers.** Each brand gets its own import inbox: an API inbox without
+  webhook, bot, auto-assignment, greeting or surveys. Messages keep their original time
+  (`external_created_at`), internal notes stay private, mentions are neutralised, conversations
+  are resolved only after their last message, and writes are paced
+  (`MIGRATION_MESSAGES_PER_MINUTE`, at most 200 per conversation).
+- **People.** Contacts are matched only by a verified identity. Typed-in emails and phone numbers
+  are kept as contact attributes and never given to Chatwoot as email or phone.
+- **Exactly once.** Every record is keyed by its source ID (`hv1:imp:<job>:<source id>`), scoped to
+  the account it came from. A write whose outcome is unknown is looked up before it is repeated.
+  Retries are bounded, and a later import skips what an earlier one imported. Jobs run in slices
+  (`MIGRATION_SLICE_SECONDS`, `MIGRATION_SLICE_CONVERSATIONS`) that end at a checkpoint, so pause,
+  cancel and a crashed worker all continue from there.
+- **Reconciliation and cutover.** Every record found is accounted for: imported, skipped,
+  quarantined with a reason, or failed. Samples are read back from Chatwoot beside the export. A
+  failed check (for example an export that was cut short) must be acknowledged at approval.
+  Until then, rollback deletes what the import created, keeping live conversations and people
+  that later imports still use. The upload is deleted at approval or rollback, or
+  `MIGRATION_EXPORT_RETENTION_DAYS` after the job ends; exported packages after 24 hours.
+- **Access.** `migration.review` to see jobs, `migration.run` to upload and run them (starting
+  needs a recent sign-in), `migration.manage` to roll back and approve. Every action is checked
+  for the job's brand and audited. Logs and audit entries carry IDs, counts, file names and source
+  addresses, never message text, personal data or tokens.
+
+`test/migration.int.test.ts` covers the preflight, quarantine and scanning, the dry run, imports
+with files, notes and identities, reconciliation, rollback, crashes, pauses, cancellation,
+retries, access and the export round trip. `test/migration-chatwoot.int.test.ts` covers another
+Chatwoot as the source and the address guard, and `test/migration-helpdesks.int.test.ts` covers
+Zendesk and Intercom exports.
+
 ## Team routing decisions (J02, J05, J08)
 
 - **Team routing** (`GET /v1/admin/brands/{brandId}/routing/teams`,

@@ -36,6 +36,10 @@ interface Inbox {
   webhookUrl: string | null;
   hmacMandatory: boolean;
   autoAssignment: boolean;
+  greetingEnabled: boolean;
+  csatEnabled: boolean;
+  workingHoursEnabled: boolean;
+  lockToSingleConversation: boolean;
   botId: number | null;
   members: Set<number>;
 }
@@ -60,6 +64,7 @@ interface Contact {
   accountId: number;
   name: string;
   email: string | null;
+  phone: string | null;
   identifier: string | null;
   customAttributes: Json;
 }
@@ -124,7 +129,30 @@ interface Message {
   senderType: 'Contact' | 'User' | 'AgentBot' | null;
   senderId: number | null;
   createdAt: number;
-  externalCreatedAt: number | null;
+  attachments: FakeAttachment[];
+}
+interface FakeAttachment {
+  id: number;
+  fileType: string;
+  name: string;
+  contentType: string;
+  bytes: Uint8Array;
+}
+interface AutomationRule {
+  id: number;
+  accountId: number;
+  name: string;
+  eventName: string;
+  active: boolean;
+  conditions: Json[];
+  actions: Json[];
+}
+interface IntegrationHook {
+  id: number;
+  accountId: number;
+  appId: string;
+  inboxId: number | null;
+  status: 'enabled' | 'disabled';
 }
 
 export interface ChaosOptions {
@@ -155,11 +183,44 @@ export interface FakeDelivery {
   outcome: 'delivered' | 'duplicated' | 'dropped' | 'failed';
 }
 
+export interface FakeRequest {
+  method: string;
+  /** Path and query, as sent. */
+  url: string;
+}
+
+/** Something Chatwoot would send outside itself for a message (a reply email, a greeting). */
+export interface FakeOutbound {
+  kind: 'reply_email' | 'greeting';
+  accountId: number;
+  conversationId: number;
+  messageId: number;
+}
+
+export interface FakeSnapshot {
+  contacts: number;
+  conversations: number;
+  messages: number;
+  inboxes: number;
+}
+
 export interface FakeChatwoot {
   url: string;
   platformToken: string;
   /** Webhook deliveries so far, in delivery order. */
   deliveries: FakeDelivery[];
+  /** Every API request received, in order. */
+  requests: FakeRequest[];
+  /**
+   * Messages Chatwoot would send beyond its own UI: a reply email for an outgoing public message
+   * to a contact with an email (Chatwoot does so on API inboxes when email continuity is on), or
+   * a greeting on an inbox with greetings enabled.
+   */
+  outbound: FakeOutbound[];
+  /** Counts of the account's records (all accounts when none is given). */
+  snapshot(accountId?: number): FakeSnapshot;
+  /** Connects an integration (Slack, Dialogflow…) that would receive message events. */
+  addIntegrationHook(accountId: number, appId: string, inboxId?: number | null): void;
   /** Resolves when every queued webhook has been delivered, dropped or failed. */
   flush(): Promise<void>;
   /** Changes chaos behaviour for later deliveries. */
@@ -172,6 +233,11 @@ export interface FakeChatwoot {
    * status instead, like a timeout after Chatwoot already committed. `null` clears it.
    */
   setResponseFault(fault: ((method: string, url: string) => number | null) | null): void;
+  /**
+   * Refuses matching requests before anything is processed, answering with the returned status
+   * (Chatwoot rejected the request and changed nothing). `null` clears it.
+   */
+  setRequestFault(fault: ((method: string, url: string) => number | null) | null): void;
   /**
    * Runs before each request is processed; resolve to let it through. Lets a test interleave
    * another actor with a request in flight (for example, a takeover while a reply is posted).
@@ -250,6 +316,9 @@ class FakeState {
   labels = new Map<number, Label>();
   fieldDefinitions = new Map<number, FieldDefinition>();
   cannedResponses = new Map<number, CannedResponse>();
+  automationRules = new Map<number, AutomationRule>();
+  hooks = new Map<number, IntegrationHook>();
+  blobs = new Map<string, FakeAttachment>();
 
   nextId(): number {
     this.seq += 1;
@@ -270,16 +339,34 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
   let chaos: ChaosOptions = options.chaos ?? {};
   let random = mulberry32(chaos.seed ?? 1);
   const deliveries: FakeDelivery[] = [];
+  const requests: FakeRequest[] = [];
+  const outbound: FakeOutbound[] = [];
+  let publicBase = '';
   let queue: Array<{ source: Source; url: string; secret: string; event: string; body: string }> =
     [];
   let pumping: Promise<void> | null = null;
   let paused = false;
   let responseFault: ((method: string, url: string) => number | null) | null = null;
+  let requestFault: ((method: string, url: string) => number | null) | null = null;
   let requestHook: ((method: string, url: string) => Promise<void> | void) | null = null;
 
-  const app = Fastify({ logger: false });
+  const app = Fastify({ logger: false, bodyLimit: 64 * 1024 * 1024 });
+  app.addHook('onRequest', async (request) => {
+    requests.push({ method: request.method, url: request.url });
+  });
+  // Chatwoot takes message attachments as multipart form data.
+  app.addContentTypeParser(
+    'multipart/form-data',
+    { parseAs: 'buffer' },
+    async (request: FastifyRequest, raw: Buffer) =>
+      new Response(new Uint8Array(raw), {
+        headers: { 'content-type': String(request.headers['content-type']) },
+      }).formData(),
+  );
   app.addHook('preHandler', async (request) => {
     await requestHook?.(request.method, request.url);
+    const refused = requestFault?.(request.method, request.url);
+    if (refused) throw new HttpError(refused, { message: 'Refused by the test', status: refused });
   });
   if (options.latencyMs) {
     const latency = options.latencyMs;
@@ -311,7 +398,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     id: c.id,
     identifier: c.identifier,
     name: c.name,
-    phone_number: null,
+    phone_number: c.phone,
     thumbnail: '',
     blocked: false,
     type: 'contact',
@@ -349,6 +436,18 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
 
   const conversationOf = (m: Message) => s.conversations.get(m.conversationId) as Conversation;
 
+  const blobKey = (a: FakeAttachment) => `blob${a.id}`;
+  const attachmentApi = (m: Message, a: FakeAttachment): Json => ({
+    id: a.id,
+    message_id: m.id,
+    file_type: a.fileType,
+    account_id: m.accountId,
+    extension: a.name.includes('.') ? a.name.split('.').pop() : null,
+    data_url: `${publicBase}/rails/active_storage/blobs/redirect/${blobKey(a)}/${encodeURIComponent(a.name)}`,
+    thumb_url: '',
+    file_size: a.bytes.byteLength,
+  });
+
   function messageApi(m: Message): Json {
     const conversation = conversationOf(m);
     return {
@@ -364,6 +463,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       private: m.private,
       source_id: m.sourceId,
       sender: senderOf(m, false),
+      ...(m.attachments.length > 0
+        ? { attachments: m.attachments.map((a) => attachmentApi(m, a)) }
+        : {}),
     };
   }
 
@@ -626,6 +728,56 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
 
   // ---------------------------------------------------------------- state changes
 
+  /**
+   * What Chatwoot would send outside itself for a new message: a reply email for an outgoing
+   * public message to a contact with an email (API inboxes with email continuity), and a greeting
+   * template on the first incoming message of an inbox with greetings on.
+   */
+  function recordOutbound(conversation: Conversation, message: Message) {
+    const contact = s.contacts.get(conversation.contactId);
+    if (message.messageType === 1 && !message.private && contact?.email) {
+      outbound.push({
+        kind: 'reply_email',
+        accountId: conversation.accountId,
+        conversationId: conversation.displayId,
+        messageId: message.id,
+      });
+    }
+    const inbox = s.inboxes.get(conversation.inboxId);
+    if (
+      message.messageType === 0 &&
+      inbox?.greetingEnabled &&
+      !messagesOf(conversation).some((m) => m.messageType === 1 || m.messageType === 3)
+    ) {
+      const greeting: Message = {
+        id: s.nextId(),
+        accountId: conversation.accountId,
+        conversationId: conversation.id,
+        content: 'Hello! How can we help?',
+        messageType: 3,
+        private: false,
+        sourceId: null,
+        contentAttributes: {},
+        senderType: null,
+        senderId: null,
+        createdAt: s.clock(),
+        attachments: [],
+      };
+      s.messages.set(greeting.id, greeting);
+      outbound.push({
+        kind: 'greeting',
+        accountId: conversation.accountId,
+        conversationId: conversation.displayId,
+        messageId: greeting.id,
+      });
+    }
+  }
+
+  function removeConversation(conversation: Conversation) {
+    for (const message of messagesOf(conversation)) s.messages.delete(message.id);
+    s.conversations.delete(conversation.id);
+  }
+
   function touch(c: Conversation, changes: string[], statusChanged = false) {
     c.updatedAt = s.clock();
     if (statusChanged) emit(c.accountId, 'conversation_status_changed', conversationWebhook(c), c);
@@ -733,6 +885,17 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     };
   });
 
+  app.delete('/platform/api/v1/accounts/:account_id', async (request, reply: FastifyReply) => {
+    requirePlatform(request);
+    const accountId = Number((request.params as Json).account_id);
+    if (!s.accounts.has(accountId)) throw notFound();
+    for (const conversation of [...s.conversations.values()]) {
+      if (conversation.accountId === accountId) removeConversation(conversation);
+    }
+    s.accounts.delete(accountId);
+    return reply.code(200).send();
+  });
+
   app.post('/platform/api/v1/accounts/:account_id/account_users', async (request) => {
     requirePlatform(request);
     const accountId = Number((request.params as Json).account_id);
@@ -761,21 +924,49 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       webhookUrl: typeof channel.webhook_url === 'string' ? channel.webhook_url : null,
       hmacMandatory: channel.hmac_mandatory === true,
       autoAssignment: input.enable_auto_assignment !== false,
+      greetingEnabled: input.greeting_enabled === true,
+      csatEnabled: input.csat_survey_enabled === true,
+      workingHoursEnabled: input.working_hours_enabled === true,
+      lockToSingleConversation: input.lock_to_single_conversation === true,
       botId: null,
       members: new Set(),
     };
     s.inboxes.set(inbox.id, inbox);
-    return {
-      id: inbox.id,
-      name: inbox.name,
-      channel_type: 'Channel::Api',
-      enable_auto_assignment: inbox.autoAssignment,
-      hmac_mandatory: inbox.hmacMandatory,
-      hmac_token: inbox.hmacToken,
-      secret: inbox.secret,
-      webhook_url: inbox.webhookUrl,
-      inbox_identifier: inbox.identifier,
-    };
+    return inboxApi(inbox);
+  });
+
+  const inboxApi = (inbox: Inbox) => ({
+    id: inbox.id,
+    name: inbox.name,
+    channel_type: 'Channel::Api',
+    enable_auto_assignment: inbox.autoAssignment,
+    greeting_enabled: inbox.greetingEnabled,
+    csat_survey_enabled: inbox.csatEnabled,
+    working_hours_enabled: inbox.workingHoursEnabled,
+    lock_to_single_conversation: inbox.lockToSingleConversation,
+    hmac_mandatory: inbox.hmacMandatory,
+    hmac_token: inbox.hmacToken,
+    secret: inbox.secret,
+    webhook_url: inbox.webhookUrl,
+    inbox_identifier: inbox.identifier,
+  });
+
+  function inboxOf(request: FastifyRequest, accountId: number): Inbox {
+    const inbox = s.inboxes.get(Number((request.params as Json).id));
+    if (!inbox || inbox.accountId !== accountId) throw notFound();
+    return inbox;
+  }
+
+  app.get('/api/v1/accounts/:account_id/inboxes/:id', async (request) => {
+    const { accountId } = accountAccess(request, 'inboxes#show');
+    return inboxApi(inboxOf(request, accountId));
+  });
+
+  app.get('/api/v1/accounts/:account_id/inboxes/:id/agent_bot', async (request) => {
+    const { accountId } = accountAccess(request, 'inboxes#agent_bot');
+    const inbox = inboxOf(request, accountId);
+    const bot = inbox.botId ? s.bots.get(inbox.botId) : undefined;
+    return { agent_bot: bot ? botSender(bot) : {} };
   });
 
   app.post('/api/v1/accounts/:account_id/agent_bots', async (request) => {
@@ -1092,7 +1283,294 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     return { payload: { messages: hits.map(messageApi) } };
   });
 
+  // ---------------------------------------------------------------- Application API: automations
+
+  const ruleApi = (rule: AutomationRule) => ({
+    id: rule.id,
+    account_id: rule.accountId,
+    name: rule.name,
+    description: '',
+    event_name: rule.eventName,
+    conditions: rule.conditions,
+    actions: rule.actions,
+    created_on: 0,
+    active: rule.active,
+  });
+
+  app.get('/api/v1/accounts/:account_id/automation_rules', async (request) => {
+    const { accountId } = accountAccess(request, 'automation_rules#index', true);
+    return {
+      payload: [...s.automationRules.values()]
+        .filter((r) => r.accountId === accountId)
+        .map(ruleApi),
+    };
+  });
+
+  app.post('/api/v1/accounts/:account_id/automation_rules', async (request) => {
+    const { accountId } = accountAccess(request, 'automation_rules#create', true);
+    const input = body(request);
+    const rule: AutomationRule = {
+      id: s.nextId(),
+      accountId,
+      name: String(input.name ?? 'Rule'),
+      eventName: String(input.event_name ?? 'conversation_created'),
+      active: input.active !== false,
+      conditions: Array.isArray(input.conditions) ? (input.conditions as Json[]) : [],
+      actions: Array.isArray(input.actions) ? (input.actions as Json[]) : [],
+    };
+    s.automationRules.set(rule.id, rule);
+    return ruleApi(rule);
+  });
+
+  app.get('/api/v1/accounts/:account_id/integrations/apps', async (request) => {
+    const { accountId } = accountAccess(request, 'apps#index');
+    const hooks = [...s.hooks.values()].filter((h) => h.accountId === accountId);
+    return {
+      payload: ['slack', 'dialogflow', 'webhook'].map((id) => ({
+        id,
+        name: id,
+        enabled: hooks.some((h) => h.appId === id),
+        hooks: hooks
+          .filter((h) => h.appId === id)
+          .map((h) => ({
+            id: h.id,
+            app_id: h.appId,
+            status: h.status,
+            inbox: h.inboxId ? { id: h.inboxId } : null,
+            account_id: h.accountId,
+          })),
+      })),
+    };
+  });
+
+  // ---------------------------------------------------------------- Application API: contacts
+
+  function contactOf(request: FastifyRequest, accountId: number): Contact {
+    const contact = s.contacts.get(Number((request.params as Json).id));
+    if (!contact || contact.accountId !== accountId) throw notFound();
+    return contact;
+  }
+
+  app.post('/api/v1/accounts/:account_id/contacts', async (request) => {
+    const { accountId } = accountAccess(request, 'contacts#create');
+    const input = body(request);
+    const identifier =
+      typeof input.identifier === 'string' && input.identifier ? input.identifier : null;
+    const email = typeof input.email === 'string' && input.email ? input.email.toLowerCase() : null;
+    const phone =
+      typeof input.phone_number === 'string' && input.phone_number ? input.phone_number : null;
+    const taken = [...s.contacts.values()].find(
+      (c) =>
+        c.accountId === accountId &&
+        ((identifier && c.identifier === identifier) || (email && c.email === email)),
+    );
+    if (taken) {
+      const field = taken.identifier === identifier ? 'identifier' : 'email';
+      throw new HttpError(422, {
+        message: `${field === 'identifier' ? 'Identifier' : 'Email'} has already been taken`,
+        attributes: [field],
+      });
+    }
+    const contact: Contact = {
+      id: s.nextId(),
+      accountId,
+      name: String(input.name ?? ''),
+      email,
+      phone,
+      identifier,
+      customAttributes: (input.custom_attributes as Json) ?? {},
+    };
+    s.contacts.set(contact.id, contact);
+    emit(accountId, 'contact_created', contactWebhook(contact));
+    let contactInbox: ContactInbox | null = null;
+    if (input.inbox_id !== undefined) {
+      const inbox = s.inboxes.get(Number(input.inbox_id));
+      if (!inbox || inbox.accountId !== accountId) throw notFound();
+      contactInbox = {
+        id: s.nextId(),
+        contactId: contact.id,
+        inboxId: inbox.id,
+        sourceId:
+          typeof input.source_id === 'string' && input.source_id ? input.source_id : randomUUID(),
+        hmacVerified: false,
+      };
+      s.contactInboxes.set(contactInbox.id, contactInbox);
+    }
+    return {
+      payload: {
+        contact: contactApi(contact),
+        contact_inbox: {
+          inbox: contactInbox ? inboxApi(s.inboxes.get(contactInbox.inboxId) as Inbox) : null,
+          source_id: contactInbox?.sourceId ?? null,
+        },
+      },
+    };
+  });
+
+  app.get('/api/v1/accounts/:account_id/contacts/search', async (request) => {
+    const { accountId } = accountAccess(request, 'contacts#search');
+    const q = String((request.query as Json).q ?? '').toLowerCase();
+    if (!q) throw new HttpError(422, { error: 'Specify search string with parameter q' });
+    const found = [...s.contacts.values()].filter(
+      (c) =>
+        c.accountId === accountId &&
+        [c.name, c.email, c.phone, c.identifier].some((v) => v?.toLowerCase().includes(q)),
+    );
+    return { meta: { count: found.length, current_page: 1 }, payload: found.map(contactApi) };
+  });
+
+  app.delete('/api/v1/accounts/:account_id/contacts/:id', async (request, reply: FastifyReply) => {
+    const { accountId } = accountAccess(request, 'contacts#destroy', true);
+    const contact = contactOf(request, accountId);
+    for (const conversation of [...s.conversations.values()]) {
+      if (conversation.contactId === contact.id) removeConversation(conversation);
+    }
+    for (const contactInbox of [...s.contactInboxes.values()]) {
+      if (contactInbox.contactId === contact.id) s.contactInboxes.delete(contactInbox.id);
+    }
+    s.contacts.delete(contact.id);
+    return reply.code(200).send();
+  });
+
+  app.get('/api/v1/accounts/:account_id/contacts/:id/conversations', async (request) => {
+    const { accountId } = accountAccess(request, 'contacts/conversations#index');
+    const contact = contactOf(request, accountId);
+    return {
+      payload: [...s.conversations.values()]
+        .filter((c) => c.contactId === contact.id)
+        .map(conversationApi),
+    };
+  });
+
   // ---------------------------------------------------------------- Application API: conversations
+
+  app.post('/api/v1/accounts/:account_id/conversations', async (request) => {
+    const { accountId } = accountAccess(request, 'conversations#create');
+    const input = body(request);
+    const inbox = s.inboxes.get(Number(input.inbox_id));
+    const contact = s.contacts.get(Number(input.contact_id));
+    if (!inbox || inbox.accountId !== accountId || !contact || contact.accountId !== accountId) {
+      throw notFound();
+    }
+    const sourceId =
+      typeof input.source_id === 'string' && input.source_id ? input.source_id : null;
+    let contactInbox = sourceId
+      ? [...s.contactInboxes.values()].find(
+          (ci) =>
+            ci.inboxId === inbox.id && ci.sourceId === sourceId && ci.contactId === contact.id,
+        )
+      : undefined;
+    if (!contactInbox) {
+      contactInbox = {
+        id: s.nextId(),
+        contactId: contact.id,
+        inboxId: inbox.id,
+        sourceId: sourceId ?? randomUUID(),
+        hmacVerified: false,
+      };
+      s.contactInboxes.set(contactInbox.id, contactInbox);
+    }
+    const account = s.accounts.get(accountId) as Account;
+    account.conversationSeq += 1;
+    const now = s.clock();
+    const attributes = input.custom_attributes;
+    const requested = String(input.status ?? '');
+    const statuses: readonly string[] = ['open', 'pending', 'resolved', 'snoozed'];
+    const conversation: Conversation = {
+      id: s.nextId(),
+      displayId: account.conversationSeq,
+      accountId,
+      inboxId: inbox.id,
+      contactId: contact.id,
+      contactInboxId: contactInbox.id,
+      uuid: randomUUID(),
+      status: statuses.includes(requested)
+        ? (requested as Status)
+        : inbox.botId
+          ? 'pending'
+          : 'open',
+      assigneeId: null,
+      aiAssigneeId: inbox.botId,
+      teamId: null,
+      labels: [],
+      customAttributes:
+        typeof attributes === 'object' && attributes !== null ? (attributes as Json) : {},
+      createdAt: now,
+      updatedAt: now,
+      waitingSince: now,
+      snoozedUntil: null,
+    };
+    s.conversations.set(conversation.id, conversation);
+    emit(accountId, 'conversation_created', conversationWebhook(conversation), conversation);
+    return conversationApi(conversation);
+  });
+
+  // The token's own profile: its accounts and roles (and, as in Chatwoot, its access token).
+  app.get('/api/v1/profile', async (request) => {
+    const principal = principalOf(request);
+    if (principal.kind !== 'user') throw unauthorized();
+    const { user } = principal;
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      access_token: user.token,
+      accounts: [...user.roles.entries()].map(([id, role]) => ({
+        id,
+        name: s.accounts.get(id)?.name ?? '',
+        role,
+      })),
+    };
+  });
+
+  app.get('/api/v1/accounts/:account_id/conversations', async (request) => {
+    const { accountId } = accountAccess(request, 'conversations#index');
+    const query = request.query as Json;
+    const inboxId = query.inbox_id === undefined ? null : Number(query.inbox_id);
+    const page = Math.max(1, Number(query.page ?? 1));
+    // Chatwoot sorts by last activity by default; created_at_asc pages oldest first.
+    const oldestFirst = query.sort_by === 'created_at_asc';
+    const all = [...s.conversations.values()]
+      .filter((c) => c.accountId === accountId && (inboxId === null || c.inboxId === inboxId))
+      .sort((a, b) => (oldestFirst ? a.id - b.id : b.id - a.id));
+    return {
+      data: {
+        meta: { mine_count: 0, unassigned_count: all.length, all_count: all.length },
+        payload: all.slice((page - 1) * 25, page * 25).map(conversationApi),
+      },
+    };
+  });
+
+  app.delete(
+    '/api/v1/accounts/:account_id/conversations/:conversation_id',
+    async (request, reply: FastifyReply) => {
+      const { principal, conversation } = conversationAccess(request, 'conversations#destroy');
+      if (
+        principal.kind !== 'user' ||
+        principal.user.roles.get(conversation.accountId) !== 'administrator'
+      ) {
+        throw unauthorized('You are not authorized to do this action');
+      }
+      removeConversation(conversation);
+      return reply.code(200).send();
+    },
+  );
+
+  // Attachment downloads (ActiveStorage redirect, then the file).
+  app.get(
+    '/rails/active_storage/blobs/redirect/:key/:name',
+    async (request, reply: FastifyReply) => {
+      const { key, name } = request.params as { key: string; name: string };
+      if (!s.blobs.has(key)) throw notFound();
+      return reply.redirect(`/rails/active_storage/disk/${key}/${encodeURIComponent(name)}`, 302);
+    },
+  );
+
+  app.get('/rails/active_storage/disk/:key/:name', async (request, reply: FastifyReply) => {
+    const blob = s.blobs.get((request.params as { key: string }).key);
+    if (!blob) throw notFound();
+    return reply.type(blob.contentType).send(Buffer.from(blob.bytes));
+  });
 
   app.get('/api/v1/accounts/:account_id/conversations/:conversation_id', async (request) => {
     const { conversation } = conversationAccess(request, 'conversations#show');
@@ -1133,7 +1611,23 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     '/api/v1/accounts/:account_id/conversations/:conversation_id/messages',
     async (request) => {
       const { principal, conversation } = conversationAccess(request, 'messages#create');
-      const input = body(request);
+      const raw = request.body;
+      const files: File[] = [];
+      let input: Json;
+      if (raw instanceof FormData) {
+        input = {};
+        for (const [key, value] of raw.entries()) {
+          if (key === 'attachments[]' && typeof value !== 'string') files.push(value);
+          else if (typeof value === 'string') input[key] = value;
+        }
+        if (typeof input.content_attributes === 'string') {
+          try {
+            input.content_attributes = JSON.parse(input.content_attributes);
+          } catch {
+            input.content_attributes = {};
+          }
+        }
+      } else input = body(request);
       const requested = String(input.message_type ?? 'outgoing');
       const messageType =
         requested === 'incoming'
@@ -1160,6 +1654,36 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         senderId = principal.kind === 'bot' ? principal.bot.id : principal.user.id;
       }
       const attributes = input.content_attributes;
+      const contentAttributes: Json =
+        typeof attributes === 'object' && attributes !== null ? { ...(attributes as Json) } : {};
+      // Like Chatwoot 4.18: the original time is kept in content_attributes and created_at is
+      // now; a top-level external_created_at is lost when content_attributes is sent too.
+      const hasAttributes = typeof attributes === 'object' && attributes !== null;
+      if (
+        !hasAttributes &&
+        input.external_created_at !== undefined &&
+        input.external_created_at !== ''
+      ) {
+        contentAttributes.external_created_at = input.external_created_at;
+      }
+      const attachments: FakeAttachment[] = [];
+      for (const file of files) {
+        const contentType = file.type || 'application/octet-stream';
+        attachments.push({
+          id: s.nextId(),
+          fileType: contentType.startsWith('image/')
+            ? 'image'
+            : contentType.startsWith('audio/')
+              ? 'audio'
+              : contentType.startsWith('video/')
+                ? 'video'
+                : 'file',
+          name: file.name || 'file',
+          contentType,
+          bytes: new Uint8Array(await file.arrayBuffer()),
+        });
+      }
+      for (const attachment of attachments) s.blobs.set(blobKey(attachment), attachment);
       const message: Message = {
         id: s.nextId(),
         accountId: conversation.accountId,
@@ -1168,15 +1692,14 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         messageType,
         private: input.private === true || input.private === 'true',
         sourceId: typeof input.source_id === 'string' ? input.source_id : null,
-        contentAttributes:
-          typeof attributes === 'object' && attributes !== null ? (attributes as Json) : {},
+        contentAttributes,
         senderType,
         senderId,
         createdAt: s.clock(),
-        externalCreatedAt:
-          typeof input.external_created_at === 'number' ? input.external_created_at : null,
+        attachments,
       };
       s.messages.set(message.id, message);
+      recordOutbound(conversation, message);
       // Incoming messages reopen resolved or snoozed conversations (pending again when a bot is active).
       let statusChanged = false;
       if (
@@ -1369,6 +1892,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
           accountId: inbox.accountId,
           name: typeof input.name === 'string' ? input.name : 'Visitor',
           email,
+          phone: null,
           identifier: identifier || null,
           customAttributes: (input.custom_attributes as Json) ?? {},
         };
@@ -1490,10 +2014,28 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     }
   }
 
+  publicBase = address.replace('0.0.0.0', '127.0.0.1');
+
   return {
-    url: address.replace('0.0.0.0', '127.0.0.1'),
+    url: publicBase,
     platformToken,
     deliveries,
+    requests,
+    outbound,
+    snapshot(accountId) {
+      const own = <T extends { accountId: number }>(items: Iterable<T>) =>
+        [...items].filter((i) => accountId === undefined || i.accountId === accountId).length;
+      return {
+        contacts: own(s.contacts.values()),
+        conversations: own(s.conversations.values()),
+        messages: own(s.messages.values()),
+        inboxes: own(s.inboxes.values()),
+      };
+    },
+    addIntegrationHook(accountId, appId, inboxId = null) {
+      const id = s.nextId();
+      s.hooks.set(id, { id, accountId, appId, inboxId, status: 'enabled' });
+    },
     flush,
     setChaos(next) {
       chaos = next;
@@ -1504,6 +2046,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
     setResponseFault(fault) {
       responseFault = fault;
+    },
+    setRequestFault(fault) {
+      requestFault = fault;
     },
     setRequestHook(hook) {
       requestHook = hook;

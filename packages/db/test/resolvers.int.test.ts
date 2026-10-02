@@ -6,6 +6,7 @@ import {
   claimReconcileCursors,
   ensureReconcileCursors,
   purgeExpired,
+  purgeMigrationFiles,
   resolveApiKey,
   resolveAuthorityConnection,
   resolveStaffMemberships,
@@ -145,6 +146,27 @@ describe('worker maintenance', () => {
       tx.select().from(schema.conversationJournal),
     );
     expect(remaining.map((r) => r.seq)).toEqual([1]);
+  });
+
+  it('clears uploaded migration exports once their retention has passed, in every tenant', async () => {
+    const past = new Date(Date.now() - 60_000);
+    await withTenant(h.app, { tenantId: a.tenantId }, (tx) =>
+      tx.update(schema.migrationFiles).set({ purgeAfter: past }),
+    );
+    await withTenant(h.app, { tenantId: b.tenantId }, (tx) =>
+      tx.update(schema.migrationFiles).set({ purgeAfter: new Date(Date.now() + 86_400_000) }),
+    );
+    expect(await purgeMigrationFiles(h.app)).toBe(1);
+    const [purged] = await withTenant(h.app, { tenantId: a.tenantId }, (tx) =>
+      tx.select().from(schema.migrationFiles),
+    );
+    expect(purged).toMatchObject({ raw: null, state: 'purged' });
+    expect(purged?.purgedAt).toBeInstanceOf(Date);
+    const [kept] = await withTenant(h.app, { tenantId: b.tenantId }, (tx) =>
+      tx.select().from(schema.migrationFiles),
+    );
+    expect(kept?.raw).toBeInstanceOf(Buffer);
+    expect(await purgeMigrationFiles(h.app)).toBe(0);
   });
 
   it('leases due reconciler cursors across tenants and follows conversations without one', async () => {

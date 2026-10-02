@@ -16,6 +16,25 @@ export const INBOX_SIGNAL = 'hamnivo:integration-inbox';
 
 const RESOLVE_TTL_MS = 60_000;
 
+type Json = Record<string, unknown>;
+const obj = (value: unknown): Json =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Json) : {};
+
+/**
+ * Events about imported history (the import inbox, conversations carrying an import key, contacts
+ * with an import identifier). They must not trigger anything, and are not stored at all.
+ */
+export function isImportEvent(payload: unknown, importInboxIds: ReadonlySet<number>): boolean {
+  const p = obj(payload);
+  const conversation = obj(p.conversation);
+  const inboxId = Number(obj(p.inbox).id ?? conversation.inbox_id ?? p.inbox_id);
+  if (Number.isInteger(inboxId) && importInboxIds.has(inboxId)) return true;
+  const key =
+    obj(conversation.custom_attributes).hv_import_key ?? obj(p.custom_attributes).hv_import_key;
+  if (typeof key === 'string' && key.startsWith('hv1:imp:')) return true;
+  return typeof p.identifier === 'string' && p.identifier.startsWith('hv:imp:');
+}
+
 /**
  * Chatwoot webhook intake: verify the signature with the secret of that webhook source, store the
  * event once (deduplicated across the account, inbox and bot copies), acknowledge. Processing
@@ -92,6 +111,10 @@ export class IngressService {
     } catch {
       throw new AppError('VALIDATION_FAILED', { detail: 'The webhook body is not JSON.' });
     }
+    const importInboxes = new Set(
+      runtime.inboxes.filter((i) => i.purpose === 'import').map((i) => i.externalInboxId),
+    );
+    if (isImportEvent(payload, importInboxes)) return { stored: false };
     const event = parseChatwootEvent(payload);
     const deliveryId = header('x-chatwoot-delivery') ?? null;
     const key = dedupeKey(event, deliveryId);

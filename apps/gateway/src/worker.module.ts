@@ -27,6 +27,8 @@ import { MemoryFingerprints } from './memory/fingerprints.js';
 import { MemoryIndexService } from './memory/index.service.js';
 import { MemoryRecallService } from './memory/recall.service.js';
 import { MemoryWriter } from './memory/writer.service.js';
+import { MigrationEngine } from './migration/engine.service.js';
+import { MigrationExporter } from './migration/export.service.js';
 import { OUTBOX_HANDLERS, type OutboxHandler, OutboxRelay } from './outbox/relay.service.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
 import { AgentsService } from './runtime/agents.service.js';
@@ -102,6 +104,8 @@ export class WorkerModule {
         ConversationHistory,
         MemoryExtractionService,
         RepliesService,
+        MigrationEngine,
+        MigrationExporter,
         ...COMMERCE_WORKER_PROVIDERS,
         {
           provide: OUTBOX_HANDLERS,
@@ -109,6 +113,8 @@ export class WorkerModule {
             AuthoritySyncService,
             RepliesService,
             IngestionService,
+            MigrationEngine,
+            MigrationExporter,
             MemoryExtractionService,
             MemoryIndexService,
             MemoryDeletionService,
@@ -119,6 +125,8 @@ export class WorkerModule {
             sync: AuthoritySyncService,
             replies: RepliesService,
             ingestion: IngestionService,
+            migration: MigrationEngine,
+            exporter: MigrationExporter,
             extraction: MemoryExtractionService,
             index: MemoryIndexService,
             deletions: MemoryDeletionService,
@@ -140,6 +148,11 @@ export class WorkerModule {
                 },
               ],
               ['knowledge.ingest', (event) => ingestion.onIngest(event)],
+              ['migration.scan', (event) => migration.onScan(event)],
+              ['migration.dry_run', (event) => migration.onDryRun(event)],
+              ['migration.run', (event) => migration.onRun(event)],
+              ['migration.rollback', (event) => migration.onRollback(event)],
+              ['migration.export', (event) => exporter.onExport(event)],
               ['memory.extract', async (event) => void (await extraction.onExtract(event))],
               ['memory.embed', (event) => index.onEmbed(event)],
               ['memory.deleted', (event) => deletions.complete(event)],

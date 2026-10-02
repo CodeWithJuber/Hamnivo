@@ -1,0 +1,41 @@
+[
+  {
+    "id": "7b2e40a0-9e55-11ef-8c31-4d9a2e7f1c05",
+    "type": "chat",
+    "pageId": "6512f0c4a9e3b10c8d7e4f21",
+    "visitor": {
+      "name": "Sara Nguyen",
+      "id": "2ed08ef211a48e278067a93a0be4cf1afadcb5561ccde316342e0de92b9e87ff",
+      "email": "sara.nguyen@example.com"
+    },
+    "location": {
+      "countryCode": "GB",
+      "city": "Leeds"
+    },
+    "messageCount": 2,
+    "chatDuration": 61,
+    "rating": 0,
+    "createdOn": "2026-09-24T17:30:00.000Z",
+    "messages": [
+      {
+        "sender": { "t": "v" },
+        "type": "msg",
+        "time": "2026-09-24T17:30:00.000Z",
+        "msg": "The replacement arrived today, thank you."
+      },
+      {
+        "sender": { "t": "a", "n": "Liam Davies", "id": "18f66404b4817a529e67a171" },
+        "type": "msg",
+        "time": "2026-09-24T17:31:12.450Z",
+        "msg": "Great to hear! Have a lovely evening."
+      }
+    ]
+  },
+  {
+    "id": "9c05f7e0-9f01-11ef-a6d8-1b3c5e7a9d20",
+    "type": "ticket",
+    "humanId": 17,
+    "subject": "Invoice copy",
+    "createdOn": "2026-09-25T08:00:00.000Z"
+  }
+]

@@ -17,6 +17,7 @@ import {
   BrainIcon,
   BuildingIcon,
   DatabaseZapIcon,
+  FolderInputIcon,
   InboxIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
@@ -49,6 +50,7 @@ type NavPath =
   | '/brands'
   | '/agents'
   | '/knowledge'
+  | '/migration'
   | '/memory'
   | '/models'
   | '/runs'
@@ -86,6 +88,12 @@ function useNavItems(): NavItem[] {
       permission: 'knowledge.read',
     },
     { to: '/memory', label: t('nav.memory'), icon: BrainIcon, permission: 'memory.read' },
+    {
+      to: '/migration',
+      label: t('migration.nav'),
+      icon: FolderInputIcon,
+      permission: 'migration.review',
+    },
     {
       to: '/models',
       label: t('nav.models'),
