@@ -109,6 +109,14 @@ const numOrNull = (value: unknown): number | null =>
 const round = (value: number | null, digits = 4) =>
   value === null ? null : Math.round(value * 10 ** digits) / 10 ** digits;
 
+/**
+ * A share, withheld when its numerator is a small group: with the denominator shown, a rate would
+ * give the withheld count away.
+ */
+function heldRate(numerator: number, denominator: number, k: number): number | null {
+  return protectCount(numerator, k) === null ? null : protectedRate(numerator, denominator, k);
+}
+
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -417,19 +425,19 @@ export class AnalyticsService {
             value: protectCount(num(t.handed_off), k),
             suppressed: protectCount(num(t.handed_off), k) === null,
             sample: aiStarted,
-            rate: round(protectedRate(num(t.handed_off), aiStarted, k)),
+            rate: round(heldRate(num(t.handed_off), aiStarted, k)),
           },
           resolved: {
             value: protectCount(resolved, k),
             suppressed: protectCount(resolved, k) === null,
             sample: conversations,
-            rate: round(protectedRate(resolved, conversations, k)),
+            rate: round(heldRate(resolved, conversations, k)),
           },
           aiResolved: {
             value: protectCount(num(t.ai_resolved), k),
             suppressed: protectCount(num(t.ai_resolved), k) === null,
             sample: aiStarted,
-            rate: round(protectedRate(num(t.ai_resolved), aiStarted, k)),
+            rate: round(heldRate(num(t.ai_resolved), aiStarted, k)),
           },
           firstResponseMedianSeconds: {
             value: frtSample >= k ? round(numOrNull(t.frt_median), 1) : null,
@@ -469,7 +477,7 @@ export class AnalyticsService {
               !suppressed && teamFrt >= k ? round(numOrNull(row.frt_median), 1) : null,
             handoffRate: suppressed
               ? null
-              : round(protectedRate(num(row.handed_off), num(row.ai_started), k)),
+              : round(heldRate(num(row.handed_off), num(row.ai_started), k)),
             csatAverage: !suppressed && csatN >= k ? round(numOrNull(row.csat_avg), 2) : null,
             csatResponses: suppressed ? 0 : csatN,
             suppressed,
@@ -480,7 +488,7 @@ export class AnalyticsService {
           conversations: suppressed ? null : count,
           handoffRate: suppressed
             ? null
-            : round(protectedRate(num(row.handed_off), num(row.ai_started), k)),
+            : round(heldRate(num(row.handed_off), num(row.ai_started), k)),
           suppressed,
         })),
         commerce: commerceRows.map((row) => {

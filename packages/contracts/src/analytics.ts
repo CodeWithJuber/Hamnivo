@@ -99,7 +99,11 @@ export const AnalyticsOverview = z
       limitHandoffs: Held,
     }),
     cache: z.object({
-      /** The answer cache does not report hits and misses in this version. */
+      /**
+       * `measured`: from the answer cache's daily hit and miss counts (per brand, UTC days).
+       * `not_measured`: no cache lookups in the range, or a team, inbox or channel view, which the
+       * cache does not count separately.
+       */
       status: z.enum(['not_measured', 'measured']),
       hitRate: Held,
     }),
