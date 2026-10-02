@@ -1,7 +1,7 @@
 import { ChatwootError } from '@hamnivo/chatwoot';
 import type { Message } from '@hamnivo/contracts';
 import { type Db, newId, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo/db';
-import type { AuthorityMessage, MessageAuthor } from '@hamnivo/domain';
+import type { AuthorityMessage, MessageAuthor, OutgoingAttachment } from '@hamnivo/domain';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, ne } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
@@ -35,6 +35,11 @@ export interface OutboundInput {
   visibility: 'public' | 'private';
   text: string;
   contentAttributes?: Record<string, unknown>;
+  /**
+   * Files that travel with the message (W09), read after `load` ran, so they can be claimed in
+   * the same transaction as the ledger reservation.
+   */
+  attachments?: () => OutgoingAttachment[];
   /** Loads (and authorizes) the conversation inside the reservation transaction. */
   load: (tx: TenantTx) => Promise<ControlRow>;
   /** Runs in the commit transaction, only for the call that committed the message. */
@@ -156,6 +161,7 @@ export class OutboundMessagesService {
       }
     }
     if (!committed) {
+      const files = input.attachments?.() ?? [];
       try {
         ({ message: committed } = await runtime.authority.appendMessage({
           conversationRef: ref,
@@ -164,6 +170,7 @@ export class OutboundMessagesService {
           visibility: input.visibility,
           text: input.text,
           ...(input.contentAttributes ? { contentAttributes: input.contentAttributes } : {}),
+          ...(files.length > 0 ? { attachments: files } : {}),
         }));
       } catch (error) {
         const retryable = !(error instanceof ChatwootError) || error.retryable;

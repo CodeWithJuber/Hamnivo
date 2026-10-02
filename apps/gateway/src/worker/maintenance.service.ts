@@ -1,4 +1,10 @@
-import { type Db, ensureAuditPartitions, ensureReconcileCursors, purgeExpired } from '@hamnivo/db';
+import {
+  type Db,
+  ensureAuditPartitions,
+  ensureReconcileCursors,
+  purgeExpired,
+  purgeWidgetUploads,
+} from '@hamnivo/db';
 import {
   Inject,
   Injectable,
@@ -34,8 +40,15 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     switch (job) {
       case 'audit-partitions':
         return { created: await ensureAuditPartitions(this.db, 3) };
-      case 'purge-expired':
-        return purgeExpired(this.db);
+      case 'purge-expired': {
+        // Quarantined customer files never sent lose their bytes (W09).
+        const uploads = await purgeWidgetUploads(this.db);
+        return {
+          ...(await purgeExpired(this.db)),
+          widget_uploads_expired: uploads.expired,
+          widget_uploads_removed: uploads.removed,
+        };
+      }
       case 'reconcile-cursors':
         return { followed: await ensureReconcileCursors(this.db) };
       case 'memory-retention':

@@ -21,10 +21,11 @@ export function toProblem(error: unknown, requestId: string) {
   // A malformed or foreign identifier is indistinguishable from a missing resource.
   if (error instanceof InvalidPublicIdError) return problem('NOT_FOUND', requestId);
   if (error instanceof AppError) {
-    const { detail, fields, retryAfter, retryable } = error.details;
+    const { detail, fields, retryAfter, retryable, reason } = error.details;
     return problem(error.code, requestId, {
       ...(detail ? { detail } : {}),
       ...(fields ? { fields } : {}),
+      ...(reason ? { reason } : {}),
       ...(retryAfter !== undefined ? { retryAfter } : {}),
       ...(retryable !== undefined ? { retryable } : {}),
     });

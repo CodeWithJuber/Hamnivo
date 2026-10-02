@@ -19,14 +19,19 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
 import { confirmCardPublication } from '../commerce/card-publisher.service.js';
+import type { AppConfig } from '../config.js';
 import { projectInboxState } from '../inbox/projection.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { retryDelayMs } from '../outbox/relay.service.js';
-import { APP_DB, CLOCK, type Clock, REDIS } from '../tokens.js';
+import { APP_DB, CLOCK, type Clock, CONFIG, REDIS } from '../tokens.js';
+import { queueReplyWaiting, queueTranscript } from '../widget/notify-queue.js';
+import { applyStaffSeen } from '../widget/read-state.js';
+import { reactionOf } from './extended-parts.js';
 import { INBOX_SIGNAL } from './ingress.service.js';
 import { type JournalEntry, JournalService } from './journal.service.js';
 import { type ControlRow, OwnershipService, type OwnerTarget } from './ownership.service.js';
 import { PublicationsService } from './publications.service.js';
+import { redactJournaledMessage } from './redaction.js';
 import { authorityMessageUuid } from './uuid.js';
 import { contractMessage, laneOf, publicationFacts } from './views.js';
 
@@ -58,6 +63,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     @Inject(APP_DB) private readonly db: Db,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(CONFIG) private readonly config: AppConfig,
     private readonly journal: JournalService,
     private readonly ownership: OwnershipService,
     private readonly publications: PublicationsService,
@@ -224,8 +230,9 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
           })
           .where(eq(schema.messageLedger.id, ledger.id));
         // The webhook can confirm a customer message before the API request that sent it does.
-        // Whichever commits the message starts the AI job, so it runs exactly once.
-        if (ledger.senderKind === 'customer') {
+        // Whichever commits the message starts the AI job, so it runs exactly once. A reaction
+        // (W22) is not a question: nobody is asked to answer it.
+        if (ledger.senderKind === 'customer' && !reactionOf(message)) {
           await enqueueOutbox(tx, tenantId, {
             topic: 'conversation.customer_message',
             aggregateType: 'conversation',
@@ -274,19 +281,36 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
             ])),
           );
         }
+      } else if (message.contentAttributes.deleted === true) {
+        // Deleted in the authority (W23): stored copies lose their text, and the lane hears once.
+        entries.push(
+          ...(await redactJournaledMessage(tx, this.journal, {
+            tenantId,
+            conversationId: control.id,
+            lane,
+            authorityId,
+            messageId: view.id,
+          })),
+        );
       } else {
-        const deleted = message.contentAttributes.deleted === true;
         entries.push(
           ...(await this.journal.append(tx, tenantId, control.id, [
-            deleted
-              ? {
-                  lane,
-                  type: 'message.redacted',
-                  data: { messageId: view.id, reason: 'deleted' },
-                  authorityId,
-                }
-              : { lane, type: 'message.updated', data: { message: view }, authorityId },
+            { lane, type: 'message.updated', data: { message: view }, authorityId },
           ])),
+        );
+      }
+      // A reply from staff or the assistant: the customer may want an email if it waits (W25).
+      if (
+        type === 'message.created' &&
+        lane === 'customer' &&
+        (message.sender.kind === 'user' || message.sender.kind === 'bot')
+      ) {
+        await queueReplyWaiting(
+          tx,
+          tenantId,
+          control,
+          authorityId,
+          new Date(now.getTime() + this.config.CUSTOMER_REPLY_EMAIL_DELAY_SECONDS * 1000),
         );
       }
     }
@@ -382,9 +406,20 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
   ): Promise<Notification[]> {
     const control = await this.control(tx, connectionId, state.ref);
     if (!control) return [];
-    if (control.authorityUpdatedAt !== null && state.version <= control.authorityUpdatedAt)
-      return [];
-    const entries: JournalEntry[] = [];
+    // When staff last looked moves without a new version (Chatwoot writes it directly), so it is
+    // read before the version check (W06).
+    const receipts = await applyStaffSeen(
+      tx,
+      this.journal,
+      tenantId,
+      control,
+      state.staffLastSeenAt,
+      this.clock(),
+    );
+    if (control.authorityUpdatedAt !== null && state.version <= control.authorityUpdatedAt) {
+      return receipts.length ? [{ tenantId, conversationId: control.id, entries: receipts }] : [];
+    }
+    const entries: JournalEntry[] = [...receipts];
     await tx
       .update(schema.conversationControls)
       .set({
@@ -396,11 +431,12 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     await projectInboxState(tx, tenantId, control.id, connectionId, state);
     const wasResolved = control.authorityStatus === 'resolved';
     if (!wasResolved && state.status === 'resolved') {
-      entries.push(
-        ...(await this.journal.append(tx, tenantId, control.id, [
-          { lane: 'customer', type: 'conversation.resolved', data: { canReopen: true } },
-        ])),
-      );
+      const resolved = await this.journal.append(tx, tenantId, control.id, [
+        { lane: 'customer', type: 'conversation.resolved', data: { canReopen: true } },
+      ]);
+      entries.push(...resolved);
+      // The customer asked for a transcript when a conversation closes (W25).
+      await queueTranscript(tx, tenantId, control, resolved[0]?.seq ?? control.journalSeq);
     } else if (wasResolved && state.status !== 'resolved') {
       entries.push(
         ...(await this.journal.append(tx, tenantId, control.id, [

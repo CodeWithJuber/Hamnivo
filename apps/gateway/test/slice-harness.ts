@@ -15,6 +15,7 @@ import { CommerceWorker } from '../src/commerce/worker.service.js';
 import { loadConfig } from '../src/config.js';
 import type { Scanner } from '../src/knowledge/scanner.js';
 import { OutboxRelay } from '../src/outbox/relay.service.js';
+import { MemoryMailer } from '../src/platform/mailer.js';
 import { WorkerModule } from '../src/worker.module.js';
 import { Client, type Gateway, signUp, startGateway, testEnv } from './harness.js';
 
@@ -36,6 +37,8 @@ export interface Slice {
   gw: Gateway;
   fake: FakeChatwoot;
   worker: INestApplicationContext;
+  /** Emails the worker sent (customer notifications). */
+  workerMailer: MemoryMailer;
   app: Db;
   baseUrl: string;
   /** Delivers webhooks and runs the worker until nothing is left to do. */
@@ -82,6 +85,7 @@ export async function startSlice(
   const gw = await startGateway(env, undefined, {
     ...(options.clock ? { clock: options.clock } : {}),
     ...(options.apiModel ? { model: options.apiModel } : {}),
+    ...(options.scanner ? { scanner: options.scanner } : {}),
     ...shared,
   });
   await gw.app.listen(port, '127.0.0.1');
@@ -93,8 +97,10 @@ export async function startSlice(
       CACHE_KEY_PREFIX: gw.config.CACHE_KEY_PREFIX,
     }),
   );
+  const workerMailer = new MemoryMailer();
   const worker = await NestFactory.createApplicationContext(
     WorkerModule.forRoot(config, {
+      mailer: workerMailer,
       ...shared,
       ...(options.clock ? { clock: options.clock } : {}),
       ...(options.model ? { model: options.model } : {}),
@@ -112,6 +118,7 @@ export async function startSlice(
     gw,
     fake,
     worker,
+    workerMailer,
     app,
     baseUrl,
     async drain() {

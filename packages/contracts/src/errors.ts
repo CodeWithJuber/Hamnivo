@@ -122,6 +122,8 @@ export const Problem = z
     requestId: z.string(),
     /** Seconds to wait before retrying, when known. */
     retryAfter: z.int().min(0).optional(),
+    /** A finer machine-readable reason, such as why a file was refused (`malware_detected`). */
+    reason: z.string().max(60).optional(),
     fields: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
   })
   .meta({ id: 'Problem', description: 'RFC 9457 problem details' });

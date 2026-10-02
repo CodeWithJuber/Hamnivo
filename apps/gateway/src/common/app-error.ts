@@ -5,6 +5,8 @@ export interface AppErrorDetails {
   fields?: { path: string; message: string }[];
   retryAfter?: number;
   retryable?: boolean;
+  /** A finer machine-readable reason (Problem.reason). */
+  reason?: string;
   /** Logged for operators, never sent to clients. */
   internal?: unknown;
 }

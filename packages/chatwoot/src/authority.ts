@@ -694,7 +694,8 @@ function multipart(
 ): FormData {
   const form = new FormData();
   for (const [name, value] of Object.entries(fields)) {
-    if (value === undefined) continue;
+    // A message may be only files: no empty text is sent with them.
+    if (value === undefined || (name === 'content' && value === '')) continue;
     form.append(
       name,
       typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value),

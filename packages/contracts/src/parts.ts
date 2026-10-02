@@ -167,6 +167,8 @@ export const NoticePart = z
       'reopened',
       'team_offline',
       'follow_up_scheduled',
+      /** The sender deleted this message; its text and files are gone (W23). */
+      'message_deleted',
     ]),
     text: z.string().max(300),
   })

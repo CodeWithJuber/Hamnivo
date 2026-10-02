@@ -36,6 +36,9 @@ import { RepliesService } from './runtime/replies.service.js';
 import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
 import { AuthorityContactsService } from './widget/contacts.service.js';
+import { CustomerEmailsService } from './widget/customer-emails.service.js';
+import { REPLY_WAITING_TOPIC, TRANSCRIPT_TOPIC } from './widget/notify-queue.js';
+import { WIDGET_SURFACE_WORKER_PROVIDERS } from './widget/surface.module.js';
 import { MaintenanceService } from './worker/maintenance.service.js';
 
 /** Outbox topics with a consumer that needs no other service. */
@@ -103,6 +106,7 @@ export class WorkerModule {
         MemoryExtractionService,
         RepliesService,
         ...COMMERCE_WORKER_PROVIDERS,
+        ...WIDGET_SURFACE_WORKER_PROVIDERS,
         {
           provide: OUTBOX_HANDLERS,
           inject: [
@@ -114,6 +118,7 @@ export class WorkerModule {
             MemoryDeletionService,
             RoutingService,
             CommerceCardsService,
+            CustomerEmailsService,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -124,6 +129,7 @@ export class WorkerModule {
             deletions: MemoryDeletionService,
             routing: RoutingService,
             cards: CommerceCardsService,
+            emails: CustomerEmailsService,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -145,6 +151,8 @@ export class WorkerModule {
               ['memory.deleted', (event) => deletions.complete(event)],
               ['conversation.route', (event) => routing.onRoute(event)],
               [CARD_TOPIC, (event) => cards.onCardEvent(event)],
+              [TRANSCRIPT_TOPIC, (event) => emails.onTranscript(event)],
+              [REPLY_WAITING_TOPIC, (event) => emails.onReplyWaiting(event)],
             ]),
         },
         OutboxRelay,
