@@ -102,6 +102,7 @@ describe('database roles', () => {
         'app.purge_expired(integer)',
         'app.purge_migration_files(integer)',
         'app.purge_webhook_events(integer,integer)',
+        'app.purge_widget_uploads(integer)',
         'app.resolve_api_key(text)',
         'app.resolve_authority_connection(uuid)',
         'app.resolve_invitation(uuid)',

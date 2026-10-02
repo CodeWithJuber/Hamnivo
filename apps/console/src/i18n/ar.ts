@@ -4,6 +4,7 @@ import { decisionsAr } from './decisions';
 import { developerAr } from './developer/ar';
 import type { Translation } from './en';
 import { reportsAr } from './reports/ar';
+import { chatSettingsAr } from './widget/ar';
 
 /** Arabic (Modern Standard). Pending review by native speakers, as the note in the interface says. */
 export const ar: Translation = {
@@ -1102,6 +1103,9 @@ export const ar: Translation = {
         available: 'متاح',
         rejected: 'محظور',
       },
+      place: 'شارك مكانًا: {{label}}',
+      contact: 'شارك جهة اتصال: {{details}}',
+      reaction: 'تفاعل بـ {{emoji}}',
     },
     translation: {
       translate: 'ترجمة إلى {{language}}',
@@ -1288,6 +1292,7 @@ export const ar: Translation = {
   commerce: commerceAr,
   developer: developerAr,
   reports: reportsAr,
+  chatSettings: chatSettingsAr,
   memory: {
     title: 'ذاكرة العملاء',
     description: 'أدِر ما نتذكره عن عملائك.',
@@ -2261,6 +2266,7 @@ export const ar: Translation = {
     widget: {
       configure: 'إعداد أداة الدردشة',
       identity_keys: 'تسجيل المفاتيح التي تتحقق من هوية العملاء',
+      proactive: 'تحديد متى تدعو الدردشة زوار الموقع إلى التحدث',
     },
     agents: {
       read: 'عرض وكلاء الذكاء الاصطناعي وإصداراتهم',

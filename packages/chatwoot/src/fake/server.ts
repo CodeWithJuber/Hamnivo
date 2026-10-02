@@ -94,6 +94,9 @@ interface Conversation {
   waitingSince: number | null;
   /** Unix seconds; set while snoozed with a time. */
   snoozedUntil: number | null;
+  /** Unix seconds when an agent last opened the conversation (update_last_seen). */
+  agentLastSeenAt: number | null;
+  contactLastSeenAt: number | null;
 }
 interface Label {
   id: number;
@@ -117,6 +120,16 @@ interface CannedResponse {
   shortCode: string;
   content: string;
 }
+interface Attachment {
+  id: number;
+  accountId: number;
+  fileType: 'image' | 'audio' | 'video' | 'file';
+  contentType: string;
+  name: string;
+  /** Stands in for ActiveStorage's signed blob id. */
+  signedId: string;
+  bytes: Buffer;
+}
 interface Message {
   id: number;
   accountId: number;
@@ -129,14 +142,9 @@ interface Message {
   senderType: 'Contact' | 'User' | 'AgentBot' | null;
   senderId: number | null;
   createdAt: number;
-  attachments: FakeAttachment[];
-}
-interface FakeAttachment {
-  id: number;
-  fileType: string;
-  name: string;
-  contentType: string;
-  bytes: Uint8Array;
+  attachments: Attachment[];
+  /** Delivery state: agent messages become `read` when the customer's client reports seeing them. */
+  status: 'sent' | 'delivered' | 'read' | 'failed';
 }
 interface AutomationRule {
   id: number;
@@ -297,6 +305,30 @@ function mulberry32(seed: number): () => number {
 
 const token = (bytes = 18) => randomBytes(bytes).toString('base64url');
 
+/**
+ * A multipart message: its text fields, which stay strings as Rails reads them except for
+ * `content_attributes` (a JSON string Chatwoot parses, so nested values keep their types), and
+ * its `attachments[]` files.
+ */
+function formFields(form: FormData): { fields: Json; files: File[] } {
+  const fields: Json = {};
+  const files: File[] = [];
+  for (const [name, value] of form.entries()) {
+    if (typeof value !== 'string') {
+      if (name === 'attachments[]') files.push(value);
+    } else if (name === 'content_attributes') {
+      try {
+        fields[name] = JSON.parse(value);
+      } catch {
+        fields[name] = {};
+      }
+    } else {
+      fields[name] = value;
+    }
+  }
+  return { fields, files };
+}
+
 type Principal = { kind: 'user'; user: User } | { kind: 'bot'; bot: Bot };
 
 class FakeState {
@@ -318,7 +350,6 @@ class FakeState {
   cannedResponses = new Map<number, CannedResponse>();
   automationRules = new Map<number, AutomationRule>();
   hooks = new Map<number, IntegrationHook>();
-  blobs = new Map<string, FakeAttachment>();
 
   nextId(): number {
     this.seq += 1;
@@ -341,6 +372,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
   const deliveries: FakeDelivery[] = [];
   const requests: FakeRequest[] = [];
   const outbound: FakeOutbound[] = [];
+  /** Chatwoot's FRONTEND_URL: the address in the file URLs it hands out. */
   let publicBase = '';
   let queue: Array<{ source: Source; url: string; secret: string; event: string; body: string }> =
     [];
@@ -354,7 +386,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
   app.addHook('onRequest', async (request) => {
     requests.push({ method: request.method, url: request.url });
   });
-  // Chatwoot takes message attachments as multipart form data.
+  // Messages with files arrive as multipart form data, like Chatwoot's dashboard sends them.
   app.addContentTypeParser(
     'multipart/form-data',
     { parseAs: 'buffer' },
@@ -436,17 +468,26 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
 
   const conversationOf = (m: Message) => s.conversations.get(m.conversationId) as Conversation;
 
-  const blobKey = (a: FakeAttachment) => `blob${a.id}`;
-  const attachmentApi = (m: Message, a: FakeAttachment): Json => ({
-    id: a.id,
-    message_id: m.id,
-    file_type: a.fileType,
-    account_id: m.accountId,
-    extension: a.name.includes('.') ? a.name.split('.').pop() : null,
-    data_url: `${publicBase}/rails/active_storage/blobs/redirect/${blobKey(a)}/${encodeURIComponent(a.name)}`,
-    thumb_url: '',
-    file_size: a.bytes.byteLength,
-  });
+  /** Like Chatwoot's attachment JSON: no file name, which only the blob URL carries. */
+  const attachmentJson = (m: Message, a: Attachment): Json => {
+    const name = encodeURIComponent(a.name);
+    return {
+      id: a.id,
+      message_id: m.id,
+      file_type: a.fileType,
+      account_id: a.accountId,
+      extension: a.name.includes('.') ? a.name.split('.').pop() : null,
+      content_type: a.contentType,
+      data_url: `${publicBase}/rails/active_storage/blobs/redirect/${a.signedId}/${name}`,
+      thumb_url:
+        a.fileType === 'image'
+          ? `${publicBase}/rails/active_storage/representations/redirect/${a.signedId}/x/${name}`
+          : '',
+      file_size: a.bytes.length,
+      width: null,
+      height: null,
+    };
+  };
 
   function messageApi(m: Message): Json {
     const conversation = conversationOf(m);
@@ -457,14 +498,14 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       conversation_id: conversation.displayId,
       message_type: m.messageType,
       content_type: 'text',
-      status: 'sent',
+      status: m.status,
       content_attributes: m.contentAttributes,
       created_at: Math.floor(m.createdAt),
       private: m.private,
       source_id: m.sourceId,
       sender: senderOf(m, false),
       ...(m.attachments.length > 0
-        ? { attachments: m.attachments.map((a) => attachmentApi(m, a)) }
+        ? { attachments: m.attachments.map((a) => attachmentJson(m, a)) }
         : {}),
     };
   }
@@ -510,10 +551,10 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       account_id: c.accountId,
       uuid: c.uuid,
       additional_attributes: {},
-      agent_last_seen_at: 0,
+      agent_last_seen_at: Math.floor(c.agentLastSeenAt ?? 0),
       assignee_last_seen_at: 0,
       can_reply: true,
-      contact_last_seen_at: 0,
+      contact_last_seen_at: Math.floor(c.contactLastSeenAt ?? 0),
       custom_attributes: c.customAttributes,
       inbox_id: c.inboxId,
       labels: c.labels,
@@ -560,8 +601,8 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       first_reply_created_at: null,
       priority: null,
       waiting_since: c.waitingSince ? Math.floor(c.waitingSince) : 0,
-      agent_last_seen_at: 0,
-      contact_last_seen_at: 0,
+      agent_last_seen_at: Math.floor(c.agentLastSeenAt ?? 0),
+      contact_last_seen_at: Math.floor(c.contactLastSeenAt ?? 0),
       last_activity_at: Math.floor(last?.createdAt ?? c.createdAt),
       timestamp: Math.floor(last?.createdAt ?? c.createdAt),
       created_at: Math.floor(c.createdAt),
@@ -587,6 +628,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       private: m.private,
       sender: senderOf(m, true),
       source_id: m.sourceId,
+      ...(m.attachments.length > 0
+        ? { attachments: m.attachments.map((a) => attachmentJson(m, a)) }
+        : {}),
     };
   }
 
@@ -762,6 +806,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         senderId: null,
         createdAt: s.clock(),
         attachments: [],
+        status: 'sent',
       };
       s.messages.set(greeting.id, greeting);
       outbound.push({
@@ -1499,6 +1544,8 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       updatedAt: now,
       waitingSince: now,
       snoozedUntil: null,
+      agentLastSeenAt: null,
+      contactLastSeenAt: null,
     };
     s.conversations.set(conversation.id, conversation);
     emit(accountId, 'conversation_created', conversationWebhook(conversation), conversation);
@@ -1556,22 +1603,6 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
   );
 
-  // Attachment downloads (ActiveStorage redirect, then the file).
-  app.get(
-    '/rails/active_storage/blobs/redirect/:key/:name',
-    async (request, reply: FastifyReply) => {
-      const { key, name } = request.params as { key: string; name: string };
-      if (!s.blobs.has(key)) throw notFound();
-      return reply.redirect(`/rails/active_storage/disk/${key}/${encodeURIComponent(name)}`, 302);
-    },
-  );
-
-  app.get('/rails/active_storage/disk/:key/:name', async (request, reply: FastifyReply) => {
-    const blob = s.blobs.get((request.params as { key: string }).key);
-    if (!blob) throw notFound();
-    return reply.type(blob.contentType).send(Buffer.from(blob.bytes));
-  });
-
   app.get('/api/v1/accounts/:account_id/conversations/:conversation_id', async (request) => {
     const { conversation } = conversationAccess(request, 'conversations#show');
     return conversationApi(conversation);
@@ -1599,7 +1630,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
           labels: conversation.labels,
           additional_attributes: {},
           contact: contactApi(contact),
-          agent_last_seen_at: null,
+          agent_last_seen_at: conversation.agentLastSeenAt
+            ? new Date(conversation.agentLastSeenAt * 1000).toISOString()
+            : null,
           assignee_last_seen_at: null,
         },
         payload: page.map(messageApi),
@@ -1611,23 +1644,10 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     '/api/v1/accounts/:account_id/conversations/:conversation_id/messages',
     async (request) => {
       const { principal, conversation } = conversationAccess(request, 'messages#create');
-      const raw = request.body;
-      const files: File[] = [];
-      let input: Json;
-      if (raw instanceof FormData) {
-        input = {};
-        for (const [key, value] of raw.entries()) {
-          if (key === 'attachments[]' && typeof value !== 'string') files.push(value);
-          else if (typeof value === 'string') input[key] = value;
-        }
-        if (typeof input.content_attributes === 'string') {
-          try {
-            input.content_attributes = JSON.parse(input.content_attributes);
-          } catch {
-            input.content_attributes = {};
-          }
-        }
-      } else input = body(request);
+      const { fields: input, files } =
+        request.body instanceof FormData
+          ? formFields(request.body)
+          : { fields: body(request), files: [] };
       const requested = String(input.message_type ?? 'outgoing');
       const messageType =
         requested === 'incoming'
@@ -1666,11 +1686,12 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       ) {
         contentAttributes.external_created_at = input.external_created_at;
       }
-      const attachments: FakeAttachment[] = [];
+      const attachments: Attachment[] = [];
       for (const file of files) {
         const contentType = file.type || 'application/octet-stream';
         attachments.push({
           id: s.nextId(),
+          accountId: conversation.accountId,
           fileType: contentType.startsWith('image/')
             ? 'image'
             : contentType.startsWith('audio/')
@@ -1678,12 +1699,12 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
               : contentType.startsWith('video/')
                 ? 'video'
                 : 'file',
-          name: file.name || 'file',
           contentType,
-          bytes: new Uint8Array(await file.arrayBuffer()),
+          name: file.name || 'file',
+          signedId: `${randomBytes(24).toString('base64url')}--${randomBytes(20).toString('hex')}`,
+          bytes: Buffer.from(await file.arrayBuffer()),
         });
       }
-      for (const attachment of attachments) s.blobs.set(blobKey(attachment), attachment);
       const message: Message = {
         id: s.nextId(),
         accountId: conversation.accountId,
@@ -1697,6 +1718,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         senderId,
         createdAt: s.clock(),
         attachments,
+        status: 'sent',
       };
       s.messages.set(message.id, message);
       recordOutbound(conversation, message);
@@ -1847,6 +1869,31 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
   );
 
+  app.delete(
+    '/api/v1/accounts/:account_id/conversations/:conversation_id/messages/:message_id',
+    async (request) => {
+      const { conversation } = conversationAccess(request, 'messages#destroy');
+      const message = s.messages.get(Number((request.params as Json).message_id));
+      if (!message || message.conversationId !== conversation.id) throw notFound();
+      // Like Chatwoot: the text is replaced, the files are removed, a marker stays.
+      message.content = 'This message was deleted';
+      message.contentAttributes = { deleted: true };
+      message.attachments = [];
+      emit(conversation.accountId, 'message_updated', messageWebhook(message), conversation);
+      return messageApi(message);
+    },
+  );
+
+  app.post(
+    '/api/v1/accounts/:account_id/conversations/:conversation_id/update_last_seen',
+    async (request, reply: FastifyReply) => {
+      const { conversation } = conversationAccess(request, 'conversations#update_last_seen');
+      // Chatwoot updates the column directly: no webhook, and updated_at stays as it was.
+      conversation.agentLastSeenAt = Date.now() / 1000;
+      return reply.code(200).send();
+    },
+  );
+
   // ---------------------------------------------------------------- Client (public) API
 
   function inboxByIdentifier(request: FastifyRequest): Inbox {
@@ -1950,6 +1997,8 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         updatedAt: now,
         waitingSince: now,
         snoozedUntil: null,
+        agentLastSeenAt: null,
+        contactLastSeenAt: null,
       };
       s.conversations.set(conversation.id, conversation);
       emit(
@@ -1979,6 +2028,29 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
   );
 
+  app.post(
+    '/public/api/v1/inboxes/:inbox_identifier/contacts/:contact_identifier/conversations/:conversation_id/update_last_seen',
+    async (request, reply: FastifyReply) => {
+      const inbox = inboxByIdentifier(request);
+      const params = request.params as Json;
+      const contactInbox = contactInboxOf(inbox, String(params.contact_identifier));
+      const conversation = [...s.conversations.values()].find(
+        (c) =>
+          c.contactInboxId === contactInbox.id && c.displayId === Number(params.conversation_id),
+      );
+      if (!conversation) throw notFound();
+      const seenAt = Date.now() / 1000;
+      conversation.contactLastSeenAt = seenAt;
+      // Agent messages sent before now become read (Conversations::UpdateMessageStatusJob).
+      for (const m of messagesOf(conversation)) {
+        if (m.messageType !== 0 && (m.status === 'sent' || m.status === 'delivered')) {
+          m.status = 'read';
+        }
+      }
+      return reply.code(200).send();
+    },
+  );
+
   app.get(
     '/public/api/v1/inboxes/:inbox_identifier/contacts/:contact_identifier/conversations/:conversation_id/messages',
     async (request) => {
@@ -2005,7 +2077,53 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
   );
 
+  // ---------------------------------------------------------------- ActiveStorage
+
+  // A file exists while the message that carries it does (deleting a message removes its files).
+  const attachmentBySigned = (signed: string) => {
+    for (const message of s.messages.values()) {
+      const found = message.attachments.find((a) => a.signedId === signed);
+      if (found) return found;
+    }
+    return null;
+  };
+  const sendFile = (reply: FastifyReply, signed: unknown) => {
+    const found = attachmentBySigned(String(signed));
+    if (!found) throw notFound();
+    // Any file name is valid in the header: a plain fallback and the exact name encoded.
+    const plain = found.name.replace(/[^\x20-\x7e]|["\\]/g, '_');
+    return reply
+      .header('content-type', found.contentType)
+      .header(
+        'content-disposition',
+        `inline; filename="${plain}"; filename*=UTF-8''${encodeURIComponent(found.name)}`,
+      )
+      .send(found.bytes);
+  };
+
+  // The URL Chatwoot hands out (`data_url`) redirects to the storage service, whose disk route
+  // sends the file; the proxy route sends it without the redirect.
+  app.get(
+    '/rails/active_storage/blobs/redirect/:signed/:filename',
+    async (request, reply: FastifyReply) => {
+      const params = request.params as Json;
+      if (!attachmentBySigned(String(params.signed))) throw notFound();
+      return reply.redirect(
+        `/rails/active_storage/disk/${String(params.signed)}/${encodeURIComponent(String(params.filename))}`,
+        302,
+      );
+    },
+  );
+  app.get('/rails/active_storage/disk/:signed/:filename', async (request, reply: FastifyReply) =>
+    sendFile(reply, (request.params as Json).signed),
+  );
+  app.get(
+    '/rails/active_storage/blobs/proxy/:signed/:filename',
+    async (request, reply: FastifyReply) => sendFile(reply, (request.params as Json).signed),
+  );
+
   const address = await app.listen({ host: options.host ?? '127.0.0.1', port: options.port ?? 0 });
+  publicBase = address.replace('0.0.0.0', '127.0.0.1');
 
   async function flush() {
     while (pumping || (!paused && queue.length > 0)) {
@@ -2013,8 +2131,6 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       await pumping;
     }
   }
-
-  publicBase = address.replace('0.0.0.0', '127.0.0.1');
 
   return {
     url: publicBase,

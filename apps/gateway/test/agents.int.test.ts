@@ -168,7 +168,12 @@ describe('the default agent', () => {
     const usage = await withTenant(slice.app, { tenantId }, (tx) =>
       tx.select().from(schema.usageEntries).where(eq(schema.usageEntries.sourceRef, run?.id)),
     );
-    expect(usage.map((u) => u.meter).sort()).toEqual(['ai.tokens.input', 'ai.tokens.output']);
+    // Tokens, and the reply itself, which counts against the plan's AI replies (A08).
+    expect(usage.map((u) => u.meter).sort()).toEqual([
+      'ai.replies',
+      'ai.tokens.input',
+      'ai.tokens.output',
+    ]);
   });
 });
 

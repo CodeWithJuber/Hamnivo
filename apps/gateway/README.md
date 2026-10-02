@@ -325,6 +325,47 @@ Zendesk and Intercom exports.
   customer's own means the entry is not cached). A store call must match the lookup's audience,
   or nothing is stored.
 
+## Customer surface (W02, W05–W07, W09, W17–W19, W22–W25)
+
+`src/widget/surface.*`, `attachments.service.ts`, `messages.service.ts`, `help.service.ts`,
+`notifications.service.ts`, `customer-emails.service.ts`, `settings.service.ts`.
+
+- **Brand settings.** `GET/PUT /v1/admin/brands/{id}/widget-settings` (widget.configure): layout,
+  files, help suggestions and search, the deletion window and email offers.
+  `GET/PUT /v1/admin/brands/{id}/proactive` (widget.proactive, its own permission): prompts, off
+  by default, at most five, at most three a day, with a quiet time after a dismissal. Each change
+  is audited and publishes a new configuration version.
+- **Launcher.** `GET /v1/widget/launcher?widgetId=` gives the loader the layout, colours, labels
+  and prompts in one language. Only the brand's allowed websites get CORS permission to read it.
+- **Files.** `POST /v1/widget/conversations/{id}/uploads?name=` takes the file's own bytes
+  (`application/octet-stream`, 10 MB at most). The type is read from the bytes; the brand's types,
+  size and count apply; the scanner must pass it (ClamAV with `CLAMAV_URL`, the EICAR check in
+  development and tests). A scanner that fails, throws or takes over 30 seconds refuses the file.
+  Scanned files wait in quarantine for 24 hours and go to Chatwoot with one message only; a retry
+  of that message may claim them again. `GET …/attachments/{id}` serves a file only from the
+  caller's conversation and the customer's view of it (never a private note's), scanned again,
+  as a download with `nosniff` and a sandboxing CSP. In production without `CLAMAV_URL` the
+  widget offers no files. Bytes still in quarantine are dropped after a day by the `purge-expired`
+  job.
+- **Read state.** `POST …/read` moves the customer's read point (unread counts) and tells
+  Chatwoot the contact saw the conversation. Chatwoot's `agent_last_seen_at`, read by webhooks and
+  the reconciler, marks the customer's earlier messages read (`delivery.updated`, once).
+- **Deleting and reacting.** `POST …/messages/{id}/delete` deletes the customer's own message
+  within the brand's window (`DELETE_WINDOW_CLOSED` after it, `CAPABILITY_UNSUPPORTED` where the
+  authority cannot). Chatwoot keeps a marker; the journal's copies lose their text and the lane
+  gets one `message.redacted`. `POST …/reactions` sends a reaction as a short message quoting the
+  reply (`in_reply_to`), once, and asks nobody to answer it.
+- **Help.** `GET /v1/widget/help/search?q=` searches the brand's public knowledge with the
+  assistant's retrieval (20 searches a minute per session).
+- **Sessions.** Signing in as someone else or out ends the old session's open streams at once
+  (a Valkey signal), not at the next heartbeat.
+- **Emails.** `GET/POST /v1/widget/notifications`: verified customers with a verified address
+  choose transcripts and reply-waiting emails. The worker sends them through the mailer: a
+  transcript when the conversation closes (the customer's view only), and a note when a reply
+  stays unread for `CUSTOMER_REPLY_EMAIL_DELAY_SECONDS` (default 300), at most one every 30
+  minutes, never with the reply's text. Every email carries a signed one-click unsubscribe link
+  (`/v1/notifications/unsubscribe`, RFC 8058) that asks before changing anything.
+
 ## Widget framing
 
 `GET /v1/widget/frame-policy?widgetId=wid_…` names the websites that may frame a brand's widget

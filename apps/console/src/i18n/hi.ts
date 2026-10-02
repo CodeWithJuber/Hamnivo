@@ -4,6 +4,7 @@ import { decisionsHi } from './decisions';
 import { developerHi } from './developer/hi';
 import type { Translation } from './en';
 import { reportsHi } from './reports/hi';
+import { chatSettingsHi } from './widget/hi';
 
 /** Hindi. Pending review by native speakers, as the note in the interface says. */
 export const hi: Translation = {
@@ -1107,6 +1108,9 @@ export const hi: Translation = {
         available: 'उपलब्ध',
         rejected: 'रोकी गई',
       },
+      place: 'एक जगह साझा की: {{label}}',
+      contact: 'एक संपर्क साझा किया: {{details}}',
+      reaction: '{{emoji}} से प्रतिक्रिया दी',
     },
     translation: {
       translate: '{{language}} में अनुवाद करें',
@@ -1293,6 +1297,7 @@ export const hi: Translation = {
   commerce: commerceHi,
   developer: developerHi,
   reports: reportsHi,
+  chatSettings: chatSettingsHi,
   memory: {
     title: 'ग्राहक मेमोरी',
     description: 'तय करें कि हम आपके ग्राहकों के बारे में क्या याद रखते हैं।',
@@ -2266,6 +2271,7 @@ export const hi: Translation = {
     widget: {
       configure: 'चैट विजेट सेट करें',
       identity_keys: 'ग्राहक की पहचान सत्यापित करने वाली कुंजियां दर्ज करें',
+      proactive: 'चुनें कि चैट वेबसाइट के विज़िटर को बात करने के लिए कब बुलाए',
     },
     agents: {
       read: 'AI एजेंट और उनके वर्शन देखें',

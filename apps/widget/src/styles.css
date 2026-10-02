@@ -53,3 +53,18 @@ body {
   border-inline-start: 3px solid var(--color-border);
   padding-inline-start: 0.75em;
 }
+
+/* Less motion (W14) when the visitor asks for it in the chat's settings; the device's own setting
+   is applied by the shared styles. It must beat component animation utilities, hence !important. */
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  /* biome-ignore lint/complexity/noImportantStyles: must override animation utilities */
+  animation-duration: 0.01ms !important;
+  /* biome-ignore lint/complexity/noImportantStyles: must override animation utilities */
+  animation-iteration-count: 1 !important;
+  /* biome-ignore lint/complexity/noImportantStyles: must override animation utilities */
+  transition-duration: 0.01ms !important;
+  /* biome-ignore lint/complexity/noImportantStyles: must override animation utilities */
+  scroll-behavior: auto !important;
+}

@@ -4,6 +4,7 @@ import { decisionsUr } from './decisions';
 import { developerUr } from './developer/ur';
 import type { Translation } from './en';
 import { reportsUr } from './reports/ur';
+import { chatSettingsUr } from './widget/ur';
 
 /** Urdu. Pending review by native speakers, as the note in the interface says. */
 export const ur: Translation = {
@@ -1125,6 +1126,9 @@ export const ur: Translation = {
         available: 'دستیاب',
         rejected: 'روک دی گئی',
       },
+      place: 'ایک جگہ شیئر کی: {{label}}',
+      contact: 'ایک رابطہ شیئر کیا: {{details}}',
+      reaction: '{{emoji}} سے ردعمل دیا',
     },
     translation: {
       translate: '{{language}} میں ترجمہ کریں',
@@ -1314,6 +1318,7 @@ export const ur: Translation = {
   commerce: commerceUr,
   developer: developerUr,
   reports: reportsUr,
+  chatSettings: chatSettingsUr,
   memory: {
     title: 'کسٹمر میموری',
     description: 'طے کریں کہ ہم آپ کے کسٹمرز کے بارے میں کیا یاد رکھتے ہیں۔',
@@ -2306,6 +2311,7 @@ export const ur: Translation = {
     widget: {
       configure: 'چیٹ ویجیٹ سیٹ کریں',
       identity_keys: 'کسٹمر کی شناخت کی تصدیق کرنے والی کلیدیں درج کریں',
+      proactive: 'طے کریں کہ چیٹ ویب سائٹ کے وزیٹرز کو بات کرنے کی دعوت کب دے',
     },
     agents: {
       read: 'AI ایجنٹس اور ان کے ورژن دیکھیں',

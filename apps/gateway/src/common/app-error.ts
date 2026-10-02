@@ -7,6 +7,8 @@ export interface AppErrorDetails {
   retryable?: boolean;
   /** Which limit was reached (plan, budget or rate limit). */
   quota?: QuotaInfo;
+  /** A finer machine-readable reason (Problem.reason). */
+  reason?: string;
   /** Logged for operators, never sent to clients. */
   internal?: unknown;
 }

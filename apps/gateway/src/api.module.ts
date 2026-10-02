@@ -59,6 +59,7 @@ import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { KnowledgeController } from './knowledge/knowledge.controller.js';
 import { KnowledgeService } from './knowledge/knowledge.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
+import type { Scanner } from './knowledge/scanner.js';
 import { LanguageController } from './language/language.controller.js';
 import { AdminMemoryController } from './memory/admin-memory.controller.js';
 import { AdminMemoryService } from './memory/admin-memory.service.js';
@@ -95,6 +96,10 @@ import { AuthorityContactsService } from './widget/contacts.service.js';
 import { WidgetConversationsService } from './widget/conversations.service.js';
 import { WidgetEventsService } from './widget/events.service.js';
 import { WidgetSessionsService } from './widget/sessions.service.js';
+import {
+  WIDGET_SURFACE_API_CONTROLLERS,
+  widgetSurfaceApiProviders,
+} from './widget/surface.module.js';
 import { WidgetTokens } from './widget/tokens.service.js';
 import { WidgetController } from './widget/widget.controller.js';
 import { WidgetGuard } from './widget/widget.guard.js';
@@ -104,6 +109,8 @@ export interface ApiOverrides extends PlatformOverrides, DeveloperOverrides {
   model?: LanguageModel;
   /** Answers DNS TXT lookups for domain verification (tests). */
   dns?: DnsResolver;
+  /** Replaces the scanner for customer files (tests); ClamAV or the EICAR check otherwise. */
+  scanner?: Scanner;
 }
 
 /** HTTP API process: REST, staff authentication and administration. */
@@ -143,6 +150,7 @@ export class ApiModule {
         PlatformController,
         ...COMMERCE_API_CONTROLLERS,
         ...DEVELOPER_API_CONTROLLERS,
+        ...WIDGET_SURFACE_API_CONTROLLERS,
       ],
       providers: [
         {
@@ -220,6 +228,7 @@ export class ApiModule {
         AdminMemoryService,
         ...COMMERCE_API_PROVIDERS,
         ...developerApiProviders(overrides),
+        ...widgetSurfaceApiProviders(config, overrides.scanner),
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

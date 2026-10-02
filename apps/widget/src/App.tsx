@@ -1,4 +1,5 @@
 import { HamnivoClient } from '@hamnivo/client';
+import type { WidgetLayoutMode } from '@hamnivo/contracts';
 import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +8,7 @@ import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
 import { applyLocale, type Locale } from './i18n.js';
 import { useChat } from './useChat.js';
+import { useDisplay } from './useDisplay.js';
 import { useMemory } from './useMemory.js';
 import { useReplyLanguage } from './useReplyLanguage.js';
 
@@ -15,6 +17,8 @@ export interface WidgetParams {
   widgetId: string;
   hostOrigin: string | null;
   locale: Locale;
+  /** How the loader placed the chat on the page (W02); null when the brand's choice applies. */
+  mode: WidgetLayoutMode | null;
 }
 
 export function App({ params, bridge }: { params: WidgetParams; bridge: HostBridge }) {
@@ -38,6 +42,26 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const { onEvent } = chat;
   useEffect(() => onEvent(commerce.onEvent), [onEvent, commerce.onEvent]);
   const memory = useMemory(client, chat.state.session?.principal.id ?? null);
+  const display = useDisplay(params.widgetId);
+  // Embedded, the chat is on screen only while the loader shows it; on its own page, always.
+  const [open, setOpen] = useState(
+    !params.hostOrigin || params.mode === 'inline' || params.mode === 'fullpage',
+  );
+  const [pageShown, setPageShown] = useState(document.visibilityState === 'visible');
+  /** The proactive prompt the visitor opened the chat from (W19), by trigger id. */
+  const [trigger, setTrigger] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onVisibility = () => setPageShown(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  // The launcher shows how many replies wait while the chat is closed (W05).
+  const { unread } = chat.state;
+  useEffect(() => {
+    bridge.post({ type: 'event', event: 'unread', payload: { count: unread } });
+  }, [bridge, unread]);
 
   useEffect(() => {
     applyLocale(locale);
@@ -61,6 +85,9 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     const identityChanged = (verified: boolean) =>
       bridge.post({ type: 'event', event: 'identity.changed', payload: { verified } });
     return bridge.listen((message) => {
+      if (message.type === 'open') setOpen(true);
+      if (message.type === 'close') setOpen(false);
+      if (message.type === 'proactive') setTrigger(message.triggerId);
       if (message.type === 'set-locale')
         setLocale((message.locale.split('-')[0] as Locale) ?? 'en');
       if (message.type === 'identify') {
@@ -111,25 +138,45 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       </p>
     );
   }
+  const session = chat.state.session;
+  const mode = params.mode ?? session.config.layout?.mode ?? 'bubble';
+  // Only the brand's own words, from its configuration: the page sends nothing but the id.
+  const prompt =
+    session.config.proactive?.triggers.find((t) => t.id === trigger)?.message[locale] ?? null;
+  // Inline and full-page chats have no launcher to go back to.
+  const closable = Boolean(params.hostOrigin) && mode !== 'inline' && mode !== 'fullpage';
   return (
     <AnnouncerProvider>
       <Chat
-        session={chat.state.session}
+        client={client}
+        session={session}
         state={chat.state}
         commerce={commerce}
         pending={chat.pending}
         locale={locale}
+        mode={mode}
+        visible={open && pageShown}
+        display={display}
+        prompt={prompt}
         onLocale={(next) => {
           setLocale(next);
           void saveLocale(next);
         }}
         onSend={chat.send}
         onRetry={(id) => chat.retry(id)}
+        onRemove={chat.remove}
+        onFlush={chat.flush}
         onHandoff={chat.handoff}
+        onLoadOlder={chat.loadOlder}
+        onSeen={chat.markSeen}
+        onDelete={chat.deleteMessage}
+        onReact={chat.react}
+        onOpenConversation={chat.open}
+        onFilesConversation={chat.conversationForFiles}
         language={language}
         memory={memory}
         onClose={
-          params.hostOrigin
+          closable
             ? () => bridge.post({ type: 'layout', open: false, width: 0, height: 0 })
             : undefined
         }

@@ -37,7 +37,7 @@ export function MemoryConsent({
       data-testid="memory-consent"
       className="mx-4 mb-3 flex flex-col gap-2 rounded-2xl border border-border bg-surface p-4 text-sm text-text shadow-sm"
     >
-      <h2 id="memory-consent-title" className="text-[15px] font-semibold">
+      <h2 id="memory-consent-title" className="text-[0.9375rem] font-semibold">
         {t('memory.consent.title')}
       </h2>
       <p>{t('memory.consent.what')}</p>

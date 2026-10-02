@@ -5,6 +5,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { JournalService } from '../authority/journal.service.js';
 import type { AppConfig } from '../config.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
+import { SessionSignals } from './session-signals.service.js';
 import type { WidgetClaims } from './tokens.service.js';
 
 const PAGE = 100;
@@ -23,6 +24,7 @@ export class WidgetEventsService {
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly journal: JournalService,
+    private readonly signals: SessionSignals,
   ) {}
 
   private async sessionActive(claims: WidgetClaims): Promise<boolean> {
@@ -119,7 +121,30 @@ export class WidgetEventsService {
     };
 
     request.raw.on('close', end);
-    unsubscribe = await this.journal.subscribe(tenantId, conversationId, () => void flush());
+    const unsubscribeJournal = await this.journal.subscribe(
+      tenantId,
+      conversationId,
+      () => void flush(),
+    );
+    // A sign-in as someone else or a sign-out ends this stream at once, not at the next heartbeat.
+    const unsubscribeSession = await this.signals.onEnded(tenantId, claims.sessionId, () => {
+      control({ control: 'auth_expired' });
+      end();
+    });
+    unsubscribe = () => {
+      unsubscribeJournal();
+      unsubscribeSession();
+    };
+    if (closed) {
+      unsubscribe();
+      return;
+    }
+    // A session that ended while the stream was opening would have missed its signal.
+    if (!(await this.sessionActive(claims).catch(() => true))) {
+      control({ control: 'auth_expired' });
+      end();
+      return;
+    }
     heartbeat = setInterval(() => {
       void (async () => {
         if (!(await this.sessionActive(claims).catch(() => true))) {

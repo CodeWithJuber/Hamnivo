@@ -218,28 +218,37 @@
     "note": "One shared behaviour suite runs against every model provider (generate, stream, wire format, key placement, 401/429/5xx/529/abort) with provider-specific capability tests, and the Jev adapter has its own wire contract fixtures. Fixtures come from public API docs, not recorded traffic."
   },
   "W05": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/widget/conversations.service.ts",
+      "apps/gateway/src/widget/read-state.ts",
+      "apps/gateway/test/customer-surface.int.test.ts",
       "apps/gateway/test/slice.int.test.ts",
-      "apps/widget/src/useChat.ts"
+      "apps/widget/e2e/surface.spec.ts",
+      "apps/widget/src/useChat.ts",
+      "packages/widget-loader/src/loader.ts"
     ],
-    "note": "Customer history from Chatwoot's customer view (private notes and activity excluded) with an older-page cursor, shown when the widget reopens; unread markers pending."
+    "note": "History from Chatwoot's customer view (private notes and activity excluded) with earlier pages on request. Unread replies are counted from the customer's read point: a line where they start, a count on the launcher while the chat is closed (also in its accessible name) and a new-messages button with the count while reading back (tested in the gateway and the browser)."
   },
   "W06": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/authority/outbound.service.ts",
+      "apps/gateway/src/authority/processor.service.ts",
+      "apps/gateway/src/widget/read-state.ts",
+      "apps/gateway/test/customer-surface.int.test.ts",
       "apps/gateway/test/slice.int.test.ts",
       "apps/widget/e2e/journey.spec.ts",
+      "apps/widget/e2e/surface.spec.ts",
       "apps/widget/src/components/Chat.tsx",
       "packages/client/src/outbox.ts",
-      "packages/client/test/client.test.ts"
+      "packages/client/test/client.test.ts",
+      "packages/client/test/customer-surface.test.ts"
     ],
-    "note": "Queued, sending, accepted and failed (with retry) states in the widget, backed by the SDK outbox; 'accepted' only after the authority committed. Delivered/read states pending."
+    "note": "Waiting for connection, sending, sent (only once the authority committed the message), read, and not sent with a readable reason and retry, edit and remove. Read only where Chatwoot reports it: its agent_last_seen_at, from webhooks or the reconciler, marks the customer's earlier messages read with one delivery.updated event. Chatwoot has no delivery receipts for this channel, so 'delivered' is not shown (tested in the gateway, the SDK and the browser)."
   },
   "W07": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/authority/journal.service.ts",
       "apps/gateway/src/authority/reconciler.service.ts",
@@ -247,11 +256,14 @@
       "apps/gateway/test/reconciler.int.test.ts",
       "apps/gateway/test/slice.int.test.ts",
       "apps/widget/e2e/journey.spec.ts",
+      "apps/widget/e2e/surface.spec.ts",
+      "packages/client/src/drafts.ts",
       "packages/client/src/outbox.ts",
       "packages/client/src/stream.ts",
-      "packages/client/test/client.test.ts"
+      "packages/client/test/client.test.ts",
+      "packages/client/test/customer-surface.test.ts"
     ],
-    "note": "Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline (tested in unit tests and the browser journey); draft text preservation pending. Server side, the worker's reconciler recovers messages and state changes whose Chatwoot webhooks were lost (tested with every webhook dropped)."
+    "note": "Resumable SSE (Last-Event-ID, backoff, idle watchdog, auth renewal, resync) and a persistent outbox that resends unsent messages with the same id after reloads or going offline. Drafts are kept per person and conversation across reloads and forgotten at sign-out. Server side, the worker's reconciler recovers messages and state changes whose Chatwoot webhooks were lost. All tested (unit, integration with every webhook dropped, and the browser)."
   },
   "W12": {
     "status": "implemented",
@@ -381,10 +393,12 @@
     "status": "in-progress",
     "evidence": [
       "apps/widget/e2e/journey.spec.ts",
+      "apps/widget/e2e/surface.spec.ts",
       "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/useDisplay.ts",
       "packages/widget-loader/src/loader.ts"
     ],
-    "note": "Keyboard operation, Escape to close with focus returned to the launcher, labelled controls, polite live announcements and an axe audit with no WCAG 2.2 AA violations (tested); manual screen-reader review pending."
+    "note": "Keyboard operation (tested from the page's launcher into the chat's settings), Escape to close with focus returned to the launcher, labelled controls, polite live announcements, text size and less motion in the chat's settings with the device's own text size and reduced-motion setting applied first, reflow at 320 px and 200 % zoom, and axe audits with no WCAG 2.2 AA violations (tested). Manual screen-reader review pending."
   },
   "D02": {
     "status": "in-progress",
@@ -628,11 +642,13 @@
     "status": "in-progress",
     "evidence": [
       "apps/gateway/src/widget/copy.ts",
+      "apps/gateway/src/widget/customer-emails.service.ts",
       "apps/gateway/test/conversation-flow.int.test.ts",
+      "apps/widget/e2e/surface.spec.ts",
       "packages/domain/src/business-hours.ts",
       "packages/domain/test/business-hours.test.ts"
     ],
-    "note": "Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; \"talk to a person\" answers queued or offline with the return time in the customer's language, shown in the widget (tested). Syncing Chatwoot working hours and follow-up by email are pending."
+    "note": "Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; \"talk to a person\" answers queued or offline with the return time in the customer's language. Offline, the widget shows a banner with the last update and a way to try again, and messages wait and go out once (tested). Verified customers can get an email when a reply waits (W25). Syncing Chatwoot working hours and a contact path for anonymous visitors are pending."
   },
   "A04": {
     "status": "in-progress",
@@ -2261,5 +2277,202 @@
       "apps/console/e2e/reports.spec.ts"
     ],
     "note": "Invoice status, overdue and failed payments, due dates and the past-due notice are shown. Updating a payment method and plan changes with effective dates need a payment provider, which is not connected yet."
+  },
+  "W02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/widget/copy.ts",
+      "apps/gateway/src/widget/settings.service.ts",
+      "apps/gateway/test/customer-surface.int.test.ts",
+      "apps/widget/e2e/surface.spec.ts",
+      "apps/console/src/pages/BrandChatSettings.tsx",
+      "apps/console/e2e/chat-settings.spec.ts",
+      "packages/widget-loader/src/loader.ts"
+    ],
+    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens narrower than 480 px the button and the panel open full screen, sized to the visible area. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic."
+  },
+  "W09": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/widget/attachments.service.ts",
+      "apps/gateway/src/widget/surface.module.ts",
+      "apps/gateway/test/customer-surface.int.test.ts",
+      "apps/gateway/test/customer-surface.test.ts",
+      "apps/widget/e2e/surface.spec.ts",
+      "apps/widget/src/components/Parts.tsx",
+      "packages/chatwoot/src/authority.ts",
+      "packages/chatwoot/test/contract/suite.ts",
+      "packages/db/src/schema/customer-surface.ts",
+      "packages/db/test/customer-surface.int.test.ts"
+    ],
+    "note": "Customers upload a file's own bytes into quarantine. The type is read from the bytes, the brand's types, size (up to 10 MB) and count (up to 5) apply, and the scanner (ClamAV in production, the EICAR check in tests) must pass it: any scanner failure, error or timeout refuses the file. Only then does one message carry it to Chatwoot. Downloads come only from the caller's conversation and the customer's view of it, and are scanned again. The widget shows previews and accessible chips with the reason for a refusal. Production without ClamAV offers no files. Mutation-checked."
+  },
+  "W17": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/widget/help.service.ts",
+      "apps/widget/src/components/Home.tsx",
+      "apps/gateway/test/customer-surface.int.test.ts",
+      "apps/widget/e2e/surface.spec.ts",
+      "apps/console/src/pages/BrandChatSettings.tsx"
+    ],
+    "note": "A home before the conversation: the brand's suggested questions in each language, each starting the conversation, and a search of the brand's public knowledge with the assistant's retrieval and the customer audience (internal sources and other brands excluded), limited per session. Results are the brand's own articles, never generated text (tested)."
+  },
+  "W18": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/widget/events.service.ts",
+      "apps/gateway/src/widget/session-signals.service.ts",
+      "apps/gateway/src/widget/sessions.service.ts",
+      "apps/gateway/test/customer-surface.int.test.ts",
+      "apps/widget/src/components/Conversations.tsx",
+      "apps/widget/e2e/surface.spec.ts"
+    ],
+    "note": "A customer signed in by the website's assertion is one principal per brand on every device and continues the same conversations. Anonymous visitors, other customers and the same person on another brand see none of them by any path (list, history, files, stream). Signing in as someone else or out ends the old session's open streams at once. Resuming by an emailed link is not offered (tested, mutation-checked)."
+  },
+  "W19": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/widget/settings.service.ts",
+      "apps/gateway/test/customer-surface.int.test.ts",
+      "apps/widget/e2e/surface.spec.ts",
+      "apps/console/src/pages/BrandChatSettings.tsx",
+      "apps/console/e2e/chat-settings.spec.ts",
+      "packages/contracts/src/customer-surface.ts",
+      "packages/widget-loader/src/loader.ts",
+      "packages/widget-loader/src/proactive.ts",
+      "packages/widget-loader/test/proactive.test.ts"
+    ],
+    "note": "Prompts on a page, after time on a page, or for returning visitors, set per brand in Studio under their own permission (widget.proactive) and off by default. At most three a day, a quiet time after a dismissal, one per page view, never over an open chat, and optionally only during business hours. The page passes only the prompt's id; the chat shows the brand's own words (tested, mutation-checked)."
+  },
+  "W22": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/authority/extended-parts.ts",
+      "apps/gateway/src/widget/messages.service.ts",
+      "apps/gateway/test/customer-surface.int.test.ts",
+      "apps/widget/src/components/MessageActions.tsx",
+      "apps/widget/e2e/surface.spec.ts",
+      "packages/chatwoot/src/authority.ts"
+    ],
+    "note": "Chatwoot CE has no reactions (the adapter reports reactions: false), so a reaction travels as a short customer message quoting the reply (in_reply_to, a stable parent reference) that staff read as such, sent once and never answered by the assistant. Threads (replying to a chosen message) are not offered."
+  },
+  "W23": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/authority/redaction.ts",
+      "apps/gateway/src/widget/messages.service.ts",
+      "apps/gateway/test/customer-surface.int.test.ts",
+      "apps/widget/src/components/MessageActions.tsx",
+      "apps/widget/e2e/surface.spec.ts",
+      "packages/chatwoot/src/authority.ts"
+    ],
+    "note": "Customers delete their own messages within the brand's window (0 to 60 minutes; 0 turns it off). Chatwoot keeps a marker, the journal's stored copies lose their text, and the lane gets one message.redacted whichever path reports it. After the window, or where the authority cannot, the customer is told so. Edits are not offered: Chatwoot CE has no customer edits, so there is no revision history."
+  },
+  "W24": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/authority/extended-parts.ts",
+      "apps/gateway/test/customer-surface.test.ts",
+      "apps/widget/src/components/Parts.tsx",
+      "packages/chatwoot/src/mapping.ts",
+      "packages/chatwoot/test/mapping.test.ts"
+    ],
+    "note": "Shared places and contacts from the authority render as cards (coordinates, phone numbers and addresses validated; links only to a map, tel: and mailto:), and anything unknown falls back to its text. Audio, video, polls and per-channel capability negotiation are not done."
+  },
+  "W25": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/widget/customer-emails.service.ts",
+      "apps/gateway/src/widget/notifications.service.ts",
+      "apps/gateway/test/customer-surface.int.test.ts",
+      "apps/widget/src/components/Settings.tsx",
+      "apps/widget/e2e/surface.spec.ts",
+      "packages/db/src/schema/customer-surface.ts"
+    ],
+    "note": "Verified customers with a verified address choose transcript and reply-waiting emails, sent through the mailer. Reply emails never carry the reply's text, wait for a delay, skip replies already read and come at most every 30 minutes; transcripts hold only what the customer could see. Every email has a signed one-click unsubscribe link that asks first. Quiet hours are not done."
+  },
+  "HNV-05-01": {
+    "status": "implemented",
+    "evidence": ["packages/widget-loader/src/loader.ts", "apps/widget/e2e/surface.spec.ts"],
+    "note": "Launcher with the real unread count while the chat is closed, also in its accessible name; motion follows reduced-motion settings."
+  },
+  "HNV-05-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/components/Home.tsx",
+      "apps/widget/e2e/journey.spec.ts",
+      "apps/widget/e2e/surface.spec.ts"
+    ],
+    "note": "First visit: greeting, language picker, AI disclosure, suggested questions and help search, and \"Talk to a person\"."
+  },
+  "HNV-06-01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "packages/client/src/drafts.ts",
+      "apps/widget/e2e/surface.spec.ts"
+    ],
+    "note": "The draft is kept; attached files show as removable chips with name, size and state, and sending waits for their checks."
+  },
+  "HNV-06-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "packages/client/src/outbox.ts",
+      "apps/widget/e2e/surface.spec.ts"
+    ],
+    "note": "One bubble goes from waiting or sending to Sent; Read only where Chatwoot reports that the team saw it."
+  },
+  "HNV-06-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "packages/client/src/outbox.ts",
+      "apps/widget/e2e/surface.spec.ts"
+    ],
+    "note": "A message that was not sent says why in the customer's language and offers Retry, Edit and Remove."
+  },
+  "HNV-06-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "packages/client/src/outbox.ts",
+      "apps/widget/e2e/surface.spec.ts"
+    ],
+    "note": "Offline banner with the last update and Try again; the message box keeps working and messages wait to be sent once."
+  },
+  "HNV-06-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/widget/attachments.service.ts",
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/e2e/surface.spec.ts"
+    ],
+    "note": "A refused file keeps a tile with the reason: its type (pictures or PDF), the size limit, too many files, possible malware, or a scanner that could not check it."
+  },
+  "HNV-06-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/useChat.ts",
+      "apps/widget/e2e/surface.spec.ts"
+    ],
+    "note": "While reading back, new replies leave the reading position alone and a button says how many wait."
+  },
+  "HNV-07-01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "packages/widget-loader/src/loader.ts",
+      "apps/widget/e2e/surface.spec.ts"
+    ],
+    "note": "On narrow screens the chat opens full screen as one pane; the header wraps, the message box stays reachable and clears the safe area (tested at 320 px and at 200 % zoom)."
+  },
+  "HNV-07-02": {
+    "status": "in-progress",
+    "evidence": ["packages/widget-loader/src/loader.ts"],
+    "note": "A full-screen chat is sized to the visible area (visualViewport), so the on-screen keyboard does not hide the message box; not yet checked on a device with an on-screen keyboard."
   }
 }

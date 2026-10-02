@@ -6,6 +6,8 @@ export interface MailMessage {
   text: string;
   /** Stable identifier of the template, e.g. `auth.verify-email`. */
   template: string;
+  /** Extra headers, such as List-Unsubscribe for customer emails. */
+  headers?: Record<string, string>;
 }
 
 export interface Mailer {
@@ -27,7 +29,7 @@ export class SmtpMailer implements Mailer {
       to: message.to,
       subject: message.subject,
       text: message.text,
-      headers: { 'X-Hamnivo-Template': message.template },
+      headers: { ...message.headers, 'X-Hamnivo-Template': message.template },
     });
   }
 }

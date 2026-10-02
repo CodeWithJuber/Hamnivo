@@ -36,6 +36,7 @@ export const ErrorCode = z.enum([
   'QUOTE_EXPIRED',
   'CAPABILITY_UNSUPPORTED',
   'SEPARATE_APPROVER_REQUIRED',
+  'DELETE_WINDOW_CLOSED',
   'INTERNAL',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
@@ -107,6 +108,11 @@ export const ERROR_DEFAULTS: Record<
     retryable: false,
     title: 'Someone other than the requester must approve this',
   },
+  DELETE_WINDOW_CLOSED: {
+    status: 409,
+    retryable: false,
+    title: 'This message can no longer be deleted',
+  },
   INTERNAL: { status: 500, retryable: true, title: 'Something went wrong on our side' },
 };
 
@@ -138,6 +144,8 @@ export const Problem = z
     requestId: z.string(),
     /** Seconds to wait before retrying, when known. */
     retryAfter: z.int().min(0).optional(),
+    /** A finer machine-readable reason, such as why a file was refused (`malware_detected`). */
+    reason: z.string().max(60).optional(),
     fields: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
     quota: QuotaInfo.optional(),
   })

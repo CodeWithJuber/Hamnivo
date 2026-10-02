@@ -3,6 +3,7 @@ import { commerceEn } from './commerce/en';
 import { decisionsEn } from './decisions';
 import { developerEn } from './developer/en';
 import { reportsEn } from './reports/en';
+import { chatSettingsEn } from './widget/en';
 
 /** Studio interface text in English (the source language). Keep sentences short and plain. */
 export const en = {
@@ -1113,6 +1114,9 @@ export const en = {
         available: 'available',
         rejected: 'blocked',
       },
+      place: 'Shared a place: {{label}}',
+      contact: 'Shared a contact: {{details}}',
+      reaction: 'Reacted with {{emoji}}',
     },
     translation: {
       translate: 'Translate to {{language}}',
@@ -1300,6 +1304,7 @@ export const en = {
   commerce: commerceEn,
   developer: developerEn,
   reports: reportsEn,
+  chatSettings: chatSettingsEn,
   memory: {
     title: 'Customer memory',
     description: 'Manage what we remember about your customers.',
@@ -2282,6 +2287,7 @@ export const en = {
     widget: {
       configure: 'Configure the chat widget',
       identity_keys: 'Register the keys that verify customer identity',
+      proactive: 'Choose when the chat invites website visitors to talk',
     },
     agents: {
       read: 'View AI agents and their versions',

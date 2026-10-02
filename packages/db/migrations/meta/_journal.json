@@ -239,6 +239,20 @@
       "when": 1790968175131,
       "tag": "20261002190935_developer_platform_security",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790968903867,
+      "tag": "20261002192143_customer_surface",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1790968913197,
+      "tag": "20261002192153_customer_surface_security",
+      "breakpoints": true
     }
   ]
 }

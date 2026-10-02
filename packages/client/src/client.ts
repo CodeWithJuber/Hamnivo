@@ -2,19 +2,27 @@ import type {
   CustomerConversation,
   CustomerMemory,
   HandoffResponse,
+  HelpSearchResponse,
   MemoryChange,
   MemoryConsent,
   MemoryDeletionReceipt,
   Message,
+  MessageDeletion,
   MessagePage,
+  MessagePart,
+  NotificationPreferences,
+  ReactionEmoji,
   SetWidgetLanguageRequest,
   WidgetLanguageState,
   WidgetSession,
 } from '@hamnivo/contracts';
+import { Drafts } from './drafts.js';
 import { HamnivoApiError, problemOf } from './errors.js';
 import { defaultStorage, type KeyValueStorage } from './storage.js';
 
 type Conversation = CustomerConversation;
+/** A file the gateway scanned and keeps until a message carries it (W09). */
+export type UploadedFile = Extract<MessagePart, { type: 'attachment' }>;
 type Page = MessagePage;
 type Handoff = HandoffResponse;
 
@@ -47,6 +55,7 @@ export class HamnivoClient {
   private session: WidgetSession | null = null;
   private renewing: Promise<WidgetSession> | null = null;
   private readonly listeners = new Set<(session: WidgetSession | null) => void>();
+  private draftStore: Drafts | undefined;
 
   constructor(readonly options: HamnivoClientOptions) {
     this.storage = options.storage ?? defaultStorage();
@@ -66,6 +75,12 @@ export class HamnivoClient {
   /** Where the unsent messages of one conversation are kept. */
   outboxKey(conversationId: string): string {
     return `hamnivo:${this.options.widgetId}:outbox:${conversationId}`;
+  }
+
+  /** Unfinished messages the visitor typed, per person and conversation (W07). */
+  get drafts(): Drafts {
+    this.draftStore ??= new Drafts(this.storage, `hamnivo:${this.options.widgetId}`);
+    return this.draftStore;
   }
 
   private outboxes(): string[] {
@@ -182,6 +197,33 @@ export class HamnivoClient {
     return (response.status === 204 ? undefined : await response.json()) as T;
   }
 
+  /** Authorized request with a body of bytes or an answer of bytes (files), renewed once. */
+  private async binary(
+    method: string,
+    path: string,
+    body?: { bytes: Blob | ArrayBuffer | Uint8Array; contentType: string },
+  ): Promise<Response> {
+    const url = `${this.options.apiBase.replace(/\/$/, '')}${path}`;
+    const attempt = async (token: string) => {
+      try {
+        return await this.fetchImpl(url, {
+          method,
+          headers: {
+            authorization: `Bearer ${token}`,
+            ...(body ? { 'content-type': body.contentType } : {}),
+          },
+          ...(body ? { body: body.bytes as BodyInit } : {}),
+        });
+      } catch (error) {
+        throw HamnivoApiError.network(error);
+      }
+    };
+    let response = await attempt(await this.token());
+    if (response.status === 401) response = await attempt((await this.renew()).accessToken);
+    if (!response.ok) throw await problemOf(response);
+    return response;
+  }
+
   listConversations(): Promise<{ items: Conversation[] }> {
     return this.request('GET', '/v1/widget/conversations');
   }
@@ -205,11 +247,100 @@ export class HamnivoClient {
     );
   }
 
-  send(id: string, clientMessageId: string, text: string): Promise<SendResult> {
+  /**
+   * Sends a message: its words and the files uploaded for it, in that order. A retry must send the
+   * same words and files with the same client message id.
+   */
+  send(
+    id: string,
+    clientMessageId: string,
+    text: string,
+    uploadIds: readonly string[] = [],
+  ): Promise<SendResult> {
     return this.request('POST', `/v1/widget/conversations/${encodeURIComponent(id)}/messages`, {
       clientMessageId,
-      parts: [{ type: 'text', text }],
+      parts: [
+        ...(text.trim() || uploadIds.length === 0 ? [{ type: 'text', text }] : []),
+        ...uploadIds.map((uploadId) => ({ type: 'attachment', uploadId })),
+      ],
     });
+  }
+
+  /**
+   * Uploads a file for the next message (W09). The gateway reads its type from the bytes, scans it
+   * and keeps it until a message carries it; a refusal is a HamnivoApiError whose `reason` says why
+   * (`type_not_allowed`, `too_large`, `too_many`, `malware_detected`, `scan_unavailable`).
+   */
+  async uploadAttachment(
+    conversationId: string,
+    file: Blob | ArrayBuffer | Uint8Array,
+    name: string,
+  ): Promise<UploadedFile> {
+    const response = await this.binary(
+      'POST',
+      `/v1/widget/conversations/${encodeURIComponent(conversationId)}/uploads?${new URLSearchParams({ name })}`,
+      { bytes: file, contentType: 'application/octet-stream' },
+    );
+    return (await response.json()) as UploadedFile;
+  }
+
+  /** A file from one of the visitor's conversations, checked again by the gateway. */
+  async downloadAttachment(conversationId: string, attachmentId: string): Promise<Blob> {
+    const response = await this.binary(
+      'GET',
+      `/v1/widget/conversations/${encodeURIComponent(conversationId)}/attachments/${encodeURIComponent(attachmentId)}`,
+    );
+    return response.blob();
+  }
+
+  /** Deletes one of the visitor's own messages, within the brand's window (W23). */
+  deleteMessage(conversationId: string, messageId: string): Promise<MessageDeletion> {
+    return this.request(
+      'POST',
+      `/v1/widget/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/delete`,
+    );
+  }
+
+  /** Reacts to a reply (W22); retries reuse the client message id. */
+  react(
+    conversationId: string,
+    messageId: string,
+    clientMessageId: string,
+    emoji: ReactionEmoji,
+  ): Promise<SendResult> {
+    return this.request(
+      'POST',
+      `/v1/widget/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
+      { clientMessageId, emoji },
+    );
+  }
+
+  /** The visitor saw the conversation up to this sequence (W05, W06). */
+  markRead(conversationId: string, upToSequence: number): Promise<void> {
+    return this.request(
+      'POST',
+      `/v1/widget/conversations/${encodeURIComponent(conversationId)}/read`,
+      {
+        upToSequence,
+      },
+    );
+  }
+
+  /** Searches the brand's public help (W17). */
+  helpSearch(query: string): Promise<HelpSearchResponse> {
+    return this.request('GET', `/v1/widget/help/search?${new URLSearchParams({ q: query })}`);
+  }
+
+  /** The emails this customer can choose, and their choices (W25). */
+  notifications(): Promise<NotificationPreferences> {
+    return this.request('GET', '/v1/widget/notifications');
+  }
+
+  setNotifications(input: {
+    transcript?: boolean;
+    replyWaiting?: boolean;
+  }): Promise<NotificationPreferences> {
+    return this.request('POST', '/v1/widget/notifications', input);
   }
 
   requestHandoff(id: string, clientRequestId: string, note?: string): Promise<Handoff> {
@@ -292,9 +423,10 @@ export class HamnivoClient {
     try {
       if (this.session) await this.request('POST', '/v1/widget/sessions/reset');
     } finally {
-      // Unsent messages belong to the person leaving too; they are never sent as the next one.
+      // Unsent messages and drafts belong to the person leaving too; the next one never sees them.
       for (const id of this.outboxes()) this.storage.removeItem(this.outboxKey(id));
       this.storage.removeItem(this.outboxIndexKey);
+      this.drafts.clearAll();
       this.adopt(null);
     }
   }

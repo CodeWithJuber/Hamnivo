@@ -58,6 +58,7 @@ const APPEND_ONLY = new Set([
   'webhook_events',
   'webhook_attempts',
   'usage_alerts',
+  'customer_notifications',
 ]);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
@@ -237,6 +238,11 @@ describe('two-tenant isolation', () => {
     'message_ledger',
     'publications',
     'conversation_feedback',
+    'brand_widget_settings',
+    'widget_uploads',
+    'conversation_read_state',
+    'customer_notification_preferences',
+    'customer_notifications',
     'integration_inbox',
     'conversation_journal',
     'reconcile_cursors',
@@ -398,6 +404,11 @@ describe('two-tenant isolation', () => {
       'message_ledger',
       'publications',
       'conversation_feedback',
+      'brand_widget_settings',
+      'widget_uploads',
+      'conversation_read_state',
+      'customer_notification_preferences',
+      'customer_notifications',
       'integration_inbox',
       'conversation_journal',
       'reconcile_cursors',

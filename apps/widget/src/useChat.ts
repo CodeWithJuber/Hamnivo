@@ -2,10 +2,17 @@ import {
   EventStream,
   type HamnivoClient,
   Outbox,
+  type OutgoingAttachment,
   type OutgoingMessage,
   type StreamStatus,
 } from '@hamnivo/client';
-import type { CustomerConversation, Message, WidgetSession } from '@hamnivo/contracts';
+import type {
+  CustomerConversation,
+  Message,
+  MessagePart,
+  ReactionEmoji,
+  WidgetSession,
+} from '@hamnivo/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export type Connection = StreamStatus | 'idle' | 'offline';
@@ -20,33 +27,89 @@ export interface ChatState {
   phase: 'loading' | 'ready' | 'error';
   session: WidgetSession | null;
   conversation: CustomerConversation | null;
+  /** The person's conversations, newest first (on every device once they are signed in, W18). */
+  conversations: CustomerConversation[];
   messages: Message[];
   outgoing: readonly OutgoingMessage[];
   connection: Connection;
   error: string | null;
   /** The server's answer to "talk to a person", such as when people are back (W11). */
   handoffNotice: string | null;
+  /** Where older history continues (W05); null when everything is shown. */
+  olderCursor: string | null;
+  loadingOlder: boolean;
+  /** The newest journal position shown, which is what "read" refers to. */
+  latestSequence: number;
+  /** Replies the person has not seen yet (W05). */
+  unread: number;
+  /** The first reply that was unread when the conversation opened (the "new messages" line). */
+  firstUnreadId: string | null;
+  /** When the chat last heard from the server, for the offline banner. */
+  lastSync: string | null;
 }
+
+/** A deleted message keeps its place and author, nothing of what it said (W23). */
+export const DELETED: MessagePart = {
+  type: 'notice',
+  notice: 'message_deleted',
+  text: 'This message was deleted.',
+};
 
 const byTime = (a: Message, b: Message) =>
   Date.parse(a.createdAt) - Date.parse(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0);
 
 function merge(messages: Message[], incoming: Message): Message[] {
+  const previous = messages.find((m) => m.id === incoming.id);
   const without = messages.filter((m) => m.id !== incoming.id);
-  return [...without, incoming].sort(byTime);
+  // A read receipt that arrived first is not lost when the message itself comes again.
+  const delivery = previous?.delivery === 'read' ? 'read' : incoming.delivery;
+  return [...without, { ...incoming, delivery }].sort(byTime);
+}
+
+/** Marks a message and every earlier one from the customer as read (W06). */
+function markRead(messages: Message[], messageId: string): Message[] {
+  const target = messages.find((m) => m.id === messageId);
+  if (!target) return messages;
+  const until = Date.parse(target.createdAt);
+  return messages.map((m) =>
+    m.sender.kind === 'customer' && Date.parse(m.createdAt) <= until && m.delivery !== 'read'
+      ? { ...m, delivery: 'read' }
+      : m,
+  );
+}
+
+/** The first of the last `unread` replies, where the "new messages" line goes. */
+function firstUnread(messages: Message[], unread: number): string | null {
+  if (unread <= 0) return null;
+  let left = unread;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i] as Message;
+    if (message.sender.kind === 'customer') continue;
+    left -= 1;
+    if (left === 0) return message.id;
+  }
+  return messages.find((m) => m.sender.kind !== 'customer')?.id ?? null;
 }
 
 const EMPTY: ChatState = {
   phase: 'loading',
   session: null,
   conversation: null,
+  conversations: [],
   messages: [],
   outgoing: [],
   connection: 'idle',
   error: null,
   handoffNotice: null,
+  olderCursor: null,
+  loadingOlder: false,
+  latestSequence: 0,
+  unread: 0,
+  firstUnreadId: null,
+  lastSync: null,
 };
 
+const PAGE = 50;
 const messageOf = (error: unknown) => String((error as Error)?.message ?? error);
 
 /**
@@ -66,6 +129,8 @@ export function useChat(client: HamnivoClient) {
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   /** The person whose chats are on screen. */
   const shown = useRef<string | null>(null);
+  /** The journal position last reported as read, so it is reported once. */
+  const reported = useRef(0);
   /** Other parts of the widget (the shop) that follow live events. */
   const listeners = useRef(new Set<(event: ChatEvent) => void>());
   const onEvent = useCallback((listener: (event: ChatEvent) => void) => {
@@ -94,17 +159,42 @@ export function useChat(client: HamnivoClient) {
 
   const apply = useCallback((event: Record<string, unknown> & { type: string }) => {
     const data = (event.data ?? {}) as Record<string, unknown>;
+    const sequence = Number(event.sequence);
     for (const listener of listeners.current) listener({ type: event.type, data });
-    setState((s) => {
+    setState((current) => {
+      const s: ChatState = {
+        ...current,
+        lastSync: new Date().toISOString(),
+        latestSequence: Number.isFinite(sequence)
+          ? Math.max(current.latestSequence, sequence)
+          : current.latestSequence,
+      };
       switch (event.type) {
         case 'message.created':
         case 'message.updated': {
           const message = data.message as Message;
           if (message.clientMessageId) outbox.current?.settle(message.clientMessageId);
-          return { ...s, messages: merge(s.messages, message) };
+          const isNew =
+            event.type === 'message.created' &&
+            message.sender.kind !== 'customer' &&
+            !s.messages.some((m) => m.id === message.id);
+          return {
+            ...s,
+            messages: merge(s.messages, message),
+            unread: isNew ? s.unread + 1 : s.unread,
+          };
         }
         case 'message.redacted':
-          return { ...s, messages: s.messages.filter((m) => m.id !== data.messageId) };
+          return {
+            ...s,
+            messages: s.messages.map((m) =>
+              m.id === data.messageId ? { ...m, parts: [DELETED] } : m,
+            ),
+          };
+        case 'delivery.updated':
+          return data.state === 'read'
+            ? { ...s, messages: markRead(s.messages, String(data.messageId)) }
+            : s;
         case 'conversation.updated':
           return s.conversation
             ? {
@@ -136,14 +226,30 @@ export function useChat(client: HamnivoClient) {
       outbox.current?.dispose();
       let after = conversation.latestSequence;
       let messages: Message[] = [];
+      let olderCursor: string | null = null;
       if (loadHistory) {
-        const page = await client.history(conversation.id, { limit: 50 });
+        const page = await client.history(conversation.id, { limit: PAGE });
         if (stale()) return;
         messages = [...page.items].sort(byTime);
         after = page.latestSequence;
+        olderCursor = page.olderCursor;
       }
       if (stale()) return;
-      setState((s) => ({ ...s, conversation, messages }));
+      reported.current = 0;
+      setState((s) => ({
+        ...s,
+        conversation,
+        conversations: s.conversations.some((c) => c.id === conversation.id)
+          ? s.conversations
+          : [conversation, ...s.conversations],
+        messages,
+        olderCursor,
+        loadingOlder: false,
+        latestSequence: after,
+        unread: conversation.unreadCount,
+        firstUnreadId: firstUnread(messages, conversation.unreadCount),
+        lastSync: new Date().toISOString(),
+      }));
       const box = new Outbox(client, conversation.id);
       outbox.current = box;
       box.subscribe((items) => setState((s) => ({ ...s, outgoing: items })));
@@ -152,10 +258,22 @@ export function useChat(client: HamnivoClient) {
         conversation.id,
         {
           onEvent: apply,
-          onStatus: (connection) => setState((s) => ({ ...s, connection })),
+          onStatus: (connection) =>
+            setState((s) => ({
+              ...s,
+              connection:
+                s.connection === 'offline' && connection !== 'open' ? 'offline' : connection,
+              ...(connection === 'open' ? { lastSync: new Date().toISOString() } : {}),
+            })),
           onResync: () => {
-            void client.history(conversation.id, { limit: 50 }).then((page) => {
-              if (!stale()) setState((s) => ({ ...s, messages: [...page.items].sort(byTime) }));
+            void client.history(conversation.id, { limit: PAGE }).then((page) => {
+              if (!stale())
+                setState((s) => ({
+                  ...s,
+                  messages: [...page.items].sort(byTime),
+                  olderCursor: page.olderCursor,
+                  latestSequence: page.latestSequence,
+                }));
             });
           },
           onError: (error) =>
@@ -172,7 +290,14 @@ export function useChat(client: HamnivoClient) {
     async (session: WidgetSession) => {
       detach();
       shown.current = session.principal.id;
-      setState({ ...EMPTY, phase: 'ready', session });
+      setState({
+        ...EMPTY,
+        phase: 'ready',
+        session,
+        conversations: session.conversations,
+        connection:
+          typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'idle',
+      });
       const conversation =
         session.conversations.find((c) => c.status !== 'resolved') ??
         session.conversations[0] ??
@@ -284,24 +409,122 @@ export function useChat(client: HamnivoClient) {
     [attach, client],
   );
 
+  /** The conversation to send in, started first when there is none yet. */
+  const ready = useCallback(async (): Promise<number> => {
+    const current = generation.current;
+    if (!outbox.current) {
+      attaching.current ??= startFor(current);
+      await attaching.current;
+    }
+    return current;
+  }, [startFor]);
+
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, attachments: readonly OutgoingAttachment[] = []) => {
       const trimmed = text.trim();
-      if (!trimmed) return;
-      const current = generation.current;
-      if (!outbox.current) {
-        attaching.current ??= startFor(current);
-        await attaching.current;
-      }
+      if (!trimmed && attachments.length === 0) return;
+      const current = await ready();
       // Typed by the person before an identity change: never sent as the next one.
-      if (current === generation.current) outbox.current?.enqueue(trimmed);
+      if (current === generation.current) {
+        outbox.current?.enqueue(trimmed, attachments);
+        setState((s) => ({ ...s, firstUnreadId: null }));
+      }
     },
-    [startFor],
+    [ready],
   );
+
+  /** The conversation files are uploaded to; started on the first file if needed. */
+  const conversationForFiles = useCallback(async (): Promise<string | null> => {
+    const current = await ready();
+    if (current !== generation.current) return null;
+    return outbox.current?.conversationId ?? null;
+  }, [ready]);
 
   const retry = useCallback(
     (clientMessageId: string) => outbox.current?.retry(clientMessageId),
     [],
+  );
+
+  /** Takes back an unsent message, to edit or drop it. */
+  const remove = useCallback(
+    (clientMessageId: string) => outbox.current?.remove(clientMessageId) ?? null,
+    [],
+  );
+
+  /** "Try again" while offline or reconnecting: send what waits. */
+  const flush = useCallback(() => outbox.current?.flush(), []);
+
+  /** Older messages above the ones shown (W05). */
+  const loadOlder = useCallback(async () => {
+    const conversation = state.conversation;
+    const before = state.olderCursor;
+    if (!conversation || !before || state.loadingOlder) return;
+    const current = generation.current;
+    setState((s) => ({ ...s, loadingOlder: true }));
+    try {
+      const page = await client.history(conversation.id, { before, limit: PAGE });
+      if (current !== generation.current) return;
+      setState((s) => ({
+        ...s,
+        loadingOlder: false,
+        olderCursor: page.olderCursor,
+        messages: page.items.reduce(merge, s.messages),
+      }));
+    } catch (error) {
+      if (current === generation.current)
+        setState((s) => ({ ...s, loadingOlder: false, error: messageOf(error) }));
+    }
+  }, [client, state.conversation, state.olderCursor, state.loadingOlder]);
+
+  /** The person saw everything up to now (W05, W06): unread counts drop, staff see it read. */
+  const markSeen = useCallback(() => {
+    const conversation = state.conversation;
+    if (!conversation) return;
+    const upTo = state.latestSequence;
+    if (state.unread > 0) setState((s) => ({ ...s, unread: 0 }));
+    if (upTo <= reported.current) return;
+    reported.current = upTo;
+    void client.markRead(conversation.id, upTo).catch(() => {
+      reported.current = 0;
+    });
+  }, [client, state.conversation, state.latestSequence, state.unread]);
+
+  /** Deletes one of the person's own messages (W23); the reason is thrown when it can't be. */
+  const deleteMessage = useCallback(
+    async (messageId: string) => {
+      const conversation = state.conversation;
+      if (!conversation) return;
+      await client.deleteMessage(conversation.id, messageId);
+      setState((s) => ({
+        ...s,
+        messages: s.messages.map((m) => (m.id === messageId ? { ...m, parts: [DELETED] } : m)),
+      }));
+    },
+    [client, state.conversation],
+  );
+
+  /** Reacts to a reply (W22). */
+  const react = useCallback(
+    async (messageId: string, emoji: ReactionEmoji) => {
+      const conversation = state.conversation;
+      if (!conversation) return;
+      const result = await client.react(conversation.id, messageId, crypto.randomUUID(), emoji);
+      setState((s) => ({ ...s, messages: merge(s.messages, result.message) }));
+    },
+    [client, state.conversation],
+  );
+
+  /** Shows another of the person's conversations (W18). */
+  const open = useCallback(
+    (conversationId: string) =>
+      serial(async () => {
+        const conversation = state.conversations.find((c) => c.id === conversationId);
+        if (!conversation || conversation.id === state.conversation?.id) return;
+        generation.current += 1;
+        attaching.current = null;
+        await attach(conversation, true);
+      }),
+    [attach, serial, state.conversation?.id, state.conversations],
   );
 
   const handoff = useCallback(async () => {
@@ -335,5 +558,22 @@ export function useChat(client: HamnivoClient) {
     [state.outgoing, state.messages],
   );
 
-  return { state, pending, send, retry, handoff, identify, reset, onEvent };
+  return {
+    state,
+    pending,
+    send,
+    retry,
+    remove,
+    flush,
+    handoff,
+    identify,
+    reset,
+    onEvent,
+    loadOlder,
+    markSeen,
+    deleteMessage,
+    react,
+    open,
+    conversationForFiles,
+  };
 }

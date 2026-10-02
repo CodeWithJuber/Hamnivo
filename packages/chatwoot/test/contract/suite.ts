@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AuthorityMessage } from '@hamnivo/domain';
+import type { AuthorityAttachment, AuthorityMessage } from '@hamnivo/domain';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ChatwootAuthority } from '../../src/authority.js';
 import { ChatwootError, call, createChatwootClient } from '../../src/client.js';
@@ -42,13 +42,25 @@ export function authorityContract(
     let authority: ChatwootAuthority;
     const inboxRef = () => String(account.inbox.id);
     const botRef = () => String(account.bot.id);
-    const state: { conversationRef: string; sourceId: string; contactRef: string; keys: string[] } =
-      {
-        conversationRef: '',
-        sourceId: '',
-        contactRef: '',
-        keys: [],
-      };
+    const state: {
+      conversationRef: string;
+      sourceId: string;
+      contactRef: string;
+      keys: string[];
+      fileMessageRef: string;
+    } = {
+      conversationRef: '',
+      sourceId: '',
+      contactRef: '',
+      keys: [],
+      fileMessageRef: '',
+    };
+    const customerView = () =>
+      authority.listMessages(state.conversationRef, {
+        view: 'customer',
+        contactSourceId: state.sourceId,
+        inboxRef: inboxRef(),
+      });
 
     beforeAll(async () => {
       t = await target();
@@ -341,6 +353,90 @@ export function authorityContract(
       expect([...s.labels].sort()).toEqual(['orders', 'vip']);
       await authority.typing(ref, true, { kind: 'bot', botRef: botRef() });
       await authority.typing(ref, false, { kind: 'bot', botRef: botRef() });
+    });
+
+    it('sends files with a message and serves them only from its own address', async () => {
+      const ref = state.conversationRef;
+      const png = Buffer.from(
+        '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8cfc0f01f0005000201ffa6f5a40000000049454e44ae426082',
+        'hex',
+      );
+      const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+      const key = `hv1:m:${randomUUID()}`;
+      const sent = await authority.appendMessage({
+        conversationRef: ref,
+        key,
+        author: { kind: 'customer' },
+        visibility: 'public',
+        text: 'Here is the receipt',
+        contentAttributes: { hv: { v: 1, files: 2 } },
+        attachments: [
+          { name: 'pixel.png', mimeType: 'image/png', bytes: png },
+          { name: 'receipt.pdf', mimeType: 'application/pdf', bytes: pdf },
+        ],
+      });
+      // Content attributes keep their types over multipart (Chatwoot parses the JSON string).
+      expect(sent.message).toMatchObject({
+        key,
+        direction: 'incoming',
+        contentAttributes: { hv: { v: 1, files: 2 } },
+      });
+      expect(sent.message.attachments.map((a) => [a.fileType, a.name, a.mimeType, a.size])).toEqual(
+        [
+          ['image', 'pixel.png', 'image/png', png.length],
+          ['file', 'receipt.pdf', 'application/pdf', pdf.length],
+        ],
+      );
+      state.fileMessageRef = sent.message.ref;
+      const seen = (await customerView()).find((m) => m.ref === sent.message.ref);
+      expect(seen?.attachments.map((a) => a.name).sort()).toEqual(['pixel.png', 'receipt.pdf']);
+      const byName = (name: string) =>
+        seen?.attachments.find((a) => a.name === name) as AuthorityAttachment;
+      const file = await authority.downloadAttachment(byName('receipt.pdf'));
+      expect(Buffer.from(file.bytes).equals(pdf)).toBe(true);
+      expect(file.contentType).toContain('application/pdf');
+      const image = await authority.downloadAttachment(byName('pixel.png'));
+      expect(Buffer.from(image.bytes).equals(png)).toBe(true);
+      // Only this Chatwoot's own files: another address is refused without being fetched.
+      await expect(
+        authority.downloadAttachment({
+          ...byName('pixel.png'),
+          url: 'http://169.254.169.254/latest/meta-data/',
+        }),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('deletes a customer message and keeps a marker without its text or files', async () => {
+      await authority.deleteMessage(state.conversationRef, state.fileMessageRef, {
+        kind: 'integration',
+      });
+      const deleted = (await customerView()).find((m) => m.ref === state.fileMessageRef);
+      expect(deleted).toMatchObject({ contentAttributes: { deleted: true }, attachments: [] });
+      expect(deleted?.text ?? '').not.toContain('receipt');
+      await receiver.waitFor(
+        (r) =>
+          r.path === '/account' &&
+          r.body.includes('"message_updated"') &&
+          r.body.includes('"deleted":true'),
+      );
+    });
+
+    it('reports when staff last saw a conversation, and records that the customer saw it', async () => {
+      const ref = state.conversationRef;
+      expect((await authority.getState(ref)).staffLastSeenAt ?? null).toBeNull();
+      // Staff open the conversation in Chatwoot's dashboard (not a webhook event).
+      const opened = await fetch(
+        `${t.baseUrl}/api/v1/accounts/${account.accountId}/conversations/${ref}/update_last_seen`,
+        { method: 'POST', headers: { api_access_token: staff.token } },
+      );
+      expect(opened.status).toBe(200);
+      const seenAt = (await authority.getState(ref)).staffLastSeenAt;
+      expect(seenAt).toBeInstanceOf(Date);
+      expect(Math.abs((seenAt?.getTime() ?? 0) - Date.now())).toBeLessThan(120_000);
+      await authority.markSeenByContact(ref, {
+        contactSourceId: state.sourceId,
+        inboxRef: inboxRef(),
+      });
     });
 
     describe('staff inbox operations, as the staff member’s own user', () => {

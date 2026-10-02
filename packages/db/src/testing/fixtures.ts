@@ -603,6 +603,48 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       rating: 5,
       comment: 'Very helpful',
     });
+    // Customer surface: widget settings, a quarantined file, read state and email choices.
+    await tx.insert(s.brandWidgetSettings).values({
+      tenantId,
+      brandId: ids.brandId,
+      settings: { layout: { mode: 'panel' } },
+      proactive: { enabled: false },
+    });
+    await tx.insert(s.widgetUploads).values({
+      tenantId,
+      brandId: ids.brandId,
+      conversationId: ids.conversationId,
+      principalId: ids.principalId,
+      name: 'receipt.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 9,
+      sha256: bytes(),
+      status: 'available',
+      scanEngine: 'eicar',
+      scannedAt: new Date(),
+      content: Buffer.from('%PDF-1.7\n'),
+      expiresAt: inDays(1),
+    });
+    await tx.insert(s.conversationReadState).values({
+      tenantId,
+      conversationId: ids.conversationId,
+      principalId: ids.principalId,
+      customerReadSeq: 1,
+    });
+    await tx.insert(s.customerNotificationPreferences).values({
+      tenantId,
+      brandId: ids.brandId,
+      principalId: ids.principalId,
+      transcript: true,
+    });
+    await tx.insert(s.customerNotifications).values({
+      tenantId,
+      principalId: ids.principalId,
+      conversationId: ids.conversationId,
+      kind: 'transcript',
+      dedupeKey: `transcript:${ids.conversationId}:1`,
+      status: 'sent',
+    });
     await tx.insert(s.reconcileCursors).values({
       tenantId,
       connectionId: ids.connectionId,

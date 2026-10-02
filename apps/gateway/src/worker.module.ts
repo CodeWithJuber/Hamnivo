@@ -41,6 +41,9 @@ import { RepliesService } from './runtime/replies.service.js';
 import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
 import { AuthorityContactsService } from './widget/contacts.service.js';
+import { CustomerEmailsService } from './widget/customer-emails.service.js';
+import { REPLY_WAITING_TOPIC, TRANSCRIPT_TOPIC } from './widget/notify-queue.js';
+import { WIDGET_SURFACE_WORKER_PROVIDERS } from './widget/surface.module.js';
 import { MaintenanceService } from './worker/maintenance.service.js';
 
 /** Outbox topics with a consumer that needs no other service. */
@@ -111,6 +114,7 @@ export class WorkerModule {
         MigrationEngine,
         MigrationExporter,
         ...COMMERCE_WORKER_PROVIDERS,
+        ...WIDGET_SURFACE_WORKER_PROVIDERS,
         {
           provide: OUTBOX_HANDLERS,
           inject: [
@@ -125,6 +129,7 @@ export class WorkerModule {
             RoutingService,
             CommerceCardsService,
             WebhookFanout,
+            CustomerEmailsService,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -138,6 +143,7 @@ export class WorkerModule {
             routing: RoutingService,
             cards: CommerceCardsService,
             webhooks: WebhookFanout,
+            emails: CustomerEmailsService,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -165,6 +171,8 @@ export class WorkerModule {
               ['conversation.route', (event) => routing.onRoute(event)],
               [CARD_TOPIC, (event) => cards.onCardEvent(event)],
               [WEBHOOK_SOURCE_TOPIC, (event) => webhooks.onSource(event)],
+              [TRANSCRIPT_TOPIC, (event) => emails.onTranscript(event)],
+              [REPLY_WAITING_TOPIC, (event) => emails.onReplyWaiting(event)],
             ]),
         },
         OutboxRelay,

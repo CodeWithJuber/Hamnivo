@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { AuthorityAttachment } from '@hamnivo/domain';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ChatwootAuthority } from '../src/authority.js';
 import { ChatwootError, call, createChatwootClient } from '../src/client.js';
@@ -108,6 +109,42 @@ describe('fake Chatwoot webhook chaos', () => {
       'hv1:m:5',
     ]);
     expect(first).not.toEqual([...first].sort());
+  });
+});
+
+describe('fake Chatwoot files', () => {
+  it('serves one file by redirect, from disk and by proxy, whatever its name', async () => {
+    const { fake, authority, open } = await setup();
+    const { conversationRef } = await open();
+    const bytes = Buffer.from('%PDF-1.4\n% فاتورة\n');
+    const { message } = await authority.appendMessage({
+      conversationRef,
+      key: 'hv1:m:file',
+      author: { kind: 'customer' },
+      visibility: 'public',
+      text: 'Here is the invoice',
+      attachments: [{ name: 'فاتورة résumé.pdf', mimeType: 'application/pdf', bytes }],
+    });
+    const file = message.attachments[0] as AuthorityAttachment;
+    expect(file).toMatchObject({
+      name: 'فاتورة résumé.pdf',
+      mimeType: 'application/pdf',
+      size: bytes.length,
+    });
+    // The address Chatwoot hands out is its own, and redirects to the storage service...
+    expect(file.url?.startsWith(`${fake.url}/rails/active_storage/blobs/redirect/`)).toBe(true);
+    const link = new URL(file.url as string);
+    const redirect = await fetch(link, { redirect: 'manual' });
+    expect(redirect.status).toBe(302);
+    const disk = await fetch(new URL(redirect.headers.get('location') as string, link));
+    expect(disk.status).toBe(200);
+    expect(Buffer.from(await disk.arrayBuffer()).equals(bytes)).toBe(true);
+    // ...while the proxy route sends the same file at once, which is what the adapter reads.
+    const downloaded = await authority.downloadAttachment(file);
+    expect(Buffer.from(downloaded.bytes).equals(bytes)).toBe(true);
+    // A deleted message takes its files with it.
+    await authority.deleteMessage(conversationRef, message.ref, { kind: 'integration' });
+    await expect(authority.downloadAttachment(file)).rejects.toMatchObject({ status: 404 });
   });
 });
 

@@ -8,3 +8,4 @@ export * from './operators.js';
 export * from './resolvers.js';
 export * as schema from './schema/index.js';
 export * from './tenant.js';
+export * from './uploads.js';

@@ -71,6 +71,11 @@ const EnvSchema = z.object({
   STREAM_HEARTBEAT_SECONDS: z.coerce.number().int().min(1).max(60).default(15),
   /** Days a realtime journal entry stays replayable (it is a projection, not a transcript). */
   JOURNAL_RETENTION_DAYS: z.coerce.number().int().min(1).max(30).default(7),
+  /**
+   * Seconds a reply waits unread before a customer who asked for it gets an email (W25). The
+   * same conversation emails at most once in 30 minutes.
+   */
+  CUSTOMER_REPLY_EMAIL_DELAY_SECONDS: z.coerce.number().int().min(0).max(86_400).default(300),
 
   /** Chatwoot and the operator's Platform App token, used to provision tenant accounts. */
   CHATWOOT_URL: z.url().optional(),

@@ -3,6 +3,7 @@ import type {
   DeliveryState,
   MemoryPart,
   Message,
+  MessagePart,
   Sender,
   SourcePart,
 } from '@hamnivo/contracts';
@@ -11,6 +12,7 @@ import type { OwnerMode } from '@hamnivo/db/schema';
 import type { AuthorityMessage } from '@hamnivo/domain';
 import { and, eq, inArray, or } from 'drizzle-orm';
 import type { z } from 'zod';
+import { attachmentParts, DELETED_PART, isDeleted, reactionOf } from './extended-parts.js';
 
 export type SourceRef = z.infer<typeof SourcePart>;
 export type MemoryPartRef = z.infer<typeof MemoryPart>;
@@ -161,21 +163,29 @@ export function contractMessage(input: {
     };
   }
   const text = input.message.text?.trim();
+  // A deleted message keeps its place and author, nothing of what it said (W23).
+  const deleted = isDeleted(input.message);
+  const reaction = deleted ? null : reactionOf(input.message);
+  const files = deleted || reaction ? [] : attachmentParts(input.message, input.id);
+  const parts: MessagePart[] = deleted
+    ? [DELETED_PART]
+    : reaction
+      ? [reaction]
+      : [
+          ...(text || files.length === 0
+            ? [{ type: 'text' as const, text: text || '[empty message]', format: 'plain' as const }]
+            : []),
+          ...files,
+          ...(input.facts?.sources ?? []),
+          ...(input.facts?.memories ?? []),
+        ];
   return {
     id: input.id,
     conversationId: input.conversationId,
     sequence: input.sequence,
     sender,
     visibility: input.message.private ? 'internal' : 'public',
-    parts: [
-      {
-        type: 'text',
-        text: text || (input.message.attachments.length > 0 ? '[attachment]' : '[empty message]'),
-        format: 'plain',
-      },
-      ...(input.facts?.sources ?? []),
-      ...(input.facts?.memories ?? []),
-    ],
+    parts,
     createdAt: input.message.createdAt.toISOString(),
     clientMessageId: input.clientMessageId,
     delivery: input.delivery,

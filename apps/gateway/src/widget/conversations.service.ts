@@ -17,7 +17,7 @@ import {
   withTenant,
 } from '@hamnivo/db';
 import type { AuthorityMessage } from '@hamnivo/domain';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import canonicalize from 'canonicalize';
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
@@ -38,8 +38,15 @@ import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
+import { WidgetAttachmentsService } from './attachments.service.js';
 import { AuthorityContactsService } from './contacts.service.js';
 import { handoffOutcome } from './copy.js';
+import {
+  advanceCustomerRead,
+  markCustomerSeenSynced,
+  staffSeenAt,
+  unreadCounts,
+} from './read-state.js';
 import { sha256, type WidgetClaims } from './tokens.service.js';
 import { customerConversation, lastPreview, principalConversations } from './views.js';
 
@@ -49,6 +56,8 @@ import { customerConversation, lastPreview, principalConversations } from './vie
  */
 @Injectable()
 export class WidgetConversationsService {
+  private readonly logger = new Logger(WidgetConversationsService.name);
+
   constructor(
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -59,6 +68,7 @@ export class WidgetConversationsService {
     private readonly outbound: OutboundMessagesService,
     private readonly agents: AgentsService,
     private readonly entitlements: EntitlementsService,
+    private readonly attachments: WidgetAttachmentsService,
   ) {}
 
   private tx<T>(claims: WidgetClaims, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -101,7 +111,12 @@ export class WidgetConversationsService {
   get(claims: WidgetClaims, publicId: string): Promise<CustomerConversation> {
     return this.tx(claims, async (tx) => {
       const control = await this.own(tx, claims, this.conversationId(publicId));
-      return customerConversation(control, await lastPreview(tx, control.id));
+      const unread = await unreadCounts(tx, [control.id]);
+      return customerConversation(
+        control,
+        await lastPreview(tx, control.id),
+        unread.get(control.id) ?? 0,
+      );
     });
   }
 
@@ -217,17 +232,18 @@ export class WidgetConversationsService {
     publicId: string,
     input: z.output<typeof SendMessageRequest>,
   ): Promise<OutboundResult> {
-    if (input.parts.some((part) => part.type === 'attachment')) {
-      throw new AppError('UPLOAD_REJECTED', {
-        detail: 'Attachments are not available in this chat yet.',
-      });
-    }
     const conversationId = this.conversationId(publicId);
     const text = input.parts
       .map((part) => (part.type === 'text' ? part.text : ''))
       .join('\n\n')
       .trim();
-    return this.outbound.send({
+    // Files are claimed for this message with the ledger reservation (W09): scanned, still in
+    // quarantine, sent only with it. A retry with the same message id may claim them again.
+    const uploadIds = input.parts.flatMap((part) =>
+      part.type === 'attachment' ? [part.uploadId] : [],
+    );
+    let files: Awaited<ReturnType<WidgetAttachmentsService['reserve']>> | null = null;
+    const result = await this.outbound.send({
       tenantId: claims.tenantId,
       actorId: toPublicId('customer', claims.principalId),
       conversationId,
@@ -240,7 +256,20 @@ export class WidgetConversationsService {
       visibility: 'public',
       text,
       contentAttributes: { hv: { v: 1, ...(input.context ? { context: input.context } : {}) } },
-      load: (tx) => this.own(tx, claims, conversationId),
+      attachments: () => files?.files ?? [],
+      load: async (tx) => {
+        const control = await this.own(tx, claims, conversationId);
+        if (uploadIds.length > 0) {
+          files = await this.attachments.reserve(
+            tx,
+            claims,
+            conversationId,
+            uploadIds,
+            input.clientMessageId,
+          );
+        }
+        return control;
+      },
       onCommitted: async (tx, control, ledgerId) => {
         await tx
           .update(schema.conversationControls)
@@ -265,6 +294,9 @@ export class WidgetConversationsService {
         }
       },
     });
+    const claimed = files as Awaited<ReturnType<WidgetAttachmentsService['reserve']>> | null;
+    if (claimed?.ids.length) await this.attachments.markSent(claims, claimed.ids);
+    return result;
   }
 
   async history(
@@ -304,6 +336,7 @@ export class WidgetConversationsService {
         control,
         inbox,
         sourceId: contact ? this.contacts.sourceIdOf(claims.tenantId, contact) : null,
+        staffSeenAt: await staffSeenAt(tx, conversationId),
         clientIds: new Map(
           ledger
             .filter((l) => l.authorityMessageId !== null)
@@ -331,6 +364,17 @@ export class WidgetConversationsService {
     const before = query.before
       ? Number(Buffer.from(query.before, 'base64url').toString('utf8'))
       : Number.POSITIVE_INFINITY;
+    if (Number.isNaN(before)) {
+      throw new AppError('VALIDATION_FAILED', { detail: 'Unknown history cursor.' });
+    }
+    // Read only where the authority reported staff saw the conversation after the message (W06).
+    const seen = context.staffSeenAt?.getTime() ?? null;
+    const deliveryOf = (m: AuthorityMessage) =>
+      m.direction !== 'incoming'
+        ? null
+        : seen !== null && m.createdAt.getTime() < seen
+          ? ('read' as const)
+          : ('accepted' as const);
     const visible = messages
       .filter((m) => Number(m.ref) < before)
       .sort((a, b) => Number(b.ref) - Number(a.ref));
@@ -344,7 +388,7 @@ export class WidgetConversationsService {
           conversationId: publicId,
           sequence: null,
           clientMessageId: context.clientIds.get(m.ref) ?? null,
-          delivery: m.direction === 'incoming' ? 'accepted' : null,
+          delivery: deliveryOf(m),
           ...(facts.has(m.ref) ? { facts: facts.get(m.ref) } : {}),
         }),
       ),
@@ -505,6 +549,52 @@ export class WidgetConversationsService {
         },
       });
     });
+  }
+
+  /**
+   * The customer saw the conversation up to a sequence (W05, W06): unread counts drop, and
+   * Chatwoot is told the contact saw it (at most every 15 seconds), so staff see their replies
+   * as read there. Telling Chatwoot is best effort; the read point is kept either way.
+   */
+  async markRead(claims: WidgetClaims, publicId: string, upToSequence: number): Promise<void> {
+    const conversationId = this.conversationId(publicId);
+    const now = this.clock();
+    const due = await this.tx(claims, async (tx) => {
+      const control = await this.own(tx, claims, conversationId);
+      const result = await advanceCustomerRead(tx, control, claims.principalId, upToSequence, now);
+      const recent = result.syncedAt && now.getTime() - result.syncedAt.getTime() < 15_000;
+      if (!result.advanced || recent) return null;
+      const [contact] = await tx
+        .select()
+        .from(schema.authorityContacts)
+        .where(
+          and(
+            eq(schema.authorityContacts.inboxId, control.inboxId),
+            eq(schema.authorityContacts.principalId, claims.principalId),
+          ),
+        );
+      const [inbox] = await tx
+        .select({ externalInboxId: schema.authorityInboxes.externalInboxId })
+        .from(schema.authorityInboxes)
+        .where(eq(schema.authorityInboxes.id, control.inboxId));
+      if (!contact || !inbox) return null;
+      await markCustomerSeenSynced(tx, conversationId, now);
+      return {
+        control,
+        sourceId: this.contacts.sourceIdOf(claims.tenantId, contact),
+        inboxRef: String(inbox.externalInboxId),
+      };
+    });
+    if (!due) return;
+    try {
+      const runtime = await this.registry.get(claims.tenantId, due.control.connectionId);
+      await runtime.authority.markSeenByContact(String(due.control.externalConversationId), {
+        contactSourceId: due.sourceId,
+        inboxRef: due.inboxRef,
+      });
+    } catch (error) {
+      this.logger.warn(`could not tell the authority the customer saw ${publicId}: ${error}`);
+    }
   }
 
   /** Latest journal head for a conversation the principal owns (for streams). */
