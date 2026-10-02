@@ -252,8 +252,8 @@ describe('events from conversations', () => {
       ['handoff.accepted', 'ai', 'person'],
       ['handoff.returned', 'person', 'ai'],
     ]);
-    expect(handoffs[0].data.staffId).toMatch(/^stf_/);
-    expect(handoffs[0].data.reason).toBe('staff_takeover');
+    expect(handoffs[0]?.data.staffId).toMatch(/^stf_/);
+    expect(handoffs[0]?.data.reason).toBe('staff_takeover');
   });
 });
 

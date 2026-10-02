@@ -1,7 +1,7 @@
+import type { LookupAddress } from 'node:dns';
 import type { IncomingHttpHeaders, IncomingMessage } from 'node:http';
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
-import type { LookupAddress } from 'node:net';
 import { isIP } from 'node:net';
 import { addressBlock } from './address.js';
 import {
