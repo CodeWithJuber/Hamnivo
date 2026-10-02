@@ -59,6 +59,8 @@ import { MemoryDeletionService } from './memory/deletion.service.js';
 import { MemoryFingerprints } from './memory/fingerprints.js';
 import { WidgetMemoryController } from './memory/widget-memory.controller.js';
 import { MemoryWriter } from './memory/writer.service.js';
+import { MigrationController } from './migration/migration.controller.js';
+import { MigrationService } from './migration/migration.service.js';
 import { HealthController } from './platform/health.controller.js';
 import type { Mailer } from './platform/mailer.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
@@ -111,6 +113,7 @@ export class ApiModule {
         KillSwitchesController,
         RunsController,
         KnowledgeController,
+        MigrationController,
         DecisionsController,
         CacheController,
         LanguageController,
@@ -163,6 +166,7 @@ export class ApiModule {
         EmbeddingFactory,
         RetrievalService,
         KnowledgeService,
+        MigrationService,
         WidgetTokens,
         WidgetSessionsService,
         AuthorityContactsService,

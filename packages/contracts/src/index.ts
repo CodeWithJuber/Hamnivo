@@ -24,6 +24,8 @@ export * from './language.js';
 export * from './language-routes.js';
 export * from './memory.js';
 export * from './memory-routes.js';
+export * from './migration.js';
+export * from './migration-routes.js';
 export * from './participants.js';
 export * from './parts.js';
 export * from './routes.js';

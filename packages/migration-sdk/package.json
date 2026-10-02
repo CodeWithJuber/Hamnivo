@@ -1,0 +1,38 @@
+{
+  "name": "@hamnivo/migration-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hamnivo migration SDK: the source adapter interface, the NDJSON package reader and writer with its JSON Schema, adapters for tawk.to, Zendesk and Intercom exports, and the preflight, checkpoint and reconciliation rules",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./schema.json": "./schema/hamnivo-migration-v1.schema.json"
+  },
+  "files": [
+    "dist",
+    "schema"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "schema": "tsx scripts/schema.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx scripts/schema.ts --check && vitest run"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "ajv": "8.20.0",
+    "tsdown": "0.23.0",
+    "tsx": "4.23.15",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

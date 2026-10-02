@@ -264,6 +264,42 @@ Rules that always hold:
 - TypeSafe says it does not train Jev on requests or responses
   ([data handling](https://docs.typesafe.ai/models)).
 
+### Bring your old chats
+
+Studio's **Import history** page brings a brand's conversations over from another tool. The
+conversations land in Chatwoot, as if they had always been there.
+
+**Sources:**
+- a tawk.to export file;
+- a Zendesk full JSON export;
+- Intercom conversations in its API format;
+- a Hamnivo package;
+- another Chatwoot, read with an access token.
+
+**Steps:**
+1. Upload the export, or connect the other Chatwoot.
+2. Read the check. It lists counts, how each field is imported, the source's known limits and the
+   records to review.
+3. Do a dry run. It writes nothing.
+4. Start the import, then compare the sample conversations with your export.
+5. Approve, or roll back.
+
+**What keeps it safe:**
+- Imports never message customers. Each brand gets its own import inbox without a webhook, bot,
+  auto-assignment or automations. The check stops an import while anything there could notify
+  people. Conversations keep their original times.
+- Uploads are scanned for malware before they are read. Keep ClamAV running
+  (`COMPOSE_PROFILES=scan`, the default). Without it, only the standard EICAR test file is caught.
+- The other Chatwoot's token is stored encrypted, used once and then revoked in Hamnivo. Revoke it
+  in that Chatwoot as well. Its address must be public `https`.
+- Uploaded files are deleted at approval or rollback, or `MIGRATION_EXPORT_RETENTION_DAYS` after
+  the import ends.
+
+**Limits:**
+- Teams and groups from the other tool are not imported.
+- The Zendesk and Intercom readers follow those vendors' documented formats but have not yet been
+  tried on real exports. Use the dry run and the samples before you approve.
+
 ### Settings that need the API for now
 
 Three settings have no Studio screen yet: **business hours**, **identity keys** and **selling in

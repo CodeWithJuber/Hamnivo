@@ -66,6 +66,22 @@ const EnvSchema = z.object({
   /** ClamAV daemon for uploads (tcp://host:3310). Without it only the EICAR test file is caught. */
   CLAMAV_URL: z.url().optional(),
 
+  /** Messages per minute written into one conversation while importing (Chatwoot allows 200). */
+  MIGRATION_MESSAGES_PER_MINUTE: z.coerce.number().int().min(1).max(200).default(180),
+  /** One worker pass works on an import for at most this long, then hands over to the next. */
+  MIGRATION_SLICE_SECONDS: z.coerce.number().int().min(1).max(300).default(20),
+  /** …and for at most this many conversations. */
+  MIGRATION_SLICE_CONVERSATIONS: z.coerce.number().int().min(1).max(10_000).default(200),
+  /** Days an uploaded export is kept after its job ends (samples and retries need it). */
+  MIGRATION_EXPORT_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+  /** Conversations one import reads from a Chatwoot source; the next import continues. */
+  MIGRATION_SOURCE_MAX_CONVERSATIONS: z.coerce.number().int().min(1).max(10_000).default(1000),
+  /**
+   * Lets imports read a source at a loopback or private address (development and tests only):
+   * otherwise source URLs must be https and public, checked again on every connection.
+   */
+  MIGRATION_SOURCE_ALLOW_PRIVATE: bool.default(false),
+
   /**
    * Jev (TypeSafe) for routing decisions. Without a key, rubrics that name Jev record every
    * decision as unavailable and the deterministic baseline decides. Set as TYPESAFE_API_KEY and

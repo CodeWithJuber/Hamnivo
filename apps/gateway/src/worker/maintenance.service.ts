@@ -1,4 +1,10 @@
-import { type Db, ensureAuditPartitions, ensureReconcileCursors, purgeExpired } from '@hamnivo/db';
+import {
+  type Db,
+  ensureAuditPartitions,
+  ensureReconcileCursors,
+  purgeExpired,
+  purgeMigrationFiles,
+} from '@hamnivo/db';
 import {
   Inject,
   Injectable,
@@ -35,7 +41,10 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       case 'audit-partitions':
         return { created: await ensureAuditPartitions(this.db, 3) };
       case 'purge-expired':
-        return purgeExpired(this.db);
+        return {
+          ...(await purgeExpired(this.db)),
+          migration_files: await purgeMigrationFiles(this.db),
+        };
       case 'reconcile-cursors':
         return { followed: await ensureReconcileCursors(this.db) };
       case 'memory-retention':

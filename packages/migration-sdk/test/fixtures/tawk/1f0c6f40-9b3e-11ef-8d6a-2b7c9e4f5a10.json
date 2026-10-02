@@ -1,0 +1,58 @@
+{
+  "id": "1f0c6f40-9b3e-11ef-8d6a-2b7c9e4f5a10",
+  "type": "chat",
+  "pageId": "6512f0c4a9e3b10c8d7e4f21",
+  "visitor": {
+    "name": "Sara Nguyen",
+    "id": "2ed08ef211a48e278067a93a0be4cf1afadcb5561ccde316342e0de92b9e87ff",
+    "email": "sara.nguyen@example.com"
+  },
+  "location": {
+    "countryCode": "GB",
+    "city": "Leeds"
+  },
+  "messageCount": 4,
+  "chatDuration": 342,
+  "rating": 1,
+  "createdOn": "2026-09-20T09:12:04.118Z",
+  "messages": [
+    {
+      "sender": { "t": "s" },
+      "type": "msg",
+      "time": "2026-09-20T09:12:04.118Z",
+      "msg": "Welcome to Northline Studio! If you need help, simply reply to this message. We are online and ready to help."
+    },
+    {
+      "sender": { "t": "v" },
+      "type": "msg",
+      "time": "2026-09-20T09:12:31.502Z",
+      "msg": "Hi there, I'm having an issue with my order. It arrived damaged. Could you please advise on next steps?",
+      "attchs": [
+        {
+          "type": "file",
+          "content": {
+            "file": {
+              "url": "https://tawk.link/6512f0c4a9e3b10c8d7e4f21/files/message/Xk2mQ9pL/order-receipt.pdf",
+              "name": "order-receipt.pdf",
+              "mimeType": "application/pdf",
+              "size": 245760,
+              "extension": "pdf"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "sender": { "t": "a", "n": "Liam Davies", "id": "18f66404b4817a529e67a171" },
+      "type": "msg",
+      "time": "2026-09-20T09:24:10.004Z",
+      "msg": "Thanks for getting in touch, Sara. I'm sorry to hear that. I can help with a replacement. Could you share a few photos of the item and the packaging?"
+    },
+    {
+      "sender": { "t": "v" },
+      "type": "msg",
+      "time": "2026-09-20T09:17:46.880Z",
+      "msg": "Sure, sending them now. You can also call me on +44 7700 900123."
+    }
+  ]
+}

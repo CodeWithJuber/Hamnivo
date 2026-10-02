@@ -1,0 +1,49 @@
+{
+  "id": "5d77e1b0-9d40-11ef-b9c2-0e4a6c1d2f88",
+  "type": "chat",
+  "pageId": "6512f0c4a9e3b10c8d7e4f21",
+  "visitor": {
+    "name": "Ayesha",
+    "id": "ff774c8c5aaadcc9dd5857f758c623c7a4cdd9cbc230f2f6b61cc862e98c3acb",
+    "email": "ayesha.k@example.org"
+  },
+  "location": {
+    "countryCode": "PK",
+    "city": "Lahore"
+  },
+  "messageCount": 6,
+  "chatDuration": 505,
+  "rating": -1,
+  "createdOn": "2026-09-22T06:40:55.301Z",
+  "messages": [
+    {
+      "sender": { "t": "v" },
+      "type": "msg",
+      "time": "2026-09-22T06:40:55.301Z",
+      "msg": "السلام علیکم، میرا آرڈر ابھی تک نہیں پہنچا۔"
+    },
+    {
+      "sender": { "t": "a", "n": "Priya Sharma", "id": "18f66404b4817a529e67a171" },
+      "type": "msg",
+      "time": "2026-09-22T06:42:10.922Z",
+      "msg": "Namaste! Main check karti hoon. आपका ऑर्डर कल तक पहुँच जाएगा।"
+    },
+    {
+      "sender": { "t": "v" },
+      "type": "msg",
+      "msg": "Is there a tracking link?"
+    },
+    {
+      "sender": { "t": "a", "n": "Priya Sharma", "id": "18f66404b4817a529e67a171" },
+      "type": "call",
+      "time": "2026-09-22T06:44:01.000Z",
+      "msg": "Missed call"
+    },
+    {
+      "sender": { "t": "v" },
+      "type": "msg",
+      "time": "2026-09-22T06:45:20.512Z",
+      "msg": "   "
+    }
+  ]
+}

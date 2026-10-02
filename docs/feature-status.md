@@ -7,9 +7,9 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 114 · in-progress: 66 · implemented: 42 · implemented-live-unverified: 5 · partial: 5
+**Blueprint features (232):** planned: 107 · in-progress: 68 · implemented: 47 · implemented-live-unverified: 5 · partial: 5
 
-**Design states (168):** planned: 106 · in-progress: 12 · implemented: 49 · partial: 1
+**Design states (168):** planned: 100 · in-progress: 14 · implemented: 53 · partial: 1
 
 ## Blueprint features
 
@@ -157,14 +157,14 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Feature | Priority | Wave | Status | Evidence / note |
 |---|---|---|---|---|---|
-| M01 | Migration preflight | P0 | C | planned |  |
-| M02 | Universal import/export | P0 | C | planned |  |
-| M03 | tawk.to import | P0 | C | planned |  |
-| M04 | Chatwoot migration adapter | P1 | C | planned |  |
-| M05 | Intercom/Zendesk import | P1 | C | planned |  |
+| M01 | Migration preflight | P0 | C | implemented | `packages/migration-sdk/src/preflight.ts`, `packages/migration-sdk/src/fields.ts`, `apps/gateway/src/migration/engine.service.ts`, `apps/console/src/components/migration/Preflight.tsx`, `apps/gateway/test/migration.int.test.ts`, `apps/console/e2e/migration.spec.ts` — Before anything is imported, an export is scanned and read: counts, the fields found with how each is imported, required fields, known limits of the source and every record that needs review, with the destination checked (Chatwoot connected, a quiet import inbox, no automation or integration acting on imports, the importer’s permissions) and a file from another source refused (tested, also in browsers). |
+| M02 | Universal import/export | P0 | C | implemented | `packages/migration-sdk/src/model.ts`, `packages/migration-sdk/schema/hamnivo-migration-v1.schema.json`, `packages/migration-sdk/src/package/reader.ts`, `packages/migration-sdk/src/package/writer.ts`, `packages/migration-sdk/test/package.test.ts`, `apps/gateway/test/migration.int.test.ts` — The Hamnivo package: NDJSON records (or a ZIP with a manifest, checksums and an attachments manifest), a JSON Schema generated from the model, raw source references, and export of a brand’s history in the same format, read back by the importer (round trip tested). |
+| M03 | tawk.to import | P0 | C | in-progress | `packages/migration-sdk/src/adapters/tawk.ts`, `packages/migration-sdk/test/tawk.test.ts`, `apps/gateway/test/migration.int.test.ts`, `apps/console/e2e/migration.spec.ts` — tawk.to JSON exports (ZIP or JSON) import end to end, with the 50-chat export cap, cut-short chats and file links reported (tested with fixtures shaped on tawk.to’s documented export; not yet checked against a real export). Importing through the tawk.to REST API is not built: it needs tawk.to’s approval. |
+| M04 | Chatwoot migration adapter | P1 | C | implemented | `apps/gateway/src/migration/chatwoot-source.ts`, `apps/gateway/src/migration/source-guard.ts`, `packages/migration-sdk/src/adapters/chatwoot.ts`, `packages/chatwoot/src/migration.ts`, `apps/gateway/test/migration-chatwoot.int.test.ts`, `packages/chatwoot/test/contract/importer.ts` — Another Chatwoot account is read with a user’s access token kept only in the secret broker and revoked after one read: paginated conversations and messages with their contacts and files, oldest first, a set number per import with later imports continuing; the address must be public https (checked again on every connection). Tested against the fake and, for the read path, against Chatwoot 4.18. |
+| M05 | Intercom/Zendesk import | P1 | C | in-progress | `packages/migration-sdk/src/adapters/zendesk.ts`, `packages/migration-sdk/src/adapters/intercom.ts`, `packages/migration-sdk/test/zendesk.test.ts`, `packages/migration-sdk/test/intercom.test.ts`, `apps/gateway/test/migration-helpdesks.int.test.ts`, `apps/console/e2e/migration.spec.ts` — Separate connectors for the Zendesk full JSON export (with the users export and the error file for tickets over 1 MB) and for Intercom conversations in its API format (with its 500-part limit): cut-short tickets and conversations are reported and never imported half-way unnoticed (tested with fixtures shaped on the vendors’ documentation, not real exports). Reading Intercom directly through its API is pending. |
 | M06 | Crisp/other adapters | P2 | A | planned |  |
-| M07 | Resumable migration jobs | P0 | C | planned |  |
-| M08 | Reconciliation and cutover | P0 | C | planned |  |
+| M07 | Resumable migration jobs | P0 | C | implemented | `packages/migration-sdk/src/checkpoint.ts`, `packages/migration-sdk/src/plan.ts`, `apps/gateway/src/migration/engine.service.ts`, `packages/migration-sdk/test/checkpoint.test.ts`, `apps/gateway/test/migration.int.test.ts` — Import jobs run in the worker in slices with checkpoints, pause, resume and cancel; every record is keyed by its source ID (scoped to the account it came from), a write with an unknown outcome is looked up before it is repeated, retries are bounded, and a crashed job rerun creates no duplicates (tested with injected faults). |
+| M08 | Reconciliation and cutover | P0 | C | implemented | `packages/migration-sdk/src/reconcile.ts`, `apps/gateway/src/migration/engine.service.ts`, `apps/console/src/components/migration/Review.tsx`, `packages/migration-sdk/test/reconcile.test.ts`, `apps/gateway/test/migration.int.test.ts`, `apps/console/e2e/migration.spec.ts` — Reconciliation per record type (found, imported, skipped, quarantined, failed), fields not imported, the quarantine list with reasons and a CSV download, samples read back from Chatwoot beside the export, a gate that failed checks must be acknowledged at approval, and rollback that keeps live conversations and people still in use (tested, also in browsers). A record retried after a failure lands after its neighbours in Chatwoot, which the sample check reports. |
 
 ### Operations
 
@@ -513,12 +513,12 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-18-01 | Migration wizard | Select source and scope | planned |  |
-| HNV-18-02 | Field mapping | Mapping incomplete | planned |  |
-| HNV-18-03 | Dry run | Preview and conflicts | planned |  |
-| HNV-18-04 | Import job | Running and resumable | planned |  |
-| HNV-18-05 | Import job | Partial failure | planned |  |
-| HNV-18-06 | Migration completion | Reconciliation and cutover | planned |  |
+| HNV-18-01 | Migration wizard | Select source and scope | in-progress | `apps/console/src/components/migration/MigrationDialogs.tsx`, `apps/console/e2e/migration.spec.ts` — Choose the brand and the source (tawk.to, Zendesk, Intercom, a Hamnivo package, or another Chatwoot with its access token); files are checked for type and size before sending, and the source is read only (tested in browsers, with accessibility audits right to left). The scope is fixed: conversations with their people and files, or chosen inboxes for Chatwoot. |
+| HNV-18-02 | Field mapping | Mapping incomplete | in-progress | `apps/console/src/components/migration/Preflight.tsx`, `apps/console/e2e/migration.spec.ts` — Every field in the export is listed with what it becomes, whether it is required and how many records carry it; people are matched only by a verified identity, original times are kept exactly (stored in UTC), and files are shown as imported or links (tested). The mapping is fixed per source: editing it and saving a mapping draft are pending. |
+| HNV-18-03 | Dry run | Preview and conflicts | implemented | `apps/console/src/components/migration/DryRun.tsx`, `apps/console/src/components/migration/Sample.tsx`, `apps/console/e2e/migration.spec.ts` — The dry run changes nothing and shows what would be imported, duplicates of earlier imports, records that need review with reasons, and redacted sample conversations (tested). Duplicates are always skipped: what is already in Chatwoot is never overwritten. |
+| HNV-18-04 | Import job | Running and resumable | implemented | `apps/console/src/components/migration/Progress.tsx`, `apps/console/e2e/migration.spec.ts`, `apps/gateway/test/migration.int.test.ts` — Starting needs a recent sign-in; progress, counts and the last checkpoint show while the worker imports, with pause, resume and cancel at a checkpoint (tested). |
+| HNV-18-05 | Import job | Partial failure | implemented | `apps/console/src/components/migration/Progress.tsx`, `apps/console/e2e/migration.spec.ts`, `apps/gateway/test/migration.int.test.ts` — A job that finishes with problems says so, lists each record with its reason, offers them as a CSV and retries only the failed records; missing and quarantined files are listed, never hidden (tested). |
+| HNV-18-06 | Migration completion | Reconciliation and cutover | implemented | `apps/console/src/components/migration/Review.tsx`, `apps/console/e2e/migration.spec.ts`, `apps/gateway/test/migration.int.test.ts` — Totals per record type, what was missing from the export, identity and privacy checks, samples beside the export, a cutover checklist and a rollback window until approval (tested, rollback also in Arabic). That live conversations already reach Hamnivo is confirmed by the approver, not measured. |
 
 ### 19 · REST API, webhooks and developer operations
 

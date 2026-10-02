@@ -74,9 +74,13 @@ export async function createApiApp(
   } as never);
 
   const fastify = app.getHttpAdapter().getInstance();
-  // Knowledge uploads carry up to 5 MB as base64; every other route keeps the 1 MB limit.
+  // Knowledge uploads carry up to 5 MB and migration exports up to 20 MB as base64; every other
+  // route keeps the 1 MB limit.
   fastify.addHook('onRoute', (route) => {
     if (route.url.startsWith('/v1/admin/knowledge/')) route.bodyLimit = 8 * 1024 * 1024;
+    if (route.url === '/v1/admin/migrations' && route.method === 'POST') {
+      route.bodyLimit = 28 * 1024 * 1024;
+    }
   });
   await app.register(helmet, {
     contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },

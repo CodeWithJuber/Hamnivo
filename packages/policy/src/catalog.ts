@@ -171,9 +171,18 @@ export const PERMISSIONS = {
     scopes: TENANT,
     stepUp: true,
   },
+  'migration.review': {
+    description: 'See imports, their reports and sample conversations',
+    scopes: BRAND,
+  },
+  'migration.run': {
+    description: 'Upload exports, and run, pause, resume or cancel imports',
+    scopes: BRAND,
+    stepUp: true,
+  },
   'migration.manage': {
-    description: 'Import data from other platforms',
-    scopes: TENANT,
+    description: 'Approve an import for cutover or roll it back',
+    scopes: BRAND,
     stepUp: true,
   },
   'settings.manage': { description: 'Edit workspace settings', scopes: WORKSPACE },
