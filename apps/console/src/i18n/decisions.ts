@@ -104,6 +104,8 @@ export const decisionsEn = {
     thresholds: 'How sure Jev must be, per language',
     thresholdsHint:
       'From 0 to 1. Leave a language empty if it was not evaluated: Jev then abstains there and the fixed rules decide.',
+    thresholdsEvaluated:
+      'Filled in from Hamnivo’s test of {{model}}. Compare them on your own messages in shadow mode first.',
     threshold: '{{language}}',
     save: 'Save draft',
     saved: 'Draft saved.',
@@ -320,6 +322,8 @@ export const decisionsAr: DecisionsText = {
     thresholds: 'مدى التأكد المطلوب من Jev لكل لغة',
     thresholdsHint:
       'من 0 إلى 1. اترك اللغة فارغة إن لم تُقيَّم: عندها يمتنع Jev فيها وتقرر القواعد الثابتة.',
+    thresholdsEvaluated:
+      'مأخوذة من اختبار Hamnivo للإصدار {{model}}. قارنها أولًا على رسائلك في وضع “مقارنة فقط”.',
     threshold: '{{language}}',
     save: 'حفظ المسودة',
     saved: 'حُفظت المسودة.',
@@ -531,6 +535,8 @@ export const decisionsHi: DecisionsText = {
     thresholds: 'हर भाषा में Jev को कितना पक्का होना चाहिए',
     thresholdsHint:
       '0 से 1 तक। जिस भाषा का मूल्यांकन नहीं हुआ, उसे खाली छोड़ें: वहाँ Jev फ़ैसला नहीं करेगा और तय नियम फ़ैसला करेंगे।',
+    thresholdsEvaluated:
+      'Hamnivo के {{model}} के परीक्षण से भरे गए। पहले अपने संदेशों पर “सिर्फ़ तुलना” मोड में जाँचें।',
     threshold: '{{language}}',
     save: 'ड्राफ़्ट सहेजें',
     saved: 'ड्राफ़्ट सहेजा गया।',
@@ -744,6 +750,8 @@ export const decisionsUr: DecisionsText = {
     thresholds: 'ہر زبان میں Jev کو کتنا یقین ہونا چاہیے',
     thresholdsHint:
       '0 سے 1 تک۔ جس زبان کی جانچ نہیں ہوئی اسے خالی چھوڑیں: وہاں Jev فیصلہ نہیں کرے گا اور طے شدہ اصول فیصلہ کریں گے۔',
+    thresholdsEvaluated:
+      'Hamnivo کے {{model}} کے ٹیسٹ سے بھرے گئے۔ پہلے اپنے پیغامات پر “صرف موازنہ” موڈ میں جانچیں۔',
     threshold: '{{language}}',
     save: 'مسودہ محفوظ کریں',
     saved: 'مسودہ محفوظ ہو گیا۔',

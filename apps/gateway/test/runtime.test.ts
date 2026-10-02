@@ -1,6 +1,6 @@
 import { APICallError } from '@ai-sdk/provider';
-import { AgentConfig } from '@hamnivo/contracts';
-import type { AuthorityMessage } from '@hamnivo/domain';
+import { AgentConfig, JEV_RECOMMENDED_MODEL } from '@hamnivo/contracts';
+import { type AuthorityMessage, DEFAULT_DECISION_THRESHOLDS } from '@hamnivo/domain';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import { DecisionProviders } from '../src/decisions/providers.js';
@@ -177,12 +177,30 @@ describe('configuration', () => {
       HAMNIVO_KEK_BASE64: Buffer.alloc(32, 1).toString('base64'),
       BETTER_AUTH_SECRET: 'x'.repeat(32),
     };
+    // The routing thresholds measured for that version (docs/evals/jev-1.13.0-2026-10-02.md).
+    const recommendedThresholds = {
+      en: 0.5,
+      hinglish: 0.5,
+      'roman-urdu': 0.5,
+      ar: 0.5,
+      hi: 0.5,
+      ur: 0.5,
+    };
     const without = new DecisionProviders(loadConfig(base));
-    expect(without.jevStatus()).toEqual({ configured: false, recommendedModel: 'jev-1.13.0' });
+    expect(without.jevStatus()).toEqual({
+      configured: false,
+      recommendedModel: 'jev-1.13.0',
+      recommendedThresholds,
+    });
+    expect(DEFAULT_DECISION_THRESHOLDS.model).toBe(JEV_RECOMMENDED_MODEL);
     const withKey = new DecisionProviders(
       loadConfig({ ...base, TYPESAFE_API_KEY: 'typesafe-secret-key' }),
     );
-    expect(withKey.jevStatus()).toEqual({ configured: true, recommendedModel: 'jev-1.13.0' });
+    expect(withKey.jevStatus()).toEqual({
+      configured: true,
+      recommendedModel: 'jev-1.13.0',
+      recommendedThresholds,
+    });
     expect(JSON.stringify(withKey.jevStatus())).not.toContain('typesafe-secret-key');
     // Without a key, a rubric that names Jev is honestly unavailable, never silently skipped.
     expect(

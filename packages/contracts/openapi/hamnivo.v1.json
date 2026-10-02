@@ -20887,11 +20887,23 @@
           },
           "recommendedModel": {
             "type": "string"
+          },
+          "recommendedThresholds": {
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/LanguageSlice"
+            },
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
           }
         },
         "required": [
           "configured",
-          "recommendedModel"
+          "recommendedModel",
+          "recommendedThresholds"
         ],
         "additionalProperties": false
       },

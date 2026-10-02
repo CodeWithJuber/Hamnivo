@@ -140,7 +140,11 @@ beforeAll(async () => {
     published: { version: 1 },
     draft: null,
     // The slice's fake Jev transport counts as configured; the version Studio suggests.
-    jev: { configured: true, recommendedModel: 'jev-1.13.0' },
+    jev: {
+      configured: true,
+      recommendedModel: 'jev-1.13.0',
+      recommendedThresholds: { en: 0.5, ar: 0.5, ur: 0.5 },
+    },
   });
 });
 

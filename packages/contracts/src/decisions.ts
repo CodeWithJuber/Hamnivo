@@ -123,6 +123,11 @@ export const JevStatus = z
     /** The server has a TypeSafe key (TYPESAFE_API_KEY). Without it, Jev decisions are unavailable. */
     configured: z.boolean(),
     recommendedModel: z.string(),
+    /**
+     * Routing thresholds measured for `recommendedModel` (docs/evals): Studio fills empty
+     * languages with them when a rubric chooses that version. A language without one stays empty.
+     */
+    recommendedThresholds: z.partialRecord(LanguageSlice, z.number().min(0).max(1)),
   })
   .meta({ id: 'JevStatus' });
 export type JevStatus = z.infer<typeof JevStatus>;

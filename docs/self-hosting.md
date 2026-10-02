@@ -246,17 +246,21 @@ conversation's language. Without Jev, a fixed keyword rule routes.
 3. The brand starts in **shadow** mode. Every conversation records both Jev's choice and the fixed
    rule's, but only the fixed rule routes. **Jev compared with the fixed rules** shows how often
    they agree, per language.
-4. Switch to **live** when the comparison looks right. Set a minimum confidence per language;
-   below it, the fixed rule routes. Jev is most accurate in English. Look at Hinglish, Roman Urdu,
-   Arabic, Hindi and Urdu on your own conversations before you rely on it there.
+4. Switch to **live** when the comparison looks right. Each language has a minimum confidence;
+   below it, the fixed rule routes. Choosing Jev fills in the values Hamnivo measured for
+   `jev-1.13.0` (0.50 in every language). In that test Jev chose the right topic for 260 of 266
+   messages in the six languages; the keyword rule chose it for 188
+   ([report](evals/jev-1.13.0-2026-10-02.md)). Those were test messages, not your customers', so
+   look at each language on your own conversations before you rely on it there.
 
 Rules that always hold:
 - A customer who asks for a person gets one; Jev never decides that.
 - If TypeSafe is slow or down, the fixed rule routes once the rubric's deadline passes (1.5 s by
   default).
 - Each decision sends TypeSafe only the customer's latest messages and the conversation's status, as
-  the rubric chooses. That is a few hundred tokens, at $0.042 per million input tokens (TypeSafe's
-  price in October 2026).
+  the rubric chooses. In the test that was about 670 tokens, at $0.042 per million input tokens
+  (TypeSafe's price in October 2026): about $0.00003 per decision. Half of the decisions took 148 ms
+  or less, and 95% took 214 ms or less.
 - TypeSafe says it does not train Jev on requests or responses
   ([data handling](https://docs.typesafe.ai/models)).
 

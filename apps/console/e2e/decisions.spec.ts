@@ -53,13 +53,17 @@ test('HNV-12-01 HNV-12-02 HNV-12-03 HNV-12-05 · edit, publish and try a routing
   await expect(routing).toBeHidden();
   await expect(team).toContainText('بالترجمة: الأردية');
 
-  // Choosing Jev pins the version the thresholds were evaluated on, and says plainly that this
-  // server has no TypeSafe key (the test stack never has one).
+  // Choosing Jev pins the version the thresholds were evaluated on, fills the empty languages
+  // with the thresholds measured for it, and says plainly that this server has no TypeSafe key
+  // (the test stack never has one).
   const providerSelect = page.getByRole('combobox', { name: 'من يقترح الفريق' });
   const modelField = page.getByRole('textbox', { name: 'إصدار Jev المثبّت' });
   await expect(page.getByTestId('jev-not-configured')).toHaveCount(0);
+  await expect(page.getByRole('spinbutton', { name: 'الأردية', exact: true })).toHaveValue('');
   await providerSelect.selectOption('jev');
   await expect(modelField).toHaveValue('jev-1.13.0');
+  await expect(page.getByRole('spinbutton', { name: 'الأردية', exact: true })).toHaveValue('0.5');
+  await expect(page.getByTestId('thresholds-evaluated')).toContainText('jev-1.13.0');
   await expect(page.getByTestId('jev-not-configured')).toContainText('TYPESAFE_API_KEY');
   const jevViolations = await audit(page, 'decisions with Jev unconfigured (ar)');
   await modelField.fill('');

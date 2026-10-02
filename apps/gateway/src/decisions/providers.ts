@@ -2,6 +2,7 @@ import { createJevDecisionProvider, JEV_PROVIDER_ID } from '@hamnivo/adapters/je
 import { JEV_RECOMMENDED_MODEL, type JevStatus } from '@hamnivo/contracts';
 import {
   createMockDecisionProvider,
+  DEFAULT_DECISION_THRESHOLDS,
   type DecisionAnswers,
   type DecisionProvider,
   type DecisionQuestions,
@@ -60,11 +61,18 @@ export class DecisionProviders {
     @Optional() @Inject(DECISION_FETCH) private readonly fetchOverride?: typeof fetch | null,
   ) {}
 
-  /** Whether Jev can be called here: a key, or the test transport. Never says which key. */
+  /**
+   * Whether Jev can be called here (a key, or the test transport; never which key), with the
+   * version and routing thresholds Hamnivo evaluated.
+   */
   jevStatus(): JevStatus {
     return {
       configured: Boolean(this.config.JEV_API_KEY ?? this.fetchOverride),
       recommendedModel: JEV_RECOMMENDED_MODEL,
+      recommendedThresholds:
+        DEFAULT_DECISION_THRESHOLDS.model === JEV_RECOMMENDED_MODEL
+          ? { ...DEFAULT_DECISION_THRESHOLDS.routing }
+          : {},
     };
   }
 

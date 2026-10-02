@@ -662,10 +662,25 @@ function RubricSection({ brandId, task }: { brandId: string; task: DecisionTask 
     setTopics((current) =>
       current.map((topic) => (topic.id === id ? { ...topic, ...change } : topic)),
     );
-  /** Choosing Jev with no model fills in the version Hamnivo's thresholds were evaluated on. */
+  const [evaluatedFill, setEvaluatedFill] = useState(false);
+  /**
+   * Choosing Jev with no model fills in the version Hamnivo evaluated, and its measured thresholds
+   * for the languages still empty. Nothing a person typed is replaced.
+   */
   const chooseProvider = (next: Provider) => {
     setProvider(next);
-    if (next === 'jev' && model.trim() === '') setModel(task.jev.recommendedModel);
+    if (next !== 'jev' || model.trim() !== '') return;
+    setModel(task.jev.recommendedModel);
+    const measured = task.jev.recommendedThresholds;
+    const empty = SLICES.filter(
+      (slice) => thresholds[slice].trim() === '' && measured[slice] !== undefined,
+    );
+    if (empty.length === 0) return;
+    setThresholds((current) => ({
+      ...current,
+      ...Object.fromEntries(empty.map((slice) => [slice, String(measured[slice])])),
+    }));
+    setEvaluatedFill(true);
   };
 
   return (
@@ -835,6 +850,11 @@ function RubricSection({ brandId, task }: { brandId: string; task: DecisionTask 
             <p id="rubric-thresholds-hint" className="text-sm text-text-secondary">
               {t('decisions.rubric.thresholdsHint')}
             </p>
+            {evaluatedFill ? (
+              <p className="text-sm text-text-secondary" data-testid="thresholds-evaluated">
+                {t('decisions.rubric.thresholdsEvaluated', { model: task.jev.recommendedModel })}
+              </p>
+            ) : null}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {SLICES.map((slice) => (
                 <TextField

@@ -371,7 +371,11 @@ pnpm --filter @hamnivo/gateway start:api      # or start:worker; reads ../../.en
 ```bash
 pnpm --filter @hamnivo/gateway test           # unit
 pnpm --filter @hamnivo/gateway test:int       # PostgreSQL + Valkey (services:up or ci:local)
+TYPESAFE_API_KEY=… pnpm --filter @hamnivo/gateway test:live   # opt-in: routing with the real Jev
 ```
+
+`test:live` is never part of the other runs. Each live file skips itself when its key is not in
+the environment, reads the key from there only, and makes a handful of calls.
 
 The integration suites run the real HTTP stack in process (`app.inject`) against a cloned database.
 They cover sign-up with email verification, TOTP enrolment and the second-factor sign-in, tenant
