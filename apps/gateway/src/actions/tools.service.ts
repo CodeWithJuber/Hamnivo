@@ -870,6 +870,7 @@ export class ToolsService {
   async listActions(
     principal: StaffPrincipal,
     query: {
+      brandId?: string | undefined;
       conversationId?: string | undefined;
       toolId?: string | undefined;
       state?: Action['state'] | undefined;
@@ -885,6 +886,9 @@ export class ToolsService {
         );
       }
       if (query.toolId) filters.push(eq(schema.actions.toolId, fromPublicId('tool', query.toolId)));
+      if (query.brandId) {
+        filters.push(eq(schema.toolDefinitions.brandId, fromPublicId('brand', query.brandId)));
+      }
       if (query.state) filters.push(eq(schema.actions.state, query.state));
       if (query.cursor) filters.push(lt(schema.actions.id, fromPublicId('action', query.cursor)));
       const rows = await tx

@@ -2,6 +2,7 @@ import { cachingAr } from './caching';
 import { commerceAr } from './commerce/ar';
 import { decisionsAr } from './decisions';
 import type { Translation } from './en';
+import { toolsAr } from './tools';
 
 /** Arabic (Modern Standard). Pending review by native speakers, as the note in the interface says. */
 export const ar: Translation = {
@@ -1274,6 +1275,7 @@ export const ar: Translation = {
   },
   decisions: decisionsAr,
   caching: cachingAr,
+  tools: toolsAr,
   commerce: commerceAr,
   memory: {
     title: 'ذاكرة العملاء',

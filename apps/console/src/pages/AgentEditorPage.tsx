@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AgentTools } from '../components/AgentTools';
 import { AgentVersions } from '../components/AgentVersions';
 import { ConfirmDialog } from '../components/AppDialog';
 import { VisibilityBadge } from '../components/Badges';
@@ -30,6 +31,7 @@ import {
   TextField,
 } from '../components/Fields';
 import { PageHeader } from '../components/PageHeader';
+import { Simulations } from '../components/Simulations';
 import { ActionError, QueryState } from '../components/States';
 import { LANGUAGE_NAMES } from '../i18n';
 import {
@@ -89,6 +91,8 @@ function sectionLabel(t: TFunction, key: SectionKey): string {
       return t('editor.sections.knowledge');
     case 'memory':
       return t('editor.sections.memory');
+    case 'tools':
+      return t('tools.grants.title');
   }
 }
 
@@ -785,6 +789,16 @@ function Editor({ detail }: { detail: AgentDetail }) {
             ) : null}
           </FormSection>
 
+          <FormSection id="tools" title={t('tools.grants.title')}>
+            <AgentTools
+              brandId={agent.brandId}
+              form={form}
+              update={update}
+              editable={editable}
+              errors={errors}
+            />
+          </FormSection>
+
           <div className="sticky bottom-0 z-10 -mx-4 flex flex-col gap-3 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
             <ActionError error={saveError} />
             <div className="flex flex-wrap items-center gap-3">
@@ -858,6 +872,8 @@ function Editor({ detail }: { detail: AgentDetail }) {
           />
         </aside>
       </div>
+
+      <Simulations agentId={agent.id} draftVersion={draftVersion} />
 
       <ConfirmDialog
         open={publishOpen}

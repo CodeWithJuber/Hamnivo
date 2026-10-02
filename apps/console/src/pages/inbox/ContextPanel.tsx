@@ -5,6 +5,7 @@ import { Link } from '@tanstack/react-router';
 import { LinkIcon, StarIcon, XIcon } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ConversationActions, HandoffSummary } from '../../components/ConversationActions';
 import {
   CheckboxField,
   ChoiceField,
@@ -639,6 +640,12 @@ export function ContextPanel({ detail }: { detail: InboxDetail }) {
     <div className="flex flex-col">
       <Block id={`ctx-customer-${detail.id}`} title={t('inbox.customer.title')}>
         <Customer detail={detail} />
+      </Block>
+      <Block id={`ctx-actions-${detail.id}`} title={t('tools.inbox.title')}>
+        <ConversationActions conversationId={detail.id} />
+      </Block>
+      <Block id={`ctx-handoff-${detail.id}`} title={t('tools.handoff.title')}>
+        <HandoffSummary conversationId={detail.id} />
       </Block>
       <Block id={`ctx-tags-${detail.id}`} title={t('inbox.tags.title')}>
         <Tags detail={detail} />

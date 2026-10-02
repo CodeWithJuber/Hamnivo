@@ -2,6 +2,7 @@ import { cachingUr } from './caching';
 import { commerceUr } from './commerce/ur';
 import { decisionsUr } from './decisions';
 import type { Translation } from './en';
+import { toolsUr } from './tools';
 
 /** Urdu. Pending review by native speakers, as the note in the interface says. */
 export const ur: Translation = {
@@ -1300,6 +1301,7 @@ export const ur: Translation = {
   },
   decisions: decisionsUr,
   caching: cachingUr,
+  tools: toolsUr,
   commerce: commerceUr,
   memory: {
     title: 'کسٹمر میموری',

@@ -28,6 +28,7 @@ import {
   ShoppingBagIcon,
   StoreIcon,
   WaypointsIcon,
+  WrenchIcon,
   XIcon,
 } from 'lucide-react';
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from 'react';
@@ -54,6 +55,7 @@ type NavPath =
   | '/runs'
   | '/decisions'
   | '/caching'
+  | '/tools'
   | '/orders'
   | '/finance'
   | '/stop-ai'
@@ -105,6 +107,7 @@ function useNavItems(): NavItem[] {
       icon: DatabaseZapIcon,
       permission: 'knowledge.read',
     },
+    { to: '/tools', label: t('tools.nav'), icon: WrenchIcon, permission: 'tools.read' },
     {
       to: '/orders',
       label: t('commerce.nav.orders'),
@@ -218,7 +221,8 @@ function KillSwitchBanner() {
   const { t } = useTranslation();
   const switches = useKillSwitches();
   const names = useNames();
-  const active = (switches.data?.items ?? []).filter((s) => s.active);
+  // A tool switch stops one tool's actions, not replies: it is listed on the Stop AI page.
+  const active = (switches.data?.items ?? []).filter((s) => s.active && s.scope !== 'tool');
   if (active.length === 0) return null;
   return (
     <section
@@ -268,7 +272,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [stopOpen, setStopOpen] = useState(false);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const shownPath = useRef(pathname);
-  const activeCount = (switches.data?.items ?? []).filter((s) => s.active).length;
+  const activeCount = (switches.data?.items ?? []).filter(
+    (s) => s.active && s.scope !== 'tool',
+  ).length;
   const dir = directionOf(isLocale(i18n.language) ? i18n.language : 'en');
 
   // After in-app navigation, start at the new page's heading (screen readers hear its name).

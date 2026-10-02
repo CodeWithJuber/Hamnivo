@@ -179,6 +179,7 @@ export const toolAdminRoutes = {
     tags: ['Tools'],
     auth: 'staff_session',
     query: z.object({
+      brandId: z.string().optional(),
       conversationId: z.string().optional(),
       toolId: z.string().optional(),
       state: ActionState.optional(),
