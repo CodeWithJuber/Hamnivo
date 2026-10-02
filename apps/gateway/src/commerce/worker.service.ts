@@ -16,10 +16,12 @@ import {
   Logger,
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
+  Optional,
 } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
 import { JournalService } from '../authority/journal.service.js';
+import { OperationReconcilers } from '../common/operation-reconcilers.js';
 import { retryDelayMs } from '../outbox/relay.service.js';
 import { APP_DB, CLOCK, type Clock, REDIS } from '../tokens.js';
 import { CheckoutService } from './checkout.service.js';
@@ -97,6 +99,7 @@ export class CommerceWorker implements OnApplicationBootstrap, OnApplicationShut
     private readonly purchases: PurchasesService,
     private readonly checkout: CheckoutService,
     private readonly refunds: RefundsService,
+    @Optional() private readonly reconcilers?: OperationReconcilers,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -166,6 +169,9 @@ export class CommerceWorker implements OnApplicationBootstrap, OnApplicationShut
           await this.checkout.reconcileOperation(item.tenantId, item.id, 'worker');
         } else if (op?.kind === 'commerce.refund.create') {
           await this.refunds.reconcileOperation(item.tenantId, item.id, 'worker');
+        } else if (op) {
+          // Other writes in the same ledger (AI tool actions) are checked by their own module.
+          await this.reconcilers?.reconcile(op.kind, item.tenantId, item.id);
         }
         return;
       }

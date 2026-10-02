@@ -16,10 +16,19 @@ import {
   type ModuleDataClass,
   sharedCacheEligibility,
 } from '@hamnivo/domain';
+import {
+  ACTION_CLAIM_CORRECTION,
+  checkActionClaims,
+  findActionClaims,
+} from '@hamnivo/domain/actions';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { generateText, isStepCount } from 'ai';
+import { generateText, isStepCount, type ToolSet } from 'ai';
 import canonicalize from 'canonicalize';
 import { and, eq, ne, sql } from 'drizzle-orm';
+import { TOOL_DATA_CLASS } from '../actions/answer-cache.js';
+import { ActionApprovals } from '../actions/approvals.service.js';
+import { type RunTools, ToolGateway } from '../actions/gateway.service.js';
+import { HandoffPackets } from '../actions/handoff.service.js';
 import { type JournalEntry, JournalService } from '../authority/journal.service.js';
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
 import { PublicationsService } from '../authority/publications.service.js';
@@ -162,6 +171,9 @@ export class RepliesService {
     private readonly language: LanguageService,
     private readonly answers: AnswerCache,
     private readonly memory: MemoryRecallService,
+    private readonly toolGateway: ToolGateway,
+    private readonly approvals: ActionApprovals,
+    private readonly handoffs: HandoffPackets,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -299,9 +311,24 @@ export class RepliesService {
       return;
     }
     const history = await this.history(tenantId, runtime, control);
+    const question = latestCustomerText(history.messages);
+    // An answer to an approval request by text ("APPROVE 4F2A9C" where cards are not shown, W16)
+    // is a decision, not a question: it is recorded and the AI does not reply to it.
+    if (await this.approvals.decideByText(tenantId, control, question, payload.ledgerId)) {
+      await this.tx(tenantId, async (tx) => {
+        await this.runs.step(tx, tenantId, run.id, {
+          kind: 'decision',
+          name: 'text_approval',
+          status: 'ok',
+          detail: {},
+        });
+        await this.runs.finish(tx, run.id, { outcome: 'skipped', state: 'skipped' });
+      });
+      return;
+    }
     // Handoff precedence 1: a customer who asks for a person gets one, and no model or decision
     // provider is consulted first (J04).
-    const asked = detectHumanRequest(latestCustomerText(history.messages));
+    const asked = detectHumanRequest(question);
     if (asked.requested) {
       await this.tx(tenantId, (tx) =>
         this.runs.step(tx, tenantId, run.id, {
@@ -311,18 +338,21 @@ export class RepliesService {
           detail: { language: asked.language ?? null },
         }),
       );
-      await this.handOff(tenantId, control, run.id, payload.epoch, 'customer_request');
+      await this.handOff(tenantId, control, run.id, payload.epoch, 'customer_request', undefined, {
+        request: question,
+      });
       return;
     }
 
     // Reply in the customer's language (U01): their explicit choice, otherwise their words.
-    const question = latestCustomerText(history.messages);
     const chosen = await this.language.forReply(tenantId, control.principalId, question);
     const options: GenerateOptions = {
       language: chosen.resolution.language,
       style: chosen.style,
       languageSource: chosen.resolution.source,
+      tools: agent.config.tools.grants.length > 0,
     };
+    const handoffContext = { request: question, language: chosen.resolution.language ?? null };
     // Customer memory (G19) is recalled before the cache: a reply built with it never enters a
     // shared entry, only the customer's own (keyed by their memory version, K09).
     const memories = await this.memory.recall(tenantId, {
@@ -333,7 +363,8 @@ export class RepliesService {
     });
     const shared = sharedCacheEligibility({ memoryItems: memories.length });
     const personalContext = shared.eligible ? [] : [shared.reason];
-    // Commerce data the conversation holds (K06): a reply built from it is never cached.
+    // Commerce data the conversation holds (K06): a reply built from it is never cached. Nor is
+    // the reply of an agent that may call tools (G15): it may rest on a tool's answer.
     const liveData = await this.tx(tenantId, (tx) => conversationLiveData(tx, control.id));
     const cached = await this.cachedAnswer(
       tenantId,
@@ -344,7 +375,7 @@ export class RepliesService {
       question,
       options,
       personalContext,
-      liveData,
+      options.tools ? [...liveData, TOOL_DATA_CLASS] : liveData,
     );
 
     let generated: Generated | null;
@@ -362,6 +393,23 @@ export class RepliesService {
         liveData: [],
       };
     } else {
+      // The agent's granted tools (G07, G08), cancelled with the run or when someone takes over.
+      const tools =
+        options.tools && control.brandId
+          ? await this.toolGateway.forRun({
+              tenantId,
+              brandId: control.brandId,
+              conversationId: control.id,
+              principalId: control.principalId,
+              runId: run.id,
+              epoch: payload.epoch,
+              agentId: agent.profile.id,
+              agentVersionId: agent.version.id,
+              agentDisplayName: agent.config.displayName,
+              config: agent.config,
+              controller: new AbortController(),
+            })
+          : null;
       try {
         generated = await this.generate(
           tenantId,
@@ -371,8 +419,13 @@ export class RepliesService {
           history,
           options,
           memories,
+          tools,
         );
       } catch (error) {
+        if (tools?.signal.aborted) {
+          await this.stopped(tenantId, run.id, tools);
+          return;
+        }
         const failure = classifyModelError(error);
         if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
         await this.handOff(
@@ -382,11 +435,26 @@ export class RepliesService {
           payload.epoch,
           'ai_unavailable',
           failure.kind,
+          handoffContext,
         );
+        return;
+      } finally {
+        tools?.close();
+      }
+      if (tools?.signal.aborted) {
+        await this.stopped(tenantId, run.id, tools);
         return;
       }
       if (!generated) {
-        await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_blocked');
+        await this.handOff(
+          tenantId,
+          control,
+          run.id,
+          payload.epoch,
+          'ai_blocked',
+          undefined,
+          handoffContext,
+        );
         return;
       }
       // Only complete answers that passed the honesty guard, from the configured model, are kept.
@@ -423,6 +491,8 @@ export class RepliesService {
     // The customer may have written again while the model was working: that message's job
     // answers both, so this reply is dropped (R05: one AI reply per burst of messages).
     if (await this.skipIfSuperseded(tenantId, run.id, payload, telemetry)) return;
+    // A person stopped this run (Cancel run): nothing more is posted.
+    if (await this.cancelRequested(tenantId, run.id, telemetry)) return;
 
     const facts: PublicationFacts = {
       sources: generated.sources,
@@ -715,6 +785,7 @@ export class RepliesService {
     fetched?: { messages: AuthorityMessage[]; view: 'customer' | 'staff_filtered' },
     options: GenerateOptions = {},
     recalled?: RecalledMemory[],
+    tools?: RunTools | null,
   ): Promise<Generated | null> {
     const runtime = await this.registry.get(tenantId, context.control.connectionId);
     const { messages: history, view } =
@@ -741,11 +812,19 @@ export class RepliesService {
     let correction: string | null = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const system = correction ? `${base}\n\n${correction}` : base;
-      const generated = await this.callModels(tenantId, runId, config, system, messages, {
-        view,
-        ...(options.language ? { language: options.language } : {}),
-        ...(options.languageSource ? { languageSource: options.languageSource } : {}),
-      });
+      const generated = await this.callModels(
+        tenantId,
+        runId,
+        config,
+        system,
+        messages,
+        {
+          view,
+          ...(options.language ? { language: options.language } : {}),
+          ...(options.languageSource ? { languageSource: options.languageSource } : {}),
+        },
+        tools,
+      );
       const cited = applyCitations(generated.text, passages, (p) => p.documentId);
       const remembered = citeMemories(cited.text, memories);
       const result: Generated = {
@@ -801,6 +880,33 @@ export class RepliesService {
       if (!claims.verdict.ok) {
         correction = CLAIM_CORRECTION;
         continue;
+      }
+      // G14: "changed", "done" or "checked" only with a receipt for an action in this
+      // conversation and nothing still pending; a knowledge search counts as checking.
+      const actionClaims = findActionClaims(result.text);
+      if (actionClaims.length > 0) {
+        const evidence = await this.toolGateway.evidence(tenantId, context.control.id);
+        const verdict = checkActionClaims(result.text, {
+          ...evidence,
+          completedLookups: evidence.completedLookups + (passages.length > 0 ? 1 : 0),
+        });
+        await this.tx(tenantId, (tx) =>
+          this.runs.step(tx, tenantId, runId, {
+            kind: 'guard',
+            name: 'action_claims',
+            status: verdict.ok ? 'ok' : 'blocked',
+            outputHash: sha256(result.text),
+            detail: {
+              claims: actionClaims.map((c) => c.claim),
+              rules: actionClaims.map((c) => c.rule),
+              ...evidence,
+            },
+          }),
+        );
+        if (!verdict.ok) {
+          correction = ACTION_CLAIM_CORRECTION;
+          continue;
+        }
       }
       if (!result.text) throw new EmptyReplyError('The model returned no text.');
       return { ...result, liveData: claimedLiveData(claims.claimed) };
@@ -862,6 +968,7 @@ export class RepliesService {
     system: string,
     messages: ReturnType<typeof historyMessages>,
     context: { view: string; language?: string; languageSource?: string },
+    tools?: RunTools | null,
   ): Promise<Generated> {
     const choices: ModelChoice[] = [config.model, ...config.fallbackModels];
     const inputHash = sha256(canonicalize({ system, messages }) ?? '');
@@ -870,14 +977,16 @@ export class RepliesService {
       const started = Date.now();
       try {
         const resolved = await this.models.resolve(tenantId, choice);
+        const timeout = AbortSignal.timeout(config.limits.timeoutMs);
         const result = await generateText({
           model: resolved.model,
           instructions: system,
           messages,
+          ...(tools ? { tools: tools.tools as ToolSet } : {}),
           maxOutputTokens: config.limits.maxOutputTokens,
           stopWhen: isStepCount(config.limits.maxSteps),
           maxRetries: 0,
-          abortSignal: AbortSignal.timeout(config.limits.timeoutMs),
+          abortSignal: tools ? AbortSignal.any([timeout, tools.signal]) : timeout,
         });
         const generated: Generated = {
           text: result.text.trim(),
@@ -908,6 +1017,7 @@ export class RepliesService {
               history: messages.length,
               ...context,
               index,
+              ...(tools ? { steps: result.steps.length, toolCalls: tools.calls } : {}),
             },
           }),
         );
@@ -924,10 +1034,14 @@ export class RepliesService {
             modelId: choice.modelId,
             latencyMs: Date.now() - started,
             inputHash,
-            detail: { errorKind: failure.kind, index },
+            detail: {
+              errorKind: tools?.signal.aborted ? 'stopped' : failure.kind,
+              index,
+            },
           }),
         );
-        if (!FALLBACK_KINDS.has(failure.kind)) throw error;
+        // A stopped run is not retried on another model.
+        if (tools?.signal.aborted || !FALLBACK_KINDS.has(failure.kind)) throw error;
       }
     }
     throw lastError;
@@ -963,7 +1077,11 @@ export class RepliesService {
     }
   }
 
-  /** Hands an AI-owned conversation to people, unless someone already took it. */
+  /**
+   * Hands an AI-owned conversation to people, unless someone already took it. The handoff note is
+   * the handoff packet (G10): why, what the AI did, what is still pending and the customer facts
+   * it relied on, from Hamnivo's records; the packet is kept for the inbox.
+   */
   private async handOff(
     tenantId: string,
     control: ControlRow,
@@ -971,11 +1089,20 @@ export class RepliesService {
     epoch: number,
     reason: AiHandoffReason,
     errorKind?: string,
+    handoff: { request?: string | null; language?: string | null } = {},
   ) {
     const outcome: RunOutcome = reason === 'ai_blocked' ? 'blocked' : 'handoff';
     let journal: JournalEntry[] = [];
     try {
       journal = await this.tx(tenantId, async (tx) => {
+        const packet = await this.handoffs.build(tx, {
+          control,
+          runId,
+          reason,
+          reasonText: HANDOFF_NOTES[reason],
+          request: handoff.request?.trim() || null,
+          replyLanguage: handoff.language ?? null,
+        });
         const result = await this.ownership.transition(
           tx,
           tenantId,
@@ -986,9 +1113,21 @@ export class RepliesService {
             reason,
             actor: { type: 'system', id: 'ai' },
             expectedEpoch: epoch,
-            handoffNote: HANDOFF_NOTES[reason],
+            handoffNote: this.handoffs.note(packet),
           },
         );
+        if (result.changed) {
+          await this.handoffs.record(
+            tx,
+            {
+              tenantId,
+              conversationId: control.id,
+              epoch: result.control.ownershipEpoch,
+              runId,
+            },
+            packet,
+          );
+        }
         await this.runs.finish(tx, runId, {
           outcome,
           state: reason === 'ai_unavailable' ? 'failed' : 'succeeded',
@@ -1003,6 +1142,50 @@ export class RepliesService {
     }
     await this.journal.notify(tenantId, control.id, journal);
     this.logger.log(`conversation ${control.id} handed to people: ${reason}`);
+  }
+
+  /** A run a person stopped (Cancel run), or one whose conversation someone else took. */
+  private async stopped(tenantId: string, runId: string, tools: RunTools) {
+    const cancelled = tools.signal.reason === 'cancel_requested';
+    await this.tx(tenantId, async (tx) => {
+      await this.runs.step(tx, tenantId, runId, {
+        kind: 'decision',
+        name: 'stopped',
+        status: 'ok',
+        detail: {
+          reason: cancelled ? 'cancel_requested' : 'owner_changed',
+          toolCalls: tools.calls,
+        },
+      });
+      await this.runs.finish(
+        tx,
+        runId,
+        cancelled ? { outcome: 'cancelled', state: 'skipped' } : { outcome: 'fenced' },
+      );
+    });
+  }
+
+  /** Ends a run a person asked to stop before its reply is posted. */
+  private async cancelRequested(
+    tenantId: string,
+    runId: string,
+    telemetry: Omit<Parameters<RunsService['finish']>[2], 'outcome' | 'state'>,
+  ): Promise<boolean> {
+    return this.tx(tenantId, async (tx) => {
+      const [row] = await tx
+        .select({ at: schema.runs.cancelRequestedAt })
+        .from(schema.runs)
+        .where(eq(schema.runs.id, runId));
+      if (!row?.at) return false;
+      await this.runs.step(tx, tenantId, runId, {
+        kind: 'decision',
+        name: 'stopped',
+        status: 'ok',
+        detail: { reason: 'cancel_requested', toolCalls: 0 },
+      });
+      await this.runs.finish(tx, runId, { outcome: 'cancelled', state: 'skipped', ...telemetry });
+      return true;
+    });
   }
 
   private async abort(

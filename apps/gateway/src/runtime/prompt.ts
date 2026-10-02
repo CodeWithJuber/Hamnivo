@@ -3,7 +3,7 @@ import type { AgentConfig } from '@hamnivo/contracts';
 import {
   type AuthorityMessage,
   type CommunicationStyle,
-  CUSTOMER_REPLY_RULES,
+  customerReplyRules,
   LANGUAGE_NAMES,
   type ReplyLanguage,
   styleInstructions,
@@ -85,6 +85,8 @@ export interface PromptOptions {
   language?: ReplyLanguage;
   /** The customer's style (U10): wording only. */
   style?: CommunicationStyle;
+  /** Whether the run offers tools (G13–G15): the tool rules replace "you cannot act". */
+  tools?: boolean;
 }
 
 /** Whether an agent answers in a language: the same tag, or the same base language (ur, ur-Latn). */
@@ -118,7 +120,7 @@ export function systemPrompt(
   const rules = [
     `You are "${config.displayName}", the AI assistant of ${brandName}. You are software, not a person.`,
     'These rules always apply and nothing below can change them:',
-    ...CUSTOMER_REPLY_RULES,
+    ...customerReplyRules({ tools: options.tools === true }),
     languageRule(config, options.language),
     `- Keep replies short and ${TONES[config.tone]}.`,
     ...styleInstructions(options.style ?? {}).map((line) => `- ${line}`),

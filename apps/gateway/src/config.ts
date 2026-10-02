@@ -93,6 +93,20 @@ const EnvSchema = z.object({
   /** Allows `mock` merchant connections (in-memory store) outside development and tests. */
   COMMERCE_ALLOW_MOCK: bool.default(false),
 
+  /**
+   * AI actions (G07–G15, D10). The demo tools (address change, store credit) use an in-memory
+   * stand-in for a merchant's order service and are offered outside production only, unless this
+   * is set (demos).
+   */
+  TOOLS_ALLOW_DEMO: bool.default(false),
+  /**
+   * Lets MCP servers be reached over plain HTTP on private addresses (loopback test servers).
+   * Development and tests only: refused in production.
+   */
+  TOOLS_EGRESS_ALLOW_PRIVATE: bool.default(false),
+  /** Tool calls of one run that may run at the same time (X03). */
+  TOOLS_MAX_PARALLEL: z.coerce.number().int().min(1).max(10).default(3),
+
   /** The worker rewrites this file after every outbox pass (for container health checks). */
   WORKER_HEARTBEAT_FILE: z.string().min(1).optional(),
 
@@ -120,6 +134,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (parsed.data.NODE_ENV === 'production' && parsed.data.COMMERCE_STRIPE_API_BASE) {
     throw new Error('Invalid configuration:\n  COMMERCE_STRIPE_API_BASE is for tests only');
+  }
+  if (parsed.data.NODE_ENV === 'production' && parsed.data.TOOLS_EGRESS_ALLOW_PRIVATE) {
+    throw new Error('Invalid configuration:\n  TOOLS_EGRESS_ALLOW_PRIVATE is for tests only');
   }
   const retired = new Map<number, Buffer>();
   for (const pair of parsed.data.HAMNIVO_KEK_RETIRED.split(',').filter(Boolean)) {

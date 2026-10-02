@@ -23,6 +23,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import canonicalize from 'canonicalize';
 import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { z } from 'zod';
+import { simulationProblems, toolGrantProblems } from '../actions/publish-checks.js';
 import { AppError } from '../common/app-error.js';
 import { isUniqueViolation } from '../common/pg-error.js';
 import { iso } from '../common/views.js';
@@ -382,6 +383,20 @@ export class AgentsService {
           throw new AppError('VALIDATION_FAILED', {
             detail: 'Some knowledge sources are missing, retired or belong to another brand.',
             fields: [{ path: 'config.knowledgeSourceIds', message: 'Unknown or unusable source' }],
+          });
+        }
+      }
+      // A draft goes live only with tools it may use (G07) and after passing the required
+      // simulations (G11). A rollback restores a version exactly as it was published.
+      if (target.state === 'draft') {
+        const problems = [
+          ...(await toolGrantProblems(tx, row.brandId, config)),
+          ...(await simulationProblems(tx, row.id, target.id, configHash(config))),
+        ];
+        if (problems.length > 0) {
+          throw new AppError('VALIDATION_FAILED', {
+            detail: problems[0]?.message ?? 'The draft cannot be published yet.',
+            fields: problems,
           });
         }
       }
