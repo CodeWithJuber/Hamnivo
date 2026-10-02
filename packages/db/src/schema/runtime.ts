@@ -15,6 +15,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { toolDefinitions } from './actions.js';
 import { conversationControls } from './authority.js';
 import { bytea, createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { secrets, staffMembers } from './identity.js';
@@ -155,15 +156,19 @@ export const agentVersions = pgTable(
   ],
 );
 
-/** Stops AI replies in a scope while people keep answering (X08). Active until cleared. */
+/**
+ * Stops AI replies in a scope while people keep answering (X08). Active until cleared. A `tool`
+ * switch stops one tool's actions only: replies go on, and calls to the tool are refused.
+ */
 export const killSwitches = pgTable(
   'kill_switches',
   {
     id: id(),
     tenantId: tenantId(),
-    scope: text('scope', { enum: ['tenant', 'brand', 'agent'] }).notNull(),
+    scope: text('scope', { enum: ['tenant', 'brand', 'agent', 'tool'] }).notNull(),
     brandId: uuid('brand_id'),
     agentId: uuid('agent_id'),
+    toolId: uuid('tool_id'),
     reason: text('reason').notNull(),
     createdBy: uuid('created_by'),
     createdAt: createdAt(),
@@ -175,9 +180,10 @@ export const killSwitches = pgTable(
     index('kill_switches_active_idx').on(t.tenantId).where(sql`${t.clearedAt} is null`),
     check(
       'kill_switches_target_ck',
-      sql`(${t.scope} = 'tenant' and ${t.brandId} is null and ${t.agentId} is null)
-        or (${t.scope} = 'brand' and ${t.brandId} is not null and ${t.agentId} is null)
-        or (${t.scope} = 'agent' and ${t.agentId} is not null)`,
+      sql`(${t.scope} = 'tenant' and ${t.brandId} is null and ${t.agentId} is null and ${t.toolId} is null)
+        or (${t.scope} = 'brand' and ${t.brandId} is not null and ${t.agentId} is null and ${t.toolId} is null)
+        or (${t.scope} = 'agent' and ${t.agentId} is not null and ${t.toolId} is null)
+        or (${t.scope} = 'tool' and ${t.toolId} is not null and ${t.agentId} is null)`,
     ),
     foreignKey({
       name: 'kill_switches_brand_fk',
@@ -188,6 +194,11 @@ export const killSwitches = pgTable(
       name: 'kill_switches_agent_fk',
       columns: [t.tenantId, t.agentId],
       foreignColumns: [agentProfiles.tenantId, agentProfiles.id],
+    }),
+    foreignKey({
+      name: 'kill_switches_tool_fk',
+      columns: [t.tenantId, t.toolId],
+      foreignColumns: [toolDefinitions.tenantId, toolDefinitions.id],
     }),
     foreignKey({
       name: 'kill_switches_created_by_fk',
@@ -243,9 +254,17 @@ export const runs = pgTable(
     attempts: integer('attempts').notNull().default(1),
     startedAt: tstz('started_at').notNull().defaultNow(),
     finishedAt: tstz('finished_at'),
+    /** A person asked to stop the run: its tool calls in flight are cancelled (G09, X08). */
+    cancelRequestedAt: tstz('cancel_requested_at'),
+    cancelRequestedBy: uuid('cancel_requested_by'),
   },
   (t) => [
     unique('runs_tenant_id_id_key').on(t.tenantId, t.id),
+    foreignKey({
+      name: 'runs_cancel_requested_by_fk',
+      columns: [t.tenantId, t.cancelRequestedBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
     uniqueIndex('runs_trigger_key').on(t.tenantId, t.conversationId, t.triggerRef),
     index('runs_conversation_idx').on(t.tenantId, t.conversationId, t.startedAt),
     index('runs_agent_idx').on(t.tenantId, t.agentId, t.startedAt),
