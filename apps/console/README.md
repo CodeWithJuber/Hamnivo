@@ -8,10 +8,17 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
 - **Sign in** (board 02).
   - Email and password.
   - A 6-digit code or a backup code when two-factor authentication is on.
-  - Passkeys where the browser supports them.
+  - Passkeys where the browser supports them: add them under Account security, then sign in or
+    confirm a sensitive action with one.
+  - Single sign-on (A13): "Continue with single sign-on" asks for a work email address and goes to
+    the workspace's identity provider. When the domain requires it, a password sign-in is turned
+    to single sign-on, and errors from the provider are explained on the sign-in page.
   - Sign up, "check your email", and forgotten or reset password.
   - When an action needs a recent sign-in, or the session has ended, a dialog asks to sign in
     again over the page. The page keeps its unsaved work, and the action is repeated afterwards.
+    People who signed in with single sign-on are offered it first, in a small window where the
+    provider asks who they are again; a passkey works too. Signing in as someone else there
+    signs Studio out instead of continuing.
 - **Workspace choice.** Lists the person's workspaces and creates new ones. The choice is
   remembered in this browser. With only one workspace, Studio opens it.
 - **Overview.** Brands with their Chatwoot connection, each brand's AI assistant (live version or
@@ -59,6 +66,28 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
   stored answers by fingerprint and sources, stopping reuse after a correction, and use and health
   per day, tier and language. Questions and answers are never listed.
 - **Account security.** Turn two-factor authentication on or off, and add passkeys.
+- **Team and access** (board 22, `members.read`).
+  - Members: role and scope, status and last activity, with search and filters. Invite by email
+    with a role and scope (the link is shown once to copy), resend or withdraw invitations, change
+    a role or scope in one step, suspend, restore and remove. Studio offers only roles and scopes
+    within the person's own reach; the gateway checks the same.
+  - Removing someone shows first what they hold (open conversations, which can be reassigned in
+    bulk, and their access), and the last owner can't be removed. Nobody changes their own access.
+  - Roles: built-in roles are read only. Custom roles are edited by permission area, with what is
+    added and removed, what needs extra checks and who gains or loses what, before saving.
+  - Audit log: filters by action, actor, target and time, with the outcome of each event, an
+    integrity check, and export as CSV or NDJSON of what the filters show (`audit.export`,
+    recorded too).
+  - Invitations open at `/invitations/accept`, for the invited address only.
+- **Security** (`security.manage` or `support.grant`).
+  - Single sign-on: prove a domain with a DNS record, connect an OpenID Connect provider (the
+    client secret is write-only), turn it on, require it, and choose the role for new people.
+  - Support access (A18): requests from Hamnivo's support with reason, scope and duration;
+    approve (narrower if needed), decline, and end active access. A banner on every page says when
+    support access is active or waiting, and incident banners from the platform show there too.
+- **Platform console** (board 26, `/platform`). Only for platform operators, with its own layout:
+  workspaces with metadata only (never content), service health, support access requests and
+  sessions (reading only what the owner approved), incident banners and the platform audit log.
 - **Inbox** (boards 07–10). Staff answer customers here instead of in Chatwoot.
   - Queues: mine, waiting for a person, AI answering, my teams and all, with counts. Filters by
     status, brand, channel, customer language and tag, and search over customers and message
@@ -165,14 +194,18 @@ pnpm --filter @hamnivo/console test:e2e
 
 - `e2e/stack.ts` starts everything the tests need:
   - a throwaway database;
-  - the fake Chatwoot;
+  - the fake Chatwoot and the fake Stripe server;
+  - an OpenID Connect provider (`e2e/idp.ts`, whose login page takes any password) and a DNS
+    server for domain checks (`e2e/dns.ts`);
   - the built gateway API and worker;
   - the widget and loader (what the snippet points to);
-  - Studio's build, with the gateway behind its origin.
+  - Studio's build at `http://localhost` (passkeys need a host name), with the gateway behind its
+    origin.
 - It needs `DATABASE_URL`, `DATABASE_OWNER_URL` and `REDIS_URL` for throwaway services. Never
   point them at data you want to keep. `pnpm ci:local` provides them in containers, and that is
   the easiest way to run the tests.
-- Ports: `E2E_STUDIO_API_PORT` (5185), `E2E_STUDIO_PORT` (5186), `E2E_STUDIO_WIDGET_PORT` (5187).
+- Ports: `E2E_STUDIO_API_PORT` (5185), `E2E_STUDIO_PORT` (5186), `E2E_STUDIO_WIDGET_PORT` (5187),
+  `E2E_STUDIO_IDP_PORT` (5188) and `E2E_STUDIO_DNS_PORT` (5189).
   `E2E_REUSE_STACK=1` runs against a stack you started yourself with `node e2e/stack.ts`.
 - Tests are named after the UX state IDs in `docs/design/UX-State-Matrix.csv`. They cover:
   - sign-up → workspace → brand → Chatwoot → install snippet;
@@ -191,6 +224,17 @@ pnpm --filter @hamnivo/console test:e2e
     arriving live; Arabic; a 390 px phone; keyboard only; an AI suggestion that is not sent;
     offline drafts; filters and a bulk change, with axe along the way;
   - customer memory: review, correct, delete, export and erase, right to left, and access denied;
+  - passkeys (`e2e/passkeys.spec.ts`) with Chromium's virtual authenticator: add one, sign in with
+    it, and confirm a sensitive action;
+  - single sign-on (`e2e/sso.spec.ts`): a domain proved through DNS, a provider connected and
+    turned on, a new person joining with the chosen role, an address the provider never verified
+    turned away, a required SSO turning a password sign-in around, and signing in again through
+    the provider before an export;
+  - team and access (`e2e/team.spec.ts`): an invitation sent and accepted, a role changed, a
+    member suspended, restored and removed, a custom role with its diff and impact, and the audit
+    log filtered, checked and exported;
+  - the platform console (`e2e/platform.spec.ts`): no access for workspace owners, service health,
+    support access asked for and approved narrower, and an incident banner;
   - axe (WCAG 2.2 A and AA) on every main screen in English and Arabic;
   - no sideways scrolling from 320 to 1920 px;
   - `e2e/commerce.spec.ts`: a customer pays through the fake Stripe server, one person asks for a

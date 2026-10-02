@@ -1,6 +1,10 @@
 import { lookup as dnsLookup, type LookupAddress } from 'node:dns';
 import { isIP } from 'node:net';
 import { Agent, fetch as undiciFetch } from 'undici';
+import { isPublicAddress } from '../common/outbound.js';
+
+// The same address rules as every other request made on a tenant's behalf.
+export { isPublicAddress };
 
 /**
  * Guards requests to a source system a staff member names by URL (the Chatwoot migration source,
@@ -18,89 +22,6 @@ export class SourceUrlError extends Error {
   ) {
     super(message);
   }
-}
-
-function ipv4Parts(address: string): number[] | null {
-  const parts = address.split('.').map(Number);
-  return parts.length === 4 && parts.every((p) => Number.isInteger(p) && p >= 0 && p <= 255)
-    ? parts
-    : null;
-}
-
-function publicIpv4(address: string): boolean {
-  const p = ipv4Parts(address);
-  if (!p) return false;
-  const [a, b] = p as [number, number, number, number];
-  if (a === 0 || a === 10 || a === 127) return false; // this network, private, loopback
-  if (a === 100 && b >= 64 && b <= 127) return false; // carrier-grade NAT
-  if (a === 169 && b === 254) return false; // link-local, cloud metadata
-  if (a === 172 && b >= 16 && b <= 31) return false; // private
-  if (a === 192 && b === 168) return false; // private
-  if (a === 192 && b === 0) return false; // IETF protocol assignments, documentation
-  if (a === 198 && (b === 18 || b === 19)) return false; // benchmarking
-  if (a === 198 && b === 51) return false; // documentation
-  if (a === 203 && b === 0) return false; // documentation
-  if (a >= 224) return false; // multicast, reserved, broadcast
-  return true;
-}
-
-function expandIpv6(address: string): number[] | null {
-  let text = address.toLowerCase().split('%')[0] ?? '';
-  // An embedded IPv4 tail (::ffff:10.0.0.1) becomes two groups.
-  const v4 = /(\d+\.\d+\.\d+\.\d+)$/.exec(text);
-  if (v4?.[1]) {
-    const parts = ipv4Parts(v4[1]);
-    if (!parts) return null;
-    const [a, b, c, d] = parts as [number, number, number, number];
-    text = `${text.slice(0, -v4[1].length)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
-  }
-  const [head, tail] = text.split('::');
-  const left = head ? head.split(':') : [];
-  const right = tail ? tail.split(':') : [];
-  if (text.includes('::') ? left.length + right.length > 7 : left.length !== 8) return null;
-  const groups = [
-    ...left,
-    ...Array.from({ length: 8 - left.length - right.length }, () => '0'),
-    ...right,
-  ].map((g) => Number.parseInt(g || '0', 16));
-  return groups.length === 8 && groups.every((g) => Number.isInteger(g) && g >= 0 && g <= 0xffff)
-    ? groups
-    : null;
-}
-
-function publicIpv6(address: string): boolean {
-  const g = expandIpv6(address);
-  if (!g) return false;
-  const first = g[0] as number;
-  if (g.every((x) => x === 0)) return false; // unspecified
-  if (g.slice(0, 7).every((x) => x === 0) && g[7] === 1) return false; // loopback
-  // IPv4-mapped, IPv4-compatible and IPv4-translated addresses: judge the IPv4 address.
-  const mapped = g.slice(0, 5).every((x) => x === 0) && (g[5] === 0xffff || g[5] === 0);
-  const translated = g.slice(0, 4).every((x) => x === 0) && g[4] === 0xffff && g[5] === 0;
-  if (mapped || translated) {
-    const hi = g[6] as number;
-    const lo = g[7] as number;
-    return publicIpv4(`${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`);
-  }
-  if (first === 0x64 && g[1] === 0xff9b) return false; // NAT64 (to internal IPv4)
-  // 6to4 and Teredo carry an IPv4 address inside; neither is needed to reach a source system.
-  if (first === 0x2002) return false;
-  if (first === 0x2001 && g[1] === 0) return false;
-  if (first === 0x0100 && g.slice(1, 4).every((x) => x === 0)) return false; // discard-only
-  if ((first & 0xfe00) === 0xfc00) return false; // unique local
-  if ((first & 0xffc0) === 0xfe80) return false; // link-local
-  if ((first & 0xffc0) === 0xfec0) return false; // site-local (deprecated, still routable inside)
-  if ((first & 0xff00) === 0xff00) return false; // multicast
-  if (first === 0x2001 && g[1] === 0x0db8) return false; // documentation
-  return true;
-}
-
-/** An address on the public internet (not loopback, private, link-local, reserved…). */
-export function isPublicAddress(address: string): boolean {
-  const family = isIP(address);
-  if (family === 4) return publicIpv4(address);
-  if (family === 6) return publicIpv6(address);
-  return false;
 }
 
 function lookupAll(hostname: string): Promise<LookupAddress[]> {

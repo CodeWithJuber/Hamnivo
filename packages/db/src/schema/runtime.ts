@@ -16,7 +16,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { conversationControls } from './authority.js';
-import { bytea, createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
+import { bytea, createdAt, id, platformRead, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { secrets, staffMembers } from './identity.js';
 import { brands, tenantId, workspaces } from './tenancy.js';
 
@@ -54,6 +54,8 @@ export const modelConnections = pgTable(
       foreignColumns: [staffMembers.tenantId, staffMembers.id],
     }),
     tenantIsolation(),
+    // The platform console sees which providers are connected or switched off (never the key).
+    platformRead(),
   ],
 );
 
@@ -200,6 +202,8 @@ export const killSwitches = pgTable(
       foreignColumns: [staffMembers.tenantId, staffMembers.id],
     }),
     tenantIsolation(),
+    // The platform console sees where AI replies are stopped (column grants leave out the reason).
+    platformRead(),
   ],
 );
 

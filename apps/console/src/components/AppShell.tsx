@@ -8,7 +8,7 @@ import {
   SheetTitle,
 } from '@hamnivo/ui/components/sheet';
 import { StatusBadge } from '@hamnivo/ui/components/status-badge';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouter, useRouterState } from '@tanstack/react-router';
 import {
   ActivityIcon,
@@ -21,19 +21,23 @@ import {
   InboxIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
+  LockKeyholeIcon,
   LogOutIcon,
   MenuIcon,
   OctagonPauseIcon,
   ReceiptIcon,
+  ServerCogIcon,
   ShieldCheckIcon,
   ShoppingBagIcon,
   StoreIcon,
+  UsersIcon,
   WaypointsIcon,
   XIcon,
 } from 'lucide-react';
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { directionOf, isLocale } from '../i18n';
+import { api } from '../lib/api';
 import { authClient } from '../lib/auth-client';
 import { returnFocus, useOpener } from '../lib/focus';
 import { formatDateTime } from '../lib/format';
@@ -41,8 +45,10 @@ import { killSwitchScope, useNames } from '../lib/names';
 import { useKillSwitches } from '../lib/queries';
 import { reauth } from '../lib/reauth';
 import { chooseTenant, useTenant } from '../lib/tenant';
+import type { PlatformOperator } from '../lib/types';
 import { LanguageSelect, TranslationNote } from './LanguageSelect';
 import { StopAiDialog } from './StopAiDialog';
+import { WorkspaceNotices } from './WorkspaceNotices';
 
 type NavPath =
   | '/overview'
@@ -59,6 +65,8 @@ type NavPath =
   | '/orders'
   | '/finance'
   | '/stop-ai'
+  | '/team'
+  | '/security'
   | '/account';
 
 interface NavItem {
@@ -66,6 +74,8 @@ interface NavItem {
   label: string;
   icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
   permission?: string;
+  /** Shown when the person holds any of these. */
+  anyOf?: string[];
 }
 
 function useNavItems(): NavItem[] {
@@ -126,9 +136,20 @@ function useNavItems(): NavItem[] {
       permission: 'commerce.read',
     },
     { to: '/stop-ai', label: t('nav.stopAi'), icon: OctagonPauseIcon, permission: 'agents.read' },
+    { to: '/team', label: t('nav.team'), icon: UsersIcon, permission: 'members.read' },
+    {
+      to: '/security',
+      label: t('nav.security'),
+      icon: LockKeyholeIcon,
+      anyOf: ['security.manage', 'support.grant'],
+    },
   ];
   // Navigation is filtered by role; the gateway still checks every request (HNV-03-05).
-  return items.filter((item) => !item.permission || can(item.permission));
+  return items.filter(
+    (item) =>
+      (!item.permission || can(item.permission)) &&
+      (!item.anyOf || item.anyOf.some((permission) => can(permission))),
+  );
 }
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
@@ -172,11 +193,22 @@ function WorkspaceSwitcher({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Whether this person is a platform operator (A17); the console itself checks again. */
+function usePlatformOperator() {
+  return useQuery({
+    queryKey: ['platform', 'me'],
+    queryFn: ({ signal }) => api<PlatformOperator>('/v1/platform/me', { signal }),
+    retry: false,
+    staleTime: 10 * 60_000,
+  });
+}
+
 function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const { me } = useTenant();
   const client = useQueryClient();
   const router = useRouter();
+  const operator = usePlatformOperator();
   const signOut = async () => {
     reauth.pause();
     await authClient.signOut().catch(() => undefined);
@@ -202,6 +234,17 @@ function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
         <ShieldCheckIcon className="size-[18px]" aria-hidden="true" />
         {t('nav.account')}
       </Link>
+      {operator.data ? (
+        <Link
+          to="/platform"
+          onClick={onNavigate}
+          data-testid="platform-link"
+          className="flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-text-secondary hover:bg-surface-sunken hover:text-text"
+        >
+          <ServerCogIcon className="size-[18px]" aria-hidden="true" />
+          {t('nav.platform')}
+        </Link>
+      ) : null}
       <Button variant="ghost" className="justify-start gap-3 px-3" onClick={signOut}>
         <LogOutIcon className="rtl:-scale-x-100" aria-hidden="true" />
         {t('nav.signOut')}
@@ -349,6 +392,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <KillSwitchBanner />
+        <WorkspaceNotices />
         <main
           id="main"
           tabIndex={-1}

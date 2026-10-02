@@ -1,16 +1,26 @@
 import { fromPublicId, InvalidPublicIdError } from '@hamnivo/db';
-import { authorize, authorizeAny, type Decision, explain } from '@hamnivo/policy';
+import {
+  authorize,
+  authorizeAny,
+  authorizePlatform,
+  type DenyReason,
+  explain,
+  type PlatformPermission,
+} from '@hamnivo/policy';
 import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
+import { OperatorsService } from '../operations/operators.service.js';
 import { CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { PrincipalService } from './principal.service.js';
-import { STAFF_ROUTE, type StaffRouteOptions } from './request-auth.js';
+import { PLATFORM_ROUTE, STAFF_ROUTE, type StaffRouteOptions } from './request-auth.js';
 
 /** Turns a policy decision into the matching public error (MFA, step-up or plain denial). */
-export function enforce(decision: Decision): void {
+export function enforce(
+  decision: { allowed: true } | { allowed: false; reason: DenyReason },
+): void {
   if (decision.allowed) return;
   const explanation = explain(decision);
   const detail = explanation.allowed ? undefined : `${explanation.text} ${explanation.remedy}`;
@@ -44,15 +54,44 @@ export class StaffGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly principals: PrincipalService,
+    private readonly operators: OperatorsService,
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
+  /** Platform console routes (A17): a platform operator, never a tenant role. */
+  private async platform(
+    context: ExecutionContext,
+    options: { permission?: PlatformPermission },
+  ): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<FastifyRequest>();
+    const session = await this.principals.session(request);
+    if (!session) throw new AppError('AUTH_REQUIRED');
+    const operator = await this.operators.operator(session);
+    // Not an operator (or no console configured): indistinguishable from a missing route.
+    if (!operator) throw new AppError('NOT_FOUND');
+    request.hamnivo = { session, operator };
+    if (options.permission) {
+      enforce(
+        authorizePlatform(operator.principal, options.permission, {
+          now: this.clock(),
+          stepUpMaxAgeMs: this.config.STEP_UP_MAX_AGE_MINUTES * 60_000,
+        }),
+      );
+    }
+    return true;
+  }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const options = this.reflector.getAllAndOverride<StaffRouteOptions | undefined>(STAFF_ROUTE, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const targets = [context.getHandler(), context.getClass()];
+    const platform = this.reflector.getAllAndOverride<
+      { permission?: PlatformPermission } | undefined
+    >(PLATFORM_ROUTE, targets);
+    if (platform) return this.platform(context, platform);
+    const options = this.reflector.getAllAndOverride<StaffRouteOptions | undefined>(
+      STAFF_ROUTE,
+      targets,
+    );
     if (!options) return true;
 
     const request = context.switchToHttp().getRequest<FastifyRequest>();

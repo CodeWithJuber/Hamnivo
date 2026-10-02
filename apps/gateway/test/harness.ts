@@ -27,6 +27,7 @@ export function testEnv(
     NODE_ENV: 'test',
     LOG_LEVEL: process.env.GATEWAY_TEST_LOG_LEVEL ?? 'silent',
     DATABASE_URL: database.app,
+    DATABASE_PLATFORM_URL: database.platform,
     DATABASE_POOL_MAX: '4',
     REDIS_URL: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
     HAMNIVO_KEK_BASE64: randomBytes(32).toString('base64'),
@@ -115,7 +116,8 @@ export class Client {
     }
     const text = response.body;
     let body: unknown = text;
-    if (text && String(response.headers['content-type'] ?? '').includes('json'))
+    // JSON and problem+json; NDJSON exports stay text.
+    if (text && /[/+]json(?:;|$)/.test(String(response.headers['content-type'] ?? '')))
       body = JSON.parse(text);
     return { status: response.statusCode, body: body as T, headers: response.headers };
   }

@@ -98,16 +98,16 @@
     "note": "Forward-compatible parsing and fixtures in place; client SDK compatibility tests follow with packages/client."
   },
   "A09": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "packages/db/src/audit.ts",
-      "packages/db/src/schema/audit.ts",
-      "packages/db/migrations/20260926232017_security.sql",
       "packages/db/test/audit.int.test.ts",
       "apps/gateway/src/audit/audit.controller.ts",
-      "apps/gateway/test/admin.int.test.ts"
+      "apps/gateway/test/team-access.int.test.ts",
+      "apps/console/src/pages/team/AuditTab.tsx",
+      "apps/console/e2e/team.spec.ts"
     ],
-    "note": "Append-only, per-tenant hash-chained audit log with monthly partitions, tamper detection, list/filter/verify API and events for every administrative change; export and Studio views pending."
+    "note": "Append-only, per-tenant hash-chained audit log (actor, action, target, outcome, reason, request ID, time and redacted data, with configuration versions where they apply) with filters, chain verification and CSV or NDJSON export behind its own permission and a fresh sign-in. The export is audited and never holds secrets or customer content. Studio filters the log, checks the chain and exports what it shows."
   },
   "A06": {
     "status": "in-progress",
@@ -136,13 +136,17 @@
     "note": "One-server production stack: gateway and edge images built from source, compose file with PostgreSQL 18 + pgvector, Valkey, Chatwoot 4.18.0-ce, ClamAV and Caddy (automatic HTTPS, HTTP to HTTPS, HTTP/3); only the edge publishes ports. hamnivo.sh sets up generated secrets and runs up, status, logs, backup, restore and update. The smoke test deploys it with Caddy's internal CA and checks sign-up, a real Chatwoot connection, an AI reply over the stream, the website and a backup and restore (tested). Studio is served at app.<domain> and used in a real browser by the smoke test. Let's Encrypt issuance needs public DNS and was not exercised here. Images are tagged and labelled with their commit, and the newest 3 versions are kept for rollback."
   },
   "A02": {
-    "status": "in-progress",
+    "status": "partial",
     "evidence": [
       "packages/policy/src/presets.ts",
       "apps/gateway/src/admin/admin.service.ts",
-      "apps/gateway/test/admin.int.test.ts"
+      "apps/gateway/test/admin.int.test.ts",
+      "apps/gateway/test/team-access.int.test.ts",
+      "apps/console/src/pages/team/MembersTab.tsx",
+      "apps/console/src/pages/team/OffboardDialog.tsx",
+      "apps/console/e2e/team.spec.ts"
     ],
-    "note": "Invitations (verified-email acceptance), scoped grants and eight role presets through the admin API with integration tests; Studio screens pending."
+    "note": "Members are listed, invited (verified-email acceptance; resending replaces the link), given a role and scope in one step, suspended, restored and removed from Studio and the API, all within the delegation ceiling and audited. Suspension or removal ends workspace access on the next request and closes live streams at the next heartbeat; sign-in sessions end when no other workspace keeps the person. Privileged permissions need two-step verification and a fresh sign-in. Owner recovery is partial: the last owner cannot be removed, suspended or demoted, and owners recover their own account by verified email and backup codes, but nothing helps a workspace whose every owner has lost access."
   },
   "A03": {
     "status": "implemented",
@@ -637,13 +641,15 @@
     "note": "Each brand has its own widget ID, allowed websites and business hours. Studio creates and edits brands; a website taken off the list gets no frame permission (CSP frame-ancestors per brand), no new chats, and its open chats end at once (tested). Per-brand appearance editing (board 04) is next."
   },
   "HNV-02-01": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/console/src/pages/SignInPage.tsx",
       "apps/console/src/components/SignIn.tsx",
-      "apps/console/e2e/journeys.spec.ts"
+      "apps/console/e2e/journeys.spec.ts",
+      "apps/console/e2e/sso.spec.ts",
+      "apps/console/e2e/passkeys.spec.ts"
     ],
-    "note": "Email and password sign-in with password-manager-friendly fields, and passkeys where the browser supports them (tested). The SSO choice comes with tenant SSO (A13)."
+    "note": "Email and password with password-manager-friendly fields, single sign-on by work email (with SSO required, passwords and passkeys turn to SSO), passkeys, and recovery through a verified email, all tested end to end. The workspace is chosen after sign-in rather than shown on the sign-in page."
   },
   "HNV-02-03": {
     "status": "implemented",
@@ -654,9 +660,11 @@
     "status": "implemented",
     "evidence": [
       "apps/console/src/components/ReauthDialog.tsx",
-      "apps/console/e2e/journeys.spec.ts"
+      "apps/console/e2e/journeys.spec.ts",
+      "apps/console/e2e/passkeys.spec.ts",
+      "apps/console/e2e/sso.spec.ts"
     ],
-    "note": "Sensitive actions and ended sessions ask to sign in again over the page; unsaved work is kept and the save finishes afterwards (tested)."
+    "note": "Sensitive actions and ended sessions ask to sign in again over the page; unsaved work is kept and the action finishes afterwards (tested). A password with a code, a passkey or single sign-on confirm it; people who use SSO are offered it first, and the provider is asked to check who they are again (prompt=login)."
   },
   "HNV-02-06": {
     "status": "in-progress",
@@ -1875,5 +1883,171 @@
       "apps/gateway/test/migration.int.test.ts"
     ],
     "note": "Totals per record type, what was missing from the export, identity and privacy checks, samples beside the export, a cutover checklist and a rollback window until approval (tested, rollback also in Arabic). That live conversations already reach Hamnivo is confirmed by the approver, not measured."
+  },
+  "A12": {
+    "status": "implemented",
+    "evidence": [
+      "packages/policy/src/diff.ts",
+      "packages/policy/src/impact.ts",
+      "packages/policy/test/policy.test.ts",
+      "apps/gateway/src/admin/admin.service.ts",
+      "apps/gateway/test/team-access.int.test.ts",
+      "apps/console/src/pages/team/RoleEditor.tsx",
+      "apps/console/e2e/team.spec.ts"
+    ],
+    "note": "Custom roles are built by permission area from the editor's own tenant-wide permissions; anything beyond is refused by the gateway and shown as out of reach. Before saving, the editor shows what is added and removed, what needs two-step verification or a fresh sign-in, and who gains or loses what. Saving needs a fresh sign-in and compares the edited version; a conflict keeps the draft. Built-in roles are read only, and a role is retired only when nobody holds it. Resource scope is chosen per grant, not in the role."
+  },
+  "A13": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/identity/sso/sso.service.ts",
+      "apps/gateway/src/identity/sso/sso-runtime.ts",
+      "apps/gateway/src/identity/auth.factory.ts",
+      "packages/db/migrations/20261002170327_enterprise_identity_security.sql",
+      "apps/gateway/test/sso.int.test.ts",
+      "apps/gateway/test/enterprise.test.ts",
+      "apps/console/src/pages/security/SsoSection.tsx",
+      "apps/console/e2e/sso.spec.ts",
+      "apps/console/e2e/passkeys.spec.ts"
+    ],
+    "note": "Per-workspace OpenID Connect single sign-on through Better Auth's SSO plugin: DNS TXT proof of the email domain (one workspace per verified domain; takeover attempts tested), discovery with HTTPS and public-address checks, the client secret only in the secret broker, optional SSO-only (passwords, sign-ups, resets and passkeys refused), and just-in-time membership with a role within the chooser's reach. An SSO identity joins an existing account only when both addresses are verified. Passkeys (add, sign in, confirm a sensitive action) and signing in again through the provider (prompt=login) are tested in Chromium. SAML and SCIM are not offered."
+  },
+  "A17": {
+    "status": "partial",
+    "evidence": [
+      "packages/policy/src/platform.ts",
+      "apps/gateway/src/operations/platform.service.ts",
+      "apps/gateway/src/operations/platform.controller.ts",
+      "apps/gateway/src/main.operator.ts",
+      "packages/db/src/operators.ts",
+      "apps/gateway/test/platform-support.int.test.ts",
+      "apps/console/src/pages/platform/PlatformPage.tsx",
+      "apps/console/e2e/platform.spec.ts"
+    ],
+    "note": "Platform console at /platform for operators named by the server administrator, with platform roles separate from workspace roles and the hamnivo_platform database role: workspaces with metadata only, service health (API, database, Valkey, queue, connectors), support access, AI stops per workspace, incident banners that every workspace sees, and a hash-chained platform audit log. Not built: tenant lifecycle actions (suspend, reactivate), abuse controls, and stopping AI or switching providers from the platform; AI stops are shown, not operated."
+  },
+  "A18": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/support/support.service.ts",
+      "apps/gateway/src/operations/support-sessions.service.ts",
+      "packages/db/migrations/20261002170327_enterprise_identity_security.sql",
+      "apps/gateway/test/platform-support.int.test.ts",
+      "apps/console/src/pages/security/SupportSection.tsx",
+      "apps/console/src/components/WorkspaceNotices.tsx",
+      "apps/console/e2e/platform.spec.ts"
+    ],
+    "note": "Operators ask a workspace for read-only access with a reason, scopes (configuration, the conversation list with status only, audit) and a duration. An owner with two-step verification approves it narrower or shorter, declines it or revokes it; it ends on expiry, revocation or by the operator. Every step and every read is recorded in both the workspace audit log and the platform one, and a banner shows on every Studio page while access is active or waiting."
+  },
+  "HNV-22-01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/team/MembersTab.tsx",
+      "apps/console/src/pages/team/InviteDialog.tsx",
+      "apps/gateway/test/team-access.int.test.ts",
+      "apps/console/e2e/team.spec.ts"
+    ],
+    "note": "Members with role, scope, status and last activity, pending invitations, search, and actions limited to the viewer's reach (checked again by the gateway); inviting works by keyboard alone. Availability is not shown, and inactive or pending people are found by search and their own list rather than a filter."
+  },
+  "HNV-22-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/team/InviteDialog.tsx",
+      "apps/console/src/pages/InvitationPage.tsx",
+      "apps/gateway/src/admin/admin.service.ts",
+      "apps/gateway/test/team-access.int.test.ts",
+      "apps/console/e2e/team.spec.ts"
+    ],
+    "note": "Invitations show the address, role, scope, expiry and state; resending replaces the link (the old one stops working) and withdrawing ends it. Accepting needs the invited address, verified; a suspended member can't be invited back."
+  },
+  "HNV-22-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/team/RoleEditor.tsx",
+      "packages/policy/src/diff.ts",
+      "apps/gateway/test/team-access.int.test.ts",
+      "apps/console/e2e/team.spec.ts"
+    ],
+    "note": "Permissions grouped by area with a live preview of what is added and removed, what needs two-step verification or a fresh sign-in, and what lies beyond the editor's reach (refused by the gateway too). Resource scope is chosen when the role is granted."
+  },
+  "HNV-22-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/team/RoleEditor.tsx",
+      "apps/gateway/test/admin.int.test.ts",
+      "apps/console/e2e/team.spec.ts"
+    ],
+    "note": "Saving sends the edited version, so a role someone else saved meanwhile is never overwritten. Comparing with their version keeps the draft and shows the difference and the people affected before saving again; leaving with unsaved changes asks first."
+  },
+  "HNV-22-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/team/OffboardDialog.tsx",
+      "apps/gateway/src/admin/admin.service.ts",
+      "apps/gateway/test/team-access.int.test.ts",
+      "apps/console/e2e/team.spec.ts"
+    ],
+    "note": "Removing first shows the person's open conversations (reassigned in bulk through the inbox), their access and whether they are the last owner. Removal revokes every grant and invitation, ends access on the next request and closes live streams at the next heartbeat; sign-in sessions end when no other workspace keeps the person. Session counts and other modules' pending actions are not listed."
+  },
+  "HNV-22-06": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/team/AuditTab.tsx",
+      "apps/gateway/src/audit/audit.controller.ts",
+      "apps/gateway/test/team-access.int.test.ts",
+      "apps/console/e2e/team.spec.ts"
+    ],
+    "note": "Actor, time, action, target, outcome, reason and redacted data per event, with filters, a chain integrity check and export (CSV or NDJSON, its own permission and a fresh sign-in, audited). The request ID is in the export rather than the table, and retention is not explained on the page."
+  },
+  "HNV-26-01": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/operations/platform.service.ts",
+      "apps/console/src/pages/platform/HealthView.tsx",
+      "apps/gateway/test/platform-support.int.test.ts",
+      "apps/console/e2e/platform.spec.ts"
+    ],
+    "note": "Service states (API, database, Valkey, queue, connectors), queue lag and failing events, connector counts and which platform model keys are set, without any content. Deployment versions, regions and error rates are not shown."
+  },
+  "HNV-26-02": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/operations/platform.service.ts",
+      "apps/console/src/pages/platform/TenantsView.tsx",
+      "apps/gateway/test/platform-support.int.test.ts",
+      "apps/console/e2e/platform.spec.ts"
+    ],
+    "note": "Workspace ID, state, workspaces, brands, connectors, AI stops, model providers and support history, read through column grants that leave out content; support access is asked from here. Plan and region are not modelled yet, and owners are reached through the support request, not by address."
+  },
+  "HNV-26-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/operations/support-sessions.service.ts",
+      "apps/console/src/pages/platform/TenantsView.tsx",
+      "apps/console/src/pages/security/SupportSection.tsx",
+      "apps/gateway/test/platform-support.int.test.ts",
+      "apps/console/e2e/platform.spec.ts"
+    ],
+    "note": "A request names its reason, the areas it needs (configuration, the conversation list with status only, audit) and how long; the workspace sees it at once and nothing is shared until an owner approves. Declined or pending requests leave the operator with metadata only."
+  },
+  "HNV-26-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/platform/SupportView.tsx",
+      "apps/console/src/components/WorkspaceNotices.tsx",
+      "apps/gateway/test/platform-support.int.test.ts",
+      "apps/console/e2e/platform.spec.ts"
+    ],
+    "note": "Approved access shows its scope and a countdown to the operator and a banner on every page of the workspace; each read is recorded on both sides. It ends on expiry, revocation or by the operator, after which reads are refused and the console forgets what was read."
+  },
+  "HNV-26-06": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/operations/platform.service.ts",
+      "apps/console/src/pages/platform/IncidentsView.tsx",
+      "apps/gateway/test/platform-support.int.test.ts",
+      "apps/console/e2e/platform.spec.ts"
+    ],
+    "note": "Platform administrators post an incident (title, message for workspaces, severity) that shows as a banner in every workspace until resolved, with both steps in the platform audit log. Pausing a service, scoping the blast radius and a recovery checklist are not built."
   }
 }

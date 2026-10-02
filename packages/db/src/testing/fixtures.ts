@@ -360,11 +360,38 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     });
     await tx.insert(s.supportGrants).values({
       tenantId,
-      platformUserId: 'platform_support_1',
+      platformUserId: newId(),
+      operatorName: 'Platform support',
+      status: 'approved',
       approvedBy: ids.staffMemberId,
-      scopes: ['read'],
+      decidedAt: new Date(),
+      scopes: ['configuration'],
       reason: 'Ticket 42',
       expiresAt: inDays(1),
+    });
+    const ssoDomainId = newId();
+    await tx.insert(s.ssoDomains).values({
+      id: ssoDomainId,
+      tenantId,
+      domain: `${slug}.example`,
+      verificationToken: randomBytes(16).toString('hex'),
+      verifiedAt: new Date(),
+      createdBy: ids.staffMemberId,
+    });
+    await tx.insert(s.ssoConnections).values({
+      tenantId,
+      domainId: ssoDomainId,
+      providerId: `sso_seed_${suffix}`,
+      issuer: `https://idp.${slug}.example`,
+      clientId: 'hamnivo',
+      clientSecretId: ids.secretId,
+      authorizationEndpoint: `https://idp.${slug}.example/authorize`,
+      tokenEndpoint: `https://idp.${slug}.example/token`,
+      jwksEndpoint: `https://idp.${slug}.example/jwks`,
+      status: 'active',
+      jitRoleId: ids.roleId,
+      jitGrantedBy: ids.staffMemberId,
+      createdBy: ids.staffMemberId,
     });
     await tx.insert(s.customerPrincipals).values({
       id: ids.principalId,

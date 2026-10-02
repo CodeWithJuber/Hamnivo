@@ -33,6 +33,7 @@
     "db:custom": "drizzle-kit generate --custom",
     "db:check": "drizzle-kit check",
     "db:migrate": "tsx scripts/migrate.ts",
+    "platform:operator": "tsx scripts/platform-operator.ts",
     "auth:schema": "auth generate --config scripts/better-auth.schema.config.ts --output /tmp/hamnivo-auth-schema.ts --yes"
   },
   "dependencies": {

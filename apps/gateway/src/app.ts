@@ -10,6 +10,7 @@ import { requestIdFrom } from './common/request-id.js';
 import type { AppConfig } from './config.js';
 import type { Auth } from './identity/auth.factory.js';
 import { registerAuthRoutes } from './identity/auth.routes.js';
+import { SsoRuntime } from './identity/sso/sso-runtime.js';
 import { registerApiDocs } from './platform/docs.js';
 import { registerMetrics } from './platform/metrics.js';
 
@@ -108,7 +109,7 @@ export async function createApiApp(
       );
     }
   });
-  registerAuthRoutes(fastify, app.get<Auth>(AUTH));
+  registerAuthRoutes(fastify, app.get<Auth>(AUTH), app.get(SsoRuntime));
   registerMetrics(fastify, config.METRICS_TOKEN);
   await registerApiDocs(fastify, config.API_DOCS);
   await app.init();

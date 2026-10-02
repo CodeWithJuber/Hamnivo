@@ -36,6 +36,8 @@ export const outboxEvents = pgTable(
     unique('outbox_events_tenant_id_id_key').on(t.tenantId, t.id),
     index('outbox_events_pending_idx').on(t.availableAt).where(sql`${t.processedAt} is null`),
     tenantIsolation(),
+    // Queue backlog for platform health; column grants leave out payloads and headers.
+    platformRead(),
   ],
 );
 

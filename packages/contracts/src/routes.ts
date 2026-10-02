@@ -26,6 +26,8 @@ import { languageRoutes } from './language-routes.js';
 import { adminMemoryRoutes, widgetMemoryRoutes } from './memory-routes.js';
 import { migrationRoutes } from './migration-routes.js';
 import { AttachmentPart } from './parts.js';
+import { platformRoutes } from './platform-routes.js';
+import { securityRoutes } from './security-routes.js';
 import {
   StaffConversation,
   StaffMessageRequest,
@@ -370,6 +372,8 @@ export const allRoutes: Record<string, RouteDef> = {
   ...cacheRoutes,
   ...languageRoutes,
   ...inboxRoutes,
+  ...securityRoutes,
+  ...platformRoutes,
   ...commerceAdminRoutes,
   ...commerceWidgetRoutes,
   ...commerceIntegrationRoutes,

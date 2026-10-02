@@ -104,6 +104,8 @@ describe('database roles', () => {
         'app.resolve_authority_connection(uuid)',
         'app.resolve_invitation(uuid)',
         'app.resolve_merchant_connection(uuid)',
+        'app.resolve_sso_domain(text)',
+        'app.resolve_sso_provider(text)',
         'app.resolve_staff_memberships(text)',
         'app.resolve_tenant_slug(text)',
         'app.resolve_widget(text)',

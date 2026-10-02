@@ -87,7 +87,8 @@ export function buildOpenApi(
     if (
       route.path.startsWith('/v1/admin/') ||
       route.path.startsWith('/v1/conversations/') ||
-      route.path.startsWith('/v1/inbox/')
+      route.path.startsWith('/v1/inbox/') ||
+      route.path.startsWith('/v1/workspace/')
     ) {
       parameters.push({
         in: 'header',

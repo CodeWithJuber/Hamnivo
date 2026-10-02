@@ -12,7 +12,7 @@ import {
 import { Redis } from 'ioredis';
 import type { PersonalCacheScope } from '../cache/store.js';
 import type { AppConfig } from '../config.js';
-import { APP_DB, CLOCK, CONFIG, MAILER, REDIS } from '../tokens.js';
+import { APP_DB, CLOCK, CONFIG, MAILER, PLATFORM_DB, REDIS } from '../tokens.js';
 import { LogMailer, type Mailer, SmtpMailer } from './mailer.js';
 
 export interface PlatformOverrides {
@@ -33,10 +33,15 @@ export interface PlatformOverrides {
 class ConnectionCloser implements OnApplicationShutdown {
   constructor(
     @Inject(APP_DB) private readonly db: Db,
+    @Inject(PLATFORM_DB) private readonly platform: Db | null,
     @Inject(REDIS) private readonly redis: Redis,
   ) {}
   async onApplicationShutdown(): Promise<void> {
-    await Promise.allSettled([closeDb(this.db), this.redis.quit()]);
+    await Promise.allSettled([
+      closeDb(this.db),
+      ...(this.platform ? [closeDb(this.platform)] : []),
+      this.redis.quit(),
+    ]);
   }
 }
 
@@ -72,6 +77,18 @@ export class PlatformModule {
             }),
         },
         {
+          // The platform console's own pool (hamnivo_platform: metadata only). Optional: without
+          // DATABASE_PLATFORM_URL there is no platform console and no incident banners.
+          provide: PLATFORM_DB,
+          useFactory: () =>
+            config.DATABASE_PLATFORM_URL
+              ? createDb(config.DATABASE_PLATFORM_URL, {
+                  max: 4,
+                  applicationName: `hamnivo-${role}-platform`,
+                })
+              : null,
+        },
+        {
           provide: REDIS,
           // BullMQ requires maxRetriesPerRequest: null on shared connections.
           useFactory: () => new Redis(config.REDIS_URL, { maxRetriesPerRequest: null }),
@@ -80,7 +97,7 @@ export class PlatformModule {
         { provide: CLOCK, useValue: overrides.clock ?? (() => new Date()) },
         ConnectionCloser,
       ],
-      exports: [CONFIG, APP_DB, REDIS, MAILER, CLOCK],
+      exports: [CONFIG, APP_DB, PLATFORM_DB, REDIS, MAILER, CLOCK],
     };
   }
 }

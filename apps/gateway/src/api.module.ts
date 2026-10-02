@@ -30,6 +30,10 @@ import { decisionAdminProviders, decisionProviders } from './decisions/decisions
 import { createAuth } from './identity/auth.factory.js';
 import { IdentityController } from './identity/identity.controller.js';
 import { PrincipalService } from './identity/principal.service.js';
+import { DNS_RESOLVER, type DnsResolver, systemDnsResolver } from './identity/sso/dns.js';
+import { SsoController } from './identity/sso/sso.controller.js';
+import { OUTBOUND_POLICY, SsoService } from './identity/sso/sso.service.js';
+import { SsoRuntime } from './identity/sso/sso-runtime.js';
 import { StaffGuard } from './identity/staff.guard.js';
 import { TenantsService } from './identity/tenants.service.js';
 import { InboxAccess } from './inbox/access.js';
@@ -61,6 +65,10 @@ import { WidgetMemoryController } from './memory/widget-memory.controller.js';
 import { MemoryWriter } from './memory/writer.service.js';
 import { MigrationController } from './migration/migration.controller.js';
 import { MigrationService } from './migration/migration.service.js';
+import { OperatorsService } from './operations/operators.service.js';
+import { PlatformController } from './operations/platform.controller.js';
+import { PlatformService } from './operations/platform.service.js';
+import { SupportSessionsService } from './operations/support-sessions.service.js';
 import { HealthController } from './platform/health.controller.js';
 import type { Mailer } from './platform/mailer.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
@@ -75,6 +83,8 @@ import { RunsController } from './runtime/runs.controller.js';
 import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
 import { SecretsController } from './secrets/secrets.controller.js';
+import { SupportController } from './support/support.controller.js';
+import { SupportService } from './support/support.service.js';
 import { APP_DB, AUTH, CONFIG, MAILER } from './tokens.js';
 import { AuthorityContactsService } from './widget/contacts.service.js';
 import { WidgetConversationsService } from './widget/conversations.service.js';
@@ -87,6 +97,8 @@ import { WidgetGuard } from './widget/widget.guard.js';
 export interface ApiOverrides extends PlatformOverrides {
   /** Replaces every agent's model (tests); agents otherwise use their configured model. */
   model?: LanguageModel;
+  /** Answers DNS TXT lookups for domain verification (tests). */
+  dns?: DnsResolver;
 }
 
 /** HTTP API process: REST, staff authentication and administration. */
@@ -121,14 +133,32 @@ export class ApiModule {
         AdminMemoryController,
         InboxController,
         TeamsController,
+        SsoController,
+        SupportController,
+        PlatformController,
         ...COMMERCE_API_CONTROLLERS,
       ],
       providers: [
         {
           provide: AUTH,
-          inject: [CONFIG, APP_DB, MAILER],
-          useFactory: (cfg: AppConfig, db: Db, mailer: Mailer) => createAuth(cfg, db, mailer),
+          inject: [CONFIG, APP_DB, MAILER, SsoRuntime],
+          useFactory: (cfg: AppConfig, db: Db, mailer: Mailer, sso: SsoRuntime) =>
+            createAuth(cfg, db, mailer, sso),
         },
+        {
+          provide: DNS_RESOLVER,
+          useValue: overrides.dns ?? systemDnsResolver(config.SSO_DNS_SERVERS),
+        },
+        {
+          provide: OUTBOUND_POLICY,
+          useValue: { trustedOrigins: config.SSO_TRUSTED_IDP_ORIGINS },
+        },
+        SsoRuntime,
+        SsoService,
+        SupportService,
+        OperatorsService,
+        PlatformService,
+        SupportSessionsService,
         PrincipalService,
         TenantsService,
         AdminService,

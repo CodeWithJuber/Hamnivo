@@ -12,6 +12,8 @@ export * from './language.js';
 export * from './memory.js';
 export * from './migration.js';
 export * from './operations.js';
+export * from './operators.js';
 export * from './platform.js';
 export * from './runtime.js';
+export * from './sso.js';
 export * from './tenancy.js';
