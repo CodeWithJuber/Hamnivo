@@ -25,6 +25,8 @@ this repository.
 | Public website (EN/AR/HI/UR, static) | ready | see "The public website" below |
 | AI agents: real models (Anthropic, OpenAI, Gemini, OpenAI-compatible), knowledge, kill switches | ready (API) | see "Connect a brand to Chatwoot" below |
 | Studio (staff console): sign-in with two-step verification, brands and install, Chatwoot connection, AI agents, model connections, knowledge, Stop AI, runs | ready (first version) | `https://app.<your domain>` (A6); `pnpm --filter @hamnivo/console dev` in development |
+| Team and access (members, invitations, custom roles, audit log with export), single sign-on per workspace (OpenID Connect), passkeys, support access | ready (first version) | Studio: Team and access, Security (A6) |
+| Platform console for the people who run the server: workspaces (metadata only), service health, support access, incident banners | ready (first version) | `https://app.<your domain>/platform`; operators are named on the server (A7) |
 
 # Part A: Host Hamnivo on your server
 
@@ -225,6 +227,49 @@ Open Studio, the staff console, at `https://app.example.com` (your domain in pla
 Staff can answer customers in Chatwoot at `https://support.example.com`. The super admin email and
 password are in `.env` (`CHATWOOT_ADMIN_EMAIL` and `CHATWOOT_ADMIN_PASSWORD`).
 
+### Your team
+
+Under **Team and access**:
+
+- **Members.** Invite people by email with a role and, if you like, a narrower scope (one
+  workspace, team or brand). They join from the link in the email, signed in with that address.
+  You can only hand out access you have yourself. Change someone's role in one step, suspend them
+  or remove them. They lose access on their next request, and their live views close at the next
+  check (15 seconds by default). Removing someone first shows what they still hold, such as open
+  conversations.
+- **Roles.** The built-in roles can't be changed. A custom role can only contain permissions you
+  hold. Before it is saved, Studio shows what changes and who gains or loses what.
+- **Audit log.** Every administrative change, with filters and an integrity check. Exporting it as
+  CSV or NDJSON needs its own permission and a recent sign-in, and is recorded too. It never
+  contains secrets or customers' messages.
+
+### Single sign-on
+
+An owner with two-step verification sets it up under **Security**:
+
+1. **Prove the domain.** Add the company's email domain, publish the TXT record Studio shows
+   (`_hamnivo-verification.example.com`), then check it. Once it is verified, no other workspace
+   can use that domain.
+2. **Connect the identity provider** (OpenID Connect): its issuer URL, and the client ID and
+   client secret it gave you. The secret is stored encrypted and never shown again. Studio then
+   shows the callback address; register it at the provider as a redirect URL.
+3. **Turn it on**, and choose the role for people who sign in for the first time. Roles that need
+   two-step verification can't be given this way. **Require single sign-on** turns away passwords
+   and passkeys for addresses at the domain.
+
+People then use "Continue with single sign-on" on the sign-in page. An existing account is joined
+to the provider's identity only when both have verified the address. A provider on a private
+network must be listed in `SSO_TRUSTED_IDP_ORIGINS` (comma-separated origins). Every other
+provider must use HTTPS on a public address. `SSO_DNS_SERVERS` picks the DNS servers for the
+domain check.
+
+### Support access
+
+The people who run the server never see a workspace's content on their own. When they need to,
+they ask for read-only access with a reason, what they need to see and for how long. An owner
+approves it, possibly narrower, or declines it under **Security**, and can end it at any time.
+Every page shows a banner while it lasts, and both sides' audit logs record it.
+
 ### Settings that need the API for now
 
 Three settings have no Studio screen yet: **business hours**, **identity keys** and **selling in
@@ -311,6 +356,24 @@ API reference is at `https://api.example.com/docs`; set `API_DOCS=false` to hide
 | Apply changed settings | `./deploy/production/hamnivo.sh up` |
 | Stop everything | `./deploy/production/hamnivo.sh down` (data stays in Docker volumes) |
 | Any compose command | `./deploy/production/hamnivo.sh compose <command>` |
+| Name a platform operator, or disable one | see "The platform console" below |
+
+### The platform console
+
+The platform console (`https://app.example.com/platform`) is for the people who run this server. It
+shows workspaces (never their content), service health, support access and AI stops, and posts
+incident banners that every workspace sees. Nobody gets it from a workspace role: you name
+operators on the server, after they have created their account in Studio:
+
+```bash
+./deploy/production/hamnivo.sh compose run --rm --no-deps migrate \
+  node dist/main.operator.js you@example.com platform_admin
+# or support_operator, platform_viewer; --disable instead of a role takes it away
+```
+
+Operators need two-step verification for anything beyond looking. Every action is recorded in the
+platform's own audit log. In development, use
+`pnpm --filter @hamnivo/db platform:operator <email> <role>`.
 
 ### Backups
 

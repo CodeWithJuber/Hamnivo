@@ -7,6 +7,7 @@ The Hamnivo Gateway: one codebase, two processes, both built on NestJS 12 and Fa
 | API | `src/main.api.ts` | REST API, staff sign-in at `/api/auth/*` (Better Auth), administration, OpenAPI at `/v1/openapi.json` and `/docs`, health, metrics |
 | Worker | `src/main.worker.ts` | Outbox relay (at-least-once), BullMQ maintenance: audit partitions and expiry purge |
 | Migrations | `src/main.migrate.ts` | Applies pending database migrations as the schema owner (`DATABASE_OWNER_URL`), then exits |
+| Platform operators | `src/main.operator.ts` | Names, changes or disables a platform operator as the schema owner, then exits (`<email> <role>` or `<email> --disable`) |
 
 In production, all three run from one image (`deploy/docker/Dockerfile`, target `gateway`); see
 `docs/self-hosting.md`, Part A. The worker rewrites `WORKER_HEARTBEAT_FILE` after every outbox
@@ -342,6 +343,58 @@ Stripe adapter against the fake Stripe server: quote, approval, payment page, we
 replays, timeouts before and after the provider acted, a bank challenge, refunds with a second
 approver, finance exceptions, fulfilment, a takeover with a payment in flight and cross-tenant
 denial. Nothing calls the real Stripe API.
+
+## Team, enterprise sign-in and platform operations (A02, A09, A12, A13, A17, A18)
+
+- **Members** (`/v1/admin/members`, `…/{id}`, `…/{id}/offboarding`, `…/{id}/remove`). Change a
+  role or scope in one step, suspend, restore and remove, each within the delegation ceiling and
+  audited. Suspending or removing ends access in the workspace at once: the next request and the
+  next heartbeat of a live stream find no membership. Sign-in sessions end too when no other
+  workspace keeps the person (`member.sessions_ended`). Removing revokes every grant, team place
+  and pending invitation; `…/offboarding` lists first what the person holds.
+- **Invitations** (`/v1/admin/invitations`, `…/{id}/resend`). Resending replaces the secret. A
+  suspended member can't be invited back (restore them instead), and accepting needs the invited,
+  verified address.
+- **Custom roles** (`/v1/admin/roles`, `…/preview`). Built-in roles are read only. Creating and
+  editing need `roles.manage` with a fresh sign-in and compare the version edited. The preview
+  returns what is added and removed, what needs extra checks, who gains or loses what, and what
+  the editor could not grant.
+- **Audit log** (`/v1/admin/audit`, `…/verify`, `…/export`). Export streams CSV or NDJSON page by
+  page with `audit.export` and a fresh sign-in, and is itself audited. Audit data never holds
+  secrets (redacted when written) or customers' messages.
+- **Single sign-on** (`/v1/admin/sso`, `…/domains`, `…/domains/{id}/verify`, `…/connections`).
+  A workspace proves an email domain with a TXT record at `_hamnivo-verification.<domain>`
+  (`node:dns`, or `SSO_DNS_SERVERS`). Only one workspace can hold a domain verified, whatever
+  another one publishes. A verified domain gets one OpenID Connect connection, found by discovery;
+  the issuer must use HTTPS on a public address unless its origin is in
+  `SSO_TRUSTED_IDP_ORIGINS`. The client secret lives only in the secret broker. A connection can
+  require SSO for its domain (password and passkey sign-ins are then refused with `SSO_REQUIRED`)
+  and name the role for just-in-time members; roles with actions that need two-step verification
+  can't be named. Changes need `security.manage` (two-step verification, fresh sign-in).
+- **Signing in with SSO** (`POST /api/auth/sign-in/sso`, `GET /api/auth/sso/callback/{id}`; every
+  other path of the SSO plugin is closed). For each request, `SsoRuntime` loads the one connection
+  concerned through the pre-tenant resolvers and hands it to Better Auth with its secret. An SSO
+  identity is joined to an existing account only when the provider asserts the address as
+  verified and the account's address is verified too; otherwise sign-in fails with
+  `sso_email_unverified` or `sso_unverified_local_account`. New people join with the chosen role
+  (`member.joined_by_sso`). The callback carries no opener policy, so a sign-in in a small window
+  can report back to the page that opened it.
+- **Support access** (A18). Platform operators ask (`POST /v1/platform/support-grants`) with a
+  reason, scopes (`configuration`, `conversations` with status only, `audit`) and a duration. An
+  owner with `support.grant` (two-step verification, fresh sign-in) approves it, possibly
+  narrower and shorter, declines it or revokes it (`/v1/admin/support-grants/…`). Access is read
+  only, ends on expiry or revocation, and every step and every read is recorded in the
+  workspace's audit log and the platform's. `/v1/workspace/notices` gives Studio's banners.
+- **Platform console** (A17, `/v1/platform/*`). For operators named by the server administrator
+  (`main.operator.ts`), with platform roles that no workspace grant can hold. It reads through the
+  `hamnivo_platform` database role: workspaces with metadata only, service health, AI stops,
+  support access and incidents, whose banners reach every workspace. Without
+  `DATABASE_PLATFORM_URL` there is no platform console.
+
+`test/team-access.int.test.ts`, `test/sso.int.test.ts` and `test/platform-support.int.test.ts`
+cover these, including cross-tenant denial, the delegation ceiling, domain takeover attempts,
+revocation during a session and support access that expires, against a real OpenID Connect
+provider in process (`oidc-provider`).
 
 ## Security rules enforced here
 

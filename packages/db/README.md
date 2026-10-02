@@ -15,7 +15,7 @@ journal and audit.
 | Row-level security | Every table has RLS **enabled and forced**. The `tenant_isolation` policy is `tenant_id = (select app.current_tenant())` for both reads and writes. |
 | Tenant context | `withTenant(db, { tenantId }, tx => …)` opens a transaction and sets `app.tenant_id` with `set_config(…, true)`. The setting is transaction-local, so it cannot leak to the next use of a pooled connection. |
 | Composite keys | Tenant tables have `UNIQUE (tenant_id, id)`, and foreign keys include `tenant_id`, so a row can never reference another tenant's row. |
-| Pre-tenant lookups | Only through `app.resolve_*` SECURITY DEFINER functions: widget public id, API key prefix, webhook connection, widget session, staff memberships and tenant slug. Each has a pinned `search_path`, column-level grants and no PUBLIC execute. |
+| Pre-tenant lookups | Only through `app.resolve_*` SECURITY DEFINER functions: widget public id, API key prefix, webhook connection, widget session, staff memberships, tenant slug, and the SSO connection for an email domain or provider id. Each has a pinned `search_path`, column-level grants and no PUBLIC execute. |
 | Partitions | Audit partitions are unreachable directly; access goes through the partitioned parent and its policies. |
 
 ## Using it
@@ -80,6 +80,22 @@ Triggers raise `cache_dependency_versions` in the same transaction as the change
 source's status, visibility or review cycle, a document's current version, status, title, URL or
 source, an agent's published version and a brand's name. `test/decisions.int.test.ts` covers the
 rubric and record guards and the triggers, including rollback and tenant isolation.
+
+## Enterprise identity and platform operations
+
+| File | Tables |
+|---|---|
+| `src/schema/sso.ts` | `sso_domains` (a workspace's email domains and their DNS proof; a partial unique index across tenants lets only one workspace hold a domain verified), `sso_connections` (one OpenID Connect connection per verified domain; the client secret is a reference into the secret broker) |
+| `src/schema/operators.ts` | Global platform tables, on the allowlist in `test/rls.int.test.ts` with their reason: `platform_operators` (named by the server administrator), `platform_incidents` (banners every workspace sees) and `platform_audit_events` with `platform_audit_head` (the platform's own hash chain, append-only, secrets redacted when written) |
+| `src/schema/identity.ts` | `support_grants` (requests, decisions and the time box of support access, A18) and `role_definitions.archived_at` |
+
+The application role has no access to the platform tables; the gateway reads them, and the
+incidents behind workspace banners, as `hamnivo_platform`. That role reads tenant metadata through
+column grants, never content. Besides its own tables it may only ask for support access (a pending
+`support_grants` row) and end a session early.
+`setPlatformOperator()` runs as the owner, and `pnpm --filter @hamnivo/db platform:operator
+<email> <role|--disable>` calls it from the command line (`node dist/main.operator.js` in the
+gateway image).
 
 ## Tests
 

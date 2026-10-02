@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { appendPlatformAudit } from './audit.js';
-import type { Db } from './client.js';
+import { closeDb, createDb, type Db } from './client.js';
 import { newId } from './ids.js';
 import { PLATFORM_OPERATOR_ROLES } from './schema/operators.js';
 
@@ -61,4 +61,44 @@ export async function setPlatformOperator(
     });
     return { id, role, status };
   });
+}
+
+/**
+ * The command line for naming platform operators, shared by the development script
+ * (`pnpm --filter @hamnivo/db platform:operator`) and the gateway image
+ * (`node dist/main.operator.js`): `<email> <role>` or `<email> --disable`, as the database owner.
+ * Returns the process exit code.
+ */
+export async function platformOperatorCommand(
+  args: readonly string[],
+  ownerUrl: string | undefined,
+  out: { log(line: string): void; error(line: string): void } = console,
+): Promise<number> {
+  const [email, choice] = args;
+  const roles: readonly string[] = PLATFORM_OPERATOR_ROLES;
+  if (!email || !choice || (choice !== '--disable' && !roles.includes(choice))) {
+    out.error(`Usage: <email> <${roles.join('|')}|--disable>`);
+    return 1;
+  }
+  if (!ownerUrl) {
+    out.error('DATABASE_OWNER_URL is not set.');
+    return 1;
+  }
+  const owner = createDb(ownerUrl, { max: 1, applicationName: 'hamnivo-platform-operator' });
+  try {
+    const result = await setPlatformOperator(owner, {
+      email,
+      ...(choice === '--disable' ? { disable: true } : { role: choice as PlatformOperatorRole }),
+    });
+    out.log(`[hamnivo] ${email}: ${result.status}, ${result.role}`);
+    return 0;
+  } catch (error) {
+    if (error instanceof OperatorAccountMissingError || error instanceof RangeError) {
+      out.error(error.message);
+      return 1;
+    }
+    throw error;
+  } finally {
+    await closeDb(owner);
+  }
 }

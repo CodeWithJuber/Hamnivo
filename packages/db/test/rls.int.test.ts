@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   appendPlatformAudit,
   OperatorAccountMissingError,
+  platformOperatorCommand,
   resolveSsoDomain,
   resolveSsoProvider,
   setPlatformOperator,
@@ -556,6 +557,36 @@ describe('platform role', () => {
       ok: true,
       lastSeq: 4,
     });
+  });
+
+  it('names operators from the command line, as the server administrator does', async () => {
+    const lines: string[] = [];
+    const out = {
+      log: (line: string) => lines.push(`log ${line}`),
+      error: (line: string) => lines.push(`error ${line}`),
+    };
+    const run = (args: string[]) => platformOperatorCommand(args, h.database.owner, out);
+    expect(await run(['nadia@example.com', 'root'])).toBe(1);
+    expect(await platformOperatorCommand(['nadia@example.com', 'platform_viewer'], '', out)).toBe(
+      1,
+    );
+    expect(await run(['nadia@example.com', 'platform_viewer'])).toBe(1);
+    await h.owner.execute(sql`
+      insert into auth."user" (id, name, email, email_verified)
+      values ('user_cli', 'Nadia Viewer', 'nadia@example.com', true)`);
+    expect(await run(['nadia@example.com', 'platform_viewer'])).toBe(0);
+    expect(await run(['nadia@example.com', '--disable'])).toBe(0);
+    expect(lines).toEqual([
+      'error Usage: <email> <platform_admin|support_operator|platform_viewer|--disable>',
+      'error DATABASE_OWNER_URL is not set.',
+      expect.stringMatching(/^error No Hamnivo account uses nadia@example\.com\./),
+      'log [hamnivo] nadia@example.com: active, platform_viewer',
+      'log [hamnivo] nadia@example.com: disabled, platform_viewer',
+    ]);
+    const stored = await h.owner.execute<{ role: string; status: string }>(
+      sql`select role, status from platform_operators where email = 'nadia@example.com'`,
+    );
+    expect(stored.rows).toEqual([{ role: 'platform_viewer', status: 'disabled' }]);
   });
 });
 
