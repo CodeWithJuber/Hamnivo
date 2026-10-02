@@ -5,6 +5,7 @@ export type AiHandoffReason =
   | 'ai_stopped'
   | 'ai_unavailable'
   | 'ai_blocked'
+  | 'ai_limit'
   | 'customer_request';
 
 /** Internal notes for staff (the staff lane), in the operator's language. */
@@ -15,5 +16,7 @@ export const HANDOFF_NOTES: Record<AiHandoffReason, string> = {
   ai_stopped: 'AI replies are stopped by a kill switch. Please answer the customer.',
   ai_unavailable: 'The AI could not answer because the model was unavailable. Please answer.',
   ai_blocked: 'The AI reply was held back because it broke the honesty rules. Please answer.',
+  ai_limit:
+    "The workspace's AI replies for this billing period are used up (plan limit or budget). Please answer.",
   customer_request: 'The customer asked to talk to a person, so the AI stepped back.',
 };

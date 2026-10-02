@@ -27,6 +27,11 @@ import { StaffConversationsController } from './conversations/staff-conversation
 import { StaffConversationsService } from './conversations/staff-conversations.service.js';
 import { DecisionsController } from './decisions/decisions.controller.js';
 import { decisionAdminProviders, decisionProviders } from './decisions/decisions.providers.js';
+import {
+  DEVELOPER_API_CONTROLLERS,
+  type DeveloperOverrides,
+  developerApiProviders,
+} from './developer/developer.module.js';
 import { createAuth } from './identity/auth.factory.js';
 import { IdentityController } from './identity/identity.controller.js';
 import { PrincipalService } from './identity/principal.service.js';
@@ -82,7 +87,7 @@ import { WidgetTokens } from './widget/tokens.service.js';
 import { WidgetController } from './widget/widget.controller.js';
 import { WidgetGuard } from './widget/widget.guard.js';
 
-export interface ApiOverrides extends PlatformOverrides {
+export interface ApiOverrides extends PlatformOverrides, DeveloperOverrides {
   /** Replaces every agent's model (tests); agents otherwise use their configured model. */
   model?: LanguageModel;
 }
@@ -119,6 +124,7 @@ export class ApiModule {
         InboxController,
         TeamsController,
         ...COMMERCE_API_CONTROLLERS,
+        ...DEVELOPER_API_CONTROLLERS,
       ],
       providers: [
         {
@@ -179,6 +185,7 @@ export class ApiModule {
         CustomerMemoryService,
         AdminMemoryService,
         ...COMMERCE_API_PROVIDERS,
+        ...developerApiProviders(overrides),
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

@@ -64,6 +64,7 @@ export const CreatedApiKey = ApiKey.extend({
   /** The whole key, shown in this response only. Store it in a secret manager. */
   secret: z.string(),
 }).meta({ id: 'CreatedApiKey' });
+export type CreatedApiKey = z.infer<typeof CreatedApiKey>;
 
 export const RotateApiKeyRequest = z
   .object({
@@ -90,6 +91,7 @@ export const ApiKeyIdentity = z
     expiresAt: Timestamp,
   })
   .meta({ id: 'ApiKeyIdentity' });
+export type ApiKeyIdentity = z.infer<typeof ApiKeyIdentity>;
 
 // ── Webhook endpoints ──────────────────────────────────────────────────────────────────────
 
@@ -175,6 +177,7 @@ export const CreatedWebhookEndpoint = WebhookEndpoint.extend({
   /** `whsec_…`, shown in this response only. */
   signingSecret: z.string(),
 }).meta({ id: 'CreatedWebhookEndpoint' });
+export type CreatedWebhookEndpoint = z.infer<typeof CreatedWebhookEndpoint>;
 
 export const UpdateWebhookEndpointRequest = z
   .object({
@@ -202,6 +205,7 @@ export const RotatedWebhookSecret = z
     signingSecret: z.string(),
   })
   .meta({ id: 'RotatedWebhookSecret' });
+export type RotatedWebhookSecret = z.infer<typeof RotatedWebhookSecret>;
 
 // ── Deliveries and events ──────────────────────────────────────────────────────────────────
 
@@ -251,6 +255,7 @@ export const WebhookDeliveryDetail = WebhookDelivery.extend({
   /** Whether the event can still be replayed (it is kept for a limited time). */
   replayable: z.boolean(),
 }).meta({ id: 'WebhookDeliveryDetail' });
+export type WebhookDeliveryDetail = z.infer<typeof WebhookDeliveryDetail>;
 
 export const WebhookDeliveryPage = z.object({
   items: z.array(WebhookDelivery),
@@ -290,6 +295,7 @@ export const TestWebhookResult = z
     verified: z.boolean(),
   })
   .meta({ id: 'TestWebhookResult' });
+export type TestWebhookResult = z.infer<typeof TestWebhookResult>;
 
 export const ReplayFailedRequest = z
   .object({
@@ -323,6 +329,7 @@ export const EgressPolicy = z
     version: z.int().nonnegative(),
   })
   .meta({ id: 'EgressPolicy' });
+export type EgressPolicy = z.infer<typeof EgressPolicy>;
 
 export const SetEgressHostsRequest = z
   .object({

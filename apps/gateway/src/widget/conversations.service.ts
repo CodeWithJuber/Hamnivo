@@ -32,6 +32,7 @@ import { RECONCILE_MIN_SECONDS } from '../authority/reconcile-policy.js';
 import { AuthorityRegistry } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage, publicationFacts } from '../authority/views.js';
+import { EntitlementsService } from '../billing/entitlements.service.js';
 import { AppError } from '../common/app-error.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
@@ -57,6 +58,7 @@ export class WidgetConversationsService {
     private readonly ownership: OwnershipService,
     private readonly outbound: OutboundMessagesService,
     private readonly agents: AgentsService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   private tx<T>(claims: WidgetClaims, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -107,6 +109,8 @@ export class WidgetConversationsService {
     claims: WidgetClaims,
     input: z.output<typeof StartConversationRequest>,
   ): Promise<CustomerConversation> {
+    // The plan's conversations for the period (A08): checked before anything is opened.
+    await this.entitlements.assertCanStartConversation(claims.tenantId);
     const setup = await this.tx(claims, async (tx) => {
       const [inbox] = await tx
         .select()

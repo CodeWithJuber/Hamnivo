@@ -1,10 +1,12 @@
-import type { ErrorCode } from '@hamnivo/contracts';
+import type { ErrorCode, QuotaInfo } from '@hamnivo/contracts';
 
 export interface AppErrorDetails {
   detail?: string;
   fields?: { path: string; message: string }[];
   retryAfter?: number;
   retryable?: boolean;
+  /** Which limit was reached (plan, budget or rate limit). */
+  quota?: QuotaInfo;
   /** Logged for operators, never sent to clients. */
   internal?: unknown;
 }

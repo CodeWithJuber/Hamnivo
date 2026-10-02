@@ -31,6 +31,7 @@ import {
   type PublicationFacts,
   type SourceRef,
 } from '../authority/views.js';
+import { EntitlementsService } from '../billing/entitlements.service.js';
 import { AnswerCache, type AnswerLookup } from '../cache/answers.js';
 import type { SourceRefRow } from '../cache/cache.service.js';
 import { claimedLiveData, conversationLiveData } from '../commerce/answer-cache.js';
@@ -162,6 +163,7 @@ export class RepliesService {
     private readonly language: LanguageService,
     private readonly answers: AnswerCache,
     private readonly memory: MemoryRecallService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -296,6 +298,20 @@ export class RepliesService {
     }
     if (context.stopped) {
       await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_stopped');
+      return;
+    }
+    // Plan limits and the workspace's own AI budget (A08): once used up, people answer instead.
+    const allowance = await this.entitlements.aiAllowance(tenantId);
+    if (!allowance.allowed) {
+      await this.tx(tenantId, (tx) =>
+        this.runs.step(tx, tenantId, run.id, {
+          kind: 'decision',
+          name: 'ai_limit',
+          status: 'ok',
+          detail: { reason: allowance.reason },
+        }),
+      );
+      await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_limit');
       return;
     }
     const history = await this.history(tenantId, runtime, control);
@@ -547,6 +563,13 @@ export class RepliesService {
     if (run.state !== 'running') return;
     if (run.attempts > 1 && (await runtime.authority.findByKey(ref, key, run.startedAt))) {
       await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'drafted' }));
+      return;
+    }
+    // Suggestions spend tokens too: none once the plan or budget is used up.
+    if (!(await this.entitlements.aiAllowance(tenantId)).allowed) {
+      await this.tx(tenantId, (tx) =>
+        this.runs.finish(tx, run.id, { outcome: 'skipped', state: 'skipped' }),
+      );
       return;
     }
     const history = await this.history(tenantId, runtime, control);
@@ -943,10 +966,12 @@ export class RepliesService {
     await this.runs.finish(tx, runId, { outcome, ...telemetry });
     const now = this.clock();
     const entries = [
-      ['ai.tokens.input', telemetry.inputTokens],
-      ['ai.tokens.output', telemetry.outputTokens],
+      ['ai.tokens.input', telemetry.inputTokens, 'token'],
+      ['ai.tokens.output', telemetry.outputTokens, 'token'],
+      // Each reply the customer received counts against the plan's AI replies (A08).
+      ['ai.replies', outcome === 'replied' ? 1 : null, 'reply'],
     ] as const;
-    for (const [meter, quantity] of entries) {
+    for (const [meter, quantity, unit] of entries) {
       if (quantity === null) continue;
       await tx
         .insert(schema.usageEntries)
@@ -954,7 +979,7 @@ export class RepliesService {
           tenantId,
           meter,
           quantity,
-          unit: 'token',
+          unit,
           occurredAt: now,
           dedupeKey: `run:${runId}:${meter}`,
           sourceRef: toPublicId('run', runId),

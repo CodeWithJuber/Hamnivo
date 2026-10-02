@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { Db } from './client.js';
+import { asDate } from './resolvers.js';
 import type { TenantTx } from './tenant.js';
 
 /**
@@ -74,8 +75,8 @@ export async function tenantInvoices(
     id: string;
     number: string;
     period_key: string;
-    period_start: Date;
-    period_end: Date;
+    period_start: string;
+    period_end: string;
     plan_name: string;
     status: TenantInvoiceRow['status'];
     currency: string;
@@ -83,21 +84,21 @@ export async function tenantInvoices(
     total_minor: string;
     lines: Record<string, unknown>[];
     usage: Record<string, number>;
-    issued_at: Date | null;
-    due_at: Date | null;
-    paid_at: Date | null;
-    voided_at: Date | null;
+    issued_at: string | null;
+    due_at: string | null;
+    paid_at: string | null;
+    voided_at: string | null;
     payment_method: TenantInvoiceRow['paymentMethod'];
     payment_state: TenantInvoiceRow['paymentState'];
-    payment_failed_at: Date | null;
-    next_payment_retry_at: Date | null;
+    payment_failed_at: string | null;
+    next_payment_retry_at: string | null;
   }>(sql`select * from app.tenant_invoices(${invoiceId}::uuid)`);
   return rows.map((row) => ({
     id: row.id,
     number: row.number,
     periodKey: row.period_key,
-    periodStart: row.period_start,
-    periodEnd: row.period_end,
+    periodStart: new Date(row.period_start),
+    periodEnd: new Date(row.period_end),
     planName: row.plan_name,
     status: row.status,
     currency: row.currency,
@@ -105,13 +106,13 @@ export async function tenantInvoices(
     totalMinor: BigInt(row.total_minor),
     lines: row.lines,
     usage: row.usage,
-    issuedAt: row.issued_at,
-    dueAt: row.due_at,
-    paidAt: row.paid_at,
-    voidedAt: row.voided_at,
+    issuedAt: asDate(row.issued_at),
+    dueAt: asDate(row.due_at),
+    paidAt: asDate(row.paid_at),
+    voidedAt: asDate(row.voided_at),
     paymentMethod: row.payment_method,
     paymentState: row.payment_state,
-    paymentFailedAt: row.payment_failed_at,
-    nextPaymentRetryAt: row.next_payment_retry_at,
+    paymentFailedAt: asDate(row.payment_failed_at),
+    nextPaymentRetryAt: asDate(row.next_payment_retry_at),
   }));
 }

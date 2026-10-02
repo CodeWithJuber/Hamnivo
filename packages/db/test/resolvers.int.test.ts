@@ -51,6 +51,9 @@ describe('pre-tenant resolvers', () => {
     const key = await resolveApiKey(h.app, a.apiKeyPrefix);
     expect(key?.tenantId).toBe(a.tenantId);
     expect(Buffer.isBuffer(key?.secretHash)).toBe(true);
+    // Timestamps come back as dates (raw queries return them as text), so expiry checks work.
+    expect(key?.expiresAt === null || key?.expiresAt instanceof Date).toBe(true);
+    expect(key?.revokedAt).toBeNull();
     expect(await resolveApiKey(h.app, 'hv_test_missing')).toBeNull();
 
     expect(await resolveWidgetSession(h.app, b.sessionId)).toBe(b.tenantId);
@@ -77,6 +80,9 @@ describe('worker maintenance', () => {
     const first = await claimOutbox(h.app, { limit: 10, leaseSeconds: 60 });
     expect(new Set(first.map((e) => e.tenantId))).toEqual(new Set([a.tenantId, b.tenantId]));
     expect(first.every((e) => e.attempts === 1)).toBe(true);
+    expect(
+      first.every((e) => e.createdAt instanceof Date && !Number.isNaN(e.createdAt.getTime())),
+    ).toBe(true);
     expect(await claimOutbox(h.app, { limit: 10, leaseSeconds: 60 })).toEqual([]);
 
     // Acknowledge inside the owning tenant; another tenant cannot acknowledge it.

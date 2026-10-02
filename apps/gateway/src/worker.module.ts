@@ -15,6 +15,9 @@ import { CommerceWorker } from './commerce/worker.service.js';
 import type { AppConfig } from './config.js';
 import { decisionProviders } from './decisions/decisions.providers.js';
 import { RoutingService } from './decisions/routing.service.js';
+import { type DeveloperOverrides, developerWorkerProviders } from './developer/developer.module.js';
+import { WebhookDispatcher } from './developer/webhooks/dispatcher.service.js';
+import { WEBHOOK_SOURCE_TOPIC, WebhookFanout } from './developer/webhooks/fanout.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
@@ -50,7 +53,7 @@ export function defaultOutboxHandlers(): Map<string, OutboxHandler> {
   ]);
 }
 
-export interface WorkerOverrides extends PlatformOverrides {
+export interface WorkerOverrides extends PlatformOverrides, DeveloperOverrides {
   /** Replaces every outbox handler (tests of the relay itself). */
   handlers?: Map<string, OutboxHandler>;
   /** Replaces every agent's model (tests); agents otherwise use their configured model. */
@@ -101,6 +104,7 @@ export class WorkerModule {
         MemoryIndexService,
         ConversationHistory,
         MemoryExtractionService,
+        ...developerWorkerProviders(overrides),
         RepliesService,
         ...COMMERCE_WORKER_PROVIDERS,
         {
@@ -114,6 +118,7 @@ export class WorkerModule {
             MemoryDeletionService,
             RoutingService,
             CommerceCardsService,
+            WebhookFanout,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -124,6 +129,7 @@ export class WorkerModule {
             deletions: MemoryDeletionService,
             routing: RoutingService,
             cards: CommerceCardsService,
+            webhooks: WebhookFanout,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -145,6 +151,7 @@ export class WorkerModule {
               ['memory.deleted', (event) => deletions.complete(event)],
               ['conversation.route', (event) => routing.onRoute(event)],
               [CARD_TOPIC, (event) => cards.onCardEvent(event)],
+              [WEBHOOK_SOURCE_TOPIC, (event) => webhooks.onSource(event)],
             ]),
         },
         OutboxRelay,
@@ -160,6 +167,7 @@ export class WorkerModule {
         MemoryExtractionService,
         MemoryDeletionService,
         CommerceWorker,
+        WebhookDispatcher,
       ],
     };
   }

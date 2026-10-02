@@ -2,6 +2,14 @@ import { sql } from 'drizzle-orm';
 import type { Db } from './client.js';
 
 /**
+ * Raw queries return timestamps as PostgreSQL text (Drizzle's node-postgres driver turns off the
+ * driver's Date parsing), so resolver results convert them here.
+ */
+export function asDate(value: string | Date | null | undefined): Date | null {
+  return value === null || value === undefined ? null : new Date(value);
+}
+
+/**
  * Typed wrappers for the SECURITY DEFINER functions in schema `app`. They are the only way the
  * application role reads across tenants: pre-tenant lookups (which tenant does this widget, API
  * key, webhook or session belong to?) and worker maintenance. Everything else uses withTenant().
@@ -74,8 +82,8 @@ export async function resolveApiKey(db: Db, prefix: string): Promise<ApiKeyResol
     scopes: string[];
     scope_type: string;
     scope_id: string | null;
-    expires_at: Date | null;
-    revoked_at: Date | null;
+    expires_at: string | null;
+    revoked_at: string | null;
     tenant_status: string;
     service_account_status: string;
   }>(sql`select * from app.resolve_api_key(${prefix})`);
@@ -90,8 +98,8 @@ export async function resolveApiKey(db: Db, prefix: string): Promise<ApiKeyResol
         scopes: row.scopes,
         scopeType: row.scope_type,
         scopeId: row.scope_id,
-        expiresAt: row.expires_at,
-        revokedAt: row.revoked_at,
+        expiresAt: asDate(row.expires_at),
+        revokedAt: asDate(row.revoked_at),
         tenantStatus: row.tenant_status,
         serviceAccountStatus: row.service_account_status,
       }
@@ -175,11 +183,13 @@ export async function resolveInvitation(
   db: Db,
   invitationId: string,
 ): Promise<{ tenantId: string; status: string; expiresAt: Date } | null> {
-  const { rows } = await db.execute<{ tenant_id: string; status: string; expires_at: Date }>(
+  const { rows } = await db.execute<{ tenant_id: string; status: string; expires_at: string }>(
     sql`select * from app.resolve_invitation(${invitationId}::uuid)`,
   );
   const row = rows[0];
-  return row ? { tenantId: row.tenant_id, status: row.status, expiresAt: row.expires_at } : null;
+  return row
+    ? { tenantId: row.tenant_id, status: row.status, expiresAt: new Date(row.expires_at) }
+    : null;
 }
 
 export interface ClaimedOutboxEvent {
@@ -208,7 +218,7 @@ export async function claimOutbox(
     payload: unknown;
     headers: Record<string, unknown>;
     attempts: number;
-    created_at: Date;
+    created_at: string;
   }>(sql`select * from app.claim_outbox(${options.limit}::int, ${options.leaseSeconds}::int)`);
   return rows.map((row) => ({
     tenantId: row.tenant_id,
@@ -219,7 +229,7 @@ export async function claimOutbox(
     payload: row.payload,
     headers: row.headers,
     attempts: row.attempts,
-    createdAt: row.created_at,
+    createdAt: new Date(row.created_at),
   }));
 }
 

@@ -55,6 +55,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@hamnivo/server": "workspace:*",
     "@nestjs/testing": "12.1.0",
     "@swc/core": "1.16.2",
     "@types/html-to-text": "9.0.4",

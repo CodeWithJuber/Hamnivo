@@ -472,6 +472,10 @@ describe('platform billing tables', () => {
     const mine = await inTenant(a, (tx) => tenantInvoices(tx));
     expect(mine.map((i) => [i.periodKey, i.status])).toEqual([['2026-07', 'issued']]);
     expect(mine[0]?.totalMinor).toBe(10_000n);
+    // Raw query results arrive as text; the wrapper returns real dates.
+    expect(mine[0]?.periodStart).toEqual(new Date('2026-07-01T00:00:00Z'));
+    expect(mine[0]?.dueAt).toBeInstanceOf(Date);
+    expect(mine[0]?.paidAt).toBeNull();
     // Without a tenant in the transaction, nothing.
     expect(await h.app.transaction((tx) => tenantInvoices(tx as unknown as TenantTx))).toEqual([]);
     await expectPgError(

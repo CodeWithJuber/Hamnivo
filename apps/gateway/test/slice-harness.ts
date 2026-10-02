@@ -2,6 +2,7 @@ import { createServer } from 'node:net';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
 import type { CacheStore } from '@hamnivo/adapters/cache';
 import { createMockModel } from '@hamnivo/adapters/models';
+import type { Resolver } from '@hamnivo/adapters/net';
 import { type FakeChatwoot, startFakeChatwoot } from '@hamnivo/chatwoot/fake';
 import { closeDb, createDb, type Db } from '@hamnivo/db';
 import type { INestApplicationContext } from '@nestjs/common';
@@ -13,6 +14,7 @@ import { ReconcilerService } from '../src/authority/reconciler.service.js';
 import type { PersonalCacheScope } from '../src/cache/store.js';
 import { CommerceWorker } from '../src/commerce/worker.service.js';
 import { loadConfig } from '../src/config.js';
+import { WebhookDispatcher } from '../src/developer/webhooks/dispatcher.service.js';
 import type { Scanner } from '../src/knowledge/scanner.js';
 import { OutboxRelay } from '../src/outbox/relay.service.js';
 import { WorkerModule } from '../src/worker.module.js';
@@ -59,6 +61,8 @@ export async function startSlice(
     personalCacheScope?: PersonalCacheScope | null;
     /** Extra environment for both processes (e.g. commerce provider settings). */
     env?: Record<string, string>;
+    /** Replaces DNS for outbound webhook requests in both processes (SSRF tests). */
+    egressResolver?: Resolver;
   } = {},
 ): Promise<Slice> {
   const fake = await startFakeChatwoot();
@@ -78,6 +82,7 @@ export async function startSlice(
     ...(options.personalCacheScope !== undefined
       ? { personalCacheScope: options.personalCacheScope }
       : {}),
+    ...(options.egressResolver ? { egressResolver: options.egressResolver } : {}),
   };
   const gw = await startGateway(env, undefined, {
     ...(options.clock ? { clock: options.clock } : {}),
@@ -107,6 +112,7 @@ export async function startSlice(
   await worker.get(InboxProcessor).onApplicationShutdown();
   await worker.get(ReconcilerService).onApplicationShutdown();
   await worker.get(CommerceWorker).onApplicationShutdown();
+  await worker.get(WebhookDispatcher).onApplicationShutdown();
   const app = createDb(gw.database.app, { max: 2 });
   return {
     gw,
