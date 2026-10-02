@@ -1,5 +1,5 @@
 import type { TenantTx } from '@hamnivo/db';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../tokens.js';
 import { EmbeddingFactory } from './embeddings.js';
@@ -25,6 +25,18 @@ export interface SearchInput {
   audience: 'customer' | 'staff';
   query: string;
   limit: number;
+}
+
+/**
+ * Optional cache for query vectors (K02), provided by the cache module. Eligibility and
+ * freshness stay in the search below: a reused vector only finds passages again.
+ */
+export const QUERY_VECTOR_CACHE = Symbol('QUERY_VECTOR_CACHE');
+export interface QueryVectorCache {
+  vector(
+    tx: TenantTx,
+    input: { brandId: string; text: string; model: string; compute: () => Promise<number[]> },
+  ): Promise<number[]>;
 }
 
 /** Candidates per method before fusion. */
@@ -62,13 +74,25 @@ export class RetrievalService {
   constructor(
     private readonly embeddings: EmbeddingFactory,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Optional() @Inject(QUERY_VECTOR_CACHE) private readonly vectors?: QueryVectorCache,
   ) {}
+
+  private async queryVector(tx: TenantTx, input: SearchInput): Promise<number[]> {
+    const compute = async () => (await this.embeddings.embed([input.query]))[0] ?? [];
+    if (!this.vectors) return compute();
+    return this.vectors.vector(tx, {
+      brandId: input.brandId,
+      text: input.query,
+      model: this.embeddings.id,
+      compute,
+    });
+  }
 
   async search(tx: TenantTx, input: SearchInput): Promise<Passage[]> {
     if (input.sourceIds && input.sourceIds.length === 0) return [];
     const words = queryWords(input.query);
-    const [queryVector] = await this.embeddings.embed([input.query]);
-    const vector = `[${(queryVector ?? []).join(',')}]`;
+    const queryVector = await this.queryVector(tx, input);
+    const vector = `[${queryVector.join(',')}]`;
     const now = this.clock().toISOString();
     const { rows } = await tx.execute<{
       chunk_id: string;

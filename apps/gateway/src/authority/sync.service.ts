@@ -1,5 +1,6 @@
 import { type ClaimedOutboxEvent, type Db, schema, withTenant } from '@hamnivo/db';
 import type { OwnerMode } from '@hamnivo/db/schema';
+import type { ActorCredential } from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { APP_DB } from '../tokens.js';
@@ -29,7 +30,8 @@ interface OwnerChanged {
 interface TeamChanged {
   conversationId: string;
   teamId: string | null;
-  actorStaffMemberId: string;
+  /** The staff member who chose the team; null when routing did (J02). */
+  actorStaffMemberId: string | null;
 }
 
 /**
@@ -144,11 +146,14 @@ export class AuthoritySyncService {
         loaded.members.map((m) => String(m.externalUserId)),
       );
     }
-    const actor = await this.staffLinks.ensure(runtime, payload.actorStaffMemberId);
-    await runtime.authority.assignTeam(String(control.externalConversationId), teamRef, {
-      kind: 'staff',
-      userRef: String(actor),
-    });
+    // Routing acts as the integration; a person as their own Chatwoot user.
+    const actor: ActorCredential = payload.actorStaffMemberId
+      ? {
+          kind: 'staff',
+          userRef: String(await this.staffLinks.ensure(runtime, payload.actorStaffMemberId)),
+        }
+      : { kind: 'integration' };
+    await runtime.authority.assignTeam(String(control.externalConversationId), teamRef, actor);
   }
 
   async applyOwnerChange(event: ClaimedOutboxEvent): Promise<void> {

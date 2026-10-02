@@ -8,10 +8,13 @@ import { ReconcilerService } from './authority/reconciler.service.js';
 import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
 import { AuthoritySyncService } from './authority/sync.service.js';
+import { cacheProviders } from './cache/cache.providers.js';
 import { CARD_TOPIC, CommerceCardsService } from './commerce/card-publisher.service.js';
 import { COMMERCE_WORKER_PROVIDERS } from './commerce/commerce.module.js';
 import { CommerceWorker } from './commerce/worker.service.js';
 import type { AppConfig } from './config.js';
+import { decisionProviders } from './decisions/decisions.providers.js';
+import { RoutingService } from './decisions/routing.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
@@ -84,6 +87,8 @@ export class WorkerModule {
         AgentsService,
         RunsService,
         AuthorityContactsService,
+        ...decisionProviders(overrides),
+        ...cacheProviders(overrides),
         EmbeddingFactory,
         RetrievalService,
         { provide: SCANNER, useValue: overrides.scanner ?? scannerFromUrl(config.CLAMAV_URL) },
@@ -107,6 +112,7 @@ export class WorkerModule {
             MemoryExtractionService,
             MemoryIndexService,
             MemoryDeletionService,
+            RoutingService,
             CommerceCardsService,
           ],
           useFactory: (
@@ -116,6 +122,7 @@ export class WorkerModule {
             extraction: MemoryExtractionService,
             index: MemoryIndexService,
             deletions: MemoryDeletionService,
+            routing: RoutingService,
             cards: CommerceCardsService,
           ) =>
             overrides.handlers ??
@@ -136,6 +143,7 @@ export class WorkerModule {
               ['memory.extract', async (event) => void (await extraction.onExtract(event))],
               ['memory.embed', (event) => index.onEmbed(event)],
               ['memory.deleted', (event) => deletions.complete(event)],
+              ['conversation.route', (event) => routing.onRoute(event)],
               [CARD_TOPIC, (event) => cards.onCardEvent(event)],
             ]),
         },

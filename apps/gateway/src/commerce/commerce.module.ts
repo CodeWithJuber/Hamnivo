@@ -1,3 +1,4 @@
+import { CommerceCacheRules } from './answer-cache.js';
 import { CommerceCardsService } from './card-publisher.service.js';
 import { CartsService } from './carts.service.js';
 import { CheckoutService } from './checkout.service.js';
@@ -19,6 +20,8 @@ import { CommerceWorker } from './worker.service.js';
  * platform, secret broker and authority services their modules already provide.
  */
 const shared = [
+  // K06: answers built from commerce data never enter or leave the answer cache.
+  CommerceCacheRules,
   CommerceProviders,
   CommerceCardsService,
   PurchasesService,

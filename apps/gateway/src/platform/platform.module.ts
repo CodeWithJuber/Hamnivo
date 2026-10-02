@@ -1,3 +1,4 @@
+import type { CacheStore } from '@hamnivo/adapters/cache';
 import { closeDb, createDb, type Db } from '@hamnivo/db';
 import {
   type DynamicModule,
@@ -9,6 +10,7 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { Redis } from 'ioredis';
+import type { PersonalCacheScope } from '../cache/store.js';
 import type { AppConfig } from '../config.js';
 import { APP_DB, CLOCK, CONFIG, MAILER, REDIS } from '../tokens.js';
 import { LogMailer, type Mailer, SmtpMailer } from './mailer.js';
@@ -16,6 +18,15 @@ import { LogMailer, type Mailer, SmtpMailer } from './mailer.js';
 export interface PlatformOverrides {
   mailer?: Mailer;
   clock?: () => Date;
+  /** Replaces the transport of the Jev decision provider (tests). */
+  decisionFetch?: typeof fetch;
+  /** Replaces the cache store, for example with one that is down (tests). */
+  cacheStore?: CacheStore;
+  /**
+   * Places entries private to one customer instead of customer memory (tests); `null` turns
+   * per-customer caching off.
+   */
+  personalCacheScope?: PersonalCacheScope | null;
 }
 
 @Injectable()
