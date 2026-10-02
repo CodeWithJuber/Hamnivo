@@ -6,15 +6,70 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@hamnivo/ui/components/dialog';
+import { useAnnouncer } from '@hamnivo/ui/components/live-region';
+import { Separator } from '@hamnivo/ui/components/separator';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClockIcon, ShieldCheckIcon } from 'lucide-react';
-import { useEffect, useSyncExternalStore } from 'react';
+import { ClockIcon, LockIcon, ShieldCheckIcon } from 'lucide-react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { authClient } from '../lib/auth-client';
+import { api } from '../lib/api';
+import { authClient, passkeysAvailable } from '../lib/auth-client';
 import { returnFocus, useOpener } from '../lib/focus';
 import { meQuery } from '../lib/queries';
 import { reauth } from '../lib/reauth';
-import { SignInFlow } from './SignIn';
+import { lastSignInMethod, ssoErrorKey, ssoInPopup } from '../lib/sso';
+import type { Me } from '../lib/types';
+import { PasskeyButton, SignInFlow } from './SignIn';
+
+/**
+ * Signing in again with single sign-on, in a small window so the page stays as it is (A13). Shown
+ * when this browser last signed in that way, or when the address turns out to require it.
+ */
+function SsoAgain({ email, onSignedIn }: { email: string; onSignedIn: () => Promise<void> }) {
+  const { t } = useTranslation();
+  const announce = useAnnouncer();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="flex flex-col gap-2">
+      <Button
+        type="button"
+        variant="secondary"
+        busy={busy}
+        className="w-full"
+        data-testid="reauth-sso"
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          const result = await ssoInPopup(email);
+          setBusy(false);
+          if (result.ok) {
+            reauth.resume();
+            await onSignedIn();
+            return;
+          }
+          if (result.error === 'closed') return;
+          const text =
+            result.error === 'popup_blocked'
+              ? t('sso.popupBlocked')
+              : result.error === 'not_set_up'
+                ? t('sso.notSetUp')
+                : t(`sso.errors.${ssoErrorKey(result.error)}`);
+          setError(text);
+          announce(text, 'assertive');
+        }}
+      >
+        {busy ? null : <LockIcon aria-hidden="true" />}
+        {t('reauthMore.sso')}
+      </Button>
+      {error ? (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Sign-in-again dialog (HNV-02-05). A sensitive action whose sign-in is too old ("step-up") or a
@@ -30,6 +85,7 @@ export function ReauthDialog() {
   const me = useQuery({ ...meQuery(), enabled: false });
   const expired = request?.reason === 'expired';
   const opener = useOpener(request !== null);
+  const [ssoNeeded, setSsoNeeded] = useState(false);
 
   useEffect(() => {
     if (!expired) return;
@@ -41,6 +97,17 @@ export function ReauthDialog() {
 
   if (!request) return null;
   const email = me.data?.user.email;
+  const signedIn = async () => {
+    // A passkey or an identity provider can sign in a different account: never continue the
+    // page as someone else.
+    const current = await api<Me>('/v1/me').catch(() => null);
+    if (email && current && current.user.email.toLowerCase() !== email.toLowerCase()) {
+      await leave();
+      return;
+    }
+    await client.invalidateQueries({ queryKey: ['me'] });
+    reauth.succeed();
+  };
 
   const leave = async () => {
     await authClient.signOut().catch(() => undefined);
@@ -96,11 +163,24 @@ export function ReauthDialog() {
           {...(email ? { fixedEmail: email } : {})}
           submitLabel={expired ? t('auth.reauth.signInAgain') : t('auth.reauth.confirm')}
           showRemember={false}
-          onSignedIn={async () => {
-            await client.invalidateQueries({ queryKey: ['me'] });
-            reauth.succeed();
-          }}
+          onSignedIn={signedIn}
+          onSsoRequired={() => setSsoNeeded(true)}
         />
+        {passkeysAvailable() || (email && (ssoNeeded || lastSignInMethod() === 'sso')) ? (
+          <div className="flex flex-col gap-3" data-testid="reauth-other-ways">
+            <div className="flex items-center gap-3 text-sm text-text-muted">
+              <Separator className="flex-1" />
+              <span>{t('reauthMore.otherWays')}</span>
+              <Separator className="flex-1" />
+            </div>
+            {email && (ssoNeeded || lastSignInMethod() === 'sso') ? (
+              <SsoAgain email={email} onSignedIn={signedIn} />
+            ) : null}
+            {passkeysAvailable() ? (
+              <PasskeyButton onSignedIn={signedIn} label={t('reauthMore.passkey')} />
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
           {expired ? (
             <>

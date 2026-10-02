@@ -22,7 +22,8 @@ export default defineConfig({
   use: {
     ...devices['Desktop Chrome'],
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
-    baseURL: `http://127.0.0.1:${consolePort}`,
+    // A host name, not an IP address: passkeys (WebAuthn) refuse IP addresses.
+    baseURL: `http://localhost:${consolePort}`,
     trace: 'retain-on-failure',
   },
   webServer: {

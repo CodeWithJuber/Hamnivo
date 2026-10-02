@@ -14,6 +14,12 @@ export interface Stack {
   apiBase: string;
   widgetOrigin: string;
   databaseUrl: string;
+  /** The database owner's connection (appointing platform operators, A17). */
+  ownerDatabaseUrl: string;
+  /** The OpenID Connect provider for single sign-on (A13). */
+  idp: { issuer: string; clientId: string; clientSecret: string };
+  /** TXT records the stack's DNS server answers with: {"name": ["value"]}. */
+  dnsRecords: string;
 }
 
 export const stack = (): Stack =>
@@ -59,6 +65,37 @@ export class Staff {
       .join('; ');
     expect(response.ok && cookie.length > 0, `sign-up returned ${response.status}`).toBe(true);
     return new Staff(email, cookie);
+  }
+
+  /**
+   * Signs in again with password and a TOTP code (a person with two-factor authentication), for a
+   * fresh session; the workspace choice carries over.
+   */
+  async signInWithTotp(code: string): Promise<Staff> {
+    const post = (path: string, body: unknown, cookie?: string) =>
+      fetch(`${stack().apiBase}${path}`, {
+        method: 'POST',
+        headers: {
+          origin: stack().studioUrl,
+          'content-type': 'application/json',
+          ...(cookie ? { cookie } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+    const cookiesOf = (response: Response) =>
+      response.headers
+        .getSetCookie()
+        .map((c) => c.split(';')[0] ?? '')
+        .filter((pair) => pair.includes('=') && !pair.endsWith('='))
+        .join('; ');
+    const first = await post('/api/auth/sign-in/email', { email: this.email, password: PASSWORD });
+    const challenge = cookiesOf(first);
+    const second = await post('/api/auth/two-factor/verify-totp', { code }, challenge);
+    const cookie = cookiesOf(second);
+    expect(second.ok && cookie.length > 0, `TOTP sign-in returned ${second.status}`).toBe(true);
+    const fresh = new Staff(this.email, cookie);
+    fresh.tenantId = this.tenantId;
+    return fresh;
   }
 
   async call<T>(method: string, path: string, body?: unknown): Promise<T> {

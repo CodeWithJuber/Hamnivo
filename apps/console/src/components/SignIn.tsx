@@ -9,6 +9,7 @@ import { type FormEvent, type ReactNode, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { authClient, passkeysAvailable } from '../lib/auth-client';
 import { reauth } from '../lib/reauth';
+import { rememberSignInMethod } from '../lib/sso';
 import { CheckboxField, describedBy } from './Fields';
 
 const REMEMBER_KEY = 'hamnivo.studio.remember';
@@ -159,6 +160,7 @@ export function SignInFlow({
   onStepChange,
   footer,
   showCodeTitle = true,
+  onSsoRequired,
 }: {
   idPrefix: string;
   fixedEmail?: string;
@@ -169,6 +171,8 @@ export function SignInFlow({
   footer?: ReactNode;
   /** The sign-in page names the code step in its own heading instead. */
   showCodeTitle?: boolean;
+  /** The address must use single sign-on (A13): offer it instead of the password. */
+  onSsoRequired?: (email: string) => void;
 }) {
   const { t } = useTranslation();
   const announce = useAnnouncer();
@@ -201,11 +205,29 @@ export function SignInFlow({
     setPassword('');
     setCode('');
     reauth.resume();
+    rememberSignInMethod('password');
     await onSignedIn();
   };
 
   const signInError = (error: AuthResultError) => {
     if (error.status === 429) return fail(t('auth.rateLimited'));
+    if (error.code === 'SSO_REQUIRED') {
+      setPassword('');
+      return fail(
+        t('sso.required'),
+        onSsoRequired ? (
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto self-start p-0"
+            onClick={() => onSsoRequired(email.trim())}
+            data-testid="sso-required-continue"
+          >
+            {t('sso.short')}
+          </Button>
+        ) : undefined,
+      );
+    }
     if (error.code === 'EMAIL_NOT_VERIFIED') {
       return fail(
         t('auth.signIn.notVerified'),
@@ -457,7 +479,13 @@ export function SignInFlow({
 }
 
 /** Passkey sign-in (the gateway's passkey plugin); shown only where the browser supports it. */
-export function PasskeyButton({ onSignedIn }: { onSignedIn: () => void | Promise<void> }) {
+export function PasskeyButton({
+  onSignedIn,
+  label,
+}: {
+  onSignedIn: () => void | Promise<void>;
+  label?: string;
+}) {
   const { t } = useTranslation();
   const announce = useAnnouncer();
   const [busy, setBusy] = useState(false);
@@ -476,11 +504,17 @@ export function PasskeyButton({ onSignedIn }: { onSignedIn: () => void | Promise
           try {
             const result = await authClient.signIn.passkey();
             if (result?.error) {
-              setError(t('auth.signIn.passkeyFailed'));
-              announce(t('auth.signIn.passkeyFailed'), 'assertive');
+              // An address that must use single sign-on can't use a passkey either (A13).
+              const text =
+                'code' in result.error && result.error.code === 'SSO_REQUIRED'
+                  ? t('sso.required')
+                  : t('auth.signIn.passkeyFailed');
+              setError(text);
+              announce(text, 'assertive');
               return;
             }
             reauth.resume();
+            rememberSignInMethod('passkey');
             await onSignedIn();
           } catch {
             setError(t('auth.signIn.passkeyFailed'));
@@ -490,7 +524,7 @@ export function PasskeyButton({ onSignedIn }: { onSignedIn: () => void | Promise
         }}
       >
         {busy ? null : <FingerprintIcon aria-hidden="true" />}
-        {t('auth.signIn.passkey')}
+        {label ?? t('auth.signIn.passkey')}
       </Button>
       {error ? (
         <p role="alert" className="text-sm text-danger">
