@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import type {
   ActorCredential,
   AppendMessageInput,
+  AuthorityAttachment,
   AuthorityCapabilities,
   AuthorityContact,
   AuthorityConversationState,
@@ -17,8 +18,11 @@ import type {
   EnsuredContact,
   StaffInboxAuthority,
 } from '@hamnivo/domain';
-import { type ChatwootClient, call, createChatwootClient } from './client.js';
-import { timeOf, toConversation, toMessage } from './mapping.js';
+import { type ChatwootClient, ChatwootError, call, createChatwootClient } from './client.js';
+import { BLOB_PATH, timeOf, toConversation, toMessage } from './mapping.js';
+
+/** The largest attachment the adapter downloads (Chatwoot's own limit is 40 MB). */
+const DOWNLOAD_MAX_BYTES = 40 * 1024 * 1024;
 
 export interface ChatwootInbox {
   /** Client API inbox identifier. */
@@ -68,6 +72,9 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
     ownerCas: false,
     multiContact: false,
     customerEdits: false,
+    customerDeletes: true,
+    reactions: false,
+    staffReadReceipts: true,
   };
 
   private readonly clients = new Map<string, ChatwootClient>();
@@ -226,7 +233,7 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
           ? { kind: 'staff', userRef: input.author.userRef }
           : { kind: 'integration' };
     const client = await this.as(actor);
-    const body = {
+    const body: Record<string, unknown> = {
       content: input.text,
       message_type: input.author.kind === 'customer' ? 'incoming' : 'outgoing',
       private: input.visibility === 'private',
@@ -243,10 +250,99 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
       'createMessage',
       client.POST('/api/v1/accounts/{account_id}/conversations/{conversation_id}/messages', {
         params: { path: this.conversationPath(input.conversationRef) },
-        body: body as never,
+        body: (input.attachments?.length ? multipart(body, input.attachments) : body) as never,
       }) as never,
     );
     return { message: toMessage(created, input.conversationRef), created: true };
+  }
+
+  async deleteMessage(
+    conversationRef: string,
+    messageRef: string,
+    actor: ActorCredential,
+  ): Promise<void> {
+    const client = await this.as(actor);
+    await call(
+      'deleteMessage',
+      client.DELETE(
+        '/api/v1/accounts/{account_id}/conversations/{conversation_id}/messages/{message_id}',
+        {
+          params: {
+            path: { ...this.conversationPath(conversationRef), message_id: Number(messageRef) },
+          },
+        },
+      ) as never,
+    );
+  }
+
+  async markSeenByContact(
+    conversationRef: string,
+    contact: { contactSourceId: string; inboxRef: string },
+  ): Promise<void> {
+    const inbox = await this.options.inbox(contact.inboxRef);
+    await call(
+      'updateContactLastSeen',
+      this.publicClient.POST(
+        '/public/api/v1/inboxes/{inbox_identifier}/contacts/{contact_identifier}/conversations/{conversation_id}/update_last_seen',
+        {
+          params: {
+            path: {
+              inbox_identifier: inbox.identifier,
+              contact_identifier: contact.contactSourceId,
+              conversation_id: Number(conversationRef),
+            },
+          },
+          // Chatwoot answers `head :ok`.
+          parseAs: 'text',
+        },
+      ) as never,
+    );
+  }
+
+  /**
+   * Reads an attachment through ActiveStorage's proxy route on this Chatwoot's own address. Only
+   * the signed blob id and file name are taken from the stored URL; its host is never contacted,
+   * and redirects are refused, so a download cannot be steered anywhere else.
+   */
+  async downloadAttachment(
+    attachment: AuthorityAttachment,
+  ): Promise<{ bytes: Uint8Array; contentType: string | null }> {
+    let path: string;
+    try {
+      path = new URL(attachment.url ?? '').pathname;
+    } catch {
+      throw new ChatwootError('downloadAttachment', 404, 'The attachment has no file.');
+    }
+    const match = BLOB_PATH.exec(path);
+    if (!match) throw new ChatwootError('downloadAttachment', 404, 'Not a Chatwoot file.');
+    const url = `${this.options.baseUrl.replace(/\/$/, '')}/rails/active_storage/blobs/proxy/${match[1]}/${match[2]}`;
+    let response: Response;
+    try {
+      response = await (this.options.fetch ?? globalThis.fetch)(url, {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(this.options.timeoutMs ?? 30_000),
+      });
+    } catch (error) {
+      throw new ChatwootError(
+        'downloadAttachment',
+        0,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    if (response.status !== 200) {
+      await response.body?.cancel();
+      throw new ChatwootError('downloadAttachment', response.status, null);
+    }
+    const declared = Number(response.headers.get('content-length'));
+    if (Number.isFinite(declared) && declared > DOWNLOAD_MAX_BYTES) {
+      await response.body?.cancel();
+      throw new ChatwootError('downloadAttachment', 413, 'The file is too large.');
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength > DOWNLOAD_MAX_BYTES) {
+      throw new ChatwootError('downloadAttachment', 413, 'The file is too large.');
+    }
+    return { bytes, contentType: response.headers.get('content-type') };
   }
 
   async findByKey(
@@ -586,4 +682,30 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
       ) as never,
     );
   }
+}
+
+/**
+ * A message with files as multipart form data. Chatwoot parses `content_attributes` sent as a JSON
+ * string (verified on v4.18.0), so nested values keep their types.
+ */
+function multipart(
+  fields: Record<string, unknown>,
+  files: NonNullable<AppendMessageInput['attachments']>,
+): FormData {
+  const form = new FormData();
+  for (const [name, value] of Object.entries(fields)) {
+    if (value === undefined) continue;
+    form.append(
+      name,
+      typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value),
+    );
+  }
+  for (const file of files) {
+    form.append(
+      'attachments[]',
+      new Blob([Buffer.from(file.bytes)], { type: file.mimeType }),
+      file.name,
+    );
+  }
+  return form;
 }

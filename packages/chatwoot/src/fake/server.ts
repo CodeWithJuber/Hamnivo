@@ -89,6 +89,9 @@ interface Conversation {
   waitingSince: number | null;
   /** Unix seconds; set while snoozed with a time. */
   snoozedUntil: number | null;
+  /** Unix seconds when an agent last opened the conversation (update_last_seen). */
+  agentLastSeenAt: number | null;
+  contactLastSeenAt: number | null;
 }
 interface Label {
   id: number;
@@ -112,6 +115,16 @@ interface CannedResponse {
   shortCode: string;
   content: string;
 }
+interface Attachment {
+  id: number;
+  accountId: number;
+  fileType: 'image' | 'audio' | 'video' | 'file';
+  contentType: string;
+  name: string;
+  /** Stands in for ActiveStorage's signed blob id. */
+  signedId: string;
+  bytes: Buffer;
+}
 interface Message {
   id: number;
   accountId: number;
@@ -125,6 +138,8 @@ interface Message {
   senderId: number | null;
   createdAt: number;
   externalCreatedAt: number | null;
+  attachments: Attachment[];
+  status: 'sent' | 'delivered' | 'read' | 'failed';
 }
 
 export interface ChaosOptions {
@@ -231,6 +246,26 @@ function mulberry32(seed: number): () => number {
 
 const token = (bytes = 18) => randomBytes(bytes).toString('base64url');
 
+/** Text fields of a multipart message, typed as Chatwoot's parameter parsing would type them. */
+function formFields(form: FormData): Json {
+  const fields: Json = {};
+  for (const [name, value] of form.entries()) {
+    if (typeof value !== 'string' || name === 'attachments[]') continue;
+    if (name === 'content_attributes') {
+      try {
+        fields[name] = JSON.parse(value);
+      } catch {
+        fields[name] = {};
+      }
+    } else if (name === 'sender_id' || name === 'external_created_at') {
+      fields[name] = Number(value);
+    } else {
+      fields[name] = value;
+    }
+  }
+  return fields;
+}
+
 type Principal = { kind: 'user'; user: User } | { kind: 'bot'; bot: Bot };
 
 class FakeState {
@@ -275,9 +310,21 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
   let pumping: Promise<void> | null = null;
   let paused = false;
   let responseFault: ((method: string, url: string) => number | null) | null = null;
+  /** Chatwoot's FRONTEND_URL: the address in the file URLs it hands out. */
+  let listening = '';
+  const publicUrl = () => listening;
   let requestHook: ((method: string, url: string) => Promise<void> | void) | null = null;
 
-  const app = Fastify({ logger: false });
+  const app = Fastify({ logger: false, bodyLimit: 50 * 1024 * 1024 });
+  // Messages with files arrive as multipart form data, like Chatwoot's dashboard sends them.
+  app.addContentTypeParser('multipart/form-data', { parseAs: 'buffer' }, (request, body, done) => {
+    new Response(new Uint8Array(body as Buffer), {
+      headers: { 'content-type': String(request.headers['content-type']) },
+    })
+      .formData()
+      .then((form) => done(null, form))
+      .catch((error: Error) => done(error, undefined));
+  });
   app.addHook('preHandler', async (request) => {
     await requestHook?.(request.method, request.url);
   });
@@ -349,6 +396,27 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
 
   const conversationOf = (m: Message) => s.conversations.get(m.conversationId) as Conversation;
 
+  /** Like Chatwoot's attachment JSON: no file name, which only the blob URL carries. */
+  const attachmentJson = (m: Message, a: Attachment) => {
+    const name = encodeURIComponent(a.name);
+    return {
+      id: a.id,
+      message_id: m.id,
+      file_type: a.fileType,
+      account_id: a.accountId,
+      extension: a.name.includes('.') ? a.name.split('.').pop() : null,
+      content_type: a.contentType,
+      data_url: `${publicUrl()}/rails/active_storage/blobs/redirect/${a.signedId}/${name}`,
+      thumb_url:
+        a.fileType === 'image'
+          ? `${publicUrl()}/rails/active_storage/representations/redirect/${a.signedId}/x/${name}`
+          : '',
+      file_size: a.bytes.length,
+      width: null,
+      height: null,
+    };
+  };
+
   function messageApi(m: Message): Json {
     const conversation = conversationOf(m);
     return {
@@ -358,12 +426,15 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       conversation_id: conversation.displayId,
       message_type: m.messageType,
       content_type: 'text',
-      status: 'sent',
+      status: m.status,
       content_attributes: m.contentAttributes,
       created_at: Math.floor(m.createdAt),
       private: m.private,
       source_id: m.sourceId,
       sender: senderOf(m, false),
+      ...(m.attachments.length > 0
+        ? { attachments: m.attachments.map((a) => attachmentJson(m, a)) }
+        : {}),
     };
   }
 
@@ -408,10 +479,10 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       account_id: c.accountId,
       uuid: c.uuid,
       additional_attributes: {},
-      agent_last_seen_at: 0,
+      agent_last_seen_at: Math.floor(c.agentLastSeenAt ?? 0),
       assignee_last_seen_at: 0,
       can_reply: true,
-      contact_last_seen_at: 0,
+      contact_last_seen_at: Math.floor(c.contactLastSeenAt ?? 0),
       custom_attributes: c.customAttributes,
       inbox_id: c.inboxId,
       labels: c.labels,
@@ -458,8 +529,8 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       first_reply_created_at: null,
       priority: null,
       waiting_since: c.waitingSince ? Math.floor(c.waitingSince) : 0,
-      agent_last_seen_at: 0,
-      contact_last_seen_at: 0,
+      agent_last_seen_at: Math.floor(c.agentLastSeenAt ?? 0),
+      contact_last_seen_at: Math.floor(c.contactLastSeenAt ?? 0),
       last_activity_at: Math.floor(last?.createdAt ?? c.createdAt),
       timestamp: Math.floor(last?.createdAt ?? c.createdAt),
       created_at: Math.floor(c.createdAt),
@@ -485,6 +556,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       private: m.private,
       sender: senderOf(m, true),
       source_id: m.sourceId,
+      ...(m.attachments.length > 0
+        ? { attachments: m.attachments.map((a) => attachmentJson(m, a)) }
+        : {}),
     };
   }
 
@@ -1121,7 +1195,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
           labels: conversation.labels,
           additional_attributes: {},
           contact: contactApi(contact),
-          agent_last_seen_at: null,
+          agent_last_seen_at: conversation.agentLastSeenAt
+            ? new Date(conversation.agentLastSeenAt * 1000).toISOString()
+            : null,
           assignee_last_seen_at: null,
         },
         payload: page.map(messageApi),
@@ -1133,7 +1209,11 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     '/api/v1/accounts/:account_id/conversations/:conversation_id/messages',
     async (request) => {
       const { principal, conversation } = conversationAccess(request, 'messages#create');
-      const input = body(request);
+      const form = request.body instanceof FormData ? request.body : null;
+      const input = form ? formFields(form) : body(request);
+      const files = form
+        ? form.getAll('attachments[]').filter((f): f is File => typeof f !== 'string')
+        : [];
       const requested = String(input.message_type ?? 'outgoing');
       const messageType =
         requested === 'incoming'
@@ -1175,7 +1255,27 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         createdAt: s.clock(),
         externalCreatedAt:
           typeof input.external_created_at === 'number' ? input.external_created_at : null,
+        attachments: [],
+        status: 'sent',
       };
+      for (const file of files) {
+        const contentType = file.type || 'application/octet-stream';
+        message.attachments.push({
+          id: s.nextId(),
+          accountId: conversation.accountId,
+          fileType: contentType.startsWith('image/')
+            ? 'image'
+            : contentType.startsWith('audio/')
+              ? 'audio'
+              : contentType.startsWith('video/')
+                ? 'video'
+                : 'file',
+          contentType,
+          name: file.name,
+          signedId: `${randomBytes(24).toString('base64url')}--${randomBytes(20).toString('hex')}`,
+          bytes: Buffer.from(await file.arrayBuffer()),
+        });
+      }
       s.messages.set(message.id, message);
       // Incoming messages reopen resolved or snoozed conversations (pending again when a bot is active).
       let statusChanged = false;
@@ -1324,6 +1424,31 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
   );
 
+  app.delete(
+    '/api/v1/accounts/:account_id/conversations/:conversation_id/messages/:message_id',
+    async (request) => {
+      const { conversation } = conversationAccess(request, 'messages#destroy');
+      const message = s.messages.get(Number((request.params as Json).message_id));
+      if (!message || message.conversationId !== conversation.id) throw notFound();
+      // Like Chatwoot: the text is replaced, the files are removed, a marker stays.
+      message.content = 'This message was deleted';
+      message.contentAttributes = { deleted: true };
+      message.attachments = [];
+      emit(conversation.accountId, 'message_updated', messageWebhook(message), conversation);
+      return messageApi(message);
+    },
+  );
+
+  app.post(
+    '/api/v1/accounts/:account_id/conversations/:conversation_id/update_last_seen',
+    async (request, reply: FastifyReply) => {
+      const { conversation } = conversationAccess(request, 'conversations#update_last_seen');
+      // Chatwoot updates the column directly: no webhook, and updated_at stays as it was.
+      conversation.agentLastSeenAt = Date.now() / 1000;
+      return reply.code(200).send();
+    },
+  );
+
   // ---------------------------------------------------------------- Client (public) API
 
   function inboxByIdentifier(request: FastifyRequest): Inbox {
@@ -1426,6 +1551,8 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         updatedAt: now,
         waitingSince: now,
         snoozedUntil: null,
+        agentLastSeenAt: null,
+        contactLastSeenAt: null,
       };
       s.conversations.set(conversation.id, conversation);
       emit(
@@ -1455,6 +1582,29 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
   );
 
+  app.post(
+    '/public/api/v1/inboxes/:inbox_identifier/contacts/:contact_identifier/conversations/:conversation_id/update_last_seen',
+    async (request, reply: FastifyReply) => {
+      const inbox = inboxByIdentifier(request);
+      const params = request.params as Json;
+      const contactInbox = contactInboxOf(inbox, String(params.contact_identifier));
+      const conversation = [...s.conversations.values()].find(
+        (c) =>
+          c.contactInboxId === contactInbox.id && c.displayId === Number(params.conversation_id),
+      );
+      if (!conversation) throw notFound();
+      const seenAt = Date.now() / 1000;
+      conversation.contactLastSeenAt = seenAt;
+      // Agent messages sent before now become read (Conversations::UpdateMessageStatusJob).
+      for (const m of messagesOf(conversation)) {
+        if (m.messageType !== 0 && (m.status === 'sent' || m.status === 'delivered')) {
+          m.status = 'read';
+        }
+      }
+      return reply.code(200).send();
+    },
+  );
+
   app.get(
     '/public/api/v1/inboxes/:inbox_identifier/contacts/:contact_identifier/conversations/:conversation_id/messages',
     async (request) => {
@@ -1481,7 +1631,36 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
   );
 
+  // ---------------------------------------------------------------- ActiveStorage
+
+  const attachmentBySigned = (signed: string) => {
+    for (const message of s.messages.values()) {
+      const found = message.attachments.find((a) => a.signedId === signed);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  // The URL Chatwoot hands out redirects to the storage service; the proxy route serves the bytes.
+  app.get('/rails/active_storage/blobs/redirect/:signed/:filename', async (request, reply) => {
+    const params = request.params as Json;
+    const found = attachmentBySigned(String(params.signed));
+    if (!found) throw notFound();
+    return reply.redirect(
+      `/rails/active_storage/disk/${found.signedId}/${String(params.filename)}`,
+    );
+  });
+  app.get('/rails/active_storage/blobs/proxy/:signed/:filename', async (request, reply) => {
+    const found = attachmentBySigned(String((request.params as Json).signed));
+    if (!found) throw notFound();
+    return reply
+      .header('content-type', found.contentType)
+      .header('content-disposition', `inline; filename="${found.name}"`)
+      .send(found.bytes);
+  });
+
   const address = await app.listen({ host: options.host ?? '127.0.0.1', port: options.port ?? 0 });
+  listening = address.replace('0.0.0.0', '127.0.0.1');
 
   async function flush() {
     while (pumping || (!paused && queue.length > 0)) {

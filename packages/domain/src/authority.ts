@@ -12,6 +12,15 @@ export interface AuthorityCapabilities {
   multiContact: boolean;
   /** Customers can edit sent messages. */
   customerEdits: boolean;
+  /**
+   * A customer's message can be deleted on their behalf (the authority keeps a "deleted" marker
+   * and drops the text and files). Chatwoot: yes, through the integration user.
+   */
+  customerDeletes: boolean;
+  /** Native message reactions (Chatwoot CE: no, so a reaction travels as a short quoted reply). */
+  reactions: boolean;
+  /** The authority reports when staff last saw a conversation (Chatwoot: agent_last_seen_at). */
+  staffReadReceipts: boolean;
 }
 
 export type ConversationStatus = 'open' | 'pending' | 'resolved' | 'snoozed';
@@ -40,6 +49,8 @@ export interface AuthorityConversationState {
   version: number;
   /** When a snoozed conversation opens again; null when it waits for the customer. */
   snoozedUntil?: Date | null;
+  /** When staff last looked at the conversation, where the authority reports it. */
+  staffLastSeenAt?: Date | null;
 }
 
 export type AuthorityMessageDirection = 'incoming' | 'outgoing' | 'activity' | 'template';
@@ -52,10 +63,26 @@ export type AuthoritySender =
 
 export interface AuthorityAttachment {
   ref: string;
+  /** image, file, audio, video, location, contact… */
   fileType: string;
   url: string | null;
   size: number | null;
   name: string | null;
+  /** The content type the authority stored, when it says. */
+  mimeType?: string | null;
+  /** Shared places (fileType `location`). */
+  coordinates?: { latitude: number; longitude: number } | null;
+  /** The authority's text for places and contacts (a place name, a phone number). */
+  fallbackTitle?: string | null;
+  /** Extra values the authority keeps, such as a shared contact's names. */
+  meta?: Record<string, unknown>;
+}
+
+/** A file to send with a message (already type-checked and scanned by the caller). */
+export interface OutgoingAttachment {
+  name: string;
+  mimeType: string;
+  bytes: Uint8Array;
 }
 
 export interface AuthorityMessage {
@@ -88,6 +115,8 @@ export interface AppendMessageInput {
   contentAttributes?: Record<string, unknown>;
   /** Original time for imported history. */
   externalCreatedAt?: Date;
+  /** Files that travel with the message; the authority owns them afterwards. */
+  attachments?: OutgoingAttachment[];
 }
 
 export interface EnsureContactInput {
@@ -171,6 +200,23 @@ export interface ConversationAuthority {
     actor: ActorCredential,
   ): Promise<void>;
   typing(conversationRef: string, on: boolean, actor: ActorCredential): Promise<void>;
+  /**
+   * Deletes a message: its text and files are removed and it stays as a "deleted" marker. Only
+   * when `capabilities.customerDeletes`; callers check who may delete what.
+   */
+  deleteMessage(conversationRef: string, messageRef: string, actor: ActorCredential): Promise<void>;
+  /** Records that the contact saw the conversation, so staff see their replies as read. */
+  markSeenByContact(
+    conversationRef: string,
+    contact: { contactSourceId: string; inboxRef: string },
+  ): Promise<void>;
+  /**
+   * The bytes of an attachment from a message listed by this authority. Only the authority's own
+   * address is ever fetched; anything else is refused.
+   */
+  downloadAttachment(
+    attachment: AuthorityAttachment,
+  ): Promise<{ bytes: Uint8Array; contentType: string | null }>;
 }
 
 /** Message keys Hamnivo writes: `hv1:m:` customer/staff messages, `hv1:p:` AI publications. */

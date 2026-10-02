@@ -28,6 +28,27 @@ from `@hamnivo/domain`.
 - Bot tokens can post messages and change conversations, but cannot list messages. Reads use the
   integration user.
 
+### Files, deletion and read markers
+
+- A message with files is `multipart/form-data` with `attachments[]`. `content_attributes` sent
+  as a JSON string keeps its types; bracket fields (`content_attributes[hv][v]`) turn numbers
+  into strings.
+- Attachment JSON has no file name. The name is the last segment of `data_url`, an
+  ActiveStorage `/blobs/redirect/{signed id}/{name}` URL on Chatwoot's `FRONTEND_URL`. The
+  customer view (Client API) may list a message's files in another order than the response that
+  created it.
+- `downloadAttachment` reads `/rails/active_storage/blobs/proxy/{signed id}/{name}` on the
+  connection's own base URL, with redirects refused. Only the signed id and name are taken from
+  `data_url`; its host is never contacted.
+- `DELETE …/messages/{id}` (the integration user, or an agent of the inbox) keeps a marker:
+  the content becomes "This message was deleted", `content_attributes` becomes `{deleted: true}`,
+  the files are removed, and `message_updated` is sent.
+- Staff opening a conversation (`POST …/conversations/{id}/update_last_seen`) sets
+  `agent_last_seen_at` (Unix seconds on the conversation, 0 before; ISO in message-list `meta`).
+  Chatwoot writes the column directly: no webhook, and `updated_at` does not move.
+- The Client API's `update_last_seen` records that the contact saw the conversation and marks
+  agent messages sent before then as `read`.
+
 ### Contacts and identity
 
 - Contacts are created through the Client API with `identifier_hash = HMAC(inbox hmac_token,
