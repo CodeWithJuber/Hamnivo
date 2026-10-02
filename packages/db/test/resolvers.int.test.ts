@@ -4,6 +4,8 @@ import {
   claimIntegrationInbox,
   claimOutbox,
   claimReconcileCursors,
+  closeDb,
+  createDb,
   ensureReconcileCursors,
   purgeExpired,
   purgeMigrationFiles,
@@ -192,5 +194,59 @@ describe('worker maintenance', () => {
       expect.objectContaining({ scope: 'conversation', scopeRef: '11', lastExternalId: 41 }),
     ]);
     expect(await ensureReconcileCursors(h.app)).toBe(0);
+  });
+});
+
+// Runs last: it leases every due event, which the tests above count on finding.
+describe('lease order', () => {
+  it('hands out events in the order they were recorded, whatever plan the database picks', async () => {
+    // The later rows are stored first, so the table's physical order is the reverse of the
+    // recorded order. A hash join returns rows in physical order unless they are sorted.
+    const earlier = '01800000-0000-7000-8000-000000000001';
+    const later = '01800000-0000-7000-8000-000000000002';
+    const dueAt = new Date(Date.now() - 60_000);
+    for (const id of [later, earlier]) {
+      await withTenant(h.app, { tenantId: a.tenantId }, async (tx) => {
+        await tx.insert(schema.outboxEvents).values({
+          id,
+          tenantId: a.tenantId,
+          topic: 'test.order',
+          aggregateType: 'conversation',
+          aggregateId: 'c1',
+          payload: {},
+          availableAt: dueAt,
+        });
+        await tx.insert(schema.integrationInbox).values({
+          id,
+          tenantId: a.tenantId,
+          connectionId: a.connectionId,
+          source: 'account',
+          dedupeKey: `order-test:${id}`,
+          eventType: 'test.order',
+          payload: {},
+          availableAt: dueAt,
+        });
+      });
+    }
+    const hashJoins = createDb(
+      `${h.database.app}${h.database.app.includes('?') ? '&' : '?'}options=${encodeURIComponent(
+        '-c enable_nestloop=off -c enable_mergejoin=off',
+      )}`,
+      { max: 1 },
+    );
+    try {
+      const outbox = await claimOutbox(hashJoins, { limit: 50, leaseSeconds: 60 });
+      expect(outbox.filter((e) => e.topic === 'test.order').map((e) => e.id)).toEqual([
+        earlier,
+        later,
+      ]);
+      const inbox = await claimIntegrationInbox(hashJoins, { limit: 50, leaseSeconds: 60 });
+      expect(inbox.map((e) => e.id).filter((id) => id === earlier || id === later)).toEqual([
+        earlier,
+        later,
+      ]);
+    } finally {
+      await closeDb(hashJoins);
+    }
   });
 });
