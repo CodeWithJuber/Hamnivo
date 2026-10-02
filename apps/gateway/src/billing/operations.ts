@@ -249,8 +249,9 @@ export class BillingOperations {
 
   /**
    * Drafts one invoice per tenant with a plan for a finished period: the plan price and metered
-   * usage beyond what it includes. A tenant that already has a (not voided) invoice for the
-   * period is skipped, so running this twice creates nothing new.
+   * usage beyond what it includes. Only tenants whose plan was assigned before the period ended
+   * are billed for it (a whole period, without proration). A tenant that already has a (not
+   * voided) invoice for the period is skipped, so running this twice creates nothing new.
    */
   async generateInvoices(periodKey: string) {
     const period = periodFromKey(periodKey);
@@ -262,6 +263,8 @@ export class BillingOperations {
     const created: InvoiceRow[] = [];
     for (const entitlement of entitled) {
       if (!entitlement.planKey || !entitlement.planName || !entitlement.currency) continue;
+      // Assigned after the period: it had no plan then, so nothing is owed for it.
+      if (!entitlement.assignedAt || entitlement.assignedAt >= period.end) continue;
       const [existing] = await this.platform
         .select({ id: schema.invoices.id })
         .from(schema.invoices)

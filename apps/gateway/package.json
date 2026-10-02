@@ -13,6 +13,7 @@
     "dev": "tsc -p tsconfig.build.json && node --env-file-if-exists=../../.env.local --watch-path=dist dist/main.api.js",
     "start:api": "node --env-file-if-exists=../../.env.local dist/main.api.js",
     "start:worker": "node --env-file-if-exists=../../.env.local dist/main.worker.js",
+    "billing": "node --env-file-if-exists=../../.env.local dist/main.billing.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:int": "vitest run --config vitest.int.config.ts"

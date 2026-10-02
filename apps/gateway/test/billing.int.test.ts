@@ -256,8 +256,18 @@ describe('plans and limits', () => {
 
 describe('invoices', () => {
   const last = previousPeriod(periodOf(new Date()));
+  /** The operator 100 days ago: a plan assigned then covers the last two months. */
+  const earlier = () =>
+    new BillingOperations({
+      platform,
+      app: slice.app,
+      operator: 'ops@hamnivo',
+      dueDays: 14,
+      clock: () => new Date(Date.now() - 100 * 86_400_000),
+    });
 
   it('drafts invoices from metered usage, shows them once issued, and records payment', async () => {
+    // Assigned today, the plan did not cover last month, so nothing is owed for it.
     await operations.assignPlan(shop.tenantId, 'starter');
     await withTenant(slice.app, { tenantId: tenantId() }, (tx) =>
       tx.insert(schema.usageEntries).values([
@@ -280,6 +290,10 @@ describe('invoices', () => {
       ]),
     );
     await expect(operations.generateInvoices(periodOf(new Date()).key)).rejects.toThrow(/not over/);
+    expect(
+      (await operations.generateInvoices(last.key)).filter((d) => d.tenantId === tenantId()),
+    ).toEqual([]);
+    await earlier().assignPlan(shop.tenantId, 'starter');
     const drafts = await operations.generateInvoices(last.key);
     const mine = drafts.filter((d) => d.tenantId === tenantId());
     expect(mine).toHaveLength(1);

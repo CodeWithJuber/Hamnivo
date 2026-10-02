@@ -7,7 +7,7 @@ import { loadConfig } from './config.js';
  * Platform billing from the command line (A16), for Hamnivo's operator:
  *
  *   billing plans
- *   billing plan:set <plan.json>
+ *   billing plan:set <plan.json | ->       (- reads the plan from standard input)
  *   billing plan:assign <tenant id or slug> <plan key>
  *   billing invoices:generate <YYYY-MM>
  *   billing invoice:issue <invoice id or number>
@@ -39,8 +39,23 @@ const print = (value: unknown) =>
     `${JSON.stringify(value, (_, v) => (typeof v === 'bigint' ? v.toString() : v), 2)}\n`,
   );
 
-const invoiceLine = (row: { id: string; number: string; status: string; totalMinor: bigint }) => ({
+/** A file's text, or standard input for `-`. */
+async function readInput(path: string): Promise<string> {
+  if (path !== '-') return readFile(path, 'utf8');
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+const invoiceLine = (row: {
+  id: string;
+  tenantId: string;
+  number: string;
+  status: string;
+  totalMinor: bigint;
+}) => ({
   id: toPublicId('invoice', row.id),
+  tenant: toPublicId('tenant', row.tenantId),
   number: row.number,
   status: row.status,
   totalMinor: row.totalMinor,
@@ -53,8 +68,8 @@ try {
       print(await operations.plans());
       break;
     case 'plan:set': {
-      if (!args[0]) throw new BillingOperationError('plan:set <plan.json>');
-      print(await operations.setPlan(JSON.parse(await readFile(args[0], 'utf8'))));
+      if (!args[0]) throw new BillingOperationError('plan:set <plan.json | ->');
+      print(await operations.setPlan(JSON.parse(await readInput(args[0]))));
       break;
     }
     case 'plan:assign': {
