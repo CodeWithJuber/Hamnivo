@@ -292,6 +292,8 @@ try {
         cookie,
         identityKey: { kid: identityKey.kid, secret: identityKey.secret },
         databaseUrl: database.app,
+        chatwootUrl: fake.url,
+        chatwootPlatformToken: fake.platformToken,
         stripeUrl: stripe.url,
       },
       null,

@@ -6,13 +6,35 @@ external-store runtime and the Hamnivo design tokens.
 
 ## What it does today
 
+- **Layouts** (W02). The loader places the chat as a floating button, a side panel, inline in
+  the page or on the whole page (`mode` in the URL); on narrow screens the first two open full
+  screen. Inline and full-page chats have no close button.
+- **Home before a conversation** (W17). The brand's greeting, its suggested questions (each starts
+  the conversation) and a search of its public help articles. A proactive prompt the visitor
+  opened shows in the brand's own words (W19).
 - **Conversations and messages.**
-  - Starts a conversation or resumes the visitor's last one, including history.
+  - Starts a conversation or resumes the visitor's last one, including history; earlier messages
+    load on request (W05). A signed-in customer finds the same conversations on every device
+    (W18), listed under "More".
   - Shows each message with its sender role: the AI assistant, a support agent, or the visitor.
-  - Shows honest send states: queued, sending, sent, or failed with a retry button.
-- **Connection.**
-  - A banner shows the connection state.
-  - A message typed while offline is sent once when the connection returns.
+  - Shows honest send states (W06): waiting for connection, sending, sent, read (when Chatwoot
+    reports the team saw it), or not sent with the reason and retry, edit and remove.
+  - Unread replies: a line where they start, a count on the launcher while the chat is closed and
+    a "New messages" button while reading back; what the visitor saw is reported as read.
+  - The visitor can delete their own message within the brand's window, after confirming (W23),
+    and react to replies with a few emoji (W22).
+  - Shared places and contacts show as cards; anything unknown shows as its text (W24).
+- **Files** (W09). The paperclip attaches pictures or PDFs. Each file is checked by the gateway
+  (type read from its bytes, size and count limits, virus scan) before it can be sent; a refused
+  file says why. Pictures show as previews and other files download, both fetched with the
+  session.
+- **Connection** (W07, W11).
+  - A banner shows when the device is offline, with the last update and "Try again".
+  - Messages typed while offline wait ("Queue") and are sent once when the connection returns.
+  - What is typed is kept as a draft across reloads, per person and conversation.
+- **Settings** (under "More"). Text size and less motion (W14); the device's own text size and
+  motion settings apply first. Signed-in customers with a verified address choose transcript and
+  reply-waiting emails (W25); others are told why they cannot.
 - **Handoff.** "Talk to a person" asks for a human, and the waiting state is shown until someone
   takes over.
 - **Customer memory** (when the brand's assistant uses it).
@@ -97,3 +119,9 @@ pnpm --filter @hamnivo/widget test:e2e
 - `e2e/memory.spec.ts` turns customer memory on for the test brand (and off again) and covers the
   memory question, "Memory" with confirm, correct, delete and the switch, an answer that used a
   memory, memory being unavailable, and right-to-left layout, each with an axe audit.
+- `e2e/surface.spec.ts` covers the customer surface: files (a program refused by its bytes,
+  previews and downloads), drafts, the offline queue, earlier history and the new-messages
+  button, a failed send with its reason, read receipts from Chatwoot, unread counts on the
+  launcher, deleting and reacting, help suggestions and search, proactive prompts with their
+  limits, the four layouts, text size and less motion, keyboard use, 320 px and 200 % zoom in
+  English and Arabic, continuing on another device and email choices, with axe audits.

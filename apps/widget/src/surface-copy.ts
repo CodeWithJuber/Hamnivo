@@ -41,7 +41,7 @@ export const SURFACE_COPY = {
       limit: 'You can send up to {{count}} files at once.',
       reasons: {
         type_not_allowed: 'This kind of file can’t be sent. Send a picture or a PDF.',
-        too_large: 'This file is too large.',
+        too_large: 'This file is too large. Files can be up to {{size}} MB.',
         too_many: 'That’s too many files for one message.',
         malware_detected: 'This file was refused because it may be harmful.',
         scan_unavailable: 'This file couldn’t be checked for viruses right now. Try again later.',
@@ -55,6 +55,12 @@ export const SURFACE_COPY = {
       sent: 'Sent',
       read: 'Read',
       failed: 'Not sent.',
+      causes: {
+        files: 'A file in it can’t be sent any more. Edit the message and attach the file again.',
+        invalid: 'It can’t be sent as it is. Edit it and try again.',
+        closed: 'This conversation can’t take messages right now.',
+        other: 'It couldn’t be sent. Try again in a moment.',
+      },
       retry: 'Retry',
       edit: 'Edit',
       remove: 'Remove',
@@ -69,7 +75,7 @@ export const SURFACE_COPY = {
       older: 'Show earlier messages',
       loading: 'Loading earlier messages…',
       newMessages: 'New messages',
-      jump: 'Go to new messages',
+      jump: 'New messages: {{count}}',
     },
     actions: {
       delete: 'Delete',
@@ -160,7 +166,7 @@ export const SURFACE_COPY = {
       limit: 'يمكنك إرسال حتى {{count}} ملفات في المرة الواحدة.',
       reasons: {
         type_not_allowed: 'لا يمكن إرسال هذا النوع من الملفات. أرسل صورة أو ملف PDF.',
-        too_large: 'هذا الملف كبير جدًا.',
+        too_large: 'هذا الملف كبير جدًا. الحد الأقصى {{size}} ميغابايت.',
         too_many: 'هذه ملفات كثيرة لرسالة واحدة.',
         malware_detected: 'رُفض هذا الملف لأنه قد يكون ضارًا.',
         scan_unavailable: 'تعذّر فحص هذا الملف من الفيروسات الآن. حاول لاحقًا.',
@@ -174,6 +180,12 @@ export const SURFACE_COPY = {
       sent: 'أُرسلت',
       read: 'قُرئت',
       failed: 'لم تُرسل.',
+      causes: {
+        files: 'لم يعد ممكنًا إرسال ملف فيها. عدّل الرسالة وأرفق الملف من جديد.',
+        invalid: 'لا يمكن إرسالها كما هي. عدّلها وحاول مرة أخرى.',
+        closed: 'لا تقبل هذه المحادثة رسائل الآن.',
+        other: 'تعذّر إرسالها. حاول بعد قليل.',
+      },
       retry: 'إعادة المحاولة',
       edit: 'تعديل',
       remove: 'إزالة',
@@ -188,7 +200,7 @@ export const SURFACE_COPY = {
       older: 'اعرض الرسائل السابقة',
       loading: 'جارٍ تحميل الرسائل السابقة…',
       newMessages: 'رسائل جديدة',
-      jump: 'انتقل إلى الرسائل الجديدة',
+      jump: 'رسائل جديدة: {{count}}',
     },
     actions: {
       delete: 'حذف',
@@ -279,7 +291,7 @@ export const SURFACE_COPY = {
       limit: 'आप एक बार में {{count}} फ़ाइलें तक भेज सकते हैं।',
       reasons: {
         type_not_allowed: 'इस तरह की फ़ाइल नहीं भेजी जा सकती। तस्वीर या PDF भेजें।',
-        too_large: 'यह फ़ाइल बहुत बड़ी है।',
+        too_large: 'यह फ़ाइल बहुत बड़ी है। फ़ाइलें {{size}} MB तक हो सकती हैं।',
         too_many: 'एक संदेश के लिए ये बहुत ज़्यादा फ़ाइलें हैं।',
         malware_detected: 'यह फ़ाइल अस्वीकार की गई क्योंकि यह नुकसानदेह हो सकती है।',
         scan_unavailable: 'अभी इस फ़ाइल की वायरस जाँच नहीं हो सकी। बाद में फिर कोशिश करें।',
@@ -293,6 +305,12 @@ export const SURFACE_COPY = {
       sent: 'भेजा गया',
       read: 'पढ़ा गया',
       failed: 'नहीं भेजा गया।',
+      causes: {
+        files: 'इसकी एक फ़ाइल अब नहीं भेजी जा सकती। संदेश बदलें और फ़ाइल फिर से जोड़ें।',
+        invalid: 'इसे ऐसे नहीं भेजा जा सकता। बदलें और फिर कोशिश करें।',
+        closed: 'यह बातचीत अभी संदेश नहीं ले सकती।',
+        other: 'यह नहीं भेजा जा सका। थोड़ी देर में फिर कोशिश करें।',
+      },
       retry: 'फिर कोशिश करें',
       edit: 'बदलें',
       remove: 'हटाएँ',
@@ -307,7 +325,7 @@ export const SURFACE_COPY = {
       older: 'पहले के संदेश दिखाएँ',
       loading: 'पहले के संदेश लोड हो रहे हैं…',
       newMessages: 'नए संदेश',
-      jump: 'नए संदेशों पर जाएँ',
+      jump: 'नए संदेश: {{count}}',
     },
     actions: {
       delete: 'मिटाएँ',
@@ -398,7 +416,7 @@ export const SURFACE_COPY = {
       limit: 'آپ ایک بار میں {{count}} فائلیں تک بھیج سکتے ہیں۔',
       reasons: {
         type_not_allowed: 'اس قسم کی فائل نہیں بھیجی جا سکتی۔ تصویر یا PDF بھیجیں۔',
-        too_large: 'یہ فائل بہت بڑی ہے۔',
+        too_large: 'یہ فائل بہت بڑی ہے۔ فائلیں {{size}} MB تک ہو سکتی ہیں۔',
         too_many: 'ایک پیغام کے لیے یہ بہت زیادہ فائلیں ہیں۔',
         malware_detected: 'یہ فائل مسترد کر دی گئی کیونکہ یہ نقصان دہ ہو سکتی ہے۔',
         scan_unavailable: 'ابھی اس فائل کی وائرس جانچ نہیں ہو سکی۔ بعد میں دوبارہ کوشش کریں۔',
@@ -412,6 +430,13 @@ export const SURFACE_COPY = {
       sent: 'بھیج دیا گیا',
       read: 'پڑھ لیا گیا',
       failed: 'نہیں بھیجا گیا۔',
+      causes: {
+        files:
+          'اس کی ایک فائل اب نہیں بھیجی جا سکتی۔ پیغام میں ترمیم کریں اور فائل دوبارہ منسلک کریں۔',
+        invalid: 'اسے ایسے نہیں بھیجا جا سکتا۔ ترمیم کریں اور دوبارہ کوشش کریں۔',
+        closed: 'یہ گفتگو ابھی پیغامات نہیں لے سکتی۔',
+        other: 'یہ نہیں بھیجا جا سکا۔ تھوڑی دیر میں دوبارہ کوشش کریں۔',
+      },
       retry: 'دوبارہ کوشش کریں',
       edit: 'ترمیم کریں',
       remove: 'ہٹائیں',
@@ -426,7 +451,7 @@ export const SURFACE_COPY = {
       older: 'پچھلے پیغامات دکھائیں',
       loading: 'پچھلے پیغامات لوڈ ہو رہے ہیں…',
       newMessages: 'نئے پیغامات',
-      jump: 'نئے پیغامات پر جائیں',
+      jump: 'نئے پیغامات: {{count}}',
     },
     actions: {
       delete: 'حذف کریں',

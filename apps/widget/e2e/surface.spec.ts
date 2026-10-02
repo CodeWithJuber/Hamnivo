@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
+import { provisionStaffUser } from '@hamnivo/chatwoot';
+import { createDb, fromPublicId } from '@hamnivo/db';
 import { createIdentityAssertion } from '@hamnivo/server';
 import { type BrowserContext, expect, type FrameLocator, type Page, test } from '@playwright/test';
 
@@ -19,6 +21,9 @@ interface Stack {
   tenantId: string;
   cookie: string;
   identityKey: { kid: string; secret: string };
+  databaseUrl: string;
+  chatwootUrl: string;
+  chatwootPlatformToken: string;
 }
 
 const stack = (): Stack =>
@@ -119,6 +124,29 @@ async function fits(frame: FrameLocator) {
   expect(scroll, wide.join(' | ')).toBeLessThanOrEqual(client + 1);
 }
 
+/** Runs SQL as the app, inside the stack tenant (row-level security applies). */
+async function asTenant<T>(query: string, params: unknown[]): Promise<T[]> {
+  const db = createDb(stack().databaseUrl, { max: 1 });
+  const client = await db.$client.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [
+      fromPublicId('tenant', stack().tenantId),
+    ]);
+    const result = await client.query(query, params);
+    await client.query('COMMIT');
+    return result.rows as T[];
+  } finally {
+    client.release();
+    await db.$client.end();
+  }
+}
+
+const conversationOf = async (frame: FrameLocator) =>
+  (await frame
+    .locator('section[data-conversation-id]')
+    .getAttribute('data-conversation-id')) as string;
+
 async function waitForAnswer(frame: FrameLocator) {
   await expect(frame.locator('[data-sender="ai_primary"]').last()).toBeVisible({
     timeout: 20_000,
@@ -213,6 +241,109 @@ test.describe('sending, drafts and offline (W06, W07, W11)', () => {
       frame.locator('[data-sender="customer"]').filter({ hasText: 'Take this back' }),
     ).toHaveCount(0);
     await expect(frame.getByTestId('delivery').last()).toHaveText('Sent');
+  });
+});
+
+test.describe('history and read receipts (W05, W06)', () => {
+  test('loads earlier messages, and counts replies that arrive while reading back', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    let frame = await openWidget(page);
+    await ask(frame, 'The very first question');
+    await waitForAnswer(frame);
+    const id = await conversationOf(frame);
+    await staff('POST', `/v1/conversations/${id}/takeover`, {});
+    for (let i = 1; i <= 55; i += 1) {
+      await staff('POST', `/v1/conversations/${id}/messages`, {
+        clientMessageId: randomUUID(),
+        text: `Update ${i}`,
+      });
+    }
+    await page.reload();
+    await page.locator('[data-hamnivo-launcher]').click();
+    frame = page.frameLocator('iframe[data-hamnivo-frame]');
+    await expect(frame.getByText('Update 55')).toBeVisible({ timeout: 15_000 });
+    await expect(frame.getByText('The very first question')).toHaveCount(0);
+    await frame.getByTestId('older').click();
+    await expect(frame.getByText('The very first question')).toBeVisible();
+    await expect(frame.getByTestId('older')).toHaveCount(0);
+
+    // Reading back: a new reply does not move the page, and a button says how many wait.
+    const viewport = frame.locator('ul[aria-label="Chat"]').locator('xpath=..');
+    await viewport.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await staff('POST', `/v1/conversations/${id}/messages`, {
+      clientMessageId: randomUUID(),
+      text: 'Update 56',
+    });
+    const pill = frame.getByTestId('jump-new');
+    await expect(pill).toHaveText('New messages: 1', { timeout: 15_000 });
+    expect(await viewport.evaluate((el) => el.scrollTop)).toBeLessThan(200);
+    await pill.click();
+    await expect(frame.getByText('Update 56', { exact: true })).toBeInViewport();
+    await expect(pill).toHaveCount(0);
+  });
+
+  test('says why a message was not sent, and lets the visitor drop it', async ({ page }) => {
+    const frame = await openWidget(page);
+    await frame
+      .getByTestId('file-input')
+      .setInputFiles([{ name: 'expired.png', mimeType: 'image/png', buffer: PNG }]);
+    await expect(frame.getByTestId('file-chips').getByRole('listitem')).toHaveAttribute(
+      'data-state',
+      'ready',
+    );
+    // The checked file is gone before the message goes (it waited too long).
+    await asTenant(
+      `UPDATE widget_uploads SET status = 'rejected', content = NULL, rejection_reason = 'unreadable'
+        WHERE name = 'expired.png' AND status = 'available'`,
+      [],
+    );
+    await ask(frame, 'Here is the photo');
+    const failed = frame.locator('[data-sender="customer"][data-state="failed"]');
+    await expect(failed).toContainText(
+      'Not sent. A file in it can’t be sent any more. Edit the message and attach the file again.',
+      { timeout: 20_000 },
+    );
+    await expect(failed.getByRole('button', { name: 'Retry' })).toBeVisible();
+    await expect(failed.getByRole('button', { name: 'Edit' })).toBeVisible();
+    await audit(page);
+    await failed.getByRole('button', { name: 'Remove' }).click();
+    await expect(failed).toHaveCount(0);
+    await expect(frame.getByText('Here is the photo')).toHaveCount(0);
+  });
+
+  test('marks a message read once Chatwoot says the team saw it', async ({ page }) => {
+    test.setTimeout(120_000);
+    const s = stack();
+    const frame = await openWidget(page);
+    await ask(frame, 'Is my refund approved?');
+    await waitForAnswer(frame);
+    const mine = frame.locator('[data-sender="customer"]').filter({ hasText: 'Is my refund' });
+    await expect(mine.getByTestId('delivery')).toHaveText('Sent');
+    const [control] = await asTenant<{ external: number }>(
+      'SELECT external_conversation_id AS external FROM conversation_controls WHERE id = $1',
+      [fromPublicId('conversation', await conversationOf(frame))],
+    );
+    const connections = await staff('GET', '/v1/admin/authority/connections');
+    const accountId = connections.items[0].accountId as number;
+    const agent = await provisionStaffUser({
+      baseUrl: s.chatwootUrl,
+      platformToken: s.chatwootPlatformToken,
+      accountId,
+      name: 'Team Member',
+      email: `team-${randomUUID()}@example.com`,
+      role: 'administrator',
+    });
+    const seen = await fetch(
+      `${s.chatwootUrl}/api/v1/accounts/${accountId}/conversations/${control?.external}/update_last_seen`,
+      { method: 'POST', headers: { api_access_token: agent.token } },
+    );
+    expect(seen.ok).toBe(true);
+    // Looking sends no webhook: the worker's reconciler reads it on its next pass.
+    await expect(mine.getByTestId('delivery')).toHaveText('Read', { timeout: 60_000 });
   });
 });
 

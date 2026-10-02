@@ -15745,6 +15745,10 @@
             "minimum": 0,
             "maximum": 9007199254740991
           },
+          "reason": {
+            "type": "string",
+            "maxLength": 60
+          },
           "fields": {
             "type": "array",
             "items": {
@@ -17117,7 +17121,8 @@
               "resolved",
               "reopened",
               "team_offline",
-              "follow_up_scheduled"
+              "follow_up_scheduled",
+              "message_deleted"
             ]
           },
           "text": {

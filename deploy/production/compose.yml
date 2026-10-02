@@ -338,8 +338,9 @@ services:
 
   # ---- Upload scanning (profile "scan", on by default through COMPOSE_PROFILES in .env) ----------
   # Needs about 2 GB of memory. Without it, set CLAMAV_URL= (empty) and remove "scan" from
-  # COMPOSE_PROFILES; uploads are then checked only for the EICAR test file. While ClamAV loads its
-  # signatures (a few minutes after a start), uploads wait and are scanned when it is ready.
+  # COMPOSE_PROFILES; knowledge uploads are then checked only for the EICAR test file, and the
+  # chat offers customers no files. While ClamAV loads its signatures (a few minutes after a
+  # start), knowledge uploads wait and are scanned when it is ready; customer files are refused.
   clamav:
     image: clamav/clamav:1.5
     profiles: ['scan']

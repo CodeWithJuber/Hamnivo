@@ -433,7 +433,7 @@ up and deploys.
   then, `hamnivo.sh mail` shows the emails and their links. With `SMTP_URL` set, failures to send
   are in `hamnivo.sh logs api`.
 - **Out of memory:** remove `scan` from `COMPOSE_PROFILES` and empty `CLAMAV_URL` to run without
-  ClamAV, or add memory.
+  ClamAV (customers then cannot send files in the chat), or add memory.
 - **Building behind a proxy that inspects TLS:** set `HAMNIVO_BUILD_CA=/path/to/proxy-ca.pem`
   before `hamnivo.sh up`.
 - **Cloudflare:**
@@ -811,8 +811,9 @@ Clearing the switch (`POST /v1/admin/kill-switches/ksw_.../clear`) lets the AI a
 To preview what an answer would use, send `POST /v1/admin/knowledge/search` with
 `{"query":"…","brandId":"brd_…"}`.
 
-On a server, run ClamAV and set `CLAMAV_URL=tcp://clamav:3310`. Without it, uploads are checked only
-for the EICAR test file. `EMBEDDING_PROVIDER` selects the embedding model; the default offline
+On a server, run ClamAV and set `CLAMAV_URL=tcp://clamav:3310`. Without it, knowledge uploads are
+checked only for the EICAR test file, and the chat offers customers no files at all: customer
+files are accepted only when ClamAV can scan them. `EMBEDDING_PROVIDER` selects the embedding model; the default offline
 `mock` matches shared words only, so use a real provider for meaning-based search.
 
 ### Put the chat on a web page

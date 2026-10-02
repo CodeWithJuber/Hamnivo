@@ -91,7 +91,8 @@ interface Custom {
   firstUnread?: boolean;
   /** The visitor's newest confirmed message, which shows "Sent" or "Read" (W06). */
   lastMine?: boolean;
-  error?: string;
+  /** The API's code for a failed send, to explain it. */
+  errorCode?: string;
 }
 
 const textOf = (m: Message) =>
@@ -180,7 +181,7 @@ function toThread(
           state: p.state,
           clientMessageId: p.clientMessageId,
           pendingFiles: p.attachments ?? [],
-          ...(p.error ? { error: p.error } : {}),
+          ...(p.errorCode ? { errorCode: p.errorCode } : {}),
         } satisfies Custom,
       },
     }),
@@ -205,6 +206,14 @@ interface BubbleContext {
   onReact: (messageId: string, emoji: ReactionEmoji) => Promise<void>;
 }
 
+/** Why a message was not sent, in words a customer can act on (HNV-06-03). */
+function causeOf(code: string | undefined): 'files' | 'invalid' | 'closed' | 'other' {
+  if (code === 'UPLOAD_REJECTED' || code === 'FEATURE_DISABLED') return 'files';
+  if (code === 'VALIDATION_FAILED' || code === 'IDEMPOTENCY_CONFLICT') return 'invalid';
+  if (code === 'NOT_FOUND' || code === 'CONVERSATION_CLOSED') return 'closed';
+  return 'other';
+}
+
 /** "Waiting", "Sending…", "Not sent" with what to do, or "Sent" and "Read" (W06). */
 function Delivery({ custom, ctx }: { custom: Partial<Custom>; ctx: BubbleContext }) {
   const { t } = useTranslation();
@@ -213,8 +222,7 @@ function Delivery({ custom, ctx }: { custom: Partial<Custom>; ctx: BubbleContext
     return (
       <div className="flex max-w-[85%] flex-col items-end gap-1 text-xs" role="alert">
         <span className="text-danger">
-          {t('surface.delivery.failed')}
-          {custom.error ? ` ${custom.error}` : ''}
+          {t('surface.delivery.failed')} {t(`surface.delivery.causes.${causeOf(custom.errorCode)}`)}
         </span>
         <span className="flex flex-wrap justify-end gap-3">
           <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onRetry(id)}>
@@ -551,6 +559,7 @@ function Composer(props: {
   onFiles: (files: File[]) => void;
   onRemoveChip: (id: string) => void;
   onSendFiles: () => void;
+  locale: string;
 }) {
   const { t } = useTranslation();
   const aui = useAui();
@@ -613,6 +622,7 @@ function Composer(props: {
               <span className="min-w-0 break-all">
                 <BidiText text={chip.name} />
               </span>
+              <span className="text-text-muted">· {fileSize(chip.size, props.locale)}</span>
               <span className="text-text-muted">
                 ·{' '}
                 {chip.state === 'uploading'
@@ -671,6 +681,7 @@ function Composer(props: {
         <ComposerPrimitive.Input
           aria-label={props.label}
           placeholder={props.label}
+          maxLength={10_000}
           dir={directionOf(text)}
           rows={1}
           submitMode="none"
@@ -852,9 +863,10 @@ export function Chat(props: {
 
   const limits = config.attachmentLimits;
   const maxFiles = limits.maxFiles;
+  const maxMb = Math.round(limits.maxBytes / (1024 * 1024));
   const reasonText = (reason: string | undefined) =>
-    reason && t(`surface.files.reasons.${reason}`, { defaultValue: '' })
-      ? t(`surface.files.reasons.${reason}`)
+    reason && t(`surface.files.reasons.${reason}`, { defaultValue: '', size: maxMb })
+      ? t(`surface.files.reasons.${reason}`, { size: maxMb })
       : t('surface.files.reasons.unreadable');
   const addFiles = async (files: File[]) => {
     const room = Math.max(
@@ -1181,13 +1193,13 @@ export function Chat(props: {
                     className="pointer-events-auto shadow-md disabled:hidden"
                     data-testid="jump-new"
                   >
-                    {t('surface.history.jump')}
+                    {t('surface.history.jump', { count: state.unread })}
                   </Button>
                 </ThreadPrimitive.ScrollToBottom>
               </div>
             ) : null}
           </ThreadPrimitive.Viewport>
-          <div className="border-t border-border bg-surface px-3 pb-3 pt-2">
+          <div className="border-t border-border bg-surface px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <ShopBar commerce={props.commerce} locale={locale} />
             {canAskPerson ? (
               <Button
@@ -1218,6 +1230,7 @@ export function Chat(props: {
               onFiles={(files) => void addFiles(files)}
               onRemoveChip={(id) => setChips((current) => current.filter((c) => c.id !== id))}
               onSendFiles={sendFiles}
+              locale={locale}
             />
           </div>
         </ThreadPrimitive.Root>
