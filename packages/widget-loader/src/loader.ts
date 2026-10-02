@@ -86,8 +86,11 @@ declare global {
   const mounted = new Promise<void>((resolve) => {
     onMounted = resolve;
   });
-  const label = (key: keyof LauncherConfig['launcher'], attr: string | undefined, fallback: string) =>
-    attr ?? config?.launcher[key] ?? fallback;
+  const label = (
+    key: keyof LauncherConfig['launcher'],
+    attr: string | undefined,
+    fallback: string,
+  ) => attr ?? config?.launcher[key] ?? fallback;
   const openLabel = () => label('openLabel', data.label, 'Open chat');
 
   const emit = (event: string, payload: Record<string, unknown> = {}) => {
@@ -112,7 +115,8 @@ declare global {
   const fit = () => {
     if (!frame) return;
     const viewport = window.visualViewport;
-    const full = mode === 'fullpage' || (launcherMode() && matchMedia('(max-width: 480px)').matches);
+    const full =
+      mode === 'fullpage' || (launcherMode() && matchMedia('(max-width: 480px)').matches);
     if (mode === 'inline') return;
     if (full) {
       style(frame, {
@@ -236,7 +240,13 @@ declare global {
   };
   const showPrompt = (trigger: Trigger) => {
     // Once per page view, never over an open chat, and within today's limit.
-    if (prompted || open || !config || !eligible(config.proactive, memory, Date.now(), location.pathname).includes(trigger)) return;
+    if (
+      prompted ||
+      open ||
+      !config ||
+      !eligible(config.proactive, memory, Date.now(), location.pathname).includes(trigger)
+    )
+      return;
     prompted = true;
     memory = shown(memory);
     remember(memory);
