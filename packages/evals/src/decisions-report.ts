@@ -6,7 +6,12 @@ import {
 } from '@hamnivo/domain';
 import type { ChoiceThresholdOutcome, NoulBand } from './calibration.js';
 import type { ChoiceMetrics, DecisionsReport, LatencyMetrics, NoulMetrics } from './decisions.js';
-import { CHAT_DEADLINE_MS, PRICE_PER_MILLION_INPUT_TOKENS } from './decisions.js';
+import {
+  CHAT_DEADLINE_MS,
+  PERSON_REQUEST_FLOOR,
+  PRICE_PER_MILLION_INPUT_TOKENS,
+  thresholdsFrom,
+} from './decisions.js';
 import { formatRate, type Rate } from './stats.js';
 import type { RoutingIntentSpec } from './types.js';
 
@@ -40,7 +45,7 @@ const slices = (by: Record<string, unknown>) =>
   [...LANGUAGE_SLICES].filter((slice) => by[slice] !== undefined);
 
 function threshold(t: ChoiceThresholdOutcome | null): [string, string, string] {
-  if (!t) return ['none reaches 90%', '100%', '–'];
+  if (!t) return ['none reaches 95%', '100%', '–'];
   return [num(t.minConfidence, 2), pct(t.abstention), num(t.accuracy)];
 }
 
@@ -123,6 +128,8 @@ export function decisionsMarkdown(
     corpusSizes: Record<string, number>;
     rubric: readonly RoutingIntentSpec[];
     maxErrors?: number;
+    /** Where the run's answers are stored (ids and numbers, no text), when they are. */
+    answers?: string;
   },
 ): string {
   const lines: string[] = [];
@@ -137,10 +144,46 @@ export function decisionsMarkdown(
   lines.push('');
   lines.push(`Command: \`${meta.command}\``);
   lines.push('');
+  if (meta.answers) {
+    lines.push(
+      `The answers are stored in \`${meta.answers}\` (corpus ids and numbers, no text): \`run-suite decisions --from ${meta.answers}\` scores them again without calling anyone.`,
+    );
+    lines.push('');
+  }
   lines.push(
     failures.length === 0
       ? 'Every call was answered.'
       : `Calls not answered: ${failures.map(([k, v]) => `${k} ${v}`).join(', ')}. They are left out of the scores below.`,
+  );
+  lines.push('');
+  const routingAll = report.routing.overall;
+  const personAll = report.personRequest.overall;
+  const languageAll = report.language.overall;
+  const notUsed = Object.entries(report.language.byAnswer)
+    .filter(([, m]) => m.threshold === null)
+    .map(([label]) => SLICE_NAMES[label] ?? label);
+  lines.push('## Summary');
+  lines.push('');
+  lines.push(
+    `- **Routing:** Jev chose the right topic for ${rate(routingAll.accuracy)} of the messages; the fixed keyword rule managed ${rate(routingAll.baselineAccuracy)}. Brier ${num(routingAll.brier)}, calibration error ${num(routingAll.calibrationError)}.`,
+  );
+  lines.push(
+    `- **Request for a person:** ${rate(personAll.accuracy)} right at 0.5 (Brier ${num(personAll.brier)}); the fixed rule, which decides first, was right for ${rate(personAll.baselineAccuracy)} (its own test cases are part of the set). Jev only adds a hand-off from ${PERSON_REQUEST_FLOOR.toFixed(2)} up; its errors are listed below.`,
+  );
+  lines.push(
+    `- **Language:** ${rate(languageAll.accuracy)}; Hinglish and Roman Urdu as one: ${rate(report.language.latinFamilyAccuracy)}. ${notUsed.length > 0 ? `Jev’s ${notUsed.join(' and ')} answer${notUsed.length > 1 ? 's are' : ' is'} not reliable enough to act on, so the product keeps asking the customer once when Latin-script Hindustani is ambiguous.` : ''}`,
+  );
+  lines.push(
+    `- **Speed and cost:** p50 ${ms(report.latency.overall.p50)}, p95 ${ms(report.latency.overall.p95)}; ${report.latency.overall.overChatDeadline} of ${report.latency.overall.calls} calls took longer than the ${CHAT_DEADLINE_MS / 1000} s chat deadline. About ${report.tokens.perCall ?? '–'} input tokens per call, $${(((report.tokens.perCall ?? 0) * PRICE_PER_MILLION_INPUT_TOKENS) / 1e6).toFixed(7)} per decision.`,
+  );
+  lines.push(
+    `- **U13 pairs:** ${report.consistency.consistent} of ${report.consistency.groups} groups got the same answer for every variant.`,
+  );
+  lines.push('');
+  lines.push(
+    'One run, about 40 messages per slice: enough to set starting thresholds and to see where Jev is weak, not to rank slices that differ by a few points. Thresholds hold only for `' +
+      report.model +
+      '` and these questions; a new Jev version needs a new run.',
   );
   lines.push('');
   lines.push('## What was measured');
@@ -194,7 +237,7 @@ export function decisionsMarkdown(
   );
   lines.push('');
   lines.push(
-    'Band: Jev’s answer counts as "asks for a person" at or above the first number and as "does not" at or below the second; between them it abstains. Chosen as the lowest bound whose "asks" answers were at least 95% right (and the highest "does not" bound at 95%).',
+    `Band: Jev’s answer counts as "asks for a person" at or above the first number and as "does not" at or below the second; between them it abstains. Chosen as the lowest bound from ${PERSON_REQUEST_FLOOR.toFixed(2)} up whose "asks" answers were at least 95% right, and the highest "does not" bound at 95%. The floor is there because Jev can only add a hand-off the fixed rule missed, and a needless one makes the customer wait for a person.`,
   );
   lines.push('');
   lines.push(
@@ -221,7 +264,7 @@ export function decisionsMarkdown(
   );
   lines.push('');
   lines.push(
-    'Threshold: the lowest confidence (0.30 to 0.95 in steps of 0.05) at which Jev’s decided answers were at least 90% right. Below it Jev abstains and the fixed rule routes.',
+    'Threshold: the lowest confidence (0.50 to 0.95 in steps of 0.05) at which at least 10 of Jev’s answers were decided and at least 95% of them were right. Below it Jev abstains and the fixed rule routes.',
   );
   lines.push('');
   lines.push('### Language');
@@ -247,6 +290,36 @@ export function decisionsMarkdown(
     `Hinglish and Roman Urdu counted as one answer (Latin-script Hindustani): ${formatRate(report.language.latinFamilyAccuracy)}. The fixed rule’s "accuracy" counts an ambiguous answer (it asks the customer) as wrong.`,
   );
   lines.push('');
+  lines.push(
+    'When the product decides, it does not know the language yet: that is the question. So its thresholds are per language Jev answered. The share of each answer that was right:',
+  );
+  lines.push('');
+  lines.push(
+    table(
+      [
+        'Jev answered',
+        'Answers',
+        'Right',
+        'Brier',
+        'Calibration error',
+        'Threshold',
+        'Set aside',
+        'Right when used',
+      ],
+      slices(report.language.byAnswer).map((slice) => {
+        const m = report.language.byAnswer[slice] as ChoiceMetrics;
+        return [
+          SLICE_NAMES[slice] ?? slice,
+          String(m.items),
+          rate(m.accuracy),
+          num(m.brier),
+          num(m.calibrationError),
+          ...threshold(m.threshold),
+        ];
+      }),
+    ),
+  );
+  lines.push('');
   lines.push('### Latency and cost');
   lines.push('');
   lines.push(
@@ -258,6 +331,33 @@ export function decisionsMarkdown(
   lines.push('');
   lines.push(
     `Input tokens: ${report.tokens.input.toLocaleString('en')} in total, ${report.tokens.perCall ?? '–'} per call. Output tokens (free): ${report.tokens.output.toLocaleString('en')}. Cost: $${report.tokens.costUsd.toFixed(4)} for the run, about $${(((report.tokens.perCall ?? 0) * PRICE_PER_MILLION_INPUT_TOKENS) / 1e6).toFixed(7)} per decision.`,
+  );
+  lines.push('');
+  const defaults = thresholdsFrom(report);
+  lines.push('### Defaults set from this run');
+  lines.push('');
+  lines.push(
+    `\`DEFAULT_DECISION_THRESHOLDS\` in \`@hamnivo/domain\` holds these for \`${defaults.model}\`; a language without one was not supported by the data, so Jev abstains there and the fixed rule decides.`,
+  );
+  lines.push('');
+  lines.push(
+    table(
+      [
+        'Slice',
+        'Routing: minimum confidence',
+        'Request for a person: band',
+        'Language: minimum confidence (by answer)',
+      ],
+      [...LANGUAGE_SLICES].map((slice) => {
+        const band = defaults.personRequest[slice];
+        return [
+          SLICE_NAMES[slice] ?? slice,
+          num(defaults.routing[slice] ?? null, 2),
+          band ? `≥ ${band.trueAtLeast.toFixed(2)} / ≤ ${band.falseAtMost.toFixed(2)}` : '–',
+          num(defaults.language[slice] ?? null, 2),
+        ];
+      }),
+    ),
   );
   lines.push('');
   lines.push('### U13 pairs');

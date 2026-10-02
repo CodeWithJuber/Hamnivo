@@ -43,6 +43,11 @@ export const PRICE_PER_MILLION_INPUT_TOKENS = 0.042;
 export const CHAT_DEADLINE_MS = 1500;
 /** A run never makes more calls than this unless told to. */
 export const DEFAULT_MAX_CALLS = 2000;
+/**
+ * Jev can only add a hand-off the fixed rule missed, and a needless one makes a customer wait for
+ * a person: its "asks for a person" bound starts at 0.80.
+ */
+export const PERSON_REQUEST_FLOOR = 0.8;
 
 export interface RoutingCorpusItem {
   id: string;
@@ -350,6 +355,11 @@ export interface DecisionsReport {
   language: {
     overall: ChoiceMetrics;
     bySlice: Record<string, ChoiceMetrics>;
+    /**
+     * By the language Jev answered: at decision time the true language is what is being decided,
+     * so thresholds are per answer. Accuracy here is the share of that answer that was right.
+     */
+    byAnswer: Record<string, ChoiceMetrics>;
     /** Hinglish and Roman Urdu counted as one Latin-script Hindustani answer. */
     latinFamilyAccuracy: Rate;
   };
@@ -399,7 +409,7 @@ function noulMetrics(rows: Array<{ p: number; y: boolean; baselineRight: boolean
     brier: brierBinary(rows),
     calibrationError: expectedCalibrationError(rows.map((r) => ({ score: r.p, outcome: r.y }))),
     baselineAccuracy: wilson(rows.filter((r) => r.baselineRight).length, rows.length),
-    band: chooseNoulBand(rows),
+    band: chooseNoulBand(rows, 0.95, 3, PERSON_REQUEST_FLOOR),
   };
 }
 
@@ -568,6 +578,7 @@ export function scoreDecisions(
     language: {
       overall: choiceMetrics(languageRows),
       bySlice: bySlice(languageRows, (r) => r.slice, choiceMetrics),
+      byAnswer: bySlice(languageRows, (r) => r.seen.label, choiceMetrics),
       latinFamilyAccuracy: wilson(
         languageRows.filter(
           (r) => LATIN_FAMILY.has(r.truth) && family(r.seen.label) === family(r.truth),
@@ -587,5 +598,35 @@ export function scoreDecisions(
       costUsd: Math.round(((input * PRICE_PER_MILLION_INPUT_TOKENS) / 1e6) * 1e6) / 1e6,
     },
     errors: errors.sort((a, b) => a.task.localeCompare(b.task) || b.score - a.score),
+  };
+}
+
+/** The defaults a run supports: what `DEFAULT_DECISION_THRESHOLDS` in @hamnivo/domain holds. */
+export interface ThresholdDefaults {
+  model: string;
+  /** Routing intent, by the message's language slice. */
+  routing: Partial<Record<LanguageSlice, number>>;
+  /** Request for a person, by the message's language slice. */
+  personRequest: Partial<Record<LanguageSlice, { trueAtLeast: number; falseAtMost: number }>>;
+  /** Language, by the language answered (the true one is what is being decided). */
+  language: Partial<Record<LanguageSlice, number>>;
+}
+
+export function thresholdsFrom(report: DecisionsReport): ThresholdDefaults {
+  const pick = <T, V>(by: Record<string, T>, value: (m: T) => V | null) =>
+    Object.fromEntries(
+      LANGUAGE_SLICES.flatMap((slice) => {
+        const metrics = by[slice];
+        const v = metrics === undefined ? null : value(metrics);
+        return v === null ? [] : [[slice, v]];
+      }),
+    );
+  return {
+    model: report.model,
+    routing: pick(report.routing.bySlice, (m) => m.threshold?.minConfidence ?? null),
+    personRequest: pick(report.personRequest.bySlice, (m) =>
+      m.band ? { trueAtLeast: m.band.trueAtLeast, falseAtMost: m.band.falseAtMost } : null,
+    ),
+    language: pick(report.language.byAnswer, (m) => m.threshold?.minConfidence ?? null),
   };
 }

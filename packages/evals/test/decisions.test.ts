@@ -1,4 +1,10 @@
-import { createMockDecisionProvider, LANGUAGE_SLICES } from '@hamnivo/domain';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  createMockDecisionProvider,
+  DEFAULT_DECISION_THRESHOLDS,
+  LANGUAGE_SLICES,
+} from '@hamnivo/domain';
 import { describe, expect, it } from 'vitest';
 import {
   atNoulBand,
@@ -10,11 +16,13 @@ import {
   percentile,
 } from '../src/calibration.js';
 import {
+  type CallRecord,
   decisionItems,
   loadRoutingCorpus,
   routingCorpusProblems,
   runDecisions,
   scoreDecisions,
+  thresholdsFrom,
 } from '../src/decisions.js';
 import { decisionsMarkdown } from '../src/decisions-report.js';
 
@@ -69,22 +77,33 @@ describe('scores for probabilistic decisions', () => {
     expect(percentile([], 50)).toBeNull();
   });
 
-  it('chooses the lowest threshold that keeps decided answers at least 90% right', () => {
+  it('chooses the lowest threshold from 0.50 that keeps ten or more decided answers 95% right', () => {
     const answers = [
-      ...Array.from({ length: 9 }, () => ({ confidence: 0.92, correct: true })),
+      ...Array.from({ length: 19 }, () => ({ confidence: 0.92, correct: true })),
       { confidence: 0.6, correct: false },
       { confidence: 0.55, correct: true },
     ];
     expect(chooseChoiceThreshold(answers)).toMatchObject({
-      minConfidence: 0.3,
-      decided: 11,
-      accuracy: 0.9091,
+      minConfidence: 0.5,
+      decided: 21,
+      accuracy: 0.9524,
+      abstention: 0,
     });
+    // Wrong answers at 0.60 push the threshold above them.
     const shaky = [
-      ...Array.from({ length: 6 }, () => ({ confidence: 0.95, correct: true })),
+      ...Array.from({ length: 12 }, () => ({ confidence: 0.95, correct: true })),
       ...Array.from({ length: 4 }, () => ({ confidence: 0.6, correct: false })),
     ];
-    expect(chooseChoiceThreshold(shaky)).toMatchObject({ minConfidence: 0.65, decided: 6 });
+    expect(chooseChoiceThreshold(shaky)).toMatchObject({
+      minConfidence: 0.65,
+      decided: 12,
+      abstention: 0.25,
+    });
+    // Nine right answers are too few to act on; unsure answers are never acted on, right or not.
+    const few = Array.from({ length: 9 }, () => ({ confidence: 0.99, correct: true }));
+    expect(chooseChoiceThreshold(few)).toBeNull();
+    const unsure = Array.from({ length: 20 }, () => ({ confidence: 0.45, correct: true }));
+    expect(chooseChoiceThreshold(unsure)).toBeNull();
     expect(chooseChoiceThreshold([{ confidence: 0.9, correct: false }])).toBeNull();
   });
 
@@ -97,6 +116,14 @@ describe('scores for probabilistic decisions', () => {
     const band = chooseNoulBand(answers);
     expect(band).toMatchObject({ trueAtLeast: 0.65, falseAtMost: 0.5, precision: 1 });
     expect(atNoulBand(answers, 0.65, 0.1)).toMatchObject({ decided: 15, abstention: 0.0625 });
+    // A floor keeps "true" bounds the data would allow lower out of reach.
+    expect(chooseNoulBand(answers, 0.95, 3, 0.8)).toMatchObject({
+      trueAtLeast: 0.8,
+      falseAtMost: 0.5,
+    });
+    // The "false" bound stays below the "true" one, so no answer counts as both.
+    const clear = answers.filter((a) => a.p !== 0.6);
+    expect(chooseNoulBand(clear)).toMatchObject({ trueAtLeast: 0.5, falseAtMost: 0.45 });
     expect(chooseNoulBand([{ p: 0.9, y: false }])).toBeNull();
   });
 });
@@ -182,4 +209,36 @@ describe('the decisions suite with the mock provider (no network)', () => {
     const report = scoreDecisions(few, records, { provider: 'flaky', model: 'm', calls });
     expect(report.failures).toEqual({ 'unavailable:rate_limited': 2 });
   }, 10_000);
+});
+
+describe('the live run of jev-1.13.0 (docs/evals/jev-1.13.0-2026-10-02.md)', () => {
+  const file = resolve(
+    import.meta.dirname,
+    '../../../docs/evals/jev-1.13.0-2026-10-02.answers.json',
+  );
+  const text = readFileSync(file, 'utf8');
+  const stored = JSON.parse(text) as {
+    provider: string;
+    model: string;
+    calls: number;
+    records: CallRecord[];
+  };
+
+  it('stores corpus ids and numbers only: no message text, no request ids', () => {
+    const items = decisionItems();
+    expect(stored.records).toHaveLength(items.length);
+    expect(text).not.toMatch(/requestId|Bearer|"text"/);
+    for (const item of items) expect(text.includes(JSON.stringify(item.text))).toBe(false);
+  });
+
+  it('is where the default thresholds in @hamnivo/domain come from', () => {
+    const report = scoreDecisions(decisionItems(), stored.records, {
+      provider: stored.provider,
+      model: stored.model,
+      calls: stored.calls,
+    });
+    const { evaluation, ...defaults } = DEFAULT_DECISION_THRESHOLDS;
+    expect(evaluation).toBe('docs/evals/jev-1.13.0-2026-10-02.md');
+    expect(thresholdsFrom(report)).toEqual(defaults);
+  });
 });

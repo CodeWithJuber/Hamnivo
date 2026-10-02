@@ -23,6 +23,8 @@ pnpm --filter @hamnivo/evals run-suite summarize ./out/adjudication-<responder>
 pnpm --filter @hamnivo/evals run-suite decisions --provider mock                          # no network
 TYPESAFE_API_KEY=… pnpm --filter @hamnivo/evals run-suite decisions --provider jev \
   --report ../../docs/evals/jev-1.13.0-<date>.md                                          # real calls
+pnpm --filter @hamnivo/evals run-suite decisions \
+  --from ../../docs/evals/jev-1.13.0-2026-10-02.answers.json                             # score again, no calls
 ```
 
 ### Decisions
@@ -38,13 +40,17 @@ TYPESAFE_API_KEY=… pnpm --filter @hamnivo/evals run-suite decisions --provider
 - the routing and hand-off groups of the U13 corpus, which must get the same answer per group.
 
 It reports, per task and slice, accuracy next to the product's fixed rule, the Brier score, the
-expected calibration error, the threshold that keeps decided answers at least 90% right (95% for
-"asks for a person") with the share that abstains there, p50 and p95 latency, and input tokens and
-cost. A run makes at most `--max-calls` calls (2,000 by default) and is refused before the first
+expected calibration error, the lowest threshold from 0.50 that keeps ten or more decided answers
+at least 95% right (for "asks for a person", the lowest from 0.80 whose "asks" answers are 95%
+precise; for the language, per language answered) with the share that abstains there, p50 and p95
+latency, and input tokens and cost. `DEFAULT_DECISION_THRESHOLDS` in `@hamnivo/domain` holds the
+thresholds of the committed run, and a test checks that its stored answers still give them. A run makes at most `--max-calls` calls (2,000 by default) and is refused before the first
 call if it would need more; failed calls are retried twice within that cap and reported. `--provider
 jev` reads `TYPESAFE_API_KEY` (and `TYPESAFE_BASE_URL`) from the environment only and pins
-`--model` (default `jev-1.13.0`). The JSON results go to `--out`; `--report` writes the Markdown
-report, which holds corpus text and numbers only.
+`--model` (default `jev-1.13.0`). The JSON results go to `--out`, with the answers alone (corpus
+ids and numbers, no text) in `decisions-<provider>.answers.json`; `--from` scores such a file again
+without calling anyone. `--report` writes the Markdown report, which holds corpus text and numbers
+only.
 
 Responders:
 

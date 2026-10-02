@@ -75,8 +75,12 @@ export function percentile(values: readonly number[], p: number): number | null 
   return sorted[index] ?? null;
 }
 
-/** The thresholds a choice is checked against: 0.30, 0.35, … 0.95. */
-export const CHOICE_GRID = Array.from({ length: 14 }, (_, i) => round(0.3 + i * 0.05, 2));
+/**
+ * The thresholds a choice is checked against: 0.50, 0.55, … 0.95. Nothing below 0.50: with a few
+ * dozen messages per slice, acting on answers the provider itself was unsure of is not supported
+ * by the data even when they happened to be right.
+ */
+export const CHOICE_GRID = Array.from({ length: 10 }, (_, i) => round(0.5 + i * 0.05, 2));
 
 export interface ChoiceThresholdOutcome {
   minConfidence: number;
@@ -110,8 +114,8 @@ export function atChoiceThreshold(
  */
 export function chooseChoiceThreshold(
   answers: readonly { confidence: number; correct: boolean }[],
-  target = 0.9,
-  minDecided = 5,
+  target = 0.95,
+  minDecided = 10,
 ): ChoiceThresholdOutcome | null {
   for (const t of CHOICE_GRID) {
     const outcome = atChoiceThreshold(answers, t);
@@ -157,28 +161,32 @@ export function atNoulBand(
   };
 }
 
-/** Candidate bands: true at 0.50…0.95, false at 0.05…0.50 (never above the true bound). */
-const TRUE_GRID = Array.from({ length: 10 }, (_, i) => round(0.5 + i * 0.05, 2));
+/** Candidate "false" bounds: 0.50 down to 0.05 (always below the "true" bound). */
 const FALSE_GRID = Array.from({ length: 10 }, (_, i) => round(0.5 - i * 0.05, 2));
 
 /**
- * The band for a noul: the lowest `trueAtLeast` whose "true" answers are at least `target`
- * precise, and the highest `falseAtMost` whose "false" answers are at least `target` right.
- * Null when the true side never reaches the target (the provider then never says true).
+ * The band for a noul: the lowest `trueAtLeast` (from `floor` up to 0.95) whose "true" answers
+ * are at least `target` precise, and the highest `falseAtMost` whose "false" answers are at least
+ * `target` right. Null when the true side never reaches the target (the provider then never says
+ * true).
  */
 export function chooseNoulBand(
   answers: readonly { p: number; y: boolean }[],
   target = 0.95,
   minTrue = 3,
+  floor = 0.5,
 ): NoulBand | null {
-  const trueAtLeast = TRUE_GRID.find((t) => {
+  const grid = Array.from({ length: 10 }, (_, i) => round(0.5 + i * 0.05, 2)).filter(
+    (t) => t >= floor,
+  );
+  const trueAtLeast = grid.find((t) => {
     const yes = answers.filter((a) => a.p >= t);
     return yes.length >= minTrue && yes.filter((a) => a.y).length / yes.length >= target;
   });
   if (trueAtLeast === undefined) return null;
   const falseAtMost =
     FALSE_GRID.find((f) => {
-      if (f > trueAtLeast) return false;
+      if (f >= trueAtLeast) return false;
       const no = answers.filter((a) => a.p <= f);
       return no.length > 0 && no.filter((a) => !a.y).length / no.length >= target;
     }) ?? 0;
