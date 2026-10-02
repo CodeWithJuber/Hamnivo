@@ -1595,3 +1595,133 @@ describe('Stripe adapter through the fake Stripe server (C05, C08)', () => {
     expect(writes.every((r) => r.idempotencyKey?.startsWith('hv-'))).toBe(true);
   });
 });
+
+describe('answers built from commerce data are never cached (K06)', () => {
+  const QUESTION = 'What are your opening hours?';
+
+  /** The answer cache step of a conversation's first AI reply. */
+  async function cacheStep(conversationId: string) {
+    const runs = await shop.owner.get(`/v1/admin/runs?conversationId=${conversationId}`);
+    expect(runs.body.items.length, JSON.stringify(runs.body)).toBeGreaterThan(0);
+    const run = await shop.owner.get(`/v1/admin/runs/${runs.body.items.at(-1).id}`);
+    return (run.body.steps as Array<Record<string, any>>).find((s) => s.name === 'answer_cache');
+  }
+
+  async function entries(): Promise<unknown[]> {
+    const listed = await shop.owner.get(
+      `/v1/admin/brands/${shop.brand.id}/cache/entries?tier=exact_answer`,
+    );
+    expect(listed.status, JSON.stringify(listed.body)).toBe(200);
+    return listed.body.items;
+  }
+
+  async function setCaching(enabled: boolean) {
+    const policy = await shop.owner.put(`/v1/admin/brands/${shop.brand.id}/cache/policy`, {
+      tiers: { exact_answer: { enabled, ttlSeconds: 3600 } },
+    });
+    expect(policy.status, JSON.stringify(policy.body)).toBe(200);
+  }
+
+  /**
+   * A conversation whose first message is answered only once it holds a paid order: the reply
+   * job waits until the payment event has made the order.
+   */
+  async function orderedConversation(firstMessage: string) {
+    const { visitor, conversationId } = await newCustomer(firstMessage);
+    const cart = await cartWith(visitor, conversationId, [
+      { productId: 'prod_notebook', quantity: 1 },
+    ]);
+    const quote = await quoted(visitor, conversationId, cart.revision);
+    const purchase = await approve(visitor, conversationId, quote);
+    expect(purchase.status, JSON.stringify(purchase.body)).toBe(200);
+    await deliverAll(store.pay(await sessionOf(purchase.body.id)));
+    await slice.worker.get(CommerceWorker).drainOnce();
+    const orders = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .select({ state: schema.orders.state })
+        .from(schema.orders)
+        .where(eq(schema.orders.conversationId, fromPublicId('conversation', conversationId))),
+    );
+    expect(orders).toHaveLength(1);
+    await settle();
+    return conversationId;
+  }
+
+  beforeAll(async () => {
+    // Public knowledge for the shop's assistant, and exact answers cached for the brand.
+    const source = await shop.owner.post('/v1/admin/knowledge/sources', {
+      brandId: shop.brand.id,
+      name: 'Help centre',
+      visibility: 'public',
+    });
+    expect(source.status, JSON.stringify(source.body)).toBe(201);
+    const document = await shop.owner.post(
+      `/v1/admin/knowledge/sources/${source.body.id}/documents`,
+      {
+        title: 'Opening hours',
+        content: {
+          mediaType: 'text/markdown',
+          text: '# Opening hours\n\nWe are open from 9 to 5, Monday to Saturday.',
+        },
+      },
+    );
+    expect(document.status, JSON.stringify(document.body)).toBe(202);
+    await settle();
+    const detail = await shop.owner.get(`/v1/admin/agents/${shop.agentId}`);
+    const config = detail.body.published?.config ?? detail.body.draft.config;
+    const draft = await shop.owner.put(`/v1/admin/agents/${shop.agentId}/draft`, {
+      config: { ...config, knowledgeSourceIds: [source.body.id] },
+    });
+    expect(draft.status, JSON.stringify(draft.body)).toBe(200);
+    const published = await shop.owner.post(`/v1/admin/agents/${shop.agentId}/publish`, {});
+    expect(published.status, JSON.stringify(published.body)).toBe(200);
+    await setCaching(true);
+  });
+
+  afterAll(async () => {
+    await setCaching(false);
+  });
+
+  it('answers a conversation with an order fresh and keeps nothing, while a plain knowledge answer is cached', async () => {
+    // A plain knowledge question is stored, then reused.
+    const plain = await newCustomer(QUESTION);
+    await settle();
+    expect((await cacheStep(plain.conversationId))?.detail).toMatchObject({
+      outcome: 'miss',
+      scope: 'shared',
+    });
+    const again = await newCustomer(QUESTION);
+    await settle();
+    expect((await cacheStep(again.conversationId))?.detail).toMatchObject({ outcome: 'hit' });
+    const stored = (await entries()).length;
+    expect(stored).toBe(1);
+
+    // The same question in a conversation with a paid order: the order's status is in the
+    // conversation, so the stored answer is not served and nothing is kept.
+    const ordered = await orderedConversation(QUESTION);
+    const bypass = (await cacheStep(ordered))?.detail;
+    expect(bypass).toMatchObject({
+      outcome: 'bypass',
+      reason: 'excluded_by_rule',
+      rule: 'commerce.live_data',
+    });
+    expect(String(bypass?.detail).split(',')).toEqual(
+      expect.arrayContaining(['commerce.order_status', 'commerce.payment_status']),
+    );
+
+    // A new question with an order is not stored either: asked again without one, it is a miss.
+    const gifts = 'Do you wrap presents?';
+    expect((await cacheStep(await orderedConversation(gifts)))?.detail).toMatchObject({
+      outcome: 'bypass',
+      rule: 'commerce.live_data',
+    });
+    expect(await entries()).toHaveLength(stored);
+    const fresh = await newCustomer(gifts);
+    await settle();
+    expect((await cacheStep(fresh.conversationId))?.detail).toMatchObject({
+      outcome: 'miss',
+      scope: 'shared',
+    });
+    expect(await entries()).toHaveLength(stored + 1);
+  });
+});

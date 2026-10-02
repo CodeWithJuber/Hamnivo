@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     'models/index': 'src/models/index.ts',
     'jev/index': 'src/jev/index.ts',
+    'cache/index': 'src/cache/index.ts',
     'commerce/index': 'src/commerce/index.ts',
     'commerce/testing': 'src/commerce/testing.ts',
     'net/index': 'src/net/index.ts',

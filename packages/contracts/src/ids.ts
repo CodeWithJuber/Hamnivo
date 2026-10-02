@@ -62,6 +62,7 @@ export const ID_PREFIX = {
   connection: 'acn',
   modelConnection: 'mcn',
   killSwitch: 'ksw',
+  rubric: 'rbc',
   savedReply: 'srp',
   review: 'rev',
   link: 'lnk',

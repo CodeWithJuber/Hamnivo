@@ -15,6 +15,10 @@
       "types": "./dist/jev/index.d.ts",
       "import": "./dist/jev/index.js"
     },
+    "./cache": {
+      "types": "./dist/cache/index.d.ts",
+      "import": "./dist/cache/index.js"
+    },
     "./commerce": {
       "types": "./dist/commerce/index.d.ts",
       "import": "./dist/commerce/index.js"

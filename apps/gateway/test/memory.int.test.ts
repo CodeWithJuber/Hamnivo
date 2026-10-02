@@ -1084,8 +1084,10 @@ describe('privacy of the records about memory', () => {
     ]) {
       expect(actions, action).toContain(action);
     }
-    expect(JSON.stringify(events)).not.toMatch(
-      /Urdu|English|WhatsApp|reception|1042|pigeon|diabetes|4111|Lahore/i,
+    // Only reason and data carry free text. Ids and hashes are random, and may contain any digits.
+    const written = JSON.stringify(events.map((e) => ({ reason: e.reason, data: e.data })));
+    expect(written).not.toMatch(
+      /Urdu|English|WhatsApp|reception|\b1042\b|pigeon|diabetes|\b4111\b|Lahore/i,
     );
   });
 });

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { adminRoutes, identityRoutes } from './admin-routes.js';
 import { agentRoutes } from './agent-routes.js';
 import { analyticsRoutes, billingRoutes } from './billing-routes.js';
+import { cacheRoutes } from './cache-routes.js';
 import {
   commerceAdminRoutes,
   commerceIntegrationRoutes,
@@ -18,10 +19,12 @@ import {
   SendMessageResponse,
   StartConversationRequest,
 } from './conversations.js';
+import { decisionRoutes } from './decision-routes.js';
 import { apiKeyRoutes, networkRoutes, webhookRoutes } from './developer-routes.js';
 import { HamnivoEvent, StreamControl } from './events.js';
 import { inboxRoutes } from './inbox-routes.js';
 import { knowledgeRoutes } from './knowledge-routes.js';
+import { languageRoutes } from './language-routes.js';
 import { adminMemoryRoutes, widgetMemoryRoutes } from './memory-routes.js';
 import { AttachmentPart } from './parts.js';
 import {
@@ -365,6 +368,9 @@ export const allRoutes: Record<string, RouteDef> = {
   ...adminMemoryRoutes,
   ...integrationRoutes,
   ...conversationRoutes,
+  ...decisionRoutes,
+  ...cacheRoutes,
+  ...languageRoutes,
   ...inboxRoutes,
   ...commerceAdminRoutes,
   ...commerceWidgetRoutes,

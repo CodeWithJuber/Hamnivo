@@ -46,6 +46,7 @@ const APPEND_ONLY = new Set([
 const NEVER_DELETED = new Set([
   'kill_switches',
   'memory_deletions',
+  'decision_records',
   'operations',
   'merchant_connections',
   'quotes',
@@ -248,6 +249,15 @@ describe('two-tenant isolation', () => {
     'staff_drafts',
     'conversation_links',
     'conversation_reviews',
+    'team_routing',
+    'decision_rubrics',
+    'decision_tasks',
+    'decision_records',
+    'language_preferences',
+    'cache_policies',
+    'cache_dependency_versions',
+    'cache_entry_index',
+    'cache_metrics_daily',
     'operations',
     'operation_receipts',
     'merchant_connections',
@@ -285,8 +295,8 @@ describe('two-tenant isolation', () => {
     });
 
     // The audit log, operation receipts, consent decisions and deletion tombstones are append-only;
-    // kill switches are cleared, deletion receipts completed and financial records change state,
-    // but none of them is ever deleted.
+    // kill switches are cleared, deletion receipts completed, decision records reviewed and
+    // financial records change state, but none of them is ever deleted.
     const updatable = !APPEND_ONLY.has(table);
     const deletable = updatable && !NEVER_DELETED.has(table);
     if (updatable) {
@@ -393,6 +403,15 @@ describe('two-tenant isolation', () => {
       'staff_drafts',
       'conversation_links',
       'conversation_reviews',
+      'team_routing',
+      'decision_rubrics',
+      'decision_tasks',
+      'decision_records',
+      'language_preferences',
+      'cache_policies',
+      'cache_dependency_versions',
+      'cache_entry_index',
+      'cache_metrics_daily',
       'operations',
       'operation_receipts',
       'merchant_connections',

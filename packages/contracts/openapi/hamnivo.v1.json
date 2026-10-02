@@ -5836,6 +5836,1415 @@
         }
       }
     },
+    "/v1/admin/brands/{brandId}/routing/teams": {
+      "get": {
+        "operationId": "listRoutingTeams",
+        "summary": "Teams that can take a brand’s conversations, with their routing (decisions.read)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Teams",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RoutingTeam"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/routing/teams/{teamId}": {
+      "put": {
+        "operationId": "setTeamRouting",
+        "summary": "Set a team’s intents, languages and availability for a brand (decisions.manage)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "teamId",
+            "schema": {
+              "type": "string",
+              "description": "Team ID (team_…)"
+            },
+            "required": true,
+            "description": "Team ID (team_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTeamRoutingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Team with its routing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingTeam"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/decisions/{task}": {
+      "get": {
+        "operationId": "getDecisionTask",
+        "summary": "Mode, published rubric and draft of a decision task (decisions.read)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Decision task, such as team-routing"
+            },
+            "required": true,
+            "description": "Decision task, such as team-routing"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Decision task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionTask"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/decisions/{task}/draft": {
+      "put": {
+        "operationId": "saveRubricDraft",
+        "summary": "Save the draft questions and thresholds; drafts are never used live (decisions.manage)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Decision task, such as team-routing"
+            },
+            "required": true,
+            "description": "Decision task, such as team-routing"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRubricDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Draft saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionRubric"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/decisions/{task}/publish": {
+      "post": {
+        "operationId": "publishRubric",
+        "summary": "Publish the draft as the next immutable version (decisions.manage)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Decision task, such as team-routing"
+            },
+            "required": true,
+            "description": "Decision task, such as team-routing"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionTask"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/decisions/{task}/mode": {
+      "put": {
+        "operationId": "setDecisionMode",
+        "summary": "Turn routing off, run it in shadow or make it live (decisions.manage)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Decision task, such as team-routing"
+            },
+            "required": true,
+            "description": "Decision task, such as team-routing"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDecisionModeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mode set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionTask"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/decisions/{task}/test": {
+      "post": {
+        "operationId": "testRubric",
+        "summary": "Try a rubric on a synthetic message; nothing reaches a customer (decisions.manage)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Decision task, such as team-routing"
+            },
+            "required": true,
+            "description": "Decision task, such as team-routing"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestRubricRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Test result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestRubricResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/decisions/{task}/records": {
+      "get": {
+        "operationId": "listDecisionRecords",
+        "summary": "Recorded decisions, newest first (decisions.read)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Decision task, such as team-routing"
+            },
+            "required": true,
+            "description": "Decision task, such as team-routing"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "decided",
+                "abstained",
+                "unavailable",
+                "invalid",
+                "skipped"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "conversationId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "Opaque pagination cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Decisions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DecisionRecord"
+                      }
+                    },
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512,
+                          "description": "Opaque pagination cursor"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/decisions/{task}/experiment": {
+      "get": {
+        "operationId": "getDecisionExperiment",
+        "summary": "Provider versus baseline: agreement, abstention, latency and tokens (decisions.read)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "schema": {
+              "type": "string",
+              "description": "Decision task, such as team-routing"
+            },
+            "required": true,
+            "description": "Decision task, such as team-routing"
+          },
+          {
+            "in": "query",
+            "name": "days",
+            "schema": {
+              "default": 30,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentReport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/decisions/{decisionId}": {
+      "get": {
+        "operationId": "getDecisionRecord",
+        "summary": "One recorded decision (decisions.read)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decisionId",
+            "schema": {
+              "type": "string",
+              "description": "Decision ID (dcs_…)"
+            },
+            "required": true,
+            "description": "Decision ID (dcs_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Decision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionRecord"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/decisions/{decisionId}/review": {
+      "post": {
+        "operationId": "reviewDecision",
+        "summary": "Record a reviewer’s correction of a decision (decisions.manage)",
+        "tags": [
+          "Decisions"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decisionId",
+            "schema": {
+              "type": "string",
+              "description": "Decision ID (dcs_…)"
+            },
+            "required": true,
+            "description": "Decision ID (dcs_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reviewed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionRecord"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/cache/policy": {
+      "get": {
+        "operationId": "getCachePolicy",
+        "summary": "Cache tiers, lifetimes and exclusions of a brand (knowledge.read)",
+        "tags": [
+          "Cache"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CachePolicy"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateCachePolicy",
+        "summary": "Change tiers and exclusions; earlier entries stop being read (knowledge.manage)",
+        "tags": [
+          "Cache"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCachePolicyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CachePolicy"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/cache/inspect": {
+      "post": {
+        "operationId": "inspectCache",
+        "summary": "What the answer cache would do for a public question (knowledge.read)",
+        "tags": [
+          "Cache"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectCacheRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inspection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CacheInspection"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/cache/entries": {
+      "get": {
+        "operationId": "listCacheEntries",
+        "summary": "Cached entries by fingerprint, versions and sources, without content (knowledge.read)",
+        "tags": [
+          "Cache"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "query",
+            "name": "tier",
+            "schema": {
+              "$ref": "#/components/schemas/CacheTier"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sourceId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CacheEntry"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/cache/impact": {
+      "get": {
+        "operationId": "getCacheImpact",
+        "summary": "How many cached answers a change to a source would invalidate (knowledge.read)",
+        "tags": [
+          "Cache"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "query",
+            "name": "sourceId",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Impact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CacheImpact"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/cache/invalidate": {
+      "post": {
+        "operationId": "invalidateCache",
+        "summary": "Stop reusing entries of a source, a tier or the whole brand (knowledge.manage)",
+        "tags": [
+          "Cache"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvalidateCacheRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invalidated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CacheInvalidation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/cache/metrics": {
+      "get": {
+        "operationId": "getCacheMetrics",
+        "summary": "Hits, misses, bypasses and savings per day, tier and language (knowledge.read)",
+        "tags": [
+          "Cache"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "query",
+            "name": "days",
+            "schema": {
+              "default": 7,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CacheMetrics"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/language": {
+      "get": {
+        "operationId": "getWidgetLanguage",
+        "summary": "Reply language, interface locale and style of this customer",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Language settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetLanguageState"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "setWidgetLanguage",
+        "summary": "Choose a reply language or style, or close the language question",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetWidgetLanguageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Language settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetLanguageState"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/inbox/conversations": {
       "get": {
         "operationId": "listInboxConversations",
@@ -14067,6 +15476,428 @@
           "text"
         ]
       },
+      "SetTeamRoutingRequest": {
+        "type": "object",
+        "properties": {
+          "intents": {
+            "default": [],
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+            }
+          },
+          "languages": {
+            "default": [],
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageSlice"
+            }
+          },
+          "translationLanguages": {
+            "default": [],
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageSlice"
+            }
+          },
+          "isDefault": {
+            "default": false,
+            "type": "boolean"
+          },
+          "accepting": {
+            "default": true,
+            "type": "boolean"
+          },
+          "status": {
+            "default": "active",
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ]
+          }
+        }
+      },
+      "LanguageSlice": {
+        "type": "string",
+        "enum": [
+          "en",
+          "ar",
+          "hi",
+          "ur",
+          "hinglish",
+          "roman-urdu"
+        ]
+      },
+      "SaveRubricDraftRequest": {
+        "type": "object",
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/RubricDefinition"
+          },
+          "provider": {
+            "default": "none",
+            "$ref": "#/components/schemas/DecisionProviderKind"
+          },
+          "modelVersion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "\\d"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deadlineMs": {
+            "default": 1500,
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "definition"
+        ]
+      },
+      "RubricDefinition": {
+        "type": "object",
+        "properties": {
+          "intents": {
+            "minItems": 1,
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoutingIntent"
+            }
+          },
+          "inputs": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "recentMessages": {
+                "default": 2,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "conversationStatus": {
+                "default": true,
+                "type": "boolean"
+              }
+            }
+          },
+          "thresholds": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/LanguageSlice"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RubricThreshold"
+            }
+          }
+        },
+        "required": [
+          "intents"
+        ]
+      },
+      "RoutingIntent": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "keywords": {
+            "default": [],
+            "maxItems": 60,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          }
+        },
+        "required": [
+          "key",
+          "description"
+        ]
+      },
+      "RubricThreshold": {
+        "type": "object",
+        "properties": {
+          "minConfidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "minConfidence"
+        ]
+      },
+      "DecisionProviderKind": {
+        "type": "string",
+        "enum": [
+          "jev",
+          "mock",
+          "none"
+        ]
+      },
+      "SetDecisionModeRequest": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/DecisionMode"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "DecisionMode": {
+        "type": "string",
+        "enum": [
+          "off",
+          "shadow",
+          "live"
+        ]
+      },
+      "TestRubricRequest": {
+        "type": "object",
+        "properties": {
+          "rubric": {
+            "default": "draft",
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "ReviewDecisionRequest": {
+        "type": "object",
+        "properties": {
+          "intent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "trainingConsent": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "intent",
+          "reason"
+        ]
+      },
+      "UpdateCachePolicyRequest": {
+        "type": "object",
+        "properties": {
+          "tiers": {
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/CacheTier"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CacheTierPolicy"
+            }
+          },
+          "excludedClasses": {
+            "maxItems": 11,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CacheDataClass"
+            }
+          }
+        },
+        "required": [
+          "tiers"
+        ]
+      },
+      "CacheTier": {
+        "type": "string",
+        "enum": [
+          "exact_answer",
+          "nlp",
+          "embedding",
+          "retrieval",
+          "translation"
+        ]
+      },
+      "CacheTierPolicy": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "ttlSeconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 2592000
+          }
+        },
+        "required": [
+          "enabled",
+          "ttlSeconds"
+        ]
+      },
+      "CacheDataClass": {
+        "type": "string",
+        "enum": [
+          "general",
+          "public_knowledge",
+          "internal_knowledge",
+          "personal",
+          "identity",
+          "account",
+          "memory",
+          "live_order",
+          "payment",
+          "approval",
+          "tool_result"
+        ]
+      },
+      "InspectCacheRequest": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "language": {
+            "$ref": "#/components/schemas/ReplyLanguage"
+          }
+        },
+        "required": [
+          "question"
+        ]
+      },
+      "ReplyLanguage": {
+        "type": "string",
+        "enum": [
+          "en",
+          "ar",
+          "hi",
+          "ur",
+          "hi-Latn",
+          "ur-Latn"
+        ]
+      },
+      "InvalidateCacheRequest": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "description": "source identifier (TypeID with prefix \"ksrc\")",
+            "example": "ksrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/CacheTier"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "SetWidgetLanguageRequest": {
+        "type": "object",
+        "properties": {
+          "replyLanguage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplyLanguage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uiLocale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "ar",
+              "hi",
+              "ur"
+            ]
+          },
+          "dismissPrompt": {
+            "type": "boolean",
+            "const": true
+          },
+          "style": {
+            "type": "object",
+            "properties": {
+              "verbosity": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "concise",
+                      "conversational",
+                      "formal"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "gentle",
+                      "direct"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
       "AssignRequest": {
         "type": "object",
         "properties": {
@@ -21856,6 +23687,1395 @@
         "required": [
           "messageId",
           "status"
+        ],
+        "additionalProperties": false
+      },
+      "RoutingTeam": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "team identifier (TypeID with prefix \"team\")",
+            "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "workspace identifier (TypeID with prefix \"wsp\")",
+                "example": "wsp_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "routing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamRouting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "name",
+          "workspaceId",
+          "routing"
+        ],
+        "additionalProperties": false
+      },
+      "TeamRouting": {
+        "type": "object",
+        "properties": {
+          "intents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageSlice"
+            }
+          },
+          "translationLanguages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageSlice"
+            }
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "accepting": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "intents",
+          "languages",
+          "translationLanguages",
+          "isDefault",
+          "accepting",
+          "status",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionTask": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "task": {
+            "$ref": "#/components/schemas/DecisionTaskName"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/DecisionMode"
+          },
+          "published": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionRubric"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionRubric"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "brandId",
+          "task",
+          "mode",
+          "published",
+          "draft",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionTaskName": {
+        "type": "string",
+        "enum": [
+          "team-routing"
+        ]
+      },
+      "DecisionRubric": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "rubric identifier (TypeID with prefix \"rbc\")",
+            "example": "rbc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "task": {
+            "$ref": "#/components/schemas/DecisionTaskName"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "retired"
+            ]
+          },
+          "definition": {
+            "$ref": "#/components/schemas/RubricDefinitionOutput"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/DecisionProviderKind"
+          },
+          "modelVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deadlineMs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "configHash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publishedBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "staff identifier (TypeID with prefix \"stf\")",
+                "example": "stf_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "task",
+          "version",
+          "state",
+          "definition",
+          "provider",
+          "modelVersion",
+          "deadlineMs",
+          "configHash",
+          "createdAt",
+          "publishedAt",
+          "publishedBy"
+        ],
+        "additionalProperties": false
+      },
+      "TestRubricResult": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "$ref": "#/components/schemas/DecisionRecord"
+          },
+          "policy": {
+            "type": "object",
+            "properties": {
+              "explicitRequest": {
+                "type": "boolean"
+              },
+              "redacted": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "explicitRequest",
+              "redacted"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "record",
+          "policy"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "decision identifier (TypeID with prefix \"dcs\")",
+            "example": "dcs_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "conversationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "conversation identifier (TypeID with prefix \"conv\")",
+                "example": "conv_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task": {
+            "$ref": "#/components/schemas/DecisionTaskName"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "new_conversation",
+              "handoff",
+              "test"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "shadow",
+              "live",
+              "test"
+            ]
+          },
+          "provider": {
+            "type": "string"
+          },
+          "modelVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rubricVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "decided",
+              "abstained",
+              "unavailable",
+              "invalid",
+              "skipped"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retryable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "providerIntent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baselineIntent": {
+            "type": "string"
+          },
+          "finalIntent": {
+            "type": "string"
+          },
+          "finalSource": {
+            "type": "string",
+            "enum": [
+              "provider",
+              "baseline"
+            ]
+          },
+          "fallback": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "team": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "team identifier (TypeID with prefix \"team\")",
+                    "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "teamBasis": {
+            "type": "string",
+            "enum": [
+              "intent",
+              "default",
+              "none"
+            ]
+          },
+          "languageMatch": {
+            "type": "string",
+            "enum": [
+              "native",
+              "translation",
+              "none",
+              "unknown"
+            ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LanguageSlice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "explicitRequest": {
+            "type": "boolean"
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "latencyMs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "totalMs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requestId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "policyVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "offered": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "review": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "intent": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "reviewedBy": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "staff identifier (TypeID with prefix \"stf\")",
+                        "example": "stf_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "reviewedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  },
+                  "trainingConsent": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "intent",
+                  "reason",
+                  "reviewedBy",
+                  "reviewedAt",
+                  "trainingConsent"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "conversationId",
+          "task",
+          "trigger",
+          "mode",
+          "provider",
+          "modelVersion",
+          "rubricVersion",
+          "status",
+          "reason",
+          "retryable",
+          "providerIntent",
+          "confidence",
+          "baselineIntent",
+          "finalIntent",
+          "finalSource",
+          "fallback",
+          "team",
+          "teamBasis",
+          "languageMatch",
+          "language",
+          "explicitRequest",
+          "applied",
+          "latencyMs",
+          "totalMs",
+          "inputTokens",
+          "outputTokens",
+          "requestId",
+          "policyVersion",
+          "offered",
+          "review",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "ExperimentReport": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "task": {
+            "$ref": "#/components/schemas/DecisionTaskName"
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/ExperimentSlice"
+          },
+          "byLanguage": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ExperimentSlice"
+            }
+          }
+        },
+        "required": [
+          "brandId",
+          "task",
+          "since",
+          "overall",
+          "byLanguage"
+        ],
+        "additionalProperties": false
+      },
+      "ExperimentSlice": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "decided": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "abstained": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "unavailable": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "invalid": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "agreement": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "reviewed": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "providerAccuracy": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "baselineAccuracy": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "latencyP50Ms": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "latencyP95Ms": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "inputTokens": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "outputTokens": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "records",
+          "decided",
+          "abstained",
+          "unavailable",
+          "invalid",
+          "agreement",
+          "reviewed",
+          "providerAccuracy",
+          "baselineAccuracy",
+          "latencyP50Ms",
+          "latencyP95Ms",
+          "inputTokens",
+          "outputTokens"
+        ],
+        "additionalProperties": false
+      },
+      "CachePolicy": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "tiers": {
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/CacheTier"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CacheTierPolicyOutput"
+            },
+            "required": [
+              "exact_answer",
+              "nlp",
+              "embedding",
+              "retrieval",
+              "translation"
+            ]
+          },
+          "excludedClasses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CacheDataClass"
+            }
+          },
+          "neverCached": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CacheDataClass"
+            }
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "staff identifier (TypeID with prefix \"stf\")",
+                "example": "stf_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "brandId",
+          "version",
+          "tiers",
+          "excludedClasses",
+          "neverCached",
+          "updatedAt",
+          "updatedBy"
+        ],
+        "additionalProperties": false
+      },
+      "CacheInspection": {
+        "type": "object",
+        "properties": {
+          "tier": {
+            "$ref": "#/components/schemas/CacheTier"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "hit",
+              "miss",
+              "stale",
+              "bypass",
+              "unavailable"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rule": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fingerprint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "language": {
+            "$ref": "#/components/schemas/ReplyLanguage"
+          },
+          "knowledge": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sourceId": {
+                  "type": "string",
+                  "description": "source identifier (TypeID with prefix \"ksrc\")",
+                  "example": "ksrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "sourceId",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preview": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CacheSourceRef"
+            }
+          }
+        },
+        "required": [
+          "tier",
+          "status",
+          "reason",
+          "rule",
+          "fingerprint",
+          "language",
+          "knowledge",
+          "expiresAt",
+          "preview",
+          "sources"
+        ],
+        "additionalProperties": false
+      },
+      "CacheSourceRef": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "document identifier (TypeID with prefix \"doc\")",
+            "example": "doc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "source identifier (TypeID with prefix \"ksrc\")",
+            "example": "ksrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "title": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "documentId",
+          "sourceId",
+          "title",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "CacheEntry": {
+        "type": "object",
+        "properties": {
+          "fingerprint": {
+            "type": "string"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/CacheTier"
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "public",
+              "staff"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dependencies": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CacheSourceRef"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "hits": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "lastHitAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "invalidatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "invalidationReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "fingerprint",
+          "tier",
+          "language",
+          "audience",
+          "model",
+          "dependencies",
+          "sources",
+          "createdAt",
+          "expiresAt",
+          "hits",
+          "lastHitAt",
+          "stale",
+          "invalidatedAt",
+          "invalidationReason"
+        ],
+        "additionalProperties": false
+      },
+      "CacheImpact": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "description": "source identifier (TypeID with prefix \"ksrc\")",
+            "example": "ksrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "entries": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "sourceId",
+          "version",
+          "entries"
+        ],
+        "additionalProperties": false
+      },
+      "CacheInvalidation": {
+        "type": "object",
+        "properties": {
+          "invalidated": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "removed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "dependencies": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "required": [
+          "invalidated",
+          "removed",
+          "failed",
+          "dependencies"
+        ],
+        "additionalProperties": false
+      },
+      "CacheMetrics": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CacheMetricsRow"
+            }
+          },
+          "health": {
+            "type": "object",
+            "properties": {
+              "store": {
+                "type": "string",
+                "enum": [
+                  "up",
+                  "degraded"
+                ]
+              },
+              "recentFailures": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "store",
+              "recentFailures"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "brandId",
+          "rows",
+          "health"
+        ],
+        "additionalProperties": false
+      },
+      "CacheMetricsRow": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/CacheTier"
+          },
+          "language": {
+            "type": "string"
+          },
+          "hits": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "misses": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "bypasses": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "stores": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "stale": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "errors": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "savedInputTokens": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "savedOutputTokens": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "savedMs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "lookupMs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "day",
+          "tier",
+          "language",
+          "hits",
+          "misses",
+          "bypasses",
+          "stores",
+          "stale",
+          "errors",
+          "savedInputTokens",
+          "savedOutputTokens",
+          "savedMs",
+          "lookupMs"
+        ],
+        "additionalProperties": false
+      },
+      "WidgetLanguageState": {
+        "type": "object",
+        "properties": {
+          "uiLocale": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "ar",
+                  "hi",
+                  "ur"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "replyLanguage": {
+            "$ref": "#/components/schemas/ReplyLanguage"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "explicit",
+              "detected",
+              "suggested",
+              "previous",
+              "locale",
+              "default"
+            ]
+          },
+          "confirm": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "suggested": {
+                    "$ref": "#/components/schemas/ReplyLanguage"
+                  },
+                  "alternatives": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ReplyLanguage"
+                    }
+                  }
+                },
+                "required": [
+                  "suggested",
+                  "alternatives"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "style": {
+            "$ref": "#/components/schemas/CommunicationStyle"
+          }
+        },
+        "required": [
+          "uiLocale",
+          "replyLanguage",
+          "source",
+          "confirm",
+          "style"
+        ],
+        "additionalProperties": false
+      },
+      "CommunicationStyle": {
+        "type": "object",
+        "properties": {
+          "verbosity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "concise",
+                  "conversational",
+                  "formal"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "gentle",
+                  "direct"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "verbosity",
+          "tone"
         ],
         "additionalProperties": false
       },
@@ -30671,6 +33891,117 @@
           "enabled",
           "maxItems",
           "maxChars"
+        ],
+        "additionalProperties": false
+      },
+      "RubricDefinitionOutput": {
+        "type": "object",
+        "properties": {
+          "intents": {
+            "minItems": 1,
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoutingIntentOutput"
+            }
+          },
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "recentMessages": {
+                "default": 2,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "conversationStatus": {
+                "default": true,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "recentMessages",
+              "conversationStatus"
+            ],
+            "additionalProperties": false
+          },
+          "thresholds": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/LanguageSlice"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RubricThresholdOutput"
+            }
+          }
+        },
+        "required": [
+          "intents",
+          "inputs",
+          "thresholds"
+        ],
+        "additionalProperties": false
+      },
+      "RoutingIntentOutput": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "keywords": {
+            "default": [],
+            "maxItems": 60,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          }
+        },
+        "required": [
+          "key",
+          "description",
+          "keywords"
+        ],
+        "additionalProperties": false
+      },
+      "RubricThresholdOutput": {
+        "type": "object",
+        "properties": {
+          "minConfidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "minConfidence"
+        ],
+        "additionalProperties": false
+      },
+      "CacheTierPolicyOutput": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "ttlSeconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 2592000
+          }
+        },
+        "required": [
+          "enabled",
+          "ttlSeconds"
         ],
         "additionalProperties": false
       },
