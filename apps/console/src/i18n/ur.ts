@@ -2,6 +2,7 @@ import { cachingUr } from './caching';
 import { commerceUr } from './commerce/ur';
 import { decisionsUr } from './decisions';
 import type { Translation } from './en';
+import { chatSettingsUr } from './widget/ur';
 
 /** Urdu. Pending review by native speakers, as the note in the interface says. */
 export const ur: Translation = {
@@ -1303,6 +1304,7 @@ export const ur: Translation = {
   decisions: decisionsUr,
   caching: cachingUr,
   commerce: commerceUr,
+  chatSettings: chatSettingsUr,
   memory: {
     title: 'کسٹمر میموری',
     description: 'طے کریں کہ ہم آپ کے کسٹمرز کے بارے میں کیا یاد رکھتے ہیں۔',
