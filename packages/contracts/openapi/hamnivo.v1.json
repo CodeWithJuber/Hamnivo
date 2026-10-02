@@ -29092,6 +29092,12 @@
               "null"
             ]
           },
+          "outcome": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "expiresAt": {
             "anyOf": [
               {
@@ -29242,6 +29248,7 @@
           "code",
           "stepUp",
           "reason",
+          "outcome",
           "expiresAt",
           "createdAt",
           "decision",

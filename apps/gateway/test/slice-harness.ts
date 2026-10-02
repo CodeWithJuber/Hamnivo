@@ -8,6 +8,7 @@ import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { LanguageModel } from 'ai';
 import { type EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
+import { ActionsWorker } from '../src/actions/worker.service.js';
 import { InboxProcessor } from '../src/authority/processor.service.js';
 import { ReconcilerService } from '../src/authority/reconciler.service.js';
 import type { PersonalCacheScope } from '../src/cache/store.js';
@@ -107,6 +108,7 @@ export async function startSlice(
   await worker.get(InboxProcessor).onApplicationShutdown();
   await worker.get(ReconcilerService).onApplicationShutdown();
   await worker.get(CommerceWorker).onApplicationShutdown();
+  await worker.get(ActionsWorker).onApplicationShutdown();
   const app = createDb(gw.database.app, { max: 2 });
   return {
     gw,

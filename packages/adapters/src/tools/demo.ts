@@ -83,6 +83,19 @@ export class DemoActionsStore {
   readonly delays = new Map<DemoOperation, number>();
   /** How many times each idempotency key changed something (always 0 or 1). */
   readonly effects = new Map<string, number>();
+  /** Calls in progress now, and the most there have been at once (parallel-call limits). */
+  active = 0;
+  peak = 0;
+
+  private async tracked<T>(work: () => Promise<T>): Promise<T> {
+    this.active += 1;
+    this.peak = Math.max(this.peak, this.active);
+    try {
+      return await work();
+    } finally {
+      this.active -= 1;
+    }
+  }
 
   address(reference: string): DemoAddress {
     const stored = this.addresses.get(reference);
@@ -132,7 +145,14 @@ export class DemoActionsStore {
     this.effects.set(key, (this.effects.get(key) ?? 0) + 1);
   }
 
-  async updateAddress(
+  updateAddress(
+    input: { reference: string; address: string; idempotencyKey: string },
+    signal?: AbortSignal,
+  ): Promise<DemoAddressChange> {
+    return this.tracked(() => this.applyAddress(input, signal));
+  }
+
+  private async applyAddress(
     input: { reference: string; address: string; idempotencyKey: string },
     signal?: AbortSignal,
   ): Promise<DemoAddressChange> {
@@ -157,7 +177,14 @@ export class DemoActionsStore {
     return result;
   }
 
-  async issueCredit(
+  issueCredit(
+    input: { reference: string; amountMinor: string; currency: string; idempotencyKey: string },
+    signal?: AbortSignal,
+  ): Promise<DemoCredit> {
+    return this.tracked(() => this.applyCredit(input, signal));
+  }
+
+  private async applyCredit(
     input: { reference: string; amountMinor: string; currency: string; idempotencyKey: string },
     signal?: AbortSignal,
   ): Promise<DemoCredit> {

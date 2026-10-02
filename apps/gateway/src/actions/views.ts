@@ -135,9 +135,11 @@ export function actionView(
           }
         : null,
     argumentsHash: row.argumentsHash.toString('hex'),
-    code: row.code,
+    // An action that asks the customer to confirm who they are cannot be approved by text.
+    code: row.stepUp ? null : row.code,
     stepUp: row.stepUp,
     reason: row.reason ? (REASON_TEXT[row.reason] ?? row.reason) : null,
+    outcome: row.outcomeSummary,
     expiresAt: iso(row.expiresAt),
     createdAt: row.createdAt.toISOString(),
     decision,

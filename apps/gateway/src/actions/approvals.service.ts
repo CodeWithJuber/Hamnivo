@@ -420,7 +420,8 @@ export class ActionApprovals {
       const action = await this.actionIn(tx, control.id, actionId, true);
       if (await this.replayed(tx, input.clientRequestId, action.id))
         return this.view(tx, action, false);
-      if (action.stepUp && input.decision === 'approve') {
+      // The identity check is for the customer's own requests; a staff action is refused below.
+      if (action.approver === 'customer' && action.stepUp && input.decision === 'approve') {
         const [session] = await tx
           .select()
           .from(schema.widgetSessions)
@@ -647,7 +648,7 @@ export class ActionApprovals {
 
   /** Approvals nobody decided in time; returns how many expired. */
   async expireOverdue(limit = 100): Promise<number> {
-    const due = await expiredActions(this.db, limit);
+    const due = await expiredActions(this.db, limit, this.clock());
     let count = 0;
     for (const item of due) {
       const effects = new Effects();

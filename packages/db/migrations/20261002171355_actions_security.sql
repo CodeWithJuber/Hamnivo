@@ -95,14 +95,14 @@ CREATE TRIGGER tool_definitions_guard BEFORE UPDATE ON tool_definitions
 -- ── Worker: approvals nobody decided in time ────────────────────────────────────────────────
 GRANT SELECT (tenant_id, id, state, expires_at) ON actions TO hamnivo_resolver;
 --> statement-breakpoint
-CREATE FUNCTION app.expired_actions(p_limit integer)
+CREATE FUNCTION app.expired_actions(p_limit integer, p_now timestamptz)
   RETURNS TABLE (tenant_id uuid, id uuid)
   LANGUAGE sql STABLE SECURITY DEFINER
   SET search_path = pg_catalog, public
   AS $$
     SELECT a.tenant_id, a.id
     FROM public.actions AS a
-    WHERE a.state = 'awaiting_approval' AND a.expires_at <= now()
+    WHERE a.state = 'awaiting_approval' AND a.expires_at <= coalesce(p_now, now())
     ORDER BY a.expires_at
     LIMIT least(greatest(p_limit, 1), 500)
   $$;
@@ -111,7 +111,7 @@ DO $$
 DECLARE
   fn regprocedure;
 BEGIN
-  FOREACH fn IN ARRAY ARRAY['app.expired_actions(integer)']::regprocedure[] LOOP
+  FOREACH fn IN ARRAY ARRAY['app.expired_actions(integer, timestamptz)']::regprocedure[] LOOP
     EXECUTE format('ALTER FUNCTION %s OWNER TO hamnivo_resolver', fn);
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', fn);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO hamnivo_app', fn);

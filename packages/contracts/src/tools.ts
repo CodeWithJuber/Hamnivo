@@ -259,6 +259,8 @@ export const Action = z
     stepUp: z.boolean(),
     /** Why a refused or superseded action did not run, in safe words. */
     reason: z.string().nullable(),
+    /** What the tool's answer established, in Hamnivo's words (never the tool's own text). */
+    outcome: z.string().nullable(),
     expiresAt: Timestamp.nullable(),
     createdAt: Timestamp,
     decision: z

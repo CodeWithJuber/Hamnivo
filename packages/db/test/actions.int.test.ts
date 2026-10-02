@@ -274,4 +274,11 @@ describe('expired approvals', () => {
     );
     expect((await expiredActions(h.app, 100)).map((f) => f.id)).not.toContain(overdue);
   });
+
+  it('are judged by the clock the worker passes', async () => {
+    const later = await pendingAction(a, new Date(Date.now() + 3_600_000));
+    expect((await expiredActions(h.app, 100)).map((f) => f.id)).not.toContain(later);
+    const found = await expiredActions(h.app, 100, new Date(Date.now() + 7_200_000));
+    expect(found.map((f) => f.id)).toContain(later);
+  });
 });
