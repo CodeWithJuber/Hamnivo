@@ -201,6 +201,41 @@ describe('decision records (J07)', () => {
   });
 });
 
+describe('decision checks around AI replies', () => {
+  it('are written once: the application can neither change nor delete one', async () => {
+    const [check] = await inA((tx) =>
+      tx.select().from(schema.decisionChecks).where(eq(schema.decisionChecks.task, 'answer-check')),
+    );
+    expect(check).toMatchObject({ verdict: 'pass', action: 'publish', applied: false });
+    const mine = eq(schema.decisionChecks.id, check?.id as string);
+    await expectPgError(
+      inA((tx) => tx.update(schema.decisionChecks).set({ verdict: 'fail' }).where(mine)),
+      '42501',
+    );
+    await expectPgError(
+      inA((tx) => tx.update(schema.decisionChecks).set({ applied: true }).where(mine)),
+      '42501',
+    );
+    await expectPgError(
+      inA((tx) => tx.delete(schema.decisionChecks).where(mine)),
+      '42501',
+    );
+  });
+
+  it('keep one record per check of a run', async () => {
+    const [check] = await inA((tx) => tx.select().from(schema.decisionChecks));
+    const {
+      id: _id,
+      createdAt: _createdAt,
+      ...copy
+    } = check as typeof schema.decisionChecks.$inferSelect;
+    await expectPgError(
+      inA((tx) => tx.insert(schema.decisionChecks).values(copy)),
+      '23505',
+    );
+  });
+});
+
 describe('cache dependency versions (K07)', () => {
   it('rise when a knowledge document changes, in the same transaction', async () => {
     const dependency = `knowledge:source:${a.knowledgeSourceId}`;

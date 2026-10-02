@@ -3,6 +3,7 @@ export * from './auth.js';
 export * from './authority.js';
 export * from './cache.js';
 export * from './commerce.js';
+export * from './decision-checks.js';
 export * from './decisions.js';
 export { appRole, platformRole } from './helpers.js';
 export * from './identity.js';

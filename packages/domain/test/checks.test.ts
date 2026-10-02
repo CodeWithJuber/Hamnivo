@@ -1,0 +1,264 @@
+import { describe, expect, it } from 'vitest';
+import {
+  type AnswerCheckPair,
+  answerCheckCorrection,
+  answerCheckRequest,
+  answerCheckThresholdKey,
+  answerCheckVerdict,
+  answersRecord,
+  type CitedClaim,
+  citedClaims,
+  type GatedAnswers,
+  gateCheck,
+  splitSentences,
+} from '../src/checks.js';
+import type { ChoiceAnswer, DecisionAnswers, DecisionResult } from '../src/decisions.js';
+
+describe('sentences of a reply', () => {
+  it('splits at the end of a sentence in every script, keeping citations with their sentence', () => {
+    expect(
+      splitSentences(
+        'Returns take 30 days [1]. Refunds go to the card.[2] واپسی ۳۰ دن میں ہوتی ہے۔ ' +
+          'रिफ़ंड कार्ड में आता है। هل تحتاج إلى شيء آخر؟',
+      ),
+    ).toEqual([
+      'Returns take 30 days [1].',
+      'Refunds go to the card.[2]',
+      'واپسی ۳۰ دن میں ہوتی ہے۔',
+      'रिफ़ंड कार्ड में आता है।',
+      'هل تحتاج إلى شيء آخر؟',
+    ]);
+  });
+
+  it('does not end a sentence inside a number, and keeps a line of citations with the line before', () => {
+    expect(splitSentences('It weighs 1.5 kg [1]\n[2]\nShipping is free!')).toEqual([
+      'It weighs 1.5 kg [1] [2]',
+      'Shipping is free!',
+    ]);
+  });
+});
+
+describe('claims a reply cites', () => {
+  it('lists each citing sentence with the passages it points at, without the markers', () => {
+    const claims = citedClaims(
+      'Hello! Returns take 30 days [1][3]. We ship in 2 days [2, 9]. Anything else?',
+      3,
+    );
+    expect(claims).toEqual([
+      { sentence: 1, text: 'Returns take 30 days.', passages: [0, 2] },
+      // [9] matches no passage the model saw, so it is left out, as it is on publication.
+      { sentence: 2, text: 'We ship in 2 days.', passages: [1] },
+    ]);
+  });
+
+  it('checks nothing when nothing is cited', () => {
+    expect(citedClaims('I do not have that information. Shall I find a person?', 2)).toEqual([]);
+    expect(citedClaims('Returns take 30 days [4].', 3)).toEqual([]);
+  });
+});
+
+describe('the answer-check request', () => {
+  const claims: CitedClaim[] = [
+    { sentence: 0, text: 'Returns take 30 days.', passages: [0, 1] },
+    { sentence: 1, text: 'Refunds go to the card.', passages: [1] },
+  ];
+
+  it('sends each claim and each passage once, with one question per pair', () => {
+    const request = answerCheckRequest(claims, ['Return policy: 30 days.', 'Refunds: card.']);
+    expect(request.state).toEqual({
+      claim_1: 'Returns take 30 days.',
+      passage_1: 'Return policy: 30 days.',
+      passage_2: 'Refunds: card.',
+      claim_2: 'Refunds go to the card.',
+    });
+    expect(Object.keys(request.questions)).toEqual(['c1_p1', 'c1_p2', 'c2_p2']);
+    expect(request.questions.c2_p2).toEqual({
+      type: 'choice',
+      instructions: 'How does passage_2 relate to claim_2?',
+      labels: {
+        supports: 'passage_2 states claim_2 or directly implies that it is true',
+        contradicts: 'passage_2 states the opposite of claim_2 or implies that it is false',
+        says_nothing: 'passage_2 does not address what claim_2 asserts, either way',
+      },
+    });
+    expect(request.pairs).toEqual([
+      { question: 'c1_p1', claim: 0, passage: 0 },
+      { question: 'c1_p2', claim: 0, passage: 1 },
+      { question: 'c2_p2', claim: 1, passage: 1 },
+    ]);
+    expect(request.unchecked).toBe(0);
+  });
+
+  it('caps the pairs of one call and counts the rest as unchecked', () => {
+    const many = Array.from({ length: 14 }, (_, i) => ({
+      sentence: i,
+      text: `Claim ${i}.`,
+      passages: [0],
+    }));
+    const request = answerCheckRequest(many, ['p']);
+    expect(request.pairs).toHaveLength(12);
+    expect(request.unchecked).toBe(2);
+    expect(answerCheckThresholdKey('c3_p1')).toBe('relation');
+  });
+});
+
+const choice = (label: string, confidence: number): ChoiceAnswer => ({
+  type: 'choice',
+  label,
+  confidence,
+  probabilities: { [label]: confidence },
+});
+
+function decided(value: DecisionAnswers): DecisionResult<DecisionAnswers> {
+  return {
+    status: 'decided',
+    provider: 'jev',
+    task: 'answer-check',
+    rubricVersion: 'answer-check-v1',
+    language: 'en',
+    latencyMs: 120,
+    modelVersion: 'jev-1.13.0',
+    value,
+  };
+}
+
+const expected = { provider: 'jev', modelVersion: 'jev-1.13.0', rubricVersion: 'answer-check-v1' };
+const thresholds = { relation: { type: 'choice' as const, minConfidence: 0.8 } };
+
+describe('thresholds one question at a time', () => {
+  it('keeps answers at or above their threshold and sets the others aside, one by one', () => {
+    const gated = gateCheck(
+      decided({ c1_p1: choice('supports', 0.95), c2_p1: choice('contradicts', 0.6) }),
+      expected,
+      thresholds,
+      answerCheckThresholdKey,
+    );
+    expect(gated.status).toBe('decided');
+    expect(gated.kept.c1_p1).toMatchObject({ label: 'supports' });
+    expect(gated.kept.c2_p1).toBeNull();
+    expect(gated.shortfalls.c2_p1).toMatch(/below 0.8/);
+    expect(answersRecord(gated)).toEqual({
+      c1_p1: { type: 'choice', label: 'supports', confidence: 0.95, kept: true },
+      c2_p1: { type: 'choice', label: 'contradicts', confidence: 0.6, kept: false },
+    });
+  });
+
+  it('abstains as a whole for a language without thresholds or another model', () => {
+    const result = decided({ c1_p1: choice('supports', 0.99) });
+    expect(gateCheck(result, expected, undefined)).toMatchObject({
+      status: 'abstained',
+      reason: 'not evaluated for this language (en)',
+      kept: {},
+    });
+    expect(
+      gateCheck(result, { ...expected, modelVersion: 'jev-1.14.0' }, thresholds),
+    ).toMatchObject({ status: 'abstained', reason: expect.stringMatching(/jev-1.14.0/) });
+  });
+
+  it('passes a provider failure through, never as an answer', () => {
+    const gated = gateCheck(
+      {
+        status: 'unavailable',
+        provider: 'jev',
+        task: 'answer-check',
+        rubricVersion: 'answer-check-v1',
+        latencyMs: 1500,
+        retryable: true,
+        reason: 'deadline',
+      },
+      expected,
+      thresholds,
+    );
+    expect(gated).toMatchObject({ status: 'unavailable', reason: 'deadline', kept: {} });
+  });
+});
+
+describe('what the answer check decides', () => {
+  const claims: CitedClaim[] = [
+    { sentence: 0, text: 'Returns take 30 days.', passages: [0] },
+    { sentence: 2, text: 'Refunds go to the card.', passages: [0, 1] },
+  ];
+  const pairs: AnswerCheckPair[] = [
+    { question: 'c1_p1', claim: 0, passage: 0 },
+    { question: 'c2_p1', claim: 1, passage: 0 },
+    { question: 'c2_p2', claim: 1, passage: 1 },
+  ];
+  const gated = (kept: Record<string, ChoiceAnswer | null>): GatedAnswers => ({
+    status: 'decided',
+    reason: null,
+    kept,
+    shortfalls: {},
+    observed: {},
+  });
+
+  it('passes when every cited sentence is supported by a passage it cites', () => {
+    expect(
+      answerCheckVerdict(
+        claims,
+        pairs,
+        gated({
+          c1_p1: choice('supports', 0.9),
+          c2_p1: choice('says_nothing', 0.9),
+          c2_p2: choice('supports', 0.9),
+        }),
+      ),
+    ).toEqual({
+      verdict: 'pass',
+      claims: [
+        { sentence: 0, verdict: 'supported' },
+        { sentence: 2, verdict: 'supported' },
+      ],
+    });
+  });
+
+  it('fails a sentence a passage contradicts, or that no passage it cites addresses', () => {
+    expect(
+      answerCheckVerdict(
+        claims,
+        pairs,
+        gated({
+          c1_p1: choice('supports', 0.9),
+          c2_p1: choice('supports', 0.9),
+          c2_p2: choice('contradicts', 0.9),
+        }),
+      ).claims[1],
+    ).toEqual({ sentence: 2, verdict: 'unsupported' });
+    expect(
+      answerCheckVerdict(
+        claims,
+        pairs,
+        gated({
+          c1_p1: choice('says_nothing', 0.9),
+          c2_p1: choice('supports', 0.9),
+          c2_p2: null,
+        }),
+      ),
+    ).toEqual({
+      verdict: 'fail',
+      claims: [
+        { sentence: 0, verdict: 'unsupported' },
+        { sentence: 2, verdict: 'supported' },
+      ],
+    });
+  });
+
+  it('is unsure, not passed, when an answer fell below its threshold', () => {
+    expect(
+      answerCheckVerdict(
+        claims,
+        pairs,
+        gated({ c1_p1: null, c2_p1: choice('supports', 0.9), c2_p2: null }),
+      ),
+    ).toEqual({
+      verdict: 'unsure',
+      claims: [
+        { sentence: 0, verdict: 'unsure' },
+        { sentence: 2, verdict: 'supported' },
+      ],
+    });
+  });
+
+  it('tells the model which sentences to leave out', () => {
+    expect(answerCheckCorrection(['Returns take 90 days.'])).toContain('- "Returns take 90 days."');
+  });
+});

@@ -24,6 +24,7 @@ const tenantColumn = (table: string) => (table === 'tenants' ? 'id' : 'tenant_id
 const APPEND_ONLY = new Set([
   'audit_events',
   'operation_receipts',
+  'decision_checks',
   'learning_consents',
   'deletion_tombstones',
 ]);
@@ -215,6 +216,7 @@ describe('two-tenant isolation', () => {
     'decision_rubrics',
     'decision_tasks',
     'decision_records',
+    'decision_checks',
     'language_preferences',
     'cache_policies',
     'cache_dependency_versions',
@@ -248,9 +250,9 @@ describe('two-tenant isolation', () => {
       );
     });
 
-    // The audit log, operation receipts, consent decisions and deletion tombstones are append-only;
-    // kill switches are cleared, deletion receipts completed, decision records reviewed and
-    // financial records change state, but none of them is ever deleted.
+    // The audit log, operation receipts, decision checks, consent decisions and deletion
+    // tombstones are append-only; kill switches are cleared, deletion receipts completed, decision
+    // records reviewed and financial records change state, but none of them is ever deleted.
     const updatable = !APPEND_ONLY.has(table);
     const deletable = updatable && !NEVER_DELETED.has(table);
     if (updatable) {
@@ -366,6 +368,7 @@ describe('two-tenant isolation', () => {
       'decision_rubrics',
       'decision_tasks',
       'decision_records',
+      'decision_checks',
       'language_preferences',
       'cache_policies',
       'cache_dependency_versions',
