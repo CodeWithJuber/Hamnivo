@@ -71,6 +71,9 @@ export const ID_PREFIX = {
   supportGrant: 'sgr',
   operator: 'opr',
   incident: 'inc',
+  mcpServer: 'mcp',
+  simulation: 'sim',
+  simulationRun: 'simr',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

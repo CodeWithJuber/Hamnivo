@@ -40,6 +40,11 @@ export interface AgentForm {
   memoryEnabled: boolean;
   memoryMaxItems: string;
   memoryMaxChars: string;
+  /** Tools the agent may call (G07); `autopilot` off means it always asks for approval. */
+  toolGrants: { toolId: string; autopilot: boolean }[];
+  /** Action budgets (G15, X03). */
+  maxCallsPerRun: string;
+  maxAutopilotPerConversation: string;
 }
 
 const toRow = (choice: ModelChoice): ModelRow => ({
@@ -69,6 +74,12 @@ export function toForm(config: AgentConfig): AgentForm {
     memoryEnabled: config.memory?.enabled ?? false,
     memoryMaxItems: String(config.memory?.maxItems ?? 8),
     memoryMaxChars: String(config.memory?.maxChars ?? 1200),
+    toolGrants: (config.tools?.grants ?? []).map((g) => ({
+      toolId: g.toolId,
+      autopilot: g.autopilot,
+    })),
+    maxCallsPerRun: String(config.tools?.maxCallsPerRun ?? 4),
+    maxAutopilotPerConversation: String(config.tools?.maxAutopilotPerConversation ?? 5),
   };
 }
 
@@ -88,6 +99,9 @@ export const FIELD_IDS = {
   memoryEnabled: 'agent-memory-enabled',
   memoryMaxItems: 'agent-memory-maxItems',
   memoryMaxChars: 'agent-memory-maxChars',
+  tools: 'agent-tools',
+  maxCallsPerRun: 'agent-tools-maxCallsPerRun',
+  maxAutopilotPerConversation: 'agent-tools-maxAutopilot',
 } as const;
 
 function choice(row: ModelRow): ModelChoice {
@@ -165,6 +179,14 @@ export function toConfig(
     errors[FIELD_IDS.knowledge] = t('editor.errors.knowledge');
   const memoryMaxItems = limit(FIELD_IDS.memoryMaxItems, form.memoryMaxItems, 1, 20);
   const memoryMaxChars = limit(FIELD_IDS.memoryMaxChars, form.memoryMaxChars, 100, 4000);
+  if (form.toolGrants.length > 30) errors[FIELD_IDS.tools] = t('tools.grants.tooMany');
+  const maxCallsPerRun = limit(FIELD_IDS.maxCallsPerRun, form.maxCallsPerRun, 1, 10);
+  const maxAutopilotPerConversation = limit(
+    FIELD_IDS.maxAutopilotPerConversation,
+    form.maxAutopilotPerConversation,
+    0,
+    50,
+  );
 
   if (Object.keys(errors).length > 0) return { config: null, errors };
   return {
@@ -185,6 +207,11 @@ export function toConfig(
         maxItems: memoryMaxItems,
         maxChars: memoryMaxChars,
       },
+      tools: {
+        grants: form.toolGrants.map((g) => ({ toolId: g.toolId, autopilot: g.autopilot })),
+        maxCallsPerRun,
+        maxAutopilotPerConversation,
+      },
     },
   };
 }
@@ -204,7 +231,8 @@ export type SectionKey =
   | 'fallback'
   | 'limits'
   | 'knowledge'
-  | 'memory';
+  | 'memory'
+  | 'tools';
 
 /** Which parts differ between two working copies, for the conflict message. */
 export function differences(mine: AgentForm, theirs: AgentForm): SectionKey[] {
@@ -239,6 +267,14 @@ export function differences(mine: AgentForm, theirs: AgentForm): SectionKey[] {
   ) {
     result.push('memory');
   }
+  if (
+    !same(
+      [mine.toolGrants, mine.maxCallsPerRun, mine.maxAutopilotPerConversation],
+      [theirs.toolGrants, theirs.maxCallsPerRun, theirs.maxAutopilotPerConversation],
+    )
+  ) {
+    result.push('tools');
+  }
   return result;
 }
 
@@ -264,6 +300,8 @@ export function fieldForPath(path: string): string | undefined {
       return FIELD_IDS.knowledge;
     case 'memory':
       return FIELD_IDS.memoryMaxItems;
+    case 'tools':
+      return FIELD_IDS.tools;
     default:
       return undefined;
   }

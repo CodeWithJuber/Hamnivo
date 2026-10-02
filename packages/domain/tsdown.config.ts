@@ -6,6 +6,7 @@ export default defineConfig({
     'commerce/index': 'src/commerce/index.ts',
     'billing/index': 'src/billing/index.ts',
     'analytics/index': 'src/analytics/index.ts',
+    'actions/index': 'src/actions/index.ts',
   },
   format: 'esm',
   dts: true,

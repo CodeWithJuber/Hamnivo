@@ -98,6 +98,7 @@ describe('database roles', () => {
         'app.claim_webhook_deliveries(integer,integer)',
         'app.ensure_audit_partitions(integer)',
         'app.ensure_reconcile_cursors()',
+        'app.expired_actions(integer,timestamp with time zone)',
         'app.expired_memory_subjects(integer)',
         'app.purge_expired(integer)',
         'app.purge_migration_files(integer)',

@@ -1,3 +1,4 @@
+export * from './actions.js';
 export * from './analytics.js';
 export * from './audit.js';
 export * from './auth.js';

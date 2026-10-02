@@ -232,7 +232,12 @@ export function useCommerce(client: HamnivoClient, conversationId: string | null
   const onEvent = useCallback(
     (event: { type: string; data?: Record<string, unknown> }) => {
       const data = event.data ?? {};
-      if (event.type === 'approval.updated' && typeof data.approvalId === 'string') {
+      // Approvals of quotes only; AI action approvals (act_…) are followed by their cards.
+      if (
+        event.type === 'approval.updated' &&
+        typeof data.approvalId === 'string' &&
+        data.approvalId.startsWith('quo_')
+      ) {
         void ensureQuote(data.approvalId, true);
       }
       if (event.type === 'action.updated' && typeof data.actionId === 'string') {

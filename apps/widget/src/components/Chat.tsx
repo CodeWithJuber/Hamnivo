@@ -1138,7 +1138,12 @@ export function Chat(props: {
             onSeen={props.onSeen}
             latest={state.latestSequence}
           />
-          <ThreadPrimitive.Viewport className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          {/* Focusable so keyboard users can scroll it even when no card has a control. */}
+          <ThreadPrimitive.Viewport
+            className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+            tabIndex={0}
+            aria-label={t('title')}
+          >
             {state.olderCursor ? (
               <div className="mb-3 flex justify-center">
                 <Button

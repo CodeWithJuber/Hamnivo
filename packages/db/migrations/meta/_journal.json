@@ -253,6 +253,20 @@
       "when": 1790968913197,
       "tag": "20261002192153_customer_surface_security",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790970050153,
+      "tag": "20261002194050_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790970058477,
+      "tag": "20261002194058_actions_security",
+      "breakpoints": true
     }
   ]
 }

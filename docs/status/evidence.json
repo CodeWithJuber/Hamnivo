@@ -463,13 +463,15 @@
     "note": "Each run records agent version, provider, model, tokens, latency, outcome, error kind and per-step records; token usage goes to the usage ledger (tested). Cost estimates and dashboards pending."
   },
   "X08": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/runtime/kill-switches.service.ts",
       "apps/gateway/test/agents.int.test.ts",
-      "packages/db/migrations/20260927021253_agents_runtime_security.sql"
+      "packages/db/migrations/20260927021253_agents_runtime_security.sql",
+      "apps/gateway/src/actions/executor.service.ts",
+      "apps/gateway/test/actions.int.test.ts"
     ],
-    "note": "Kill switches for the tenant, a brand or an agent stop AI replies at once; AI-held conversations go to people on their next message, new conversations start with people, and clearing restores AI replies (tested, mutation-checked). Switches are cleared, never deleted. Tool-level switches arrive with tools."
+    "note": "Kill switches for the tenant, a brand or an agent stop AI replies at once; AI-held conversations go to people on their next message, new conversations start with people, and clearing restores AI replies (tested, mutation-checked). Switches are cleared, never deleted. A tool switch stops one tool at once, including approvals already given (tested)."
   },
   "X11": {
     "status": "in-progress",
@@ -540,13 +542,15 @@
     "note": "Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Parsing runs in-process (no sandbox) and URL sources are pending."
   },
   "X09": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/runtime/prompt.ts",
       "apps/gateway/test/knowledge.int.test.ts",
-      "apps/gateway/test/knowledge.test.ts"
+      "apps/gateway/test/knowledge.test.ts",
+      "packages/domain/src/actions/output.ts",
+      "apps/gateway/test/tools.int.test.ts"
     ],
-    "note": "Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool outputs arrive with tools. Injection resistance is not yet measured by an adversarial suite."
+    "note": "Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool results reach the model fenced as untrusted data from a named tool, size-limited and checked, and a write proposed after reading another system’s data needs approval (tested). Measuring injection resistance with an adversarial suite is X12."
   },
   "W08": {
     "status": "in-progress",
@@ -1139,8 +1143,13 @@
   },
   "HNV-10-03": {
     "status": "in-progress",
-    "evidence": ["apps/console/e2e/inbox.spec.ts", "apps/console/src/pages/inbox/Timeline.tsx"],
-    "note": "Hamnivo's handoff summary is shown to staff as a staff-only card and the conversation can be claimed; rejecting with a capacity reason is not built yet."
+    "evidence": [
+      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/Timeline.tsx",
+      "apps/console/src/components/ConversationActions.tsx",
+      "apps/console/e2e/tools.spec.ts"
+    ],
+    "note": "Hamnivo's handoff summary (why, the customer's words and language, completed and pending actions, facts with their sources) is shown to staff as a staff-only card and in the inbox and the conversation can be claimed; rejecting with a capacity reason is not built yet."
   },
   "HNV-10-04": {
     "status": "implemented",
@@ -2105,9 +2114,13 @@
       "apps/gateway/src/developer/egress.service.ts",
       "apps/gateway/src/developer/egress.controller.ts",
       "apps/gateway/test/webhooks.int.test.ts",
-      "apps/console/e2e/developer.spec.ts"
+      "apps/console/e2e/developer.spec.ts",
+      "packages/adapters/src/egress/fetch.ts",
+      "packages/adapters/test/egress.test.ts",
+      "apps/gateway/src/actions/adapters.ts",
+      "apps/gateway/test/tools.int.test.ts"
     ],
-    "note": "Outbound requests made for tenants reach public HTTPS hosts only: private, loopback, link-local and special-use addresses are refused at connect time (so DNS rebinding fails), redirects are not followed, and responses have size and time limits. Each workspace can restrict them further to listed hosts (with wildcards); endpoints the list would refuse are shown. Only the server administrator can trust extra origins (EGRESS_TRUSTED_ORIGINS)."
+    "note": "Outbound requests made for tenants reach public HTTPS hosts only: private, loopback, link-local and special-use addresses are refused at connect time (so DNS rebinding fails), redirects are not followed, and responses have size and time limits. Each workspace can restrict them further to listed hosts (with wildcards); endpoints the list would refuse are shown. Only the server administrator can trust extra origins (EGRESS_TRUSTED_ORIGINS). Tool calls to remote MCP servers go out through the MCP adapter’s own guard (HTTPS, the tool’s host allowlist, public addresses checked inside the socket’s DNS lookup, no redirects and a size limit); the workspace’s host list does not apply to them until the two guards are merged."
   },
   "A08": {
     "status": "partial",
@@ -2474,5 +2487,210 @@
     "status": "in-progress",
     "evidence": ["packages/widget-loader/src/loader.ts"],
     "note": "A full-screen chat is sized to the visible area (visualViewport), so the on-screen keyboard does not hide the message box; not yet checked on a device with an on-screen keyboard."
+  },
+  "G07": {
+    "status": "implemented",
+    "evidence": [
+      "packages/db/src/schema/actions.ts",
+      "apps/gateway/src/actions/tools.service.ts",
+      "packages/domain/src/actions/schema.ts",
+      "packages/domain/test/actions/schema.test.ts",
+      "apps/gateway/test/tools.int.test.ts",
+      "apps/console/src/pages/ToolsPage.tsx",
+      "apps/console/e2e/tools.spec.ts"
+    ],
+    "note": "Tools per brand with an input schema and, for MCP tools, an output schema (both reduced to a portable subset; a result that does not match is refused), a risk class (read, write, money, irreversible), who approves, a required permission, a time limit, an output size limit, an approval expiry and an egress allowlist. Every policy change bumps the revision approvals are bound to and needs tools.manage and a fresh sign-in; money and irreversible tools can never run without approval (tested)."
+  },
+  "G08": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/actions/gateway.service.ts",
+      "apps/gateway/src/actions/approvals.service.ts",
+      "apps/gateway/src/actions/executor.service.ts",
+      "packages/policy/src/actions.ts",
+      "packages/policy/test/actions.test.ts",
+      "apps/gateway/test/actions.int.test.ts"
+    ],
+    "note": "Every tool call goes through one gateway. At the proposal it checks that the conversation is still the AI’s at the run’s epoch, the tool’s status and policy, kill switches, the agent’s grant, the customer’s scope (another customer’s order does not exist for the call) and the budgets. A decision checks who decides: the customer of the conversation, or staff with tools.approve, the tool’s own permission and a fresh sign-in for money and irreversible actions. When someone decides and again right before sending, the tool’s revision, status and kill switches, the agent’s grant, the resource’s revision and the ownership epoch are checked again; a change supersedes the action (tested, mutation-checked)."
+  },
+  "X02": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/actions/approval.ts",
+      "packages/domain/test/actions/approval.test.ts",
+      "apps/gateway/src/actions/executor.service.ts",
+      "apps/gateway/test/actions.int.test.ts"
+    ],
+    "note": "Right before a call is sent, the executor checks again what the approval was bound to: the arguments’ hash, the tool’s revision and status, kill switches, the agent’s grant, the resource’s revision in the customer’s scope and the ownership epoch. Anything changed supersedes the action and nothing is sent (tested: changed order, changed tool, removed grant, kill switch after approval, takeover). Budgets are taken when the action is decided, under the conversation and tenant locks, so they cannot be overrun; turning automatic actions off does not recall one already decided (a kill switch does)."
+  },
+  "X03": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/domain/src/actions/execution.ts",
+      "apps/gateway/src/actions/gateway.service.ts",
+      "apps/gateway/src/config.ts",
+      "apps/gateway/test/actions.int.test.ts"
+    ],
+    "note": "Tool calls per run, automatic actions per conversation and per tenant per day, and parallel tool calls (TOOLS_MAX_PARALLEL) have enforced ceilings, and every tool call has a time limit and an output size limit (tested). Missing: cost ceilings, and nesting limits, which belong with multi-agent specialists."
+  },
+  "G10": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/actions/handoff.ts",
+      "apps/gateway/src/actions/handoff.service.ts",
+      "apps/gateway/test/actions.int.test.ts",
+      "apps/console/src/components/ConversationActions.tsx",
+      "apps/console/e2e/tools.spec.ts"
+    ],
+    "note": "When a conversation goes to people, Hamnivo records a packet from its own records: why, the customer’s request and reply language, what the AI tried, actions still pending with their approver and expiry, and the facts it relied on with their source. Staff see it as a private note and in the inbox; it holds no hidden reasoning (tested in the gateway and in a browser)."
+  },
+  "G11": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/domain/src/actions/simulation.ts",
+      "apps/gateway/src/actions/simulation.service.ts",
+      "apps/gateway/src/actions/publish-checks.ts",
+      "apps/gateway/test/tools.int.test.ts",
+      "apps/console/src/components/Simulations.tsx",
+      "apps/console/e2e/tools.spec.ts"
+    ],
+    "note": "Suites of frozen cases (customer messages and what each tool answers) replay against the draft and the published version with nothing sent; Studio shows what changed, and publishing waits until required suites pass on the exact draft (tested in the gateway and in a browser). Replays use the deterministic mock model, so they show what Hamnivo’s rules do with the draft (tools offered, approvals, budgets, guards), not what the configured model would say. Replaying with the tenant’s own model is not built."
+  },
+  "G13": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/actions/approval.ts",
+      "apps/gateway/src/actions/approvals.service.ts",
+      "packages/db/migrations/20261002194058_actions_security.sql",
+      "packages/db/test/actions.int.test.ts",
+      "apps/gateway/test/actions.int.test.ts",
+      "apps/widget/e2e/actions.spec.ts",
+      "apps/console/e2e/tools.spec.ts"
+    ],
+    "note": "An approval shows the exact action and resource and is bound to the arguments’ SHA-256, the tool’s revision, the resource’s revision and the ownership epoch. Customers approve their own low-risk requests; staff with tools.approve and the tool’s own permission approve the rest, after a fresh sign-in for money and irreversible actions; a customer can never approve a staff action. Approvals expire, any change supersedes them, and decided approvals are append-only (tested, mutation-checked)."
+  },
+  "G14": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/actions/executor.service.ts",
+      "apps/gateway/src/common/operation-reconcilers.ts",
+      "packages/domain/src/actions/claims.ts",
+      "packages/domain/test/actions/claims.test.ts",
+      "apps/gateway/test/actions.int.test.ts",
+      "apps/gateway/test/tools.int.test.ts"
+    ],
+    "note": "A change counts as done only with a succeeded receipt in the operation ledger. A lost answer leaves the outcome unknown: the tool’s own records settle it, it is never sent again, and staff can ask for a check or record the outcome by hand. An AI reply that says something was done without a receipt is regenerated with a correction, then goes to people (tested, mutation-checked)."
+  },
+  "G15": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/actions/execution.ts",
+      "packages/domain/test/actions/execution.test.ts",
+      "apps/gateway/src/actions/gateway.service.ts",
+      "apps/gateway/test/actions.int.test.ts",
+      "apps/console/src/pages/ToolsPage.tsx"
+    ],
+    "note": "Only read and write tools whose policy allows it, granted with autopilot to the agent, run without approval, within per-run, per-conversation and per-tenant daily budgets and a tenant switch; money and irreversible tools never do. A call proposed after reading another system’s data, or with the budget spent, asks for approval, and kill switches stop tools at once (tested)."
+  },
+  "W16": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/widget/src/actions/ActionCards.tsx",
+      "apps/widget/src/actions/useActions.ts",
+      "packages/client/src/actions.ts",
+      "packages/client/test/actions.test.ts",
+      "apps/widget/e2e/actions.spec.ts"
+    ],
+    "note": "Approval cards show the exact change, its effects, who approves and when the request expires; Approve and Decline work by keyboard, right to left at phone width, with the card’s hash; a request that needs the customer to sign in tells the website. Result cards come only from receipts (browser-tested). Task forms are not built."
+  },
+  "D10": {
+    "status": "implemented",
+    "evidence": [
+      "packages/adapters/src/mcp/client.ts",
+      "packages/adapters/README.md",
+      "packages/adapters/test/mcp.test.ts",
+      "apps/gateway/src/actions/tools.service.ts",
+      "apps/gateway/test/tools.int.test.ts"
+    ],
+    "note": "Remote MCP servers over Streamable HTTP only, on MCP 2025-11-25, 2025-06-18 or 2025-03-26 (others are refused), with an optional bearer token kept in the secret broker, all through the egress guard; documented in the adapters README. Every new or changed tool waits in review before it can be granted or called, and gets Hamnivo’s own description and its own host allowlist (tested). No test talks to a third-party server."
+  },
+  "HNV-11-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/components/AgentTools.tsx",
+      "apps/console/src/pages/ToolsPage.tsx",
+      "apps/console/e2e/tools.spec.ts",
+      "apps/gateway/test/actions.int.test.ts"
+    ],
+    "note": "The agent editor grants tools, each shown with what it can do and who approves; a grant is part of a versioned draft and the test room shows the cases it changes (browser-tested). Stopping a tool takes effect at once, also for approvals already given (tested in the gateway); removing a grant takes effect with the next published version and cancels open requests for it when they are decided or sent."
+  },
+  "HNV-11-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/components/Simulations.tsx",
+      "apps/gateway/src/actions/simulation.service.ts",
+      "apps/gateway/test/tools.int.test.ts",
+      "apps/console/e2e/tools.spec.ts"
+    ],
+    "note": "The test room replays a suite against the draft and the published version, labelled “Test only: nothing was sent”, with each version’s replies, the actions and decisions per case and what changed; every run starts from the frozen cases (browser-tested). Replies come from the deterministic mock model (see G11)."
+  },
+  "HNV-11-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/actions/publish-checks.ts",
+      "apps/console/src/pages/AgentEditorPage.tsx",
+      "apps/gateway/test/tools.int.test.ts",
+      "apps/console/e2e/tools.spec.ts"
+    ],
+    "note": "Publishing is refused while a required suite has not passed on the exact draft, or a granted tool is waiting for review or belongs to another brand. The dialog names the check and what to do, the live version stays as it was, and after the suite is run again the draft publishes (browser-tested)."
+  },
+  "HNV-13-01": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/actions/gateway.service.ts",
+      "apps/console/src/components/ConversationActions.tsx",
+      "apps/gateway/test/actions.int.test.ts",
+      "apps/gateway/test/tools.int.test.ts"
+    ],
+    "note": "Lookups run with a time limit, their results are contained, and a failure reaches the customer in safe words without credentials; stopping the run cancels a call in flight (tested in the gateway). The inbox lists each lookup with its state. Missing: a browser test of a lookup while it runs."
+  },
+  "HNV-13-02": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/widget/src/actions/ActionCards.tsx",
+      "apps/console/src/components/ConversationActions.tsx",
+      "apps/widget/e2e/actions.spec.ts",
+      "apps/console/e2e/tools.spec.ts",
+      "apps/gateway/test/actions.int.test.ts"
+    ],
+    "note": "Customers and staff see the exact target, values, effects, approver and expiry and approve exactly that or decline (browser-tested); a changed request needs a new approval (tested in the gateway). Missing: editing a proposal before approving (today: decline and ask again)."
+  },
+  "HNV-13-03": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/actions/approvals.service.ts",
+      "apps/widget/src/actions/ActionCards.tsx",
+      "apps/gateway/test/actions.int.test.ts"
+    ],
+    "note": "An expired or changed request can no longer be approved: the card and the inbox say why in words, and a new request is a new card with a new hash (tested in the gateway). Missing: highlighting the fields that changed, and a browser test."
+  },
+  "HNV-13-04": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/actions/views.ts",
+      "apps/console/src/components/ConversationActions.tsx",
+      "apps/gateway/test/actions.int.test.ts"
+    ],
+    "note": "A refused action carries a reason safe to show (turned off, stopped, limit reached, not found for this customer…); the AI tells the customer it could not do it and that a person can help, and staff see the reason in the inbox and the audit log (tested in the gateway). Missing: offering an allowed alternative, a link to the audit entry, and a browser test."
+  },
+  "HNV-13-05": {
+    "status": "in-progress",
+    "evidence": [
+      "apps/gateway/src/actions/executor.service.ts",
+      "apps/console/src/components/ConversationActions.tsx",
+      "apps/gateway/test/actions.int.test.ts",
+      "apps/gateway/test/tools.int.test.ts"
+    ],
+    "note": "A write whose answer was lost shows as not confirmed, with its action reference; it is never sent again, the tool’s records settle it, and staff can ask for a check or record the outcome by hand (tested in the gateway). Missing: a browser test of these inbox controls."
   }
 }

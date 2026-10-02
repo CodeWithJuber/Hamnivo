@@ -4,6 +4,7 @@ import { decisionsUr } from './decisions';
 import { developerUr } from './developer/ur';
 import type { Translation } from './en';
 import { reportsUr } from './reports/ur';
+import { toolsUr } from './tools';
 import { chatSettingsUr } from './widget/ur';
 
 /** Urdu. Pending review by native speakers, as the note in the interface says. */
@@ -845,6 +846,7 @@ export const ur: Translation = {
       blocked: 'گارڈ نے روکا',
       error: 'خرابی',
       skipped: 'چھوڑ دیا گیا',
+      cancelled: 'کسی شخص نے روکا',
       running: 'جاری',
     },
     view: 'دیکھیں',
@@ -1315,6 +1317,7 @@ export const ur: Translation = {
   },
   decisions: decisionsUr,
   caching: cachingUr,
+  tools: toolsUr,
   commerce: commerceUr,
   developer: developerUr,
   reports: reportsUr,
@@ -2320,6 +2323,7 @@ export const ur: Translation = {
     },
     knowledge: { read: 'معلومات کے ذرائع پڑھیں', manage: 'معلومات شامل کریں، بدلیں اور ہٹائیں' },
     tools: {
+      read: 'ٹولز، اقدامات کی پالیسیاں، AI کے اقدامات اور سمیولیشن کے نتائج دیکھیں',
       manage: 'ٹولز اور اقدامات کی پالیسیاں سیٹ کریں',
       approve: 'AI ایجنٹس کے تجویز کردہ اقدامات منظور کریں',
     },

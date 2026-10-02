@@ -149,6 +149,7 @@ const outcomeTone: Record<Outcome, StatusTone> = {
   blocked: 'danger',
   error: 'danger',
   skipped: 'neutral',
+  cancelled: 'neutral',
   running: 'info',
 };
 

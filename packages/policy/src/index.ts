@@ -1,3 +1,4 @@
+export * from './actions.js';
 export * from './authorize.js';
 export * from './catalog.js';
 export * from './delegation.js';

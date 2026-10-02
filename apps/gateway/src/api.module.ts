@@ -2,6 +2,7 @@ import type { Db } from '@hamnivo/db';
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import type { LanguageModel } from 'ai';
+import { ACTIONS_API_CONTROLLERS, ACTIONS_API_PROVIDERS } from './actions/actions.module.js';
 import { AdminController } from './admin/admin.controller.js';
 import { AdminService } from './admin/admin.service.js';
 import { BrandsController } from './admin/brands.controller.js';
@@ -151,6 +152,7 @@ export class ApiModule {
         ...COMMERCE_API_CONTROLLERS,
         ...DEVELOPER_API_CONTROLLERS,
         ...WIDGET_SURFACE_API_CONTROLLERS,
+        ...ACTIONS_API_CONTROLLERS,
       ],
       providers: [
         {
@@ -229,6 +231,7 @@ export class ApiModule {
         ...COMMERCE_API_PROVIDERS,
         ...developerApiProviders(overrides),
         ...widgetSurfaceApiProviders(config, overrides.scanner),
+        ...ACTIONS_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

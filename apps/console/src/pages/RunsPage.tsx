@@ -1,5 +1,6 @@
 import { EmptyState } from '@hamnivo/ui/components/async-states';
 import { Button } from '@hamnivo/ui/components/button';
+import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import {
   Sheet,
   SheetClose,
@@ -19,18 +20,20 @@ import {
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import type { TFunction } from 'i18next';
-import { ActivityIcon, ListFilterIcon, XIcon } from 'lucide-react';
+import { ActivityIcon, ListFilterIcon, OctagonPauseIcon, XIcon } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../components/AppDialog';
 import { OutcomeBadge, outcomeOf, StepStatusBadge } from '../components/Badges';
 import { SelectField, TextField } from '../components/Fields';
 import { PageHeader } from '../components/PageHeader';
 import { QueryState } from '../components/States';
 import { directionOf, isLocale } from '../i18n';
+import { api } from '../lib/api';
 import { returnFocus, useOpener } from '../lib/focus';
 import { formatDateTime, formatDuration, formatNumber } from '../lib/format';
 import { type Names, useNames } from '../lib/names';
-import { useAgents, useRun, useRuns } from '../lib/queries';
+import { keys, useAgents, useRun, useRuns, useStudioMutation } from '../lib/queries';
 import { useTenant } from '../lib/tenant';
 import type { Run, RunStep } from '../lib/types';
 import type { RunsSearch } from '../routes/_studio/runs';
@@ -43,6 +46,7 @@ const OUTCOMES = [
   'blocked',
   'error',
   'skipped',
+  'cancelled',
   'running',
 ] as const;
 
@@ -134,8 +138,42 @@ function StepItem({ step }: { step: RunStep }) {
   );
 }
 
+/** Stops a running run (Cancel run): tool calls in flight end, nothing sent is resent. */
+function StopRun({ runId }: { runId: string }) {
+  const { t } = useTranslation();
+  const announce = useAnnouncer();
+  const [open, setOpen] = useState(false);
+  const stop = useStudioMutation(
+    (_: undefined, tenant) =>
+      api<Run>(`/v1/admin/runs/${runId}/cancel`, { method: 'POST', tenant }),
+    [keys.runs],
+  );
+  return (
+    <>
+      <Button variant="destructive" size="sm" onClick={() => setOpen(true)} data-testid="stop-run">
+        <OctagonPauseIcon aria-hidden="true" />
+        {t('tools.runs.stop')}
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={t('tools.runs.stopTitle')}
+        confirmLabel={t('tools.runs.stop')}
+        variant="destructive-solid"
+        onConfirm={async () => {
+          await stop.mutateAsync();
+          announce(t('tools.runs.stopped'), 'assertive');
+        }}
+      >
+        <p>{t('tools.runs.stopBody')}</p>
+      </ConfirmDialog>
+    </>
+  );
+}
+
 function RunDetail({ runId, names }: { runId: string; names: Names }) {
   const { t } = useTranslation();
+  const { can } = useTenant();
   const run = useRun(runId);
   return (
     <QueryState query={run} label={t('runs.detail.loading')}>
@@ -146,6 +184,9 @@ function RunDetail({ runId, names }: { runId: string; names: Names }) {
             <StatusBadge tone={data.state === 'failed' ? 'danger' : 'neutral'} icon={null}>
               {t(`runs.detail.states.${data.state}`)}
             </StatusBadge>
+            {data.state === 'running' && can('conversations.takeover') ? (
+              <StopRun runId={data.id} />
+            ) : null}
           </div>
           <section aria-labelledby="run-summary" className="flex flex-col gap-2">
             <h3 id="run-summary" className="text-sm font-semibold text-text">

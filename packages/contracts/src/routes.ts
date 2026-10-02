@@ -41,6 +41,7 @@ import {
   StaffMessageResponse,
   TakeoverRequest,
 } from './staff-conversations.js';
+import { actionInboxRoutes, actionWidgetRoutes, toolAdminRoutes } from './tool-routes.js';
 import {
   CreateWidgetSessionRequest,
   IdentifyRequest,
@@ -412,4 +413,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...customerSurfaceWidgetRoutes,
   ...notificationRoutes,
   ...customerSurfaceAdminRoutes,
+  ...toolAdminRoutes,
+  ...actionInboxRoutes,
+  ...actionWidgetRoutes,
 };

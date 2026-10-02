@@ -3,6 +3,7 @@ import type { WidgetLayoutMode } from '@hamnivo/contracts';
 import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ActionsContext, useActions } from './actions/useActions.js';
 import type { HostBridge } from './bridge.js';
 import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
@@ -42,6 +43,8 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const { onEvent } = chat;
   useEffect(() => onEvent(commerce.onEvent), [onEvent, commerce.onEvent]);
   const memory = useMemory(client, chat.state.session?.principal.id ?? null);
+  const actions = useActions(client, chat.state.conversation?.id ?? null, bridge);
+  useEffect(() => onEvent(actions.onEvent), [onEvent, actions.onEvent]);
   const display = useDisplay(params.widgetId);
   // Embedded, the chat is on screen only while the loader shows it; on its own page, always.
   const [open, setOpen] = useState(
@@ -147,40 +150,42 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const closable = Boolean(params.hostOrigin) && mode !== 'inline' && mode !== 'fullpage';
   return (
     <AnnouncerProvider>
-      <Chat
-        client={client}
-        session={session}
-        state={chat.state}
-        commerce={commerce}
-        pending={chat.pending}
-        locale={locale}
-        mode={mode}
-        visible={open && pageShown}
-        display={display}
-        prompt={prompt}
-        onLocale={(next) => {
-          setLocale(next);
-          void saveLocale(next);
-        }}
-        onSend={chat.send}
-        onRetry={(id) => chat.retry(id)}
-        onRemove={chat.remove}
-        onFlush={chat.flush}
-        onHandoff={chat.handoff}
-        onLoadOlder={chat.loadOlder}
-        onSeen={chat.markSeen}
-        onDelete={chat.deleteMessage}
-        onReact={chat.react}
-        onOpenConversation={chat.open}
-        onFilesConversation={chat.conversationForFiles}
-        language={language}
-        memory={memory}
-        onClose={
-          closable
-            ? () => bridge.post({ type: 'layout', open: false, width: 0, height: 0 })
-            : undefined
-        }
-      />
+      <ActionsContext.Provider value={actions}>
+        <Chat
+          client={client}
+          session={session}
+          state={chat.state}
+          commerce={commerce}
+          pending={chat.pending}
+          locale={locale}
+          mode={mode}
+          visible={open && pageShown}
+          display={display}
+          prompt={prompt}
+          onLocale={(next) => {
+            setLocale(next);
+            void saveLocale(next);
+          }}
+          onSend={chat.send}
+          onRetry={(id) => chat.retry(id)}
+          onRemove={chat.remove}
+          onFlush={chat.flush}
+          onHandoff={chat.handoff}
+          onLoadOlder={chat.loadOlder}
+          onSeen={chat.markSeen}
+          onDelete={chat.deleteMessage}
+          onReact={chat.react}
+          onOpenConversation={chat.open}
+          onFilesConversation={chat.conversationForFiles}
+          language={language}
+          memory={memory}
+          onClose={
+            closable
+              ? () => bridge.post({ type: 'layout', open: false, width: 0, height: 0 })
+              : undefined
+          }
+        />
+      </ActionsContext.Provider>
     </AnnouncerProvider>
   );
 }

@@ -9,11 +9,12 @@ export type ReceiptRow = typeof schema.operationReceipts.$inferSelect;
 
 export interface NewOperation {
   tenantId: string;
-  kind: 'commerce.checkout.create' | 'commerce.refund.create';
+  /** Commerce writes, and AI tool actions (`tool.<name>`) since one ledger serves both. */
+  kind: 'commerce.checkout.create' | 'commerce.refund.create' | `tool.${string}`;
   businessKey: string;
   requestHash: Buffer;
   provider: string;
-  resourceType: 'purchase_intent' | 'refund';
+  resourceType: 'purchase_intent' | 'refund' | 'action';
   resourceId: string;
   conversationId: string | null;
   ownerEpoch: number | null;

@@ -59,6 +59,8 @@ const APPEND_ONLY = new Set([
   'webhook_attempts',
   'usage_alerts',
   'customer_notifications',
+  'action_approvals',
+  'handoff_packets',
 ]);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
@@ -79,6 +81,10 @@ const NEVER_DELETED = new Set([
   'conversation_metrics',
   'tenant_entitlements',
   'egress_policies',
+  'actions',
+  'tool_definitions',
+  'mcp_servers',
+  'action_settings',
 ]);
 
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
@@ -309,6 +315,14 @@ describe('two-tenant isolation', () => {
     'tenant_entitlements',
     'usage_alerts',
     'conversation_metrics',
+    'mcp_servers',
+    'tool_definitions',
+    'action_settings',
+    'actions',
+    'action_approvals',
+    'handoff_packets',
+    'simulation_suites',
+    'simulation_runs',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -475,6 +489,14 @@ describe('two-tenant isolation', () => {
       'tenant_entitlements',
       'usage_alerts',
       'conversation_metrics',
+      'mcp_servers',
+      'tool_definitions',
+      'action_settings',
+      'actions',
+      'action_approvals',
+      'handoff_packets',
+      'simulation_suites',
+      'simulation_runs',
       'audit_heads',
       'audit_events',
     ]);

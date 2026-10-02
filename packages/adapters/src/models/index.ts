@@ -3,4 +3,5 @@ export * from './errors.js';
 export * from './fallback.js';
 export * from './mock.js';
 export * from './mock-embedding.js';
+export * from './mock-tools.js';
 export * from './registry.js';

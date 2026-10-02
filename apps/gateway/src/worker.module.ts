@@ -1,5 +1,9 @@
 import { type DynamicModule, Logger, Module } from '@nestjs/common';
 import type { LanguageModel } from 'ai';
+import { ACTIONS_WORKER_PROVIDERS } from './actions/actions.module.js';
+import { ACTION_EXECUTE_TOPIC, ActionExecutor } from './actions/executor.service.js';
+import { ACTION_RECONCILE_TOPIC } from './actions/inbox-actions.service.js';
+import { ActionsWorker } from './actions/worker.service.js';
 import { JournalService } from './authority/journal.service.js';
 import { OwnershipService } from './authority/ownership.service.js';
 import { InboxProcessor } from './authority/processor.service.js';
@@ -115,6 +119,7 @@ export class WorkerModule {
         MigrationExporter,
         ...COMMERCE_WORKER_PROVIDERS,
         ...WIDGET_SURFACE_WORKER_PROVIDERS,
+        ...ACTIONS_WORKER_PROVIDERS,
         {
           provide: OUTBOX_HANDLERS,
           inject: [
@@ -130,6 +135,8 @@ export class WorkerModule {
             CommerceCardsService,
             WebhookFanout,
             CustomerEmailsService,
+            ActionExecutor,
+            ActionsWorker,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -144,6 +151,8 @@ export class WorkerModule {
             cards: CommerceCardsService,
             webhooks: WebhookFanout,
             emails: CustomerEmailsService,
+            executor: ActionExecutor,
+            actions: ActionsWorker,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -173,6 +182,8 @@ export class WorkerModule {
               [WEBHOOK_SOURCE_TOPIC, (event) => webhooks.onSource(event)],
               [TRANSCRIPT_TOPIC, (event) => emails.onTranscript(event)],
               [REPLY_WAITING_TOPIC, (event) => emails.onReplyWaiting(event)],
+              [ACTION_EXECUTE_TOPIC, (event) => executor.onExecute(event)],
+              [ACTION_RECONCILE_TOPIC, (event) => actions.onReconcile(event)],
             ]),
         },
         OutboxRelay,
@@ -189,6 +200,8 @@ export class WorkerModule {
         MemoryDeletionService,
         CommerceWorker,
         WebhookDispatcher,
+        ActionsWorker,
+        ActionExecutor,
       ],
     };
   }

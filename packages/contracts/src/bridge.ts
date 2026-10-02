@@ -52,6 +52,8 @@ export const PublicWidgetEvent = z.enum([
   'conversation.resolved',
   'handoff.requested',
   'identity.changed',
+  /** The customer must sign in on the website to approve an AI action (payload: actionId). */
+  'identity.required',
   'error',
 ]);
 export type PublicWidgetEvent = z.infer<typeof PublicWidgetEvent>;

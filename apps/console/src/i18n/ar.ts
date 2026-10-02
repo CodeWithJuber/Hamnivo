@@ -4,6 +4,7 @@ import { decisionsAr } from './decisions';
 import { developerAr } from './developer/ar';
 import type { Translation } from './en';
 import { reportsAr } from './reports/ar';
+import { toolsAr } from './tools';
 import { chatSettingsAr } from './widget/ar';
 
 /** Arabic (Modern Standard). Pending review by native speakers, as the note in the interface says. */
@@ -823,6 +824,7 @@ export const ar: Translation = {
       blocked: 'منعه حارس',
       error: 'خطأ',
       skipped: 'تُخطّي',
+      cancelled: 'أوقفه شخص',
       running: 'قيد التشغيل',
     },
     view: 'عرض',
@@ -1289,6 +1291,7 @@ export const ar: Translation = {
   },
   decisions: decisionsAr,
   caching: cachingAr,
+  tools: toolsAr,
   commerce: commerceAr,
   developer: developerAr,
   reports: reportsAr,
@@ -2275,6 +2278,7 @@ export const ar: Translation = {
     },
     knowledge: { read: 'قراءة مصادر المعرفة', manage: 'إضافة المعرفة وتعديلها وإيقافها' },
     tools: {
+      read: 'عرض الأدوات وسياسات الإجراءات وإجراءات الذكاء الاصطناعي ونتائج المحاكاة',
       manage: 'إعداد الأدوات وسياسات الإجراءات',
       approve: 'الموافقة على الإجراءات التي يقترحها وكلاء الذكاء الاصطناعي',
     },

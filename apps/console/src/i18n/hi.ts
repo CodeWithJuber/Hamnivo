@@ -4,6 +4,7 @@ import { decisionsHi } from './decisions';
 import { developerHi } from './developer/hi';
 import type { Translation } from './en';
 import { reportsHi } from './reports/hi';
+import { toolsHi } from './tools';
 import { chatSettingsHi } from './widget/hi';
 
 /** Hindi. Pending review by native speakers, as the note in the interface says. */
@@ -828,6 +829,7 @@ export const hi: Translation = {
       blocked: 'गार्ड ने रोका',
       error: 'त्रुटि',
       skipped: 'छोड़ा गया',
+      cancelled: 'किसी व्यक्ति ने रोका',
       running: 'चल रहा है',
     },
     view: 'देखें',
@@ -1294,6 +1296,7 @@ export const hi: Translation = {
   },
   decisions: decisionsHi,
   caching: cachingHi,
+  tools: toolsHi,
   commerce: commerceHi,
   developer: developerHi,
   reports: reportsHi,
@@ -2280,6 +2283,7 @@ export const hi: Translation = {
     },
     knowledge: { read: 'जानकारी के स्रोत पढ़ें', manage: 'जानकारी जोड़ें, बदलें और हटाएं' },
     tools: {
+      read: 'टूल, कार्रवाई नीतियां, AI की कार्रवाइयां और सिमुलेशन के नतीजे देखें',
       manage: 'टूल और कार्रवाई नीतियां सेट करें',
       approve: 'AI एजेंट की सुझाई कार्रवाइयां मंज़ूर करें',
     },

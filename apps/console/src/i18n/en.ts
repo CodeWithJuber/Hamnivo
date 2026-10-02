@@ -3,6 +3,7 @@ import { commerceEn } from './commerce/en';
 import { decisionsEn } from './decisions';
 import { developerEn } from './developer/en';
 import { reportsEn } from './reports/en';
+import { toolsEn } from './tools';
 import { chatSettingsEn } from './widget/en';
 
 /** Studio interface text in English (the source language). Keep sentences short and plain. */
@@ -833,6 +834,7 @@ export const en = {
       blocked: 'Blocked by a guard',
       error: 'Error',
       skipped: 'Skipped',
+      cancelled: 'Stopped by a person',
       running: 'Running',
     },
     view: 'View',
@@ -1301,6 +1303,7 @@ export const en = {
   },
   decisions: decisionsEn,
   caching: cachingEn,
+  tools: toolsEn,
   commerce: commerceEn,
   developer: developerEn,
   reports: reportsEn,
@@ -2296,6 +2299,7 @@ export const en = {
     },
     knowledge: { read: 'Read knowledge sources', manage: 'Add, edit and retire knowledge' },
     tools: {
+      read: 'See tools, action policies, AI actions and simulation results',
       manage: 'Configure tools and action policies',
       approve: 'Approve actions proposed by AI agents',
     },

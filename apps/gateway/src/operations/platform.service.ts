@@ -91,7 +91,7 @@ export class PlatformService {
         (select count(*) from authority_connections c
            where c.tenant_id = t.id and c.status in ('degraded', 'disabled')) as unhealthy,
         (select count(*) from kill_switches k
-           where k.tenant_id = t.id and k.cleared_at is null) as ai_stops,
+           where k.tenant_id = t.id and k.cleared_at is null and k.scope <> 'tool') as ai_stops,
         (select count(*) from model_connections m
            where m.tenant_id = t.id and m.status = 'disabled') as providers_off,
         (select count(*) from support_grants s
@@ -207,11 +207,12 @@ export class PlatformService {
         status: c.status,
         lastHealthAt: iso(c.lastHealthAt),
       })),
-      aiStopList: stops.map((s) => ({
-        id: toPublicId('killSwitch', s.id),
-        scope: s.scope,
-        since: s.since.toISOString(),
-      })),
+      // A tool switch stops one tool's actions, not replies: it is not an AI stop.
+      aiStopList: stops.flatMap((s) =>
+        s.scope === 'tool'
+          ? []
+          : [{ id: toPublicId('killSwitch', s.id), scope: s.scope, since: s.since.toISOString() }],
+      ),
       providerList: providers,
       supportGrants: grants.map((g) =>
         supportGrantView(g, { id: tenantId, name: row.name }, null, now),
@@ -318,7 +319,8 @@ export class PlatformService {
         (select count(*) from support_grants where status = 'approved' and revoked_at is null
            and ended_at is null and expires_at > now()) as support_active,
         (select count(*) from support_grants where status = 'pending') as support_pending,
-        (select count(*) from kill_switches where cleared_at is null) as ai_stops,
+        (select count(*) from kill_switches
+           where cleared_at is null and scope <> 'tool') as ai_stops,
         (select count(*) from model_connections where status = 'disabled') as providers_off`);
     const counts = rows[0];
     return {

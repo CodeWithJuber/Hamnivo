@@ -4151,7 +4151,7 @@
       },
       "post": {
         "operationId": "createKillSwitch",
-        "summary": "Stop AI replies for the tenant, a brand or an agent; conversations go to people (agents.publish)",
+        "summary": "Stop AI replies for the tenant, a brand or an agent (agents.publish), or one tool’s actions (tools.manage); people keep chatting",
         "tags": [
           "Agents"
         ],
@@ -4218,7 +4218,7 @@
     "/v1/admin/kill-switches/{killSwitchId}/clear": {
       "post": {
         "operationId": "clearKillSwitch",
-        "summary": "Let the AI answer again in this scope (agents.publish, fresh sign-in)",
+        "summary": "Let the AI answer, or the tool act, again in this scope (agents.publish or tools.manage, fresh sign-in)",
         "tags": [
           "Agents"
         ],
@@ -16936,6 +16936,1751 @@
           }
         }
       }
+    },
+    "/v1/admin/tools": {
+      "get": {
+        "operationId": "listTools",
+        "summary": "Tools of the tenant or one brand, with their action policies (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "brandId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ToolDefinition"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createTool",
+        "summary": "Add a built-in tool to a brand (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Retry-safe key bound to the request body hash; reuse with a different body returns 409",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateToolRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tool added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolDefinition"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/tools/builtins": {
+      "get": {
+        "operationId": "listBuiltinTools",
+        "summary": "Built-in tools that can be added to a brand (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Built-in tools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BuiltinTool"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/tools/{toolId}": {
+      "get": {
+        "operationId": "getTool",
+        "summary": "One tool with its policy (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "toolId",
+            "schema": {
+              "type": "string",
+              "description": "Tool ID (tool_…)"
+            },
+            "required": true,
+            "description": "Tool ID (tool_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolDefinition"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateTool",
+        "summary": "Change a tool’s policy, enable a reviewed MCP tool or disable one; pending approvals are superseded (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "toolId",
+            "schema": {
+              "type": "string",
+              "description": "Tool ID (tool_…)"
+            },
+            "required": true,
+            "description": "Tool ID (tool_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateToolRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolDefinition"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers": {
+      "get": {
+        "operationId": "listMcpServers",
+        "summary": "Remote MCP servers the brand’s tools come from (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "brandId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Servers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/McpServer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createMcpServer",
+        "summary": "Connect a remote MCP server (Streamable HTTP); its host joins the brand’s egress allowlist (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Retry-safe key bound to the request body hash; reuse with a different body returns 409",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMcpServerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Server connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers/{serverId}": {
+      "patch": {
+        "operationId": "updateMcpServer",
+        "summary": "Rename, disable or change the token of an MCP server (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMcpServerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers/{serverId}/sync": {
+      "post": {
+        "operationId": "syncMcpServer",
+        "summary": "List the server’s tools; new or changed tools wait for review before any agent can use them (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tools listed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpSyncResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/action-settings": {
+      "get": {
+        "operationId": "getActionSettings",
+        "summary": "Autopilot switch and the tenant’s daily autopilot budget (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateActionSettings",
+        "summary": "Turn autopilot on or off and set its daily budget (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateActionSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/actions": {
+      "get": {
+        "operationId": "listActions",
+        "summary": "AI actions, newest first: what was proposed, decided and done (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "brandId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "conversationId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "toolId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "$ref": "#/components/schemas/ActionState"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "description": "Opaque pagination cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Actions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Action"
+                      }
+                    },
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512,
+                          "description": "Opaque pagination cursor"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/runs/{runId}/cancel": {
+      "post": {
+        "operationId": "cancelRun",
+        "summary": "Stop a running AI run: tool calls in flight are cancelled, changes already sent are reconciled (conversations.takeover)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runId",
+            "schema": {
+              "type": "string",
+              "description": "Run ID (run_…)"
+            },
+            "required": true,
+            "description": "Run ID (run_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation requested",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/agents/{agentId}/simulations": {
+      "get": {
+        "operationId": "listSimulationSuites",
+        "summary": "Simulation suites of an agent (agents.read)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "description": "Agent ID (agt_…)"
+            },
+            "required": true,
+            "description": "Agent ID (agt_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suites",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SimulationSuite"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createSimulationSuite",
+        "summary": "Save canned conversations with fake tool answers (agents.manage)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "description": "Agent ID (agt_…)"
+            },
+            "required": true,
+            "description": "Agent ID (agt_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSimulationSuiteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Suite saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationSuite"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/agents/{agentId}/simulations/{suiteId}": {
+      "put": {
+        "operationId": "updateSimulationSuite",
+        "summary": "Replace a suite’s cases (agents.manage)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "description": "Agent ID (agt_…)"
+            },
+            "required": true,
+            "description": "Agent ID (agt_…)"
+          },
+          {
+            "in": "path",
+            "name": "suiteId",
+            "schema": {
+              "type": "string",
+              "description": "Simulation suite ID (sim_…)"
+            },
+            "required": true,
+            "description": "Simulation suite ID (sim_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSimulationSuiteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Suite saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationSuite"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteSimulationSuite",
+        "summary": "Delete a suite and its runs (agents.manage)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "description": "Agent ID (agt_…)"
+            },
+            "required": true,
+            "description": "Agent ID (agt_…)"
+          },
+          {
+            "in": "path",
+            "name": "suiteId",
+            "schema": {
+              "type": "string",
+              "description": "Simulation suite ID (sim_…)"
+            },
+            "required": true,
+            "description": "Simulation suite ID (sim_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/agents/{agentId}/simulations/{suiteId}/runs": {
+      "post": {
+        "operationId": "runSimulation",
+        "summary": "Replay the suite against the draft and the published version with the mock model and fake tools; nothing is sent or executed (agents.manage)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "description": "Agent ID (agt_…)"
+            },
+            "required": true,
+            "description": "Agent ID (agt_…)"
+          },
+          {
+            "in": "path",
+            "name": "suiteId",
+            "schema": {
+              "type": "string",
+              "description": "Simulation suite ID (sim_…)"
+            },
+            "required": true,
+            "description": "Simulation suite ID (sim_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Simulation run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationRun"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listSimulationRuns",
+        "summary": "Recent runs of a suite, newest first (agents.read)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "description": "Agent ID (agt_…)"
+            },
+            "required": true,
+            "description": "Agent ID (agt_…)"
+          },
+          {
+            "in": "path",
+            "name": "suiteId",
+            "schema": {
+              "type": "string",
+              "description": "Simulation suite ID (sim_…)"
+            },
+            "required": true,
+            "description": "Simulation suite ID (sim_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SimulationRun"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/conversations/{conversationId}/actions": {
+      "get": {
+        "operationId": "listConversationActions",
+        "summary": "AI actions in the conversation with their approval and receipt (conversations.read)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Actions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Action"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/conversations/{conversationId}/actions/{actionId}/decision": {
+      "post": {
+        "operationId": "decideConversationAction",
+        "summary": "Approve or decline an AI action that staff approve; money and irreversible actions need a fresh sign-in (tools.approve and the tool’s own permission)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "path",
+            "name": "actionId",
+            "schema": {
+              "type": "string",
+              "description": "Action ID (act_…)"
+            },
+            "required": true,
+            "description": "Action ID (act_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decision recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Action"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/conversations/{conversationId}/actions/{actionId}/check": {
+      "post": {
+        "operationId": "checkConversationAction",
+        "summary": "Check an action whose outcome is not confirmed with the tool; never sends it again (tools.approve)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "path",
+            "name": "actionId",
+            "schema": {
+              "type": "string",
+              "description": "Action ID (act_…)"
+            },
+            "required": true,
+            "description": "Action ID (act_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Action"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/conversations/{conversationId}/actions/{actionId}/resolve": {
+      "post": {
+        "operationId": "resolveConversationAction",
+        "summary": "Record the checked result of an action Hamnivo cannot check itself; nothing is sent again (tools.approve and the tool’s permission)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "path",
+            "name": "actionId",
+            "schema": {
+              "type": "string",
+              "description": "Action ID (act_…)"
+            },
+            "required": true,
+            "description": "Action ID (act_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Action"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/conversations/{conversationId}/handoff-packets": {
+      "get": {
+        "operationId": "listHandoffPackets",
+        "summary": "What the AI handed over, newest first: why, what it tried, what is pending (conversations.read)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Packets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HandoffPacket"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}/actions/{actionId}": {
+      "get": {
+        "operationId": "getWidgetAction",
+        "summary": "An AI action in this conversation, as the customer may see it",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "path",
+            "name": "actionId",
+            "schema": {
+              "type": "string",
+              "description": "Action ID (act_…)"
+            },
+            "required": true,
+            "description": "Action ID (act_…)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Action"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/conversations/{conversationId}/actions/{actionId}/decision": {
+      "post": {
+        "operationId": "decideWidgetAction",
+        "summary": "Approve or decline your own request exactly as shown; staff-only actions cannot be approved here",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "path",
+            "name": "actionId",
+            "schema": {
+              "type": "string",
+              "description": "Action ID (act_…)"
+            },
+            "required": true,
+            "description": "Action ID (act_…)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decision recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Action"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "webhooks": {
@@ -18838,6 +20583,10 @@
           "memory": {
             "default": {},
             "$ref": "#/components/schemas/AgentMemory"
+          },
+          "tools": {
+            "default": {},
+            "$ref": "#/components/schemas/AgentTools"
           }
         },
         "required": [
@@ -18926,6 +20675,48 @@
             "maximum": 4000
           }
         }
+      },
+      "AgentTools": {
+        "type": "object",
+        "properties": {
+          "grants": {
+            "default": [],
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentToolGrant"
+            }
+          },
+          "maxCallsPerRun": {
+            "default": 4,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "maxAutopilotPerConversation": {
+            "default": 5,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          }
+        }
+      },
+      "AgentToolGrant": {
+        "type": "object",
+        "properties": {
+          "toolId": {
+            "type": "string",
+            "description": "tool identifier (TypeID with prefix \"tool\")",
+            "example": "tool_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "autopilot": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "toolId"
+        ]
       },
       "UpdateAgentRequest": {
         "type": "object",
@@ -19025,7 +20816,8 @@
             "enum": [
               "tenant",
               "brand",
-              "agent"
+              "agent",
+              "tool"
             ]
           },
           "targetId": {
@@ -21690,6 +23482,497 @@
           }
         }
       },
+      "CreateToolRequest": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "builtin": {
+            "$ref": "#/components/schemas/BuiltinToolKey"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "approver": {
+            "$ref": "#/components/schemas/ActionApprover"
+          },
+          "requiredPermission": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "autopilot": {
+            "type": "boolean"
+          },
+          "customerStepUp": {
+            "type": "boolean"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 60000
+          },
+          "maxOutputBytes": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 262144
+          },
+          "egressHosts": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(?:\\*\\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+            }
+          },
+          "amountArgument": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currencyArgument": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approvalMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10080
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "brandId",
+          "builtin"
+        ]
+      },
+      "BuiltinToolKey": {
+        "type": "string",
+        "enum": [
+          "order_status",
+          "demo_update_address",
+          "demo_issue_credit"
+        ]
+      },
+      "RiskClass": {
+        "type": "string",
+        "enum": [
+          "read",
+          "write",
+          "money",
+          "irreversible"
+        ],
+        "description": "What a tool can do: look, change, move money, or undo nothing"
+      },
+      "ActionApprover": {
+        "type": "string",
+        "enum": [
+          "customer",
+          "staff"
+        ]
+      },
+      "UpdateToolRequest": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "approver": {
+            "$ref": "#/components/schemas/ActionApprover"
+          },
+          "requiredPermission": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "autopilot": {
+            "type": "boolean"
+          },
+          "customerStepUp": {
+            "type": "boolean"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 60000
+          },
+          "maxOutputBytes": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 262144
+          },
+          "egressHosts": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(?:\\*\\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+            }
+          },
+          "amountArgument": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currencyArgument": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approvalMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10080
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expectedRevision"
+        ]
+      },
+      "CreateMcpServerRequest": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "brandId",
+          "label",
+          "url"
+        ]
+      },
+      "UpdateMcpServerRequest": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "UpdateActionSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "autopilotEnabled": {
+            "type": "boolean"
+          },
+          "dailyAutopilotLimit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          }
+        }
+      },
+      "ActionState": {
+        "type": "string",
+        "enum": [
+          "awaiting_approval",
+          "approved",
+          "executing",
+          "completed",
+          "failed",
+          "unknown",
+          "declined",
+          "expired",
+          "superseded",
+          "cancelled",
+          "denied"
+        ]
+      },
+      "SaveSimulationSuiteRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "required": {
+            "default": false,
+            "type": "boolean"
+          },
+          "cases": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulationCase"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "cases"
+        ]
+      },
+      "SimulationCase": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]{1,40}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "messages": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          },
+          "tools": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{1,63}$"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "output": {},
+                "error": {
+                  "type": "string",
+                  "enum": [
+                    "timeout",
+                    "failed",
+                    "timeout_after_success"
+                  ]
+                }
+              }
+            }
+          },
+          "expect": {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "replied",
+                  "handoff",
+                  "blocked",
+                  "error"
+                ]
+              },
+              "actions": {
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tool": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{1,63}$"
+                    },
+                    "decision": {
+                      "type": "string",
+                      "enum": [
+                        "executed",
+                        "approval",
+                        "denied",
+                        "invalid",
+                        "failed"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "tool",
+                    "decision"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "messages"
+        ]
+      },
+      "DecideActionRequest": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "decline"
+            ]
+          },
+          "argumentsHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "clientRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "decision",
+          "argumentsHash",
+          "clientRequestId"
+        ]
+      },
+      "ResolveActionRequest": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "succeeded",
+              "failed"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "outcome",
+          "note"
+        ]
+      },
       "WidgetSession": {
         "type": "object",
         "properties": {
@@ -23047,25 +25330,40 @@
             "type": "string",
             "maxLength": 500
           },
+          "effects": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300
+            }
+          },
           "resource": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string"
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "id",
+                  "label"
+                ],
+                "additionalProperties": false
               },
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "type",
-              "id",
-              "label"
-            ],
-            "additionalProperties": false
+            ]
           },
           "changes": {
             "type": "array",
@@ -23093,11 +25391,76 @@
               "additionalProperties": false
             }
           },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "amountMinor": {
+                    "type": "string",
+                    "pattern": "^-?(0|[1-9][0-9]{0,17})$",
+                    "description": "Integer amount in the currency minor unit, as a string",
+                    "example": "14900"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  }
+                },
+                "required": [
+                  "amountMinor",
+                  "currency"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "money",
+              "irreversible"
+            ]
+          },
           "approver": {
             "type": "string",
             "enum": [
               "customer",
               "staff"
+            ]
+          },
+          "requestedBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stepUp": {
+            "type": "boolean"
+          },
+          "argumentsHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 12
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "status": {
@@ -23123,9 +25486,16 @@
           "approvalId",
           "title",
           "actionSummary",
+          "effects",
           "resource",
           "changes",
+          "amount",
+          "risk",
           "approver",
+          "requestedBy",
+          "stepUp",
+          "argumentsHash",
+          "code",
           "status",
           "expiresAt"
         ],
@@ -27160,7 +29530,8 @@
             "enum": [
               "tenant",
               "brand",
-              "agent"
+              "agent",
+              "tool"
             ]
           },
           "targetId": {
@@ -27283,7 +29654,8 @@
                   "fenced",
                   "blocked",
                   "error",
-                  "skipped"
+                  "skipped",
+                  "cancelled"
                 ]
               },
               {
@@ -42385,6 +44757,1374 @@
         ],
         "additionalProperties": false
       },
+      "ToolDefinition": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "tool identifier (TypeID with prefix \"tool\")",
+            "example": "tool_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,63}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "remoteDescription": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "builtin",
+              "mcp"
+            ]
+          },
+          "builtin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BuiltinToolKey"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mcpServerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "mcpServer identifier (TypeID with prefix \"mcp\")",
+                "example": "mcp_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inputSchema": {
+            "$ref": "#/components/schemas/ToolSchema"
+          },
+          "outputSchema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "approver": {
+            "$ref": "#/components/schemas/ActionApprover"
+          },
+          "requiredPermission": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "autopilot": {
+            "type": "boolean"
+          },
+          "customerStepUp": {
+            "type": "boolean"
+          },
+          "resourceType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "maxOutputBytes": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "egressHosts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "amountArgument": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currencyArgument": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "approvalMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ToolStatus"
+          },
+          "stopped": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reviewedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "updatedBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "staff identifier (TypeID with prefix \"stf\")",
+                "example": "stf_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "name",
+          "title",
+          "description",
+          "remoteDescription",
+          "source",
+          "builtin",
+          "mcpServerId",
+          "inputSchema",
+          "outputSchema",
+          "risk",
+          "approver",
+          "requiredPermission",
+          "autopilot",
+          "customerStepUp",
+          "resourceType",
+          "timeoutMs",
+          "maxOutputBytes",
+          "egressHosts",
+          "amountArgument",
+          "currencyArgument",
+          "approvalMinutes",
+          "status",
+          "stopped",
+          "revision",
+          "reviewedAt",
+          "updatedAt",
+          "updatedBy"
+        ],
+        "additionalProperties": false
+      },
+      "ToolSchema": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      },
+      "ToolStatus": {
+        "type": "string",
+        "enum": [
+          "enabled",
+          "disabled",
+          "review"
+        ],
+        "description": "`review`: discovered from an MCP server, not yet reviewed"
+      },
+      "BuiltinTool": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/BuiltinToolKey"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "approver": {
+            "$ref": "#/components/schemas/ActionApprover"
+          },
+          "autopilot": {
+            "type": "boolean"
+          },
+          "resourceType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "demo": {
+            "type": "boolean"
+          },
+          "available": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "description",
+          "risk",
+          "approver",
+          "autopilot",
+          "resourceType",
+          "demo",
+          "available"
+        ],
+        "additionalProperties": false
+      },
+      "McpServer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "mcpServer identifier (TypeID with prefix \"mcp\")",
+            "example": "mcp_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          },
+          "credential": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "masked": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "masked"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "protocolVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serverName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "toolCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "pendingReview": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "lastSyncedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "label",
+          "url",
+          "status",
+          "credential",
+          "protocolVersion",
+          "serverName",
+          "toolCount",
+          "pendingReview",
+          "lastSyncedAt",
+          "lastError",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "McpSyncResult": {
+        "type": "object",
+        "properties": {
+          "server": {
+            "$ref": "#/components/schemas/McpServer"
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "server",
+          "added",
+          "changed",
+          "removed",
+          "skipped"
+        ],
+        "additionalProperties": false
+      },
+      "ActionSettings": {
+        "type": "object",
+        "properties": {
+          "autopilotEnabled": {
+            "type": "boolean"
+          },
+          "dailyAutopilotLimit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "autopilotEnabled",
+          "dailyAutopilotLimit",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "Action": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "action identifier (TypeID with prefix \"act\")",
+            "example": "act_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "conversationId": {
+            "type": "string",
+            "description": "conversation identifier (TypeID with prefix \"conv\")",
+            "example": "conv_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "runId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "run identifier (TypeID with prefix \"run\")",
+                "example": "run_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tool": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "tool identifier (TypeID with prefix \"tool\")",
+                "example": "tool_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              "name": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "title"
+            ],
+            "additionalProperties": false
+          },
+          "state": {
+            "$ref": "#/components/schemas/ActionState"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "approver": {
+            "$ref": "#/components/schemas/ActionApprover"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "from": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 300
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "to": {
+                  "type": "string",
+                  "maxLength": 300
+                }
+              },
+              "required": [
+                "field",
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "amountMinor": {
+                    "type": "string",
+                    "pattern": "^-?(0|[1-9][0-9]{0,17})$",
+                    "description": "Integer amount in the currency minor unit, as a string",
+                    "example": "14900"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  }
+                },
+                "required": [
+                  "amountMinor",
+                  "currency"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "id",
+                  "label",
+                  "revision"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "argumentsHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stepUp": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outcome": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "declined"
+                    ]
+                  },
+                  "approverKind": {
+                    "type": "string",
+                    "enum": [
+                      "customer",
+                      "staff",
+                      "autopilot"
+                    ]
+                  },
+                  "at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  }
+                },
+                "required": [
+                  "decision",
+                  "approverKind",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "receipt": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "receipt identifier (TypeID with prefix \"rcp\")",
+                    "example": "rcp_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "succeeded",
+                      "failed",
+                      "unknown"
+                    ]
+                  },
+                  "reference": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "provider_api",
+                      "provider_webhook",
+                      "reconciler",
+                      "staff"
+                    ]
+                  },
+                  "observedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  }
+                },
+                "required": [
+                  "id",
+                  "outcome",
+                  "reference",
+                  "source",
+                  "observedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "operation identifier (TypeID with prefix \"op\")",
+                "example": "op_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arguments": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "runId",
+          "tool",
+          "state",
+          "risk",
+          "approver",
+          "summary",
+          "effects",
+          "changes",
+          "amount",
+          "resource",
+          "argumentsHash",
+          "code",
+          "stepUp",
+          "reason",
+          "outcome",
+          "expiresAt",
+          "createdAt",
+          "decision",
+          "receipt",
+          "operationId"
+        ],
+        "additionalProperties": false
+      },
+      "SimulationSuite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "simulation identifier (TypeID with prefix \"sim\")",
+            "example": "sim_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "agentId": {
+            "type": "string",
+            "description": "agent identifier (TypeID with prefix \"agt\")",
+            "example": "agt_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulationCaseOutput"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "agentId",
+          "name",
+          "required",
+          "cases",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "SimulationRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "simulationRun identifier (TypeID with prefix \"simr\")",
+            "example": "simr_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "suiteId": {
+            "type": "string",
+            "description": "simulation identifier (TypeID with prefix \"sim\")",
+            "example": "sim_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "agentId": {
+            "type": "string",
+            "description": "agent identifier (TypeID with prefix \"agt\")",
+            "example": "agt_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "candidateVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "baselineVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidateConfigHash": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed"
+            ]
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "cases": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "changed": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "failed": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "passed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "cases",
+              "changed",
+              "failed",
+              "passed"
+            ],
+            "additionalProperties": false
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "candidate": {
+                  "type": "object",
+                  "properties": {
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "replied",
+                        "handoff",
+                        "blocked",
+                        "error"
+                      ]
+                    },
+                    "handoffReason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "replies": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tool": {
+                            "type": "string"
+                          },
+                          "decision": {
+                            "type": "string",
+                            "enum": [
+                              "executed",
+                              "approval",
+                              "denied",
+                              "invalid",
+                              "failed"
+                            ]
+                          },
+                          "argumentsHash": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "reason": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "tool",
+                          "decision",
+                          "argumentsHash",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "outcome",
+                    "handoffReason",
+                    "replies",
+                    "actions"
+                  ],
+                  "additionalProperties": false
+                },
+                "baseline": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "outcome": {
+                          "type": "string",
+                          "enum": [
+                            "replied",
+                            "handoff",
+                            "blocked",
+                            "error"
+                          ]
+                        },
+                        "handoffReason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "replies": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tool": {
+                                "type": "string"
+                              },
+                              "decision": {
+                                "type": "string",
+                                "enum": [
+                                  "executed",
+                                  "approval",
+                                  "denied",
+                                  "invalid",
+                                  "failed"
+                                ]
+                              },
+                              "argumentsHash": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "reason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "tool",
+                              "decision",
+                              "argumentsHash",
+                              "reason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "outcome",
+                        "handoffReason",
+                        "replies",
+                        "actions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "changes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "failures": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "caseId",
+                "name",
+                "candidate",
+                "baseline",
+                "changes",
+                "failures"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "createdBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "staff identifier (TypeID with prefix \"stf\")",
+                "example": "stf_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "suiteId",
+          "agentId",
+          "candidateVersion",
+          "baselineVersion",
+          "candidateConfigHash",
+          "status",
+          "summary",
+          "results",
+          "startedAt",
+          "finishedAt",
+          "createdBy"
+        ],
+        "additionalProperties": false
+      },
+      "HandoffPacket": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "handoff identifier (TypeID with prefix \"hnd\")",
+            "example": "hnd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "conversationId": {
+            "type": "string",
+            "description": "conversation identifier (TypeID with prefix \"conv\")",
+            "example": "conv_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "epoch": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reasonText": {
+            "type": "string"
+          },
+          "request": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "replyLanguage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "knowledge",
+                    "tool",
+                    "guard",
+                    "model",
+                    "decision"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "label",
+                "outcome"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actionId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "awaiting_approval",
+                    "approved",
+                    "executing",
+                    "unknown",
+                    "superseded"
+                  ]
+                },
+                "approver": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ActionApprover"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "expiresAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                      "description": "RFC 3339 timestamp"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "actionId",
+                "title",
+                "state",
+                "approver",
+                "expiresAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "tool",
+                        "memory",
+                        "identity",
+                        "language",
+                        "order"
+                      ]
+                    },
+                    "ref": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "observedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                          "description": "RFC 3339 timestamp"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "ref",
+                    "observedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "label",
+                "value",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "epoch",
+          "reason",
+          "reasonText",
+          "request",
+          "replyLanguage",
+          "attempts",
+          "pending",
+          "facts",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
       "TextPartOutput": {
         "type": "object",
         "properties": {
@@ -42777,6 +46517,9 @@
           },
           "memory": {
             "$ref": "#/components/schemas/AgentMemoryOutput"
+          },
+          "tools": {
+            "$ref": "#/components/schemas/AgentToolsOutput"
           }
         },
         "required": [
@@ -42790,7 +46533,8 @@
           "fallbackModels",
           "limits",
           "knowledgeSourceIds",
-          "memory"
+          "memory",
+          "tools"
         ],
         "additionalProperties": false
       },
@@ -42877,6 +46621,56 @@
           "enabled",
           "maxItems",
           "maxChars"
+        ],
+        "additionalProperties": false
+      },
+      "AgentToolsOutput": {
+        "type": "object",
+        "properties": {
+          "grants": {
+            "default": [],
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentToolGrantOutput"
+            }
+          },
+          "maxCallsPerRun": {
+            "default": 4,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "maxAutopilotPerConversation": {
+            "default": 5,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "grants",
+          "maxCallsPerRun",
+          "maxAutopilotPerConversation"
+        ],
+        "additionalProperties": false
+      },
+      "AgentToolGrantOutput": {
+        "type": "object",
+        "properties": {
+          "toolId": {
+            "type": "string",
+            "description": "tool identifier (TypeID with prefix \"tool\")",
+            "example": "tool_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "autopilot": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "toolId",
+          "autopilot"
         ],
         "additionalProperties": false
       },
@@ -43359,6 +47153,103 @@
           "seconds",
           "visits",
           "message"
+        ],
+        "additionalProperties": false
+      },
+      "SimulationCaseOutput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]{1,40}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "messages": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          },
+          "tools": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{1,63}$"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "output": {},
+                "error": {
+                  "type": "string",
+                  "enum": [
+                    "timeout",
+                    "failed",
+                    "timeout_after_success"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "expect": {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "replied",
+                  "handoff",
+                  "blocked",
+                  "error"
+                ]
+              },
+              "actions": {
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tool": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{1,63}$"
+                    },
+                    "decision": {
+                      "type": "string",
+                      "enum": [
+                        "executed",
+                        "approval",
+                        "denied",
+                        "invalid",
+                        "failed"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "tool",
+                    "decision"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "messages",
+          "tools"
         ],
         "additionalProperties": false
       }
