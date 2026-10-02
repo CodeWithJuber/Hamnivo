@@ -5,15 +5,24 @@
  *   pnpm --filter @hamnivo/evals run-suite fairness [--out DIR]
  *   pnpm --filter @hamnivo/evals run-suite adjudication [--responder …] [--out DIR]
  *   pnpm --filter @hamnivo/evals run-suite summarize DIR
+ *   pnpm --filter @hamnivo/evals run-suite decisions --provider jev|mock [--max-calls 2000]
+ *       [--concurrency 4] [--model jev-1.13.0] [--report FILE.md] [--out DIR]
  *
  * `model` uses EVAL_MODEL_PROVIDER, EVAL_MODEL_ID and, where the provider needs them,
- * EVAL_MODEL_API_KEY and EVAL_MODEL_BASE_URL. Keys come only from the environment and are never
- * written anywhere. Results hold the corpus text and the replies, never customer data.
+ * EVAL_MODEL_API_KEY and EVAL_MODEL_BASE_URL. `decisions --provider jev` uses TYPESAFE_API_KEY
+ * (and TYPESAFE_BASE_URL when set). Keys come only from the environment and are never written
+ * anywhere. Results hold the corpus text and the replies, never customer data.
  */
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { createJevDecisionProvider } from '@hamnivo/adapters/jev';
 import { createLanguageModel, createMockModel, type ModelSpec } from '@hamnivo/adapters/models';
+import {
+  createMockDecisionProvider,
+  type DecisionProvider,
+  EVALUATED_DECISION_MODEL,
+} from '@hamnivo/domain';
 import {
   buildReviewPackets,
   type ReviewPacket,
@@ -21,6 +30,15 @@ import {
   summarizeAdjudication,
 } from './adjudication.js';
 import { loadAdjudicationCorpus, loadFairnessCorpus, loadSycophancyCorpus } from './corpus.js';
+import {
+  DEFAULT_MAX_CALLS,
+  decisionItems,
+  loadHumanRequestCases,
+  loadRoutingCorpus,
+  runDecisions,
+  scoreDecisions,
+} from './decisions.js';
+import { decisionsMarkdown } from './decisions-report.js';
 import { runFairness } from './fairness.js';
 import { modelResponder, referenceResponder, sycophantResponder } from './responders.js';
 import { formatRate, groupBy } from './stats.js';
@@ -51,6 +69,57 @@ function responderFrom(name: string): Responder {
     }
     default:
       throw new Error(`Unknown responder "${name}". Use reference, sycophant, mock or model.`);
+  }
+}
+
+/** A provider for `decisions`: the mock answers from keywords, Jev from TypeSafe's API. */
+function decisionProviderFrom(name: string, model: string): DecisionProvider {
+  switch (name) {
+    case 'mock': {
+      const rubric = [...loadRoutingCorpus().rubric, ...loadFairnessCorpus().rubric];
+      const keywords: Record<string, string[]> = {};
+      for (const intent of rubric) {
+        keywords[intent.key] = [...(keywords[intent.key] ?? []), ...intent.keywords];
+      }
+      return createMockDecisionProvider({
+        rules: {
+          wants_person: {
+            type: 'noul',
+            keywords: [
+              'person',
+              'human',
+              'agent',
+              'insaan',
+              'banda',
+              'bande',
+              'banday',
+              'موظف',
+              'इंसान',
+            ],
+          },
+          intent: { type: 'choice', keywords },
+        },
+      });
+    }
+    case 'jev': {
+      const apiKey = process.env.TYPESAFE_API_KEY?.trim() || process.env.JEV_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error(
+          'Set TYPESAFE_API_KEY to evaluate Jev. It is read from the environment only.',
+        );
+      }
+      const baseURL = process.env.TYPESAFE_BASE_URL?.trim() || undefined;
+      return createJevDecisionProvider({
+        apiKey,
+        model,
+        deadlineMs: 5000,
+        // An evaluation should report failures, not stop at the first few of them.
+        breaker: { failureThreshold: 25, cooldownMs: 5000 },
+        ...(baseURL ? { baseURL } : {}),
+      });
+    }
+    default:
+      throw new Error(`Unknown decision provider "${name}". Use jev or mock.`);
   }
 }
 
@@ -86,6 +155,11 @@ async function main() {
     options: {
       responder: { type: 'string', default: 'reference' },
       out: { type: 'string', default: resolve(import.meta.dirname, '../out') },
+      provider: { type: 'string', default: 'mock' },
+      model: { type: 'string', default: EVALUATED_DECISION_MODEL },
+      'max-calls': { type: 'string', default: String(DEFAULT_MAX_CALLS) },
+      concurrency: { type: 'string', default: '4' },
+      report: { type: 'string' },
     },
   });
   const [suite, target] = positionals;
@@ -141,13 +215,86 @@ async function main() {
       say(`review packets in ${dir} (pending native review)`);
       break;
     }
+    case 'decisions': {
+      const maxCalls = Number(values['max-calls']);
+      const concurrency = Number(values.concurrency);
+      if (!(maxCalls > 0) || !(concurrency > 0 && concurrency <= 16)) {
+        throw new Error('--max-calls must be positive and --concurrency between 1 and 16.');
+      }
+      const provider = decisionProviderFrom(values.provider, values.model);
+      const routing = loadRoutingCorpus();
+      const handoff = loadHumanRequestCases();
+      const fairness = loadFairnessCorpus();
+      const items = decisionItems(routing, handoff, fairness);
+      const model = values.provider === 'jev' ? values.model : 'decision-mock-1';
+      const deadlineMs = 5000;
+      say(
+        `decisions (${provider.id} ${model}): ${items.length} messages, at most ${maxCalls} calls`,
+      );
+      const { records, calls } = await runDecisions(items, {
+        provider,
+        model,
+        maxCalls,
+        concurrency,
+        deadlineMs,
+        onProgress: (done, total) => {
+          if (done % 50 === 0 || done === total) say(`  ${done}/${total}`);
+        },
+      });
+      const report = scoreDecisions(items, records, { provider: provider.id, model, calls });
+      const file = write(
+        out,
+        `decisions-${provider.id}.json`,
+        json({ report, records: records.map((r, i) => ({ ...r, text: items[i]?.text })) }),
+      );
+      say(
+        `  person request: accuracy ${formatRate(report.personRequest.overall.accuracy)} · fixed rule ${formatRate(report.personRequest.overall.baselineAccuracy)}`,
+      );
+      say(
+        `  routing:        accuracy ${formatRate(report.routing.overall.accuracy)} · fixed rule ${formatRate(report.routing.overall.baselineAccuracy)}`,
+      );
+      say(
+        `  language:       accuracy ${formatRate(report.language.overall.accuracy)} · fixed rule ${formatRate(report.language.overall.baselineAccuracy)}`,
+      );
+      say(
+        `  latency p50 ${report.latency.overall.p50} ms, p95 ${report.latency.overall.p95} ms · ${calls} calls · ${report.tokens.input} input tokens · $${report.tokens.costUsd}`,
+      );
+      say(`written to ${file}`);
+      if (values.report) {
+        const target = resolve(values.report);
+        const date = new Date().toISOString().slice(0, 10);
+        mkdirSync(resolve(target, '..'), { recursive: true });
+        writeFileSync(
+          target,
+          decisionsMarkdown(report, {
+            date,
+            command: `pnpm --filter @hamnivo/evals run-suite decisions --provider ${values.provider} --model ${model} --max-calls ${maxCalls} --concurrency ${concurrency}`,
+            concurrency,
+            deadlineMs,
+            corpusSizes: {
+              'Routing corpus (`packages/evals/corpus/decisions-routing.json`, written for this evaluation)':
+                routing.items.length,
+              'Hand-off fixtures (`packages/domain/test/fixtures/human-requests.json`)':
+                handoff.length,
+              'U13 pairs (`packages/evals/corpus/fairness.json`, routing and hand-off groups)':
+                items.filter((i) => i.source === 'fairness').length,
+            },
+            rubric: routing.rubric,
+          }),
+        );
+        say(`report written to ${target}`);
+      }
+      break;
+    }
     case 'summarize': {
       if (!target) throw new Error('summarize needs the packet directory');
       printAdjudication(readPackets(resolve(target)));
       break;
     }
     default:
-      throw new Error('Choose a suite: sycophancy, fairness, adjudication or summarize.');
+      throw new Error(
+        'Choose a suite: sycophancy, fairness, adjudication, decisions or summarize.',
+      );
   }
 }
 

@@ -7,6 +7,7 @@ Offline evaluations of how Hamnivo answers and decides, with the corpora and a m
 | `sycophancy` | U12 | Whether praise, pressure, authority, emotion or an opposite belief move a reply away from the facts it was given |
 | `fairness` | U13 | Whether names, gender markers, politeness, script or language change routing, hand-off or privacy decisions |
 | `adjudication` | U14 | Per language slice: whether the product picks the right reply language and states the facts, plus review packets for native speakers |
+| `decisions` | J01, J02, J08 | Per language slice: whether a decision provider (Jev) recognises a request for a person, the routing intent and the language, with Brier score, calibration error, abstention at thresholds, latency and cost |
 
 The corpora in `corpus/` are a starter set (12 sycophancy scenarios × 6 variants, 13 fairness
 groups, 6 adjudication scenarios × 6 slices), not the full suite the blueprint describes. The
@@ -19,7 +20,31 @@ pnpm --filter @hamnivo/evals run-suite sycophancy --responder reference   # or s
 pnpm --filter @hamnivo/evals run-suite fairness
 pnpm --filter @hamnivo/evals run-suite adjudication --responder model --out ./out
 pnpm --filter @hamnivo/evals run-suite summarize ./out/adjudication-<responder>
+pnpm --filter @hamnivo/evals run-suite decisions --provider mock                          # no network
+TYPESAFE_API_KEY=… pnpm --filter @hamnivo/evals run-suite decisions --provider jev \
+  --report ../../docs/evals/jev-1.13.0-<date>.md                                          # real calls
 ```
+
+### Decisions
+
+`decisions` asks every labelled message once, with the three questions the product asks
+(`PERSON_REQUEST_QUESTION`, the routing `intent` choice and `LANGUAGE_QUESTION` from
+`@hamnivo/domain`) and the state routing sends. The messages are:
+
+- `corpus/decisions-routing.json`: 40 messages per language slice, labelled with a topic and the
+  language, written for this evaluation (non-English text pending native review);
+- the hand-off fixtures of `@hamnivo/domain` (`test/fixtures/human-requests.json`): requests for a
+  person and look-alikes;
+- the routing and hand-off groups of the U13 corpus, which must get the same answer per group.
+
+It reports, per task and slice, accuracy next to the product's fixed rule, the Brier score, the
+expected calibration error, the threshold that keeps decided answers at least 90% right (95% for
+"asks for a person") with the share that abstains there, p50 and p95 latency, and input tokens and
+cost. A run makes at most `--max-calls` calls (2,000 by default) and is refused before the first
+call if it would need more; failed calls are retried twice within that cap and reported. `--provider
+jev` reads `TYPESAFE_API_KEY` (and `TYPESAFE_BASE_URL`) from the environment only and pins
+`--model` (default `jev-1.13.0`). The JSON results go to `--out`; `--report` writes the Markdown
+report, which holds corpus text and numbers only.
 
 Responders:
 

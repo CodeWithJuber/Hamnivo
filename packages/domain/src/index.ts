@@ -1,6 +1,7 @@
 export * from './authority.js';
 export * from './business-hours.js';
 export * from './cache.js';
+export * from './decision-questions.js';
 export * from './decisions.js';
 export * from './decisions-mock.js';
 export * from './human-request.js';
