@@ -152,20 +152,35 @@ function negatedBefore(options: {
 /**
  * SOV languages (Hindi, Urdu and their Latin forms): negation sits before the verb, which breaks
  * the phrase ("insaan nahi chahiye"). What remains is a negator right after the match
- * ("insaan chahiye nahi"), unless it means "otherwise" ("nahi to"), or a mixed-in English "no"
- * right before it ("no insaan please").
+ * ("insaan chahiye nahi") or after "no need" ("baat karne ki zaroorat nahi"), unless it means
+ * "otherwise" ("nahi to"), or a mixed-in English "no" right before it ("no insaan please").
  */
 function negatedAfter(
   negators: readonly string[],
   otherwise: readonly string[],
-  weakBefore: readonly string[] = [],
+  words: {
+    weakBefore?: readonly string[];
+    /** "ki zaroorat" (need of) before the negator: the genitive, "any" and "need". */
+    of?: readonly string[];
+    any?: readonly string[];
+    need?: readonly string[];
+  } = {},
 ): Grammar['negated'] {
   const not = normalizedSet(negators);
   const unless = normalizedSet(otherwise);
-  const weak = normalizedSet(weakBefore);
-  return (tokens, start, end) =>
-    weak.has(tokens[start - 1] ?? '') ||
-    (not.has(tokens[end] ?? '') && !unless.has(tokens[end + 1] ?? ''));
+  const weak = normalizedSet(words.weakBefore ?? []);
+  const of = normalizedSet(words.of ?? []);
+  const any = normalizedSet(words.any ?? []);
+  const need = normalizedSet(words.need ?? []);
+  return (tokens, start, end) => {
+    if (weak.has(tokens[start - 1] ?? '')) return true;
+    let at = end;
+    if (of.has(tokens[at] ?? '')) {
+      const next = any.has(tokens[at + 1] ?? '') ? at + 2 : at + 1;
+      if (need.has(tokens[next] ?? '')) at = next + 1;
+    }
+    return not.has(tokens[at] ?? '') && !unless.has(tokens[at + 1] ?? '');
+  };
 }
 
 // English -------------------------------------------------------------------------------------
@@ -365,11 +380,16 @@ const KARO = [
   ...['kar den', 'kar dijiye', 'kar dijie', 'karwao', 'krwao'],
 ];
 const LATIN_PLEASE = ['please', 'pls', 'plz'];
-const SOV_LATIN_NEGATED = negatedAfter(
-  ['nahi', 'nahin', 'nai', 'nhi', 'nahee'],
-  ['to', 'toh'],
-  ['no'],
-);
+const SOV_LATIN_NEGATED = negatedAfter(['nahi', 'nahin', 'nai', 'nhi', 'nahee'], ['to', 'toh'], {
+  weakBefore: ['no'],
+  of: ['ki', 'ka', 'ke'],
+  any: ['koi'],
+  need: ['zaroorat', 'zarurat', 'zrurat', 'zarurt'],
+});
+
+/** Pronoun-like nouns ("kisi", someone) that are too vague for a message of their own. */
+const VAGUE = new Set(['kisi', 'किसी', 'کسی']);
+const specific = (nouns: readonly string[]) => nouns.filter((noun) => !VAGUE.has(noun));
 
 function latinSov(
   language: LanguageSlice,
@@ -382,6 +402,9 @@ function latinSov(
       pattern([LATIN_DET, nouns, SE, BAAT, LATIN_VERBS]),
       pattern([LATIN_DET, nouns, SE, BAAT], 'end'),
       pattern([LATIN_DET, nouns, SE, BAAT, LATIN_PLEASE], 'end'),
+      // "kisi insaan se" or "real person se" as a whole message (the rest is understood).
+      pattern([LATIN_DET, specific(nouns), SE], 'whole'),
+      pattern([LATIN_DET, specific(nouns), SE, LATIN_PLEASE], 'whole'),
       pattern([LATIN_DET, nouns, CHAHIYE]),
       pattern([LATIN_DET, nouns, SE, MILAO]),
       pattern([LATIN_DET, nouns, KO, BULAO]),
@@ -409,7 +432,8 @@ const hinglish = latinSov(
 const romanUrdu = latinSov(
   'roman-urdu',
   [
-    ...['insaan', 'insaano', 'banda', 'bande', 'bandey', 'bandy', 'shakhs', 'kisi'],
+    ...['insaan', 'insaano', 'insaanon', 'banda', 'bande', 'bandey', 'banday', 'bandy', 'bnday'],
+    ...['bandon', 'shakhs', 'kisi'],
     ...['numainda', 'numainde', 'numaindey', 'numainday', 'mulazim', 'karkun'],
     ...['asli insaan', 'zinda insaan', 'haqeeqi insaan'],
   ],
@@ -443,6 +467,7 @@ const hindi: Grammar = (() => {
     patterns: [
       pattern([det, nouns, ['से'], ['बात'], verbs]),
       pattern([det, nouns, ['से'], ['बात']], 'end'),
+      pattern([det, specific(nouns), ['से']], 'whole'),
       pattern([det, nouns, ['चाहिए', 'चाहिये', 'चाहीए']]),
       pattern([det, nouns, ['से'], connect]),
       pattern([det, nouns, ['को'], call]),
@@ -455,7 +480,11 @@ const hindi: Grammar = (() => {
       ],
       'whole',
     ),
-    negated: negatedAfter(['नहीं', 'नही'], ['तो']),
+    negated: negatedAfter(['नहीं', 'नही'], ['तो'], {
+      of: ['की', 'का', 'के'],
+      any: ['कोई'],
+      need: ['ज़रूरत', 'जरूरत', 'ज़रुरत', 'जरुरत'],
+    }),
   };
 })();
 
@@ -486,6 +515,7 @@ const urdu: Grammar = (() => {
     patterns: [
       pattern([det, nouns, ['سے'], ['بات'], verbs]),
       pattern([det, nouns, ['سے'], ['بات']], 'end'),
+      pattern([det, specific(nouns), ['سے']], 'whole'),
       pattern([det, nouns, ['چاہیے', 'چاہئے', 'چاہیئے', 'چائیے']]),
       pattern([det, nouns, ['سے'], connect]),
       pattern([det, nouns, ['کو'], call]),
@@ -499,7 +529,11 @@ const urdu: Grammar = (() => {
       ],
       'whole',
     ),
-    negated: negatedAfter(['نہیں', 'نہ'], ['تو']),
+    negated: negatedAfter(['نہیں', 'نہ'], ['تو'], {
+      of: ['کی', 'کا', 'کے'],
+      any: ['کوئی'],
+      need: ['ضرورت'],
+    }),
   };
 })();
 

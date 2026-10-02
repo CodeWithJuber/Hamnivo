@@ -3,10 +3,12 @@ import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { HostBridge } from './bridge.js';
+import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
 import { applyLocale, type Locale } from './i18n.js';
 import { useChat } from './useChat.js';
 import { useMemory } from './useMemory.js';
+import { useReplyLanguage } from './useReplyLanguage.js';
 
 export interface WidgetParams {
   apiBase: string;
@@ -29,6 +31,12 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     [params],
   );
   const chat = useChat(client);
+  const replies = chat.state.messages.filter((m) => m.sender.kind !== 'customer').length;
+  const language = useReplyLanguage(client, chat.state.session?.principal.id ?? null, replies);
+  const { saveLocale } = language;
+  const commerce = useCommerce(client, chat.state.conversation?.id ?? null);
+  const { onEvent } = chat;
+  useEffect(() => onEvent(commerce.onEvent), [onEvent, commerce.onEvent]);
   const memory = useMemory(client, chat.state.session?.principal.id ?? null);
 
   useEffect(() => {
@@ -108,12 +116,17 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       <Chat
         session={chat.state.session}
         state={chat.state}
+        commerce={commerce}
         pending={chat.pending}
         locale={locale}
-        onLocale={setLocale}
+        onLocale={(next) => {
+          setLocale(next);
+          void saveLocale(next);
+        }}
         onSend={chat.send}
         onRetry={(id) => chat.retry(id)}
         onHandoff={chat.handoff}
+        language={language}
         memory={memory}
         onClose={
           params.hostOrigin

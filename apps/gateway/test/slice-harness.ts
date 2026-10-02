@@ -1,5 +1,6 @@
 import { createServer } from 'node:net';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
+import type { CacheStore } from '@hamnivo/adapters/cache';
 import { createMockModel } from '@hamnivo/adapters/models';
 import { type FakeChatwoot, startFakeChatwoot } from '@hamnivo/chatwoot/fake';
 import { closeDb, createDb, type Db } from '@hamnivo/db';
@@ -9,6 +10,8 @@ import type { LanguageModel } from 'ai';
 import { type EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
 import { InboxProcessor } from '../src/authority/processor.service.js';
 import { ReconcilerService } from '../src/authority/reconciler.service.js';
+import type { PersonalCacheScope } from '../src/cache/store.js';
+import { CommerceWorker } from '../src/commerce/worker.service.js';
 import { loadConfig } from '../src/config.js';
 import type { Scanner } from '../src/knowledge/scanner.js';
 import { OutboxRelay } from '../src/outbox/relay.service.js';
@@ -48,7 +51,13 @@ export async function startSlice(
     /** The model the API process uses (copilot, translation). */
     apiModel?: LanguageModel;
     scanner?: Scanner;
-    /** Extra settings for the gateway and the worker. */
+    /** A fake Jev transport for decision providers. */
+    decisionFetch?: typeof fetch;
+    /** A cache store to use instead of Valkey (for outage tests). */
+    cacheStore?: CacheStore;
+    /** Replaces the memory-backed scope of private cache entries; `null` turns them off. */
+    personalCacheScope?: PersonalCacheScope | null;
+    /** Extra environment for both processes (e.g. commerce provider settings). */
     env?: Record<string, string>;
   } = {},
 ): Promise<Slice> {
@@ -63,9 +72,17 @@ export async function startSlice(
     STREAM_HEARTBEAT_SECONDS: '1',
     ...options.env,
   };
+  const shared = {
+    ...(options.decisionFetch ? { decisionFetch: options.decisionFetch } : {}),
+    ...(options.cacheStore ? { cacheStore: options.cacheStore } : {}),
+    ...(options.personalCacheScope !== undefined
+      ? { personalCacheScope: options.personalCacheScope }
+      : {}),
+  };
   const gw = await startGateway(env, undefined, {
     ...(options.clock ? { clock: options.clock } : {}),
     ...(options.apiModel ? { model: options.apiModel } : {}),
+    ...shared,
   });
   await gw.app.listen(port, '127.0.0.1');
   const config = loadConfig(
@@ -73,10 +90,12 @@ export async function startSlice(
       ...env,
       BETTER_AUTH_SECRET: gw.config.BETTER_AUTH_SECRET,
       HAMNIVO_KEK_BASE64: gw.config.HAMNIVO_KEK_BASE64,
+      CACHE_KEY_PREFIX: gw.config.CACHE_KEY_PREFIX,
     }),
   );
   const worker = await NestFactory.createApplicationContext(
     WorkerModule.forRoot(config, {
+      ...shared,
       ...(options.clock ? { clock: options.clock } : {}),
       ...(options.model ? { model: options.model } : {}),
       ...(options.scanner ? { scanner: options.scanner } : {}),
@@ -87,6 +106,7 @@ export async function startSlice(
   await worker.get(OutboxRelay).onApplicationShutdown();
   await worker.get(InboxProcessor).onApplicationShutdown();
   await worker.get(ReconcilerService).onApplicationShutdown();
+  await worker.get(CommerceWorker).onApplicationShutdown();
   const app = createDb(gw.database.app, { max: 2 });
   return {
     gw,

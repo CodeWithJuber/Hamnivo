@@ -11,12 +11,14 @@
     "build": "node scripts/generate-routes.mjs && tsc --noEmit && vite build",
     "preview": "vite preview --port 5173 --strictPort",
     "typecheck": "node scripts/generate-routes.mjs && tsc --noEmit",
+    "test": "vitest run",
     "test:e2e": "playwright test"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.6",
     "@hamnivo/brand": "workspace:*",
     "@hamnivo/contracts": "workspace:*",
+    "@hamnivo/domain": "workspace:*",
     "@hamnivo/ui": "workspace:*",
     "@tanstack/react-query": "5.104.0",
     "@tanstack/react-router": "1.170.39",
@@ -31,6 +33,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
+    "@hamnivo/adapters": "workspace:*",
     "@hamnivo/chatwoot": "workspace:*",
     "@hamnivo/db": "workspace:*",
     "@playwright/test": "1.63.0",
@@ -44,6 +47,7 @@
     "tailwindcss": "4.3.3",
     "typescript": "catalog:",
     "vite": "8.3.1",
+    "vitest": "catalog:",
     "zod": "catalog:"
   }
 }

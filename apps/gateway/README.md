@@ -250,6 +250,80 @@ retries, access and the export round trip. `test/migration-chatwoot.int.test.ts`
 Chatwoot as the source and the address guard, and `test/migration-helpdesks.int.test.ts` covers
 Zendesk and Intercom exports.
 
+## Team routing decisions (J02, J05, J08)
+
+- **Team routing** (`GET /v1/admin/brands/{brandId}/routing/teams`,
+  `PUT /v1/admin/brands/{brandId}/routing/teams/{teamId}`): routing uses the inbox's teams
+  (`/v1/admin/teams`, in the brand's workspace or tenant-wide) and keeps, per brand, the topics a
+  team handles, the languages its people answer in and those served through a reviewed
+  translation path, whether it is the default, whether it accepts conversations, and whether
+  routing uses it at all. Reading needs `decisions.read`; changing needs `decisions.manage`; every
+  change is audited.
+- **Rubric** (`/v1/admin/brands/{brandId}/decisions/team-routing`, `…/draft`, `…/publish`,
+  `…/mode`, `…/test`): versioned topics with baseline keywords, the inputs shared with the
+  provider (recent customer messages with personal data redacted, conversation status), a
+  threshold per language slice and the provider (`none`, `mock` or `jev` with a pinned version).
+  Changing needs `decisions.manage`; every change is audited.
+- **When it runs.** The outbox topic `conversation.route` runs on a conversation's first customer
+  message and on every hand-off. Jev decides within the rubric's deadline (1.5 s on the chat path)
+  behind the circuit breaker; the deterministic baseline decides when Jev abstains, fails, is
+  too slow or is not sure enough for the language. A request for a person is never overridden.
+- **Modes.** Brands start in `shadow`: both decisions are recorded, the baseline's is final and no
+  team is assigned. `live` puts the conversation in the chosen team's inbox queue the way the
+  inbox does (`conversation_inbox_state.team_id`, then `conversation.team_changed` sets the
+  Chatwoot team, created on first use), so team queues and team-scoped grants see it. Only
+  accepting teams are chosen; a team a person set is kept, and so is a conversation a person
+  handles. Routing picks a team, never an owner.
+- **Records** (`…/records`, `/v1/admin/decisions/{decisionId}`, `…/review`) keep labels, versions,
+  latency and tokens, never customer text; confidence only when the provider gave one.
+  `…/experiment` compares Jev with the baseline per language from shadow and live records.
+
+## Reply language (U01, U07)
+
+- `GET /v1/widget/language` and `POST /v1/widget/language` (widget session): interface locale,
+  explicit reply language (`en`, `ar`, `hi`, `ur`, `hi-Latn`, `ur-Latn`), style, and closing the
+  language question. POST because the widget's cross-origin surface allows GET and POST only.
+- Replies follow the explicit choice, then the words of the latest message, then the interface
+  locale. Words that fit Hinglish and Roman Urdu equally keep the language in use, suggest one from
+  the locale and ask once. The choice and its source are recorded on the model step. Preferences
+  keep choices and detected candidates, never message text.
+
+## Answer cache (K01, K02, K06, K07, K08, K09, K10, K12)
+
+- **Store.** A dedicated Valkey connection with a key prefix (`CACHE_KEY_PREFIX`), a 150 ms
+  timeout (`CACHE_TIMEOUT_MS`) and no offline queue, wrapped fail-open: a failure reads as
+  unavailable, the cache is skipped for 30 s and work is done fresh.
+- **Exact answers.** Only a conversation's first message, public, complete, with no personal data,
+  personal context or excluded class is stored. Keys bind tenant, brand, audience, language, model,
+  prompt version, dependency versions and a per-tenant HMAC of the question. Hits are rechecked
+  against the current knowledge. Off until a brand turns it on.
+- **Query embeddings** for knowledge search are cached under the text, model, dimensions and
+  preprocessing version, and coalesced per process.
+- **Invalidation.** Database triggers bump dependency versions with knowledge, source, agent and
+  brand changes; policy changes and `POST …/cache/invalidate` bump the tier. Stale entries are
+  reported, then removed.
+- **Studio** (`/v1/admin/brands/{brandId}/cache/policy`, `inspect`, `entries`, `impact`,
+  `invalidate`, `metrics`): reading needs `knowledge.read`, changing `knowledge.manage`; changes
+  are audited. Metrics are counts only; health comes from a live probe of the store.
+- **Customer memory (K09, G19).** Memory is recalled before the cache is read. A reply built with
+  any memory item passes `personalContext: ['personal_memory']`, so it never enters a shared
+  entry; for the opening question it may be kept for that customer alone, under their memory
+  namespace (`MemoryCache.namespace()`, `hamnivo:memory:c:{tenant}:{subject}:`) with their memory
+  version (`MemoryCache.version()`) in the key. A memory change bumps the version, so their
+  entries are no longer reachable; a deletion purges the namespace. The run's `answer_cache` step
+  says whether an entry was `shared` or the customer's own (`scope`).
+- **Commerce data (K06).** Commerce registers its rule (`commerce.live_data`, deciding with
+  `answerCacheDecision()`) in both processes. A reply in a conversation that holds catalog, cart,
+  quote, payment, order or refund data is neither read from nor written to the cache, and a reply
+  whose receipt check read a payment or refund status (X10) is not stored. The run's
+  `answer_cache` step names the rule and the data classes.
+- **Hooks for other modules.** `CacheExclusions.register(rule)` excludes requests; a module names
+  its own data classes (`commerce.order_status`) and its rule decides them.
+  `personalContext` on a cache request keeps a result out of shared entries. `PERSONAL_CACHE_SCOPE`
+  places private entries (memory provides it; a scope that is missing, slow or not the
+  customer's own means the entry is not cached). A store call must match the lookup's audience,
+  or nothing is stored.
+
 ## Widget framing
 
 `GET /v1/widget/frame-policy?widgetId=wid_…` names the websites that may frame a brand's widget
@@ -265,6 +339,62 @@ websites. A website taken off the list stops working at once:
 - chats already open there end, because their sessions are revoked and cannot be refreshed.
 
 The audit entry `brand.updated` records the websites added and removed and how many chats ended.
+
+## Commerce (wave Q)
+
+Customers buy in the chat and pay on the provider's hosted page (Stripe Checkout). Chatwoot stays
+the conversation authority; everything about money is a Hamnivo record.
+
+| Area | Where |
+|---|---|
+| Merchant connections: provider, currencies, refund policy, capability manifest (C01, E02) | `src/commerce/merchants.service.ts`, `providers.service.ts` |
+| Catalog, versioned cart, exact quote priced live by the provider (C02, C03) | `src/commerce/carts.service.ts` |
+| Approval bound to the quote hash and cart revision, hosted checkout (C04, C05) | `src/commerce/checkout.service.ts` |
+| Provider answers applied through the state machines: payment, order, cart, quote (C06, C10) | `src/commerce/purchases.service.ts` |
+| Operation ledger and receipts: one business key, one idempotency key (C07) | `src/commerce/ledger.ts`, `packages/db/src/schema/operations.ts` |
+| Webhooks: raw-body signature, account check, stored once, applied by the worker (C08) | `src/commerce/webhooks.*`, `worker.service.ts` |
+| Reconciliation of unknown outcomes and payment checks (C09, R07) | `checkout.service.ts`, `refunds.service.ts`, `worker.service.ts` |
+| Orders, fulfilment, refunds with a second approver, finance exceptions (C10, C12, C19) | `orders.service.ts`, `refunds.service.ts`, `exceptions*.ts` |
+| Cards in the conversation (catalog, quote, receipt, order status) | `cards.ts`, `card-publisher.service.ts` |
+| No payment claim without a receipt (X10) | `claims.ts`, used by `src/runtime/replies.service.ts` |
+
+The rules:
+
+- **Merchant secrets.** A brand's API key and webhook secret are stored only in the secret broker.
+  Responses show them masked; they never reach logs, audit data or the browser. Connecting and
+  rotating keys need `commerce.merchants.manage`, two-step verification and a recent sign-in.
+- **Exact money.** Amounts are integer minor units (`bigint`). A quote is priced by the provider
+  at the time it is made, and the customer approves its canonical hash (RFC 8785, SHA-256). A
+  changed cart, another hash or an expired quote is refused.
+- **Never twice.** Each provider call is an operation with a durable business key
+  (`checkout:{purchase}`, `refund:{refund}`) and one idempotency key, and the exact request is
+  stored. A call whose answer was lost is `unknown` until the provider is asked by its reference.
+  It is sent again under the same key only while the provider still remembers the key (refunds:
+  under 23 hours; checkout: while the page would stay open 31 minutes or more). After that, a
+  finance exception asks a person.
+- **Only the provider says "paid".** Payment, refund and order states move only on a provider
+  answer, webhook or check, and each observation is an append-only receipt. The customer sees
+  "confirming" until then, and the AI may not say "paid" or "refunded" without a receipt.
+- **Takeover.** Whenever a person becomes the owner (a takeover, an inbox claim, a supervisor's
+  assignment, an assignment or reply in Chatwoot), a private note lists the payments and refunds
+  still owed an outcome. It comes from `OwnershipService.transition`, which every path uses. The
+  worker keeps checking them whoever owns the conversation.
+- **Staff actions** use `@hamnivo/policy` (`commerce.read`, `commerce.carts.manage`,
+  `commerce.orders.manage`, `commerce.refunds.request`, `commerce.refunds.approve`,
+  `commerce.exceptions.resolve`, `commerce.merchants.manage`) and are audited. The person who
+  asked for a refund can never approve it.
+- **No caching.** Every commerce response is sent with `Cache-Control: no-store`.
+
+Settings: `COMMERCE_PROVIDER_TIMEOUT_MS` (default 10000), `COMMERCE_CHECKOUT_MINUTES` (how long
+a payment page stays open, 30 to 1440, default 60), `COMMERCE_ALLOW_MOCK` (in-memory `mock`
+merchants outside development, for demos) and `COMMERCE_STRIPE_API_BASE` (tests only: stripe-mock
+or the fake Stripe server; refused in production).
+
+`test/commerce.int.test.ts` covers the whole flow with the `mock` provider and, at the end, the
+Stripe adapter against the fake Stripe server: quote, approval, payment page, webhook, receipt,
+replays, timeouts before and after the provider acted, a bank challenge, refunds with a second
+approver, finance exceptions, fulfilment, a takeover with a payment in flight and cross-tenant
+denial. Nothing calls the real Stripe API.
 
 ## Security rules enforced here
 

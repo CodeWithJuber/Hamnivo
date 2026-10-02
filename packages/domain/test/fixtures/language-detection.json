@@ -1,0 +1,54 @@
+[
+  { "text": "Where is my order?", "language": "en", "candidates": ["en"] },
+  { "text": "I want to talk to a person", "language": "en", "candidates": ["en"] },
+  {
+    "text": "Please send the invoice to ayesha@example.com",
+    "language": "en",
+    "candidates": ["en"]
+  },
+  {
+    "text": "Hi, I'm Diya and my order is late",
+    "language": "en",
+    "candidates": ["en"],
+    "note": "A name that is also a Hindustani word does not decide the language"
+  },
+  { "text": "Thanks!", "language": "en", "candidates": ["en"] },
+  {
+    "text": "Order pay ho gaya, delivery nahi mili",
+    "language": null,
+    "candidates": ["hi-Latn", "ur-Latn"],
+    "note": "Code-switched Latin Hindustani: not English, and Hinglish or Roman Urdu cannot be told apart"
+  },
+  { "text": "mujhe refund chahiye", "language": null, "candidates": ["hi-Latn", "ur-Latn"] },
+  { "text": "mera order kab aayega?", "language": null, "candidates": ["hi-Latn", "ur-Latn"] },
+  { "text": "is order ka status kya hai", "language": null, "candidates": ["hi-Latn", "ur-Latn"] },
+  { "text": "Paise wapas kab milenge?", "language": null, "candidates": ["hi-Latn", "ur-Latn"] },
+  {
+    "text": "yaar abhi tak parcel nahi aaya",
+    "language": null,
+    "candidates": ["hi-Latn", "ur-Latn"]
+  },
+  {
+    "text": "bohat shukriya janab, mera masla hal ho gaya",
+    "language": "ur-Latn",
+    "candidates": ["ur-Latn"],
+    "note": "Urdu spellings and vocabulary"
+  },
+  {
+    "text": "kripya mujhe jankari dijiye, bahut samasya hai",
+    "language": "hi-Latn",
+    "candidates": ["hi-Latn"],
+    "note": "Hindi vocabulary"
+  },
+  { "text": "shukriya", "language": null, "candidates": ["ur-Latn", "hi-Latn"] },
+  { "text": "أين طلبي؟", "language": "ar", "candidates": ["ar"] },
+  { "text": "أريد استرداد المبلغ من فضلك", "language": "ar", "candidates": ["ar"] },
+  { "text": "میرا آرڈر کہاں ہے؟", "language": "ur", "candidates": ["ur"] },
+  { "text": "NL-1048 کہاں ہے؟", "language": "ur", "candidates": ["ur"] },
+  { "text": "مجھے refund چاہیے", "language": "ur", "candidates": ["ur"] },
+  { "text": "मेरा ऑर्डर कहाँ है?", "language": "hi", "candidates": ["hi"] },
+  { "text": "मेरा order कहाँ है", "language": "hi", "candidates": ["hi"] },
+  { "text": "سلام", "language": null, "candidates": ["ar", "ur"] },
+  { "text": "👍 1048", "language": null, "candidates": [] },
+  { "text": "Assalamu alaikum", "language": null, "candidates": [] }
+]

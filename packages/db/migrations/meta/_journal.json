@@ -166,15 +166,43 @@
     {
       "idx": 23,
       "version": "7",
-      "when": 1790510702853,
-      "tag": "20260927120502_migration",
+      "when": 1790510504179,
+      "tag": "20260927120144_commerce",
       "breakpoints": true
     },
     {
       "idx": 24,
       "version": "7",
-      "when": 1790510718983,
-      "tag": "20260927120518_migration_security",
+      "when": 1790510515489,
+      "tag": "20260927120155_commerce_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790512431192,
+      "tag": "20260927123351_decisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790512446726,
+      "tag": "20260927123406_decisions_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790959855288,
+      "tag": "20261002165055_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1790959868741,
+      "tag": "20261002165108_migration_security",
       "breakpoints": true
     }
   ]

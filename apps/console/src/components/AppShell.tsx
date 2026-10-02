@@ -16,6 +16,7 @@ import {
   BotIcon,
   BrainIcon,
   BuildingIcon,
+  DatabaseZapIcon,
   FolderInputIcon,
   InboxIcon,
   KeyRoundIcon,
@@ -23,8 +24,11 @@ import {
   LogOutIcon,
   MenuIcon,
   OctagonPauseIcon,
+  ReceiptIcon,
   ShieldCheckIcon,
+  ShoppingBagIcon,
   StoreIcon,
+  WaypointsIcon,
   XIcon,
 } from 'lucide-react';
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from 'react';
@@ -50,6 +54,10 @@ type NavPath =
   | '/memory'
   | '/models'
   | '/runs'
+  | '/decisions'
+  | '/caching'
+  | '/orders'
+  | '/finance'
   | '/stop-ai'
   | '/account';
 
@@ -93,6 +101,30 @@ function useNavItems(): NavItem[] {
       permission: 'integrations.manage',
     },
     { to: '/runs', label: t('nav.runs'), icon: ActivityIcon, permission: 'analytics.read' },
+    {
+      to: '/decisions',
+      label: t('decisions.nav'),
+      icon: WaypointsIcon,
+      permission: 'decisions.read',
+    },
+    {
+      to: '/caching',
+      label: t('caching.nav'),
+      icon: DatabaseZapIcon,
+      permission: 'knowledge.read',
+    },
+    {
+      to: '/orders',
+      label: t('commerce.nav.orders'),
+      icon: ShoppingBagIcon,
+      permission: 'commerce.read',
+    },
+    {
+      to: '/finance',
+      label: t('commerce.nav.finance'),
+      icon: ReceiptIcon,
+      permission: 'commerce.read',
+    },
     { to: '/stop-ai', label: t('nav.stopAi'), icon: OctagonPauseIcon, permission: 'agents.read' },
   ];
   // Navigation is filtered by role; the gateway still checks every request (HNV-03-05).

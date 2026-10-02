@@ -90,6 +90,8 @@ describe('database roles', () => {
     expect(definers.map((r) => r.fn).sort()).toEqual(
       [
         'app.apply_memory_tombstones()',
+        'app.claim_commerce_events(integer,integer)',
+        'app.claim_commerce_work(integer,integer)',
         'app.claim_integration_inbox(integer,integer)',
         'app.claim_outbox(integer,integer)',
         'app.claim_reconcile_cursors(integer,integer)',
@@ -101,6 +103,7 @@ describe('database roles', () => {
         'app.resolve_api_key(text)',
         'app.resolve_authority_connection(uuid)',
         'app.resolve_invitation(uuid)',
+        'app.resolve_merchant_connection(uuid)',
         'app.resolve_staff_memberships(text)',
         'app.resolve_tenant_slug(text)',
         'app.resolve_widget(text)',

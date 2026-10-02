@@ -22,13 +22,35 @@ external-store runtime and the Hamnivo design tokens.
     confirm a newer value, correct or delete one, forget everything and turn memory off.
     Deleting shows progress until it is removed everywhere.
   - An answer that used a memory says so under the message, with a link to it.
-- **Languages.** English, Arabic, Hindi and Urdu. Arabic and Urdu use right-to-left layout, and
-  message text uses `dir="auto"`.
+- **Languages.** English, Arabic, Hindi and Urdu. Arabic and Urdu use right-to-left layout.
+  - Each message and the message box read in their own direction by the majority of their
+    letters; order numbers, amounts, emails and links are isolated left to right (`<bdi>`), also
+    in answers written in Markdown, and copy back unchanged.
+  - When a message fits both Hinglish and Roman Urdu, the chat asks once which language replies
+    should use (suggestion first, "not now" to close). The choice is saved on the server, and so
+    is the interface language, as inputs to the reply language.
+- **Typing.** Enter sends and Shift+Enter starts a new line. An Enter that confirms an input
+  method composition (Hindi, Urdu, Arabic or Chinese keyboards) never sends.
 - **Accessibility.**
   - Everything works from the keyboard.
   - Escape closes the chat.
   - Labelled controls.
   - New messages are announced politely.
+- **Shopping** (`src/commerce/`, when the brand has a merchant connection).
+  - "Browse products" shows the shop's products with price, stock as reported, and when they were
+    read. The cart bar changes a draft cart only.
+  - "Review order" asks the shop for an exact quote. The card shows the seller, lines, delivery,
+    tax, total, refund terms, and how long the price holds. Before enabling "Approve", the widget
+    recomputes the quote's hash and checks it against the card. The button is disabled once the
+    price expires.
+  - Payment happens only on the provider's page, which opens in a new tab. When the tab comes
+    back (`checkout-return.html`), the card says "confirming" until the provider confirms; it
+    never says "paid" on its own. Cancelling keeps the cart. After a bank challenge, the same
+    page finishes the payment.
+  - Receipt and order status cards come from Hamnivo's records, never from the AI's text. A
+    delayed order shows the shop's estimate as an estimate, and offers "Talk to a person".
+  - Amounts and times use the chosen language's formatting, always with the currency and the
+    time zone.
 
 ## Develop
 
@@ -59,9 +81,19 @@ pnpm --filter @hamnivo/widget test:e2e
   throwaway containers, and that is the easiest way to run it.
 - `e2e/journey.spec.ts` covers:
   - host page → widget → AI reply → staff takeover → human reply;
+  - signing customers in and out, across tabs;
   - an offline message sent once after reconnecting;
   - Arabic and Urdu right-to-left layout with an axe audit (WCAG 2.2 AA);
   - refusal on a website the brand did not allow.
+- `e2e/composer.spec.ts` covers input method composition (no send on the confirming Enter),
+  message direction and isolated identifiers in Urdu with axe, and the Hinglish/Roman Urdu
+  language question.
+- `pnpm --filter @hamnivo/widget test` checks that every locale has every key and placeholder.
+- `e2e/shopping.spec.ts` buys through the fake Stripe server (`startFakeStripe`) and its hosted
+  page; nothing reaches the real Stripe. It covers: products → cart → exact quote → approval →
+  payment page → paid receipt → a delay update; cancelling with the cart kept, and the quote in
+  Arabic; a bank challenge finished on the same page with one payment; and the approval button
+  disabled at expiry. Each step is checked with axe.
 - `e2e/memory.spec.ts` turns customer memory on for the test brand (and off again) and covers the
   memory question, "Memory" with confirm, correct, delete and the switch, an answer that used a
   memory, memory being unavailable, and right-to-left layout, each with an axe audit.

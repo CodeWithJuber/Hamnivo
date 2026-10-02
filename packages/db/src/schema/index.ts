@@ -1,12 +1,17 @@
 export * from './audit.js';
 export * from './auth.js';
 export * from './authority.js';
+export * from './cache.js';
+export * from './commerce.js';
+export * from './decisions.js';
 export { appRole, platformRole } from './helpers.js';
 export * from './identity.js';
 export * from './inbox.js';
 export * from './knowledge.js';
+export * from './language.js';
 export * from './memory.js';
 export * from './migration.js';
+export * from './operations.js';
 export * from './platform.js';
 export * from './runtime.js';
 export * from './tenancy.js';
