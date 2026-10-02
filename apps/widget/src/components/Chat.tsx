@@ -513,7 +513,12 @@ export function Chat(props: {
         <ThreadPrimitive.Root
           className={view === 'memory' ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
         >
-          <ThreadPrimitive.Viewport className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          {/* Focusable so keyboard users can scroll it even when no card has a control. */}
+          <ThreadPrimitive.Viewport
+            className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+            tabIndex={0}
+            aria-label={t('title')}
+          >
             {state.messages.length === 0 && props.pending.length === 0 ? (
               <p
                 className="mb-4 rounded-2xl border border-border bg-surface px-3 py-2 text-[15px] text-text"

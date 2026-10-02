@@ -2,6 +2,7 @@ import { HamnivoClient } from '@hamnivo/client';
 import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ActionsContext, useActions } from './actions/useActions.js';
 import type { HostBridge } from './bridge.js';
 import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
@@ -38,6 +39,8 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const { onEvent } = chat;
   useEffect(() => onEvent(commerce.onEvent), [onEvent, commerce.onEvent]);
   const memory = useMemory(client, chat.state.session?.principal.id ?? null);
+  const actions = useActions(client, chat.state.conversation?.id ?? null, bridge);
+  useEffect(() => onEvent(actions.onEvent), [onEvent, actions.onEvent]);
 
   useEffect(() => {
     applyLocale(locale);
@@ -113,27 +116,29 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   }
   return (
     <AnnouncerProvider>
-      <Chat
-        session={chat.state.session}
-        state={chat.state}
-        commerce={commerce}
-        pending={chat.pending}
-        locale={locale}
-        onLocale={(next) => {
-          setLocale(next);
-          void saveLocale(next);
-        }}
-        onSend={chat.send}
-        onRetry={(id) => chat.retry(id)}
-        onHandoff={chat.handoff}
-        language={language}
-        memory={memory}
-        onClose={
-          params.hostOrigin
-            ? () => bridge.post({ type: 'layout', open: false, width: 0, height: 0 })
-            : undefined
-        }
-      />
+      <ActionsContext.Provider value={actions}>
+        <Chat
+          session={chat.state.session}
+          state={chat.state}
+          commerce={commerce}
+          pending={chat.pending}
+          locale={locale}
+          onLocale={(next) => {
+            setLocale(next);
+            void saveLocale(next);
+          }}
+          onSend={chat.send}
+          onRetry={(id) => chat.retry(id)}
+          onHandoff={chat.handoff}
+          language={language}
+          memory={memory}
+          onClose={
+            params.hostOrigin
+              ? () => bridge.post({ type: 'layout', open: false, width: 0, height: 0 })
+              : undefined
+          }
+        />
+      </ActionsContext.Provider>
     </AnnouncerProvider>
   );
 }

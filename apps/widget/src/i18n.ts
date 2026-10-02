@@ -1,6 +1,7 @@
 import type { ReplyLanguage } from '@hamnivo/contracts';
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { ACTION_COPY } from './actions/copy.js';
 import { SHOP_COPY } from './commerce/copy.js';
 
 /** Widget chrome in the four launch languages (translations await native review). */
@@ -29,6 +30,7 @@ export const resources = {
       languageNotNow: 'Not now',
       languageChosen: 'Replies will be in {{language}}.',
       shop: SHOP_COPY.en,
+      actions: ACTION_COPY.en,
       memory: {
         open: 'Memory',
         title: 'What we remember',
@@ -139,6 +141,7 @@ export const resources = {
       languageNotNow: 'ليس الآن',
       languageChosen: 'ستصلك الردود بهذه اللغة: {{language}}.',
       shop: SHOP_COPY.ar,
+      actions: ACTION_COPY.ar,
       memory: {
         open: 'الذاكرة',
         title: 'ما نتذكره',
@@ -247,6 +250,7 @@ export const resources = {
       languageNotNow: 'अभी नहीं',
       languageChosen: 'जवाब इस भाषा में आएँगे: {{language}}।',
       shop: SHOP_COPY.hi,
+      actions: ACTION_COPY.hi,
       memory: {
         open: 'मेमोरी',
         title: 'हम क्या याद रखते हैं',
@@ -357,6 +361,7 @@ export const resources = {
       languageNotNow: 'ابھی نہیں',
       languageChosen: 'جوابات اس زبان میں آئیں گے: {{language}}۔',
       shop: SHOP_COPY.ur,
+      actions: ACTION_COPY.ur,
       memory: {
         open: 'میموری',
         title: 'ہم کیا یاد رکھتے ہیں',
