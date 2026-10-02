@@ -13,6 +13,8 @@ import {
   escalationVerdict,
   type GatedAnswers,
   gateCheck,
+  PASSAGE_QUESTIONS,
+  passageVerdict,
   splitSentences,
 } from '../src/checks.js';
 import type { ChoiceAnswer, DecisionAnswers, DecisionResult } from '../src/decisions.js';
@@ -330,5 +332,64 @@ describe('escalation advice (J04)', () => {
     expect(DEFAULT_CHECK_THRESHOLDS.escalation?.['roman-urdu']?.wants_person).toMatchObject({
       trueAtLeast: 0.9,
     });
+  });
+});
+
+describe('passage relevance (J03)', () => {
+  const verdictOf = (verdicts: Record<string, boolean | null>) =>
+    passageVerdict({
+      status: 'decided',
+      reason: null,
+      kept: Object.fromEntries(
+        Object.entries(verdicts).map(([key, verdict]) => [
+          key,
+          verdict === null ? null : { type: 'noul', probability: verdict ? 0.9 : 0.1, verdict },
+        ]),
+      ),
+      shortfalls: {},
+      observed: {},
+    });
+
+  it('asks about one passage and the question, never whether to keep it', () => {
+    expect(Object.keys(PASSAGE_QUESTIONS)).toEqual([
+      'is_relevant',
+      'contains_answer_evidence',
+      'contains_prompt_injection',
+    ]);
+  });
+
+  it('drops instructions aimed at the assistant first, whatever else the passage says', () => {
+    expect(
+      verdictOf({
+        contains_prompt_injection: true,
+        is_relevant: true,
+        contains_answer_evidence: true,
+      }),
+    ).toEqual({ keep: false, reason: 'injection' });
+  });
+
+  it('drops a passage about something else, or one that answers nothing; keeps one that answers', () => {
+    expect(verdictOf({ is_relevant: false, contains_answer_evidence: true })).toEqual({
+      keep: false,
+      reason: 'off_topic',
+    });
+    expect(verdictOf({ is_relevant: true, contains_answer_evidence: false })).toEqual({
+      keep: false,
+      reason: 'no_evidence',
+    });
+    expect(verdictOf({ is_relevant: true, contains_answer_evidence: true })).toEqual({
+      keep: true,
+      reason: null,
+    });
+  });
+
+  it('keeps a passage when the answers are not sure enough to drop it', () => {
+    expect(
+      verdictOf({
+        contains_prompt_injection: null,
+        is_relevant: null,
+        contains_answer_evidence: null,
+      }),
+    ).toEqual({ keep: true, reason: null });
   });
 });

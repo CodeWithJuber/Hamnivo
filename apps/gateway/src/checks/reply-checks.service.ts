@@ -11,6 +11,9 @@ import {
   ESCALATION_QUESTIONS,
   type EscalationReason,
   escalationVerdict,
+  PASSAGE_CHECK_CHARS,
+  PASSAGE_QUESTIONS,
+  passageVerdict,
   type ReplyLanguage,
   redactPersonalData,
   SLICE_OF_LANGUAGE,
@@ -121,6 +124,20 @@ export class RunChecks {
   }
 
   /**
+   * Before the model sees retrieved passages: Jev asks, one request per passage, whether it is
+   * about the question, answers it, or carries instructions for the assistant (J03). Live: the
+   * passages that do not help are dropped. Shadow: all are kept, and what would be dropped is
+   * recorded. A passage Jev could not judge is kept.
+   */
+  passages<P extends CheckedPassage>(input: {
+    messages: readonly AuthorityMessage[];
+    passages: readonly P[];
+    language: ReplyLanguage | undefined;
+  }): Promise<P[]> {
+    return this.service.passages(this, input);
+  }
+
+  /**
    * Before an AI reply is published: each sentence that cites a passage is checked against that
    * passage (answer check). Live: a reply with a sentence that is not supported is never
    * published; it is written again once without it, and handed to people if that fails too.
@@ -178,7 +195,7 @@ export class ReplyChecksService {
   /** Records a check and its step in the run, so the run's timeline shows it with its usage. */
   private async record(
     run: RunChecks,
-    asked: Asked,
+    asked: Asked | readonly Asked[],
     triggerRef: string,
     outcome: {
       verdict: string;
@@ -186,35 +203,42 @@ export class ReplyChecksService {
       applied: boolean;
       detail?: Record<string, unknown>;
     },
-    step: { kind?: 'guard' | 'decision'; name: string; status: 'ok' | 'blocked' | 'skipped' },
+    step: {
+      kind?: 'guard' | 'decision' | 'retrieval';
+      name: string;
+      status: 'ok' | 'blocked' | 'skipped';
+    },
   ): Promise<void> {
     const { context } = run;
-    const values = this.checks.recordValues(
-      asked,
-      {
-        tenantId: context.tenantId,
-        brandId: context.brandId,
-        conversationId: context.conversationId,
-        runId: context.runId,
-        triggerRef,
-      },
-      outcome,
-    );
+    const where = {
+      tenantId: context.tenantId,
+      brandId: context.brandId,
+      conversationId: context.conversationId,
+      runId: context.runId,
+      triggerRef,
+    };
+    const all = Array.isArray(asked) ? (asked as readonly Asked[]) : [asked as Asked];
+    const first = all[0];
+    if (!first) return;
+    const values =
+      all.length === 1
+        ? this.checks.recordValues(first, where, outcome)
+        : this.checks.recordValuesMany(all, where, outcome, (index) => `p${index + 1}`);
     await withTenant(this.db, { tenantId: context.tenantId, actorId: 'ai' }, async (tx) => {
       await this.checks.record(context.tenantId, values, tx);
       await this.runs.step(tx, context.tenantId, context.runId, {
         kind: step.kind ?? 'guard',
         name: step.name,
         status: step.status,
-        provider: asked.result.provider,
+        provider: first.result.provider,
         modelId: values.modelVersion ?? null,
         inputTokens: values.inputTokens ?? null,
         outputTokens: values.outputTokens ?? null,
         latencyMs: values.latencyMs ?? null,
-        inputHash: asked.stateHash,
+        inputHash: values.stateHash ?? null,
         detail: {
-          mode: asked.setting.mode,
-          status: asked.gated.status,
+          mode: first.setting.mode,
+          status: values.status,
           verdict: outcome.verdict,
           action: outcome.action,
           applied: outcome.applied,
@@ -273,6 +297,70 @@ export class ReplyChecksService {
     );
     if (!live || !verdict.escalate) return { action: 'continue' };
     return { action: 'handoff', reason: 'ai_escalated', note: escalationNote(verdict.reasons) };
+  }
+
+  async passages<P extends CheckedPassage>(
+    run: RunChecks,
+    input: {
+      messages: readonly AuthorityMessage[];
+      passages: readonly P[];
+      language: ReplyLanguage | undefined;
+    },
+  ): Promise<P[]> {
+    const setting = run.setting('passage-relevance');
+    if (!setting || input.passages.length === 0) return [...input.passages];
+    // The question retrieval used: the customer's last two messages.
+    const question = customerTexts(input.messages, 2).join('\n').slice(-1000);
+    if (!question) return [...input.passages];
+    const language = input.language ? SLICE_OF_LANGUAGE[input.language] : null;
+    const deadlineMs = Math.max(1, run.remainingMs());
+    const asked = await Promise.all(
+      input.passages.map((passage) =>
+        this.checks.ask(setting, {
+          state: {
+            question: redactPersonalData(question),
+            passage: {
+              title: passage.heading ? `${passage.title} — ${passage.heading}` : passage.title,
+              text: passage.text.slice(0, PASSAGE_CHECK_CHARS),
+            },
+          },
+          questions: PASSAGE_QUESTIONS,
+          language,
+          deadlineMs,
+        }),
+      ),
+    );
+    const verdicts = asked.map((a) =>
+      a.gated.status === 'decided'
+        ? { ...passageVerdict(a.gated), status: a.gated.status }
+        : { keep: true, reason: null, status: a.gated.status },
+    );
+    const dropped = verdicts.filter((v) => !v.keep).length;
+    const live = setting.mode === 'live';
+    await this.record(
+      run,
+      asked,
+      `run:${run.context.runId}:passages`,
+      {
+        verdict: dropped > 0 ? 'drop' : 'keep',
+        action: dropped > 0 ? 'drop' : 'keep',
+        applied: live && dropped > 0,
+        detail: {
+          passages: input.passages.map((passage, index) => ({
+            document: toPublicId('document', passage.documentId),
+            keep: verdicts[index]?.keep ?? true,
+            reason: verdicts[index]?.reason ?? null,
+            status: verdicts[index]?.status ?? 'unavailable',
+          })),
+          dropped,
+          kept: input.passages.length - dropped,
+        },
+      },
+      { kind: 'retrieval', name: 'passage_relevance', status: 'ok' },
+    );
+    return live
+      ? input.passages.filter((_, index) => verdicts[index]?.keep ?? true)
+      : [...input.passages];
   }
 
   async answerCheck(

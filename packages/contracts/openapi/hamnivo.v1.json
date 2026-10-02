@@ -25315,7 +25315,8 @@
         "type": "string",
         "enum": [
           "answer-check",
-          "escalation"
+          "escalation",
+          "passage-relevance"
         ]
       },
       "CheckRubric": {

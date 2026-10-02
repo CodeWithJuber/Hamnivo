@@ -49,8 +49,19 @@ function fieldErrors(error: unknown): Map<string, string> {
   return new Map(isApiError(error) ? error.fields.map((f) => [f.path, f.message]) : []);
 }
 
-const VERDICTS = ['pass', 'fail', 'unsure', 'abstained', 'unavailable', 'invalid'] as const;
-const ACTIONS = ['publish', 'regenerate', 'handoff'] as const;
+const VERDICTS = [
+  'pass',
+  'fail',
+  'unsure',
+  'abstained',
+  'unavailable',
+  'invalid',
+  'drop',
+  'keep',
+  'escalate',
+  'continue',
+] as const;
+const ACTIONS = ['publish', 'regenerate', 'handoff', 'drop', 'keep', 'continue'] as const;
 const known = <T extends string>(list: readonly T[], value: string): value is T =>
   (list as readonly string[]).includes(value);
 

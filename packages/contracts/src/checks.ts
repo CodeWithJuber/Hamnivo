@@ -13,9 +13,12 @@ import { typeId } from './ids.js';
 /**
  * Checks Jev runs around an AI reply. `answer-check`: before an AI reply is published, each
  * sentence that cites a knowledge passage is checked against that passage. `escalation`: whether
- * the customer's messages need a person (J04); it can only add a hand-off.
+ * the customer's messages need a person (J04); it can only add a hand-off. `passage-relevance`:
+ * retrieved passages that do not help are dropped before the model sees them (J03).
  */
-export const CheckTaskName = z.enum(['answer-check', 'escalation']).meta({ id: 'CheckTaskName' });
+export const CheckTaskName = z
+  .enum(['answer-check', 'escalation', 'passage-relevance'])
+  .meta({ id: 'CheckTaskName' });
 export type CheckTaskName = z.infer<typeof CheckTaskName>;
 
 /**

@@ -526,9 +526,11 @@
     "evidence": [
       "apps/gateway/src/runtime/prompt.ts",
       "apps/gateway/test/knowledge.int.test.ts",
-      "apps/gateway/test/knowledge.test.ts"
+      "apps/gateway/test/knowledge.test.ts",
+      "apps/gateway/src/checks/reply-checks.service.ts",
+      "apps/gateway/test/checks.int.test.ts"
     ],
-    "note": "Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool outputs arrive with tools. Injection resistance is not yet measured by an adversarial suite."
+    "note": "Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool outputs arrive with tools. With the passage relevance check live, Jev also leaves out passages that carry instructions for the assistant (tested; verified live on one planted passage). Injection resistance is not yet measured by an adversarial suite."
   },
   "W08": {
     "status": "in-progress",
@@ -1898,5 +1900,16 @@
       "apps/gateway/test/migration.int.test.ts"
     ],
     "note": "Totals per record type, what was missing from the export, identity and privacy checks, samples beside the export, a cutover checklist and a rollback window until approval (tested, rollback also in Arabic). That live conversations already reach Hamnivo is confirmed by the approver, not measured."
+  },
+  "J03": {
+    "status": "partial",
+    "evidence": [
+      "packages/domain/src/checks.ts",
+      "packages/domain/test/checks.test.ts",
+      "apps/gateway/src/checks/reply-checks.service.ts",
+      "apps/gateway/test/checks.int.test.ts",
+      "apps/gateway/test/checks.live.test.ts"
+    ],
+    "note": "Evidence: before the model sees retrieved passages, the passage relevance check asks Jev three questions per passage, one request each with only the question and that passage: is it about the question, does it answer it, does it carry instructions for the assistant. Code decides, first match wins: instructions drop it, off-topic drops it, an answer keeps it, no answer drops it; an unsure passage is kept. Live drops them and records which (document ids and reasons, no text); shadow, every brand's start, records only; a passage Jev could not judge is kept. Verified live on 2026-10-02 with jev-1.13.0: a passage carrying instructions and an off-topic one were left out and the returns policy kept (247 ms for three passages in parallel). No thresholds were evaluated yet: brands set them per language. Skill ranking is not built."
   }
 }

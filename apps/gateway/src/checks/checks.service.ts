@@ -219,6 +219,45 @@ export class ChecksService {
     };
   }
 
+  /**
+   * One record for several calls of one check (one per passage, say): answers keyed by item
+   * (`p1.is_relevant`), tokens added up, the slowest call's latency, and `decided` unless no
+   * call was answered.
+   */
+  recordValuesMany(
+    asked: readonly Asked[],
+    context: Parameters<ChecksService['recordValues']>[1],
+    outcome: Parameters<ChecksService['recordValues']>[2],
+    prefix: (index: number) => string,
+  ): CheckInsert {
+    const [first] = asked;
+    if (!first) throw new Error('recordValuesMany needs at least one call');
+    const base = this.recordValues(first, context, outcome);
+    const decided = asked.filter((a) => a.gated.status === 'decided');
+    const sum = (pick: (a: Asked) => number | undefined) => {
+      const values = asked.map(pick).filter((v): v is number => typeof v === 'number');
+      return values.length === 0 ? null : values.reduce((total, v) => total + v, 0);
+    };
+    return {
+      ...base,
+      status: decided.length > 0 ? 'decided' : first.gated.status,
+      reason: decided.length > 0 ? null : base.reason,
+      answers: Object.fromEntries(
+        asked.flatMap((a, index) =>
+          Object.entries(answersRecord(a.gated)).map(([name, answer]) => [
+            `${prefix(index)}.${name}`,
+            answer,
+          ]),
+        ),
+      ),
+      latencyMs: Math.round(Math.max(...asked.map((a) => a.result.latencyMs))),
+      totalMs: Math.max(...asked.map((a) => a.totalMs)),
+      inputTokens: sum((a) => a.result.usage?.inputTokens),
+      outputTokens: sum((a) => a.result.usage?.outputTokens),
+      stateHash: sha256(asked.map((a) => a.stateHash.toString('hex')).join(':')),
+    };
+  }
+
   /** Writes a check record once; a retried run that checks the same thing again keeps the first. */
   async record(tenantId: string, values: CheckInsert, tx?: TenantTx): Promise<void> {
     const write = (t: TenantTx) =>

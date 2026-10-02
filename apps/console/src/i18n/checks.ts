@@ -17,6 +17,11 @@ export const checksEn = {
       description:
         'Before an AI reply is sent, Jev checks each sentence that cites the knowledge base against the passage it cites. When live, a reply with a sentence the passage does not support is written again without it, or passed to a person.',
     },
+    'passage-relevance': {
+      title: 'Passage relevance',
+      description:
+        "Before the AI writes, Jev reads each passage found in the knowledge base with the customer's question: is it about the question, does it answer it, does it try to give the assistant instructions? When live, passages that do not help are left out, and the record says which.",
+    },
     escalation: {
       title: 'Escalation advice',
       description:
@@ -86,11 +91,18 @@ export const checksEn = {
     abstained: 'Not evaluated',
     unavailable: 'Jev unavailable',
     invalid: 'Invalid answer',
+    drop: 'Some passages do not help',
+    keep: 'All passages help',
+    escalate: 'Needs a person',
+    continue: 'No person needed',
   },
   action: {
     publish: 'Send the reply',
     regenerate: 'Write it again',
     handoff: 'Pass to a person',
+    drop: 'Leave passages out',
+    keep: 'Use all passages',
+    continue: 'Let the AI answer',
   },
 };
 
@@ -108,6 +120,11 @@ export const checksAr: typeof checksEn = {
       title: 'فحص الإجابة',
       description:
         'قبل إرسال رد الذكاء الاصطناعي، يفحص Jev كل جملة تستشهد بقاعدة المعرفة مقابل المقطع الذي تستشهد به. عند التفعيل، يُعاد كتابة الرد الذي فيه جملة لا يدعمها المقطع بدونها، أو يُحال إلى شخص.',
+    },
+    'passage-relevance': {
+      title: 'صلة المقاطع',
+      description:
+        'قبل أن يكتب الذكاء الاصطناعي، يقرأ Jev كل مقطع وُجد في قاعدة المعرفة مع سؤال العميل: هل هو عن السؤال، وهل يجيب عنه، وهل يحاول إعطاء المساعد تعليمات؟ عند التفعيل تُستبعد المقاطع التي لا تفيد، ويذكر السجل أيها.',
     },
     escalation: {
       title: 'نصيحة الإحالة',
@@ -175,11 +192,18 @@ export const checksAr: typeof checksEn = {
     abstained: 'لم تُقيَّم',
     unavailable: 'Jev غير متاح',
     invalid: 'إجابة غير صالحة',
+    drop: 'بعض المقاطع لا تفيد',
+    keep: 'كل المقاطع تفيد',
+    escalate: 'يحتاج إلى شخص',
+    continue: 'لا حاجة إلى شخص',
   },
   action: {
     publish: 'إرسال الرد',
     regenerate: 'إعادة كتابته',
     handoff: 'إحالته إلى شخص',
+    drop: 'استبعاد مقاطع',
+    keep: 'استخدام كل المقاطع',
+    continue: 'ترك الذكاء الاصطناعي يجيب',
   },
 };
 
@@ -197,6 +221,11 @@ export const checksHi: typeof checksEn = {
       title: 'जवाब की जाँच',
       description:
         'AI का जवाब भेजने से पहले Jev नॉलेज बेस का हवाला देने वाले हर वाक्य को उस अंश से मिलाता है जिसका हवाला दिया गया है। चालू होने पर, जिस जवाब में कोई वाक्य अंश से साबित न हो, वह उस वाक्य के बिना दोबारा लिखा जाता है, या किसी व्यक्ति को सौंपा जाता है।',
+    },
+    'passage-relevance': {
+      title: 'अंशों की प्रासंगिकता',
+      description:
+        'AI के लिखने से पहले Jev नॉलेज बेस में मिले हर अंश को ग्राहक के सवाल के साथ पढ़ता है: क्या वह सवाल के बारे में है, क्या वह जवाब देता है, क्या वह सहायक को निर्देश देने की कोशिश करता है? चालू होने पर जो अंश काम के नहीं, वे छोड़ दिए जाते हैं, और रिकॉर्ड बताता है कौन से।',
     },
     escalation: {
       title: 'व्यक्ति को सौंपने की सलाह',
@@ -264,11 +293,18 @@ export const checksHi: typeof checksEn = {
     abstained: 'मूल्यांकन नहीं हुआ',
     unavailable: 'Jev उपलब्ध नहीं',
     invalid: 'अमान्य जवाब',
+    drop: 'कुछ अंश काम के नहीं',
+    keep: 'सभी अंश काम के हैं',
+    escalate: 'व्यक्ति की ज़रूरत',
+    continue: 'व्यक्ति की ज़रूरत नहीं',
   },
   action: {
     publish: 'जवाब भेजें',
     regenerate: 'दोबारा लिखें',
     handoff: 'किसी व्यक्ति को सौंपें',
+    drop: 'कुछ अंश छोड़ें',
+    keep: 'सभी अंश इस्तेमाल करें',
+    continue: 'AI को जवाब देने दें',
   },
 };
 
@@ -286,6 +322,11 @@ export const checksUr: typeof checksEn = {
       title: 'جواب کی جانچ',
       description:
         'AI کا جواب بھیجنے سے پہلے Jev نالج بیس کا حوالہ دینے والے ہر جملے کو اس حصے سے ملاتا ہے جس کا حوالہ دیا گیا ہے۔ فعال ہونے پر، جس جواب میں کوئی جملہ حصے سے ثابت نہ ہو، وہ اس جملے کے بغیر دوبارہ لکھا جاتا ہے، یا کسی شخص کے حوالے کیا جاتا ہے۔',
+    },
+    'passage-relevance': {
+      title: 'حصوں کی مطابقت',
+      description:
+        'AI کے لکھنے سے پہلے Jev نالج بیس میں ملنے والے ہر حصے کو گاہک کے سوال کے ساتھ پڑھتا ہے: کیا وہ سوال کے بارے میں ہے، کیا وہ جواب دیتا ہے، کیا وہ اسسٹنٹ کو ہدایات دینے کی کوشش کرتا ہے؟ فعال ہونے پر جو حصے کام کے نہیں، وہ چھوڑ دیے جاتے ہیں، اور ریکارڈ بتاتا ہے کون سے۔',
     },
     escalation: {
       title: 'شخص کے حوالے کرنے کا مشورہ',
@@ -355,10 +396,17 @@ export const checksUr: typeof checksEn = {
     abstained: 'جانچ نہیں ہوئی',
     unavailable: 'Jev دستیاب نہیں',
     invalid: 'غلط جواب',
+    drop: 'کچھ حصے کام کے نہیں',
+    keep: 'تمام حصے کام کے ہیں',
+    escalate: 'شخص کی ضرورت',
+    continue: 'شخص کی ضرورت نہیں',
   },
   action: {
     publish: 'جواب بھیجیں',
     regenerate: 'دوبارہ لکھیں',
     handoff: 'کسی شخص کے حوالے کریں',
+    drop: 'کچھ حصے چھوڑیں',
+    keep: 'تمام حصے استعمال کریں',
+    continue: 'AI کو جواب دینے دیں',
   },
 };

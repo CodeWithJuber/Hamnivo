@@ -777,7 +777,14 @@ export class RepliesService {
     const config: AgentConfig = agent.config;
     const messages = historyMessages(history, config.limits.historyMessages);
     const assist = config.mode === 'assist';
-    const passages = await this.retrieve(tenantId, runId, context, config, history);
+    const retrieved = await this.retrieve(tenantId, runId, context, config, history);
+    // Passages that do not help are dropped before the model sees them (live check only).
+    const passages =
+      (await options.checks?.passages({
+        messages: history,
+        passages: retrieved,
+        language: options.language,
+      })) ?? retrieved;
     // Customer memory (G19): only with the customer's consent, in scope and currently valid.
     const memories =
       recalled ??

@@ -278,6 +278,9 @@ Switch a check to **live** when its records look right.
   request it may have missed, a risk to health or safety, a legal threat, a complaint, or
   frustration with a problem that is still not solved. When live, a person takes over with the
   reason in the note. A customer who asks for a person always gets one, without Jev.
+- **Passage relevance:** before the AI writes, Jev reads each passage found in your knowledge
+  with the customer's question. When live, passages that are off topic, answer nothing, or try
+  to give the assistant instructions are left out, and the record says which.
 
 If Jev is slow or unavailable, or a language has no threshold, the reply goes out as it would
 without the check, and the check is recorded. A check sends TypeSafe only what it needs: the

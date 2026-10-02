@@ -12,6 +12,7 @@ import {
   ESCALATION_QUESTIONS,
   LANGUAGE_SLICES,
   type NoulQuestion,
+  PASSAGE_QUESTIONS,
   relationQuestion,
 } from '@hamnivo/domain';
 import { iso } from '../common/views.js';
@@ -29,6 +30,8 @@ export function checkQuestions(task: CheckTask): CheckQuestion[] {
   switch (task) {
     case 'escalation':
       return Object.entries(ESCALATION_QUESTIONS).map(([key, question]) => noulView(key, question));
+    case 'passage-relevance':
+      return Object.entries(PASSAGE_QUESTIONS).map(([key, question]) => noulView(key, question));
     case 'answer-check': {
       const question = relationQuestion(1, 1);
       return [
