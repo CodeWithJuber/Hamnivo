@@ -22,7 +22,10 @@ test.beforeAll(async () => {
   await appointOperator(operator.email, 'platform_admin');
 });
 
-test('HNV-26-01 · the console is for platform operators only', async ({ page }) => {
+test('HNV-26-01 A17 · the console is for platform operators only, and shows service health', async ({
+  page,
+  browser,
+}) => {
   await owner.signIn(page.context());
   await page.goto('/overview');
   await expect(page.locator('h1')).toHaveText('Overview');
@@ -30,9 +33,18 @@ test('HNV-26-01 · the console is for platform operators only', async ({ page })
   await expect(page.getByTestId('platform-link')).toHaveCount(0);
   await page.goto('/platform');
   await expect(page.getByTestId('not-operator')).toBeVisible();
+
+  const context = await browser.newContext();
+  await operator.signIn(context);
+  const operatorPage = await context.newPage();
+  await operatorPage.goto('/platform?view=health');
+  const health = operatorPage.getByTestId('platform-health');
+  await expect(health.locator('[data-service="database"]')).toContainText('Healthy');
+  await expect(health.locator('[data-service="api"]')).toContainText('Healthy');
+  await context.close();
 });
 
-test('HNV-26-02 · an operator asks for access and the owner approves it narrower', async ({
+test('HNV-26-02 HNV-26-03 HNV-26-04 · from tenant metadata, an operator asks for access and the owner approves it narrower', async ({
   page,
   browser,
 }) => {
@@ -79,7 +91,7 @@ test('HNV-26-02 · an operator asks for access and the owner approves it narrowe
   await expect(page.getByTestId('my-support-grant').first()).toHaveAttribute('data-state', 'ended');
 });
 
-test('HNV-26-03 · an incident banner reaches every workspace until resolved', async ({
+test('HNV-26-06 · an incident banner reaches every workspace until resolved', async ({
   page,
   browser,
 }) => {
@@ -109,7 +121,7 @@ test('HNV-26-03 · an incident banner reaches every workspace until resolved', a
   await context.close();
 });
 
-test('HNV-26-04 · the console passes axe and fits a phone, in English and Arabic', async ({
+test('HNV-24-06 · the platform console passes axe and fits a phone, in English and Arabic', async ({
   page,
 }) => {
   test.setTimeout(180_000);

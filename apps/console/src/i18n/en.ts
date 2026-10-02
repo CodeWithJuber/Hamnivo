@@ -2062,6 +2062,8 @@ export const en = {
     otherWays: 'Or confirm another way',
     passkey: 'Use a passkey',
     sso: 'Use single sign-on',
+    ssoDescription:
+      'This action needs a recent sign-in. Continue with your organization’s single sign-on. Your work on this page is kept.',
   },
   platform: {
     title: 'Hamnivo Platform',

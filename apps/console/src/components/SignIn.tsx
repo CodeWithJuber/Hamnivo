@@ -161,6 +161,7 @@ export function SignInFlow({
   footer,
   showCodeTitle = true,
   onSsoRequired,
+  quietSubmit = false,
 }: {
   idPrefix: string;
   fixedEmail?: string;
@@ -173,6 +174,8 @@ export function SignInFlow({
   showCodeTitle?: boolean;
   /** The address must use single sign-on (A13): offer it instead of the password. */
   onSsoRequired?: (email: string) => void;
+  /** Another way to sign in is the main action, so the password button is a secondary one. */
+  quietSubmit?: boolean;
 }) {
   const { t } = useTranslation();
   const announce = useAnnouncer();
@@ -470,7 +473,12 @@ export function SignInFlow({
           onCheckedChange={setRemember}
         />
       ) : null}
-      <Button type="submit" busy={busy} className="w-full">
+      <Button
+        type="submit"
+        busy={busy}
+        className="w-full"
+        {...(quietSubmit ? { variant: 'secondary' as const } : {})}
+      >
         {submitLabel}
       </Button>
       {footer}

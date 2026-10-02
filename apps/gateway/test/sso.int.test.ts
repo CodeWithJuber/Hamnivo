@@ -325,8 +325,12 @@ describe('the OpenID Connect connection (A13)', () => {
 describe('signing in with SSO (A13)', () => {
   it('signs a new person in and adds them with the chosen role', async () => {
     const lina = identity('lina', { name: 'Lina Haddad' });
-    const { client, location } = await ssoSignIn(lina);
+    const { client, start, done, location } = await ssoSignIn(lina);
     expect(location?.href).toBe(`${CONSOLE_ORIGIN}/`);
+    // The callback only redirects, without an opener policy: a sign-in window opened by a page
+    // keeps reporting back to it. Every other auth response keeps the policy.
+    expect(done?.headers['cross-origin-opener-policy']).toBeUndefined();
+    expect(start.headers['cross-origin-opener-policy']).toBe('same-origin');
     const me = await client.get('/v1/me');
     expect(me.status).toBe(200);
     expect(me.body.user).toMatchObject({ email: lina.email, emailVerified: true });

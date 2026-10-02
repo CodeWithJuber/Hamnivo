@@ -18,7 +18,7 @@ test.beforeAll(async () => {
   owner = workspace.staff;
 });
 
-test('HNV-22-01 · an invitation is sent from Studio and accepted from its link', async ({
+test('HNV-22-01 HNV-22-02 · an invitation is sent from Studio and accepted from its link', async ({
   page,
   browser,
 }) => {
@@ -58,7 +58,7 @@ test('HNV-22-01 · an invitation is sent from Studio and accepted from its link'
   await expect(page.locator(`[data-member="${invitee.email}"]`)).toContainText('Support agent');
 });
 
-test('HNV-22-02 · a role is changed in one step and a member is suspended and restored', async ({
+test('HNV-22-01 A02 · a role is changed in one step and a member is suspended and restored', async ({
   page,
 }) => {
   const cai = await memberOf(owner, 'Cai Agent', 'cai', 'agent');
@@ -205,7 +205,7 @@ test('HNV-22-06 · the audit log filters, checks integrity and exports what it s
   await expect(rows.first()).toHaveAttribute('data-action', 'audit.exported');
 });
 
-test('HNV-22-07 · team pages pass axe and fit a phone, in English and Arabic', async ({ page }) => {
+test('HNV-24-06 · team pages pass axe and fit a phone, in English and Arabic', async ({ page }) => {
   test.setTimeout(180_000);
   await owner.signIn(page.context());
   const violations: string[] = [];

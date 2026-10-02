@@ -6,7 +6,7 @@
 import { randomBytes } from 'node:crypto';
 import { expect, type Page, test } from '@playwright/test';
 import { auditPage, overflowAt, ownerWithMfa, publishTxt } from './access';
-import { audit, PASSWORD, type Staff, stack, verifyEmail } from './support';
+import { ageSessions, audit, PASSWORD, type Staff, stack, verifyEmail } from './support';
 
 const domain = `sso-${randomBytes(3).toString('hex')}.example`;
 let owner: Staff;
@@ -38,7 +38,7 @@ async function atProvider(page: Page, email: string) {
   await page.locator('button[type="submit"]').click();
 }
 
-test('HNV-26-06 · an owner proves the domain, connects the provider and turns SSO on', async ({
+test('A13 · an owner proves the domain, connects the provider and turns SSO on', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -85,7 +85,7 @@ test('HNV-26-06 · an owner proves the domain, connects the provider and turns S
   );
 });
 
-test('HNV-02-08 · a new person signs in with SSO and joins with the chosen role', async ({
+test('HNV-02-01 A13 · a new person signs in with SSO and joins with the chosen role', async ({
   browser,
 }) => {
   test.setTimeout(120_000);
@@ -104,7 +104,7 @@ test('HNV-02-08 · a new person signs in with SSO and joins with the chosen role
   await context.close();
 });
 
-test('HNV-02-09 · the provider must have verified the address', async ({ browser }) => {
+test('A13 · an address the provider has not verified is turned away', async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto('/sign-in');
@@ -119,7 +119,7 @@ test('HNV-02-09 · the provider must have verified the address', async ({ browse
   await context.close();
 });
 
-test('HNV-02-10 · with SSO required, a password sign-in is turned to SSO', async ({
+test('HNV-02-01 A13 · with SSO required, a password sign-in is turned to SSO', async ({
   page,
   browser,
 }) => {
@@ -151,7 +151,62 @@ test('HNV-02-10 · with SSO required, a password sign-in is turned to SSO', asyn
   await context.close();
 });
 
-test('HNV-26-07 · the security page passes axe and fits a phone, in English and Arabic', async ({
+test('HNV-02-05 · after SSO, a sensitive action is confirmed at the provider, which asks again', async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  // New people now join as auditors, who may export the audit log: an action that needs a recent
+  // sign-in but no two-step verification.
+  const role = await owner.call<{ id: string }>('POST', '/v1/admin/roles', {
+    key: 'sso_auditor',
+    name: 'SSO auditor',
+    permissions: ['members.read', 'audit.read', 'audit.export'],
+  });
+  const { connections } = await owner.call<{
+    connections: Array<{ id: string; version: number }>;
+  }>('GET', '/v1/admin/sso');
+  const connection = connections[0];
+  if (!connection) throw new Error('no SSO connection');
+  await owner.call('PATCH', `/v1/admin/sso/connections/${connection.id}`, {
+    version: connection.version,
+    jitRoleId: role.id,
+  });
+
+  const email = `rami@${domain}`;
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto('/sign-in');
+  await page.getByTestId('continue-with-sso').click();
+  await page.getByLabel('Work email address').fill(email);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await atProvider(page, email);
+  await expect(page).toHaveURL(/\/overview/);
+
+  // An hour later, exporting asks to sign in again. The provider still has a session, but it
+  // checks who this is again (prompt=login) before the export goes ahead.
+  await ageSessions(email);
+  await page.goto('/team?tab=audit');
+  await expect(page.getByTestId('audit-table')).toBeVisible();
+  await page.getByTestId('export-audit').click();
+  await page.getByRole('menuitem', { name: 'Export as CSV (spreadsheets)' }).click();
+  const reauth = page.getByTestId('reauth-dialog');
+  await expect(reauth).toHaveAttribute('data-reason', 'step-up');
+  // Single sign-on comes first for someone who signed in that way.
+  await expect(reauth).toContainText('Continue with your organization’s single sign-on.');
+  await expect(reauth.getByRole('button').first()).toHaveText('Use single sign-on');
+  const downloaded = page.waitForEvent('download');
+  const [popup] = await Promise.all([
+    page.waitForEvent('popup'),
+    reauth.getByTestId('reauth-sso').click(),
+  ]);
+  await atProvider(popup, email);
+  await expect(reauth).toBeHidden();
+  expect((await downloaded).suggestedFilename()).toMatch(/\.csv$/);
+  await expect(page.getByTestId('audit-exported')).toBeVisible();
+  await context.close();
+});
+
+test('HNV-24-06 · the security page passes axe and fits a phone, in English and Arabic', async ({
   page,
 }) => {
   test.setTimeout(120_000);

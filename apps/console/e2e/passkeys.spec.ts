@@ -12,7 +12,7 @@ test.beforeAll(async () => {
   workspace = await seedWorkspace();
 });
 
-test('HNV-02-07 · a passkey is registered, signs in, and confirms a sensitive action', async ({
+test('HNV-02-01 HNV-02-05 · a passkey is registered, signs in, and confirms a sensitive action', async ({
   page,
 }) => {
   test.setTimeout(120_000);

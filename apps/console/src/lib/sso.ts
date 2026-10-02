@@ -33,11 +33,16 @@ export type SsoStart =
   | { url: string }
   | { error: 'not_set_up' | 'network' | 'rate_limited' | 'failed' };
 
-/** Asks the gateway where single sign-on for this address starts. */
+/**
+ * Asks the gateway where single sign-on for this address starts. `reauthenticate` asks the
+ * provider to check who the person is again (OpenID Connect `prompt=login`), even when it still
+ * has a session: signing in again to confirm a sensitive action must not pass silently.
+ */
 export async function startSso(
   email: string,
   callbackPath: string,
   errorPath: string,
+  options: { reauthenticate?: boolean } = {},
 ): Promise<SsoStart> {
   const origin = window.location.origin;
   let response: Response;
@@ -50,6 +55,7 @@ export async function startSso(
         email: email.trim(),
         callbackURL: `${origin}${callbackPath}`,
         errorCallbackURL: `${origin}${errorPath}`,
+        ...(options.reauthenticate ? { additionalParams: { prompt: 'login' } } : {}),
       }),
     });
   } catch {
@@ -71,7 +77,7 @@ export type SsoPopupResult = { ok: true } | { ok: false; error: string };
 export async function ssoInPopup(email: string): Promise<SsoPopupResult> {
   const popup = window.open('', 'hamnivo-sso', 'popup,width=520,height=700');
   if (!popup) return { ok: false, error: 'popup_blocked' };
-  const started = await startSso(email, '/sso/done', '/sso/done');
+  const started = await startSso(email, '/sso/done', '/sso/done', { reauthenticate: true });
   if ('error' in started) {
     popup.close();
     return { ok: false, error: started.error };

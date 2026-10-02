@@ -42,6 +42,12 @@ export function registerAuthRoutes(fastify: FastifyInstance, auth: Auth, sso: Ss
           }),
         ),
       );
+      if (url.pathname.startsWith('/api/auth/sso/callback/')) {
+        // The provider's callback only redirects. Signing in again over a page (Studio's sign-in
+        // dialog) goes through it in a small window that reports back to the page that opened
+        // it; an opener policy on this hop would cut that link, so it has none.
+        reply.raw.removeHeader('cross-origin-opener-policy');
+      }
       reply.status(response.status);
       for (const [key, value] of response.headers) {
         if (key === 'set-cookie') continue;

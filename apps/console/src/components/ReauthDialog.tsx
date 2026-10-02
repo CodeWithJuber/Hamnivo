@@ -23,7 +23,7 @@ import { PasskeyButton, SignInFlow } from './SignIn';
 
 /**
  * Signing in again with single sign-on, in a small window so the page stays as it is (A13). Shown
- * when this browser last signed in that way, or when the address turns out to require it.
+ * first when this browser last signed in that way, or when the address turns out to require it.
  */
 function SsoAgain({ email, onSignedIn }: { email: string; onSignedIn: () => Promise<void> }) {
   const { t } = useTranslation();
@@ -34,7 +34,6 @@ function SsoAgain({ email, onSignedIn }: { email: string; onSignedIn: () => Prom
     <div className="flex flex-col gap-2">
       <Button
         type="button"
-        variant="secondary"
         busy={busy}
         className="w-full"
         data-testid="reauth-sso"
@@ -71,6 +70,17 @@ function SsoAgain({ email, onSignedIn }: { email: string; onSignedIn: () => Prom
   );
 }
 
+function OtherWays() {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center gap-3 text-sm text-text-muted">
+      <Separator className="flex-1" />
+      <span>{t('reauthMore.otherWays')}</span>
+      <Separator className="flex-1" />
+    </div>
+  );
+}
+
 /**
  * Sign-in-again dialog (HNV-02-05). A sensitive action whose sign-in is too old ("step-up") or a
  * session that ended ("expired") opens it over the page; the page and its unsaved work stay
@@ -97,6 +107,8 @@ export function ReauthDialog() {
 
   if (!request) return null;
   const email = me.data?.user.email;
+  // Someone who signs in with single sign-on usually has no password here: offer that first.
+  const ssoFirst = Boolean(email) && (ssoNeeded || lastSignInMethod() === 'sso');
   const signedIn = async () => {
     // A passkey or an identity provider can sign in a different account: never continue the
     // page as someone else.
@@ -155,9 +167,19 @@ export function ReauthDialog() {
             </DialogTitle>
           </div>
           <DialogDescription className="text-text-secondary">
-            {expired ? t('auth.reauth.expiredDescription') : t('auth.reauth.stepUpDescription')}
+            {expired
+              ? t('auth.reauth.expiredDescription')
+              : ssoFirst
+                ? t('reauthMore.ssoDescription')
+                : t('auth.reauth.stepUpDescription')}
           </DialogDescription>
         </DialogHeader>
+        {email && ssoFirst ? (
+          <>
+            <SsoAgain email={email} onSignedIn={signedIn} />
+            <OtherWays />
+          </>
+        ) : null}
         <SignInFlow
           idPrefix="reauth"
           {...(email ? { fixedEmail: email } : {})}
@@ -165,20 +187,12 @@ export function ReauthDialog() {
           showRemember={false}
           onSignedIn={signedIn}
           onSsoRequired={() => setSsoNeeded(true)}
+          quietSubmit={ssoFirst}
         />
-        {passkeysAvailable() || (email && (ssoNeeded || lastSignInMethod() === 'sso')) ? (
+        {passkeysAvailable() ? (
           <div className="flex flex-col gap-3" data-testid="reauth-other-ways">
-            <div className="flex items-center gap-3 text-sm text-text-muted">
-              <Separator className="flex-1" />
-              <span>{t('reauthMore.otherWays')}</span>
-              <Separator className="flex-1" />
-            </div>
-            {email && (ssoNeeded || lastSignInMethod() === 'sso') ? (
-              <SsoAgain email={email} onSignedIn={signedIn} />
-            ) : null}
-            {passkeysAvailable() ? (
-              <PasskeyButton onSignedIn={signedIn} label={t('reauthMore.passkey')} />
-            ) : null}
+            {ssoFirst ? null : <OtherWays />}
+            <PasskeyButton onSignedIn={signedIn} label={t('reauthMore.passkey')} />
           </div>
         ) : null}
         <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
