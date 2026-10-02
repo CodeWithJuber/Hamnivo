@@ -810,6 +810,7 @@ export const ar: Translation = {
       blocked: 'منعه حارس',
       error: 'خطأ',
       skipped: 'تُخطّي',
+      cancelled: 'أوقفه شخص',
       running: 'قيد التشغيل',
     },
     view: 'عرض',

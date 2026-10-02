@@ -68,6 +68,7 @@ CREATE TABLE "actions" (
 	"code" text,
 	"expires_at" timestamp with time zone,
 	"operation_id" uuid,
+	"outcome_summary" text,
 	"decided_at" timestamp with time zone,
 	"completed_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,

@@ -1,5 +1,5 @@
 {
-  "id": "2257bea3-cf84-4cfb-bfda-e5e1eaeb0193",
+  "id": "a75cad1c-0bb2-4cf2-a99f-e344766b9e10",
   "prevId": "f9837ddc-dedb-4354-8a65-9264dbc57e17",
   "version": "7",
   "dialect": "postgresql",
@@ -549,6 +549,12 @@
         "operation_id": {
           "name": "operation_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outcome_summary": {
+          "name": "outcome_summary",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

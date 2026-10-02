@@ -222,6 +222,7 @@ export const RUN_OUTCOMES = [
   'blocked',
   'error',
   'skipped',
+  'cancelled',
 ] as const;
 
 /**

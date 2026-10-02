@@ -278,6 +278,11 @@ export const actions = pgTable(
     code: text('code'),
     expiresAt: tstz('expires_at'),
     operationId: uuid('operation_id'),
+    /**
+     * What the result established, in words Hamnivo wrote from the tool's answer or receipt (for
+     * handoff packets and staff); never the tool's own text.
+     */
+    outcomeSummary: text('outcome_summary'),
     decidedAt: tstz('decided_at'),
     completedAt: tstz('completed_at'),
     createdAt: createdAt(),

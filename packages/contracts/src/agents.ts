@@ -220,14 +220,17 @@ export const CreateModelConnectionRequest = z
   })
   .meta({ id: 'CreateModelConnectionRequest' });
 
-export const KillSwitchScope = z.enum(['tenant', 'brand', 'agent']);
+export const KillSwitchScope = z.enum(['tenant', 'brand', 'agent', 'tool']);
 
-/** Stops AI replies in its scope; people keep chatting and see the conversation (X08). */
+/**
+ * Stops AI replies in its scope; people keep chatting and see the conversation (X08). A `tool`
+ * switch stops that tool's actions only: the AI keeps answering and is told the tool is stopped.
+ */
 export const KillSwitch = z
   .object({
     id: typeId('killSwitch'),
     scope: KillSwitchScope,
-    /** brd_… or agt_…; null for the whole tenant. */
+    /** brd_…, agt_… or tool_…; null for the whole tenant. */
     targetId: z.string().nullable(),
     reason: z.string(),
     active: z.boolean(),
@@ -245,7 +248,7 @@ export const CreateKillSwitchRequest = z
     reason: z.string().trim().min(3).max(500),
   })
   .superRefine((value, ctx) => {
-    const prefix = { tenant: null, brand: 'brd_', agent: 'agt_' }[value.scope];
+    const prefix = { tenant: null, brand: 'brd_', agent: 'agt_', tool: 'tool_' }[value.scope];
     if (prefix === null ? value.targetId !== undefined : !value.targetId?.startsWith(prefix)) {
       ctx.addIssue({
         code: 'custom',
@@ -283,7 +286,7 @@ export const Run = z
     kind: z.enum(['reply', 'draft']),
     state: z.enum(['running', 'succeeded', 'failed', 'skipped']),
     outcome: z
-      .enum(['replied', 'drafted', 'handoff', 'fenced', 'blocked', 'error', 'skipped'])
+      .enum(['replied', 'drafted', 'handoff', 'fenced', 'blocked', 'error', 'skipped', 'cancelled'])
       .nullable(),
     provider: z.string().nullable(),
     modelId: z.string().nullable(),

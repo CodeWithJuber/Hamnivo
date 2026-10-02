@@ -57,6 +57,8 @@ export const ApprovalCard = z
     amount: z.object({ amountMinor: MinorUnits, currency: CurrencyCode }).nullable(),
     risk: z.enum(['read', 'write', 'money', 'irreversible']),
     approver: z.enum(['customer', 'staff']),
+    /** Who proposed it: the AI agent's display name (an AI, never a person). */
+    requestedBy: z.string().max(80).nullable(),
     /** Approving needs a fresh sign-in (staff) or a fresh identity check (customer). */
     stepUp: z.boolean(),
     /** SHA-256 of the canonical arguments the approval binds to. */

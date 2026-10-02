@@ -820,6 +820,7 @@ export const en = {
       blocked: 'Blocked by a guard',
       error: 'Error',
       skipped: 'Skipped',
+      cancelled: 'Stopped by a person',
       running: 'Running',
     },
     view: 'View',

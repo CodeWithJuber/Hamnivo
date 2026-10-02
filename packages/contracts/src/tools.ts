@@ -134,6 +134,7 @@ export const BuiltinTool = z
     available: z.boolean(),
   })
   .meta({ id: 'BuiltinTool' });
+export type BuiltinTool = z.infer<typeof BuiltinTool>;
 
 export const McpServer = z
   .object({
@@ -185,6 +186,7 @@ export const McpSyncResult = z
     skipped: z.array(z.object({ name: z.string(), reason: z.string() })),
   })
   .meta({ id: 'McpSyncResult' });
+export type McpSyncResult = z.infer<typeof McpSyncResult>;
 
 export const ActionSettings = z
   .object({
@@ -194,6 +196,7 @@ export const ActionSettings = z
     updatedAt: Timestamp.nullable(),
   })
   .meta({ id: 'ActionSettings' });
+export type ActionSettings = z.infer<typeof ActionSettings>;
 
 export const UpdateActionSettingsRequest = z
   .object({
@@ -291,6 +294,18 @@ export const DecideActionRequest = z
     reason: z.string().trim().max(300).optional(),
   })
   .meta({ id: 'DecideActionRequest' });
+
+/**
+ * A person checked the system an action went to and records its result: for a tool Hamnivo
+ * cannot check itself (an MCP server has no standard status lookup). Nothing is sent again.
+ */
+export const ResolveActionRequest = z
+  .object({
+    outcome: z.enum(['succeeded', 'failed']),
+    /** What the person saw, for the audit trail (no secrets). */
+    note: z.string().trim().min(3).max(300),
+  })
+  .meta({ id: 'ResolveActionRequest' });
 
 export const HandoffPacket = z
   .object({

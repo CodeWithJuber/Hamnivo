@@ -13,6 +13,7 @@ import {
   HandoffPacket,
   McpServer,
   McpSyncResult,
+  ResolveActionRequest,
   SaveSimulationSuiteRequest,
   SimulationRun,
   SimulationSuite,
@@ -307,6 +308,18 @@ export const actionInboxRoutes = {
     tags: ['Inbox'],
     auth: 'staff_session',
     params: actionParams,
+    success: { status: 200, description: 'Action', schema: Action },
+  },
+  resolveConversationAction: {
+    method: 'post',
+    path: '/v1/inbox/conversations/{conversationId}/actions/{actionId}/resolve',
+    operationId: 'resolveConversationAction',
+    summary:
+      'Record the checked result of an action Hamnivo cannot check itself; nothing is sent again (tools.approve and the tool’s permission)',
+    tags: ['Inbox'],
+    auth: 'staff_session',
+    params: actionParams,
+    body: ResolveActionRequest,
     success: { status: 200, description: 'Action', schema: Action },
   },
   listHandoffPackets: {

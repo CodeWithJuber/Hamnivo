@@ -815,6 +815,7 @@ export const hi: Translation = {
       blocked: 'गार्ड ने रोका',
       error: 'त्रुटि',
       skipped: 'छोड़ा गया',
+      cancelled: 'किसी व्यक्ति ने रोका',
       running: 'चल रहा है',
     },
     view: 'देखें',

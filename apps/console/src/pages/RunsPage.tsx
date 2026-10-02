@@ -43,6 +43,7 @@ const OUTCOMES = [
   'blocked',
   'error',
   'skipped',
+  'cancelled',
   'running',
 ] as const;
 

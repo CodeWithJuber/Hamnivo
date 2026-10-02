@@ -1,6 +1,6 @@
 {
-  "id": "5e895199-4ea0-42a6-ad62-290ffbc2cfd3",
-  "prevId": "2257bea3-cf84-4cfb-bfda-e5e1eaeb0193",
+  "id": "361acd9d-8642-49d2-ad06-79b9018f32ac",
+  "prevId": "a75cad1c-0bb2-4cf2-a99f-e344766b9e10",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -549,6 +549,12 @@
         "operation_id": {
           "name": "operation_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outcome_summary": {
+          "name": "outcome_summary",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

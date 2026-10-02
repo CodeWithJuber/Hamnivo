@@ -832,6 +832,7 @@ export const ur: Translation = {
       blocked: 'گارڈ نے روکا',
       error: 'خرابی',
       skipped: 'چھوڑ دیا گیا',
+      cancelled: 'کسی شخص نے روکا',
       running: 'جاری',
     },
     view: 'دیکھیں',
