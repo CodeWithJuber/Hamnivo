@@ -148,6 +148,58 @@ const EnvSchema = z.object({
   METRICS_TOKEN: z.string().min(16).optional(),
   API_DOCS: bool.default(true),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(600),
+  /** Requests per minute for one API key (each key has its own budget). */
+  API_KEY_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(120),
+
+  /**
+   * Outbound requests made for tenants (webhooks) reach public HTTPS hosts only. Origins listed
+   * here (comma-separated, e.g. `http://10.0.0.5:8080`) are trusted by the server administrator:
+   * reachable on a private network and over plain HTTP. Leave empty in production unless needed.
+   */
+  EGRESS_TRUSTED_ORIGINS: z
+    .string()
+    .default('')
+    .transform((value, ctx) => {
+      const origins = value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      for (const origin of origins) {
+        let parsed: URL | null = null;
+        try {
+          parsed = new URL(origin);
+        } catch {
+          parsed = null;
+        }
+        if (!parsed || parsed.origin !== origin) {
+          ctx.addIssue({ code: 'custom', message: `not an origin: ${origin}` });
+        }
+      }
+      return origins;
+    }),
+  /** Webhook request deadline (the Standard Webhooks advice is 15 to 30 seconds). */
+  WEBHOOK_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30_000).default(15_000),
+  /** Days an event body is kept, so failed deliveries can be replayed. */
+  WEBHOOK_RETENTION_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+  /** Days the delivery log (without bodies) is kept. */
+  WEBHOOK_LOG_DAYS: z.coerce.number().int().min(1).max(365).default(90),
+  /**
+   * An endpoint is turned off after this many failed attempts in a row that span at least
+   * WEBHOOK_DISABLE_AFTER_HOURS; the owner can turn it on again and replay what failed.
+   */
+  WEBHOOK_DISABLE_AFTER_FAILURES: z.coerce.number().int().min(1).max(1000).default(10),
+  WEBHOOK_DISABLE_AFTER_HOURS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 30)
+    .default(72),
+  /** Webhook requests sent at the same time by one worker. */
+  WEBHOOK_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(8),
+  /** Analytics withhold values computed from fewer conversations or responses than this. */
+  ANALYTICS_MIN_GROUP_SIZE: z.coerce.number().int().min(2).max(50).default(5),
+  /** Days between issuing a platform invoice and its due date. */
+  BILLING_INVOICE_DUE_DAYS: z.coerce.number().int().min(1).max(90).default(14),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema> & {

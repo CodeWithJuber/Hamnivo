@@ -44,6 +44,7 @@ export const ROLE_PRESETS = [
       'migration.*',
       'settings.*',
       'security.*',
+      'network.*',
     ],
   },
   {
@@ -112,7 +113,9 @@ export const ROLE_PRESETS = [
     description: 'Installs the widget and connects systems',
     patterns: [
       'widget.configure',
+      'api_keys.read',
       'api_keys.manage',
+      'webhooks.read',
       'webhooks.manage',
       'integrations.manage',
       'agents.read',
@@ -129,7 +132,7 @@ export const ROLE_PRESETS = [
     key: 'billing',
     name: 'Billing manager',
     description: 'Plan, invoices and usage',
-    patterns: ['billing.manage', 'analytics.read'],
+    patterns: ['billing.read', 'billing.manage', 'analytics.read'],
   },
 ] as const satisfies readonly RolePreset[];
 

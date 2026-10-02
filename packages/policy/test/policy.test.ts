@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  API_KEY_PERMISSIONS,
   authorize,
   authorizeAny,
   authorizePlatform,
@@ -11,11 +12,13 @@ import {
   explain,
   type Grant,
   inapplicablePermissions,
+  isApiKeyPermission,
   isPermission,
   isPlatformPermission,
   PERMISSION_KEYS,
   PLATFORM_PERMISSION_KEYS,
   type PlatformPrincipal,
+  permissionSpec,
   permissionsAnywhere,
   platformPermissions,
   presetPermissions,
@@ -719,5 +722,90 @@ describe('migration permissions', () => {
       expect.arrayContaining(['migration.review', 'migration.run', 'migration.manage']),
     );
     expect(presetPermissions('agent').filter((p) => p.startsWith('migration.'))).toEqual([]);
+  });
+});
+
+describe('developer platform permissions', () => {
+  it('lets API keys carry only permissions without step-up or MFA', () => {
+    expect(API_KEY_PERMISSIONS.length).toBeGreaterThan(0);
+    for (const permission of API_KEY_PERMISSIONS) {
+      expect(PERMISSION_KEYS).toContain(permission);
+      const spec = permissionSpec(permission) as { stepUp?: true; mfa?: true };
+      expect(spec.stepUp, permission).toBeUndefined();
+      expect(spec.mfa, permission).toBeUndefined();
+    }
+    expect(isApiKeyPermission('analytics.read')).toBe(true);
+    expect(isApiKeyPermission('api_keys.manage')).toBe(false);
+    expect(isApiKeyPermission('webhooks.manage')).toBe(false);
+  });
+
+  it('needs a fresh sign-in for every key, webhook, network and budget change', () => {
+    for (const permission of [
+      'api_keys.manage',
+      'webhooks.manage',
+      'network.manage',
+      'billing.manage',
+    ] as const) {
+      expect(permissionSpec(permission).stepUp, permission).toBe(true);
+      expect(permissionSpec(permission).scopes).toEqual(['tenant']);
+    }
+    expect((permissionSpec('api_keys.manage') as { mfa?: true }).mfa).toBe(true);
+    for (const permission of ['api_keys.read', 'webhooks.read', 'billing.read'] as const) {
+      expect((permissionSpec(permission) as { stepUp?: true }).stepUp).toBeUndefined();
+    }
+  });
+
+  it('gives developers keys and webhooks, administrators the network list, and billing its reads', () => {
+    expect(presetPermissions('developer')).toEqual(
+      expect.arrayContaining([
+        'api_keys.read',
+        'api_keys.manage',
+        'webhooks.read',
+        'webhooks.manage',
+      ]),
+    );
+    expect(presetPermissions('developer')).not.toContain('network.manage');
+    expect(presetPermissions('admin')).toEqual(
+      expect.arrayContaining(['network.manage', 'webhooks.manage', 'api_keys.manage']),
+    );
+    expect(presetPermissions('admin')).not.toContain('billing.read');
+    expect(presetPermissions('billing')).toEqual(
+      expect.arrayContaining(['billing.read', 'billing.manage']),
+    );
+    expect(presetPermissions('analyst')).not.toContain('billing.read');
+  });
+
+  it('keeps a workspace-scoped grant of key or webhook management inert', () => {
+    const scoped = staff(
+      [
+        grant({
+          permissions: ['api_keys.*', 'webhooks.*'],
+          scope: { type: 'workspace', id: 'W' },
+        }),
+      ],
+      { mfa: true },
+    );
+    expect(effectivePermissions(scoped, now).has('api_keys.manage')).toBe(false);
+    expect(authorize(scoped, 'webhooks.manage', { workspaceId: 'W' }, { now })).toMatchObject({
+      reason: 'no_grant',
+    });
+  });
+
+  it('refuses a service account every step-up permission even when its key lists it', () => {
+    const service: ServiceAccountPrincipal = {
+      kind: 'service_account',
+      tenantId: 't1',
+      serviceAccountId: 'sa1',
+      status: 'active',
+      keyScopes: ['*'],
+      grants: [grant({ permissions: ['*'], scope: { type: 'tenant' } })],
+    };
+    expect(authorize(service, 'webhooks.read', {}, { now }).allowed).toBe(true);
+    expect(authorize(service, 'webhooks.manage', {}, { now })).toMatchObject({
+      reason: 'mfa_required',
+    });
+    expect(authorize(service, 'api_keys.manage', {}, { now })).toMatchObject({
+      reason: 'mfa_required',
+    });
   });
 });

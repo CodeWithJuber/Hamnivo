@@ -139,20 +139,38 @@ export const PERMISSIONS = {
     mfa: true,
   },
   'analytics.read': { description: 'View analytics and reports', scopes: ALL },
+  'billing.read': {
+    description: 'See the plan, usage against its limits, and invoices',
+    scopes: TENANT,
+  },
   'billing.manage': {
-    description: 'Manage plan, invoices and payment',
+    description: 'Set usage budgets and the alerts before a limit',
     scopes: TENANT,
     stepUp: true,
   },
+  'api_keys.read': {
+    description: 'See API keys, their scopes and when they were last used',
+    scopes: TENANT,
+  },
   'api_keys.manage': {
-    description: 'Create and revoke API keys',
-    scopes: WORKSPACE,
+    description: 'Create, rotate and revoke API keys',
+    scopes: TENANT,
     stepUp: true,
     mfa: true,
   },
+  'webhooks.read': {
+    description: 'See webhook endpoints and their delivery log',
+    scopes: TENANT,
+  },
   'webhooks.manage': {
-    description: 'Configure outgoing webhooks',
-    scopes: WORKSPACE,
+    description:
+      'Add and change webhook endpoints, rotate their signing secrets and replay deliveries',
+    scopes: TENANT,
+    stepUp: true,
+  },
+  'network.manage': {
+    description: 'Choose which outside hosts Hamnivo may call for this workspace',
+    scopes: TENANT,
     stepUp: true,
   },
   'integrations.manage': {
@@ -202,6 +220,22 @@ export const PERMISSIONS = {
 
 export type Permission = keyof typeof PERMISSIONS;
 export const PERMISSION_KEYS = Object.keys(PERMISSIONS) as Permission[];
+
+/**
+ * What an API key can be given. Service accounts cannot sign in again or pass two-step
+ * verification, so permissions that need either stay with people; and a key only gets what an
+ * API route actually accepts keys for, so every scope a key shows is one it can use.
+ */
+export const API_KEY_PERMISSIONS = [
+  'analytics.read',
+  'billing.read',
+  'webhooks.read',
+] as const satisfies readonly Permission[];
+export type ApiKeyPermission = (typeof API_KEY_PERMISSIONS)[number];
+
+export function isApiKeyPermission(value: string): value is ApiKeyPermission {
+  return (API_KEY_PERMISSIONS as readonly string[]).includes(value);
+}
 
 export function isPermission(value: string): value is Permission {
   return Object.hasOwn(PERMISSIONS, value);

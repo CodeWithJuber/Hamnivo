@@ -43,13 +43,21 @@ const GLOBAL_TABLES: Record<string, string> = {
     'What platform operators did; each tenant’s share is also in its own audit log',
   platform_audit_head: 'Head of the platform audit hash chain',
   platform_incidents: 'Service incidents, shown to every workspace',
+  plans:
+    'Plans are defined by the platform operator for every workspace; a workspace keeps a copy of its plan’s limits in tenant_entitlements',
+  invoices:
+    'Invoices are the platform operator’s billing records; a workspace reads its own through app.tenant_invoices() and cannot change them',
 };
+
 /** Tables the application role may only insert into. */
 const APPEND_ONLY = new Set([
   'audit_events',
   'operation_receipts',
   'learning_consents',
   'deletion_tombstones',
+  'webhook_events',
+  'webhook_attempts',
+  'usage_alerts',
 ]);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
@@ -66,6 +74,10 @@ const NEVER_DELETED = new Set([
   'refunds',
   'finance_exceptions',
   'commerce_events',
+  'webhook_deliveries',
+  'conversation_metrics',
+  'tenant_entitlements',
+  'egress_policies',
 ]);
 
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
@@ -283,6 +295,14 @@ describe('two-tenant isolation', () => {
     'refunds',
     'finance_exceptions',
     'commerce_events',
+    'webhook_endpoints',
+    'webhook_events',
+    'webhook_deliveries',
+    'webhook_attempts',
+    'egress_policies',
+    'tenant_entitlements',
+    'usage_alerts',
+    'conversation_metrics',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -436,6 +456,14 @@ describe('two-tenant isolation', () => {
       'refunds',
       'finance_exceptions',
       'commerce_events',
+      'webhook_endpoints',
+      'webhook_events',
+      'webhook_deliveries',
+      'webhook_attempts',
+      'egress_policies',
+      'tenant_entitlements',
+      'usage_alerts',
+      'conversation_metrics',
       'audit_heads',
       'audit_events',
     ]);

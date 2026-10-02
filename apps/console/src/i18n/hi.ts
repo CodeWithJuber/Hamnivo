@@ -1,7 +1,9 @@
 import { cachingHi } from './caching';
 import { commerceHi } from './commerce/hi';
 import { decisionsHi } from './decisions';
+import { developerHi } from './developer/hi';
 import type { Translation } from './en';
+import { reportsHi } from './reports/hi';
 
 /** Hindi. Pending review by native speakers, as the note in the interface says. */
 export const hi: Translation = {
@@ -62,6 +64,8 @@ export const hi: Translation = {
     rateLimited: {
       title: 'बहुत ज़्यादा अनुरोध',
       description: 'थोड़ा रुकें, फिर से कोशिश करें।',
+      retryIn: 'आप {{seconds}} सेकंड बाद फिर कोशिश कर सकते हैं।',
+      retryNow: 'अब आप फिर कोशिश कर सकते हैं।',
     },
     unavailable: {
       title: 'कोई जुड़ी हुई सेवा जवाब नहीं दे रही',
@@ -88,6 +92,11 @@ export const hi: Translation = {
     internal: {
       title: 'हमारी तरफ़ से कुछ गड़बड़ हुई',
       description: 'कुछ नहीं बदला। फिर से कोशिश करें।',
+    },
+    planLimit: {
+      title: 'प्लान की सीमा पूरी हो गई',
+      description:
+        'आपके प्लान में इससे ज़्यादा शामिल नहीं है। कुछ जगह ख़ाली करें, या वर्कस्पेस के मालिक से बड़े प्लान के बारे में पूछें।',
     },
     unknown: { title: 'कुछ गड़बड़ हुई', description: 'फिर से कोशिश करें।' },
     page: {
@@ -1282,6 +1291,8 @@ export const hi: Translation = {
   decisions: decisionsHi,
   caching: cachingHi,
   commerce: commerceHi,
+  developer: developerHi,
+  reports: reportsHi,
   memory: {
     title: 'ग्राहक मेमोरी',
     description: 'तय करें कि हम आपके ग्राहकों के बारे में क्या याद रखते हैं।',
@@ -2219,6 +2230,7 @@ export const hi: Translation = {
     billing: 'बिलिंग',
     api_keys: 'API कुंजियां',
     webhooks: 'वेबहुक',
+    network: 'अनुमत होस्ट',
     integrations: 'इंटीग्रेशन',
     secrets: 'क्रेडेंशियल',
     extensions: 'एक्सटेंशन',
@@ -2288,9 +2300,19 @@ export const hi: Translation = {
       merchants: { manage: 'व्यापारी जोड़ें और उनके क्रेडेंशियल और रिफ़ंड नियम तय करें' },
     },
     analytics: { read: 'एनालिटिक्स और रिपोर्ट देखें' },
-    billing: { manage: 'प्लान, इनवॉइस और भुगतान संभालें' },
-    api_keys: { manage: 'API कुंजियां बनाएं और रद्द करें' },
-    webhooks: { manage: 'बाहर जाने वाले वेबहुक सेट करें' },
+    billing: {
+      read: 'प्लान, उपयोग और इनवॉइस देखें',
+      manage: 'प्लान, इनवॉइस और भुगतान संभालें',
+    },
+    api_keys: {
+      read: 'API कुंजियां और उनका पिछला उपयोग देखें',
+      manage: 'API कुंजियां बनाएं और रद्द करें',
+    },
+    webhooks: {
+      read: 'वेबहुक और उनकी डिलीवरी लॉग देखें',
+      manage: 'बाहर जाने वाले वेबहुक सेट करें',
+    },
+    network: { manage: 'चुनें कि Hamnivo किन बाहरी होस्ट से जुड़ सकता है' },
     integrations: { manage: 'चैनल और थर्ड-पार्टी सेवाएं जोड़ें' },
     secrets: { manage: 'क्रेडेंशियल सहेजें और बदलें' },
     extensions: { manage: 'एक्सटेंशन इंस्टॉल करें और हटाएं' },

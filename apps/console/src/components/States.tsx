@@ -3,7 +3,7 @@ import { Button } from '@hamnivo/ui/components/button';
 import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import { Link } from '@tanstack/react-router';
 import { AlertCircleIcon, LockIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isApiError } from '../lib/api';
 import { describeError } from '../lib/errors';
@@ -67,6 +67,24 @@ export function ErrorPanel({
   );
 }
 
+/** "You can try again in 20 s", counting down from the gateway's Retry-After. */
+function RetryCountdown({ seconds }: { seconds: number }) {
+  const { t } = useTranslation();
+  const [left, setLeft] = useState(seconds);
+  useEffect(() => {
+    setLeft(seconds);
+    const timer = setInterval(() => setLeft((value) => Math.max(0, value - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [seconds]);
+  return (
+    <p className="text-text" data-testid="retry-countdown">
+      {left > 0
+        ? t('errors.rateLimited.retryIn', { seconds: left })
+        : t('errors.rateLimited.retryNow')}
+    </p>
+  );
+}
+
 /** A failed change, shown next to the form or action that caused it. */
 export function ActionError({ error, id }: { error: unknown; id?: string }) {
   const { t } = useTranslation();
@@ -87,6 +105,9 @@ export function ActionError({ error, id }: { error: unknown; id?: string }) {
           <p className="text-text-secondary">
             <bdi dir="auto">{t('app.serverDetail', { detail: text.detail })}</bdi>
           </p>
+        ) : null}
+        {isApiError(error, 'RATE_LIMITED') && error.problem?.retryAfter ? (
+          <RetryCountdown seconds={error.problem.retryAfter} />
         ) : null}
         {text.reference ? (
           <p className="text-xs text-text-secondary">

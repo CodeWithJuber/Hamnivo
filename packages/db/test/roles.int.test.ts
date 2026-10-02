@@ -95,11 +95,13 @@ describe('database roles', () => {
         'app.claim_integration_inbox(integer,integer)',
         'app.claim_outbox(integer,integer)',
         'app.claim_reconcile_cursors(integer,integer)',
+        'app.claim_webhook_deliveries(integer,integer)',
         'app.ensure_audit_partitions(integer)',
         'app.ensure_reconcile_cursors()',
         'app.expired_memory_subjects(integer)',
         'app.purge_expired(integer)',
         'app.purge_migration_files(integer)',
+        'app.purge_webhook_events(integer,integer)',
         'app.resolve_api_key(text)',
         'app.resolve_authority_connection(uuid)',
         'app.resolve_invitation(uuid)',
@@ -110,6 +112,7 @@ describe('database roles', () => {
         'app.resolve_tenant_slug(text)',
         'app.resolve_widget(text)',
         'app.resolve_widget_session(uuid)',
+        'app.tenant_invoices(uuid)',
       ].sort(),
     );
     for (const fn of definers) {

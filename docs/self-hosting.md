@@ -27,6 +27,8 @@ this repository.
 | Studio (staff console): sign-in with two-step verification, brands and install, Chatwoot connection, AI agents, model connections, knowledge, Stop AI, runs | ready (first version) | `https://app.<your domain>` (A6); `pnpm --filter @hamnivo/console dev` in development |
 | Team and access (members, invitations, custom roles, audit log with export), single sign-on per workspace (OpenID Connect), passkeys, support access | ready (first version) | Studio: Team and access, Security (A6) |
 | Platform console for the people who run the server: workspaces (metadata only), service health, support access, incident banners | ready (first version) | `https://app.<your domain>/platform`; operators are named on the server (A7) |
+| Developer platform: API keys, signed webhooks (Standard Webhooks) with retries, a delivery log and replays, allowed hosts, webhook checks in the server SDK | ready (first version) | Studio → Developer; [`docs/guides/api-keys.md`](guides/api-keys.md), [`docs/guides/webhooks.md`](guides/webhooks.md) |
+| Reports (service quality, teams, AI use, orders) with small groups withheld; plans, usage limits, AI budgets and invoices | ready (first version) | Studio → Reports; plans and invoices: "Plans and invoices" in A7 |
 
 # Part A: Host Hamnivo on your server
 
@@ -445,6 +447,45 @@ operators on the server, after they have created their account in Studio:
 Operators need two-step verification for anything beyond looking. Every action is recorded in the
 platform's own audit log. In development, use
 `pnpm --filter @hamnivo/db platform:operator <email> <role>`.
+
+### Plans and invoices
+
+Hamnivo's operator, not the workspaces, defines plans, assigns them and issues invoices, with the
+billing command. Each step is recorded in the workspace's audit log under the name in
+`HAMNIVO_OPERATOR`. A workspace without a plan has no limits.
+
+A plan is a JSON file. Prices are in minor units (cents), written as strings. `limits` can hold
+`conversations`, `aiReplies` and `aiTokens` (per calendar month, UTC) and `knowledgeStorageBytes`,
+`seats` and `webhookEndpoints` (at any time); a limit left out is unlimited. `metered` prices usage
+beyond what the plan includes.
+
+```json
+{"key":"starter","name":"Starter","currency":"USD","priceMinor":"4900",
+ "limits":{"conversations":1000,"aiReplies":5000,"aiTokens":2000000,
+           "knowledgeStorageBytes":104857600,"seats":5,"webhookEndpoints":3},
+ "metered":[{"limit":"conversations","includedUnits":1000,"unitPriceMinor":"5","perUnits":1}]}
+```
+
+```bash
+b=(./deploy/production/hamnivo.sh compose exec -T -e HAMNIVO_OPERATOR=you@example.com \
+   api node dist/main.billing.js)
+"${b[@]}" plan:set - < starter.json         # create or change a plan
+"${b[@]}" plans                             # list them
+"${b[@]}" plan:assign acme starter          # a workspace, by slug or tnt_… id
+"${b[@]}" invoices:generate 2026-09         # drafts for a finished month
+"${b[@]}" invoice:issue HV-202609-0E4F2A1B  # the workspace sees it from now on
+"${b[@]}" invoice:paid HV-202609-0E4F2A1B bank-transfer-0042
+"${b[@]}" invoice:failed HV-202609-0E4F2A1B "card declined" 2026-10-20
+"${b[@]}" invoice:void HV-202609-0E4F2A1B "issued by mistake"
+```
+
+At a limit, Hamnivo refuses what would go past it with `402 PLAN_LIMIT_REACHED` and the numbers
+(a new conversation is refused without telling the customer about the plan). When the AI replies,
+tokens or a workspace's own AI budget run out, new conversations go to people instead. Studio shows
+usage against the limits under **Reports → Billing**. Invoices are drafted from the plan price and
+the metered usage of the month. They are collected by hand (`invoice:paid`), until a payment
+provider is connected behind the billing port. In development, run the same commands with
+`pnpm --filter @hamnivo/gateway billing <command>` after building the gateway.
 
 ### Backups
 

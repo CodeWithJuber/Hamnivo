@@ -225,6 +225,20 @@
       "when": 1790965786154,
       "tag": "20261002182946_enterprise_identity_security",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790968172401,
+      "tag": "20261002190932_developer_platform",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790968175131,
+      "tag": "20261002190935_developer_platform_security",
+      "breakpoints": true
     }
   ]
 }

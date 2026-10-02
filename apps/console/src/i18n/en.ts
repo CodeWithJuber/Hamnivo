@@ -1,6 +1,8 @@
 import { cachingEn } from './caching';
 import { commerceEn } from './commerce/en';
 import { decisionsEn } from './decisions';
+import { developerEn } from './developer/en';
+import { reportsEn } from './reports/en';
 
 /** Studio interface text in English (the source language). Keep sentences short and plain. */
 export const en = {
@@ -61,6 +63,8 @@ export const en = {
     rateLimited: {
       title: 'Too many requests',
       description: 'Wait a moment, then try again.',
+      retryIn: 'You can try again in {{seconds}} s.',
+      retryNow: 'You can try again now.',
     },
     unavailable: {
       title: 'A connected service isn’t responding',
@@ -87,6 +91,11 @@ export const en = {
     internal: {
       title: 'Something went wrong on our side',
       description: 'Nothing was changed. Try again.',
+    },
+    planLimit: {
+      title: 'The plan limit is reached',
+      description:
+        'Your plan doesn’t include more of this. Free some up, or ask the workspace owner about a larger plan.',
     },
     unknown: { title: 'Something went wrong', description: 'Try again.' },
     page: {
@@ -1289,6 +1298,8 @@ export const en = {
   decisions: decisionsEn,
   caching: cachingEn,
   commerce: commerceEn,
+  developer: developerEn,
+  reports: reportsEn,
   memory: {
     title: 'Customer memory',
     description: 'Manage what we remember about your customers.',
@@ -2235,6 +2246,7 @@ export const en = {
     billing: 'Billing',
     api_keys: 'API keys',
     webhooks: 'Webhooks',
+    network: 'Allowed hosts',
     integrations: 'Integrations',
     secrets: 'Credentials',
     extensions: 'Extensions',
@@ -2303,9 +2315,19 @@ export const en = {
       merchants: { manage: 'Connect merchants and set their credentials and refund rules' },
     },
     analytics: { read: 'View analytics and reports' },
-    billing: { manage: 'Manage plan, invoices and payment' },
-    api_keys: { manage: 'Create and revoke API keys' },
-    webhooks: { manage: 'Configure outgoing webhooks' },
+    billing: {
+      read: 'See the plan, usage and invoices',
+      manage: 'Manage plan, invoices and payment',
+    },
+    api_keys: {
+      read: 'See API keys and when they were last used',
+      manage: 'Create and revoke API keys',
+    },
+    webhooks: {
+      read: 'See webhooks and their delivery log',
+      manage: 'Configure outgoing webhooks',
+    },
+    network: { manage: 'Choose which outside hosts Hamnivo may call' },
     integrations: { manage: 'Connect channels and third-party services' },
     secrets: { manage: 'Store and rotate credentials' },
     extensions: { manage: 'Install and remove extensions' },

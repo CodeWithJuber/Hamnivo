@@ -1,11 +1,15 @@
 # @hamnivo/server
 
-Hamnivo Connect for servers. Your website's backend uses it to tell Hamnivo Chat who a signed-in
-customer is. It signs a short-lived identity assertion. The chat exchanges it for a verified
-session, and the customer sees their own conversations on any device.
+Hamnivo Connect for servers. Your website's backend uses it for two things:
 
-The whole flow, from registering a key to signing out, is in
-[`docs/guides/identity.md`](../../docs/guides/identity.md). A runnable example is in
+- to tell Hamnivo Chat who a signed-in customer is. It signs a short-lived identity assertion. The
+  chat exchanges it for a verified session, and the customer sees their own conversations on any
+  device;
+- to check that a webhook request really comes from Hamnivo ([Verify webhooks](#verify-webhooks)).
+
+The whole identity flow, from registering a key to signing out, is in
+[`docs/guides/identity.md`](../../docs/guides/identity.md); webhooks are in
+[`docs/guides/webhooks.md`](../../docs/guides/webhooks.md). A runnable example of both is in
 [`examples/node-express`](../../examples/node-express).
 
 It needs Node 22.12 or later. Its only dependency is [jose](https://github.com/panva/jose).
@@ -84,11 +88,73 @@ input it would refuse fails here instead of in the customer's browser:
   PEM string, the wrong curve, or an RSA key under 2048 bits;
 - a lifetime under 10 seconds or not in whole seconds.
 
+## Verify webhooks
+
+Hamnivo signs every webhook request the
+[Standard Webhooks](https://www.standardwebhooks.com/) way, with the endpoint's `whsec_…`
+secret. `verifyWebhook` checks the signature, the timestamp and, with a replay store, that the
+request was not accepted before. Pass the body exactly as it arrived, before any JSON parsing.
+
+```ts
+import express from 'express';
+import { HamnivoWebhookError, MemoryReplayStore, verifyWebhook } from '@hamnivo/server';
+
+const replayStore = new MemoryReplayStore(); // one process; use Redis or your database for more
+
+app.post('/hamnivo/webhooks', express.raw({ type: 'application/json' }), async (req, res) => {
+  let event;
+  try {
+    event = await verifyWebhook(req.body, req.headers, {
+      secret: process.env.HAMNIVO_WEBHOOK_SECRET, // or [current, previous] while rotating
+      replayStore,
+    });
+  } catch (error) {
+    if (error instanceof HamnivoWebhookError && error.code === 'duplicate') {
+      res.sendStatus(200); // already accepted: answer 2xx so it is not sent again
+      return;
+    }
+    res.sendStatus(400);
+    return;
+  }
+  try {
+    await handle(event); // event.id is the same on every retry: deduplicate on it
+    res.sendStatus(204);
+  } catch {
+    await replayStore.release(event.id); // let Hamnivo's retry be processed
+    res.sendStatus(500);
+  }
+});
+```
+
+| Check | Refused with `error.code` |
+|---|---|
+| `webhook-id`, `webhook-timestamp` and `webhook-signature` are present | `missing_header` |
+| The timestamp is a number of seconds | `invalid_timestamp` |
+| It is at most `toleranceSeconds` (default 300) from now, either way | `timestamp_out_of_range` |
+| One `v1` signature matches one of the secrets (constant-time) | `invalid_signature` |
+| The body is a JSON object | `invalid_payload` |
+| The replay store has not seen the id within twice the tolerance | `duplicate` |
+
+- During a secret rotation, requests carry one signature per secret. Pass both secrets, or keep
+  the old one until the overlap ends.
+- A replay store refuses a captured request sent again within the tolerance window. Hamnivo's
+  own retries use the same `webhook-id` with a new timestamp, so they are refused as `duplicate`
+  too: answer them 2xx. For deduplication across the days retries can span, store processed
+  event ids in your database.
+- `signWebhook(secret, id, timestamp, body)` makes a signature as Hamnivo does, for tests of
+  your receiver.
+- It uses Web Crypto only, so it also runs in edge runtimes. It does not use the official
+  `standardwebhooks` package, which reads the clock itself and has no replay protection; it is
+  checked against that project's published test vectors instead.
+
 ## Checks
 
 ```bash
 pnpm --filter @hamnivo/server test
 ```
+
+The webhook tests check signatures against the vectors published with the Standard Webhooks
+reference libraries, and every refusal in the table above.
 
 The tests verify every assertion the way the gateway does. They use a copy of its steps and its
 jose options, and `IdentityAssertionClaims` from `@hamnivo/contracts`. They cover every

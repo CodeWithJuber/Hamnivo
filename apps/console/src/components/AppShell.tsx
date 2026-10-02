@@ -12,10 +12,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouter, useRouterState } from '@tanstack/react-router';
 import {
   ActivityIcon,
+  BarChart3Icon,
   BookOpenIcon,
   BotIcon,
   BrainIcon,
   BuildingIcon,
+  CodeXmlIcon,
   DatabaseZapIcon,
   FolderInputIcon,
   InboxIcon,
@@ -64,6 +66,8 @@ type NavPath =
   | '/caching'
   | '/orders'
   | '/finance'
+  | '/reports'
+  | '/developer'
   | '/stop-ai'
   | '/team'
   | '/security'
@@ -134,6 +138,18 @@ function useNavItems(): NavItem[] {
       label: t('commerce.nav.finance'),
       icon: ReceiptIcon,
       permission: 'commerce.read',
+    },
+    {
+      to: '/reports',
+      label: t('reports.nav'),
+      icon: BarChart3Icon,
+      anyOf: ['analytics.read', 'billing.read'],
+    },
+    {
+      to: '/developer',
+      label: t('developer.nav'),
+      icon: CodeXmlIcon,
+      anyOf: ['api_keys.read', 'webhooks.read', 'network.manage'],
     },
     { to: '/stop-ai', label: t('nav.stopAi'), icon: OctagonPauseIcon, permission: 'agents.read' },
     { to: '/team', label: t('nav.team'), icon: UsersIcon, permission: 'members.read' },

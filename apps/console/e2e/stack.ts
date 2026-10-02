@@ -3,6 +3,7 @@
  *   throwaway database · fake Chatwoot · gateway API and worker (built, as separate processes)
  *   · widget and loader (what the install snippet points to) · Studio's static build
  *   · an OpenID Connect provider and a DNS server for single sign-on.
+ *   · a webhook receiver (a trusted egress origin, so deliveries may reach it over local HTTP).
  * Studio is served with the gateway behind its own origin: /v1 and /api/auth are passed on to the
  * gateway, the same-origin set-up the README describes, so the gateway's public origin is Studio's.
  * Studio is served as http://localhost (passkeys need a host name, never an IP address). Nothing
@@ -38,6 +39,7 @@ const ports = {
   widget: Number(process.env.E2E_STUDIO_WIDGET_PORT ?? 5187),
   idp: Number(process.env.E2E_STUDIO_IDP_PORT ?? 5188),
   dns: Number(process.env.E2E_STUDIO_DNS_PORT ?? 5189),
+  hooks: Number(process.env.E2E_STUDIO_HOOKS_PORT ?? 5190),
 };
 const origin = (port: number) => `http://127.0.0.1:${port}`;
 const studioOrigin = `http://localhost:${ports.studio}`;
@@ -147,6 +149,64 @@ function studioServer(): Promise<void> {
   );
 }
 
+interface Received {
+  path: string;
+  headers: Record<string, string>;
+  body: string;
+  at: number;
+}
+
+/**
+ * Receives webhook deliveries: records each request and answers with the status set for its path
+ * (204 unless told otherwise). Tests read `GET /__received?path=…` and set
+ * `POST /__status {"path", "status"}`.
+ */
+function hooksServer(): Promise<void> {
+  const received: Received[] = [];
+  const statuses = new Map<string, number>();
+  return listen(
+    createServer((request, response) => {
+      const url = new URL(request.url ?? '/', 'http://x');
+      const chunks: Buffer[] = [];
+      request.on('data', (chunk: Buffer) => chunks.push(chunk));
+      request.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        if (url.pathname === '/__received') {
+          const path = url.searchParams.get('path');
+          response.writeHead(200, { 'content-type': 'application/json' });
+          response.end(JSON.stringify(received.filter((r) => !path || r.path === path)));
+          return;
+        }
+        if (url.pathname === '/__status' && request.method === 'POST') {
+          const set = JSON.parse(body) as { path: string; status: number };
+          statuses.set(set.path, set.status);
+          response.writeHead(204).end();
+          return;
+        }
+        received.push({
+          path: url.pathname,
+          headers: Object.fromEntries(
+            Object.entries(request.headers).map(([name, value]) => [
+              name,
+              Array.isArray(value) ? value.join(', ') : (value ?? ''),
+            ]),
+          ),
+          body,
+          at: Date.now(),
+        });
+        const status = statuses.get(url.pathname) ?? 204;
+        if (status === 204) {
+          response.writeHead(204).end();
+          return;
+        }
+        response.writeHead(status, { 'content-type': 'text/plain' });
+        response.end(status >= 400 ? 'receiver unavailable' : 'ok');
+      });
+    }),
+    ports.hooks,
+  );
+}
+
 async function waitFor(url: string, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -224,6 +284,8 @@ try {
     SSO_TRUSTED_IDP_ORIGINS: idp.issuer,
     SSO_DNS_SERVERS: `127.0.0.1:${ports.dns}`,
     COMMERCE_STRIPE_API_BASE: stripe.url,
+    // The local webhook receiver: trusted by the administrator, so plain HTTP on 127.0.0.1 works.
+    EGRESS_TRUSTED_ORIGINS: origin(ports.hooks),
   };
   delete env.WIDGET_SIGNING_KEY;
   const gatewayDist = join(root, 'apps/gateway/dist');
@@ -238,6 +300,7 @@ try {
     children.push(child);
   }
   await waitFor(`${origin(ports.api)}/health/ready`);
+  await hooksServer();
   await widgetServer();
   await studioServer();
 
@@ -252,6 +315,8 @@ try {
         ownerDatabaseUrl: database.owner,
         idp: { issuer: idp.issuer, clientId: idp.clientId, clientSecret: idp.clientSecret },
         dnsRecords,
+        platformDatabaseUrl: database.platform,
+        hooksUrl: origin(ports.hooks),
         stripe: { url: stripe.url, apiKey: stripe.apiKey },
       },
       null,
