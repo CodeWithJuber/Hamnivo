@@ -226,11 +226,24 @@ never waits on Jev.
 
 Noul answers carry only a probability. The adapter drops any confidence the wire sends with them.
 
-### Tests and what is not verified
+### Tests
 
-`test/jev/` checks the contract with an injected `fetch` and fixture JSON. No test calls the
-network. No live Jev call has been made. Account access, quotas, data handling and regional latency
-still need checking before production use.
+`test/jev/` checks the contract with an injected `fetch` and fixture JSON; `pnpm test` never calls
+the network.
+
+`test/jev/provider.live.test.ts` runs the adapter against TypeSafe's API, pinned to `jev-1.13.0`.
+It is opt-in and skips itself without a key:
+
+```sh
+TYPESAFE_API_KEY=… pnpm --filter @hamnivo/adapters test:live
+```
+
+It checks that choice, noul and score answers map correctly (labels offered, probabilities summing
+to 1, no confidence for nouls), that usage, latency, the model version and the request id are
+recorded, that a call finishes within the 1.5 s chat deadline and a 25 ms deadline stops it as
+`unavailable`/`deadline`, that a wrong key is `unavailable`/`auth`, and that a call the caller
+cancels is `unavailable`/`aborted`. The key is read from the environment only and never printed.
+Accuracy per language is measured separately by `run-suite decisions` in `@hamnivo/evals`.
 
 ## Cache stores
 
