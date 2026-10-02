@@ -89,6 +89,9 @@ test('HNV-26-02 HNV-26-03 HNV-26-04 · from tenant metadata, an operator asks fo
   await expect(page.getByTestId('support-configuration')).toContainText(owner.email);
   await grant.getByTestId('end-support').click();
   await expect(page.getByTestId('my-support-grant').first()).toHaveAttribute('data-state', 'ended');
+  // What was read through it is gone from the page.
+  await expect(page.getByTestId('support-configuration')).toHaveCount(0);
+  await expect(page.getByText(owner.email)).toHaveCount(0);
 });
 
 test('HNV-26-06 · an incident banner reaches every workspace until resolved', async ({

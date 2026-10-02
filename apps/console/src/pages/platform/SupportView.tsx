@@ -1,6 +1,7 @@
 import { Button } from '@hamnivo/ui/components/button';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { StatusBadge } from '@hamnivo/ui/components/status-badge';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch } from '@tanstack/react-router';
 import { ClockIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -158,6 +159,11 @@ function GrantCard({ grant }: { grant: SupportGrant }) {
   );
   const active = grant.state === 'active';
   const reading = search.grant === grant.id && search.area ? search.area : null;
+  const client = useQueryClient();
+  // Once access has ended, nothing read through it stays in this browser (HNV-26-04).
+  useEffect(() => {
+    if (!active) client.removeQueries({ queryKey: ['platform', 'read', grant.id] });
+  }, [active, client, grant.id]);
   return (
     <li
       className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm"
