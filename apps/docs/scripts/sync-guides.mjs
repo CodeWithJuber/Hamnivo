@@ -32,8 +32,9 @@ for (const area of areas) {
     }
     // Guides link to each other as files (`ai-keys.md`, `../ai/test-your-ai.md`); every page is
     // served as a folder (`/docs/setup/getting-started/`), so those links move one level up.
-    text = text.replace(/\]\((?!https?:|\/|#|mailto:)([^)\s]+?)\.md(#[^)\s]*)?\)/g, (_, path, hash = '') =>
-      `](../${path}/${hash})`,
+    text = text.replace(
+      /\]\((?!https?:|\/|#|mailto:)([^)\s]+?)\.md(#[^)\s]*)?\)/g,
+      (_, path, hash = '') => `](../${path}/${hash})`,
     );
     writeFileSync(join(out, file), text);
     copied += 1;
