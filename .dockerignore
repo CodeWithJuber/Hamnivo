@@ -31,4 +31,7 @@ deploy/production/state
 .data
 
 # Not needed to build: design boards, documentation and the design originals.
-docs
+# docs/evals stays in the build context: packages/evals tests replay a recorded
+# live run from it (decisions.test.ts reads docs/evals/*.answers.json).
+docs/*
+!docs/evals
