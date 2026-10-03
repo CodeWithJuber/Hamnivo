@@ -11,30 +11,18 @@ import { StatusBadge } from '@hamnivo/ui/components/status-badge';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouter, useRouterState } from '@tanstack/react-router';
 import {
-  ActivityIcon,
   BarChart3Icon,
-  BookOpenIcon,
   BotIcon,
-  BrainIcon,
   BuildingIcon,
-  CodeXmlIcon,
-  DatabaseZapIcon,
-  FolderInputIcon,
+  HouseIcon,
   InboxIcon,
-  KeyRoundIcon,
-  LayoutDashboardIcon,
-  LockKeyholeIcon,
   LogOutIcon,
   MenuIcon,
   OctagonPauseIcon,
-  ReceiptIcon,
   ServerCogIcon,
+  SettingsIcon,
   ShieldCheckIcon,
   ShoppingBagIcon,
-  StoreIcon,
-  UsersIcon,
-  WaypointsIcon,
-  WrenchIcon,
   XIcon,
 } from 'lucide-react';
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from 'react';
@@ -45,152 +33,129 @@ import { authClient } from '../lib/auth-client';
 import { returnFocus, useOpener } from '../lib/focus';
 import { formatDateTime } from '../lib/format';
 import { killSwitchScope, useNames } from '../lib/names';
+import {
+  currentRoute,
+  groupIdOfPath,
+  menuFor,
+  type NavGroupId,
+  type NavPath,
+  sectionOf,
+} from '../lib/nav';
 import { useKillSwitches } from '../lib/queries';
 import { reauth } from '../lib/reauth';
 import { chooseTenant, useTenant } from '../lib/tenant';
 import type { PlatformOperator } from '../lib/types';
 import { LanguageSelect, TranslationNote } from './LanguageSelect';
-import { StopAiDialog } from './StopAiDialog';
+import { type SectionTab, SectionTabs } from './SectionTabs';
 import { WorkspaceNotices } from './WorkspaceNotices';
 
-type NavPath =
-  | '/overview'
-  | '/inbox'
-  | '/brands'
-  | '/agents'
-  | '/knowledge'
-  | '/migration'
-  | '/memory'
-  | '/models'
-  | '/runs'
-  | '/decisions'
-  | '/checks'
-  | '/caching'
-  | '/tools'
-  | '/orders'
-  | '/finance'
-  | '/reports'
-  | '/developer'
-  | '/stop-ai'
-  | '/team'
-  | '/security'
-  | '/account';
+type NavIcon = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
 
-interface NavItem {
+const GROUP_ICONS: Record<NavGroupId, NavIcon> = {
+  home: HouseIcon,
+  inbox: InboxIcon,
+  ai: BotIcon,
+  sales: ShoppingBagIcon,
+  reports: BarChart3Icon,
+  settings: SettingsIcon,
+};
+
+interface MenuEntry {
+  id: NavGroupId;
+  /** The first page of the group this person can see. */
   to: NavPath;
   label: string;
-  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
-  permission?: string;
-  /** Shown when the person holds any of these. */
-  anyOf?: string[];
+  icon: NavIcon;
+  /** Any page of the group is being shown, nested ones included. */
+  active: boolean;
 }
 
-function useNavItems(): NavItem[] {
+interface MenuSection {
+  label: string;
+  tabs: SectionTab[];
+}
+
+/**
+ * The menu for this person (see lib/nav.ts): up to six entries, and for the group being shown the
+ * pages they can open, as a row of links above the page.
+ */
+function useMenu(pathname: string): { entries: MenuEntry[]; section: MenuSection | null } {
   const { t } = useTranslation();
   const { can } = useTenant();
-  const items: NavItem[] = [
-    { to: '/overview', label: t('nav.overview'), icon: LayoutDashboardIcon },
-    {
-      to: '/inbox',
-      label: t('nav.inbox'),
-      icon: InboxIcon,
-      permission: 'conversations.read',
-    },
-    { to: '/brands', label: t('nav.brands'), icon: StoreIcon, permission: 'brands.manage' },
-    { to: '/agents', label: t('nav.agents'), icon: BotIcon, permission: 'agents.read' },
-    {
-      to: '/knowledge',
-      label: t('nav.knowledge'),
-      icon: BookOpenIcon,
-      permission: 'knowledge.read',
-    },
-    { to: '/memory', label: t('nav.memory'), icon: BrainIcon, permission: 'memory.read' },
-    {
-      to: '/migration',
-      label: t('migration.nav'),
-      icon: FolderInputIcon,
-      permission: 'migration.review',
-    },
-    {
-      to: '/models',
-      label: t('nav.models'),
-      icon: KeyRoundIcon,
-      permission: 'integrations.manage',
-    },
-    { to: '/runs', label: t('nav.runs'), icon: ActivityIcon, permission: 'analytics.read' },
-    {
-      to: '/decisions',
-      label: t('decisions.nav'),
-      icon: WaypointsIcon,
-      permission: 'decisions.read',
-    },
-    {
-      to: '/checks',
-      label: t('checks.nav'),
-      icon: ShieldCheckIcon,
-      permission: 'decisions.read',
-    },
-    {
-      to: '/caching',
-      label: t('caching.nav'),
-      icon: DatabaseZapIcon,
-      permission: 'knowledge.read',
-    },
-    { to: '/tools', label: t('tools.nav'), icon: WrenchIcon, permission: 'tools.read' },
-    {
-      to: '/orders',
-      label: t('commerce.nav.orders'),
-      icon: ShoppingBagIcon,
-      permission: 'commerce.read',
-    },
-    {
-      to: '/finance',
-      label: t('commerce.nav.finance'),
-      icon: ReceiptIcon,
-      permission: 'commerce.read',
-    },
-    {
-      to: '/reports',
-      label: t('reports.nav'),
-      icon: BarChart3Icon,
-      anyOf: ['analytics.read', 'billing.read'],
-    },
-    {
-      to: '/developer',
-      label: t('developer.nav'),
-      icon: CodeXmlIcon,
-      anyOf: ['api_keys.read', 'webhooks.read', 'network.manage'],
-    },
-    { to: '/stop-ai', label: t('nav.stopAi'), icon: OctagonPauseIcon, permission: 'agents.read' },
-    { to: '/team', label: t('nav.team'), icon: UsersIcon, permission: 'members.read' },
-    {
-      to: '/security',
-      label: t('nav.security'),
-      icon: LockKeyholeIcon,
-      anyOf: ['security.manage', 'support.grant'],
-    },
-  ];
-  // Navigation is filtered by role; the gateway still checks every request (HNV-03-05).
-  return items.filter(
-    (item) =>
-      (!item.permission || can(item.permission)) &&
-      (!item.anyOf || item.anyOf.some((permission) => can(permission))),
-  );
+  const groupLabels = {
+    home: t('nav.home'),
+    inbox: t('nav.inbox'),
+    ai: t('nav.ai'),
+    sales: t('nav.sales'),
+    reports: t('reports.nav'),
+    settings: t('nav.settings'),
+  } satisfies Record<NavGroupId, string>;
+  const pageLabels = {
+    '/overview': t('nav.home'),
+    '/inbox': t('nav.inbox'),
+    '/agents': t('nav.agents'),
+    '/knowledge': t('nav.knowledge'),
+    '/memory': t('nav.memory'),
+    '/tools': t('tools.nav'),
+    '/checks': t('checks.nav'),
+    '/decisions': t('decisions.nav'),
+    '/runs': t('nav.runs'),
+    '/caching': t('caching.nav'),
+    '/models': t('nav.models'),
+    '/orders': t('commerce.nav.orders'),
+    '/finance': t('commerce.nav.finance'),
+    '/reports': t('reports.nav'),
+    '/brands': t('nav.brands'),
+    '/team': t('nav.team'),
+    '/security': t('nav.security'),
+    '/developer': t('developer.nav'),
+    '/migration': t('migration.nav'),
+  } satisfies Record<NavPath, string>;
+
+  const menu = menuFor(can);
+  const activeId = groupIdOfPath(pathname);
+  const entries = menu.map((group) => ({
+    id: group.id,
+    to: group.to,
+    label: groupLabels[group.id],
+    icon: GROUP_ICONS[group.id],
+    active: group.id === activeId,
+  }));
+  const group = sectionOf(menu, pathname);
+  const current = group ? currentRoute(group, pathname) : undefined;
+  const section = group
+    ? {
+        label: t('nav.sections', { name: groupLabels[group.id] }),
+        tabs: group.routes.map((route) => ({
+          to: route.to,
+          label: pageLabels[route.to],
+          current: route.to === current,
+        })),
+      }
+    : null;
+  return { entries, section };
 }
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
-  const items = useNavItems();
+function NavLinks({
+  entries,
+  onNavigate,
+}: {
+  entries: readonly MenuEntry[];
+  onNavigate?: () => void;
+}) {
   return (
     <ul className="flex flex-col gap-1">
-      {items.map((item) => (
-        <li key={item.to}>
+      {entries.map((entry) => (
+        <li key={entry.id}>
           <Link
-            to={item.to}
+            to={entry.to}
             onClick={onNavigate}
+            aria-current={entry.active ? 'page' : undefined}
+            data-status={entry.active ? 'active' : undefined}
             className="relative flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-text-secondary hover:bg-surface-sunken hover:text-text data-[status=active]:bg-surface-sunken data-[status=active]:text-text data-[status=active]:before:absolute data-[status=active]:before:inset-y-1.5 data-[status=active]:before:start-0 data-[status=active]:before:w-1 data-[status=active]:before:rounded-full data-[status=active]:before:bg-brand"
           >
-            <item.icon className="size-[18px] shrink-0" aria-hidden />
-            <span>{item.label}</span>
+            <entry.icon className="size-[18px] shrink-0" aria-hidden />
+            <span>{entry.label}</span>
           </Link>
         </li>
       ))}
@@ -334,8 +299,9 @@ function KillSwitchBanner() {
 }
 
 /**
- * Studio frame (board 03): navigation rail, a header with the always-visible Stop AI control, the
- * active-stop banner and the page. On narrow screens the rail becomes a menu sheet.
+ * Studio frame (board 03): a menu of six entries, a header with the always-visible Stop AI
+ * button, the active-stop banner and the page, with the pages of the current entry as a row of
+ * links above it. On narrow screens the menu becomes a sheet.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { t, i18n } = useTranslation();
@@ -343,8 +309,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const switches = useKillSwitches();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuOpener = useOpener(menuOpen);
-  const [stopOpen, setStopOpen] = useState(false);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const menu = useMenu(pathname);
   const shownPath = useRef(pathname);
   const activeCount = (switches.data?.items ?? []).filter(
     (s) => s.active && s.scope !== 'tool',
@@ -374,7 +340,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Brand />
         <WorkspaceSwitcher />
         <nav aria-label={t('nav.label')} className="flex-1">
-          <NavLinks />
+          <NavLinks entries={menu.entries} />
         </nav>
         <AccountLinks />
       </aside>
@@ -405,16 +371,17 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </StatusBadge>
               </Link>
             ) : null}
+            {/* Only for people who can stop the AI: a red button that leads nowhere they can act is noise. */}
             {can('agents.publish') ? (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setStopOpen(true)}
-                aria-label={t('shell.stopAiLabel')}
-                data-testid="stop-ai-button"
-              >
-                <OctagonPauseIcon aria-hidden="true" />
-                {t('shell.stopAi')}
+              <Button asChild variant="destructive-solid" size="sm">
+                <Link
+                  to="/stop-ai"
+                  aria-label={t('shell.stopAiLabel')}
+                  data-testid="stop-ai-button"
+                >
+                  <OctagonPauseIcon aria-hidden="true" />
+                  {t('shell.stopAi')}
+                </Link>
               </Button>
             ) : null}
             <LanguageSelect id="studio-language" />
@@ -427,6 +394,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           tabIndex={-1}
           className="flex min-w-0 flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8"
         >
+          {menu.section ? <SectionTabs {...menu.section} /> : null}
           {children}
         </main>
       </div>
@@ -457,13 +425,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SheetDescription className="sr-only">{t('nav.menu')}</SheetDescription>
           <WorkspaceSwitcher onNavigate={() => setMenuOpen(false)} />
           <nav aria-label={t('nav.label')} className="flex-1">
-            <NavLinks onNavigate={() => setMenuOpen(false)} />
+            <NavLinks entries={menu.entries} onNavigate={() => setMenuOpen(false)} />
           </nav>
           <AccountLinks onNavigate={() => setMenuOpen(false)} />
         </SheetContent>
       </Sheet>
-
-      {can('agents.publish') ? <StopAiDialog open={stopOpen} onOpenChange={setStopOpen} /> : null}
     </div>
   );
 }

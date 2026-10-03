@@ -364,6 +364,7 @@ function ChatConnection({
           announce(t('brands.chat.connected', { name: brand.name }));
         }}
       >
+        <p>{t('brands.chat.engineNote')}</p>
         <p>{t('brands.chat.connectIntro')}</p>
         <ul className="list-disc ps-5 text-text">
           <li>{t('brands.chat.connectItem1')}</li>

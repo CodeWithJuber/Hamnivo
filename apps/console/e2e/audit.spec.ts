@@ -100,9 +100,11 @@ for (const locale of LOCALES) {
       await open(page, path, locale);
       violations.push(...(await audit(page, `${name} (${locale})`)));
     }
-    // The stop dialog, over the overview.
+    // The stop dialog, over the Stop AI page (the header's Stop AI button leads there).
     await open(page, '/overview', locale);
     await page.getByTestId('stop-ai-button').click();
+    await expect(page).toHaveURL(/\/stop-ai/);
+    await page.getByTestId('stop-ai-open').click();
     await expect(page.getByTestId('stop-ai-dialog')).toBeVisible();
     violations.push(...(await audit(page, `stop-ai-dialog (${locale})`)));
     // The brand editor, warning that a website taken off the list ends its chats.

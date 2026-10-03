@@ -27,15 +27,18 @@ export const ur: Translation = {
   },
   nav: {
     label: 'Studio',
-    overview: 'جائزہ',
+    home: 'ہوم',
     inbox: 'ان باکس',
+    ai: 'AI معاون',
+    sales: 'فروخت',
+    settings: 'ترتیبات',
+    sections: '{{name}} کے صفحات',
     brands: 'برانڈز اور انسٹال',
     agents: 'AI ایجنٹس',
     models: 'ماڈل کنکشنز',
     knowledge: 'معلومات',
     memory: 'کسٹمر میموری',
-    stopAi: 'AI روکیں',
-    runs: 'رنز',
+    runs: 'سرگرمی',
     team: 'ٹیم اور رسائی',
     security: 'سیکیورٹی',
     platform: 'پلیٹ فارم کنسول',
@@ -274,6 +277,37 @@ export const ur: Translation = {
   overview: {
     title: 'جائزہ',
     greeting: 'خوش آمدید، {{name}}۔',
+    chats: {
+      title: 'آپ کی چیٹس',
+      description: 'وہ کسٹمرز جو کسی شخص کے منتظر ہیں، اور آپ کو سونپی گئی چیٹس۔',
+      loading: 'آپ کی چیٹس لوڈ ہو رہی ہیں',
+      waiting: 'کسی شخص کا انتظار',
+      mine: 'آپ کو سونپی گئی',
+      caughtUp: 'اس وقت آپ کے لیے کچھ انتظار میں نہیں ہے۔',
+      open: 'ان باکس کھولیں',
+    },
+    setup: {
+      title: 'سیٹ اپ مکمل کریں',
+      description: 'کسٹمرز آپ کے AI معاون سے چیٹ کر سکیں، اس سے پہلے یہ مراحل باقی ہیں۔',
+      steps: {
+        engine: {
+          title: 'چیٹ انجن جوڑیں',
+          description: 'ایک برانڈ کو جوڑیں تاکہ اس کی چیٹس آپ کی ٹیم تک پہنچیں۔',
+        },
+        brand: {
+          title: 'برانڈ شامل کریں اور چیٹ انسٹال کریں',
+          description: 'اسے نام دیں، اپنی ویب سائٹ کو اجازت دیں اور اس میں انسٹال کوڈ شامل کریں۔',
+        },
+        agent: {
+          title: 'AI ایجنٹ شائع کریں',
+          description: 'آپ کا معاون کسٹمرز کو تب ہی جواب دیتا ہے جب آپ اسے شائع کریں۔',
+        },
+        team: {
+          title: 'ساتھی کو مدعو کریں',
+          description: 'ان لوگوں کو شامل کریں جو آپ کے ساتھ چیٹس کا جواب دیں گے۔',
+        },
+      },
+    },
     brands: {
       title: 'برانڈز',
       description: 'ہر برانڈ کے لیے چیٹ کنکشن اور AI کی صورتحال۔',
@@ -356,6 +390,8 @@ export const ur: Translation = {
       account: 'Chatwoot اکاؤنٹ {{id}}',
       connect: 'Chatwoot سے جوڑیں',
       connectTitle: '{{name}} کو Chatwoot سے جوڑیں',
+      engineNote:
+        'Hamnivo، Chatwoot کو اپنے چیٹ انجن کے طور پر استعمال کرتا ہے۔ آپ اور آپ کی ٹیم Hamnivo Studio میں کام کرتے ہیں؛ آپ کو Chatwoot کھولنے کی ضرورت نہیں۔',
       connectIntro: 'Hamnivo اس برانڈ کے لیے ایک Chatwoot اکاؤنٹ سیٹ اپ کرتا ہے جس میں یہ ہوں گے:',
       connectItem1: 'ایک انٹیگریشن صارف اور ویب سائٹ چیٹ کے لیے ایک ان باکس،',
       connectItem2: 'ایک AI بوٹ جو اس ان باکس میں جواب دیتا ہے،',

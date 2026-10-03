@@ -27,15 +27,18 @@ export const ar: Translation = {
   },
   nav: {
     label: 'الاستوديو',
-    overview: 'نظرة عامة',
+    home: 'الرئيسية',
     inbox: 'صندوق الوارد',
+    ai: 'مساعد الذكاء الاصطناعي',
+    sales: 'المبيعات',
+    settings: 'الإعدادات',
+    sections: 'صفحات {{name}}',
     brands: 'العلامات التجارية والتثبيت',
     agents: 'وكلاء الذكاء الاصطناعي',
     models: 'اتصالات النماذج',
     knowledge: 'المعرفة',
     memory: 'ذاكرة العملاء',
-    stopAi: 'إيقاف الذكاء الاصطناعي',
-    runs: 'عمليات التشغيل',
+    runs: 'النشاط',
     team: 'الفريق والصلاحيات',
     security: 'الأمان',
     platform: 'واجهة المنصة',
@@ -268,6 +271,37 @@ export const ar: Translation = {
   overview: {
     title: 'نظرة عامة',
     greeting: 'مرحبًا بعودتك، {{name}}.',
+    chats: {
+      title: 'محادثاتك',
+      description: 'العملاء الذين ينتظرون شخصًا، والمحادثات المسندة إليك.',
+      loading: 'جارٍ تحميل محادثاتك',
+      waiting: 'بانتظار شخص',
+      mine: 'مسندة إليك',
+      caughtUp: 'لا شيء ينتظرك الآن.',
+      open: 'افتح صندوق الوارد',
+    },
+    setup: {
+      title: 'ابدأ الإعداد',
+      description: 'تبقّت هذه الخطوات قبل أن يتمكن العملاء من محادثة مساعد الذكاء الاصطناعي.',
+      steps: {
+        engine: {
+          title: 'اربط محرك المحادثة',
+          description: 'اربط علامة تجارية لتصل محادثاتها إلى فريقك.',
+        },
+        brand: {
+          title: 'أضف علامة تجارية وثبّت المحادثة',
+          description: 'أعطِها اسمًا، واسمح بموقعك، ثم ألصق رمز التثبيت فيه.',
+        },
+        agent: {
+          title: 'انشر وكيل ذكاء اصطناعي',
+          description: 'لا يجيب مساعدك العملاء إلا بعد أن تنشره.',
+        },
+        team: {
+          title: 'ادعُ زميلًا',
+          description: 'أضف من سيجيبون على المحادثات معك.',
+        },
+      },
+    },
     brands: {
       title: 'العلامات التجارية',
       description: 'حالة اتصال المحادثة والذكاء الاصطناعي لكل علامة تجارية.',
@@ -349,6 +383,8 @@ export const ar: Translation = {
       account: 'حساب Chatwoot رقم {{id}}',
       connect: 'اربط Chatwoot',
       connectTitle: 'اربط {{name}} بـ Chatwoot',
+      engineNote:
+        'يستخدم Hamnivo منصة Chatwoot كمحرك للمحادثات. أنت وفريقك تعملون في Hamnivo Studio، ولا تحتاجون إلى فتح Chatwoot.',
       connectIntro: 'يُعدّ Hamnivo حساب Chatwoot لهذه العلامة التجارية يتضمن:',
       connectItem1: 'مستخدم تكامل وصندوق وارد لمحادثة الموقع،',
       connectItem2: 'روبوت ذكاء اصطناعي يجيب في صندوق الوارد هذا،',
