@@ -17,7 +17,9 @@ GRANT SELECT ON billing_accounts, chatwoot_provisioning TO hamnivo_platform;
 -- ── Append-only and never-deleted tenant tables ─────────────────────────────────────────────
 -- A billing event is a record of what a provider said and what billing did with it. A billing
 -- account changes state but is never deleted: it links the workspace to the provider's records.
-REVOKE UPDATE, DELETE, TRUNCATE ON billing_events FROM hamnivo_app;
+-- The application role only ever holds SELECT, INSERT, UPDATE and DELETE (the default privileges
+-- in the foundations migration), so those are the rights taken back here.
+REVOKE UPDATE, DELETE ON billing_events FROM hamnivo_app;
 --> statement-breakpoint
 REVOKE DELETE ON billing_accounts FROM hamnivo_app;
 --> statement-breakpoint

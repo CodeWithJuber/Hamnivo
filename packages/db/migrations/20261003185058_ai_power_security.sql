@@ -5,7 +5,9 @@
 -- before it finished.
 SELECT app.harden_tenant_tables();
 --> statement-breakpoint
-REVOKE DELETE, TRUNCATE ON http_tool_sources, http_tool_endpoints FROM hamnivo_app;
+-- The application role only ever holds SELECT, INSERT, UPDATE and DELETE (the default privileges
+-- in the foundations migration), so DELETE is the right taken back here.
+REVOKE DELETE ON http_tool_sources, http_tool_endpoints FROM hamnivo_app;
 --> statement-breakpoint
 -- ── Worker: website sources that are due ────────────────────────────────────────────────────
 GRANT SELECT (tenant_id, id, schedule, state, next_run_at, lease_until)

@@ -30,8 +30,11 @@ deploy/production/state
 **/e2e/.host.html
 .data
 
-# Not needed to build: design boards, documentation and the design originals.
-# docs/evals stays in the build context: packages/evals tests replay a recorded
-# live run from it (decisions.test.ts reads docs/evals/*.answers.json).
+# Not needed to build: design boards, documentation and the design originals. Two folders stay:
+# - docs/evals: packages/evals tests replay a recorded live run from it (decisions.test.ts reads
+#   docs/evals/*.answers.json);
+# - docs/guide: the docs site (apps/docs) publishes these guides, and the React and Vue packages
+#   test that the guide shows the code they type-check.
 docs/*
 !docs/evals
+!docs/guide
