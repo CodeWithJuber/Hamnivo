@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { TypingEvent } from '@hamnivo/contracts';
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import type { Client } from './harness.js';
 import { customerStarts, join, type Shop, StaffStream } from './inbox-support.js';
@@ -503,6 +504,8 @@ describe('typing', () => {
     // A live signal: it has no id, so it never moves the customer's place in the conversation.
     const message = stream.messages.find((m) => m.event === 'typing');
     expect(message?.id).toBeUndefined();
+    // And it is the event the contract describes, so every client can read it.
+    expect(TypingEvent.safeParse(typingEvents()[0]).success).toBe(true);
 
     await amina.client.post(inbox(conversationId, '/presence'), { state: 'left' });
     await stream.until(() => typingEvents().length > 1);
