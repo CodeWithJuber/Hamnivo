@@ -57,6 +57,7 @@ import { CustomerTypingService } from './inbox/customer-typing.service.js';
 import { DraftsService } from './inbox/drafts.service.js';
 import { InboxController, TeamsController } from './inbox/inbox.controller.js';
 import { InboxService } from './inbox/inbox.service.js';
+import { LIBRARY_API_CONTROLLERS, LIBRARY_API_PROVIDERS } from './inbox/library.module.js';
 import { InboxLiveService } from './inbox/live.service.js';
 import { InboxMessagesService } from './inbox/messages.service.js';
 import { InboxSignals } from './inbox/signals.service.js';
@@ -165,6 +166,7 @@ export class ApiModule {
         ...DEVELOPER_API_CONTROLLERS,
         ...WIDGET_SURFACE_API_CONTROLLERS,
         ...VISITORS_API_CONTROLLERS,
+        ...LIBRARY_API_CONTROLLERS,
         ...ACTIONS_API_CONTROLLERS,
       ],
       providers: [
@@ -252,6 +254,7 @@ export class ApiModule {
         ...developerApiProviders(overrides),
         ...widgetSurfaceApiProviders(config, overrides.scanner),
         ...VISITORS_API_PROVIDERS,
+        ...LIBRARY_API_PROVIDERS,
         ...ACTIONS_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },

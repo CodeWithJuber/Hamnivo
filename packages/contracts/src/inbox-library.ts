@@ -7,12 +7,13 @@ import { typeId } from './ids.js';
  * the same chat account. Changing them needs `inbox.manage` on the brand.
  */
 
+/** What staff type to find a saved reply: letters (with their marks), numbers, - and _. */
 const ShortCode = z
   .string()
   .trim()
   .min(1)
   .max(40)
-  .regex(/^[\p{L}\p{N}_-]+$/u, 'Letters, numbers, - and _ only');
+  .regex(/^[\p{L}\p{M}\p{N}_-]+$/u, 'Letters, numbers, - and _ only');
 
 export const SavedReplyRecord = z
   .object({
@@ -42,14 +43,23 @@ export const UpdateSavedReplyRequest = z
     message: 'Send a short code, the text or both',
   })
   .meta({ id: 'UpdateSavedReplyRequest' });
+export type UpdateSavedReplyRequest = z.infer<typeof UpdateSavedReplyRequest>;
 
-/** A tag is named by its title: letters, numbers, - and _, lower case as the chat account keeps it. */
+/**
+ * A tag is named by its title, in lower case as the chat account keeps it. Chatwoot's own rule: at
+ * least two characters, letters and numbers with - and _ , and not starting with - or _ . Its
+ * letters are Unicode letters without combining marks, so a word written with vowel signs (such as
+ * Hindi) is refused by the chat account itself.
+ */
 export const TagTitle = z
   .string()
   .trim()
-  .min(1)
+  .min(2)
   .max(50)
-  .regex(/^[\p{L}\p{N}_-]+$/u, 'Letters, numbers, - and _ only');
+  .regex(
+    /^[\p{L}\p{N}][\p{L}\p{N}_-]+$/u,
+    'Letters, numbers, - and _, starting with a letter or number',
+  );
 
 const TagColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'A colour like #1F93FF');
 

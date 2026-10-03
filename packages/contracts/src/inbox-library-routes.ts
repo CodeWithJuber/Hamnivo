@@ -104,7 +104,8 @@ export const inboxLibraryRoutes = {
     method: 'delete',
     path: '/v1/admin/brands/{brandId}/tags/{title}',
     operationId: 'deleteBrandTag',
-    summary: 'Delete a tag; conversations that carry it lose it (inbox.manage)',
+    summary:
+      'Delete a tag; the chat account also takes it off the conversations that carry it (inbox.manage)',
     tags,
     auth: 'staff_session',
     params: tagParams,

@@ -8,6 +8,8 @@ import type { ActorCredential, AuthorityMessage } from './authority.js';
 
 /** A tag the account defined (Chatwoot label). */
 export interface AuthorityLabel {
+  /** The authority's own id for it, needed to rename or remove it. */
+  ref: string;
   title: string;
   description: string | null;
   color: string | null;
@@ -60,6 +62,26 @@ export interface StaffInboxAuthority {
   /** Messages matching a text query in conversations the actor may read, newest first. */
   searchMessages(query: string, page: number, actor: ActorCredential): Promise<AuthorityMessage[]>;
   listLabels(actor: ActorCredential): Promise<AuthorityLabel[]>;
+  /** Defines a tag. The authority allows this to administrators only, so it is the integration user. */
+  createLabel(label: {
+    title: string;
+    description?: string;
+    color?: string;
+  }): Promise<AuthorityLabel>;
+  /**
+   * Renames a tag or changes its description or colour (integration user). A rename is carried
+   * over by the authority to the conversations that have the tag; a null description clears it.
+   */
+  updateLabel(
+    labelRef: string,
+    changes: { title?: string; description?: string | null; color?: string },
+  ): Promise<AuthorityLabel>;
+  /**
+   * Deletes a tag (integration user). The authority also takes it off the conversations that carry
+   * it, a little later and without announcing it, so a copy of their tags must be updated by the
+   * caller.
+   */
+  deleteLabel(labelRef: string): Promise<void>;
   listFieldDefinitions(actor: ActorCredential): Promise<AuthorityFieldDefinition[]>;
   listSavedReplies(
     search: string | undefined,
@@ -69,6 +91,12 @@ export interface StaffInboxAuthority {
     input: { shortCode: string; content: string },
     actor: ActorCredential,
   ): Promise<AuthoritySavedReply>;
+  updateSavedReply(
+    replyRef: string,
+    changes: { shortCode?: string; content?: string },
+    actor: ActorCredential,
+  ): Promise<AuthoritySavedReply>;
+  deleteSavedReply(replyRef: string, actor: ActorCredential): Promise<void>;
   getContact(contactRef: string, actor: ActorCredential): Promise<AuthorityContact>;
   /** Snooze until a time; without one, until the customer writes. */
   snooze(conversationRef: string, until: Date | null, actor: ActorCredential): Promise<void>;

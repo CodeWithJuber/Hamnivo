@@ -1183,27 +1183,79 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     };
   });
 
+  /**
+   * Chatwoot: at least two characters, Unicode letters and numbers with - and _ , not starting
+   * with - or _ (combining marks are not letters, so Hindi vowel signs are refused); stored in
+   * lower case and unique per account.
+   */
+  function labelTitle(title: string, accountId: number, own?: Label): string {
+    const lower = title.toLowerCase();
+    if (!/^[\p{L}\p{N}]+[\p{L}\p{N}_-]+$/u.test(lower)) {
+      throw new HttpError(422, { message: 'Title is invalid', attributes: ['title'] });
+    }
+    if (
+      [...s.labels.values()].some(
+        (l) => l.accountId === accountId && l.title === lower && l !== own,
+      )
+    ) {
+      throw new HttpError(422, { message: 'Title has already been taken', attributes: ['title'] });
+    }
+    return lower;
+  }
+
+  function labelOf(request: FastifyRequest, accountId: number): Label {
+    const label = s.labels.get(Number((request.params as Json).id));
+    if (!label || label.accountId !== accountId) throw notFound();
+    return label;
+  }
+
   app.post('/api/v1/accounts/:account_id/labels', async (request) => {
     const { accountId } = accountAccess(request, 'labels#create_account_label', true);
     const input = body(request);
-    const title = String(input.title ?? '');
-    // Chatwoot: letters, numbers, - and _ only; stored in lower case and unique per account.
-    if (!/^[\p{L}\p{N}_-]+$/u.test(title)) {
-      throw new HttpError(422, { message: 'Title is invalid', attributes: ['title'] });
-    }
-    const lower = title.toLowerCase();
-    if ([...s.labels.values()].some((l) => l.accountId === accountId && l.title === lower)) {
-      throw new HttpError(422, { message: 'Title has already been taken', attributes: ['title'] });
-    }
     const label: Label = {
       id: s.nextId(),
       accountId,
-      title: lower,
+      title: labelTitle(String(input.title ?? ''), accountId),
       description: typeof input.description === 'string' ? input.description : null,
       color: typeof input.color === 'string' ? input.color : '#1f93ff',
     };
     s.labels.set(label.id, label);
     return labelJson(label);
+  });
+
+  app.patch('/api/v1/accounts/:account_id/labels/:id', async (request) => {
+    const { accountId } = accountAccess(request, 'labels#update', true);
+    const label = labelOf(request, accountId);
+    const input = body(request);
+    const was = label.title;
+    if (input.title !== undefined) label.title = labelTitle(String(input.title), accountId, label);
+    if (typeof input.description === 'string') label.description = input.description || null;
+    if (typeof input.color === 'string') label.color = input.color;
+    // A rename follows the tag onto the conversations that have it (Chatwoot does this in a job).
+    if (label.title !== was) {
+      for (const conversation of s.conversations.values()) {
+        if (conversation.accountId !== accountId || !conversation.labels.includes(was)) continue;
+        conversation.labels = [
+          ...new Set(conversation.labels.map((tag) => (tag === was ? label.title : tag))),
+        ];
+        touch(conversation, ['label_list']);
+      }
+    }
+    return labelJson(label);
+  });
+
+  // Like Chatwoot, deleting a tag also takes it off the account's conversations (a job there). It
+  // changes the stored list directly, so the conversation's version stays and no webhook is sent.
+  app.delete('/api/v1/accounts/:account_id/labels/:id', async (request, reply: FastifyReply) => {
+    const { accountId } = accountAccess(request, 'labels#destroy', true);
+    const label = labelOf(request, accountId);
+    s.labels.delete(label.id);
+    for (const conversation of s.conversations.values()) {
+      if (conversation.accountId === accountId) {
+        conversation.labels = conversation.labels.filter((tag) => tag !== label.title);
+      }
+    }
+    return reply.code(200).send();
   });
 
   const FIELD_TYPES = [
@@ -1279,19 +1331,74 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       .map(cannedJson);
   });
 
+  /** Chatwoot: a short code and text are required, and a short code is unique per account. */
+  function checkCanned(
+    shortCode: string,
+    content: string,
+    accountId: number,
+    own?: CannedResponse,
+  ) {
+    if (!shortCode.trim()) {
+      throw new HttpError(422, {
+        message: 'Short code can’t be blank',
+        attributes: ['short_code'],
+      });
+    }
+    if (!content.trim()) {
+      throw new HttpError(422, { message: 'Content can’t be blank', attributes: ['content'] });
+    }
+    if (
+      [...s.cannedResponses.values()].some(
+        (c) => c.accountId === accountId && c.shortCode === shortCode && c !== own,
+      )
+    ) {
+      throw new HttpError(422, {
+        message: 'Short code has already been taken',
+        attributes: ['short_code'],
+      });
+    }
+  }
+
+  function cannedOf(request: FastifyRequest, accountId: number): CannedResponse {
+    const canned = s.cannedResponses.get(Number((request.params as Json).id));
+    if (!canned || canned.accountId !== accountId) throw notFound();
+    return canned;
+  }
+
   app.post('/api/v1/accounts/:account_id/canned_responses', async (request) => {
     // Agents may add saved replies in Chatwoot, as administrators can.
     const { accountId } = accountAccess(request, 'canned_responses#create');
     const input = body(request);
-    const canned: CannedResponse = {
-      id: s.nextId(),
-      accountId,
-      shortCode: String(input.short_code ?? ''),
-      content: String(input.content ?? ''),
-    };
+    const shortCode = String(input.short_code ?? '');
+    const content = String(input.content ?? '');
+    checkCanned(shortCode, content, accountId);
+    const canned: CannedResponse = { id: s.nextId(), accountId, shortCode, content };
     s.cannedResponses.set(canned.id, canned);
     return cannedJson(canned);
   });
+
+  // Chatwoot checks no role for saved replies beyond membership of the account: agents change and
+  // remove them as administrators do.
+  app.patch('/api/v1/accounts/:account_id/canned_responses/:id', async (request) => {
+    const { accountId } = accountAccess(request, 'canned_responses#update');
+    const canned = cannedOf(request, accountId);
+    const input = body(request);
+    const shortCode = input.short_code === undefined ? canned.shortCode : String(input.short_code);
+    const content = input.content === undefined ? canned.content : String(input.content);
+    checkCanned(shortCode, content, accountId, canned);
+    canned.shortCode = shortCode;
+    canned.content = content;
+    return cannedJson(canned);
+  });
+
+  app.delete(
+    '/api/v1/accounts/:account_id/canned_responses/:id',
+    async (request, reply: FastifyReply) => {
+      const { accountId } = accountAccess(request, 'canned_responses#destroy');
+      s.cannedResponses.delete(cannedOf(request, accountId).id);
+      return reply.code(200).send();
+    },
+  );
 
   app.get('/api/v1/accounts/:account_id/contacts/:id', async (request) => {
     const { accountId } = accountAccess(request, 'contacts#show');

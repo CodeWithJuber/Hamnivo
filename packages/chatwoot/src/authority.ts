@@ -61,6 +61,19 @@ const FIELD_TYPES: AuthorityFieldType[] = [
 const text = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() ? value : null;
 
+/** A Chatwoot label as a tag; `fallback` fills what a thin answer leaves out. */
+function toLabel(
+  label: Json,
+  fallback: { ref?: string; title?: string; description?: string | null; color?: string } = {},
+): AuthorityLabel {
+  return {
+    ref: String(label.id ?? fallback.ref ?? ''),
+    title: String(label.title ?? fallback.title ?? ''),
+    description: text(label.description) ?? text(fallback.description),
+    color: text(label.color) ?? text(fallback.color),
+  };
+}
+
 /**
  * ConversationAuthority on Chatwoot CE v4.18.0. Customer and AI messages are written with the
  * Application API so they carry `source_id` (idempotency key); the customer view comes from the
@@ -482,22 +495,62 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
       }) as never,
     );
     const payload = Array.isArray(result.payload) ? (result.payload as Json[]) : [];
-    return payload
-      .filter((l) => typeof l.title === 'string')
-      .map((l) => ({
-        title: String(l.title),
-        description: text(l.description),
-        color: text(l.color),
-      }));
+    return payload.filter((l) => typeof l.title === 'string').map((l) => toLabel(l));
   }
 
   /** Defines an account tag. Chatwoot allows this to administrators only (the integration user). */
-  async createLabel(label: { title: string; description?: string; color?: string }) {
-    await call(
+  async createLabel(label: {
+    title: string;
+    description?: string;
+    color?: string;
+  }): Promise<AuthorityLabel> {
+    const created = await call<Json>(
       'createLabel',
       this.integration.POST('/api/v1/accounts/{account_id}/labels', {
         params: { path: this.accountPath },
         body: { show_on_sidebar: true, ...label } as never,
+      }) as never,
+    );
+    // Chatwoot keeps tags in lower case, and answers with the tag as stored.
+    return toLabel(created, { ...label, title: label.title.toLowerCase() });
+  }
+
+  /**
+   * Renames a tag or changes its description or colour (administrators only: the integration
+   * user). Chatwoot carries a rename over to the conversations that have the tag.
+   */
+  async updateLabel(
+    labelRef: string,
+    changes: { title?: string; description?: string | null; color?: string },
+  ): Promise<AuthorityLabel> {
+    const updated = await call<Json>(
+      'updateLabel',
+      this.integration.PATCH('/api/v1/accounts/{account_id}/labels/{id}', {
+        params: { path: { account_id: this.options.accountId, id: Number(labelRef) } },
+        body: {
+          ...(changes.title !== undefined ? { title: changes.title } : {}),
+          // Chatwoot clears a description with an empty one.
+          ...(changes.description !== undefined ? { description: changes.description ?? '' } : {}),
+          ...(changes.color !== undefined ? { color: changes.color } : {}),
+        } as never,
+      }) as never,
+    );
+    return toLabel(updated, {
+      ref: labelRef,
+      ...(changes.title !== undefined ? { title: changes.title.toLowerCase() } : {}),
+    });
+  }
+
+  /**
+   * Deletes a tag (administrators only: the integration user). Chatwoot then takes it off the
+   * conversations that carry it in a background job, writing the stored list directly: the
+   * conversation's version does not move and no webhook says so.
+   */
+  async deleteLabel(labelRef: string): Promise<void> {
+    await call(
+      'deleteLabel',
+      this.integration.DELETE('/api/v1/accounts/{account_id}/labels/{id}', {
+        params: { path: { account_id: this.options.accountId, id: Number(labelRef) } },
       }) as never,
     );
   }
@@ -583,6 +636,39 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
       shortCode: String(created.short_code ?? input.shortCode),
       content: String(created.content ?? input.content),
     };
+  }
+
+  async updateSavedReply(
+    replyRef: string,
+    changes: { shortCode?: string; content?: string },
+    actor: ActorCredential,
+  ): Promise<AuthoritySavedReply> {
+    const client = await this.as(actor);
+    const updated = await call<Json>(
+      'updateCannedResponse',
+      client.PATCH('/api/v1/accounts/{account_id}/canned_responses/{id}', {
+        params: { path: { account_id: this.options.accountId, id: Number(replyRef) } },
+        body: {
+          ...(changes.shortCode !== undefined ? { short_code: changes.shortCode } : {}),
+          ...(changes.content !== undefined ? { content: changes.content } : {}),
+        } as never,
+      }) as never,
+    );
+    return {
+      ref: String(updated.id ?? replyRef),
+      shortCode: String(updated.short_code ?? changes.shortCode ?? ''),
+      content: String(updated.content ?? changes.content ?? ''),
+    };
+  }
+
+  async deleteSavedReply(replyRef: string, actor: ActorCredential): Promise<void> {
+    const client = await this.as(actor);
+    await call(
+      'deleteCannedResponse',
+      client.DELETE('/api/v1/accounts/{account_id}/canned_responses/{id}', {
+        params: { path: { account_id: this.options.accountId, id: Number(replyRef) } },
+      }) as never,
+    );
   }
 
   async getContact(contactRef: string, actor: ActorCredential): Promise<AuthorityContact> {
