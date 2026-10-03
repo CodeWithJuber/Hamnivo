@@ -4,8 +4,11 @@ import {
   claimIntegrationInbox,
   claimOutbox,
   claimReconcileCursors,
+  closeDb,
+  createDb,
   ensureReconcileCursors,
   purgeExpired,
+  purgeMigrationFiles,
   resolveApiKey,
   resolveAuthorityConnection,
   resolveStaffMemberships,
@@ -51,6 +54,9 @@ describe('pre-tenant resolvers', () => {
     const key = await resolveApiKey(h.app, a.apiKeyPrefix);
     expect(key?.tenantId).toBe(a.tenantId);
     expect(Buffer.isBuffer(key?.secretHash)).toBe(true);
+    // Timestamps come back as dates (raw queries return them as text), so expiry checks work.
+    expect(key?.expiresAt === null || key?.expiresAt instanceof Date).toBe(true);
+    expect(key?.revokedAt).toBeNull();
     expect(await resolveApiKey(h.app, 'hv_test_missing')).toBeNull();
 
     expect(await resolveWidgetSession(h.app, b.sessionId)).toBe(b.tenantId);
@@ -77,6 +83,9 @@ describe('worker maintenance', () => {
     const first = await claimOutbox(h.app, { limit: 10, leaseSeconds: 60 });
     expect(new Set(first.map((e) => e.tenantId))).toEqual(new Set([a.tenantId, b.tenantId]));
     expect(first.every((e) => e.attempts === 1)).toBe(true);
+    expect(
+      first.every((e) => e.createdAt instanceof Date && !Number.isNaN(e.createdAt.getTime())),
+    ).toBe(true);
     expect(await claimOutbox(h.app, { limit: 10, leaseSeconds: 60 })).toEqual([]);
 
     // Acknowledge inside the owning tenant; another tenant cannot acknowledge it.
@@ -147,6 +156,27 @@ describe('worker maintenance', () => {
     expect(remaining.map((r) => r.seq)).toEqual([1]);
   });
 
+  it('clears uploaded migration exports once their retention has passed, in every tenant', async () => {
+    const past = new Date(Date.now() - 60_000);
+    await withTenant(h.app, { tenantId: a.tenantId }, (tx) =>
+      tx.update(schema.migrationFiles).set({ purgeAfter: past }),
+    );
+    await withTenant(h.app, { tenantId: b.tenantId }, (tx) =>
+      tx.update(schema.migrationFiles).set({ purgeAfter: new Date(Date.now() + 86_400_000) }),
+    );
+    expect(await purgeMigrationFiles(h.app)).toBe(1);
+    const [purged] = await withTenant(h.app, { tenantId: a.tenantId }, (tx) =>
+      tx.select().from(schema.migrationFiles),
+    );
+    expect(purged).toMatchObject({ raw: null, state: 'purged' });
+    expect(purged?.purgedAt).toBeInstanceOf(Date);
+    const [kept] = await withTenant(h.app, { tenantId: b.tenantId }, (tx) =>
+      tx.select().from(schema.migrationFiles),
+    );
+    expect(kept?.raw).toBeInstanceOf(Buffer);
+    expect(await purgeMigrationFiles(h.app)).toBe(0);
+  });
+
   it('leases due reconciler cursors across tenants and follows conversations without one', async () => {
     const first = await claimReconcileCursors(h.app, { limit: 10, leaseSeconds: 60 });
     expect(new Set(first.map((c) => c.tenantId))).toEqual(new Set([a.tenantId, b.tenantId]));
@@ -170,5 +200,59 @@ describe('worker maintenance', () => {
       expect.objectContaining({ scope: 'conversation', scopeRef: '11', lastExternalId: 41 }),
     ]);
     expect(await ensureReconcileCursors(h.app)).toBe(0);
+  });
+});
+
+// Runs last: it leases every due event, which the tests above count on finding.
+describe('lease order', () => {
+  it('hands out events in the order they were recorded, whatever plan the database picks', async () => {
+    // The later rows are stored first, so the table's physical order is the reverse of the
+    // recorded order. A hash join returns rows in physical order unless they are sorted.
+    const earlier = '01800000-0000-7000-8000-000000000001';
+    const later = '01800000-0000-7000-8000-000000000002';
+    const dueAt = new Date(Date.now() - 60_000);
+    for (const id of [later, earlier]) {
+      await withTenant(h.app, { tenantId: a.tenantId }, async (tx) => {
+        await tx.insert(schema.outboxEvents).values({
+          id,
+          tenantId: a.tenantId,
+          topic: 'test.order',
+          aggregateType: 'conversation',
+          aggregateId: 'c1',
+          payload: {},
+          availableAt: dueAt,
+        });
+        await tx.insert(schema.integrationInbox).values({
+          id,
+          tenantId: a.tenantId,
+          connectionId: a.connectionId,
+          source: 'account',
+          dedupeKey: `order-test:${id}`,
+          eventType: 'test.order',
+          payload: {},
+          availableAt: dueAt,
+        });
+      });
+    }
+    const hashJoins = createDb(
+      `${h.database.app}${h.database.app.includes('?') ? '&' : '?'}options=${encodeURIComponent(
+        '-c enable_nestloop=off -c enable_mergejoin=off',
+      )}`,
+      { max: 1 },
+    );
+    try {
+      const outbox = await claimOutbox(hashJoins, { limit: 50, leaseSeconds: 60 });
+      expect(outbox.filter((e) => e.topic === 'test.order').map((e) => e.id)).toEqual([
+        earlier,
+        later,
+      ]);
+      const inbox = await claimIntegrationInbox(hashJoins, { limit: 50, leaseSeconds: 60 });
+      expect(inbox.map((e) => e.id).filter((id) => id === earlier || id === later)).toEqual([
+        earlier,
+        later,
+      ]);
+    } finally {
+      await closeDb(hashJoins);
+    }
   });
 });

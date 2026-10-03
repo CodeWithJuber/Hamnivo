@@ -42,6 +42,21 @@ function sender(raw: unknown, messageType: AuthorityMessageDirection): Authority
   }
 }
 
+/** ActiveStorage blob paths Chatwoot hands out: redirect (the default) or proxy. */
+export const BLOB_PATH =
+  /^\/rails\/active_storage\/blobs\/(?:redirect\/|proxy\/)?([A-Za-z0-9_=-]+--[0-9a-f]+)\/([^/?#]+)$/;
+
+/** Chatwoot's attachment JSON has no file name; the blob URL ends with it. */
+function fileNameOf(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const match = BLOB_PATH.exec(new URL(url).pathname);
+    return match?.[2] ? decodeURIComponent(match[2]) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Chatwoot message JSON (API response or webhook) → AuthorityMessage. */
 export function toMessage(raw: unknown, conversationRef?: string): AuthorityMessage {
   const m = obj(raw);
@@ -65,12 +80,24 @@ export function toMessage(raw: unknown, conversationRef?: string): AuthorityMess
     sender: sender(m.sender, direction),
     attachments: (Array.isArray(m.attachments) ? m.attachments : []).map((a) => {
       const at = obj(a);
+      const url = str(at.data_url);
+      const latitude = Number(at.coordinates_lat);
+      const longitude = Number(at.coordinates_long);
+      const located =
+        at.coordinates_lat !== null &&
+        at.coordinates_lat !== undefined &&
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude);
       return {
         ref: String(at.id),
         fileType: String(at.file_type ?? 'file'),
-        url: str(at.data_url),
+        url,
         size: typeof at.file_size === 'number' ? at.file_size : null,
-        name: str(at.file_name) ?? null,
+        name: str(at.file_name) ?? fileNameOf(url),
+        mimeType: str(at.content_type),
+        coordinates: located ? { latitude, longitude } : null,
+        fallbackTitle: str(at.fallback_title),
+        meta: obj(at.meta),
       };
     }),
     createdAt: new Date(Number.isFinite(created) ? created : Date.now()),
@@ -105,6 +132,8 @@ export function toConversation(raw: unknown): AuthorityConversationState {
     attributes: obj(c.custom_attributes),
     version: typeof c.updated_at === 'number' ? c.updated_at : Number(c.timestamp ?? 0),
     snoozedUntil: timeOf(c.snoozed_until),
+    // Unix seconds on the conversation (0 when nobody looked yet); ISO in list metadata.
+    staffLastSeenAt: timeOf(c.agent_last_seen_at),
   };
 }
 

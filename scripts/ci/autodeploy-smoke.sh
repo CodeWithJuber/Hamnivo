@@ -21,6 +21,8 @@
 # The test does what the systemd units would (see run_service). HAMNIVO_BUILD_CA and
 # HAMNIVO_BUILD_NETWORK are passed to the image builds (see deploy/production/hamnivo.sh).
 set -euo pipefail
+# Compose takes settings from this shell too: the stacks never call the real Jev.
+unset TYPESAFE_API_KEY TYPESAFE_BASE_URL JEV_API_KEY JEV_BASE_URL
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 keep=0

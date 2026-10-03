@@ -58,6 +58,11 @@ export const MessageRedactedEvent = ev(
   'message.redacted',
   z.object({ messageId: z.string(), reason: z.enum(['deleted', 'retention', 'privacy_request']) }),
 );
+/**
+ * Part of a draft reply streamed before it is published. A draft is provisional: it becomes final
+ * only as the `message.created` that publishes it, and is withdrawn by `message.draft_discarded`.
+ * While the answer check is live, a draft is never published before the check passes.
+ */
 export const MessageDeltaEvent = ev(
   'message.delta',
   z.object({
@@ -67,12 +72,16 @@ export const MessageDeltaEvent = ev(
     textDelta: z.string(),
   }),
 );
+/**
+ * A streamed draft is withdrawn: it never becomes a message. `check_failed`: the answer check
+ * found a sentence its cited passage does not support; a checked reply or a hand-off follows.
+ */
 export const DraftDiscardedEvent = ev(
   'message.draft_discarded',
   z.object({
     runId: z.string(),
     draftId: z.string(),
-    reason: z.enum(['takeover', 'cancelled', 'failed', 'superseded']),
+    reason: z.enum(['takeover', 'cancelled', 'failed', 'superseded', 'check_failed']),
   }),
 );
 export const DeliveryUpdatedEvent = ev(

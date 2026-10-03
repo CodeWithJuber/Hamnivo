@@ -2,6 +2,7 @@ import type { Card, MessagePart } from '@hamnivo/contracts';
 import { Button } from '@hamnivo/ui/components/button';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ActionReceipt, ApprovalCardView } from '../actions/ActionCards.js';
 import { day, price, time } from './format.js';
 import type { Commerce } from './useCommerce.js';
 
@@ -28,7 +29,16 @@ export function CommerceCard(props: {
     case 'quote':
       return <Quote card={card} commerce={props.commerce} locale={props.locale} />;
     case 'receipt':
-      return <Receipt card={card} locale={props.locale} />;
+      // Receipts of AI actions (act_…) say what was done; others are payments and refunds.
+      return card.actionId.startsWith('act_') ? (
+        <ActionReceipt card={card} locale={props.locale} />
+      ) : (
+        <Receipt card={card} locale={props.locale} />
+      );
+    case 'approval':
+      return (
+        <ApprovalCardView card={card} locale={props.locale} fallback={props.part.fallbackText} />
+      );
     case 'order_status':
       return <OrderStatus card={card} locale={props.locale} onHelp={props.onHelp} />;
     default:

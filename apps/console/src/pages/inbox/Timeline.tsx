@@ -31,15 +31,30 @@ const AVATAR: Record<InboxMessage['sender']['kind'], ParticipantKind> = {
   system: 'system',
 };
 
-function textOf(message: InboxMessage): string {
+/** The words of a message; shared places, contacts and reactions are described (W22, W24). */
+function textOf(t: TFunction, message: InboxMessage): string {
   return message.parts
-    .map((part) =>
-      part.type === 'text' || part.type === 'notice'
-        ? part.text
-        : part.type === 'unknown'
-          ? (part.fallbackText ?? '')
-          : '',
-    )
+    .map((part) => {
+      switch (part.type) {
+        case 'text':
+        case 'notice':
+          return part.text;
+        case 'unknown':
+          return part.fallbackText ?? '';
+        case 'location':
+          return t('inbox.message.place', {
+            label: part.label ?? `${part.latitude.toFixed(5)}, ${part.longitude.toFixed(5)}`,
+          });
+        case 'contact':
+          return t('inbox.message.contact', {
+            details: [part.name, part.phone, part.email].filter(Boolean).join(', '),
+          });
+        case 'reaction':
+          return t('inbox.message.reaction', { emoji: part.emoji });
+        default:
+          return '';
+      }
+    })
     .filter(Boolean)
     .join('\n');
 }
@@ -212,7 +227,7 @@ function Attachments({ message }: { message: InboxMessage }) {
 
 function MessageItem({ detail, message }: { detail: InboxDetail; message: InboxMessage }) {
   const { t } = useTranslation();
-  const text = textOf(message);
+  const text = textOf(t, message);
   if (message.system === 'activity') {
     return (
       <li className="flex justify-center px-4" data-kind="activity">

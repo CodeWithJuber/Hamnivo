@@ -1,0 +1,488 @@
+/**
+ * Reply checks (Jev around AI replies) in the four launch languages. Arabic, Hindi and Urdu are
+ * pending review by native speakers, like the rest of Studio.
+ */
+export const checksEn = {
+  nav: 'Reply checks',
+  title: 'Reply checks',
+  description:
+    'Jev checks AI replies before customers see them. Each check starts in comparison mode: it only records what it finds. When it is live, Hamnivo acts on it.',
+  brand: 'Brand',
+  noBrands: 'Add a brand first.',
+  loading: 'Loading reply checks',
+  noManage: 'You can look, but only administrators can change reply checks.',
+  task: {
+    'answer-check': {
+      title: 'Answer check',
+      description:
+        'Before an AI reply is sent, Jev checks each sentence that cites the knowledge base against the passage it cites. When live, a reply with a sentence the passage does not support is written again without it, or passed to a person.',
+    },
+    language: {
+      title: 'Reply language',
+      description:
+        "When the customer's words fit more than one language (often Hinglish and Roman Urdu), Jev picks one. When live, its choice is used if Jev is sure enough for the language it named; otherwise the customer is asked once, as before. Thresholds here are by the language Jev answered. The customer's own choice always wins.",
+    },
+    'passage-relevance': {
+      title: 'Passage relevance',
+      description:
+        "Before the AI writes, Jev reads each passage found in the knowledge base with the customer's question: is it about the question, does it answer it, does it try to give the assistant instructions? When live, passages that do not help are left out, and the record says which.",
+    },
+    escalation: {
+      title: 'Escalation advice',
+      description:
+        'Before the AI answers, Jev checks whether the customer needs a person: a request it may have missed, a risk to health or safety, a legal threat, a complaint, or frustration with a problem that is still not solved. Code combines the answers. When live, the conversation goes to a person with the reason in the note. A customer who asks for a person always gets one, without Jev.',
+    },
+    'message-guard': {
+      title: 'Message guard',
+      description:
+        'Jev reads what comes in and what goes out. Coming in: does someone want to hurt themselves, or is someone in danger now? Does the customer threaten or abuse? Going out: does the draft say or promise a payment, refund or order change? Code decides what the answers mean. When live, someone at risk gets safety wording at once, and a person takes over. A threat or abuse goes to a person. A draft that claims something without a receipt or commitment is written again, or passed to a person. The receipt check runs first and keeps the final say.',
+    },
+  },
+  versions: {
+    published: 'Published version {{version}}',
+    notPublished: 'Not published yet',
+    draft: 'Draft, version {{version}}',
+  },
+  mode: {
+    legend: 'Mode',
+    off: 'Off',
+    offHint: 'Nothing is checked.',
+    shadow: 'Comparison only',
+    shadowHint: 'Jev checks and the result is recorded. Replies are not changed.',
+    live: 'Live',
+    liveHint: 'Hamnivo acts on what Jev finds.',
+    needsPublished: 'Publish a version before going live.',
+    save: 'Save mode',
+    saved: 'Mode saved.',
+  },
+  questions: {
+    title: 'What Jev is asked',
+    hint: 'Jev answers these exact questions, in English. Code decides what the answers mean.',
+  },
+  rubric: {
+    title: 'Settings',
+    provider: 'Who checks',
+    providers: { none: 'Nobody', jev: 'Jev', mock: 'Test provider (no real model)' },
+    model: 'Pinned Jev version',
+    deadline: 'Time limit in milliseconds',
+    thresholds: 'How sure Jev must be, per language',
+    thresholdsHint:
+      'From 0 to 1. Leave a language empty if it was not evaluated: the check then only records there.',
+    minConfidence: '{{question}} · {{language}}: at least',
+    trueAtLeast: '{{question}} · {{language}}: yes from',
+    falseAtMost: '{{question}} · {{language}}: no up to',
+    evaluated:
+      'Filled in from Hamnivo’s test of {{model}}. Compare them on your own conversations first.',
+    save: 'Save draft',
+    saved: 'Draft saved.',
+    publish: 'Publish draft',
+    publishTitle: 'Publish this draft?',
+    publishBody:
+      'The check uses it from the next reply. In comparison mode it only records what it finds.',
+    publishedNotice: 'Version {{version}} is published.',
+  },
+  records: {
+    title: 'Recent checks',
+    empty: 'No checks recorded yet.',
+    time: 'Time',
+    mode: 'Mode',
+    status: 'Status',
+    verdict: 'Result',
+    action: 'What Hamnivo does',
+    notApplied: 'recorded only',
+    test: 'Test',
+    latency: 'Time taken',
+    tokens: 'Input tokens',
+  },
+  verdict: {
+    pass: 'Supported',
+    fail: 'Not supported',
+    unsure: 'Not sure enough',
+    abstained: 'Not evaluated',
+    unavailable: 'Jev unavailable',
+    invalid: 'Invalid answer',
+    drop: 'Some passages do not help',
+    keep: 'All passages help',
+    escalate: 'Needs a person',
+    continue: 'No person needed',
+    decided: 'Language chosen',
+    ask: 'Not sure enough',
+    at_risk: 'Someone may be at risk',
+    flagged: 'Threat or abuse',
+    clear: 'Nothing found',
+    unbacked: 'Claim without a receipt',
+  },
+  action: {
+    publish: 'Send the reply',
+    regenerate: 'Write it again',
+    handoff: 'Pass to a person',
+    drop: 'Leave passages out',
+    keep: 'Use all passages',
+    continue: 'Let the AI answer',
+    use: 'Reply in that language',
+    ask: 'Ask the customer',
+    urgent: 'Safety wording, then a person',
+  },
+};
+
+export const checksAr: typeof checksEn = {
+  nav: 'فحص الردود',
+  title: 'فحص الردود',
+  description:
+    'يفحص Jev ردود الذكاء الاصطناعي قبل أن يراها العملاء. يبدأ كل فحص في وضع المقارنة فقط: يسجّل ما يجده فقط. وعند تفعيله يتصرف Hamnivo بناءً عليه.',
+  brand: 'العلامة التجارية',
+  noBrands: 'أضف علامة تجارية أولًا.',
+  loading: 'جارٍ تحميل فحص الردود',
+  noManage: 'يمكنك الاطلاع، لكن المسؤولين وحدهم يستطيعون تغيير فحص الردود.',
+  task: {
+    'answer-check': {
+      title: 'فحص الإجابة',
+      description:
+        'قبل إرسال رد الذكاء الاصطناعي، يفحص Jev كل جملة تستشهد بقاعدة المعرفة مقابل المقطع الذي تستشهد به. عند التفعيل، يُعاد كتابة الرد الذي فيه جملة لا يدعمها المقطع بدونها، أو يُحال إلى شخص.',
+    },
+    language: {
+      title: 'لغة الرد',
+      description:
+        'عندما تناسب كلمات العميل أكثر من لغة (غالبًا الهندية والأردية بحروف لاتينية)، يختار Jev واحدة. عند التفعيل يُستخدم اختياره إذا كان متأكدًا بما يكفي للغة التي ذكرها، وإلا يُسأل العميل مرة واحدة كما من قبل. الحدود هنا حسب اللغة التي أجاب بها Jev. واختيار العميل نفسه يفوز دائمًا.',
+    },
+    'passage-relevance': {
+      title: 'صلة المقاطع',
+      description:
+        'قبل أن يكتب الذكاء الاصطناعي، يقرأ Jev كل مقطع وُجد في قاعدة المعرفة مع سؤال العميل: هل هو عن السؤال، وهل يجيب عنه، وهل يحاول إعطاء المساعد تعليمات؟ عند التفعيل تُستبعد المقاطع التي لا تفيد، ويذكر السجل أيها.',
+    },
+    escalation: {
+      title: 'نصيحة الإحالة',
+      description:
+        'قبل أن يجيب الذكاء الاصطناعي، يفحص Jev هل يحتاج العميل إلى شخص: طلب ربما فاته، أو خطر على الصحة أو السلامة، أو تهديد قانوني، أو شكوى، أو استياء من مشكلة لم تُحل بعد. وتجمع الشيفرة الإجابات. عند التفعيل، تنتقل المحادثة إلى شخص مع السبب في الملاحظة. والعميل الذي يطلب شخصًا يحصل عليه دائمًا، دون Jev.',
+    },
+    'message-guard': {
+      title: 'حارس الرسائل',
+      description:
+        'يقرأ Jev ما يصل وما يُرسَل. الوارد: هل يريد أحد إيذاء نفسه، أو هل أحد في خطر الآن؟ هل يهدد العميل أو يسيء؟ الصادر: هل تقول مسودة الرد أو تعد بدفعة أو استرداد أو تغيير في طلب؟ الكود هو الذي يقرر معنى الإجابات. عند التفعيل، يتلقى من قد يكون في خطر كلمات أمان فورًا، ويتولى شخص المحادثة. ويذهب التهديد أو الإساءة إلى شخص. وتُكتب المسودة التي تدّعي شيئًا بلا إيصال أو التزام من جديد، أو تُحال إلى شخص. يعمل فحص الإيصالات أولًا ويبقى القرار الأخير له.',
+    },
+  },
+  versions: {
+    published: 'الإصدار المنشور {{version}}',
+    notPublished: 'لم يُنشر بعد',
+    draft: 'المسودة، الإصدار {{version}}',
+  },
+  mode: {
+    legend: 'الوضع',
+    off: 'متوقف',
+    offHint: 'لا يُفحص شيء.',
+    shadow: 'مقارنة فقط',
+    shadowHint: 'يفحص Jev وتُسجَّل النتيجة. لا تتغير الردود.',
+    live: 'مُفعَّل',
+    liveHint: 'يتصرف Hamnivo بناءً على ما يجده Jev.',
+    needsPublished: 'انشر إصدارًا قبل التفعيل.',
+    save: 'حفظ الوضع',
+    saved: 'حُفظ الوضع.',
+  },
+  questions: {
+    title: 'ما يُسأل عنه Jev',
+    hint: 'يجيب Jev عن هذه الأسئلة نفسها، بالإنجليزية. وتقرر الشيفرة معنى الإجابات.',
+  },
+  rubric: {
+    title: 'الإعدادات',
+    provider: 'من يفحص',
+    providers: { none: 'لا أحد', jev: 'Jev', mock: 'مزوّد تجريبي (بلا نموذج حقيقي)' },
+    model: 'إصدار Jev المثبّت',
+    deadline: 'المهلة بالملي ثانية',
+    thresholds: 'مدى التأكد المطلوب من Jev لكل لغة',
+    thresholdsHint: 'من 0 إلى 1. اترك اللغة فارغة إن لم تُقيَّم: عندها يسجّل الفحص فقط فيها.',
+    minConfidence: '{{question}} · {{language}}: على الأقل',
+    trueAtLeast: '{{question}} · {{language}}: نعم ابتداءً من',
+    falseAtMost: '{{question}} · {{language}}: لا حتى',
+    evaluated: 'مأخوذة من اختبار Hamnivo للإصدار {{model}}. قارنها أولًا على محادثاتك.',
+    save: 'حفظ المسودة',
+    saved: 'حُفظت المسودة.',
+    publish: 'نشر المسودة',
+    publishTitle: 'هل تريد نشر هذه المسودة؟',
+    publishBody: 'يستخدمها الفحص من الرد التالي. وفي وضع المقارنة فقط يسجّل ما يجده فقط.',
+    publishedNotice: 'نُشر الإصدار {{version}}.',
+  },
+  records: {
+    title: 'آخر الفحوص',
+    empty: 'لم يُسجَّل أي فحص بعد.',
+    time: 'الوقت',
+    mode: 'الوضع',
+    status: 'الحالة',
+    verdict: 'النتيجة',
+    action: 'ما يفعله Hamnivo',
+    notApplied: 'سُجّل فقط',
+    test: 'اختبار',
+    latency: 'المدة',
+    tokens: 'رموز الإدخال',
+  },
+  verdict: {
+    pass: 'مدعومة',
+    fail: 'غير مدعومة',
+    unsure: 'غير متأكد بما يكفي',
+    abstained: 'لم تُقيَّم',
+    unavailable: 'Jev غير متاح',
+    invalid: 'إجابة غير صالحة',
+    drop: 'بعض المقاطع لا تفيد',
+    keep: 'كل المقاطع تفيد',
+    escalate: 'يحتاج إلى شخص',
+    continue: 'لا حاجة إلى شخص',
+    decided: 'اختيرت اللغة',
+    ask: 'غير متأكد بما يكفي',
+    at_risk: 'قد يكون أحد في خطر',
+    flagged: 'تهديد أو إساءة',
+    clear: 'لم يُعثر على شيء',
+    unbacked: 'ادعاء بلا إيصال',
+  },
+  action: {
+    publish: 'إرسال الرد',
+    regenerate: 'إعادة كتابته',
+    handoff: 'إحالته إلى شخص',
+    drop: 'استبعاد مقاطع',
+    keep: 'استخدام كل المقاطع',
+    continue: 'ترك الذكاء الاصطناعي يجيب',
+    use: 'الرد بتلك اللغة',
+    ask: 'سؤال العميل',
+    urgent: 'كلمات أمان ثم شخص',
+  },
+};
+
+export const checksHi: typeof checksEn = {
+  nav: 'जवाबों की जाँच',
+  title: 'जवाबों की जाँच',
+  description:
+    'Jev ग्राहकों के देखने से पहले AI के जवाब जाँचता है। हर जाँच “सिर्फ़ तुलना” मोड में शुरू होती है: वह सिर्फ़ दर्ज करती है कि उसे क्या मिला। चालू होने पर Hamnivo उसके हिसाब से काम करता है।',
+  brand: 'ब्रांड',
+  noBrands: 'पहले एक ब्रांड जोड़ें।',
+  loading: 'जवाबों की जाँच लोड हो रही है',
+  noManage: 'आप देख सकते हैं, पर जवाबों की जाँच सिर्फ़ एडमिन बदल सकते हैं।',
+  task: {
+    'answer-check': {
+      title: 'जवाब की जाँच',
+      description:
+        'AI का जवाब भेजने से पहले Jev नॉलेज बेस का हवाला देने वाले हर वाक्य को उस अंश से मिलाता है जिसका हवाला दिया गया है। चालू होने पर, जिस जवाब में कोई वाक्य अंश से साबित न हो, वह उस वाक्य के बिना दोबारा लिखा जाता है, या किसी व्यक्ति को सौंपा जाता है।',
+    },
+    language: {
+      title: 'जवाब की भाषा',
+      description:
+        'जब ग्राहक के शब्द एक से ज़्यादा भाषाओं में फिट हों (अक्सर हिंग्लिश और रोमन उर्दू), Jev एक चुनता है। चालू होने पर उसका चुनाव तभी इस्तेमाल होता है जब Jev उस भाषा के लिए काफ़ी पक्का हो; वरना ग्राहक से पहले की तरह एक बार पूछा जाता है। यहाँ सीमाएँ उस भाषा के हिसाब से हैं जो Jev ने बताई। ग्राहक का अपना चुनाव हमेशा जीतता है।',
+    },
+    'passage-relevance': {
+      title: 'अंशों की प्रासंगिकता',
+      description:
+        'AI के लिखने से पहले Jev नॉलेज बेस में मिले हर अंश को ग्राहक के सवाल के साथ पढ़ता है: क्या वह सवाल के बारे में है, क्या वह जवाब देता है, क्या वह सहायक को निर्देश देने की कोशिश करता है? चालू होने पर जो अंश काम के नहीं, वे छोड़ दिए जाते हैं, और रिकॉर्ड बताता है कौन से।',
+    },
+    escalation: {
+      title: 'व्यक्ति को सौंपने की सलाह',
+      description:
+        'AI के जवाब देने से पहले Jev जाँचता है कि ग्राहक को किसी व्यक्ति की ज़रूरत है या नहीं: ऐसा अनुरोध जो छूट गया हो, सेहत या सुरक्षा का खतरा, कानूनी धमकी, शिकायत, या किसी अनसुलझी समस्या से नाराज़गी। जवाबों को कोड जोड़ता है। चालू होने पर बातचीत वजह के नोट के साथ किसी व्यक्ति को जाती है। जो ग्राहक किसी व्यक्ति से बात करना चाहे, उसे हमेशा व्यक्ति मिलता है, Jev के बिना।',
+    },
+    'message-guard': {
+      title: 'संदेश गार्ड',
+      description:
+        'Jev आने वाले और जाने वाले संदेश पढ़ता है। आने वाले: क्या कोई खुद को नुकसान पहुँचाना चाहता है, या कोई अभी खतरे में है? क्या ग्राहक धमकी देता है या गाली देता है? जाने वाले: क्या जवाब का मसौदा किसी भुगतान, रिफ़ंड या ऑर्डर बदलाव की बात या वादा करता है? जवाबों का मतलब कोड तय करता है। चालू होने पर, खतरे में हो सकने वाले व्यक्ति को तुरंत सुरक्षा संदेश मिलता है, और एक व्यक्ति बातचीत संभालता है। धमकी या गाली किसी व्यक्ति के पास जाती है। बिना रसीद या प्रतिबद्धता के दावा करने वाला मसौदा दोबारा लिखा जाता है, या किसी व्यक्ति को दिया जाता है। रसीद जाँच पहले चलती है और आख़िरी फ़ैसला उसी का है।',
+    },
+  },
+  versions: {
+    published: 'प्रकाशित संस्करण {{version}}',
+    notPublished: 'अभी प्रकाशित नहीं',
+    draft: 'ड्राफ़्ट, संस्करण {{version}}',
+  },
+  mode: {
+    legend: 'मोड',
+    off: 'बंद',
+    offHint: 'कुछ नहीं जाँचा जाता।',
+    shadow: 'सिर्फ़ तुलना',
+    shadowHint: 'Jev जाँचता है और नतीजा दर्ज होता है। जवाब नहीं बदलते।',
+    live: 'चालू',
+    liveHint: 'Jev को जो मिलता है, Hamnivo उसके हिसाब से काम करता है।',
+    needsPublished: 'चालू करने से पहले एक संस्करण प्रकाशित करें।',
+    save: 'मोड सहेजें',
+    saved: 'मोड सहेजा गया।',
+  },
+  questions: {
+    title: 'Jev से क्या पूछा जाता है',
+    hint: 'Jev यही सवाल अंग्रेज़ी में जवाब देता है। जवाबों का मतलब कोड तय करता है।',
+  },
+  rubric: {
+    title: 'सेटिंग',
+    provider: 'कौन जाँचता है',
+    providers: { none: 'कोई नहीं', jev: 'Jev', mock: 'टेस्ट प्रोवाइडर (असली मॉडल नहीं)' },
+    model: 'तय किया गया Jev संस्करण',
+    deadline: 'समय सीमा (मिलीसेकंड)',
+    thresholds: 'हर भाषा में Jev को कितना पक्का होना चाहिए',
+    thresholdsHint: '0 से 1 तक। जिस भाषा का मूल्यांकन नहीं हुआ, उसे खाली छोड़ें: वहाँ जाँच सिर्फ़ दर्ज करेगी।',
+    minConfidence: '{{question}} · {{language}}: कम से कम',
+    trueAtLeast: '{{question}} · {{language}}: हाँ, इतने से',
+    falseAtMost: '{{question}} · {{language}}: नहीं, इतने तक',
+    evaluated: 'Hamnivo के {{model}} के परीक्षण से भरे गए। पहले अपनी बातचीत पर जाँचें।',
+    save: 'ड्राफ़्ट सहेजें',
+    saved: 'ड्राफ़्ट सहेजा गया।',
+    publish: 'ड्राफ़्ट प्रकाशित करें',
+    publishTitle: 'यह ड्राफ़्ट प्रकाशित करें?',
+    publishBody: 'जाँच अगले जवाब से इसका इस्तेमाल करेगी। “सिर्फ़ तुलना” मोड में वह सिर्फ़ दर्ज करती है।',
+    publishedNotice: 'संस्करण {{version}} प्रकाशित हो गया।',
+  },
+  records: {
+    title: 'हाल की जाँचें',
+    empty: 'अभी कोई जाँच दर्ज नहीं हुई।',
+    time: 'समय',
+    mode: 'मोड',
+    status: 'स्थिति',
+    verdict: 'नतीजा',
+    action: 'Hamnivo क्या करता है',
+    notApplied: 'सिर्फ़ दर्ज',
+    test: 'टेस्ट',
+    latency: 'लगा समय',
+    tokens: 'इनपुट टोकन',
+  },
+  verdict: {
+    pass: 'साबित',
+    fail: 'साबित नहीं',
+    unsure: 'पूरा भरोसा नहीं',
+    abstained: 'मूल्यांकन नहीं हुआ',
+    unavailable: 'Jev उपलब्ध नहीं',
+    invalid: 'अमान्य जवाब',
+    drop: 'कुछ अंश काम के नहीं',
+    keep: 'सभी अंश काम के हैं',
+    escalate: 'व्यक्ति की ज़रूरत',
+    continue: 'व्यक्ति की ज़रूरत नहीं',
+    decided: 'भाषा चुनी गई',
+    ask: 'पूरा भरोसा नहीं',
+    at_risk: 'कोई खतरे में हो सकता है',
+    flagged: 'धमकी या गाली',
+    clear: 'कुछ नहीं मिला',
+    unbacked: 'बिना रसीद का दावा',
+  },
+  action: {
+    publish: 'जवाब भेजें',
+    regenerate: 'दोबारा लिखें',
+    handoff: 'किसी व्यक्ति को सौंपें',
+    drop: 'कुछ अंश छोड़ें',
+    keep: 'सभी अंश इस्तेमाल करें',
+    continue: 'AI को जवाब देने दें',
+    use: 'उसी भाषा में जवाब',
+    ask: 'ग्राहक से पूछें',
+    urgent: 'सुरक्षा संदेश, फिर व्यक्ति',
+  },
+};
+
+export const checksUr: typeof checksEn = {
+  nav: 'جوابات کی جانچ',
+  title: 'جوابات کی جانچ',
+  description:
+    'Jev گاہکوں کے دیکھنے سے پہلے AI کے جوابات جانچتا ہے۔ ہر جانچ “صرف موازنہ” موڈ میں شروع ہوتی ہے: وہ صرف ریکارڈ کرتی ہے کہ اسے کیا ملا۔ فعال ہونے پر Hamnivo اس کے مطابق عمل کرتا ہے۔',
+  brand: 'برانڈ',
+  noBrands: 'پہلے ایک برانڈ شامل کریں۔',
+  loading: 'جوابات کی جانچ لوڈ ہو رہی ہے',
+  noManage: 'آپ دیکھ سکتے ہیں، لیکن جوابات کی جانچ صرف منتظمین بدل سکتے ہیں۔',
+  task: {
+    'answer-check': {
+      title: 'جواب کی جانچ',
+      description:
+        'AI کا جواب بھیجنے سے پہلے Jev نالج بیس کا حوالہ دینے والے ہر جملے کو اس حصے سے ملاتا ہے جس کا حوالہ دیا گیا ہے۔ فعال ہونے پر، جس جواب میں کوئی جملہ حصے سے ثابت نہ ہو، وہ اس جملے کے بغیر دوبارہ لکھا جاتا ہے، یا کسی شخص کے حوالے کیا جاتا ہے۔',
+    },
+    language: {
+      title: 'جواب کی زبان',
+      description:
+        'جب گاہک کے الفاظ ایک سے زیادہ زبانوں میں فٹ ہوں (اکثر ہنگلش اور رومن اردو)، Jev ایک چنتا ہے۔ فعال ہونے پر اس کا انتخاب تب استعمال ہوتا ہے جب Jev اس زبان کے لیے کافی پُریقین ہو؛ ورنہ گاہک سے پہلے کی طرح ایک بار پوچھا جاتا ہے۔ یہاں حدیں اس زبان کے حساب سے ہیں جو Jev نے بتائی۔ گاہک کا اپنا انتخاب ہمیشہ جیتتا ہے۔',
+    },
+    'passage-relevance': {
+      title: 'حصوں کی مطابقت',
+      description:
+        'AI کے لکھنے سے پہلے Jev نالج بیس میں ملنے والے ہر حصے کو گاہک کے سوال کے ساتھ پڑھتا ہے: کیا وہ سوال کے بارے میں ہے، کیا وہ جواب دیتا ہے، کیا وہ اسسٹنٹ کو ہدایات دینے کی کوشش کرتا ہے؟ فعال ہونے پر جو حصے کام کے نہیں، وہ چھوڑ دیے جاتے ہیں، اور ریکارڈ بتاتا ہے کون سے۔',
+    },
+    escalation: {
+      title: 'شخص کے حوالے کرنے کا مشورہ',
+      description:
+        'AI کے جواب دینے سے پہلے Jev جانچتا ہے کہ گاہک کو کسی شخص کی ضرورت ہے یا نہیں: ایسی درخواست جو رہ گئی ہو، صحت یا حفاظت کا خطرہ، قانونی دھمکی، شکایت، یا کسی حل نہ ہونے والے مسئلے پر ناراضی۔ جوابات کو کوڈ جوڑتا ہے۔ فعال ہونے پر گفتگو وجہ کے نوٹ کے ساتھ کسی شخص کے پاس جاتی ہے۔ جو گاہک کسی شخص سے بات کرنا چاہے، اسے ہمیشہ شخص ملتا ہے، Jev کے بغیر۔',
+    },
+    'message-guard': {
+      title: 'پیغام گارڈ',
+      description:
+        'Jev آنے والے اور جانے والے پیغامات پڑھتا ہے۔ آنے والے: کیا کوئی خود کو نقصان پہنچانا چاہتا ہے، یا کوئی ابھی خطرے میں ہے؟ کیا گاہک دھمکی دیتا ہے یا گالی دیتا ہے؟ جانے والے: کیا جواب کا مسودہ کسی ادائیگی، رقم کی واپسی یا آرڈر میں تبدیلی کی بات یا وعدہ کرتا ہے؟ جوابوں کا مطلب کوڈ طے کرتا ہے۔ فعال ہونے پر، خطرے میں ہو سکنے والے شخص کو فوراً حفاظتی پیغام ملتا ہے، اور ایک فرد بات چیت سنبھالتا ہے۔ دھمکی یا گالی کسی فرد کے پاس جاتی ہے۔ رسید یا وعدے کے بغیر دعویٰ کرنے والا مسودہ دوبارہ لکھا جاتا ہے، یا کسی فرد کو دیا جاتا ہے۔ رسید کی جانچ پہلے چلتی ہے اور آخری فیصلہ اسی کا ہے۔',
+    },
+  },
+  versions: {
+    published: 'شائع شدہ ورژن {{version}}',
+    notPublished: 'ابھی شائع نہیں ہوا',
+    draft: 'مسودہ، ورژن {{version}}',
+  },
+  mode: {
+    legend: 'موڈ',
+    off: 'بند',
+    offHint: 'کچھ نہیں جانچا جاتا۔',
+    shadow: 'صرف موازنہ',
+    shadowHint: 'Jev جانچتا ہے اور نتیجہ ریکارڈ ہوتا ہے۔ جوابات نہیں بدلتے۔',
+    live: 'فعال',
+    liveHint: 'Jev کو جو ملتا ہے، Hamnivo اس کے مطابق عمل کرتا ہے۔',
+    needsPublished: 'فعال کرنے سے پہلے ایک ورژن شائع کریں۔',
+    save: 'موڈ محفوظ کریں',
+    saved: 'موڈ محفوظ ہو گیا۔',
+  },
+  questions: {
+    title: 'Jev سے کیا پوچھا جاتا ہے',
+    hint: 'Jev یہی سوالات انگریزی میں جواب دیتا ہے۔ جوابات کا مطلب کوڈ طے کرتا ہے۔',
+  },
+  rubric: {
+    title: 'ترتیبات',
+    provider: 'کون جانچتا ہے',
+    providers: { none: 'کوئی نہیں', jev: 'Jev', mock: 'ٹیسٹ پرووائیڈر (اصل ماڈل نہیں)' },
+    model: 'مقرر Jev ورژن',
+    deadline: 'وقت کی حد (ملی سیکنڈ)',
+    thresholds: 'ہر زبان میں Jev کو کتنا یقین ہونا چاہیے',
+    thresholdsHint:
+      '0 سے 1 تک۔ جس زبان کی جانچ نہیں ہوئی اسے خالی چھوڑیں: وہاں جانچ صرف ریکارڈ کرے گی۔',
+    minConfidence: '{{question}} · {{language}}: کم از کم',
+    trueAtLeast: '{{question}} · {{language}}: ہاں، اتنے سے',
+    falseAtMost: '{{question}} · {{language}}: نہیں، اتنے تک',
+    evaluated: 'Hamnivo کے {{model}} کے ٹیسٹ سے بھرے گئے۔ پہلے اپنی گفتگو پر جانچیں۔',
+    save: 'مسودہ محفوظ کریں',
+    saved: 'مسودہ محفوظ ہو گیا۔',
+    publish: 'مسودہ شائع کریں',
+    publishTitle: 'یہ مسودہ شائع کریں؟',
+    publishBody:
+      'جانچ اگلے جواب سے اسے استعمال کرے گی۔ “صرف موازنہ” موڈ میں وہ صرف ریکارڈ کرتی ہے۔',
+    publishedNotice: 'ورژن {{version}} شائع ہو گیا۔',
+  },
+  records: {
+    title: 'حالیہ جانچیں',
+    empty: 'ابھی کوئی جانچ ریکارڈ نہیں ہوئی۔',
+    time: 'وقت',
+    mode: 'موڈ',
+    status: 'حالت',
+    verdict: 'نتیجہ',
+    action: 'Hamnivo کیا کرتا ہے',
+    notApplied: 'صرف ریکارڈ',
+    test: 'ٹیسٹ',
+    latency: 'لگنے والا وقت',
+    tokens: 'ان پٹ ٹوکن',
+  },
+  verdict: {
+    pass: 'ثابت',
+    fail: 'ثابت نہیں',
+    unsure: 'پورا یقین نہیں',
+    abstained: 'جانچ نہیں ہوئی',
+    unavailable: 'Jev دستیاب نہیں',
+    invalid: 'غلط جواب',
+    drop: 'کچھ حصے کام کے نہیں',
+    keep: 'تمام حصے کام کے ہیں',
+    escalate: 'شخص کی ضرورت',
+    continue: 'شخص کی ضرورت نہیں',
+    decided: 'زبان چنی گئی',
+    ask: 'پورا یقین نہیں',
+    at_risk: 'کوئی خطرے میں ہو سکتا ہے',
+    flagged: 'دھمکی یا گالی',
+    clear: 'کچھ نہیں ملا',
+    unbacked: 'رسید کے بغیر دعویٰ',
+  },
+  action: {
+    publish: 'جواب بھیجیں',
+    regenerate: 'دوبارہ لکھیں',
+    handoff: 'کسی شخص کے حوالے کریں',
+    drop: 'کچھ حصے چھوڑیں',
+    keep: 'تمام حصے استعمال کریں',
+    continue: 'AI کو جواب دینے دیں',
+    use: 'اسی زبان میں جواب',
+    ask: 'گاہک سے پوچھیں',
+    urgent: 'حفاظتی پیغام، پھر فرد',
+  },
+};

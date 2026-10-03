@@ -1,6 +1,14 @@
-import type { HandoffResponse, WidgetConfig } from '@hamnivo/contracts';
+import {
+  type HandoffResponse,
+  type LauncherConfig,
+  type LocalizedText,
+  ProactiveSettings,
+  type WidgetConfig,
+  WidgetSettings,
+} from '@hamnivo/contracts';
 import type { schema } from '@hamnivo/db';
 import { isOpen, nextOpening } from '@hamnivo/domain';
+import type { BrandSurface } from './settings.service.js';
 
 type Locale = 'en' | 'ar' | 'hi' | 'ur';
 
@@ -73,17 +81,37 @@ export function availabilityOf(
   };
 }
 
+/** Defaults for a brand that has saved no settings. */
+export const DEFAULT_SURFACE: BrandSurface = {
+  settings: WidgetSettings.parse({}),
+  proactive: ProactiveSettings.parse({}),
+  settingsUpdatedAt: null,
+  proactiveUpdatedAt: null,
+};
+
+const LOCALES: Locale[] = ['en', 'ar', 'hi', 'ur'];
+
+/** A brand's text in one language, falling back to its English. */
+const textIn = (text: LocalizedText, locale: Locale): string => text[locale] ?? text.en;
+
 export function widgetConfig(
   brand: typeof schema.brands.$inferSelect,
   now: Date = new Date(),
+  surface: BrandSurface = DEFAULT_SURFACE,
+  /** Files are offered only where they can be scanned (ClamAV in production). */
+  options: { filesScannable?: boolean } = {},
 ): WidgetConfig {
   const theme = brand.theme ?? {};
+  const { settings, proactive } = surface;
   const copy = Object.fromEntries(
     (Object.keys(COPY) as Locale[]).map((locale) => [
       locale,
       { ...COPY[locale], aiDisclosure: COPY[locale].aiDisclosure.replace('{brand}', brand.name) },
     ]),
   ) as WidgetConfig['copy'];
+  const availability = availabilityOf(brand, now);
+  const prompting =
+    proactive.enabled && (!proactive.onlyWhenAvailable || availability.humanAvailable);
   return {
     widgetId: brand.widgetPublicId,
     version: brand.configVersion,
@@ -93,22 +121,118 @@ export function widgetConfig(
       accent: theme.accent ?? '#192A30',
       onAccent: theme.onAccent ?? '#FFFFFF',
       radius: theme.radius ?? 12,
-      launcherPosition: theme.launcherPosition ?? 'bottom-right',
+      launcherPosition: settings.layout.position,
     },
     locales: { default: 'en', available: ['en', 'ar', 'hi', 'ur'] },
     copy,
-    availability: availabilityOf(brand, now),
+    availability,
     features: {
-      attachments: false,
-      helpCenter: false,
+      attachments: settings.attachments.enabled && options.filesScannable !== false,
+      helpCenter: settings.help.search,
       csat: false,
       voice: false,
       identityRequiredForHistory: false,
     },
     privacyPolicyUrl: null,
     attachmentLimits: {
-      maxBytes: 10 * 1024 * 1024,
-      allowedMimeTypes: ['image/png', 'image/jpeg', 'application/pdf'],
+      maxBytes: settings.attachments.maxMegabytes * 1024 * 1024,
+      allowedMimeTypes: [...settings.attachments.allowedTypes],
+      maxFiles: settings.attachments.maxFiles,
+    },
+    layout: { mode: settings.layout.mode, position: settings.layout.position },
+    help: {
+      suggestions: Object.fromEntries(
+        LOCALES.map((locale) => [locale, settings.help.suggestions.map((q) => textIn(q, locale))]),
+      ) as WidgetConfig['help']['suggestions'],
+      search: settings.help.search,
+    },
+    messageDeletion: { windowSeconds: settings.deletion.windowMinutes * 60 },
+    notifications: { email: settings.notifications.email },
+    proactive: {
+      triggers: prompting
+        ? proactive.triggers.map((trigger) => ({
+            id: trigger.id,
+            kind: trigger.kind,
+            message: Object.fromEntries(
+              LOCALES.map((locale) => [locale, textIn(trigger.message, locale)]),
+            ) as Record<Locale, string>,
+          }))
+        : [],
+    },
+  };
+}
+
+/** The loader's own words (W01, W02, W19): its button, the chat frame and a prompt's close. */
+const LAUNCHER_COPY: Record<Locale, Omit<LauncherConfig['launcher'], 'accent' | 'onAccent'>> = {
+  en: {
+    openLabel: 'Open chat',
+    closeLabel: 'Close chat',
+    title: 'Chat',
+    dismissLabel: 'Dismiss',
+    unreadLabel: '{count} unread',
+  },
+  ar: {
+    openLabel: 'فتح المحادثة',
+    closeLabel: 'إغلاق المحادثة',
+    title: 'المحادثة',
+    dismissLabel: 'تجاهل',
+    unreadLabel: '{count} غير مقروءة',
+  },
+  hi: {
+    openLabel: 'चैट खोलें',
+    closeLabel: 'चैट बंद करें',
+    title: 'चैट',
+    dismissLabel: 'हटाएँ',
+    unreadLabel: '{count} अपठित',
+  },
+  ur: {
+    openLabel: 'چیٹ کھولیں',
+    closeLabel: 'چیٹ بند کریں',
+    title: 'چیٹ',
+    dismissLabel: 'ہٹائیں',
+    unreadLabel: '{count} بغیر پڑھے',
+  },
+};
+
+/**
+ * What the loader needs before the widget loads (W02, W19): the layout, launcher colours and
+ * labels, and the proactive prompts in one language. Prompts are only sent while the brand has
+ * them on (and, when it asks, while people are working); the loader enforces the caps.
+ */
+export function launcherConfig(
+  brand: typeof schema.brands.$inferSelect,
+  surface: BrandSurface,
+  locale: string | null | undefined,
+  now: Date,
+): LauncherConfig {
+  const lang = localeOf(locale);
+  const config = widgetConfig(brand, now, surface);
+  const shown = new Set(config.proactive.triggers.map((t) => t.id));
+  return {
+    widgetId: brand.widgetPublicId,
+    version: brand.configVersion,
+    locale: lang,
+    dir: lang === 'ar' || lang === 'ur' ? 'rtl' : 'ltr',
+    layout: config.layout,
+    launcher: {
+      accent: config.brand.accent,
+      onAccent: config.brand.onAccent,
+      ...LAUNCHER_COPY[lang],
+    },
+    proactive: {
+      enabled: shown.size > 0,
+      maxPerDay: surface.proactive.maxPerDay,
+      dismissHours: surface.proactive.dismissHours,
+      triggers: surface.proactive.triggers
+        .filter((t) => shown.has(t.id))
+        .map((t) => ({
+          id: t.id,
+          kind: t.kind,
+          path: t.path,
+          seconds: t.seconds,
+          visits: t.visits,
+          message: textIn(t.message, lang),
+        })),
     },
   };
 }

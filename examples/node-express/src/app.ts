@@ -1,6 +1,13 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { join } from 'node:path';
-import { createIdentityAssertion, type IdentitySigningKey } from '@hamnivo/server';
+import {
+  createIdentityAssertion,
+  HamnivoWebhookError,
+  type HamnivoWebhookEvent,
+  type IdentitySigningKey,
+  MemoryReplayStore,
+  verifyWebhook,
+} from '@hamnivo/server';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { renderPage } from './page.js';
 import { USERS, type User } from './users.js';
@@ -14,11 +21,25 @@ export interface AppOptions {
   api: string;
   /** The identity key registered for the brand. It never leaves this server. */
   key: IdentitySigningKey;
+  /**
+   * The webhook endpoint's `whsec_…` signing secret (both secrets while rotating). Without it the
+   * webhook route is not mounted.
+   */
+  webhookSecret?: string | readonly string[];
+  /** What to do with a verified event (default: log its type and id). */
+  onWebhook?: (event: HamnivoWebhookEvent) => void | Promise<void>;
 }
 
 const COOKIE = 'example_session';
 
-export function createApp({ widgetId, widgetOrigin, api, key }: AppOptions): Express {
+export function createApp({
+  widgetId,
+  widgetOrigin,
+  api,
+  key,
+  webhookSecret,
+  onWebhook = (event) => void process.stdout.write(`webhook ${event.type} ${event.id}\n`),
+}: AppOptions): Express {
   // Signs the sign-in cookie. It is new on every start, so a restart signs everyone out.
   const cookieSecret = randomBytes(32);
   const currentUser = (req: Request) => signedInUser(cookieSecret, req.headers.cookie);
@@ -74,6 +95,37 @@ export function createApp({ widgetId, widgetOrigin, api, key }: AppOptions): Exp
     });
     res.json({ assertion });
   });
+
+  // Webhooks from Hamnivo: verified on the raw body, then handled once per event id.
+  if (webhookSecret) {
+    const replayStore = new MemoryReplayStore();
+    app.post('/hamnivo/webhooks', express.raw({ type: '*/*', limit: '1mb' }), async (req, res) => {
+      let event: HamnivoWebhookEvent;
+      try {
+        const body = Buffer.isBuffer(req.body) ? new Uint8Array(req.body) : new Uint8Array();
+        event = await verifyWebhook(body, req.headers, { secret: webhookSecret, replayStore });
+      } catch (error) {
+        if (error instanceof HamnivoWebhookError && error.code === 'duplicate') {
+          // Already handled: 2xx stops Hamnivo from sending it again.
+          res.sendStatus(200);
+          return;
+        }
+        if (error instanceof HamnivoWebhookError) {
+          res.status(400).json({ error: error.code });
+          return;
+        }
+        throw error;
+      }
+      try {
+        await onWebhook(event);
+      } catch (error) {
+        // Not handled: forget the id so Hamnivo's retry is processed, and say so with a 5xx.
+        await replayStore.release(event.id);
+        throw error;
+      }
+      res.sendStatus(204);
+    });
+  }
 
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     // The reason stays in the server log; the browser gets no details.

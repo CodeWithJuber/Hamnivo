@@ -6,7 +6,15 @@ import { ReasonedAction } from '@hamnivo/ui/components/reasoned-action';
 import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import { StatusBadge } from '@hamnivo/ui/components/status-badge';
 import { useRouterState } from '@tanstack/react-router';
-import { GlobeIcon, PencilIcon, PlugZapIcon, PlusIcon, TriangleAlertIcon } from 'lucide-react';
+import {
+  GlobeIcon,
+  MessageSquareTextIcon,
+  PencilIcon,
+  PlugZapIcon,
+  PlusIcon,
+  SlidersHorizontalIcon,
+  TriangleAlertIcon,
+} from 'lucide-react';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppDialog, ConfirmDialog, DialogFooter } from '../components/AppDialog';
@@ -26,6 +34,7 @@ import {
 } from '../lib/queries';
 import { useTenant } from '../lib/tenant';
 import type { AuthorityConnection, Brand } from '../lib/types';
+import { ChatSettingsDialog, ProactiveDialog } from './BrandChatSettings';
 import { connectionFor } from './OverviewPage';
 
 const ORIGIN = /^https?:\/\/[^/?#\s]+$/;
@@ -379,6 +388,8 @@ function BrandCard({
   const { t } = useTranslation();
   const { can } = useTenant();
   const [editing, setEditing] = useState(false);
+  const [chatSettings, setChatSettings] = useState(false);
+  const [proactive, setProactive] = useState(false);
   const snippet = installSnippet(brand.widgetId);
   const codeRef = useRef<HTMLElement>(null);
   const titleId = `brand-${brand.id}-title`;
@@ -406,6 +417,30 @@ function BrandCard({
           {brand.status === 'disabled' ? (
             <StatusBadge tone="neutral">{t('status.connection.disabled')}</StatusBadge>
           ) : null}
+          {can('widget.configure') ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setChatSettings(true)}
+              aria-label={t('chatSettings.openLabel', { name: brand.name })}
+              data-testid="chat-settings"
+            >
+              <SlidersHorizontalIcon aria-hidden="true" />
+              {t('chatSettings.open')}
+            </Button>
+          ) : null}
+          {can('widget.proactive') ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setProactive(true)}
+              aria-label={t('chatSettings.proactive.openLabel', { name: brand.name })}
+              data-testid="proactive-settings"
+            >
+              <MessageSquareTextIcon aria-hidden="true" />
+              {t('chatSettings.proactive.open')}
+            </Button>
+          ) : null}
           {can('brands.manage') ? (
             <Button
               variant="secondary"
@@ -421,6 +456,8 @@ function BrandCard({
         </div>
       </div>
       <EditBrandDialog brand={brand} open={editing} onOpenChange={setEditing} />
+      <ChatSettingsDialog brand={brand} open={chatSettings} onOpenChange={setChatSettings} />
+      <ProactiveDialog brand={brand} open={proactive} onOpenChange={setProactive} />
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">

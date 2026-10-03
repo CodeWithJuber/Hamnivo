@@ -4,14 +4,32 @@ import type { HamnivoApiError } from './errors.js';
 
 export type OutgoingState = 'queued' | 'sending' | 'accepted' | 'failed';
 
+/** A file already scanned by the gateway that travels with a message (W09). */
+export interface OutgoingAttachment {
+  uploadId: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
 export interface OutgoingMessage {
   clientMessageId: string;
   text: string;
+  /** Files sent with the words, in order. */
+  attachments?: OutgoingAttachment[];
   state: OutgoingState;
   attempts: number;
   createdAt: string;
   message?: Message;
   error?: string;
+  /** The API's code for a failure (for example UPLOAD_REJECTED), to explain it. */
+  errorCode?: string;
+}
+
+export interface OutboxOptions {
+  backoffMs?: (attempt: number) => number;
+  /** Whether the device is online; while it is not, nothing is sent and nothing is spent. */
+  online?: () => boolean;
 }
 
 const MAX_ATTEMPTS = 8;
@@ -26,24 +44,36 @@ function uuid(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
+const browserOnline = () =>
+  typeof navigator === 'undefined' || (navigator as { onLine?: boolean }).onLine !== false;
+
 /**
  * Messages the visitor typed, in order, with honest states (W06): queued → sending → accepted,
- * or failed with a retry action. Unsent messages survive a page reload (W07); a retry always
- * reuses the client message id, so the server stores each message exactly once.
+ * or failed with retry, edit and remove. Unsent messages survive a page reload (W07). While the
+ * device is offline they wait without spending attempts, and go out once it is back (W11); a retry
+ * always reuses the client message id, so the server stores each message exactly once.
  */
 export class Outbox {
   private items: OutgoingMessage[];
   private readonly listeners = new Set<(items: readonly OutgoingMessage[]) => void>();
   private running = false;
+  private disposed = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private readonly backoffMs: (attempt: number) => number;
+  private readonly online: () => boolean;
+  private readonly onOnline = () => this.kick();
 
   constructor(
     private readonly client: HamnivoClient,
     readonly conversationId: string,
-    private readonly backoffMs = (attempt: number) => Math.min(30_000, 500 * 2 ** attempt),
+    options: OutboxOptions | ((attempt: number) => number) = {},
   ) {
+    const opts = typeof options === 'function' ? { backoffMs: options } : options;
+    this.backoffMs = opts.backoffMs ?? ((attempt) => Math.min(30_000, 500 * 2 ** attempt));
+    this.online = opts.online ?? browserOnline;
     this.items = this.load();
-    if (this.items.some((i) => i.state !== 'accepted' && i.state !== 'failed')) this.kick();
+    if (typeof window !== 'undefined') window.addEventListener('online', this.onOnline);
+    if (this.items.some((i) => i.state === 'queued')) this.kick();
   }
 
   private get key() {
@@ -62,9 +92,13 @@ export class Outbox {
 
   private save() {
     const pending = this.items.filter((i) => i.state !== 'accepted');
-    if (pending.length) this.client.storage.setItem(this.key, JSON.stringify(pending));
-    else this.client.storage.removeItem(this.key);
-    this.client.trackOutbox(this.conversationId, pending.length > 0);
+    try {
+      if (pending.length) this.client.storage.setItem(this.key, JSON.stringify(pending));
+      else this.client.storage.removeItem(this.key);
+      this.client.trackOutbox(this.conversationId, pending.length > 0);
+    } catch {
+      // Storage full or blocked: the messages still go out from memory.
+    }
     for (const listener of this.listeners) listener(this.items);
   }
 
@@ -78,10 +112,11 @@ export class Outbox {
     return () => this.listeners.delete(listener);
   }
 
-  enqueue(text: string): OutgoingMessage {
+  enqueue(text: string, attachments: readonly OutgoingAttachment[] = []): OutgoingMessage {
     const item: OutgoingMessage = {
       clientMessageId: uuid(),
       text,
+      ...(attachments.length ? { attachments: [...attachments] } : {}),
       state: 'queued',
       attempts: 0,
       createdAt: new Date().toISOString(),
@@ -98,12 +133,29 @@ export class Outbox {
     this.kick();
   }
 
+  /**
+   * Takes back a message that is not on its way (failed, or waiting for the connection), for
+   * example to edit it. Returns it, or null when it is being sent or already arrived.
+   */
+  remove(clientMessageId: string): OutgoingMessage | null {
+    const item = this.items.find((i) => i.clientMessageId === clientMessageId);
+    if (!item || (item.state !== 'failed' && item.state !== 'queued')) return null;
+    this.items = this.items.filter((i) => i !== item);
+    this.save();
+    return item;
+  }
+
   /** Drops accepted messages once they appear in the conversation stream. */
   settle(clientMessageId: string) {
     this.items = this.items.filter(
       (i) => !(i.clientMessageId === clientMessageId && i.state === 'accepted'),
     );
     this.save();
+  }
+
+  /** Tries the queue now (for example from a "try again" button). */
+  flush() {
+    this.kick();
   }
 
   private update(clientMessageId: string, patch: Partial<OutgoingMessage>) {
@@ -114,16 +166,19 @@ export class Outbox {
   }
 
   private kick(delay = 0) {
+    if (this.disposed) return;
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => void this.drain(), delay);
   }
 
   /** Sends queued messages one at a time, preserving their order. */
   async drain(): Promise<void> {
-    if (this.running) return;
+    if (this.running || this.disposed) return;
     this.running = true;
     try {
       for (;;) {
+        // Offline: wait for the "online" event instead of spending attempts.
+        if (!this.online()) return;
         const next = this.items.find((i) => i.state === 'queued');
         if (!next) return;
         this.update(next.clientMessageId, { state: 'sending', attempts: next.attempts + 1 });
@@ -132,17 +187,27 @@ export class Outbox {
             this.conversationId,
             next.clientMessageId,
             next.text,
+            (next.attachments ?? []).map((a) => a.uploadId),
           );
           this.update(next.clientMessageId, { state: 'accepted', message: result.message });
         } catch (error) {
           const problem = error as HamnivoApiError;
+          // The connection dropped while sending: wait for it, without counting the attempt.
+          if (problem.status === 0 && !this.online()) {
+            this.update(next.clientMessageId, { state: 'queued', attempts: next.attempts });
+            return;
+          }
           const attempts = next.attempts + 1;
           if (problem.retryable && attempts < MAX_ATTEMPTS) {
             this.update(next.clientMessageId, { state: 'queued', error: problem.message });
             this.kick(problem.retryAfterMs ?? this.backoffMs(attempts));
             return;
           }
-          this.update(next.clientMessageId, { state: 'failed', error: problem.message });
+          this.update(next.clientMessageId, {
+            state: 'failed',
+            error: problem.message,
+            ...(problem.code ? { errorCode: problem.code } : {}),
+          });
         }
       }
     } finally {
@@ -151,7 +216,9 @@ export class Outbox {
   }
 
   dispose() {
+    this.disposed = true;
     if (this.timer) clearTimeout(this.timer);
+    if (typeof window !== 'undefined') window.removeEventListener('online', this.onOnline);
     this.listeners.clear();
   }
 }

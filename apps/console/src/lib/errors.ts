@@ -15,6 +15,7 @@ type ErrorKey =
   | 'notFound'
   | 'validation'
   | 'rateLimited'
+  | 'planLimit'
   | 'unavailable'
   | 'idempotency'
   | 'conflict'
@@ -38,6 +39,8 @@ function keyOf(error: ApiError): ErrorKey {
     case 'RATE_LIMITED':
     case 'QUOTA_EXCEEDED':
       return 'rateLimited';
+    case 'PLAN_LIMIT_REACHED':
+      return 'planLimit';
     case 'PROVIDER_UNAVAILABLE':
     case 'AUTHORITY_UNAVAILABLE':
       return 'unavailable';
@@ -67,7 +70,11 @@ export function describeError(t: TFunction, error: unknown): ErrorText {
   }
   const key = keyOf(error);
   const detail =
-    key === 'validation' || key === 'denied' || key === 'notFound' || key === 'rejected'
+    key === 'validation' ||
+    key === 'denied' ||
+    key === 'notFound' ||
+    key === 'rejected' ||
+    key === 'planLimit'
       ? error.problem?.detail
       : undefined;
   return {

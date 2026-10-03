@@ -20,8 +20,9 @@ export class KillSwitchesController {
     return { items: await this.switches.list(principal) };
   }
 
+  /** agents.publish for reply switches, tools.manage for tool switches (checked on the target). */
   @Post()
-  @StaffRoute({ tenant: true, permission: 'agents.publish' })
+  @StaffRoute({ tenant: true })
   async create(
     @CurrentPrincipal() principal: StaffPrincipal,
     @Body() body: unknown,
@@ -46,7 +47,7 @@ export class KillSwitchesController {
 
   @Post(':killSwitchId/clear')
   @HttpCode(200)
-  @StaffRoute({ tenant: true, permission: 'agents.publish' })
+  @StaffRoute({ tenant: true })
   clear(
     @CurrentPrincipal() principal: StaffPrincipal,
     @Param('killSwitchId') killSwitchId: string,

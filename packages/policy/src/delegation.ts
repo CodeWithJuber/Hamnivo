@@ -71,6 +71,80 @@ export function checkDelegation(
   return problems;
 }
 
+/** Access someone already holds: a role's permission patterns at one scope. */
+export interface HeldGrant {
+  permissions: readonly string[];
+  scope: Scope;
+}
+
+/**
+ * The same ceiling for taking access away or changing it (A02, A03): a person may only revoke,
+ * replace, suspend or remove access that they could have granted themselves, meaning permissions
+ * they hold in a scope that contains the target's. Otherwise a sub-admin could suspend an owner or
+ * strip a colleague who has more access than they do. Freshness is checked by the route itself.
+ */
+export function checkRevocation(
+  actor: StaffPrincipal,
+  target: { staffMemberId: string; grants: readonly HeldGrant[] },
+  hierarchy: ScopeHierarchy,
+  now = new Date(),
+  managePermission: Permission = 'grants.manage',
+): DelegationProblem[] {
+  const problems: DelegationProblem[] = [];
+  const add = (problem: DelegationProblem) => {
+    if (!problems.some((p) => p.code === problem.code)) problems.push(problem);
+  };
+  if (target.staffMemberId === actor.staffMemberId) add({ code: 'self_grant' });
+  const missing = new Set<Permission>();
+  for (const grant of target.grants) {
+    const resource = grant.scope.type === 'tenant' ? {} : hierarchyResource(grant.scope, hierarchy);
+    const canManage = authorize(actor, managePermission, resource, {
+      now,
+      stepUpMaxAgeMs: Number.POSITIVE_INFINITY,
+    });
+    if (!canManage.allowed) add({ code: 'not_allowed', detail: canManage.reason });
+    const containing = actor.grants.filter(
+      (g) => isGrantActive(g, now) && scopeContains(g.scope, grant.scope, hierarchy),
+    );
+    if (containing.length === 0) add({ code: 'outside_own_scope' });
+    const held = new Set(
+      containing.flatMap((g) =>
+        expandPatterns(g.permissions).filter((p) => appliesAtScope(p, g.scope.type)),
+      ),
+    );
+    for (const permission of expandPatterns(grant.permissions)) {
+      if (appliesAtScope(permission, grant.scope.type) && !held.has(permission)) {
+        missing.add(permission);
+      }
+    }
+  }
+  if (missing.size > 0) {
+    problems.push({ code: 'exceeds_own_permissions', permissions: [...missing] });
+  }
+  return problems;
+}
+
+/**
+ * Permissions the principal does not hold across the whole tenant, so cannot put into a role
+ * (A12): a role can be granted anywhere, so building one needs tenant-wide reach.
+ */
+export function unreachablePermissions(
+  principal: StaffPrincipal,
+  permissions: readonly Permission[],
+  now = new Date(),
+): Permission[] {
+  return permissions.filter((permission) => {
+    const decision = authorize(
+      principal,
+      permission,
+      {},
+      { now, stepUpMaxAgeMs: Number.POSITIVE_INFINITY },
+    );
+    // Holding a permission whose use needs two-step verification still counts as holding it.
+    return !decision.allowed && decision.reason !== 'mfa_required';
+  });
+}
+
 function hierarchyResource(scope: Exclude<Scope, { type: 'tenant' }>, hierarchy: ScopeHierarchy) {
   const parents = hierarchy(scope);
   switch (scope.type) {

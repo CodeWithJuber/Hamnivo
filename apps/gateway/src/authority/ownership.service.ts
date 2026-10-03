@@ -2,6 +2,7 @@ import { appendAudit, schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { OwnerMode } from '@hamnivo/db/schema';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import { actionsInFlightNote, supersedeForOwnerChange } from '../actions/in-flight.js';
 import { inFlightNote } from '../commerce/in-flight.js';
 import { AppError } from '../common/app-error.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
@@ -36,7 +37,9 @@ export interface TransitionOptions {
     | 'assist_mode'
     | 'ai_stopped'
     | 'ai_unavailable'
-    | 'ai_blocked';
+    | 'ai_blocked'
+    | 'ai_limit'
+    | 'ai_escalated';
   /** Audit actor (`stf_…`, `cus_…`, `authority`). */
   actor: { type: 'staff' | 'customer' | 'system'; id: string };
   /** The epoch the caller saw; a different current epoch fails with OWNERSHIP_CHANGED. */
@@ -147,12 +150,22 @@ export class OwnershipService {
 
     const before = customerView(control.ownerMode, control.authorityStatus);
     const after = customerView(mode, control.authorityStatus);
-    const journal =
-      before.status !== after.status || before.responder !== after.responder
-        ? await this.journal.append(tx, tenantId, conversationId, [
-            { lane: 'customer', type: 'conversation.updated', data: after },
-          ])
-        : [];
+    // AI actions are approved for one epoch (G13): pending approvals end here; anything already
+    // sent stays open and is reconciled under the new owner (listed in the note below).
+    const superseded = await supersedeForOwnerChange(tx, conversationId, epoch, this.clock());
+    const updates = [
+      ...(before.status !== after.status || before.responder !== after.responder
+        ? [{ lane: 'customer' as const, type: 'conversation.updated' as const, data: after }]
+        : []),
+      ...superseded.map((s) => ({
+        lane: (s.approver === 'customer' ? 'customer' : 'staff') as 'customer' | 'staff',
+        type: 'approval.updated' as const,
+        data: { approvalId: s.actionId, status: 'superseded' },
+      })),
+    ];
+    const journal = updates.length
+      ? await this.journal.append(tx, tenantId, conversationId, updates)
+      : [];
 
     // A conversation that now waits for people is routed to a team (J02). Routing runs after this
     // transaction and only picks the team; the handoff itself is already done here.
@@ -195,11 +208,15 @@ export class OwnershipService {
         origin: options.origin,
       },
     });
-    // Whoever takes over sees the money still in flight here (R07): on every path by which a person
-    // becomes the owner (takeover, inbox claim, assignment by a supervisor, a Chatwoot assignment
-    // or reply). A move to the queue waits for the person who picks it up.
+    // Whoever takes over sees the money and AI actions still in flight here (R07): on every path
+    // by which a person becomes the owner (takeover, inbox claim, assignment by a supervisor, a
+    // Chatwoot assignment or reply). A move to the queue waits for the person who picks it up.
     if (mode === 'HUMAN_ACTIVE') {
-      const note = await inFlightNote(tx, conversationId);
+      const notes = [
+        await inFlightNote(tx, conversationId),
+        await actionsInFlightNote(tx, conversationId),
+      ].filter((n): n is string => n !== null);
+      const note = notes.length ? notes.join('\n\n') : null;
       if (note) {
         await enqueueOutbox(tx, tenantId, {
           topic: 'conversation.note',

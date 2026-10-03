@@ -25,6 +25,10 @@ this repository.
 | Public website (EN/AR/HI/UR, static) | ready | see "The public website" below |
 | AI agents: real models (Anthropic, OpenAI, Gemini, OpenAI-compatible), knowledge, kill switches | ready (API) | see "Connect a brand to Chatwoot" below |
 | Studio (staff console): sign-in with two-step verification, brands and install, Chatwoot connection, AI agents, model connections, knowledge, Stop AI, runs | ready (first version) | `https://app.<your domain>` (A6); `pnpm --filter @hamnivo/console dev` in development |
+| Team and access (members, invitations, custom roles, audit log with export), single sign-on per workspace (OpenID Connect), passkeys, support access | ready (first version) | Studio: Team and access, Security (A6) |
+| Platform console for the people who run the server: workspaces (metadata only), service health, support access, incident banners | ready (first version) | `https://app.<your domain>/platform`; operators are named on the server (A7) |
+| Developer platform: API keys, signed webhooks (Standard Webhooks) with retries, a delivery log and replays, allowed hosts, webhook checks in the server SDK | ready (first version) | Studio → Developer; [`docs/guides/api-keys.md`](guides/api-keys.md), [`docs/guides/webhooks.md`](guides/webhooks.md) |
+| Reports (service quality, teams, AI use, orders) with small groups withheld; plans, usage limits, AI budgets and invoices | ready (first version) | Studio → Reports; plans and invoices: "Plans and invoices" in A7 |
 
 # Part A: Host Hamnivo on your server
 
@@ -156,6 +160,8 @@ Then edit `deploy/production/.env` for:
 - **AI models (optional):** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`,
   or `OPENAI_COMPATIBLE_BASE_URL` for a local model. Each company can also store its own keys
   later. `EMBEDDING_PROVIDER` chooses the model for knowledge search.
+- **Decisions with Jev (optional):** `TYPESAFE_API_KEY`, a key from [typesafe.ai](https://typesafe.ai).
+  It lets brands route conversations with Jev (A6, "Decisions with Jev").
 - **Other names:** change `HAMNIVO_*_HOST`, then run `setup` again to update the addresses derived
   from them.
 - **Behind Cloudflare's proxy:** run `setup --cloudflare on`. Caddy then believes the visitor
@@ -224,6 +230,160 @@ Open Studio, the staff console, at `https://app.example.com` (your domain in pla
 
 Staff can answer customers in Chatwoot at `https://support.example.com`. The super admin email and
 password are in `.env` (`CHATWOOT_ADMIN_EMAIL` and `CHATWOOT_ADMIN_PASSWORD`).
+
+### Decisions with Jev
+
+Jev is TypeSafe's decision model. It can route each conversation to the team that handles its topic.
+It answers a fixed question, "which of these topics is this?", with a confidence for each answer.
+Hamnivo acts on the answer only when that confidence reaches the threshold you set for the
+conversation's language. Without Jev, a fixed keyword rule routes.
+
+1. Put your key from typesafe.ai in `deploy/production/.env` as `TYPESAFE_API_KEY=...`, then run
+   `./deploy/production/hamnivo.sh up --no-build`.
+2. In Studio, open **Decision rules**, choose the brand, and edit its **Rubric**:
+   - **Provider:** Jev. **Model:** a fixed version, currently `jev-1.13.0`. Moving names such as
+     `jev-latest` are refused, so a new Jev release changes nothing until you try it and publish a
+     rubric that names it.
+   - **Topics:** the topics your teams handle, each with a few keywords for the fixed rule. Under
+     **Teams**, say which team takes which topics.
+   - Try a few messages under **Try a message**, then publish.
+3. The brand starts in **shadow** mode. Every conversation records both Jev's choice and the fixed
+   rule's, but only the fixed rule routes. **Jev compared with the fixed rules** shows how often
+   they agree, per language.
+4. Switch to **live** when the comparison looks right. Each language has a minimum confidence;
+   below it, the fixed rule routes. Choosing Jev fills in the values Hamnivo measured for
+   `jev-1.13.0` (0.50 in every language). In that test Jev chose the right topic for 260 of 266
+   messages in the six languages; the keyword rule chose it for 188
+   ([report](evals/jev-1.13.0-2026-10-02.md)). Those were test messages, not your customers', so
+   look at each language on your own conversations before you rely on it there.
+
+Rules that always hold:
+- A customer who asks for a person gets one; Jev never decides that.
+- If TypeSafe is slow or down, the fixed rule routes once the rubric's deadline passes (1.5 s by
+  default).
+- Each decision sends TypeSafe only the customer's latest messages and the conversation's status, as
+  the rubric chooses. In the test that was about 670 tokens, at $0.042 per million input tokens
+  (TypeSafe's price in October 2026): about $0.00003 per decision. Half of the decisions took 148 ms
+  or less, and 95% took 214 ms or less.
+- TypeSafe says it does not train Jev on requests or responses
+  ([data handling](https://docs.typesafe.ai/models)).
+
+### Reply checks with Jev
+
+Jev can also check AI replies. Open **Reply checks** in Studio and choose the brand. Each check
+works like routing: choose Jev and a fixed version, set how sure Jev must be in each language,
+publish, and start in **comparison only** mode, which records what Jev finds and changes nothing.
+Switch a check to **live** when its records look right.
+
+- **Answer check:** before an AI reply is sent, Jev checks each sentence that cites your knowledge
+  against the passage it cites. When live, a reply with a sentence the passage does not support is
+  written again once without it; if that fails too, a person takes over with a note.
+- **Escalation advice:** before the AI answers, Jev checks whether the customer needs a person: a
+  request it may have missed, a risk to health or safety, a legal threat, a complaint, or
+  frustration with a problem that is still not solved. When live, a person takes over with the
+  reason in the note. A customer who asks for a person always gets one, without Jev.
+- **Passage relevance:** before the AI writes, Jev reads each passage found in your knowledge
+  with the customer's question. When live, passages that are off topic, answer nothing, or try
+  to give the assistant instructions are left out, and the record says which.
+- **Reply language:** when a customer's words fit more than one language (often Hinglish and
+  Roman Urdu), Jev picks one. When live, its choice is used if Jev is sure enough for that
+  language; otherwise the customer is asked once, as before. Choosing Jev fills in the thresholds
+  Hamnivo measured. A customer's own choice always wins.
+- **Message guard:** Jev reads what comes in and what goes out. When live, a customer who says
+  they want to hurt themselves, or that someone is in danger now, gets safety wording at once in
+  their language, pointing to local emergency help, and a person takes over with an urgent note.
+  This does not depend on the plan or the AI budget: the wording is fixed text and costs no
+  tokens, so it is sent even when the AI replies are used up. A customer who asks for a person is
+  handed over first, as ever; Jev is asked after that and, if it finds someone at risk, adds the
+  wording and an urgent note. A threat or abuse goes to a person. A draft reply that says or
+  promises a payment, refund or order change without a receipt or a submitted refund is written
+  again once, then passed to a person. The receipt check runs first and keeps the final say. These
+  questions have no measured thresholds yet: set them from what comparison mode records. The
+  safety wording in languages other than English is waiting for review by native speakers.
+
+If Jev is slow or unavailable, or a language has no threshold, the reply goes out as it would
+without the check, and the check is recorded. A check sends TypeSafe only what it needs: the
+customer's latest messages or the draft reply, with personal data replaced by its kind, and the
+knowledge passages it checks.
+
+### Bring your old chats
+
+Studio's **Import history** page brings a brand's conversations over from another tool. The
+conversations land in Chatwoot, as if they had always been there.
+
+**Sources:**
+- a tawk.to export file;
+- a Zendesk full JSON export;
+- Intercom conversations in its API format;
+- a Hamnivo package;
+- another Chatwoot, read with an access token.
+
+**Steps:**
+1. Upload the export, or connect the other Chatwoot.
+2. Read the check. It lists counts, how each field is imported, the source's known limits and the
+   records to review.
+3. Do a dry run. It writes nothing.
+4. Start the import, then compare the sample conversations with your export.
+5. Approve, or roll back.
+
+**What keeps it safe:**
+- Imports never message customers. Each brand gets its own import inbox without a webhook, bot,
+  auto-assignment or automations. The check stops an import while anything there could notify
+  people. Conversations keep their original times.
+- Uploads are scanned for malware before they are read. Keep ClamAV running
+  (`COMPOSE_PROFILES=scan`, the default). Without it, only the standard EICAR test file is caught.
+- The other Chatwoot's token is stored encrypted, used once and then revoked in Hamnivo. Revoke it
+  in that Chatwoot as well. Its address must be public `https`.
+- Uploaded files are deleted at approval or rollback, or `MIGRATION_EXPORT_RETENTION_DAYS` after
+  the import ends.
+
+**Limits:**
+- Teams and groups from the other tool are not imported.
+- The Zendesk and Intercom readers follow those vendors' documented formats but have not yet been
+  tried on real exports. Use the dry run and the samples before you approve.
+
+### Your team
+
+Under **Team and access**:
+
+- **Members.** Invite people by email with a role and, if you like, a narrower scope (one
+  workspace, team or brand). They join from the link in the email, signed in with that address.
+  You can only hand out access you have yourself. Change someone's role in one step, suspend them
+  or remove them. They lose access on their next request, and their live views close at the next
+  check (15 seconds by default). Removing someone first shows what they still hold, such as open
+  conversations.
+- **Roles.** The built-in roles can't be changed. A custom role can only contain permissions you
+  hold. Before it is saved, Studio shows what changes and who gains or loses what.
+- **Audit log.** Every administrative change, with filters and an integrity check. Exporting it as
+  CSV or NDJSON needs its own permission and a recent sign-in, and is recorded too. It never
+  contains secrets or customers' messages.
+
+### Single sign-on
+
+An owner with two-step verification sets it up under **Security**:
+
+1. **Prove the domain.** Add the company's email domain, publish the TXT record Studio shows
+   (`_hamnivo-verification.example.com`), then check it. Once it is verified, no other workspace
+   can use that domain.
+2. **Connect the identity provider** (OpenID Connect): its issuer URL, and the client ID and
+   client secret it gave you. The secret is stored encrypted and never shown again. Studio then
+   shows the callback address; register it at the provider as a redirect URL.
+3. **Turn it on**, and choose the role for people who sign in for the first time. Roles that need
+   two-step verification can't be given this way. **Require single sign-on** turns away passwords
+   and passkeys for addresses at the domain.
+
+People then use "Continue with single sign-on" on the sign-in page. An existing account is joined
+to the provider's identity only when both have verified the address. A provider on a private
+network must be listed in `SSO_TRUSTED_IDP_ORIGINS` (comma-separated origins). Every other
+provider must use HTTPS on a public address. `SSO_DNS_SERVERS` picks the DNS servers for the
+domain check.
+
+### Support access
+
+The people who run the server never see a workspace's content on their own. When they need to,
+they ask for read-only access with a reason, what they need to see and for how long. An owner
+approves it, possibly narrower, or declines it under **Security**, and can end it at any time.
+Every page shows a banner while it lasts, and both sides' audit logs record it.
 
 ### Settings that need the API for now
 
@@ -311,6 +471,63 @@ API reference is at `https://api.example.com/docs`; set `API_DOCS=false` to hide
 | Apply changed settings | `./deploy/production/hamnivo.sh up` |
 | Stop everything | `./deploy/production/hamnivo.sh down` (data stays in Docker volumes) |
 | Any compose command | `./deploy/production/hamnivo.sh compose <command>` |
+| Name a platform operator, or disable one | see "The platform console" below |
+
+### The platform console
+
+The platform console (`https://app.example.com/platform`) is for the people who run this server. It
+shows workspaces (never their content), service health, support access and AI stops, and posts
+incident banners that every workspace sees. Nobody gets it from a workspace role: you name
+operators on the server, after they have created their account in Studio:
+
+```bash
+./deploy/production/hamnivo.sh compose run --rm --no-deps migrate \
+  node dist/main.operator.js you@example.com platform_admin
+# or support_operator, platform_viewer; --disable instead of a role takes it away
+```
+
+Operators need two-step verification for anything beyond looking. Every action is recorded in the
+platform's own audit log. In development, use
+`pnpm --filter @hamnivo/db platform:operator <email> <role>`.
+
+### Plans and invoices
+
+Hamnivo's operator, not the workspaces, defines plans, assigns them and issues invoices, with the
+billing command. Each step is recorded in the workspace's audit log under the name in
+`HAMNIVO_OPERATOR`. A workspace without a plan has no limits.
+
+A plan is a JSON file. Prices are in minor units (cents), written as strings. `limits` can hold
+`conversations`, `aiReplies` and `aiTokens` (per calendar month, UTC) and `knowledgeStorageBytes`,
+`seats` and `webhookEndpoints` (at any time); a limit left out is unlimited. `metered` prices usage
+beyond what the plan includes.
+
+```json
+{"key":"starter","name":"Starter","currency":"USD","priceMinor":"4900",
+ "limits":{"conversations":1000,"aiReplies":5000,"aiTokens":2000000,
+           "knowledgeStorageBytes":104857600,"seats":5,"webhookEndpoints":3},
+ "metered":[{"limit":"conversations","includedUnits":1000,"unitPriceMinor":"5","perUnits":1}]}
+```
+
+```bash
+b=(./deploy/production/hamnivo.sh compose exec -T -e HAMNIVO_OPERATOR=you@example.com \
+   api node dist/main.billing.js)
+"${b[@]}" plan:set - < starter.json         # create or change a plan
+"${b[@]}" plans                             # list them
+"${b[@]}" plan:assign acme starter          # a workspace, by slug or tnt_… id
+"${b[@]}" invoices:generate 2026-09         # drafts for a finished month
+"${b[@]}" invoice:issue HV-202609-0E4F2A1B  # the workspace sees it from now on
+"${b[@]}" invoice:paid HV-202609-0E4F2A1B bank-transfer-0042
+"${b[@]}" invoice:failed HV-202609-0E4F2A1B "card declined" 2026-10-20
+"${b[@]}" invoice:void HV-202609-0E4F2A1B "issued by mistake"
+```
+
+At a limit, Hamnivo refuses what would go past it with `402 PLAN_LIMIT_REACHED` and the numbers
+(a new conversation is refused without telling the customer about the plan). When the AI replies,
+tokens or a workspace's own AI budget run out, new conversations go to people instead. Studio shows
+usage against the limits under **Reports → Billing**. Invoices are drafted from the plan price and
+the metered usage of the month. They are collected by hand (`invoice:paid`), until a payment
+provider is connected behind the billing port. In development, run the same commands with
+`pnpm --filter @hamnivo/gateway billing <command>` after building the gateway.
 
 ### Backups
 
@@ -433,7 +650,7 @@ up and deploys.
   then, `hamnivo.sh mail` shows the emails and their links. With `SMTP_URL` set, failures to send
   are in `hamnivo.sh logs api`.
 - **Out of memory:** remove `scan` from `COMPOSE_PROFILES` and empty `CLAMAV_URL` to run without
-  ClamAV, or add memory.
+  ClamAV (customers then cannot send files in the chat), or add memory.
 - **Building behind a proxy that inspects TLS:** set `HAMNIVO_BUILD_CA=/path/to/proxy-ca.pem`
   before `hamnivo.sh up`.
 - **Cloudflare:**
@@ -811,8 +1028,9 @@ Clearing the switch (`POST /v1/admin/kill-switches/ksw_.../clear`) lets the AI a
 To preview what an answer would use, send `POST /v1/admin/knowledge/search` with
 `{"query":"…","brandId":"brd_…"}`.
 
-On a server, run ClamAV and set `CLAMAV_URL=tcp://clamav:3310`. Without it, uploads are checked only
-for the EICAR test file. `EMBEDDING_PROVIDER` selects the embedding model; the default offline
+On a server, run ClamAV and set `CLAMAV_URL=tcp://clamav:3310`. Without it, knowledge uploads are
+checked only for the EICAR test file, and the chat offers customers no files at all: customer
+files are accepted only when ClamAV can scan them. `EMBEDDING_PROVIDER` selects the embedding model; the default offline
 `mock` matches shared words only, so use a real provider for meaning-based search.
 
 ### Put the chat on a web page
@@ -903,8 +1121,37 @@ is never touched:
 
 - The built website in Chromium: every language at desktop and phone width, with an axe audit.
 
-The summary is written to `test-results/ci-local.md`. Paste it into the pull request when you
-review a change.
+The summary is written to `test-results/ci-local.md`. On GitHub it is kept as the run's
+`ci-results` artifact.
+
+### Run the checks on GitHub
+
+Every push runs this whole pipeline on GitHub Actions (ADR 0009), on a runner of your own. Set it
+up once:
+
+1. **Get a machine for it.** It needs 4 CPUs, 8 GB of memory, 40 GB of free disk and Docker. Don't
+   use the production server: the checks build images with the same names, and they would slow
+   the live service. A machine that already runs another project's runner will do.
+2. **Register the runner.** In the repository on GitHub, open **Settings → Actions → Runners →
+   New self-hosted runner** and choose Linux x64. Run the commands it shows on the machine, as a
+   user other than root. When `config.sh` asks for labels, enter `hamnivo`.
+3. **Give it Docker and run it as a service.** In the runner's folder:
+
+   ```bash
+   sudo usermod -aG docker "$USER"
+   sudo ./svc.sh install "$USER" && sudo ./svc.sh start
+   ```
+
+4. **Install Chromium's system libraries, once:** `sudo npx --yes playwright install-deps chromium`.
+5. **Make `main` wait for the checks.** Under **Settings → Branches**, in the rule for `main`, turn
+   on "Require status checks to pass" and pick `checks`.
+
+A newer push to the same branch cancels the run that is still going. Runs wait in the queue
+until a runner is online.
+
+To use GitHub's own runners instead, set the repository variable `HAMNIVO_CI_RUNNER` to
+`["ubuntu-latest"]`, under **Settings → Secrets and variables → Actions → Variables**. GitHub
+bills private repositories for those by the minute.
 
 To run the quick checks automatically before every `git push`:
 

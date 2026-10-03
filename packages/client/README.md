@@ -36,6 +36,26 @@ const stream = new EventStream(client, conversation.id, {
 });
 ```
 
+### Files, drafts and the rest of the chat
+
+```ts
+// Files (W09): the gateway reads the type from the bytes and scans the file before keeping it.
+const file = await client.uploadAttachment(conversation.id, blob, 'receipt.pdf');
+outbox.enqueue('Here is my receipt', [file]); // words and files travel as one message
+const bytes = await client.downloadAttachment(conversation.id, part.uploadId); // a Blob
+
+client.drafts.set(`${principalId}:${conversation.id}`, text); // kept across reloads (W07)
+await client.markRead(conversation.id, latestSequence); // unread counts, read receipts (W05, W06)
+await client.deleteMessage(conversation.id, messageId); // within the brand's window (W23)
+await client.react(conversation.id, replyId, crypto.randomUUID(), '👍'); // W22
+await client.helpSearch('returns'); // the brand's public help (W17)
+await client.setNotifications({ transcript: true }); // verified customers only (W25)
+```
+
+A refused file is a `HamnivoApiError` with `code: 'UPLOAD_REJECTED'` (or `UPLOAD_TOO_LARGE`), and
+`problem.reason` says why: `type_not_allowed`, `too_large`, `too_many`, `malware_detected` or
+`scan_unavailable`.
+
 ## Guarantees
 
 - **Sessions.**
@@ -53,6 +73,12 @@ const stream = new EventStream(client, conversation.id, {
   - A message is marked `failed` only after 8 attempts or a non-retryable error. `retry(id)` sends
     it again with the same id.
   - Unsent messages are kept under `hamnivo:{widgetId}:outbox:{conversationId}`.
+  - While the device is offline, queued messages wait without using attempts. When it is back
+    online they go out in order, each once. `remove(id)` takes back a failed or waiting message,
+    for example to edit it.
+- **Drafts and sign-out.**
+  - Drafts are kept per person and conversation under `hamnivo:{widgetId}:draft:{scope}`.
+  - `reset()` forgets the session, every unsent message and every draft on the device.
 - **Streams.**
   - Streams use `fetch`, so the token travels in a header and never in the URL.
   - They reconnect with backoff and `Last-Event-ID`, and drop events already shown.
@@ -63,7 +89,7 @@ const stream = new EventStream(client, conversation.id, {
 ## Checks
 
 ```bash
-pnpm --filter @hamnivo/client test   # msw-backed unit tests: renewal, outbox retries, stream dedupe
+pnpm --filter @hamnivo/client test   # msw-backed unit tests: renewal, outbox, offline, files, streams
 ```
 
 The browser journey in `apps/widget/e2e` exercises the same code against a real gateway.

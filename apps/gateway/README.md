@@ -7,6 +7,7 @@ The Hamnivo Gateway: one codebase, two processes, both built on NestJS 12 and Fa
 | API | `src/main.api.ts` | REST API, staff sign-in at `/api/auth/*` (Better Auth), administration, OpenAPI at `/v1/openapi.json` and `/docs`, health, metrics |
 | Worker | `src/main.worker.ts` | Outbox relay (at-least-once), BullMQ maintenance: audit partitions and expiry purge |
 | Migrations | `src/main.migrate.ts` | Applies pending database migrations as the schema owner (`DATABASE_OWNER_URL`), then exits |
+| Platform operators | `src/main.operator.ts` | Names, changes or disables a platform operator as the schema owner, then exits (`<email> <role>` or `<email> --disable`) |
 
 In production, all three run from one image (`deploy/docker/Dockerfile`, target `gateway`); see
 `docs/self-hosting.md`, Part A. The worker rewrites `WORKER_HEARTBEAT_FILE` after every outbox
@@ -197,6 +198,59 @@ Late publication (R06):
   configuration's `availability`, and the answer to "talk to a person": queued, or offline with
   the time people are back. Without hours, the widget never claims someone is available.
 
+## Imports and exports (M01–M08)
+
+Staff bring a company's chat history from another tool into Chatwoot, and export a brand's
+history in the same format. Hamnivo keeps only the state of each job; the history itself lives in
+Chatwoot.
+
+| Area | Where |
+|---|---|
+| API under `/v1/admin/migrations`: upload or connect, check again, dry run, start, pause, resume, cancel, retry, roll back, approve, samples, records, export | `src/migration/migration.controller.ts`, `migration.service.ts` |
+| Worker: scan, read, plan, import in checkpointed slices, reconcile, roll back, purge | `src/migration/engine.service.ts`, `destination.ts`, `views.ts` |
+| Export of a brand's history as a Hamnivo package | `src/migration/export.service.ts` |
+| Another Chatwoot as the source (M04), and its address rules (the shared egress guard) | `src/migration/chatwoot-source.ts`, `source-guard.ts` |
+| Export formats, the package, planning and reconciliation | `@hamnivo/migration-sdk` |
+
+- **Quarantine first.** An upload (tawk.to, Zendesk, Intercom or a Hamnivo package, up to 20 MB)
+  is stored in `migration_files`, scanned (a scan that cannot run refuses it) and only then read.
+  A Chatwoot source is read once with a token that only the secret broker holds, which is revoked
+  right after. Its address must be public `https`, checked again for every connection
+  (`MIGRATION_SOURCE_ALLOW_PRIVATE` lifts this for development only).
+- **Checked before anything is written.** The preflight lists counts, fields and how each is
+  imported, known limits of the source and every record that needs review. It blocks while
+  Chatwoot is not connected, while the import inbox has anything that could notify people, while
+  an automation or integration would act on imports, or when the file comes from another source.
+  The dry run writes nothing.
+- **Nothing reaches customers.** Each brand gets its own import inbox: an API inbox without
+  webhook, bot, auto-assignment, greeting or surveys. Messages keep their original time
+  (`external_created_at`), internal notes stay private, mentions are neutralised, conversations
+  are resolved only after their last message, and writes are paced
+  (`MIGRATION_MESSAGES_PER_MINUTE`, at most 200 per conversation).
+- **People.** Contacts are matched only by a verified identity. Typed-in emails and phone numbers
+  are kept as contact attributes and never given to Chatwoot as email or phone.
+- **Exactly once.** Every record is keyed by its source ID (`hv1:imp:<job>:<source id>`), scoped to
+  the account it came from. A write whose outcome is unknown is looked up before it is repeated.
+  Retries are bounded, and a later import skips what an earlier one imported. Jobs run in slices
+  (`MIGRATION_SLICE_SECONDS`, `MIGRATION_SLICE_CONVERSATIONS`) that end at a checkpoint, so pause,
+  cancel and a crashed worker all continue from there.
+- **Reconciliation and cutover.** Every record found is accounted for: imported, skipped,
+  quarantined with a reason, or failed. Samples are read back from Chatwoot beside the export. A
+  failed check (for example an export that was cut short) must be acknowledged at approval.
+  Until then, rollback deletes what the import created, keeping live conversations and people
+  that later imports still use. The upload is deleted at approval or rollback, or
+  `MIGRATION_EXPORT_RETENTION_DAYS` after the job ends; exported packages after 24 hours.
+- **Access.** `migration.review` to see jobs, `migration.run` to upload and run them (starting
+  needs a recent sign-in), `migration.manage` to roll back and approve. Every action is checked
+  for the job's brand and audited. Logs and audit entries carry IDs, counts, file names and source
+  addresses, never message text, personal data or tokens.
+
+`test/migration.int.test.ts` covers the preflight, quarantine and scanning, the dry run, imports
+with files, notes and identities, reconciliation, rollback, crashes, pauses, cancellation,
+retries, access and the export round trip. `test/migration-chatwoot.int.test.ts` covers another
+Chatwoot as the source and the address guard, and `test/migration-helpdesks.int.test.ts` covers
+Zendesk and Intercom exports.
+
 ## Team routing decisions (J02, J05, J08)
 
 - **Team routing** (`GET /v1/admin/brands/{brandId}/routing/teams`,
@@ -224,6 +278,40 @@ Late publication (R06):
 - **Records** (`…/records`, `/v1/admin/decisions/{decisionId}`, `…/review`) keep labels, versions,
   latency and tokens, never customer text; confidence only when the provider gave one.
   `…/experiment` compares Jev with the baseline per language from shadow and live records.
+
+## Reply checks (J03, J04, U01, X10)
+
+Jev checks around an AI reply live in `src/checks/`. `ReplyChecksService.forRun` loads a brand's
+check settings once per run and returns one handle (`RunChecks`); the reply path calls it from a
+few points: the inbound checks (message guard and escalation, side by side), the language
+decider, passage relevance, and the draft checks (answer check and message guard, side by side,
+after the receipt check). Each check asks exact questions about a minimized state (personal data
+replaced by its kind), and `@hamnivo/domain` decides what the answers mean. A check can only hold
+a reply, drop a passage or hand the conversation to people.
+
+- **Settings.** Studio's `/v1/admin/brands/{brandId}/checks` API: a versioned rubric per check with
+  thresholds per language, and the mode (`off`, `shadow`, `live`). Brands start in `shadow`.
+- **Records.** One `decision_checks` row and one run step per check, with labels, numbers and
+  document ids, never text. A run's check writes go one at a time, since run steps are numbered
+  in order.
+- **Within the run.** A check's deadline is what is left of the agent's time limit, and a draft is
+  written again only when half of it is left. When Jev is unavailable, or a language has no
+  thresholds, the reply goes on as it would without the check.
+- **Someone at risk.** The message guard's urgent result skips memory, cache and model. Hamnivo's
+  safety wording (`SAFE_REPLIES`) is fixed text, so the plan's limits and the AI budget never hold
+  it back: they only stop replies a model would write (`ai_limit` is decided after text approvals,
+  the request for a person and the guard, and with the allowance used up only the guard's safety
+  question is asked). While the AI has the conversation, the hand-off to people (with the urgent
+  note) and the reservation of the wording commit in one transaction, and the outbox posts the
+  wording (`conversation.safe_reply`) at least once, shown once, as the bot that held the
+  conversation. It goes out only while the conversation still waits for people at that hand-off's
+  epoch and Chatwoot shows no person on it: never over a person.
+- **A request for a person, and someone at risk.** The deterministic hand-off comes first, exactly
+  as before (J04): no provider is asked before it. Only then the guard's check runs (not the
+  escalation advice). Live, if it finds someone at risk, the urgent note is queued and, while
+  nobody has answered, the wording follows. Jev can only add; if it is unavailable, or the brand
+  has no message guard, the hand-off stands as it is. There is no deterministic detector of
+  self-harm or danger to fall back on.
 
 ## Reply language (U01, U07)
 
@@ -270,6 +358,47 @@ Late publication (R06):
   places private entries (memory provides it; a scope that is missing, slow or not the
   customer's own means the entry is not cached). A store call must match the lookup's audience,
   or nothing is stored.
+
+## Customer surface (W02, W05–W07, W09, W17–W19, W22–W25)
+
+`src/widget/surface.*`, `attachments.service.ts`, `messages.service.ts`, `help.service.ts`,
+`notifications.service.ts`, `customer-emails.service.ts`, `settings.service.ts`.
+
+- **Brand settings.** `GET/PUT /v1/admin/brands/{id}/widget-settings` (widget.configure): layout,
+  files, help suggestions and search, the deletion window and email offers.
+  `GET/PUT /v1/admin/brands/{id}/proactive` (widget.proactive, its own permission): prompts, off
+  by default, at most five, at most three a day, with a quiet time after a dismissal. Each change
+  is audited and publishes a new configuration version.
+- **Launcher.** `GET /v1/widget/launcher?widgetId=` gives the loader the layout, colours, labels
+  and prompts in one language. Only the brand's allowed websites get CORS permission to read it.
+- **Files.** `POST /v1/widget/conversations/{id}/uploads?name=` takes the file's own bytes
+  (`application/octet-stream`, 10 MB at most). The type is read from the bytes; the brand's types,
+  size and count apply; the scanner must pass it (ClamAV with `CLAMAV_URL`, the EICAR check in
+  development and tests). A scanner that fails, throws or takes over 30 seconds refuses the file.
+  Scanned files wait in quarantine for 24 hours and go to Chatwoot with one message only; a retry
+  of that message may claim them again. `GET …/attachments/{id}` serves a file only from the
+  caller's conversation and the customer's view of it (never a private note's), scanned again,
+  as a download with `nosniff` and a sandboxing CSP. In production without `CLAMAV_URL` the
+  widget offers no files. Bytes still in quarantine are dropped after a day by the `purge-expired`
+  job.
+- **Read state.** `POST …/read` moves the customer's read point (unread counts) and tells
+  Chatwoot the contact saw the conversation. Chatwoot's `agent_last_seen_at`, read by webhooks and
+  the reconciler, marks the customer's earlier messages read (`delivery.updated`, once).
+- **Deleting and reacting.** `POST …/messages/{id}/delete` deletes the customer's own message
+  within the brand's window (`DELETE_WINDOW_CLOSED` after it, `CAPABILITY_UNSUPPORTED` where the
+  authority cannot). Chatwoot keeps a marker; the journal's copies lose their text and the lane
+  gets one `message.redacted`. `POST …/reactions` sends a reaction as a short message quoting the
+  reply (`in_reply_to`), once, and asks nobody to answer it.
+- **Help.** `GET /v1/widget/help/search?q=` searches the brand's public knowledge with the
+  assistant's retrieval (20 searches a minute per session).
+- **Sessions.** Signing in as someone else or out ends the old session's open streams at once
+  (a Valkey signal), not at the next heartbeat.
+- **Emails.** `GET/POST /v1/widget/notifications`: verified customers with a verified address
+  choose transcripts and reply-waiting emails. The worker sends them through the mailer: a
+  transcript when the conversation closes (the customer's view only), and a note when a reply
+  stays unread for `CUSTOMER_REPLY_EMAIL_DELAY_SECONDS` (default 300), at most one every 30
+  minutes, never with the reply's text. Every email carries a signed one-click unsubscribe link
+  (`/v1/notifications/unsubscribe`, RFC 8058) that asks before changing anything.
 
 ## Widget framing
 
@@ -343,6 +472,65 @@ replays, timeouts before and after the provider acted, a bank challenge, refunds
 approver, finance exceptions, fulfilment, a takeover with a payment in flight and cross-tenant
 denial. Nothing calls the real Stripe API.
 
+## Team, enterprise sign-in and platform operations (A02, A09, A12, A13, A17, A18)
+
+- **Members** (`/v1/admin/members`, `…/{id}`, `…/{id}/offboarding`, `…/{id}/remove`). Change a
+  role or scope in one step, suspend, restore and remove, each within the delegation ceiling and
+  audited. Suspending or removing ends access in the workspace at once: the next request and the
+  next heartbeat of a live stream find no membership. Sign-in sessions end too when no other
+  workspace keeps the person (`member.sessions_ended`). Removing revokes every grant, team place
+  and pending invitation; `…/offboarding` lists first what the person holds.
+- **Invitations** (`/v1/admin/invitations`, `…/{id}/resend`). Resending replaces the secret. A
+  suspended member can't be invited back (restore them instead), and accepting needs the invited,
+  verified address.
+- **Custom roles** (`/v1/admin/roles`, `…/preview`). Built-in roles are read only. Creating and
+  editing need `roles.manage` with a fresh sign-in and compare the version edited. The preview
+  returns what is added and removed, what needs extra checks, who gains or loses what, and what
+  the editor could not grant.
+- **Audit log** (`/v1/admin/audit`, `…/verify`, `…/export`). Export streams CSV or NDJSON page by
+  page with `audit.export` and a fresh sign-in, and is itself audited. Audit data never holds
+  secrets (redacted when written) or customers' messages.
+- **Single sign-on** (`/v1/admin/sso`, `…/domains`, `…/domains/{id}/verify`, `…/connections`).
+  A workspace proves an email domain with a TXT record at `_hamnivo-verification.<domain>`
+  (`node:dns`, or `SSO_DNS_SERVERS`). Only one workspace can hold a domain verified, whatever
+  another one publishes. A verified domain gets one OpenID Connect connection, found by discovery;
+  the issuer must use HTTPS on a public address unless its origin is in
+  `SSO_TRUSTED_IDP_ORIGINS`. The client secret lives only in the secret broker. A connection can
+  require SSO for its domain (password and passkey sign-ins are then refused with `SSO_REQUIRED`)
+  and name the role for just-in-time members; roles with actions that need two-step verification
+  can't be named. Changes need `security.manage` (two-step verification, fresh sign-in).
+- **Signing in with SSO** (`POST /api/auth/sign-in/sso`, `GET /api/auth/sso/callback/{id}`; every
+  other path of the SSO plugin is closed). For each request, `SsoRuntime` loads the one connection
+  concerned through the pre-tenant resolvers and hands it to Better Auth with its secret. An SSO
+  identity is joined to an existing account only when the provider asserts the address as
+  verified and the account's address is verified too; otherwise sign-in fails with
+  `sso_email_unverified` or `sso_unverified_local_account`. New people join with the chosen role
+  (`member.joined_by_sso`). The callback carries no opener policy, so a sign-in in a small window
+  can report back to the page that opened it. The addresses of a connection (issuer and endpoints)
+  are checked with the egress guard (`@hamnivo/adapters/net`) when it is saved. The plugin itself
+  then calls the token, key and user-info endpoints with the global `fetch`: `SSOOptions` has no
+  option for another one, so those calls are not behind the guard's connection check. The plugin
+  refuses redirects and private addresses on its own, with a single lookup it does not pin to the
+  connection. Closing that gap takes a `fetch` or `dispatcher` option in the plugin (or a patch of
+  it), or running the code exchange here; replacing the global `fetch` would reach every other
+  request the process makes (X05 in `docs/status/evidence.json`).
+- **Support access** (A18). Platform operators ask (`POST /v1/platform/support-grants`) with a
+  reason, scopes (`configuration`, `conversations` with status only, `audit`) and a duration. An
+  owner with `support.grant` (two-step verification, fresh sign-in) approves it, possibly
+  narrower and shorter, declines it or revokes it (`/v1/admin/support-grants/…`). Access is read
+  only, ends on expiry or revocation, and every step and every read is recorded in the
+  workspace's audit log and the platform's. `/v1/workspace/notices` gives Studio's banners.
+- **Platform console** (A17, `/v1/platform/*`). For operators named by the server administrator
+  (`main.operator.ts`), with platform roles that no workspace grant can hold. It reads through the
+  `hamnivo_platform` database role: workspaces with metadata only, service health, AI stops,
+  support access and incidents, whose banners reach every workspace. Without
+  `DATABASE_PLATFORM_URL` there is no platform console.
+
+`test/team-access.int.test.ts`, `test/sso.int.test.ts` and `test/platform-support.int.test.ts`
+cover these, including cross-tenant denial, the delegation ceiling, domain takeover attempts,
+revocation during a session and support access that expires, against a real OpenID Connect
+provider in process (`oidc-provider`).
+
 ## Security rules enforced here
 
 - **Delegation ceiling (A03).** Grants and invitations may only hand out permissions the grantor
@@ -371,7 +559,11 @@ pnpm --filter @hamnivo/gateway start:api      # or start:worker; reads ../../.en
 ```bash
 pnpm --filter @hamnivo/gateway test           # unit
 pnpm --filter @hamnivo/gateway test:int       # PostgreSQL + Valkey (services:up or ci:local)
+TYPESAFE_API_KEY=… pnpm --filter @hamnivo/gateway test:live   # opt-in: routing and checks with the real Jev
 ```
+
+`test:live` is never part of the other runs. Each live file skips itself when its key is not in
+the environment, reads the key from there only, and makes a handful of calls.
 
 The integration suites run the real HTTP stack in process (`app.inject`) against a cloned database.
 They cover sign-up with email verification, TOTP enrolment and the second-factor sign-in, tenant

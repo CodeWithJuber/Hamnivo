@@ -1,0 +1,1544 @@
+{
+  "version": 1,
+  "review": "pending_native_review",
+  "description": "Labelled customer messages for evaluating routing intents and language identification, about 40 per language slice. Written for evaluation, not taken from customers. Arabic, Hindi, Urdu, Hinglish and Roman Urdu text is pending native review; some Hinglish and Roman Urdu messages are written the same way in both and are kept to measure that ambiguity.",
+  "rubric": [
+    {
+      "key": "billing",
+      "description": "Payments, charges, invoices and refunds",
+      "keywords": [
+        "refund",
+        "invoice",
+        "payment",
+        "charged",
+        "bill",
+        "استرداد",
+        "فاتورة",
+        "الدفع",
+        "रिफ़ंड",
+        "भुगतान",
+        "बिल",
+        "ریفنڈ",
+        "ادائیگی",
+        "رسید",
+        "paise",
+        "raqam",
+        "adaigi",
+        "raseed"
+      ]
+    },
+    {
+      "key": "shipping",
+      "description": "Delivery, parcels, tracking and delivery delays",
+      "keywords": [
+        "delivery",
+        "parcel",
+        "tracking",
+        "courier",
+        "shipping",
+        "التوصيل",
+        "طرد",
+        "الشحن",
+        "डिलीवरी",
+        "पार्सल",
+        "शिपिंग",
+        "ڈیلیوری",
+        "پارسل",
+        "شپنگ"
+      ]
+    },
+    {
+      "key": "returns",
+      "description": "Returning or exchanging an item",
+      "keywords": [
+        "return",
+        "exchange",
+        "send it back",
+        "إرجاع",
+        "استبدال",
+        "वापस",
+        "बदल",
+        "واپس",
+        "بدل",
+        "wapas",
+        "wapsi",
+        "tabdeel",
+        "badal"
+      ]
+    },
+    {
+      "key": "account",
+      "description": "Signing in, passwords, account details and account settings",
+      "keywords": [
+        "password",
+        "account",
+        "sign in",
+        "login",
+        "كلمة المرور",
+        "حسابي",
+        "पासवर्ड",
+        "खाता",
+        "پاس ورڈ",
+        "اکاؤنٹ"
+      ]
+    },
+    {
+      "key": "product",
+      "description": "Questions about products before buying: sizes, colours, stock and features",
+      "keywords": [
+        "size",
+        "waterproof",
+        "stock",
+        "model",
+        "مقاس",
+        "المخزون",
+        "साइज़",
+        "स्टॉक",
+        "سائز",
+        "اسٹاک"
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "en-billing-1",
+      "slice": "en",
+      "intent": "billing",
+      "text": "I was charged twice for the same order."
+    },
+    {
+      "id": "en-billing-2",
+      "slice": "en",
+      "intent": "billing",
+      "text": "Can you send me the invoice for my last purchase?"
+    },
+    {
+      "id": "en-billing-3",
+      "slice": "en",
+      "intent": "billing",
+      "text": "My card payment failed but the money left my account."
+    },
+    {
+      "id": "en-billing-4",
+      "slice": "en",
+      "intent": "billing",
+      "text": "When will I get my refund? I cancelled last week."
+    },
+    {
+      "id": "en-billing-5",
+      "slice": "en",
+      "intent": "billing",
+      "text": "Why is there an extra fee on my bill?"
+    },
+    {
+      "id": "en-billing-6",
+      "slice": "en",
+      "intent": "billing",
+      "text": "Do you accept PayPal or only cards?"
+    },
+    {
+      "id": "en-billing-7",
+      "slice": "en",
+      "intent": "billing",
+      "text": "I need a VAT receipt for my company."
+    },
+    {
+      "id": "en-shipping-1",
+      "slice": "en",
+      "intent": "shipping",
+      "text": "Where is my parcel? It was due yesterday."
+    },
+    {
+      "id": "en-shipping-2",
+      "slice": "en",
+      "intent": "shipping",
+      "text": "My tracking number has not updated for five days."
+    },
+    {
+      "id": "en-shipping-3",
+      "slice": "en",
+      "intent": "shipping",
+      "text": "Can you deliver to a different address?"
+    },
+    {
+      "id": "en-shipping-4",
+      "slice": "en",
+      "intent": "shipping",
+      "text": "The courier says delivered but I have nothing."
+    },
+    {
+      "id": "en-shipping-5",
+      "slice": "en",
+      "intent": "shipping",
+      "text": "How long does shipping take to Karachi?"
+    },
+    {
+      "id": "en-shipping-6",
+      "slice": "en",
+      "intent": "shipping",
+      "text": "Do you ship to Dubai, and how much does delivery cost?"
+    },
+    {
+      "id": "en-shipping-7",
+      "slice": "en",
+      "intent": "shipping",
+      "text": "The delivery driver could not find my house, what now?"
+    },
+    {
+      "id": "en-returns-1",
+      "slice": "en",
+      "intent": "returns",
+      "text": "I want to return the shoes, they are too small."
+    },
+    {
+      "id": "en-returns-2",
+      "slice": "en",
+      "intent": "returns",
+      "text": "How do I exchange this shirt for a bigger size?"
+    },
+    {
+      "id": "en-returns-3",
+      "slice": "en",
+      "intent": "returns",
+      "text": "The blender I got does not work, can I send it back?"
+    },
+    {
+      "id": "en-returns-4",
+      "slice": "en",
+      "intent": "returns",
+      "text": "What is your return policy for opened items?"
+    },
+    {
+      "id": "en-returns-5",
+      "slice": "en",
+      "intent": "returns",
+      "text": "I sent the jacket back two weeks ago, did you receive it?"
+    },
+    {
+      "id": "en-returns-6",
+      "slice": "en",
+      "intent": "returns",
+      "text": "Can I swap the blue bag for the black one?"
+    },
+    {
+      "id": "en-returns-7",
+      "slice": "en",
+      "intent": "returns",
+      "text": "Where do I print the return label?"
+    },
+    {
+      "id": "en-account-1",
+      "slice": "en",
+      "intent": "account",
+      "text": "I forgot my password and the reset email never comes."
+    },
+    {
+      "id": "en-account-2",
+      "slice": "en",
+      "intent": "account",
+      "text": "How do I change the email address on my account?"
+    },
+    {
+      "id": "en-account-3",
+      "slice": "en",
+      "intent": "account",
+      "text": "My account is locked after too many login attempts."
+    },
+    {
+      "id": "en-account-4",
+      "slice": "en",
+      "intent": "account",
+      "text": "Please delete my account and my data."
+    },
+    {
+      "id": "en-account-5",
+      "slice": "en",
+      "intent": "account",
+      "text": "I can't sign in with Google anymore."
+    },
+    {
+      "id": "en-account-6",
+      "slice": "en",
+      "intent": "account",
+      "text": "How do I turn on two-step verification?"
+    },
+    {
+      "id": "en-account-7",
+      "slice": "en",
+      "intent": "account",
+      "text": "I want to update my phone number in my profile."
+    },
+    {
+      "id": "en-product-1",
+      "slice": "en",
+      "intent": "product",
+      "text": "Is this jacket waterproof?"
+    },
+    {
+      "id": "en-product-2",
+      "slice": "en",
+      "intent": "product",
+      "text": "Do you have the size 42 in black?"
+    },
+    {
+      "id": "en-product-3",
+      "slice": "en",
+      "intent": "product",
+      "text": "What is the difference between the Pro and the Lite model?"
+    },
+    {
+      "id": "en-product-4",
+      "slice": "en",
+      "intent": "product",
+      "text": "Is the cotton in these sheets organic?"
+    },
+    {
+      "id": "en-product-5",
+      "slice": "en",
+      "intent": "product",
+      "text": "Will the charger work with an iPhone 15?"
+    },
+    {
+      "id": "en-product-6",
+      "slice": "en",
+      "intent": "product",
+      "text": "When will the green colour be back in stock?"
+    },
+    {
+      "id": "en-product-7",
+      "slice": "en",
+      "intent": "product",
+      "text": "Does the backpack fit a 16-inch laptop?"
+    },
+    {
+      "id": "en-other-1",
+      "slice": "en",
+      "intent": "other",
+      "text": "Hello!"
+    },
+    {
+      "id": "en-other-2",
+      "slice": "en",
+      "intent": "other",
+      "text": "Thanks, have a nice day."
+    },
+    {
+      "id": "en-other-3",
+      "slice": "en",
+      "intent": "other",
+      "text": "Are you open on Sunday?"
+    },
+    {
+      "id": "en-other-4",
+      "slice": "en",
+      "intent": "other",
+      "text": "Do you have a shop in Lahore?"
+    },
+    {
+      "id": "en-other-5",
+      "slice": "en",
+      "intent": "other",
+      "text": "I'd like to give feedback about your website design."
+    },
+    {
+      "id": "ar-billing-1",
+      "slice": "ar",
+      "intent": "billing",
+      "text": "تم خصم المبلغ مرتين لنفس الطلب."
+    },
+    {
+      "id": "ar-billing-2",
+      "slice": "ar",
+      "intent": "billing",
+      "text": "هل يمكنكم إرسال فاتورة آخر عملية شراء؟"
+    },
+    {
+      "id": "ar-billing-3",
+      "slice": "ar",
+      "intent": "billing",
+      "text": "فشل الدفع بالبطاقة لكن المبلغ خُصم من حسابي."
+    },
+    {
+      "id": "ar-billing-4",
+      "slice": "ar",
+      "intent": "billing",
+      "text": "متى سأستلم المبلغ المسترد؟ ألغيت الطلب الأسبوع الماضي."
+    },
+    {
+      "id": "ar-billing-5",
+      "slice": "ar",
+      "intent": "billing",
+      "text": "لماذا توجد رسوم إضافية في فاتورتي؟"
+    },
+    {
+      "id": "ar-billing-6",
+      "slice": "ar",
+      "intent": "billing",
+      "text": "هل تقبلون الدفع عند الاستلام؟"
+    },
+    {
+      "id": "ar-billing-7",
+      "slice": "ar",
+      "intent": "billing",
+      "text": "أحتاج إيصالاً ضريبياً لشركتي."
+    },
+    {
+      "id": "ar-shipping-1",
+      "slice": "ar",
+      "intent": "shipping",
+      "text": "أين طردي؟ كان من المفترض أن يصل أمس."
+    },
+    {
+      "id": "ar-shipping-2",
+      "slice": "ar",
+      "intent": "shipping",
+      "text": "رقم التتبع لم يتغير منذ خمسة أيام."
+    },
+    {
+      "id": "ar-shipping-3",
+      "slice": "ar",
+      "intent": "shipping",
+      "text": "هل يمكن التوصيل إلى عنوان آخر؟"
+    },
+    {
+      "id": "ar-shipping-4",
+      "slice": "ar",
+      "intent": "shipping",
+      "text": "شركة الشحن تقول إنه تم التسليم لكنني لم أستلم شيئاً."
+    },
+    {
+      "id": "ar-shipping-5",
+      "slice": "ar",
+      "intent": "shipping",
+      "text": "كم يستغرق الشحن إلى الرياض؟"
+    },
+    {
+      "id": "ar-shipping-6",
+      "slice": "ar",
+      "intent": "shipping",
+      "text": "هل تشحنون إلى دبي وكم تكلفة التوصيل؟"
+    },
+    {
+      "id": "ar-shipping-7",
+      "slice": "ar",
+      "intent": "shipping",
+      "text": "لم يتمكن المندوب من الوصول إلى منزلي، ماذا أفعل؟"
+    },
+    {
+      "id": "ar-returns-1",
+      "slice": "ar",
+      "intent": "returns",
+      "text": "أريد إرجاع الحذاء لأنه صغير."
+    },
+    {
+      "id": "ar-returns-2",
+      "slice": "ar",
+      "intent": "returns",
+      "text": "كيف أستبدل هذا القميص بمقاس أكبر؟"
+    },
+    {
+      "id": "ar-returns-3",
+      "slice": "ar",
+      "intent": "returns",
+      "text": "الخلاط الذي وصلني لا يعمل، هل يمكنني إعادته؟"
+    },
+    {
+      "id": "ar-returns-4",
+      "slice": "ar",
+      "intent": "returns",
+      "text": "ما سياسة الإرجاع للمنتجات المفتوحة؟"
+    },
+    {
+      "id": "ar-returns-5",
+      "slice": "ar",
+      "intent": "returns",
+      "text": "أرسلت السترة قبل أسبوعين، هل استلمتموها؟"
+    },
+    {
+      "id": "ar-returns-6",
+      "slice": "ar",
+      "intent": "returns",
+      "text": "هل يمكنني استبدال الحقيبة الزرقاء بالسوداء؟"
+    },
+    {
+      "id": "ar-returns-7",
+      "slice": "ar",
+      "intent": "returns",
+      "text": "أين أطبع ملصق الإرجاع؟"
+    },
+    {
+      "id": "ar-account-1",
+      "slice": "ar",
+      "intent": "account",
+      "text": "نسيت كلمة المرور ولا تصلني رسالة إعادة التعيين."
+    },
+    {
+      "id": "ar-account-2",
+      "slice": "ar",
+      "intent": "account",
+      "text": "كيف أغير البريد الإلكتروني في حسابي؟"
+    },
+    {
+      "id": "ar-account-3",
+      "slice": "ar",
+      "intent": "account",
+      "text": "تم قفل حسابي بعد محاولات دخول كثيرة."
+    },
+    {
+      "id": "ar-account-4",
+      "slice": "ar",
+      "intent": "account",
+      "text": "أرجو حذف حسابي وبياناتي."
+    },
+    {
+      "id": "ar-account-5",
+      "slice": "ar",
+      "intent": "account",
+      "text": "لم أعد أستطيع تسجيل الدخول بحساب جوجل."
+    },
+    {
+      "id": "ar-account-6",
+      "slice": "ar",
+      "intent": "account",
+      "text": "كيف أفعّل التحقق بخطوتين؟"
+    },
+    {
+      "id": "ar-account-7",
+      "slice": "ar",
+      "intent": "account",
+      "text": "أريد تحديث رقم هاتفي في الملف الشخصي."
+    },
+    {
+      "id": "ar-product-1",
+      "slice": "ar",
+      "intent": "product",
+      "text": "هل هذه السترة مقاومة للماء؟"
+    },
+    {
+      "id": "ar-product-2",
+      "slice": "ar",
+      "intent": "product",
+      "text": "هل يتوفر المقاس 42 باللون الأسود؟"
+    },
+    {
+      "id": "ar-product-3",
+      "slice": "ar",
+      "intent": "product",
+      "text": "ما الفرق بين الطراز برو والطراز لايت؟"
+    },
+    {
+      "id": "ar-product-4",
+      "slice": "ar",
+      "intent": "product",
+      "text": "هل القطن في هذه الشراشف عضوي؟"
+    },
+    {
+      "id": "ar-product-5",
+      "slice": "ar",
+      "intent": "product",
+      "text": "هل يعمل الشاحن مع آيفون 15؟"
+    },
+    {
+      "id": "ar-product-6",
+      "slice": "ar",
+      "intent": "product",
+      "text": "متى يعود اللون الأخضر إلى المخزون؟"
+    },
+    {
+      "id": "ar-product-7",
+      "slice": "ar",
+      "intent": "product",
+      "text": "هل تتسع الحقيبة لحاسوب 16 بوصة؟"
+    },
+    {
+      "id": "ar-other-1",
+      "slice": "ar",
+      "intent": "other",
+      "text": "مرحباً!"
+    },
+    {
+      "id": "ar-other-2",
+      "slice": "ar",
+      "intent": "other",
+      "text": "شكراً لكم، يومكم سعيد."
+    },
+    {
+      "id": "ar-other-3",
+      "slice": "ar",
+      "intent": "other",
+      "text": "هل أنتم مفتوحون يوم الجمعة؟"
+    },
+    {
+      "id": "ar-other-4",
+      "slice": "ar",
+      "intent": "other",
+      "text": "هل لديكم فرع في جدة؟"
+    },
+    {
+      "id": "ar-other-5",
+      "slice": "ar",
+      "intent": "other",
+      "text": "أود تقديم ملاحظات عن تصميم موقعكم."
+    },
+    {
+      "id": "hi-billing-1",
+      "slice": "hi",
+      "intent": "billing",
+      "text": "एक ही ऑर्डर के लिए मुझसे दो बार पैसे काटे गए।"
+    },
+    {
+      "id": "hi-billing-2",
+      "slice": "hi",
+      "intent": "billing",
+      "text": "क्या आप मेरी पिछली ख़रीद का बिल भेज सकते हैं?"
+    },
+    {
+      "id": "hi-billing-3",
+      "slice": "hi",
+      "intent": "billing",
+      "text": "कार्ड से भुगतान फ़ेल हो गया लेकिन पैसे कट गए।"
+    },
+    {
+      "id": "hi-billing-4",
+      "slice": "hi",
+      "intent": "billing",
+      "text": "मेरा रिफ़ंड कब आएगा? मैंने पिछले हफ़्ते ऑर्डर रद्द किया था।"
+    },
+    {
+      "id": "hi-billing-5",
+      "slice": "hi",
+      "intent": "billing",
+      "text": "मेरे बिल में अतिरिक्त शुल्क क्यों लगा है?"
+    },
+    {
+      "id": "hi-billing-6",
+      "slice": "hi",
+      "intent": "billing",
+      "text": "क्या आप UPI से भुगतान लेते हैं?"
+    },
+    {
+      "id": "hi-billing-7",
+      "slice": "hi",
+      "intent": "billing",
+      "text": "मुझे अपनी कंपनी के लिए GST बिल चाहिए।"
+    },
+    {
+      "id": "hi-shipping-1",
+      "slice": "hi",
+      "intent": "shipping",
+      "text": "मेरा पार्सल कहाँ है? कल आना था।"
+    },
+    {
+      "id": "hi-shipping-2",
+      "slice": "hi",
+      "intent": "shipping",
+      "text": "पाँच दिन से ट्रैकिंग अपडेट नहीं हुई है।"
+    },
+    {
+      "id": "hi-shipping-3",
+      "slice": "hi",
+      "intent": "shipping",
+      "text": "क्या आप किसी दूसरे पते पर डिलीवरी कर सकते हैं?"
+    },
+    {
+      "id": "hi-shipping-4",
+      "slice": "hi",
+      "intent": "shipping",
+      "text": "कूरियर कह रहा है डिलीवर हो गया, पर मुझे कुछ नहीं मिला।"
+    },
+    {
+      "id": "hi-shipping-5",
+      "slice": "hi",
+      "intent": "shipping",
+      "text": "दिल्ली तक शिपिंग में कितने दिन लगते हैं?"
+    },
+    {
+      "id": "hi-shipping-6",
+      "slice": "hi",
+      "intent": "shipping",
+      "text": "क्या आप दुबई भेजते हैं और डिलीवरी का कितना खर्च है?"
+    },
+    {
+      "id": "hi-shipping-7",
+      "slice": "hi",
+      "intent": "shipping",
+      "text": "डिलीवरी वाला मेरा घर नहीं ढूँढ पाया, अब क्या करूँ?"
+    },
+    {
+      "id": "hi-returns-1",
+      "slice": "hi",
+      "intent": "returns",
+      "text": "मुझे जूते लौटाने हैं, वे छोटे हैं।"
+    },
+    {
+      "id": "hi-returns-2",
+      "slice": "hi",
+      "intent": "returns",
+      "text": "इस शर्ट को बड़े साइज़ से कैसे बदलूँ?"
+    },
+    {
+      "id": "hi-returns-3",
+      "slice": "hi",
+      "intent": "returns",
+      "text": "जो मिक्सर मिला वह चल नहीं रहा, क्या मैं उसे वापस भेज सकता हूँ?"
+    },
+    {
+      "id": "hi-returns-4",
+      "slice": "hi",
+      "intent": "returns",
+      "text": "खोले गए सामान के लिए वापसी की नीति क्या है?"
+    },
+    {
+      "id": "hi-returns-5",
+      "slice": "hi",
+      "intent": "returns",
+      "text": "मैंने दो हफ़्ते पहले जैकेट वापस भेजी थी, क्या आपको मिल गई?"
+    },
+    {
+      "id": "hi-returns-6",
+      "slice": "hi",
+      "intent": "returns",
+      "text": "क्या मैं नीला बैग काले बैग से बदल सकती हूँ?"
+    },
+    {
+      "id": "hi-returns-7",
+      "slice": "hi",
+      "intent": "returns",
+      "text": "रिटर्न लेबल कहाँ से प्रिंट करूँ?"
+    },
+    {
+      "id": "hi-account-1",
+      "slice": "hi",
+      "intent": "account",
+      "text": "मैं पासवर्ड भूल गया और रीसेट ईमेल नहीं आ रहा।"
+    },
+    {
+      "id": "hi-account-2",
+      "slice": "hi",
+      "intent": "account",
+      "text": "अपने खाते का ईमेल पता कैसे बदलूँ?"
+    },
+    {
+      "id": "hi-account-3",
+      "slice": "hi",
+      "intent": "account",
+      "text": "कई बार गलत लॉगिन के बाद मेरा खाता लॉक हो गया।"
+    },
+    {
+      "id": "hi-account-4",
+      "slice": "hi",
+      "intent": "account",
+      "text": "कृपया मेरा खाता और मेरा डेटा हटा दीजिए।"
+    },
+    {
+      "id": "hi-account-5",
+      "slice": "hi",
+      "intent": "account",
+      "text": "अब मैं Google से साइन इन नहीं कर पा रहा हूँ।"
+    },
+    {
+      "id": "hi-account-6",
+      "slice": "hi",
+      "intent": "account",
+      "text": "दो-चरणीय सत्यापन कैसे चालू करूँ?"
+    },
+    {
+      "id": "hi-account-7",
+      "slice": "hi",
+      "intent": "account",
+      "text": "मुझे अपनी प्रोफ़ाइल में फ़ोन नंबर बदलना है।"
+    },
+    {
+      "id": "hi-product-1",
+      "slice": "hi",
+      "intent": "product",
+      "text": "क्या यह जैकेट वॉटरप्रूफ़ है?"
+    },
+    {
+      "id": "hi-product-2",
+      "slice": "hi",
+      "intent": "product",
+      "text": "क्या काले रंग में 42 साइज़ उपलब्ध है?"
+    },
+    {
+      "id": "hi-product-3",
+      "slice": "hi",
+      "intent": "product",
+      "text": "प्रो और लाइट मॉडल में क्या अंतर है?"
+    },
+    {
+      "id": "hi-product-4",
+      "slice": "hi",
+      "intent": "product",
+      "text": "क्या इन चादरों का कपास ऑर्गेनिक है?"
+    },
+    {
+      "id": "hi-product-5",
+      "slice": "hi",
+      "intent": "product",
+      "text": "क्या यह चार्जर iPhone 15 के साथ चलेगा?"
+    },
+    {
+      "id": "hi-product-6",
+      "slice": "hi",
+      "intent": "product",
+      "text": "हरा रंग फिर से स्टॉक में कब आएगा?"
+    },
+    {
+      "id": "hi-product-7",
+      "slice": "hi",
+      "intent": "product",
+      "text": "क्या इस बैग में 16 इंच का लैपटॉप आ जाएगा?"
+    },
+    {
+      "id": "hi-other-1",
+      "slice": "hi",
+      "intent": "other",
+      "text": "नमस्ते!"
+    },
+    {
+      "id": "hi-other-2",
+      "slice": "hi",
+      "intent": "other",
+      "text": "धन्यवाद, आपका दिन शुभ हो।"
+    },
+    {
+      "id": "hi-other-3",
+      "slice": "hi",
+      "intent": "other",
+      "text": "क्या आप रविवार को खुले रहते हैं?"
+    },
+    {
+      "id": "hi-other-4",
+      "slice": "hi",
+      "intent": "other",
+      "text": "क्या आपकी कोई दुकान जयपुर में है?"
+    },
+    {
+      "id": "hi-other-5",
+      "slice": "hi",
+      "intent": "other",
+      "text": "मैं आपकी वेबसाइट के डिज़ाइन के बारे में सुझाव देना चाहता हूँ।"
+    },
+    {
+      "id": "ur-billing-1",
+      "slice": "ur",
+      "intent": "billing",
+      "text": "ایک ہی آرڈر کے لیے مجھ سے دو بار پیسے کاٹے گئے۔"
+    },
+    {
+      "id": "ur-billing-2",
+      "slice": "ur",
+      "intent": "billing",
+      "text": "کیا آپ میری پچھلی خریداری کی رسید بھیج سکتے ہیں؟"
+    },
+    {
+      "id": "ur-billing-3",
+      "slice": "ur",
+      "intent": "billing",
+      "text": "کارڈ سے ادائیگی ناکام ہوئی لیکن پیسے کٹ گئے۔"
+    },
+    {
+      "id": "ur-billing-4",
+      "slice": "ur",
+      "intent": "billing",
+      "text": "میرا ریفنڈ کب آئے گا؟ میں نے پچھلے ہفتے آرڈر منسوخ کیا تھا۔"
+    },
+    {
+      "id": "ur-billing-5",
+      "slice": "ur",
+      "intent": "billing",
+      "text": "میرے بل میں اضافی چارجز کیوں لگے ہیں؟"
+    },
+    {
+      "id": "ur-billing-6",
+      "slice": "ur",
+      "intent": "billing",
+      "text": "کیا آپ جیز کیش سے ادائیگی لیتے ہیں؟"
+    },
+    {
+      "id": "ur-billing-7",
+      "slice": "ur",
+      "intent": "billing",
+      "text": "مجھے اپنی کمپنی کے لیے ٹیکس رسید چاہیے۔"
+    },
+    {
+      "id": "ur-shipping-1",
+      "slice": "ur",
+      "intent": "shipping",
+      "text": "میرا پارسل کہاں ہے؟ کل آنا تھا۔"
+    },
+    {
+      "id": "ur-shipping-2",
+      "slice": "ur",
+      "intent": "shipping",
+      "text": "پانچ دن سے ٹریکنگ اپڈیٹ نہیں ہوئی۔"
+    },
+    {
+      "id": "ur-shipping-3",
+      "slice": "ur",
+      "intent": "shipping",
+      "text": "کیا آپ کسی دوسرے پتے پر ڈیلیوری کر سکتے ہیں؟"
+    },
+    {
+      "id": "ur-shipping-4",
+      "slice": "ur",
+      "intent": "shipping",
+      "text": "کوریئر کہہ رہا ہے ڈیلیور ہو گیا، لیکن مجھے کچھ نہیں ملا۔"
+    },
+    {
+      "id": "ur-shipping-5",
+      "slice": "ur",
+      "intent": "shipping",
+      "text": "کراچی تک شپنگ میں کتنے دن لگتے ہیں؟"
+    },
+    {
+      "id": "ur-shipping-6",
+      "slice": "ur",
+      "intent": "shipping",
+      "text": "کیا آپ دبئی بھیجتے ہیں اور ڈیلیوری کا کتنا خرچ ہے؟"
+    },
+    {
+      "id": "ur-shipping-7",
+      "slice": "ur",
+      "intent": "shipping",
+      "text": "ڈیلیوری والا میرا گھر نہیں ڈھونڈ سکا، اب کیا کروں؟"
+    },
+    {
+      "id": "ur-returns-1",
+      "slice": "ur",
+      "intent": "returns",
+      "text": "مجھے جوتے واپس کرنے ہیں، یہ چھوٹے ہیں۔"
+    },
+    {
+      "id": "ur-returns-2",
+      "slice": "ur",
+      "intent": "returns",
+      "text": "اس قمیض کو بڑے سائز سے کیسے بدلوں؟"
+    },
+    {
+      "id": "ur-returns-3",
+      "slice": "ur",
+      "intent": "returns",
+      "text": "جو بلینڈر ملا وہ نہیں چل رہا، کیا میں اسے واپس بھیج سکتا ہوں؟"
+    },
+    {
+      "id": "ur-returns-4",
+      "slice": "ur",
+      "intent": "returns",
+      "text": "کھولی ہوئی چیزوں کی واپسی کی پالیسی کیا ہے؟"
+    },
+    {
+      "id": "ur-returns-5",
+      "slice": "ur",
+      "intent": "returns",
+      "text": "میں نے دو ہفتے پہلے جیکٹ واپس بھیجی تھی، کیا آپ کو مل گئی؟"
+    },
+    {
+      "id": "ur-returns-6",
+      "slice": "ur",
+      "intent": "returns",
+      "text": "کیا میں نیلا بیگ کالے بیگ سے بدل سکتی ہوں؟"
+    },
+    {
+      "id": "ur-returns-7",
+      "slice": "ur",
+      "intent": "returns",
+      "text": "واپسی کا لیبل کہاں سے پرنٹ کروں؟"
+    },
+    {
+      "id": "ur-account-1",
+      "slice": "ur",
+      "intent": "account",
+      "text": "میں پاس ورڈ بھول گیا ہوں اور ری سیٹ ای میل نہیں آ رہی۔"
+    },
+    {
+      "id": "ur-account-2",
+      "slice": "ur",
+      "intent": "account",
+      "text": "اپنے اکاؤنٹ کا ای میل کیسے بدلوں؟"
+    },
+    {
+      "id": "ur-account-3",
+      "slice": "ur",
+      "intent": "account",
+      "text": "کئی بار غلط لاگ ان کے بعد میرا اکاؤنٹ لاک ہو گیا۔"
+    },
+    {
+      "id": "ur-account-4",
+      "slice": "ur",
+      "intent": "account",
+      "text": "براہ کرم میرا اکاؤنٹ اور میرا ڈیٹا حذف کر دیں۔"
+    },
+    {
+      "id": "ur-account-5",
+      "slice": "ur",
+      "intent": "account",
+      "text": "اب میں گوگل سے سائن ان نہیں کر پا رہا۔"
+    },
+    {
+      "id": "ur-account-6",
+      "slice": "ur",
+      "intent": "account",
+      "text": "دو مرحلہ تصدیق کیسے آن کروں؟"
+    },
+    {
+      "id": "ur-account-7",
+      "slice": "ur",
+      "intent": "account",
+      "text": "مجھے اپنی پروفائل میں فون نمبر بدلنا ہے۔"
+    },
+    {
+      "id": "ur-product-1",
+      "slice": "ur",
+      "intent": "product",
+      "text": "کیا یہ جیکٹ واٹر پروف ہے؟"
+    },
+    {
+      "id": "ur-product-2",
+      "slice": "ur",
+      "intent": "product",
+      "text": "کیا کالے رنگ میں 42 سائز دستیاب ہے؟"
+    },
+    {
+      "id": "ur-product-3",
+      "slice": "ur",
+      "intent": "product",
+      "text": "پرو اور لائٹ ماڈل میں کیا فرق ہے؟"
+    },
+    {
+      "id": "ur-product-4",
+      "slice": "ur",
+      "intent": "product",
+      "text": "کیا ان چادروں کی روئی آرگینک ہے؟"
+    },
+    {
+      "id": "ur-product-5",
+      "slice": "ur",
+      "intent": "product",
+      "text": "کیا یہ چارجر آئی فون 15 کے ساتھ چلے گا؟"
+    },
+    {
+      "id": "ur-product-6",
+      "slice": "ur",
+      "intent": "product",
+      "text": "ہرا رنگ دوبارہ اسٹاک میں کب آئے گا؟"
+    },
+    {
+      "id": "ur-product-7",
+      "slice": "ur",
+      "intent": "product",
+      "text": "کیا اس بیگ میں 16 انچ کا لیپ ٹاپ آ جائے گا؟"
+    },
+    {
+      "id": "ur-other-1",
+      "slice": "ur",
+      "intent": "other",
+      "text": "السلام علیکم!"
+    },
+    {
+      "id": "ur-other-2",
+      "slice": "ur",
+      "intent": "other",
+      "text": "شکریہ، آپ کا دن اچھا گزرے۔"
+    },
+    {
+      "id": "ur-other-3",
+      "slice": "ur",
+      "intent": "other",
+      "text": "کیا آپ اتوار کو کھلے ہوتے ہیں؟"
+    },
+    {
+      "id": "ur-other-4",
+      "slice": "ur",
+      "intent": "other",
+      "text": "کیا لاہور میں آپ کی کوئی دکان ہے؟"
+    },
+    {
+      "id": "ur-other-5",
+      "slice": "ur",
+      "intent": "other",
+      "text": "میں آپ کی ویب سائٹ کے ڈیزائن کے بارے میں رائے دینا چاہتا ہوں۔"
+    },
+    {
+      "id": "hinglish-billing-1",
+      "slice": "hinglish",
+      "intent": "billing",
+      "text": "Ek hi order ke liye mujhse do baar paise kaat liye gaye."
+    },
+    {
+      "id": "hinglish-billing-2",
+      "slice": "hinglish",
+      "intent": "billing",
+      "text": "Kya aap meri pichhli kharidari ka bill bhej sakte hain?"
+    },
+    {
+      "id": "hinglish-billing-3",
+      "slice": "hinglish",
+      "intent": "billing",
+      "text": "Card se payment fail ho gaya lekin paise kat gaye."
+    },
+    {
+      "id": "hinglish-billing-4",
+      "slice": "hinglish",
+      "intent": "billing",
+      "text": "Mera refund kab aayega? Maine pichhle hafte order cancel kiya tha."
+    },
+    {
+      "id": "hinglish-billing-5",
+      "slice": "hinglish",
+      "intent": "billing",
+      "text": "Mere bill mein extra charge kyun laga hai?"
+    },
+    {
+      "id": "hinglish-billing-6",
+      "slice": "hinglish",
+      "intent": "billing",
+      "text": "Kya aap UPI se payment lete ho?"
+    },
+    {
+      "id": "hinglish-billing-7",
+      "slice": "hinglish",
+      "intent": "billing",
+      "text": "Mujhe apni company ke liye GST bill chahiye."
+    },
+    {
+      "id": "hinglish-shipping-1",
+      "slice": "hinglish",
+      "intent": "shipping",
+      "text": "Mera parcel kahan hai? Kal aana tha."
+    },
+    {
+      "id": "hinglish-shipping-2",
+      "slice": "hinglish",
+      "intent": "shipping",
+      "text": "Paanch din se tracking update nahi hui."
+    },
+    {
+      "id": "hinglish-shipping-3",
+      "slice": "hinglish",
+      "intent": "shipping",
+      "text": "Kya aap kisi doosre pate par delivery kar sakte ho?"
+    },
+    {
+      "id": "hinglish-shipping-4",
+      "slice": "hinglish",
+      "intent": "shipping",
+      "text": "Courier keh raha hai deliver ho gaya, par mujhe kuch nahi mila."
+    },
+    {
+      "id": "hinglish-shipping-5",
+      "slice": "hinglish",
+      "intent": "shipping",
+      "text": "Delhi tak shipping mein kitne din lagte hain?"
+    },
+    {
+      "id": "hinglish-shipping-6",
+      "slice": "hinglish",
+      "intent": "shipping",
+      "text": "Kya aap Dubai bhejte ho aur delivery ka kitna kharcha hai?"
+    },
+    {
+      "id": "hinglish-shipping-7",
+      "slice": "hinglish",
+      "intent": "shipping",
+      "text": "Delivery wala mera ghar nahi dhoondh paya, ab kya karun?"
+    },
+    {
+      "id": "hinglish-returns-1",
+      "slice": "hinglish",
+      "intent": "returns",
+      "text": "Mujhe joote wapas karne hain, chhote hain."
+    },
+    {
+      "id": "hinglish-returns-2",
+      "slice": "hinglish",
+      "intent": "returns",
+      "text": "Is shirt ko bade size se kaise badlun?"
+    },
+    {
+      "id": "hinglish-returns-3",
+      "slice": "hinglish",
+      "intent": "returns",
+      "text": "Jo mixer mila woh chal nahi raha, kya main use wapas bhej sakta hoon?"
+    },
+    {
+      "id": "hinglish-returns-4",
+      "slice": "hinglish",
+      "intent": "returns",
+      "text": "Khole hue saamaan ki wapsi ki policy kya hai?"
+    },
+    {
+      "id": "hinglish-returns-5",
+      "slice": "hinglish",
+      "intent": "returns",
+      "text": "Maine do hafte pehle jacket wapas bheji thi, kya aapko mil gayi?"
+    },
+    {
+      "id": "hinglish-returns-6",
+      "slice": "hinglish",
+      "intent": "returns",
+      "text": "Kya main neela bag kaale bag se badal sakti hoon?"
+    },
+    {
+      "id": "hinglish-returns-7",
+      "slice": "hinglish",
+      "intent": "returns",
+      "text": "Return label kahan se print karun?"
+    },
+    {
+      "id": "hinglish-account-1",
+      "slice": "hinglish",
+      "intent": "account",
+      "text": "Main password bhool gaya aur reset email nahi aa raha."
+    },
+    {
+      "id": "hinglish-account-2",
+      "slice": "hinglish",
+      "intent": "account",
+      "text": "Apne account ka email kaise badlun?"
+    },
+    {
+      "id": "hinglish-account-3",
+      "slice": "hinglish",
+      "intent": "account",
+      "text": "Kai baar galat login ke baad mera account lock ho gaya."
+    },
+    {
+      "id": "hinglish-account-4",
+      "slice": "hinglish",
+      "intent": "account",
+      "text": "Kripya mera account aur mera data hata dijiye."
+    },
+    {
+      "id": "hinglish-account-5",
+      "slice": "hinglish",
+      "intent": "account",
+      "text": "Ab main Google se sign in nahi kar pa raha."
+    },
+    {
+      "id": "hinglish-account-6",
+      "slice": "hinglish",
+      "intent": "account",
+      "text": "Two-step verification kaise on karun?"
+    },
+    {
+      "id": "hinglish-account-7",
+      "slice": "hinglish",
+      "intent": "account",
+      "text": "Mujhe apni profile mein phone number badalna hai."
+    },
+    {
+      "id": "hinglish-product-1",
+      "slice": "hinglish",
+      "intent": "product",
+      "text": "Kya yeh jacket waterproof hai?"
+    },
+    {
+      "id": "hinglish-product-2",
+      "slice": "hinglish",
+      "intent": "product",
+      "text": "Kya kaale rang mein 42 size available hai?"
+    },
+    {
+      "id": "hinglish-product-3",
+      "slice": "hinglish",
+      "intent": "product",
+      "text": "Pro aur Lite model mein kya antar hai?"
+    },
+    {
+      "id": "hinglish-product-4",
+      "slice": "hinglish",
+      "intent": "product",
+      "text": "Kya in chaadaron ka cotton organic hai?"
+    },
+    {
+      "id": "hinglish-product-5",
+      "slice": "hinglish",
+      "intent": "product",
+      "text": "Kya yeh charger iPhone 15 ke saath chalega?"
+    },
+    {
+      "id": "hinglish-product-6",
+      "slice": "hinglish",
+      "intent": "product",
+      "text": "Hara rang dobara stock mein kab aayega?"
+    },
+    {
+      "id": "hinglish-product-7",
+      "slice": "hinglish",
+      "intent": "product",
+      "text": "Kya is bag mein 16 inch ka laptop aa jayega?"
+    },
+    {
+      "id": "hinglish-other-1",
+      "slice": "hinglish",
+      "intent": "other",
+      "text": "Namaste!"
+    },
+    {
+      "id": "hinglish-other-2",
+      "slice": "hinglish",
+      "intent": "other",
+      "text": "Dhanyavaad, aapka din shubh ho."
+    },
+    {
+      "id": "hinglish-other-3",
+      "slice": "hinglish",
+      "intent": "other",
+      "text": "Kya aap Ravivaar ko khule rehte ho?"
+    },
+    {
+      "id": "hinglish-other-4",
+      "slice": "hinglish",
+      "intent": "other",
+      "text": "Kya Jaipur mein aapki koi dukaan hai?"
+    },
+    {
+      "id": "hinglish-other-5",
+      "slice": "hinglish",
+      "intent": "other",
+      "text": "Main aapki website ke design ke baare mein sujhaav dena chahta hoon."
+    },
+    {
+      "id": "roman-urdu-billing-1",
+      "slice": "roman-urdu",
+      "intent": "billing",
+      "text": "Ek hi order ke liye mujh se do dafa raqam kaat li gayi."
+    },
+    {
+      "id": "roman-urdu-billing-2",
+      "slice": "roman-urdu",
+      "intent": "billing",
+      "text": "Kya aap meri pichli khareedari ki raseed bhej sakte hain?"
+    },
+    {
+      "id": "roman-urdu-billing-3",
+      "slice": "roman-urdu",
+      "intent": "billing",
+      "text": "Card se adaigi nakam hui lekin paise kat gaye."
+    },
+    {
+      "id": "roman-urdu-billing-4",
+      "slice": "roman-urdu",
+      "intent": "billing",
+      "text": "Mera refund kab aaye ga? Main ne pichle hafte order mansookh kiya tha."
+    },
+    {
+      "id": "roman-urdu-billing-5",
+      "slice": "roman-urdu",
+      "intent": "billing",
+      "text": "Mere bill mein izafi charges kyun lage hain?"
+    },
+    {
+      "id": "roman-urdu-billing-6",
+      "slice": "roman-urdu",
+      "intent": "billing",
+      "text": "Kya aap JazzCash se adaigi lete hain?"
+    },
+    {
+      "id": "roman-urdu-billing-7",
+      "slice": "roman-urdu",
+      "intent": "billing",
+      "text": "Mujhe apni company ke liye tax ki raseed chahiye."
+    },
+    {
+      "id": "roman-urdu-shipping-1",
+      "slice": "roman-urdu",
+      "intent": "shipping",
+      "text": "Janab mera parcel kahan hai? Kal pohanchna tha."
+    },
+    {
+      "id": "roman-urdu-shipping-2",
+      "slice": "roman-urdu",
+      "intent": "shipping",
+      "text": "Paanch din se tracking update nahi hui, kya masla hai?"
+    },
+    {
+      "id": "roman-urdu-shipping-3",
+      "slice": "roman-urdu",
+      "intent": "shipping",
+      "text": "Kya aap kisi doosre pate par delivery kar sakte hain?"
+    },
+    {
+      "id": "roman-urdu-shipping-4",
+      "slice": "roman-urdu",
+      "intent": "shipping",
+      "text": "Courier keh raha hai deliver ho gaya, lekin mujhe kuch nahi mila."
+    },
+    {
+      "id": "roman-urdu-shipping-5",
+      "slice": "roman-urdu",
+      "intent": "shipping",
+      "text": "Karachi tak shipping mein kitne din lagte hain?"
+    },
+    {
+      "id": "roman-urdu-shipping-6",
+      "slice": "roman-urdu",
+      "intent": "shipping",
+      "text": "Kya aap Dubai bhejte hain aur delivery ka kitna kharcha hai?"
+    },
+    {
+      "id": "roman-urdu-shipping-7",
+      "slice": "roman-urdu",
+      "intent": "shipping",
+      "text": "Delivery wala mera ghar nahi dhoond saka, ab kya karoon?"
+    },
+    {
+      "id": "roman-urdu-returns-1",
+      "slice": "roman-urdu",
+      "intent": "returns",
+      "text": "Mujhe joote wapas karne hain, yeh chhote hain."
+    },
+    {
+      "id": "roman-urdu-returns-2",
+      "slice": "roman-urdu",
+      "intent": "returns",
+      "text": "Is qameez ko baray size se kaise tabdeel karoon?"
+    },
+    {
+      "id": "roman-urdu-returns-3",
+      "slice": "roman-urdu",
+      "intent": "returns",
+      "text": "Jo blender mila woh nahi chal raha, kya main usay wapas bhej sakta hoon?"
+    },
+    {
+      "id": "roman-urdu-returns-4",
+      "slice": "roman-urdu",
+      "intent": "returns",
+      "text": "Kholi hui cheezon ki wapsi ki policy kya hai?"
+    },
+    {
+      "id": "roman-urdu-returns-5",
+      "slice": "roman-urdu",
+      "intent": "returns",
+      "text": "Main ne do hafte pehle jacket wapas bheji thi, kya aap ko mil gayi?"
+    },
+    {
+      "id": "roman-urdu-returns-6",
+      "slice": "roman-urdu",
+      "intent": "returns",
+      "text": "Kya main neela bag kaale bag se tabdeel kar sakti hoon?"
+    },
+    {
+      "id": "roman-urdu-returns-7",
+      "slice": "roman-urdu",
+      "intent": "returns",
+      "text": "Wapsi ka label kahan se print karoon?"
+    },
+    {
+      "id": "roman-urdu-account-1",
+      "slice": "roman-urdu",
+      "intent": "account",
+      "text": "Main password bhool gaya hoon aur reset email nahi aa rahi."
+    },
+    {
+      "id": "roman-urdu-account-2",
+      "slice": "roman-urdu",
+      "intent": "account",
+      "text": "Apne account ka email kaise tabdeel karoon?"
+    },
+    {
+      "id": "roman-urdu-account-3",
+      "slice": "roman-urdu",
+      "intent": "account",
+      "text": "Kayi dafa ghalat login ke baad mera account lock ho gaya."
+    },
+    {
+      "id": "roman-urdu-account-4",
+      "slice": "roman-urdu",
+      "intent": "account",
+      "text": "Baraye meherbani mera account aur mera data hazf kar dein."
+    },
+    {
+      "id": "roman-urdu-account-5",
+      "slice": "roman-urdu",
+      "intent": "account",
+      "text": "Ab main Google se sign in nahi kar pa raha."
+    },
+    {
+      "id": "roman-urdu-account-6",
+      "slice": "roman-urdu",
+      "intent": "account",
+      "text": "Do marhala tasdeeq kaise on karoon?"
+    },
+    {
+      "id": "roman-urdu-account-7",
+      "slice": "roman-urdu",
+      "intent": "account",
+      "text": "Mujhe apni profile mein phone number tabdeel karna hai."
+    },
+    {
+      "id": "roman-urdu-product-1",
+      "slice": "roman-urdu",
+      "intent": "product",
+      "text": "Janab kya yeh jacket waterproof hai?"
+    },
+    {
+      "id": "roman-urdu-product-2",
+      "slice": "roman-urdu",
+      "intent": "product",
+      "text": "Kya kaale rang mein 42 size dastiyab hai?"
+    },
+    {
+      "id": "roman-urdu-product-3",
+      "slice": "roman-urdu",
+      "intent": "product",
+      "text": "Pro aur Lite model mein kya farq hai?"
+    },
+    {
+      "id": "roman-urdu-product-4",
+      "slice": "roman-urdu",
+      "intent": "product",
+      "text": "Kya in chaadron ki rooi organic hai?"
+    },
+    {
+      "id": "roman-urdu-product-5",
+      "slice": "roman-urdu",
+      "intent": "product",
+      "text": "Kya yeh charger iPhone 15 ke sath chale ga?"
+    },
+    {
+      "id": "roman-urdu-product-6",
+      "slice": "roman-urdu",
+      "intent": "product",
+      "text": "Hara rang dobara stock mein kab aaye ga?"
+    },
+    {
+      "id": "roman-urdu-product-7",
+      "slice": "roman-urdu",
+      "intent": "product",
+      "text": "Kya is bag mein 16 inch ka laptop aa jaye ga?"
+    },
+    {
+      "id": "roman-urdu-other-1",
+      "slice": "roman-urdu",
+      "intent": "other",
+      "text": "Assalam o alaikum!"
+    },
+    {
+      "id": "roman-urdu-other-2",
+      "slice": "roman-urdu",
+      "intent": "other",
+      "text": "Shukriya, aap ka din acha guzray."
+    },
+    {
+      "id": "roman-urdu-other-3",
+      "slice": "roman-urdu",
+      "intent": "other",
+      "text": "Kya aap Itwaar ko khulay hote hain?"
+    },
+    {
+      "id": "roman-urdu-other-4",
+      "slice": "roman-urdu",
+      "intent": "other",
+      "text": "Kya Lahore mein aap ki koi dukaan hai?"
+    },
+    {
+      "id": "roman-urdu-other-5",
+      "slice": "roman-urdu",
+      "intent": "other",
+      "text": "Main aap ki website ke design ke baare mein raye dena chahta hoon."
+    }
+  ]
+}

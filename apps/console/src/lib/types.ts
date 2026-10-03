@@ -50,3 +50,39 @@ export type Problem = C.Problem;
 export type ErrorCode = C.ErrorCode;
 
 export type Items<T> = { items: T[] };
+
+// Team and access (A02, A09, A12), enterprise sign-in and support access (A13, A18).
+export type Role = z.infer<typeof C.Role>;
+export type RoleRef = z.infer<typeof C.RoleRef>;
+export type GrantView = z.infer<typeof C.GrantView>;
+export type GrantScope = z.infer<typeof C.GrantScope>;
+export type Invitation = z.infer<typeof C.Invitation>;
+export type CreatedInvitation = z.infer<typeof C.CreatedInvitation>;
+export type PermissionInfo = z.infer<typeof C.PermissionInfo>;
+export type RolePreview = z.infer<typeof C.RolePreview>;
+export type MemberOffboarding = z.infer<typeof C.MemberOffboarding>;
+export type AuditEvent = z.infer<typeof C.AuditEventView>;
+export type AuditPage = z.infer<typeof C.AuditPage>;
+export type AuditVerification = z.infer<typeof C.AuditVerification>;
+export type Team = C.Team;
+export type BulkResult = C.BulkResult;
+export type SsoSettings = C.SsoSettings;
+export type SsoDomain = C.SsoDomain;
+export type SsoConnection = C.SsoConnection;
+export type SupportGrant = C.SupportGrant;
+export type SupportScope = C.SupportScope;
+export type WorkspaceNotices = C.WorkspaceNotices;
+export type IncidentNotice = C.IncidentNotice;
+
+// Platform operations console (A17).
+export type PlatformOperator = C.PlatformOperator;
+export type PlatformTenant = C.PlatformTenant;
+export type PlatformTenantDetail = C.PlatformTenantDetail;
+export type PlatformHealth = C.PlatformHealth;
+export type PlatformOverview = C.PlatformOverview;
+export type Incident = C.Incident;
+export type PlatformAuditPage = C.PlatformAuditPage;
+export type PlatformAuditEvent = C.PlatformAuditEvent;
+export type SupportConfiguration = C.SupportConfiguration;
+export type SupportConversations = C.SupportConversations;
+export type SupportAudit = C.SupportAudit;

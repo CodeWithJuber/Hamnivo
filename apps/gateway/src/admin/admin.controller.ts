@@ -2,11 +2,14 @@ import {
   CreateGrantRequest,
   CreateInvitationRequest,
   CreateRoleRequest,
+  RemoveMemberRequest,
+  ReplaceGrantRequest,
   RevokeGrantRequest,
+  RolePreviewRequest,
   UpdateMemberRequest,
   UpdateRoleRequest,
 } from '@hamnivo/contracts';
-import { PERMISSION_KEYS, PERMISSIONS, type StaffPrincipal } from '@hamnivo/policy';
+import type { StaffPrincipal } from '@hamnivo/policy';
 import {
   Body,
   Controller,
@@ -57,19 +60,8 @@ export class AdminController {
 
   @Get('permissions')
   @StaffRoute({ tenant: true })
-  permissions() {
-    return {
-      items: PERMISSION_KEYS.map((key) => {
-        const spec = PERMISSIONS[key];
-        return {
-          key,
-          description: spec.description,
-          scopes: [...spec.scopes],
-          stepUp: 'stepUp' in spec && spec.stepUp === true,
-          mfa: 'mfa' in spec && spec.mfa === true,
-        };
-      }),
-    };
+  permissions(@CurrentPrincipal() principal: StaffPrincipal) {
+    return { items: this.admin.permissions(principal) };
   }
 
   @Get('workspaces')
@@ -92,6 +84,24 @@ export class AdminController {
     @Body() body: unknown,
   ) {
     return this.admin.updateMember(principal, id, parseInput(UpdateMemberRequest, body));
+  }
+
+  @Get('members/:id/offboarding')
+  @StaffRoute({ tenant: true, permission: 'members.remove', tenantWide: true })
+  offboarding(@CurrentPrincipal() principal: StaffPrincipal, @Param('id') id: string) {
+    return this.admin.offboarding(principal, id);
+  }
+
+  @Post('members/:id/remove')
+  @HttpCode(204)
+  @StaffRoute({ tenant: true, permission: 'members.remove', tenantWide: true })
+  async removeMember(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const { reason } = parseInput(RemoveMemberRequest, body ?? {});
+    await this.admin.removeMember(principal, id, reason);
   }
 
   @Get('invitations')
@@ -121,6 +131,13 @@ export class AdminController {
     await this.admin.revokeInvitation(principal, id);
   }
 
+  @Post('invitations/:id/resend')
+  @HttpCode(200)
+  @StaffRoute({ tenant: true, permission: 'members.invite' })
+  resendInvitation(@CurrentPrincipal() principal: StaffPrincipal, @Param('id') id: string) {
+    return this.admin.resendInvitation(principal, id);
+  }
+
   @Get('roles')
   @StaffRoute({ tenant: true, permission: 'members.read' })
   async roles(@CurrentPrincipal() principal: StaffPrincipal) {
@@ -141,6 +158,14 @@ export class AdminController {
     );
   }
 
+  /** A preview changes nothing, so it needs roles.manage without a fresh sign-in. */
+  @Post('roles/preview')
+  @HttpCode(200)
+  @StaffRoute({ tenant: true, permission: 'members.read' })
+  previewRole(@CurrentPrincipal() principal: StaffPrincipal, @Body() body: unknown) {
+    return this.admin.previewRole(principal, parseInput(RolePreviewRequest, body));
+  }
+
   @Patch('roles/:id')
   @StaffRoute({ tenant: true, permission: 'roles.manage' })
   updateRole(
@@ -149,6 +174,13 @@ export class AdminController {
     @Body() body: unknown,
   ) {
     return this.admin.updateRole(principal, id, parseInput(UpdateRoleRequest, body));
+  }
+
+  @Delete('roles/:id')
+  @HttpCode(204)
+  @StaffRoute({ tenant: true, permission: 'roles.manage' })
+  async archiveRole(@CurrentPrincipal() principal: StaffPrincipal, @Param('id') id: string) {
+    await this.admin.archiveRole(principal, id);
   }
 
   @Post('grants')
@@ -175,5 +207,16 @@ export class AdminController {
   ) {
     const { reason } = parseInput(RevokeGrantRequest, body ?? {});
     await this.admin.revokeGrant(principal, id, reason);
+  }
+
+  @Post('grants/:id/replace')
+  @HttpCode(200)
+  @StaffRoute({ tenant: true, permission: 'grants.manage' })
+  replaceGrant(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.admin.replaceGrant(principal, id, parseInput(ReplaceGrantRequest, body));
   }
 }

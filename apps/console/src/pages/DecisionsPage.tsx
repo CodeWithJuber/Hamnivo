@@ -12,7 +12,7 @@ import {
 } from '@hamnivo/ui/components/table';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { PlusIcon, SendIcon, Trash2Icon } from 'lucide-react';
+import { AlertTriangleIcon, PlusIcon, SendIcon, Trash2Icon } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppDialog, ConfirmDialog, DialogFooter } from '../components/AppDialog';
@@ -563,6 +563,31 @@ interface TopicRow {
   keywords: string;
 }
 
+/** Jev is chosen, but this server has no TypeSafe key: every Jev decision would be unavailable. */
+/** Says plainly that this server has no TypeSafe key, so Jev decisions are unavailable. */
+export function JevNotConfigured() {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="status"
+      data-testid="jev-not-configured"
+      className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning-subtle p-4"
+    >
+      <AlertTriangleIcon className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />
+      <div className="flex min-w-0 flex-col gap-1 text-sm">
+        <p className="font-semibold text-text">{t('decisions.rubric.jevMissing.title')}</p>
+        <p className="text-text">
+          {t('decisions.rubric.jevMissing.body')}{' '}
+          <bdi dir="ltr" className="font-mono text-[13px]">
+            TYPESAFE_API_KEY
+          </bdi>
+        </p>
+        <p className="text-text-secondary">{t('decisions.rubric.jevMissing.guide')}</p>
+      </div>
+    </div>
+  );
+}
+
 function RubricSection({ brandId, task }: { brandId: string; task: DecisionTask }) {
   const { t } = useTranslation();
   const { can } = useTenant();
@@ -638,6 +663,26 @@ function RubricSection({ brandId, task }: { brandId: string; task: DecisionTask 
     setTopics((current) =>
       current.map((topic) => (topic.id === id ? { ...topic, ...change } : topic)),
     );
+  const [evaluatedFill, setEvaluatedFill] = useState(false);
+  /**
+   * Choosing Jev with no model fills in the version Hamnivo evaluated, and its measured thresholds
+   * for the languages still empty. Nothing a person typed is replaced.
+   */
+  const chooseProvider = (next: Provider) => {
+    setProvider(next);
+    if (next !== 'jev' || model.trim() !== '') return;
+    setModel(task.jev.recommendedModel);
+    const measured = task.jev.recommendedThresholds;
+    const empty = SLICES.filter(
+      (slice) => thresholds[slice].trim() === '' && measured[slice] !== undefined,
+    );
+    if (empty.length === 0) return;
+    setThresholds((current) => ({
+      ...current,
+      ...Object.fromEntries(empty.map((slice) => [slice, String(measured[slice])])),
+    }));
+    setEvaluatedFill(true);
+  };
 
   return (
     <Section
@@ -671,7 +716,7 @@ function RubricSection({ brandId, task }: { brandId: string; task: DecisionTask 
               id="rubric-provider"
               label={t('decisions.rubric.provider')}
               value={provider}
-              onChange={(event) => setProvider(event.target.value as Provider)}
+              onChange={(event) => chooseProvider(event.target.value as Provider)}
               options={PROVIDERS.map((value) => ({
                 value,
                 label: t(`decisions.rubric.providers.${value}`),
@@ -702,6 +747,7 @@ function RubricSection({ brandId, task }: { brandId: string; task: DecisionTask 
               error={errors.get('deadlineMs')}
             />
           </div>
+          {provider === 'jev' && !task.jev.configured ? <JevNotConfigured /> : null}
 
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-1 text-md font-semibold text-text">
@@ -805,6 +851,11 @@ function RubricSection({ brandId, task }: { brandId: string; task: DecisionTask 
             <p id="rubric-thresholds-hint" className="text-sm text-text-secondary">
               {t('decisions.rubric.thresholdsHint')}
             </p>
+            {evaluatedFill ? (
+              <p className="text-sm text-text-secondary" data-testid="thresholds-evaluated">
+                {t('decisions.rubric.thresholdsEvaluated', { model: task.jev.recommendedModel })}
+              </p>
+            ) : null}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {SLICES.map((slice) => (
                 <TextField

@@ -1,4 +1,7 @@
-import type { Decision, DenyReason } from './authorize.js';
+import type { DenyReason } from './authorize.js';
+
+/** A tenant or platform decision: allowed, or denied with a reason. */
+type AnyDecision = { allowed: true } | { allowed: false; reason: DenyReason };
 
 /**
  * Stable message keys (translated in the Studio) and English defaults. The UI shows these next to
@@ -38,7 +41,7 @@ export const DENY_MESSAGES: Record<DenyReason, { key: string; text: string; reme
 };
 
 export function explain(
-  decision: Decision,
+  decision: AnyDecision,
 ): { allowed: true } | { allowed: false; key: string; text: string; remedy: string } {
   if (decision.allowed) return { allowed: true };
   return { allowed: false, ...DENY_MESSAGES[decision.reason] };

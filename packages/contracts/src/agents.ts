@@ -44,6 +44,32 @@ export const AgentMemory = z
   })
   .meta({ id: 'AgentMemory' });
 
+/** One tool the agent may call (G07). The tool's own policy decides approval and autopilot. */
+export const AgentToolGrant = z
+  .object({
+    toolId: typeId('tool'),
+    /** Off: this agent always asks for approval, even where the tool may run on autopilot. */
+    autopilot: z.boolean().default(true),
+  })
+  .meta({ id: 'AgentToolGrant' });
+
+/** Tools granted to the agent and its action budgets (G15). */
+export const AgentTools = z
+  .object({
+    grants: z.array(AgentToolGrant).max(30).default([]),
+    /** Tool calls in one run, whatever their kind. */
+    maxCallsPerRun: z.int().min(1).max(10).default(4),
+    /** Autopilot actions in one conversation; beyond it, changes wait for approval. */
+    maxAutopilotPerConversation: z.int().min(0).max(50).default(5),
+  })
+  .superRefine((value, ctx) => {
+    const ids = value.grants.map((g) => g.toolId);
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: 'custom', path: ['grants'], message: 'Each tool can be granted once' });
+    }
+  })
+  .meta({ id: 'AgentTools' });
+
 /**
  * Everything that decides how an agent behaves. A published version of it never changes; edits
  * create a new draft (A07).
@@ -73,6 +99,8 @@ export const AgentConfig = z
     /** Knowledge the agent answers from. Customer answers use only public sources (G05). */
     knowledgeSourceIds: z.array(typeId('source')).max(20).default([]),
     memory: AgentMemory.prefault({}),
+    /** Tools the agent may call and its action budgets (G07, G15). */
+    tools: AgentTools.prefault({}),
   })
   .meta({ id: 'AgentConfig' });
 export type AgentConfig = z.output<typeof AgentConfig>;
@@ -192,14 +220,17 @@ export const CreateModelConnectionRequest = z
   })
   .meta({ id: 'CreateModelConnectionRequest' });
 
-export const KillSwitchScope = z.enum(['tenant', 'brand', 'agent']);
+export const KillSwitchScope = z.enum(['tenant', 'brand', 'agent', 'tool']);
 
-/** Stops AI replies in its scope; people keep chatting and see the conversation (X08). */
+/**
+ * Stops AI replies in its scope; people keep chatting and see the conversation (X08). A `tool`
+ * switch stops that tool's actions only: the AI keeps answering and is told the tool is stopped.
+ */
 export const KillSwitch = z
   .object({
     id: typeId('killSwitch'),
     scope: KillSwitchScope,
-    /** brd_… or agt_…; null for the whole tenant. */
+    /** brd_…, agt_… or tool_…; null for the whole tenant. */
     targetId: z.string().nullable(),
     reason: z.string(),
     active: z.boolean(),
@@ -217,7 +248,7 @@ export const CreateKillSwitchRequest = z
     reason: z.string().trim().min(3).max(500),
   })
   .superRefine((value, ctx) => {
-    const prefix = { tenant: null, brand: 'brd_', agent: 'agt_' }[value.scope];
+    const prefix = { tenant: null, brand: 'brd_', agent: 'agt_', tool: 'tool_' }[value.scope];
     if (prefix === null ? value.targetId !== undefined : !value.targetId?.startsWith(prefix)) {
       ctx.addIssue({
         code: 'custom',
@@ -255,7 +286,7 @@ export const Run = z
     kind: z.enum(['reply', 'draft']),
     state: z.enum(['running', 'succeeded', 'failed', 'skipped']),
     outcome: z
-      .enum(['replied', 'drafted', 'handoff', 'fenced', 'blocked', 'error', 'skipped'])
+      .enum(['replied', 'drafted', 'handoff', 'fenced', 'blocked', 'error', 'skipped', 'cancelled'])
       .nullable(),
     provider: z.string().nullable(),
     modelId: z.string().nullable(),

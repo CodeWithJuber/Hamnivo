@@ -37,6 +37,8 @@ x-gateway: &gateway
     PUBLIC_WIDGET_ORIGIN: ${HAMNIVO_CHAT_ORIGIN:?run hamnivo.sh setup}
     REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
     STEP_UP_MAX_AGE_MINUTES: ${STEP_UP_MAX_AGE_MINUTES:-10}
+    SSO_TRUSTED_IDP_ORIGINS: ${SSO_TRUSTED_IDP_ORIGINS:-}
+    SSO_DNS_SERVERS: ${SSO_DNS_SERVERS:-}
     SMTP_URL: ${SMTP_URL:-}
     MAIL_FROM: ${MAIL_FROM:-}
     WIDGET_SIGNING_KEY: ${WIDGET_SIGNING_KEY:?run hamnivo.sh setup}
@@ -51,11 +53,26 @@ x-gateway: &gateway
     EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-mock}
     EMBEDDING_MODEL: ${EMBEDDING_MODEL:-hamnivo-embed}
     CLAMAV_URL: ${CLAMAV_URL:-}
+    TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-${JEV_API_KEY:-}}
+    TYPESAFE_BASE_URL: ${TYPESAFE_BASE_URL:-${JEV_BASE_URL:-}}
     COMMERCE_CHECKOUT_MINUTES: ${COMMERCE_CHECKOUT_MINUTES:-60}
     COMMERCE_PROVIDER_TIMEOUT_MS: ${COMMERCE_PROVIDER_TIMEOUT_MS:-10000}
+    MIGRATION_MESSAGES_PER_MINUTE: ${MIGRATION_MESSAGES_PER_MINUTE:-180}
+    MIGRATION_EXPORT_RETENTION_DAYS: ${MIGRATION_EXPORT_RETENTION_DAYS:-14}
+    MIGRATION_SOURCE_MAX_CONVERSATIONS: ${MIGRATION_SOURCE_MAX_CONVERSATIONS:-1000}
     METRICS_TOKEN: ${METRICS_TOKEN:-}
     API_DOCS: ${API_DOCS:-true}
     RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-600}
+    API_KEY_RATE_LIMIT_PER_MINUTE: ${API_KEY_RATE_LIMIT_PER_MINUTE:-120}
+    EGRESS_TRUSTED_ORIGINS: ${EGRESS_TRUSTED_ORIGINS:-}
+    WEBHOOK_TIMEOUT_MS: ${WEBHOOK_TIMEOUT_MS:-15000}
+    WEBHOOK_RETENTION_DAYS: ${WEBHOOK_RETENTION_DAYS:-30}
+    WEBHOOK_LOG_DAYS: ${WEBHOOK_LOG_DAYS:-90}
+    WEBHOOK_DISABLE_AFTER_FAILURES: ${WEBHOOK_DISABLE_AFTER_FAILURES:-10}
+    WEBHOOK_DISABLE_AFTER_HOURS: ${WEBHOOK_DISABLE_AFTER_HOURS:-72}
+    WEBHOOK_CONCURRENCY: ${WEBHOOK_CONCURRENCY:-8}
+    ANALYTICS_MIN_GROUP_SIZE: ${ANALYTICS_MIN_GROUP_SIZE:-5}
+    BILLING_INVOICE_DUE_DAYS: ${BILLING_INVOICE_DUE_DAYS:-14}
   depends_on: &gateway-deps
     migrate:
       condition: service_completed_successfully
@@ -338,8 +355,9 @@ services:
 
   # ---- Upload scanning (profile "scan", on by default through COMPOSE_PROFILES in .env) ----------
   # Needs about 2 GB of memory. Without it, set CLAMAV_URL= (empty) and remove "scan" from
-  # COMPOSE_PROFILES; uploads are then checked only for the EICAR test file. While ClamAV loads its
-  # signatures (a few minutes after a start), uploads wait and are scanned when it is ready.
+  # COMPOSE_PROFILES; knowledge uploads are then checked only for the EICAR test file, and the
+  # chat offers customers no files. While ClamAV loads its signatures (a few minutes after a
+  # start), knowledge uploads wait and are scanned when it is ready; customer files are refused.
   clamav:
     image: clamav/clamav:1.5
     profiles: ['scan']

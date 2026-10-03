@@ -6,5 +6,7 @@ export const REDIS = Symbol('REDIS');
 export const AUTH = Symbol('AUTH');
 export const MAILER = Symbol('MAILER');
 export const CLOCK = Symbol('CLOCK');
+/** Replaces DNS resolution for every outbound request made for a tenant (tests of the guard). */
+export const EGRESS_RESOLVER = Symbol('EGRESS_RESOLVER');
 
 export type Clock = () => Date;

@@ -140,8 +140,8 @@ export class WidgetController {
     @Param('conversationId') conversationId: string,
     @Body() body: unknown,
   ): Promise<void> {
-    parseInput(ReadReceiptRequest, body);
-    await this.conversations.get(claims, conversationId);
+    const input = parseInput(ReadReceiptRequest, body);
+    await this.conversations.markRead(claims, conversationId, input.upToSequence);
   }
 
   @Post('conversations/:conversationId/handoff')

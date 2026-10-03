@@ -27,6 +27,36 @@ const EnvSchema = z.object({
   REQUIRE_EMAIL_VERIFICATION: bool.default(true),
   /** Minutes a sign-in stays "fresh" for step-up actions. */
   STEP_UP_MAX_AGE_MINUTES: z.coerce.number().int().min(1).max(120).default(10),
+  /**
+   * Identity-provider origins on a private network that tenants may use for single sign-on,
+   * comma-separated (e.g. `https://idp.corp.internal`). Every other provider must use HTTPS on a
+   * publicly routable address; the server never fetches private addresses for a tenant.
+   */
+  SSO_TRUSTED_IDP_ORIGINS: z
+    .string()
+    .default('')
+    .transform((value, ctx) => {
+      const origins: string[] = [];
+      for (const entry of value.split(',').map((origin) => origin.trim())) {
+        if (!entry) continue;
+        if (!URL.canParse(entry)) {
+          ctx.addIssue({ code: 'custom', message: `not a URL: ${entry}` });
+          continue;
+        }
+        origins.push(new URL(entry).origin);
+      }
+      return origins;
+    }),
+  /** DNS servers for domain verification (`ip` or `ip:port`, comma-separated); default: system. */
+  SSO_DNS_SERVERS: z
+    .string()
+    .default('')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((server) => server.trim())
+        .filter(Boolean),
+    ),
 
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default('Hamnivo <no-reply@hamnivo.local>'),
@@ -41,6 +71,11 @@ const EnvSchema = z.object({
   STREAM_HEARTBEAT_SECONDS: z.coerce.number().int().min(1).max(60).default(15),
   /** Days a realtime journal entry stays replayable (it is a projection, not a transcript). */
   JOURNAL_RETENTION_DAYS: z.coerce.number().int().min(1).max(30).default(7),
+  /**
+   * Seconds a reply waits unread before a customer who asked for it gets an email (W25). The
+   * same conversation emails at most once in 30 minutes.
+   */
+  CUSTOMER_REPLY_EMAIL_DELAY_SECONDS: z.coerce.number().int().min(0).max(86_400).default(300),
 
   /** Chatwoot and the operator's Platform App token, used to provision tenant accounts. */
   CHATWOOT_URL: z.url().optional(),
@@ -66,9 +101,27 @@ const EnvSchema = z.object({
   /** ClamAV daemon for uploads (tcp://host:3310). Without it only the EICAR test file is caught. */
   CLAMAV_URL: z.url().optional(),
 
+  /** Messages per minute written into one conversation while importing (Chatwoot allows 200). */
+  MIGRATION_MESSAGES_PER_MINUTE: z.coerce.number().int().min(1).max(200).default(180),
+  /** One worker pass works on an import for at most this long, then hands over to the next. */
+  MIGRATION_SLICE_SECONDS: z.coerce.number().int().min(1).max(300).default(20),
+  /** …and for at most this many conversations. */
+  MIGRATION_SLICE_CONVERSATIONS: z.coerce.number().int().min(1).max(10_000).default(200),
+  /** Days an uploaded export is kept after its job ends (samples and retries need it). */
+  MIGRATION_EXPORT_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+  /** Conversations one import reads from a Chatwoot source; the next import continues. */
+  MIGRATION_SOURCE_MAX_CONVERSATIONS: z.coerce.number().int().min(1).max(10_000).default(1000),
+  /**
+   * Lets imports read a source at a loopback or private address (development and tests only):
+   * otherwise source URLs must be https and public, checked again on every connection.
+   */
+  MIGRATION_SOURCE_ALLOW_PRIVATE: bool.default(false),
+
   /**
    * Jev (TypeSafe) for routing decisions. Without a key, rubrics that name Jev record every
-   * decision as unavailable and the deterministic baseline decides.
+   * decision as unavailable and the deterministic baseline decides. Set as TYPESAFE_API_KEY and
+   * TYPESAFE_BASE_URL, the names TypeSafe's SDK and docs use; JEV_API_KEY and JEV_BASE_URL are
+   * still read when those are unset.
    */
   JEV_API_KEY: z.string().min(8).optional(),
   JEV_BASE_URL: z.url().optional(),
@@ -93,6 +146,20 @@ const EnvSchema = z.object({
   /** Allows `mock` merchant connections (in-memory store) outside development and tests. */
   COMMERCE_ALLOW_MOCK: bool.default(false),
 
+  /**
+   * AI actions (G07–G15, D10). The demo tools (address change, store credit) use an in-memory
+   * stand-in for a merchant's order service and are offered outside production only, unless this
+   * is set (demos).
+   */
+  TOOLS_ALLOW_DEMO: bool.default(false),
+  /**
+   * Lets MCP servers be reached over plain HTTP on private addresses (loopback test servers).
+   * Development and tests only: refused in production.
+   */
+  TOOLS_EGRESS_ALLOW_PRIVATE: bool.default(false),
+  /** Tool calls of one run that may run at the same time (X03). */
+  TOOLS_MAX_PARALLEL: z.coerce.number().int().min(1).max(10).default(3),
+
   /** The worker rewrites this file after every outbox pass (for container health checks). */
   WORKER_HEARTBEAT_FILE: z.string().min(1).optional(),
 
@@ -100,6 +167,58 @@ const EnvSchema = z.object({
   METRICS_TOKEN: z.string().min(16).optional(),
   API_DOCS: bool.default(true),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(600),
+  /** Requests per minute for one API key (each key has its own budget). */
+  API_KEY_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(120),
+
+  /**
+   * Outbound requests made for tenants (webhooks) reach public HTTPS hosts only. Origins listed
+   * here (comma-separated, e.g. `http://10.0.0.5:8080`) are trusted by the server administrator:
+   * reachable on a private network and over plain HTTP. Leave empty in production unless needed.
+   */
+  EGRESS_TRUSTED_ORIGINS: z
+    .string()
+    .default('')
+    .transform((value, ctx) => {
+      const origins = value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      for (const origin of origins) {
+        let parsed: URL | null = null;
+        try {
+          parsed = new URL(origin);
+        } catch {
+          parsed = null;
+        }
+        if (!parsed || parsed.origin !== origin) {
+          ctx.addIssue({ code: 'custom', message: `not an origin: ${origin}` });
+        }
+      }
+      return origins;
+    }),
+  /** Webhook request deadline (the Standard Webhooks advice is 15 to 30 seconds). */
+  WEBHOOK_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30_000).default(15_000),
+  /** Days an event body is kept, so failed deliveries can be replayed. */
+  WEBHOOK_RETENTION_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+  /** Days the delivery log (without bodies) is kept. */
+  WEBHOOK_LOG_DAYS: z.coerce.number().int().min(1).max(365).default(90),
+  /**
+   * An endpoint is turned off after this many failed attempts in a row that span at least
+   * WEBHOOK_DISABLE_AFTER_HOURS; the owner can turn it on again and replay what failed.
+   */
+  WEBHOOK_DISABLE_AFTER_FAILURES: z.coerce.number().int().min(1).max(1000).default(10),
+  WEBHOOK_DISABLE_AFTER_HOURS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 30)
+    .default(72),
+  /** Webhook requests sent at the same time by one worker. */
+  WEBHOOK_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(8),
+  /** Analytics withhold values computed from fewer conversations or responses than this. */
+  ANALYTICS_MIN_GROUP_SIZE: z.coerce.number().int().min(2).max(50).default(5),
+  /** Days between issuing a platform invoice and its due date. */
+  BILLING_INVOICE_DUE_DAYS: z.coerce.number().int().min(1).max(90).default(14),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema> & {
@@ -109,9 +228,11 @@ export type AppConfig = z.infer<typeof EnvSchema> & {
 /** Parses and validates the environment once at start-up; misconfiguration stops the process. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   // `KEY=` in an env file means "not set", as in .env.example.
-  const parsed = EnvSchema.safeParse(
-    Object.fromEntries(Object.entries(env).filter(([, value]) => value !== '')),
-  );
+  const set = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ''));
+  // TypeSafe's own names for the Jev key and endpoint come first.
+  set.JEV_API_KEY = set.TYPESAFE_API_KEY ?? set.JEV_API_KEY;
+  set.JEV_BASE_URL = set.TYPESAFE_BASE_URL ?? set.JEV_BASE_URL;
+  const parsed = EnvSchema.safeParse(set);
   if (!parsed.success) {
     const problems = parsed.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)
@@ -120,6 +241,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (parsed.data.NODE_ENV === 'production' && parsed.data.COMMERCE_STRIPE_API_BASE) {
     throw new Error('Invalid configuration:\n  COMMERCE_STRIPE_API_BASE is for tests only');
+  }
+  if (parsed.data.NODE_ENV === 'production' && parsed.data.TOOLS_EGRESS_ALLOW_PRIVATE) {
+    throw new Error('Invalid configuration:\n  TOOLS_EGRESS_ALLOW_PRIVATE is for tests only');
   }
   const retired = new Map<number, Buffer>();
   for (const pair of parsed.data.HAMNIVO_KEK_RETIRED.split(',').filter(Boolean)) {

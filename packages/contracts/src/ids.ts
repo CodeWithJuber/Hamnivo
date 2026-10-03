@@ -25,6 +25,7 @@ export const ID_PREFIX = {
   run: 'run',
   draft: 'drf',
   decision: 'dcs',
+  check: 'chk',
   tool: 'tool',
   action: 'act',
   approval: 'apr',
@@ -49,6 +50,9 @@ export const ID_PREFIX = {
   webhookEndpoint: 'whe',
   webhookDelivery: 'whd',
   apiKey: 'key',
+  serviceAccount: 'sac',
+  invoice: 'invc',
+  plan: 'plan',
   migration: 'mig',
   invitation: 'inv',
   role: 'role',
@@ -63,6 +67,14 @@ export const ID_PREFIX = {
   savedReply: 'srp',
   review: 'rev',
   link: 'lnk',
+  ssoDomain: 'sdom',
+  ssoConnection: 'ssoc',
+  supportGrant: 'sgr',
+  operator: 'opr',
+  incident: 'inc',
+  mcpServer: 'mcp',
+  simulation: 'sim',
+  simulationRun: 'simr',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

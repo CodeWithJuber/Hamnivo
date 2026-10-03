@@ -3,6 +3,7 @@ import { InvalidPublicIdError } from '@hamnivo/db';
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from './app-error.js';
+import { planLimitFromDatabase } from './plan-limit.js';
 
 const STATUS_TO_CODE: Record<number, ErrorCode> = {
   400: 'VALIDATION_FAILED',
@@ -20,13 +21,16 @@ const STATUS_TO_CODE: Record<number, ErrorCode> = {
 export function toProblem(error: unknown, requestId: string) {
   // A malformed or foreign identifier is indistinguishable from a missing resource.
   if (error instanceof InvalidPublicIdError) return problem('NOT_FOUND', requestId);
-  if (error instanceof AppError) {
-    const { detail, fields, retryAfter, retryable } = error.details;
-    return problem(error.code, requestId, {
+  const appError = error instanceof AppError ? error : planLimitFromDatabase(error);
+  if (appError) {
+    const { detail, fields, retryAfter, retryable, quota, reason } = appError.details;
+    return problem(appError.code, requestId, {
       ...(detail ? { detail } : {}),
       ...(fields ? { fields } : {}),
+      ...(reason ? { reason } : {}),
       ...(retryAfter !== undefined ? { retryAfter } : {}),
       ...(retryable !== undefined ? { retryable } : {}),
+      ...(quota ? { quota } : {}),
     });
   }
   const status =

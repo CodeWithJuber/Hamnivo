@@ -73,6 +73,47 @@ export class SecretBroker {
     return id;
   }
 
+  /** Replaces a stored secret's value inside an existing tenant transaction. */
+  async rotateIn(tx: TenantTx, tenantId: string, secretId: string, value: string): Promise<void> {
+    const sealed = seal(this.ring, value, secretAad(tenantId, secretId));
+    const [row] = await tx
+      .update(schema.secrets)
+      .set({
+        ciphertext: sealed.ciphertext,
+        iv: sealed.iv,
+        wrappedKey: sealed.wrappedKey,
+        kekVersion: sealed.kekVersion,
+        hint: hintOf(value),
+        rotatedAt: this.clock(),
+      })
+      .where(and(eq(schema.secrets.id, secretId), isNull(schema.secrets.revokedAt)))
+      .returning({ id: schema.secrets.id });
+    if (!row) throw new AppError('NOT_FOUND', { detail: 'The credential is missing or revoked.' });
+  }
+
+  /** Revokes a stored secret inside an existing tenant transaction (no-op when already revoked). */
+  async revokeIn(tx: TenantTx, secretId: string): Promise<void> {
+    await tx
+      .update(schema.secrets)
+      .set({ revokedAt: this.clock() })
+      .where(and(eq(schema.secrets.id, secretId), isNull(schema.secrets.revokedAt)));
+  }
+
+  /** The masked form of a stored secret, e.g. `••••9f3a`, and when it was last replaced. */
+  async maskedIn(
+    tx: TenantTx,
+    secretId: string,
+  ): Promise<{ masked: string; rotatedAt: string | null }> {
+    const [row] = await tx
+      .select({ hint: schema.secrets.hint, rotatedAt: schema.secrets.rotatedAt })
+      .from(schema.secrets)
+      .where(eq(schema.secrets.id, secretId));
+    return {
+      masked: row?.hint ? `••••${row.hint}` : '••••',
+      rotatedAt: iso(row?.rotatedAt ?? null),
+    };
+  }
+
   /**
    * Returns the plaintext for server-side use. Data keys wrapped with a retired KEK are rewrapped
    * with the active one on the way (lazy rotation).

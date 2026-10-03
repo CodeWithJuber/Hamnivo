@@ -111,6 +111,27 @@ export const DecisionProviderKind = z
   .enum(['jev', 'mock', 'none'])
   .meta({ id: 'DecisionProviderKind' });
 
+/**
+ * The Jev version Hamnivo's thresholds were evaluated on (docs/evals). Studio suggests it when a
+ * rubric chooses Jev; a rubric still pins its own version, and moving to a newer one is a choice.
+ */
+export const JEV_RECOMMENDED_MODEL = 'jev-1.13.0';
+
+/** Whether this server can call Jev, and the version to pin (see JEV_RECOMMENDED_MODEL). */
+export const JevStatus = z
+  .object({
+    /** The server has a TypeSafe key (TYPESAFE_API_KEY). Without it, Jev decisions are unavailable. */
+    configured: z.boolean(),
+    recommendedModel: z.string(),
+    /**
+     * Routing thresholds measured for `recommendedModel` (docs/evals): Studio fills empty
+     * languages with them when a rubric chooses that version. A language without one stays empty.
+     */
+    recommendedThresholds: z.partialRecord(LanguageSlice, z.number().min(0).max(1)),
+  })
+  .meta({ id: 'JevStatus' });
+export type JevStatus = z.infer<typeof JevStatus>;
+
 /** A pinned provider model: it must name a version, never a moving alias such as `latest`. */
 export const PinnedModelVersion = z
   .string()
@@ -171,6 +192,7 @@ export const DecisionTask = z
     published: DecisionRubric.nullable(),
     draft: DecisionRubric.nullable(),
     updatedAt: Timestamp.nullable(),
+    jev: JevStatus,
   })
   .meta({ id: 'DecisionTask' });
 export type DecisionTask = z.infer<typeof DecisionTask>;

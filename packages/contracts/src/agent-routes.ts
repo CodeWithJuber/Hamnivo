@@ -151,7 +151,7 @@ export const agentRoutes = {
     path: '/v1/admin/kill-switches',
     operationId: 'createKillSwitch',
     summary:
-      'Stop AI replies for the tenant, a brand or an agent; conversations go to people (agents.publish)',
+      'Stop AI replies for the tenant, a brand or an agent (agents.publish), or one tool’s actions (tools.manage); people keep chatting',
     tags: ['Agents'],
     auth: 'staff_session',
     body: CreateKillSwitchRequest,
@@ -162,7 +162,8 @@ export const agentRoutes = {
     method: 'post',
     path: '/v1/admin/kill-switches/{killSwitchId}/clear',
     operationId: 'clearKillSwitch',
-    summary: 'Let the AI answer again in this scope (agents.publish, fresh sign-in)',
+    summary:
+      'Let the AI answer, or the tool act, again in this scope (agents.publish or tools.manage, fresh sign-in)',
     tags: ['Agents'],
     auth: 'staff_session',
     params: z.object({ killSwitchId: z.string().meta({ description: 'ksw_…' }) }),

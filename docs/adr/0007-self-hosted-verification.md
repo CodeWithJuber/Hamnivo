@@ -1,6 +1,6 @@
 # ADR 0007: Self-hosted verification instead of hosted CI
 
-- Status: accepted
+- Status: accepted; amended by ADR 0009 (the same pipeline now also runs on GitHub Actions)
 - Date: 2026-09-26
 
 ## Context

@@ -13,9 +13,11 @@
     "dev": "tsc -p tsconfig.build.json && node --env-file-if-exists=../../.env.local --watch-path=dist dist/main.api.js",
     "start:api": "node --env-file-if-exists=../../.env.local dist/main.api.js",
     "start:worker": "node --env-file-if-exists=../../.env.local dist/main.worker.js",
+    "billing": "node --env-file-if-exists=../../.env.local dist/main.billing.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:int": "vitest run --config vitest.int.config.ts"
+    "test:int": "vitest run --config vitest.int.config.ts",
+    "test:live": "vitest run --config vitest.live.config.ts"
   },
   "dependencies": {
     "@ai-sdk/provider": "4.0.18",
@@ -29,6 +31,7 @@
     "@hamnivo/contracts": "workspace:*",
     "@hamnivo/db": "workspace:*",
     "@hamnivo/domain": "workspace:*",
+    "@hamnivo/migration-sdk": "workspace:*",
     "@hamnivo/policy": "workspace:*",
     "@nestjs/common": "12.1.0",
     "@nestjs/core": "12.1.0",
@@ -55,12 +58,15 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@hamnivo/server": "workspace:*",
     "@nestjs/testing": "12.1.0",
     "@swc/core": "1.16.2",
     "@types/html-to-text": "9.0.4",
     "@types/node": "catalog:",
     "@types/nodemailer": "8.0.2",
+    "@types/oidc-provider": "9.12.1",
     "eventsource-parser": "4.1.1",
+    "oidc-provider": "9.12.2",
     "typescript": "catalog:",
     "unplugin-swc": "2.0.0",
     "vitest": "catalog:"

@@ -34,6 +34,11 @@ export const HostToFrame = z.discriminatedUnion('type', [
     requestId: z.string().max(64),
   }),
   z.object({ ...base, type: z.literal('set-locale'), locale: z.string().max(35) }),
+  /**
+   * The visitor opened the chat from a proactive prompt (W19). Only the trigger's id travels: the
+   * widget shows the brand's own words from its configuration, never text from the page.
+   */
+  z.object({ ...base, type: z.literal('proactive'), triggerId: z.string().max(32) }),
 ]);
 export type HostToFrame = z.infer<typeof HostToFrame>;
 
@@ -47,6 +52,8 @@ export const PublicWidgetEvent = z.enum([
   'conversation.resolved',
   'handoff.requested',
   'identity.changed',
+  /** The customer must sign in on the website to approve an AI action (payload: actionId). */
+  'identity.required',
   'error',
 ]);
 export type PublicWidgetEvent = z.infer<typeof PublicWidgetEvent>;

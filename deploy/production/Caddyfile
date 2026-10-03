@@ -106,7 +106,8 @@
 			lb_try_interval 250ms
 		}
 		header {
-			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors {http.request.header.X-Hamnivo-Frame-Ancestors}"
+			# blob: shows pictures customers and staff sent, fetched with the session (W09).
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors {http.request.header.X-Hamnivo-Frame-Ancestors}"
 			Cache-Control no-store
 		}
 	}

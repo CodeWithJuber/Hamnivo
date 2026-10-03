@@ -1,0 +1,38 @@
+{
+  "id": "3a91d2c0-9c12-11ef-a1b4-6f2d8e0c7b33",
+  "type": "chat",
+  "pageId": "6512f0c4a9e3b10c8d7e4f21",
+  "visitor": {
+    "name": "V1727190442218704",
+    "id": "5c8b6a4d2af9663f7c49f339c9f5981f3c637615b93368acacc58e61ae386e8e",
+    "email": null
+  },
+  "location": {
+    "countryCode": "AE",
+    "city": "Dubai"
+  },
+  "messageCount": 3,
+  "chatDuration": 128,
+  "rating": 0,
+  "createdOn": "2026-09-21T14:03:12.640Z",
+  "messages": [
+    {
+      "sender": { "t": "v" },
+      "type": "msg",
+      "time": "2026-09-21T14:03:12.640Z",
+      "msg": "مرحبًا، هل يمكنني تغيير عنوان التوصيل لطلبي رقم 4821؟"
+    },
+    {
+      "sender": { "t": "a", "n": "Omar Haddad", "id": "a11fa33e39eb0d4e6af44acd" },
+      "type": "msg",
+      "time": "2026-09-21T14:04:30.019Z",
+      "msg": "أهلًا بك! نعم، أرسل لي العنوان الجديد وسأحدّثه الآن."
+    },
+    {
+      "sender": { "t": "v" },
+      "type": "msg",
+      "time": "2026-09-21T14:05:02.377Z",
+      "msg": "شكرًا جزيلًا 🙏"
+    }
+  ]
+}

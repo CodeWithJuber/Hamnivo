@@ -10,7 +10,7 @@ import {
 } from '@hamnivo/db';
 import { authorize, type Permission, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm';
 import type { z } from 'zod';
 import { AppError } from '../common/app-error.js';
 import { iso } from '../common/views.js';
@@ -24,11 +24,13 @@ function view(row: Row): KillSwitch {
   return {
     id: toPublicId('killSwitch', row.id),
     scope: row.scope,
-    targetId: row.agentId
-      ? toPublicId('agent', row.agentId)
-      : row.brandId
-        ? toPublicId('brand', row.brandId)
-        : null,
+    targetId: row.toolId
+      ? toPublicId('tool', row.toolId)
+      : row.agentId
+        ? toPublicId('agent', row.agentId)
+        : row.brandId
+          ? toPublicId('brand', row.brandId)
+          : null,
     reason: row.reason,
     active: row.clearedAt === null,
     createdAt: row.createdAt.toISOString(),
@@ -38,8 +40,9 @@ function view(row: Row): KillSwitch {
 }
 
 /**
- * Kill switches (X08): stop AI replies for the tenant, a brand or one agent. Conversations the AI
- * held go to people on their next message; staff messaging keeps working throughout.
+ * Kill switches (X08): stop AI replies for the tenant, a brand or one agent, or one tool's actions.
+ * Conversations the AI held go to people on their next message; staff messaging keeps working
+ * throughout. A tool switch refuses calls to the tool and the sending of its approved actions.
  */
 @Injectable()
 export class KillSwitchesService {
@@ -69,7 +72,15 @@ export class KillSwitchesService {
   }
 
   /** The resource a switch acts on, for authorization: the brand, or the whole tenant. */
-  private async resourceOf(tx: TenantTx, row: Pick<Row, 'brandId' | 'agentId'>) {
+  private async resourceOf(tx: TenantTx, row: Pick<Row, 'brandId' | 'agentId' | 'toolId'>) {
+    if (row.toolId) {
+      const [tool] = await tx
+        .select()
+        .from(schema.toolDefinitions)
+        .where(eq(schema.toolDefinitions.id, row.toolId));
+      if (!tool) throw new AppError('NOT_FOUND', { detail: 'Tool not found.' });
+      return { workspaceId: tool.workspaceId, brandId: tool.brandId };
+    }
     if (row.agentId) {
       const [agent] = await tx
         .select()
@@ -113,9 +124,12 @@ export class KillSwitchesService {
     const target = {
       brandId: input.scope === 'brand' ? fromPublicId('brand', input.targetId ?? '') : null,
       agentId: input.scope === 'agent' ? fromPublicId('agent', input.targetId ?? '') : null,
+      toolId: input.scope === 'tool' ? fromPublicId('tool', input.targetId ?? '') : null,
     };
     return this.tx(principal, async (tx) => {
-      enforce(this.allowed(principal, 'agents.publish', await this.resourceOf(tx, target)));
+      // Stopping a tool is a tool policy change; stopping replies is an agent release decision.
+      const permission = input.scope === 'tool' ? 'tools.manage' : 'agents.publish';
+      enforce(this.allowed(principal, permission, await this.resourceOf(tx, target)));
       const [row] = await tx
         .insert(schema.killSwitches)
         .values({
@@ -148,7 +162,13 @@ export class KillSwitchesService {
         .where(eq(schema.killSwitches.id, fromPublicId('killSwitch', publicId)))
         .for('update');
       if (!row) throw new AppError('NOT_FOUND', { detail: 'Kill switch not found.' });
-      enforce(this.allowed(principal, 'agents.publish', await this.resourceOf(tx, row)));
+      enforce(
+        this.allowed(
+          principal,
+          row.scope === 'tool' ? 'tools.manage' : 'agents.publish',
+          await this.resourceOf(tx, row),
+        ),
+      );
       if (row.clearedAt) return view(row);
       const [cleared] = await tx
         .update(schema.killSwitches)
@@ -169,10 +189,13 @@ export class KillSwitchesService {
     });
   }
 
-  /** The active switch that stops this brand's agent, if any. */
+  /**
+   * The active switch that stops this brand's agent, if any. With a tool, a switch on that tool
+   * counts too (tool switches never stop replies, only the tool's actions).
+   */
   async activeFor(
     tx: TenantTx,
-    scope: { brandId: string | null; agentId: string | null },
+    scope: { brandId: string | null; agentId: string | null; toolId?: string | null },
   ): Promise<Row | null> {
     const [row] = await tx
       .select()
@@ -182,12 +205,34 @@ export class KillSwitchesService {
           isNull(schema.killSwitches.clearedAt),
           or(
             eq(schema.killSwitches.scope, 'tenant'),
-            scope.brandId ? eq(schema.killSwitches.brandId, scope.brandId) : undefined,
+            scope.brandId
+              ? and(
+                  eq(schema.killSwitches.brandId, scope.brandId),
+                  eq(schema.killSwitches.scope, 'brand'),
+                )
+              : undefined,
             scope.agentId ? eq(schema.killSwitches.agentId, scope.agentId) : undefined,
+            scope.toolId ? eq(schema.killSwitches.toolId, scope.toolId) : undefined,
           ),
         ),
       )
       .limit(1);
     return row ?? null;
+  }
+
+  /** Tools stopped by an active tool switch, among these. */
+  async stoppedTools(tx: TenantTx, toolIds: string[]): Promise<Set<string>> {
+    if (toolIds.length === 0) return new Set();
+    const rows = await tx
+      .select({ toolId: schema.killSwitches.toolId })
+      .from(schema.killSwitches)
+      .where(
+        and(
+          isNull(schema.killSwitches.clearedAt),
+          eq(schema.killSwitches.scope, 'tool'),
+          inArray(schema.killSwitches.toolId, toolIds),
+        ),
+      );
+    return new Set(rows.flatMap((r) => (r.toolId ? [r.toolId] : [])));
   }
 }

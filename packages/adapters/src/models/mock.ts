@@ -1,6 +1,8 @@
 import type {
   LanguageModelV4,
   LanguageModelV4CallOptions,
+  LanguageModelV4Content,
+  LanguageModelV4FunctionTool,
   LanguageModelV4GenerateResult,
   LanguageModelV4Prompt,
   LanguageModelV4StreamPart,
@@ -11,6 +13,13 @@ import {
   MEMORY_EXTRACTION_MARKER,
   mockExtractMemories,
 } from '@hamnivo/domain';
+import {
+  lastToolResult,
+  planToolCall,
+  replyAfterTool,
+  type SeenToolResult,
+  type ToolPlan,
+} from './mock-tools.js';
 
 export interface MockTurn {
   /** System instructions, joined. */
@@ -146,19 +155,62 @@ export const defaultMockReply: MockReply = ({ system, text }) => {
   return `${GREETING.test(text) ? reply.greeting : ''}${reply.body}${remembered}`;
 };
 
+export interface MockToolOptions {
+  /**
+   * Replaces the default tool planner, e.g. to test a misbehaving model that follows
+   * instructions found in tool output. `undefined` falls back to the default; `null` calls none.
+   */
+  plan?: (input: {
+    turn: MockTurn;
+    tools: LanguageModelV4FunctionTool[];
+    lastResult: SeenToolResult | null;
+  }) => ToolPlan | null | undefined;
+}
+
+type MockOutput =
+  | { kind: 'text'; turn: MockTurn; text: string }
+  | { kind: 'tool'; turn: MockTurn; plan: ToolPlan; id: string };
+
+const TOOL_FINISH = { unified: 'tool-calls', raw: 'tool_calls' } as const;
+const STOP = { unified: 'stop', raw: 'stop' } as const;
+
 /**
  * `hamnivo-mock`: a deterministic, offline language model with the AI SDK V4 interface, used when
- * no provider key is configured, in tests and in evaluations. It never calls the network.
+ * no provider key is configured, in tests, simulations and evaluations. It never calls the
+ * network. Offered tools are called deterministically (see mock-tools.ts); `tools: false` turns
+ * that off.
  */
 export function createMockModel(
-  options: { modelId?: string; reply?: MockReply; chunkWords?: number } = {},
+  options: {
+    modelId?: string;
+    reply?: MockReply;
+    chunkWords?: number;
+    tools?: MockToolOptions | false;
+  } = {},
 ): LanguageModelV4 {
   const reply = options.reply ?? defaultMockReply;
   const chunkWords = options.chunkWords ?? 3;
-  const run = (call: LanguageModelV4CallOptions) => {
+  const run = (call: LanguageModelV4CallOptions): MockOutput => {
     const turn = turnOf(call.prompt);
-    return { turn, output: reply(turn) };
+    const seen = lastToolResult(call.prompt);
+    const tools = (call.tools ?? []).filter(
+      (tool): tool is LanguageModelV4FunctionTool => tool.type === 'function',
+    );
+    if (options.tools !== false && tools.length > 0) {
+      const custom = options.tools?.plan?.({ turn, tools, lastResult: seen });
+      const plan = custom !== undefined ? custom : seen ? null : planToolCall(turn.text, tools);
+      if (plan) {
+        const calls = call.prompt.filter((m) => m.role === 'tool').length;
+        return { kind: 'tool', turn, plan, id: `call_${turn.turn}_${calls}` };
+      }
+    }
+    return { kind: 'text', turn, text: seen ? replyAfterTool(seen) : reply(turn) };
   };
+  const usage = (output: MockOutput) =>
+    usageOf(
+      `${output.turn.system} ${output.turn.text}`,
+      output.kind === 'text' ? output.text : JSON.stringify(output.plan),
+    );
   return {
     specificationVersion: 'v4',
     provider: 'hamnivo',
@@ -166,31 +218,52 @@ export function createMockModel(
     supportedUrls: {},
     async doGenerate(call): Promise<LanguageModelV4GenerateResult> {
       call.abortSignal?.throwIfAborted();
-      const { turn, output } = run(call);
+      const output = run(call);
+      const content: LanguageModelV4Content[] =
+        output.kind === 'text'
+          ? [{ type: 'text', text: output.text }]
+          : [
+              {
+                type: 'tool-call',
+                toolCallId: output.id,
+                toolName: output.plan.toolName,
+                input: JSON.stringify(output.plan.input),
+              },
+            ];
       return {
-        content: [{ type: 'text', text: output }],
-        finishReason: { unified: 'stop', raw: 'stop' },
-        usage: usageOf(`${turn.system} ${turn.text}`, output),
+        content,
+        finishReason: output.kind === 'text' ? STOP : TOOL_FINISH,
+        usage: usage(output),
         warnings: [],
       };
     },
     async doStream(call) {
       call.abortSignal?.throwIfAborted();
-      const { turn, output } = run(call);
-      const pieces = output.split(/(?<=\s)/);
-      const parts: LanguageModelV4StreamPart[] = [{ type: 'text-start', id: 't0' }];
-      for (let i = 0; i < pieces.length; i += chunkWords) {
+      const output = run(call);
+      const parts: LanguageModelV4StreamPart[] = [];
+      if (output.kind === 'tool') {
         parts.push({
-          type: 'text-delta',
-          id: 't0',
-          delta: pieces.slice(i, i + chunkWords).join(''),
+          type: 'tool-call',
+          toolCallId: output.id,
+          toolName: output.plan.toolName,
+          input: JSON.stringify(output.plan.input),
         });
+      } else {
+        const pieces = output.text.split(/(?<=\s)/);
+        parts.push({ type: 'text-start', id: 't0' });
+        for (let i = 0; i < pieces.length; i += chunkWords) {
+          parts.push({
+            type: 'text-delta',
+            id: 't0',
+            delta: pieces.slice(i, i + chunkWords).join(''),
+          });
+        }
+        parts.push({ type: 'text-end', id: 't0' });
       }
-      parts.push({ type: 'text-end', id: 't0' });
       parts.push({
         type: 'finish',
-        finishReason: { unified: 'stop', raw: 'stop' },
-        usage: usageOf(`${turn.system} ${turn.text}`, output),
+        finishReason: output.kind === 'text' ? STOP : TOOL_FINISH,
+        usage: usage(output),
       });
       const stream = new ReadableStream<LanguageModelV4StreamPart>({
         start(controller) {

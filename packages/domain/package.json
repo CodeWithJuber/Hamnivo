@@ -2,7 +2,7 @@
   "name": "@hamnivo/domain",
   "version": "0.1.0",
   "private": true,
-  "description": "Hamnivo domain types and ports: the conversation authority and decision ports, pure domain rules such as explicit human-request detection, and commerce rules (money, state machines, quote hashing, approvals, refund policy, capabilities, receipt-backed claims)",
+  "description": "Hamnivo domain types and ports: the conversation authority and decision ports, pure domain rules such as explicit human-request detection, and commerce rules (money, state machines, quote hashing, approvals, refund policy, capabilities, receipt-backed claims) and AI action rules (portable tool schemas, action policy, approval binding, autopilot decisions, receipt-backed action claims, handoff packets, simulation comparison)",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -14,6 +14,18 @@
     "./commerce": {
       "types": "./dist/commerce/index.d.ts",
       "import": "./dist/commerce/index.js"
+    },
+    "./billing": {
+      "types": "./dist/billing/index.d.ts",
+      "import": "./dist/billing/index.js"
+    },
+    "./analytics": {
+      "types": "./dist/analytics/index.d.ts",
+      "import": "./dist/analytics/index.js"
+    },
+    "./actions": {
+      "types": "./dist/actions/index.d.ts",
+      "import": "./dist/actions/index.js"
     }
   },
   "files": [

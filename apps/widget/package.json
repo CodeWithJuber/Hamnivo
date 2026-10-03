@@ -21,6 +21,7 @@
     "@hamnivo/ui": "workspace:*",
     "dompurify": "3.4.16",
     "i18next": "26.4.2",
+    "lucide-react": "1.48.0",
     "marked": "18.0.14",
     "react": "19.3.0",
     "react-dom": "19.3.0",

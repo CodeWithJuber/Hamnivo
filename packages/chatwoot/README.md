@@ -12,7 +12,8 @@ from `@hamnivo/domain`.
 | `src/mapping.ts` | Converts Chatwoot JSON (API responses and webhooks) into authority messages and conversation state. |
 | `src/webhooks.ts` | Signature verification (`sha256=HMAC(secret, "{ts}.{body}")`, ±5 minutes, constant time). Also event normalization, dedupe keys and redaction of credentials before storage. |
 | `src/provisioning.ts` | Creates a connected account: an integration user, an API inbox with mandatory HMAC identity and auto-assignment off, the AI agent bot, a signed account webhook and the Copilot dashboard app. It refuses to adopt existing Chatwoot users. |
-| `src/fake/` | A fake Chatwoot for tests, with faithful payloads, permissions, assignment rules, paging and signed webhooks. It can duplicate, drop, delay or reorder webhook deliveries. |
+| `src/migration.ts` | `ChatwootImporter` writes imported history (migration): the import inbox, contacts without email or phone, conversations found again by a key attribute, messages with their original time and `source_id`, file attachments, resolving, and deletion for rollbacks. It also reads what could act on imports (automation rules, integration hooks, inbox settings). |
+| `src/fake/` | A fake Chatwoot for tests, with faithful payloads, permissions, assignment rules, paging and signed webhooks. It can duplicate, drop, delay or reorder webhook deliveries. It logs every request and what Chatwoot would send outside itself (reply emails, greetings). |
 
 ## Chatwoot behaviour this package relies on (verified on v4.18.0-ce)
 
@@ -27,6 +28,27 @@ from `@hamnivo/domain`.
 - The customer view comes from the Client API, which excludes private notes and activity messages.
 - Bot tokens can post messages and change conversations, but cannot list messages. Reads use the
   integration user.
+
+### Files, deletion and read markers
+
+- A message with files is `multipart/form-data` with `attachments[]`. `content_attributes` sent
+  as a JSON string keeps its types; bracket fields (`content_attributes[hv][v]`) turn numbers
+  into strings.
+- Attachment JSON has no file name. The name is the last segment of `data_url`, an
+  ActiveStorage `/blobs/redirect/{signed id}/{name}` URL on Chatwoot's `FRONTEND_URL`. The
+  customer view (Client API) may list a message's files in another order than the response that
+  created it.
+- `downloadAttachment` reads `/rails/active_storage/blobs/proxy/{signed id}/{name}` on the
+  connection's own base URL, with redirects refused. Only the signed id and name are taken from
+  `data_url`; its host is never contacted.
+- `DELETE …/messages/{id}` (the integration user, or an agent of the inbox) keeps a marker:
+  the content becomes "This message was deleted", `content_attributes` becomes `{deleted: true}`,
+  the files are removed, and `message_updated` is sent.
+- Staff opening a conversation (`POST …/conversations/{id}/update_last_seen`) sets
+  `agent_last_seen_at` (Unix seconds on the conversation, 0 before; ISO in message-list `meta`).
+  Chatwoot writes the column directly: no webhook, and `updated_at` does not move.
+- The Client API's `update_last_seen` records that the contact saw the conversation and marks
+  agent messages sent before then as `read`.
 
 ### Contacts and identity
 
@@ -49,6 +71,22 @@ from `@hamnivo/domain`.
 - Assigning a user clears the bot and opens a pending conversation.
 - Assigning `assignee_type: 'AgentBot'` sets the bot and makes the conversation `pending`.
 - `assignee_id: null` clears both and leaves the status unchanged.
+
+### Imported history
+
+- `external_created_at` is kept only in the message's `content_attributes`. Chatwoot stores its
+  own `created_at`, orders messages by it and shows it in its dashboard, so imports write messages
+  in their original order and Hamnivo shows the original times.
+- A top-level `external_created_at` is lost when the same request also sends
+  `content_attributes`; the original time therefore always travels inside `content_attributes`.
+- Application API contacts are created as given: no merge by email. A second contact with the same
+  identifier is refused (HTTP 422), and `contacts/search` finds it by identifier.
+- Chatwoot emails an outgoing public message on an API inbox when the contact has an email and the
+  account has email continuity on. Imported contacts never get an email or phone number.
+- Deleting a conversation is asynchronous (it disappears within seconds). Deleting a contact also
+  deletes its conversations.
+- `(mention://user/…)` links in private notes notify the mentioned staff, so imported text has
+  them turned into plain names first.
 
 ### Webhooks
 

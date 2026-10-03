@@ -2,6 +2,14 @@ import { sql } from 'drizzle-orm';
 import type { Db } from './client.js';
 
 /**
+ * Raw queries return timestamps as PostgreSQL text (Drizzle's node-postgres driver turns off the
+ * driver's Date parsing), so resolver results convert them here.
+ */
+export function asDate(value: string | Date | null | undefined): Date | null {
+  return value === null || value === undefined ? null : new Date(value);
+}
+
+/**
  * Typed wrappers for the SECURITY DEFINER functions in schema `app`. They are the only way the
  * application role reads across tenants: pre-tenant lookups (which tenant does this widget, API
  * key, webhook or session belong to?) and worker maintenance. Everything else uses withTenant().
@@ -53,10 +61,15 @@ export interface ApiKeyResolution {
   keyId: string;
   serviceAccountId: string;
   secretHash: Buffer;
+  /** Version of the key-encryption key the secret hash was made with. */
+  hashVersion: number;
   scopes: string[];
+  scopeType: string;
+  scopeId: string | null;
   expiresAt: Date | null;
   revokedAt: Date | null;
   tenantStatus: string;
+  serviceAccountStatus: string;
 }
 
 export async function resolveApiKey(db: Db, prefix: string): Promise<ApiKeyResolution | null> {
@@ -65,10 +78,14 @@ export async function resolveApiKey(db: Db, prefix: string): Promise<ApiKeyResol
     key_id: string;
     service_account_id: string;
     secret_hash: Buffer;
+    hash_version: number;
     scopes: string[];
-    expires_at: Date | null;
-    revoked_at: Date | null;
+    scope_type: string;
+    scope_id: string | null;
+    expires_at: string | null;
+    revoked_at: string | null;
     tenant_status: string;
+    service_account_status: string;
   }>(sql`select * from app.resolve_api_key(${prefix})`);
   const row = rows[0];
   return row
@@ -77,10 +94,14 @@ export async function resolveApiKey(db: Db, prefix: string): Promise<ApiKeyResol
         keyId: row.key_id,
         serviceAccountId: row.service_account_id,
         secretHash: row.secret_hash,
+        hashVersion: row.hash_version,
         scopes: row.scopes,
-        expiresAt: row.expires_at,
-        revokedAt: row.revoked_at,
+        scopeType: row.scope_type,
+        scopeId: row.scope_id,
+        expiresAt: asDate(row.expires_at),
+        revokedAt: asDate(row.revoked_at),
         tenantStatus: row.tenant_status,
+        serviceAccountStatus: row.service_account_status,
       }
     : null;
 }
@@ -158,15 +179,77 @@ export async function resolveTenantSlug(
   return row ? { tenantId: row.tenant_id, tenantStatus: row.tenant_status } : null;
 }
 
+export interface SsoResolution {
+  tenantId: string;
+  connectionId: string;
+  connectionStatus: string;
+  ssoOnly: boolean;
+  tenantStatus: string;
+}
+
+/** The workspace that proved this email domain, with its SSO connection (verified only). */
+export async function resolveSsoDomain(
+  db: Db,
+  domain: string,
+): Promise<(SsoResolution & { providerId: string }) | null> {
+  const { rows } = await db.execute<{
+    tenant_id: string;
+    connection_id: string;
+    provider_id: string;
+    connection_status: string;
+    sso_only: boolean;
+    tenant_status: string;
+  }>(sql`select * from app.resolve_sso_domain(${domain})`);
+  const row = rows[0];
+  return row
+    ? {
+        tenantId: row.tenant_id,
+        connectionId: row.connection_id,
+        providerId: row.provider_id,
+        connectionStatus: row.connection_status,
+        ssoOnly: row.sso_only,
+        tenantStatus: row.tenant_status,
+      }
+    : null;
+}
+
+/** The workspace an SSO callback belongs to (verified domains only). */
+export async function resolveSsoProvider(
+  db: Db,
+  providerId: string,
+): Promise<(SsoResolution & { domain: string }) | null> {
+  const { rows } = await db.execute<{
+    tenant_id: string;
+    connection_id: string;
+    domain: string;
+    connection_status: string;
+    sso_only: boolean;
+    tenant_status: string;
+  }>(sql`select * from app.resolve_sso_provider(${providerId})`);
+  const row = rows[0];
+  return row
+    ? {
+        tenantId: row.tenant_id,
+        connectionId: row.connection_id,
+        domain: row.domain,
+        connectionStatus: row.connection_status,
+        ssoOnly: row.sso_only,
+        tenantStatus: row.tenant_status,
+      }
+    : null;
+}
+
 export async function resolveInvitation(
   db: Db,
   invitationId: string,
 ): Promise<{ tenantId: string; status: string; expiresAt: Date } | null> {
-  const { rows } = await db.execute<{ tenant_id: string; status: string; expires_at: Date }>(
+  const { rows } = await db.execute<{ tenant_id: string; status: string; expires_at: string }>(
     sql`select * from app.resolve_invitation(${invitationId}::uuid)`,
   );
   const row = rows[0];
-  return row ? { tenantId: row.tenant_id, status: row.status, expiresAt: row.expires_at } : null;
+  return row
+    ? { tenantId: row.tenant_id, status: row.status, expiresAt: new Date(row.expires_at) }
+    : null;
 }
 
 export interface ClaimedOutboxEvent {
@@ -195,7 +278,7 @@ export async function claimOutbox(
     payload: unknown;
     headers: Record<string, unknown>;
     attempts: number;
-    created_at: Date;
+    created_at: string;
   }>(sql`select * from app.claim_outbox(${options.limit}::int, ${options.leaseSeconds}::int)`);
   return rows.map((row) => ({
     tenantId: row.tenant_id,
@@ -206,7 +289,7 @@ export async function claimOutbox(
     payload: row.payload,
     headers: row.headers,
     attempts: row.attempts,
-    createdAt: row.created_at,
+    createdAt: new Date(row.created_at),
   }));
 }
 
@@ -331,4 +414,12 @@ export async function ensureAuditPartitions(db: Db, monthsAhead = 2): Promise<nu
     sql`select app.ensure_audit_partitions(${monthsAhead}::int) as created`,
   );
   return rows[0]?.created ?? 0;
+}
+
+/** Clears uploaded migration exports whose retention has passed; returns how many. */
+export async function purgeMigrationFiles(db: Db, batch = 100): Promise<number> {
+  const { rows } = await db.execute<{ purge_migration_files: number }>(
+    sql`select app.purge_migration_files(${batch}::int)`,
+  );
+  return Number(rows[0]?.purge_migration_files ?? 0);
 }

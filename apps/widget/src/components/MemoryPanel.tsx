@@ -103,7 +103,7 @@ function Item({
     >
       <div className="flex flex-col gap-0.5">
         <span className="text-xs font-medium text-text-secondary">{label(item.key)}</span>
-        <bdi dir="auto" className="text-[15px] font-medium text-text">
+        <bdi dir="auto" className="text-[0.9375rem] font-medium text-text">
           {item.value}
         </bdi>
       </div>

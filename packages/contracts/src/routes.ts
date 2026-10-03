@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { adminRoutes, identityRoutes } from './admin-routes.js';
 import { agentRoutes } from './agent-routes.js';
+import { analyticsRoutes, billingRoutes } from './billing-routes.js';
 import { cacheRoutes } from './cache-routes.js';
+import { checkRoutes } from './check-routes.js';
 import {
   commerceAdminRoutes,
   commerceIntegrationRoutes,
@@ -18,19 +20,29 @@ import {
   SendMessageResponse,
   StartConversationRequest,
 } from './conversations.js';
+import {
+  customerSurfaceAdminRoutes,
+  customerSurfaceWidgetRoutes,
+  notificationRoutes,
+} from './customer-surface-routes.js';
 import { decisionRoutes } from './decision-routes.js';
+import { apiKeyRoutes, networkRoutes, webhookRoutes } from './developer-routes.js';
 import { HamnivoEvent, StreamControl } from './events.js';
 import { inboxRoutes } from './inbox-routes.js';
 import { knowledgeRoutes } from './knowledge-routes.js';
 import { languageRoutes } from './language-routes.js';
 import { adminMemoryRoutes, widgetMemoryRoutes } from './memory-routes.js';
+import { migrationRoutes } from './migration-routes.js';
 import { AttachmentPart } from './parts.js';
+import { platformRoutes } from './platform-routes.js';
+import { securityRoutes } from './security-routes.js';
 import {
   StaffConversation,
   StaffMessageRequest,
   StaffMessageResponse,
   TakeoverRequest,
 } from './staff-conversations.js';
+import { actionInboxRoutes, actionWidgetRoutes, toolAdminRoutes } from './tool-routes.js';
 import {
   CreateWidgetSessionRequest,
   IdentifyRequest,
@@ -47,6 +59,8 @@ export type RouteAuth =
   | 'widget_session'
   | 'staff_session'
   | 'api_key'
+  /** A staff session (with X-Hamnivo-Tenant) or an API key (its own tenant). */
+  | 'staff_or_api_key'
   | 'integration_signature'
   | 'provider_signature';
 
@@ -60,6 +74,8 @@ export interface RouteDef {
   params?: z.ZodObject;
   query?: z.ZodObject;
   body?: z.ZodType;
+  /** A request body that is not JSON, such as the bytes of an uploaded file. */
+  rawBody?: { contentType: string; description: string };
   /** Success response. `schema` undefined means an empty body. */
   success: { status: number; description: string; schema?: z.ZodType; contentType?: string };
   /** Accepts an Idempotency-Key header bound to the request hash. */
@@ -236,11 +252,27 @@ export const widgetRoutes = {
     method: 'post',
     path: '/v1/widget/conversations/{conversationId}/uploads',
     operationId: 'uploadAttachment',
-    summary: 'Upload a file into quarantine; it becomes available only after scanning',
+    summary:
+      'Upload a file into quarantine: its type is read from its bytes, it is scanned, and only a clean file can be sent',
     tags: ['Widget'],
     auth: 'widget_session',
     params: conversationParams,
-    success: { status: 201, description: 'Upload received', schema: AttachmentPart },
+    query: z.object({
+      name: z
+        .string()
+        .min(1)
+        .max(255)
+        .meta({ description: 'The file name as the customer chose it' }),
+    }),
+    rawBody: {
+      contentType: 'application/octet-stream',
+      description: 'The file’s bytes (at most the brand’s size limit, 10 MB at most)',
+    },
+    success: {
+      status: 201,
+      description: 'Scanned and ready to send (a refused file is a 413 or 422 problem instead)',
+      schema: AttachmentPart,
+    },
   },
   events: {
     method: 'get',
@@ -360,15 +392,30 @@ export const allRoutes: Record<string, RouteDef> = {
   ...adminRoutes,
   ...agentRoutes,
   ...knowledgeRoutes,
+  ...migrationRoutes,
   ...widgetMemoryRoutes,
   ...adminMemoryRoutes,
   ...integrationRoutes,
   ...conversationRoutes,
   ...decisionRoutes,
+  ...checkRoutes,
   ...cacheRoutes,
   ...languageRoutes,
   ...inboxRoutes,
+  ...securityRoutes,
+  ...platformRoutes,
   ...commerceAdminRoutes,
   ...commerceWidgetRoutes,
   ...commerceIntegrationRoutes,
+  ...apiKeyRoutes,
+  ...webhookRoutes,
+  ...networkRoutes,
+  ...billingRoutes,
+  ...analyticsRoutes,
+  ...customerSurfaceWidgetRoutes,
+  ...notificationRoutes,
+  ...customerSurfaceAdminRoutes,
+  ...toolAdminRoutes,
+  ...actionInboxRoutes,
+  ...actionWidgetRoutes,
 };

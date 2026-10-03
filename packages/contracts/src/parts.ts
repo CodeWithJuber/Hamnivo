@@ -13,22 +13,81 @@ export const TextPart = z
   })
   .meta({ id: 'TextPart' });
 
+/** Why a file was refused (W09). Any failure to scan is a refusal, never a pass. */
+export const AttachmentRejection = z.enum([
+  'type_not_allowed',
+  'too_large',
+  'too_many',
+  'malware_detected',
+  'scan_unavailable',
+  'unreadable',
+]);
+export type AttachmentRejection = z.infer<typeof AttachmentRejection>;
+
 export const AttachmentPart = z
   .object({
     type: z.literal('attachment'),
+    /**
+     * The file's id (upl_…). Downloads go through the gateway, which checks the caller may see
+     * the conversation it was sent in; the browser never receives an authority URL.
+     */
     uploadId: z.string(),
     name: z.string().max(255),
+    /** Detected from the file's bytes, never from its name or the declared type. */
     mimeType: z.string().max(127),
     sizeBytes: z.int().nonnegative(),
     /** Files are unavailable until scanning succeeds; scan failure denies access (W09). */
     status: z.enum(['quarantined', 'scanning', 'available', 'rejected']),
-    rejectionReason: z
-      .enum(['type_not_allowed', 'too_large', 'malware_detected', 'scan_unavailable', 'unreadable'])
-      .optional(),
+    rejectionReason: AttachmentRejection.optional(),
     /** Short-lived, authorization-checked download URL; present only when status is available. */
     url: z.url().optional(),
   })
   .meta({ id: 'AttachmentPart' });
+
+/**
+ * A shared place (W24). Clients show the label and coordinates as text, with a link to a public
+ * map; they never embed a third-party map or treat the label as markup.
+ */
+export const LocationPart = z
+  .object({
+    type: z.literal('location'),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    /** A place name or address as the sender gave it (plain text). */
+    label: z.string().max(300).nullable(),
+  })
+  .meta({ id: 'LocationPart' });
+
+/** A shared contact card (W24): plain values only; links are built by the client (tel:, mailto:). */
+export const ContactPart = z
+  .object({
+    type: z.literal('contact'),
+    name: z.string().min(1).max(120),
+    phone: z
+      .string()
+      .regex(/^\+?[0-9][0-9 ()\-.]{2,31}$/, 'Expected a phone number')
+      .nullable(),
+    email: z.email().max(254).nullable(),
+  })
+  .meta({ id: 'ContactPart' });
+
+/** Reactions a customer can add to a reply (W22). */
+export const REACTIONS = ['👍', '👎', '❤️', '🙏', '😊'] as const;
+export const ReactionEmoji = z.enum(REACTIONS);
+export type ReactionEmoji = z.infer<typeof ReactionEmoji>;
+
+/**
+ * A reaction to an earlier message (W22). Authorities without reactions (Chatwoot CE) receive it
+ * as a short reply that quotes the message, so staff read it as "👍" in reply to that message.
+ */
+export const ReactionPart = z
+  .object({
+    type: z.literal('reaction'),
+    emoji: ReactionEmoji,
+    /** The message reacted to (msg_…). */
+    messageId: z.string(),
+  })
+  .meta({ id: 'ReactionPart' });
 
 export const SourcePart = z
   .object({
@@ -109,6 +168,8 @@ export const NoticePart = z
       'reopened',
       'team_offline',
       'follow_up_scheduled',
+      /** The sender deleted this message; its text and files are gone (W23). */
+      'message_deleted',
     ]),
     text: z.string().max(300),
   })
@@ -132,6 +193,9 @@ export const KnownPart = z.discriminatedUnion('type', [
   TaskUpdatePart,
   ActionReceiptPart,
   NoticePart,
+  LocationPart,
+  ContactPart,
+  ReactionPart,
 ]);
 export const MessagePart = z.union([KnownPart, UnknownPart]).meta({ id: 'MessagePart' });
 export type MessagePart = z.infer<typeof MessagePart>;
@@ -146,6 +210,9 @@ const KNOWN_PART_TYPES = new Set([
   'task_update',
   'action_receipt',
   'notice',
+  'location',
+  'contact',
+  'reaction',
 ]);
 
 /**
@@ -189,6 +256,14 @@ function partToPlainText(part: MessagePart): string {
       return part.title;
     case 'action_receipt':
       return part.summary;
+    case 'location': {
+      const at = `${part.latitude.toFixed(5)}, ${part.longitude.toFixed(5)}`;
+      return part.label ? `${part.label} (${at})` : at;
+    }
+    case 'contact':
+      return [part.name, part.phone, part.email].filter(Boolean).join(', ');
+    case 'reaction':
+      return part.emoji;
     default:
       return part.fallbackText ?? '';
   }

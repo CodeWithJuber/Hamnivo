@@ -226,11 +226,24 @@ never waits on Jev.
 
 Noul answers carry only a probability. The adapter drops any confidence the wire sends with them.
 
-### Tests and what is not verified
+### Tests
 
-`test/jev/` checks the contract with an injected `fetch` and fixture JSON. No test calls the
-network. No live Jev call has been made. Account access, quotas, data handling and regional latency
-still need checking before production use.
+`test/jev/` checks the contract with an injected `fetch` and fixture JSON; `pnpm test` never calls
+the network.
+
+`test/jev/provider.live.test.ts` runs the adapter against TypeSafe's API, pinned to `jev-1.13.0`.
+It is opt-in and skips itself without a key:
+
+```sh
+TYPESAFE_API_KEY=… pnpm --filter @hamnivo/adapters test:live
+```
+
+It checks that choice, noul and score answers map correctly (labels offered, probabilities summing
+to 1, no confidence for nouls), that usage, latency, the model version and the request id are
+recorded, that a call finishes within the 1.5 s chat deadline and a 25 ms deadline stops it as
+`unavailable`/`deadline`, that a wrong key is `unavailable`/`auth`, and that a call the caller
+cancels is `unavailable`/`aborted`. The key is read from the environment only and never printed.
+Accuracy per language is measured separately by `run-suite decisions` in `@hamnivo/evals`.
 
 ## Cache stores
 
@@ -288,3 +301,109 @@ before calling the provider.
 
 No test calls the real Stripe API. The adapter has not yet been run against Stripe's live test
 mode.
+
+## Tools: MCP and the egress guard
+
+`@hamnivo/adapters/mcp` lets the AI use tools on remote MCP servers (D10), through the official
+`@modelcontextprotocol/sdk`. MCP is only a way to reach tools: Hamnivo's gateway decides which
+tools exist, who may call them and who approves.
+
+| | Supported |
+|---|---|
+| Transport | Streamable HTTP to a remote server, over HTTPS. No local (stdio) servers and no fallback to the older HTTP with SSE transport. |
+| Protocol revisions | `2025-11-25`, `2025-06-18` and `2025-03-26` (`MCP_SUPPORTED_PROTOCOLS`). The client offers the newest; a server that answers with another revision is refused before any tool is listed or called. |
+| Authentication | None, or a bearer token per server (`Authorization: Bearer …`). The gateway keeps the token in its secret broker and reveals it only for the request. OAuth is not supported yet. |
+| Requests used | `initialize`, `tools/list` (at most 200 tools over 10 pages) and `tools/call`. Resources, prompts, sampling and elicitation are not used. |
+| Network | Every request goes through the egress guard below. |
+
+| Export | What it does |
+|---|---|
+| `listMcpTools(endpoint, signal?)` | The server's tools with their names, descriptions, schemas and annotations, all as untrusted data, plus the revision the server chose. |
+| `callMcpTool(endpoint, name, args, { idempotencyKey, signal })` | One call. The idempotency key goes in `_meta['hamnivo/idempotency-key']`, for servers that honour it. Returns `isError`, structured content and text. |
+| `McpCallError` | `kind` (`egress`, `timeout`, `network`, `refused`, `protocol`) and `mayHaveApplied`. A refusal did nothing; a timeout or lost connection after sending may have, so the gateway records the outcome as unknown and checks it rather than sending again. |
+| `startFakeMcpServer()` (`@hamnivo/adapters/mcp/testing`) | A real Streamable HTTP server on 127.0.0.1 with scripted tools, faults before or after a change, a chosen protocol revision, and a record of calls and tokens. |
+
+Tool calls reach the network only through the egress guard (X05, `@hamnivo/adapters/net`, described
+in the next section): a request goes out only over HTTPS to public addresses, to the server's own
+host or a host on the tool's allowlist (`orders.example.com`, or `*.example.com` for subdomains). The
+address check runs when the connection is made, so a name that turns private after it was checked
+is still refused (no DNS rebinding). Redirects are refused and responses stop at a size limit. The
+gateway also holds a server to the workspace's allowed hosts. Plain HTTP and loopback addresses work
+only for an origin listed in the endpoint's `trustedOrigins`, which the gateway fills, for the
+server's own origin, only with `TOOLS_EGRESS_ALLOW_PRIVATE` (development and tests; refused in
+production).
+
+### The reviewed tool allowlist
+
+What a server says about its tools is never trusted. The gateway:
+
+- puts every new tool, and every tool whose name, description, schemas or annotations changed, in
+  review. A tool in review cannot be called or granted to an agent, and open approvals for a
+  changed tool are cancelled. Someone with `tools.manage` sets its risk, approver and limits,
+  then enables it (Studio, Tools and permissions);
+- writes the tool's description itself. The server's description is kept as plain text for the
+  reviewer; the model sees only the description that Hamnivo or the reviewer wrote;
+- reduces input and output schemas to a portable subset (`sanitizeToolSchema` in
+  `@hamnivo/domain`): unknown keywords are dropped, `pattern` is removed from untrusted schemas,
+  and a tool with a schema that cannot be represented safely is not added. A result that does not
+  match the tool's output schema is refused;
+- gives each tool its own egress allowlist, starting with the server's host. A call is refused
+  unless that list covers the server;
+- treats results as data: size limited, cleaned to plain JSON, fenced in the prompt as untrusted,
+  and never followed as instructions.
+
+### Tests and what is not verified
+
+- `test/mcp.test.ts`: listing as data, the bearer token, the idempotency key, a lost answer after
+  the change, a failed tool, refused servers, cancellation, each supported revision and the
+  refusal of another.
+- `test/net/*.test.ts`: the egress guard itself (next section). `test/mcp.test.ts` also checks a
+  name that turns private between the check and the connection, redirects and answers over the size
+  limit.
+- The gateway's `test/tools.int.test.ts` connects a fake server, reviews its tools, and checks
+  that results must match the output schema, that a changed listing goes back to review and that
+  calls keep to the allowlist.
+
+No test talks to a third-party MCP server.
+
+## The egress guard: every request made on a tenant's behalf (X05)
+
+`@hamnivo/adapters/net` is the one place that decides where the server may send a request that a
+tenant can point at an address: a webhook, an MCP tool call, an identity provider's discovery
+document, a migration source, the tenant's own model server. Each of them once kept a list of
+private ranges of its own; there is one list now, and every caller goes through it.
+
+| Export | What it does |
+|---|---|
+| `isPublicAddress(address)`, `addressBlock(address)` | Only publicly routable unicast addresses. The union of every range any of the earlier guards refused (the IANA special-purpose registries, IPv4 and IPv6). An IPv4-mapped IPv6 address is judged by its IPv4 address; NAT64, 6to4, Teredo, IPv4-translated and IPv4-compatible forms are refused outright. |
+| `checkUrl(url, policy)`, `checkDestination(url, policy)` | The URL check: HTTPS only, no user name or password, no private IP literal, no local name (`localhost`, `.internal`, `.local`, a name without a dot and the like) and the allowlist. `checkDestination` also resolves the name, so a person setting an address up hears at once that it points inside the network. |
+| `guardedDispatcher(policy)` | An undici `Agent` that checks every address when it connects. Its `lookup` refuses the connection when any address the name resolves to is private, so DNS rebinding after the check does not help; an IP literal skips lookups, so the connector judges it by the same rules. |
+| `guardedFetch(policy, { maxResponseBytes, refuseRedirects })` | A `fetch` on that dispatcher, for SDKs (MCP, migration sources, model servers). A redirect is never followed: it is returned as it is, or refused with `refuseRedirects`. |
+| `safeRequest(request, policy)` | One request with a deadline for the whole exchange, a response size cap and a fresh connection, for webhooks and discovery documents. A redirect comes back as the response it is. |
+| `EgressError` | What a refusal or failure carries: `problem` is `invalid_url`, `insecure_url`, `host_not_allowed`, `private_address`, `unresolvable`, `timeout`, `network`, `tls`, `redirect` or `response_too_large`, and the message never holds response content. |
+
+A policy has `allowedHosts` (hosts, or `*.example.com`; left out, any public host is allowed; an
+empty list allows none), `trustedOrigins` and `resolve` (tests replace DNS with it). Trusted origins
+are the only exception to the rules: origins (exact scheme, host and port) that the server
+administrator trusts, reachable over plain HTTP and on private addresses. Tenants never supply them.
+
+Each caller keeps the trusted-origin setting it had:
+
+| Caller | Trusted origins |
+|---|---|
+| Webhooks, and the tenant's own model servers | `EGRESS_TRUSTED_ORIGINS` (a trusted origin passes the workspace's allowed hosts, too) |
+| MCP servers | None, but the server's own origin with `TOOLS_EGRESS_ALLOW_PRIVATE` (development and tests only); the workspace's allowed hosts and the tool's own list both apply |
+| SSO discovery | `SSO_TRUSTED_IDP_ORIGINS` |
+| Migration sources | None, but the source's own origin with `MIGRATION_SOURCE_ALLOW_PRIVATE` (development only) |
+
+Tests: `test/net/address.test.ts` holds every refused range, from its first to its last address
+and the addresses just outside it. `policy.test.ts`, `request.test.ts` and `fetch.test.ts` cover the
+URL rules, trusted origins, redirects, size and time limits, and a name that resolves to a public
+address when it is checked and to a private one when the connection is made. Each caller has a test
+of that last case: `test/mcp.test.ts` here, and in the gateway `test/egress.test.ts` (webhook
+deliveries), `test/enterprise.test.ts` (SSO discovery), `test/units.test.ts` (migration sources) and
+`test/egress.int.test.ts` (model servers and MCP servers added through the API).
+
+One request is not behind the guard: Better Auth's SSO plugin fetches an identity provider's token,
+key and user-info endpoints itself, with the global `fetch`, and has no option to replace it. The
+gateway checks those endpoints with the guard when a connection is saved; see the gateway README.

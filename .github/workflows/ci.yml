@@ -1,0 +1,64 @@
+# The full check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, with the production
+# and automatic-deploy smoke tests. It runs on every push, on a runner of your own: hosted runners
+# never started for this private repository (ADR 0007). To use other runners, set the repository
+# variable HAMNIVO_CI_RUNNER to a JSON list of labels, such as ["ubuntu-latest"].
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+# A newer push to the same branch replaces a run that is still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: checks
+    runs-on: ${{ fromJSON(vars.HAMNIVO_CI_RUNNER || '["self-hosted", "linux", "x64", "hamnivo"]') }}
+    timeout-minutes: 150
+    env:
+      TURBO_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      # The pnpm version comes from packageManager in package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Browsers live in the runner's cache; their system libraries are installed once when the
+      # runner is set up (docs/self-hosting.md, "Run the checks on GitHub").
+      - name: Install Chromium for the browser checks
+        run: pnpm --filter @hamnivo/console exec playwright install chromium
+
+      - name: Checks
+        run: pnpm ci:local --with-production --with-autodeploy
+
+      - name: Keep the summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # Only what the smoke tests leave behind; the runner keeps its other images and caches.
+      - name: Free disk
+        if: always()
+        run: |
+          docker image rm hamnivo/gateway:smoke hamnivo/edge:smoke \
+            hamnivo/gateway:unlabelled hamnivo/edge:unlabelled >/dev/null 2>&1 || true
+          docker image prune -f >/dev/null
+          docker builder prune -f --filter until=168h >/dev/null

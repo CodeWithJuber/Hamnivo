@@ -21,6 +21,15 @@ import type { WidgetClaims } from '../widget/tokens.service.js';
 
 type PreferenceRow = typeof schema.languagePreferences.$inferSelect;
 
+/**
+ * Asks a decision provider which of the candidate languages the words are in; null when it is not
+ * sure enough (or not live). Called only when the words fit more than one language.
+ */
+export type LanguageDecider = (input: {
+  text: string;
+  candidates: readonly ReplyLanguage[];
+}) => Promise<ReplyLanguage | null>;
+
 export interface ReplyLanguageChoice {
   resolution: LanguageResolution;
   detection: LanguageDetection;
@@ -77,6 +86,7 @@ export class LanguageService {
     row: PreferenceRow | undefined,
     locale: UiLocale | null,
     detection?: LanguageDetection | null,
+    decided?: ReplyLanguage | null,
   ) {
     return resolveReplyLanguage({
       explicit: replyLanguage(row?.explicitLanguage),
@@ -84,15 +94,21 @@ export class LanguageService {
       uiLocale: locale,
       detection: detection === undefined ? storedDetection(row) : detection,
       prompted: row?.promptedAt != null,
+      decided: decided ?? null,
     });
   }
 
   private view(row: PreferenceRow | undefined, locale: UiLocale | null): WidgetLanguageState {
     const resolution = this.resolve(row, locale);
+    // A language Jev settled on is stored as the message's only candidate; say so.
+    const decided =
+      row?.lastSource === 'decided' &&
+      resolution.source === 'detected' &&
+      resolution.language === row.lastLanguage;
     return {
       uiLocale: locale,
       replyLanguage: resolution.language,
-      source: resolution.source,
+      source: decided ? 'decided' : resolution.source,
       confirm: resolution.confirm,
       style: { verbosity: row?.styleVerbosity ?? null, tone: row?.styleTone ?? null },
     };
@@ -157,19 +173,36 @@ export class LanguageService {
     tenantId: string,
     principalId: string | null,
     text: string,
+    decide?: LanguageDecider,
   ): Promise<ReplyLanguageChoice> {
     const detection = detectLanguage(text);
+    // A provider is asked only when the words fit more than one language, and never over the
+    // customer's own choice; below its threshold the customer is asked once, as before.
+    const decision = async (explicit: ReplyLanguage | null) =>
+      decide && !explicit && detection.language === null && detection.candidates.length > 1
+        ? await decide({ text, candidates: detection.candidates })
+        : null;
     if (!principalId) {
-      return { resolution: resolveReplyLanguage({ detection }), detection, style: {} };
+      const decided = await decision(null);
+      return { resolution: resolveReplyLanguage({ detection, decided }), detection, style: {} };
     }
-    return withTenant(this.db, { tenantId, actorId: 'language' }, async (tx) => {
+    const stored = await withTenant(this.db, { tenantId, actorId: 'language' }, async (tx) => {
       const row = await this.row(tx, principalId);
       const locale = uiLocale(row?.uiLocale) ?? (await this.sessionLocale(tx, principalId));
-      const resolution = this.resolve(row, locale, detection);
+      return { row, locale };
+    });
+    // Outside any transaction: the provider call holds no database connection.
+    const decided = await decision(replyLanguage(stored.row?.explicitLanguage));
+    return withTenant(this.db, { tenantId, actorId: 'language' }, async (tx) => {
+      const row = await this.row(tx, principalId);
+      const locale = stored.locale;
+      const resolution = this.resolve(row, locale, detection, decided);
       const changes = {
         lastLanguage: resolution.language,
         lastSource: resolution.source,
-        lastDetected: detection.candidates,
+        // A settled language is the message's only candidate from now on.
+        lastDetected:
+          resolution.source === 'decided' ? [resolution.language] : detection.candidates,
         updatedAt: this.clock(),
       };
       await tx

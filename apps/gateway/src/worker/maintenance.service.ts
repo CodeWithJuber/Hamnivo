@@ -1,4 +1,12 @@
-import { type Db, ensureAuditPartitions, ensureReconcileCursors, purgeExpired } from '@hamnivo/db';
+import {
+  type Db,
+  ensureAuditPartitions,
+  ensureReconcileCursors,
+  purgeExpired,
+  purgeMigrationFiles,
+  purgeWebhookEvents,
+  purgeWidgetUploads,
+} from '@hamnivo/db';
 import {
   Inject,
   Injectable,
@@ -8,15 +16,17 @@ import {
 } from '@nestjs/common';
 import { Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
+import type { AppConfig } from '../config.js';
 import { MemoryDeletionService } from '../memory/deletion.service.js';
-import { APP_DB, REDIS } from '../tokens.js';
+import { APP_DB, CONFIG, REDIS } from '../tokens.js';
 
 const QUEUE = 'hamnivo-maintenance';
 
 /**
  * Scheduled upkeep through BullMQ job schedulers: audit partitions daily; expiry purge and
  * reconciler cursors every ten minutes; memory past its retention hourly; memory tombstones
- * replayed daily (a safety net after restores).
+ * replayed daily (a safety net after restores); webhook event bodies past their retention cleared,
+ * and the delivery log past WEBHOOK_LOG_DAYS deleted, hourly.
  */
 @Injectable()
 export class MaintenanceService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -27,6 +37,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
   constructor(
     @Inject(APP_DB) private readonly db: Db,
     @Inject(REDIS) private readonly redis: Redis,
+    @Inject(CONFIG) private readonly config: AppConfig,
     private readonly memory: MemoryDeletionService,
   ) {}
 
@@ -34,14 +45,24 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     switch (job) {
       case 'audit-partitions':
         return { created: await ensureAuditPartitions(this.db, 3) };
-      case 'purge-expired':
-        return purgeExpired(this.db);
+      case 'purge-expired': {
+        // Quarantined customer files never sent lose their bytes (W09).
+        const uploads = await purgeWidgetUploads(this.db);
+        return {
+          ...(await purgeExpired(this.db)),
+          migration_files: await purgeMigrationFiles(this.db),
+          widget_uploads_expired: uploads.expired,
+          widget_uploads_removed: uploads.removed,
+        };
+      }
       case 'reconcile-cursors':
         return { followed: await ensureReconcileCursors(this.db) };
       case 'memory-retention':
         return { deleted: await this.memory.purgeExpired() };
       case 'memory-tombstones':
         return { removed: await this.memory.replayTombstones() };
+      case 'webhook-retention':
+        return purgeWebhookEvents(this.db, { keepDays: this.config.WEBHOOK_LOG_DAYS });
       default:
         throw new Error(`Unknown maintenance job ${job}`);
     }
@@ -74,6 +95,11 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       'memory-tombstones',
       { every: 24 * 60 * 60 * 1000 },
       { name: 'memory-tombstones' },
+    );
+    await this.queue.upsertJobScheduler(
+      'webhook-retention',
+      { every: 60 * 60 * 1000 },
+      { name: 'webhook-retention' },
     );
     this.worker = new Worker(QUEUE, (job) => this.run(job.name), {
       connection: this.redis.duplicate(),

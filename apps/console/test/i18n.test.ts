@@ -1,3 +1,4 @@
+import { PERMISSION_KEYS } from '@hamnivo/policy';
 import { describe, expect, it } from 'vitest';
 import { ar } from '../src/i18n/ar';
 import { en } from '../src/i18n/en';
@@ -52,5 +53,28 @@ describe('Studio text in every language (U05)', () => {
 
   it('names each language in itself', () => {
     expect(Object.keys(LANGUAGE_NAMES).sort()).toEqual([...LOCALES].sort());
+  });
+});
+
+// Team and access (board 22) lists every permission of the catalog. A permission added to
+// @hamnivo/policy without a label would show its English description in every language.
+describe('permission labels', () => {
+  it('every permission in the catalog has a label', () => {
+    const missing = PERMISSION_KEYS.filter((key) => english[`permissions.${key}`] === undefined);
+    expect(missing).toEqual([]);
+  });
+
+  it('every permission area has a name', () => {
+    const areas = [...new Set(PERMISSION_KEYS.map((key) => key.split('.')[0]))];
+    expect(areas.filter((area) => english[`permissionAreas.${area}`] === undefined)).toEqual([]);
+  });
+
+  it('no label is left for a permission the catalog no longer has', () => {
+    const known = new Set<string>(PERMISSION_KEYS);
+    const stale = Object.keys(english)
+      .filter((key) => key.startsWith('permissions.'))
+      .map((key) => key.slice('permissions.'.length))
+      .filter((key) => !known.has(key));
+    expect(stale).toEqual([]);
   });
 });

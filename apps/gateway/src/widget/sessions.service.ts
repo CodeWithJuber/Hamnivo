@@ -1,5 +1,6 @@
 import {
   IdentityAssertionClaims,
+  type LauncherConfig,
   type WidgetFramePolicy,
   type WidgetSession,
 } from '@hamnivo/contracts';
@@ -21,8 +22,11 @@ import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
-import { widgetConfig } from './copy.js';
+import { filesScannable } from './attachments.service.js';
+import { launcherConfig, widgetConfig } from './copy.js';
 import { LOCAL_ANCESTORS, originAllowed, sessionOrigin } from './origins.js';
+import { SessionSignals } from './session-signals.service.js';
+import { brandSurface } from './settings.service.js';
 import {
   newRefreshSecret,
   sameHash,
@@ -53,6 +57,7 @@ export class WidgetSessionsService {
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly tokens: WidgetTokens,
     private readonly secrets: SecretBroker,
+    private readonly signals: SessionSignals,
   ) {}
 
   private checkOrigin(allowed: string[], hostOrigin: string | undefined) {
@@ -75,6 +80,30 @@ export class WidgetSessionsService {
       widgetId,
       frameAncestors: widget.allowedOrigins.length > 0 ? widget.allowedOrigins : LOCAL_ANCESTORS,
     };
+  }
+
+  /**
+   * What the loader needs before the chat loads (W02, W19). Public like the frame policy, but a
+   * browser on a website the brand did not allow is refused (and gets no CORS permission).
+   */
+  async launcher(
+    widgetId: string,
+    origin: string | undefined,
+    locale: string | undefined,
+  ): Promise<LauncherConfig> {
+    const widget = await resolveWidget(this.db, widgetId);
+    if (widget?.brandStatus !== 'active' || widget.tenantStatus !== 'active') {
+      throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
+    }
+    if (origin !== undefined) this.checkOrigin(widget.allowedOrigins, origin);
+    return withTenant(this.db, { tenantId: widget.tenantId }, async (tx) => {
+      const [brand] = await tx
+        .select()
+        .from(schema.brands)
+        .where(eq(schema.brands.id, widget.brandId));
+      if (!brand) throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
+      return launcherConfig(brand, await brandSurface(tx, brand.id), locale, this.clock());
+    });
   }
 
   async create(input: {
@@ -174,7 +203,9 @@ export class WidgetSessionsService {
         verified: principal.kind === 'verified',
         displayName: principal.displayName,
       },
-      config: widgetConfig(brand as BrandRow, this.clock()),
+      config: widgetConfig(brand as BrandRow, this.clock(), await brandSurface(tx, brand.id), {
+        filesScannable: filesScannable(this.config),
+      }),
       conversations: await principalConversations(tx, principal.id),
     };
   }
@@ -255,6 +286,8 @@ export class WidgetSessionsService {
         .set({ revokedAt: this.clock(), revokeReason: 'signed_out' })
         .where(eq(schema.widgetSessions.id, claims.sessionId)),
     );
+    // Its open streams end now (W18), not at their next heartbeat.
+    await this.signals.ended(claims.tenantId, [claims.sessionId]);
   }
 
   /**
@@ -273,6 +306,19 @@ export class WidgetSessionsService {
     }
     if (!kid) throw invalid('The identity assertion has no key id (kid).');
     const now = this.clock();
+    const session = await this.verifyAndSwitch(claims, assertion, kid, now, invalid);
+    // The previous session's streams end now (W18): nothing of the previous person keeps flowing.
+    await this.signals.ended(claims.tenantId, [claims.sessionId]);
+    return session;
+  }
+
+  private verifyAndSwitch(
+    claims: WidgetClaims,
+    assertion: string,
+    kid: string,
+    now: Date,
+    invalid: (detail: string) => AppError,
+  ): Promise<WidgetSession> {
     return withTenant(this.db, { tenantId: claims.tenantId, actorId: 'widget' }, async (tx) => {
       const [key] = await tx
         .select()

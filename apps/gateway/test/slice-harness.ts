@@ -2,19 +2,23 @@ import { createServer } from 'node:net';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
 import type { CacheStore } from '@hamnivo/adapters/cache';
 import { createMockModel } from '@hamnivo/adapters/models';
+import type { Resolver } from '@hamnivo/adapters/net';
 import { type FakeChatwoot, startFakeChatwoot } from '@hamnivo/chatwoot/fake';
 import { closeDb, createDb, type Db } from '@hamnivo/db';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { LanguageModel } from 'ai';
 import { type EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
+import { ActionsWorker } from '../src/actions/worker.service.js';
 import { InboxProcessor } from '../src/authority/processor.service.js';
 import { ReconcilerService } from '../src/authority/reconciler.service.js';
 import type { PersonalCacheScope } from '../src/cache/store.js';
 import { CommerceWorker } from '../src/commerce/worker.service.js';
 import { loadConfig } from '../src/config.js';
+import { WebhookDispatcher } from '../src/developer/webhooks/dispatcher.service.js';
 import type { Scanner } from '../src/knowledge/scanner.js';
 import { OutboxRelay } from '../src/outbox/relay.service.js';
+import { MemoryMailer } from '../src/platform/mailer.js';
 import { WorkerModule } from '../src/worker.module.js';
 import { Client, type Gateway, signUp, startGateway, testEnv } from './harness.js';
 
@@ -36,6 +40,8 @@ export interface Slice {
   gw: Gateway;
   fake: FakeChatwoot;
   worker: INestApplicationContext;
+  /** Emails the worker sent (customer notifications). */
+  workerMailer: MemoryMailer;
   app: Db;
   baseUrl: string;
   /** Delivers webhooks and runs the worker until nothing is left to do. */
@@ -59,6 +65,8 @@ export async function startSlice(
     personalCacheScope?: PersonalCacheScope | null;
     /** Extra environment for both processes (e.g. commerce provider settings). */
     env?: Record<string, string>;
+    /** Replaces DNS for outbound webhook requests in both processes (SSRF tests). */
+    egressResolver?: Resolver;
   } = {},
 ): Promise<Slice> {
   const fake = await startFakeChatwoot();
@@ -78,10 +86,12 @@ export async function startSlice(
     ...(options.personalCacheScope !== undefined
       ? { personalCacheScope: options.personalCacheScope }
       : {}),
+    ...(options.egressResolver ? { egressResolver: options.egressResolver } : {}),
   };
   const gw = await startGateway(env, undefined, {
     ...(options.clock ? { clock: options.clock } : {}),
     ...(options.apiModel ? { model: options.apiModel } : {}),
+    ...(options.scanner ? { scanner: options.scanner } : {}),
     ...shared,
   });
   await gw.app.listen(port, '127.0.0.1');
@@ -93,8 +103,10 @@ export async function startSlice(
       CACHE_KEY_PREFIX: gw.config.CACHE_KEY_PREFIX,
     }),
   );
+  const workerMailer = new MemoryMailer();
   const worker = await NestFactory.createApplicationContext(
     WorkerModule.forRoot(config, {
+      mailer: workerMailer,
       ...shared,
       ...(options.clock ? { clock: options.clock } : {}),
       ...(options.model ? { model: options.model } : {}),
@@ -107,11 +119,14 @@ export async function startSlice(
   await worker.get(InboxProcessor).onApplicationShutdown();
   await worker.get(ReconcilerService).onApplicationShutdown();
   await worker.get(CommerceWorker).onApplicationShutdown();
+  await worker.get(WebhookDispatcher).onApplicationShutdown();
+  await worker.get(ActionsWorker).onApplicationShutdown();
   const app = createDb(gw.database.app, { max: 2 });
   return {
     gw,
     fake,
     worker,
+    workerMailer,
     app,
     baseUrl,
     async drain() {

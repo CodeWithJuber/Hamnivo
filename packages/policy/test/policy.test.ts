@@ -1,20 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import {
+  API_KEY_PERMISSIONS,
   authorize,
   authorizeAny,
+  authorizePlatform,
   checkDelegation,
+  checkRevocation,
   diffPermissions,
   effectivePermissions,
+  expandPatterns,
   explain,
   type Grant,
   inapplicablePermissions,
+  isApiKeyPermission,
+  isPermission,
+  isPlatformPermission,
   PERMISSION_KEYS,
+  PLATFORM_PERMISSION_KEYS,
+  type PlatformPrincipal,
+  permissionSpec,
+  permissionsAnywhere,
+  platformPermissions,
   presetPermissions,
   ROLE_PRESETS,
+  roleChangeImpact,
   rolePatterns,
   type ScopeHierarchy,
   type ServiceAccountPrincipal,
   type StaffPrincipal,
+  unreachablePermissions,
   validatePatterns,
 } from '../src/index.js';
 
@@ -92,6 +106,16 @@ describe('catalog and presets', () => {
     expect(rolePatterns({ key: 'agent', isPreset: false, permissions: stored })).toEqual(stored);
     // A preset key that no longer exists keeps its stored list.
     expect(rolePatterns({ key: 'retired', isPreset: true, permissions: stored })).toEqual(stored);
+  });
+});
+
+describe('proactive prompt permission (W19)', () => {
+  it('is its own permission: administrators have it, developers and agents do not', () => {
+    expect(presetPermissions('admin')).toContain('widget.proactive');
+    expect(presetPermissions('developer')).toContain('widget.configure');
+    expect(presetPermissions('developer')).not.toContain('widget.proactive');
+    expect(presetPermissions('agent')).not.toContain('widget.proactive');
+    expect(presetPermissions('supervisor')).not.toContain('widget.proactive');
   });
 });
 
@@ -432,6 +456,194 @@ describe('permission diff', () => {
   });
 });
 
+describe('revocation ceiling', () => {
+  const owner = staff([grant({ permissions: ['*'], scope: { type: 'tenant' } })], {
+    staffMemberId: 'own',
+  });
+  const admin = staff(
+    [grant({ permissions: presetPermissions('admin'), scope: { type: 'tenant' } })],
+    { staffMemberId: 'adm' },
+  );
+  const lead = staff(
+    [grant({ permissions: presetPermissions('supervisor'), scope: { type: 'team', id: 'T' } })],
+    { staffMemberId: 'lead' },
+  );
+  const agentOnTeam = {
+    permissions: presetPermissions('agent'),
+    scope: { type: 'team', id: 'T' },
+  } as const;
+
+  it('lets people take away only access they could have granted', () => {
+    expect(
+      checkRevocation(lead, { staffMemberId: 'x', grants: [agentOnTeam] }, hierarchy, now),
+    ).toEqual([]);
+    expect(
+      checkRevocation(admin, { staffMemberId: 'x', grants: [agentOnTeam] }, hierarchy, now),
+    ).toEqual([]);
+  });
+
+  it('stops an administrator from suspending or stripping an owner', () => {
+    const problems = checkRevocation(
+      admin,
+      { staffMemberId: 'own', grants: [{ permissions: ['*'], scope: { type: 'tenant' } }] },
+      hierarchy,
+      now,
+      'members.remove',
+    );
+    expect(problems).toEqual([
+      {
+        code: 'exceeds_own_permissions',
+        permissions: expect.arrayContaining(['billing.manage', 'support.grant']),
+      },
+    ]);
+    expect(
+      checkRevocation(
+        owner,
+        { staffMemberId: 'adm', grants: [{ permissions: ['*'], scope: { type: 'tenant' } }] },
+        hierarchy,
+        now,
+        'members.remove',
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps a team lead inside the team and away from their own access', () => {
+    const elsewhere = checkRevocation(
+      lead,
+      {
+        staffMemberId: 'x',
+        grants: [{ permissions: ['conversations.read'], scope: { type: 'team', id: 'T2' } }],
+      },
+      hierarchy,
+      now,
+    ).map((p) => p.code);
+    expect(elsewhere).toEqual(expect.arrayContaining(['not_allowed', 'outside_own_scope']));
+    const self = checkRevocation(
+      lead,
+      { staffMemberId: 'lead', grants: [agentOnTeam] },
+      hierarchy,
+      now,
+    ).map((p) => p.code);
+    expect(self).toEqual(['self_grant']);
+  });
+
+  it('ignores permissions that are inert at the level of the grant', () => {
+    // billing.manage has no effect in a team grant, so the lead is not missing it.
+    const grants = [
+      { permissions: ['conversations.read', 'billing.manage'], scope: { type: 'team', id: 'T' } },
+    ] as const;
+    expect(checkRevocation(lead, { staffMemberId: 'x', grants }, hierarchy, now)).toEqual([]);
+  });
+});
+
+describe('role building reach', () => {
+  it('lists permissions the builder does not hold across the tenant', () => {
+    const wsAdmin = staff([
+      grant({ permissions: presetPermissions('admin'), scope: { type: 'workspace', id: 'W' } }),
+    ]);
+    expect(unreachablePermissions(wsAdmin, ['conversations.read', 'audit.read'], now)).toEqual([
+      'conversations.read',
+      'audit.read',
+    ]);
+    // Reference data (members.read) counts from any scope.
+    expect(unreachablePermissions(wsAdmin, ['members.read'], now)).toEqual([]);
+    const admin = staff([
+      grant({ permissions: presetPermissions('admin'), scope: { type: 'tenant' } }),
+    ]);
+    // A permission that needs two-step verification still counts as held.
+    expect(unreachablePermissions(admin, ['secrets.manage', 'billing.manage'], now)).toEqual([
+      'billing.manage',
+    ]);
+    const suspended = staff([grant({ permissions: ['*'], scope: { type: 'tenant' } })], {
+      status: 'suspended',
+    });
+    expect(unreachablePermissions(suspended, ['conversations.read'], now)).toEqual([
+      'conversations.read',
+    ]);
+  });
+});
+
+describe('role change impact', () => {
+  const members = [
+    {
+      staffMemberId: 'a',
+      grants: [
+        {
+          roleId: 'r1',
+          permissions: ['conversations.read', 'knowledge.read'],
+          scope: { type: 'tenant' },
+        },
+      ],
+    },
+    {
+      staffMemberId: 'b',
+      grants: [
+        {
+          roleId: 'r1',
+          permissions: ['conversations.read', 'knowledge.read'],
+          scope: { type: 'team', id: 'T' },
+        },
+        { roleId: 'r2', permissions: ['knowledge.read'], scope: { type: 'tenant' } },
+      ],
+    },
+    {
+      staffMemberId: 'c',
+      grants: [{ roleId: 'r2', permissions: ['knowledge.read'], scope: { type: 'tenant' } }],
+    },
+  ] as const;
+
+  it('lists only holders of the role, with what they gain and lose', () => {
+    expect(roleChangeImpact(members, 'r1', ['conversations.read', 'audit.read'])).toEqual([
+      { staffMemberId: 'a', gains: ['audit.read'], loses: ['knowledge.read'] },
+      // audit.read has no effect in a team grant, and knowledge.read still comes from r2.
+      { staffMemberId: 'b', gains: [], loses: [] },
+    ]);
+    expect(permissionsAnywhere(members[1].grants)).toEqual(
+      new Set(['conversations.read', 'knowledge.read']),
+    );
+  });
+});
+
+describe('platform permissions', () => {
+  const operator = (overrides: Partial<PlatformPrincipal> = {}): PlatformPrincipal => ({
+    kind: 'platform',
+    operatorId: 'op1',
+    role: 'support_operator',
+    status: 'active',
+    mfa: true,
+    authenticatedAt: minutesAgo(1),
+    ...overrides,
+  });
+
+  it('are separate from tenant roles and follow the operator’s role', () => {
+    for (const key of PLATFORM_PERMISSION_KEYS) expect(isPermission(key)).toBe(false);
+    expect(PERMISSION_KEYS.some((key) => isPlatformPermission(key))).toBe(false);
+    expect(expandPatterns(['*'])).not.toContain('platform.tenants.read');
+    expect(authorizePlatform(operator(), 'platform.tenants.read', { now }).allowed).toBe(true);
+    expect(authorizePlatform(operator(), 'platform.incidents.manage', { now })).toMatchObject({
+      reason: 'no_grant',
+    });
+    const admin = operator({ role: 'platform_admin' });
+    expect(authorizePlatform(admin, 'platform.incidents.manage', { now }).allowed).toBe(true);
+    expect(platformPermissions(operator({ status: 'disabled' }))).toEqual([]);
+  });
+
+  it('asks for two-step verification and a fresh sign-in before support access', () => {
+    expect(
+      authorizePlatform(operator({ mfa: false }), 'platform.support.request', { now }),
+    ).toMatchObject({ reason: 'mfa_required' });
+    const stale = operator({ authenticatedAt: minutesAgo(60) });
+    expect(authorizePlatform(stale, 'platform.support.use', { now })).toMatchObject({
+      reason: 'step_up_required',
+    });
+    const disabled = operator({ status: 'disabled' });
+    expect(explain(authorizePlatform(disabled, 'platform.health.read', { now }))).toMatchObject({
+      allowed: false,
+      key: 'policy.inactive',
+    });
+  });
+});
+
 describe('commerce permissions', () => {
   const at = (preset: Parameters<typeof presetPermissions>[0], scope: Grant['scope']) =>
     staff([grant({ permissions: presetPermissions(preset), scope })], { mfa: true });
@@ -488,5 +700,122 @@ describe('commerce permissions', () => {
     const commerce = PERMISSION_KEYS.filter((p) => p.startsWith('commerce.'));
     expect(commerce.length).toBeGreaterThanOrEqual(7);
     expect(presetPermissions('admin')).toEqual(expect.arrayContaining(commerce));
+  });
+});
+
+describe('migration permissions', () => {
+  it('lets reviewers read imports of their brand, and asks runners for a fresh sign-in', () => {
+    const reviewer = staff([
+      grant({ permissions: ['migration.review'], scope: { type: 'brand', id: 'B' } }),
+    ]);
+    expect(authorize(reviewer, 'migration.review', { brandId: 'B' }, { now }).allowed).toBe(true);
+    expect(authorize(reviewer, 'migration.review', { brandId: 'C' }, { now })).toMatchObject({
+      allowed: false,
+      reason: 'outside_scope',
+    });
+    expect(authorize(reviewer, 'migration.run', { brandId: 'B' }, { now })).toMatchObject({
+      reason: 'no_grant',
+    });
+    const runner = staff(
+      [grant({ permissions: ['migration.*'], scope: { type: 'brand', id: 'B' } })],
+      { authenticatedAt: minutesAgo(30) },
+    );
+    for (const permission of ['migration.run', 'migration.manage'] as const) {
+      expect(authorize(runner, permission, { brandId: 'B' }, { now })).toMatchObject({
+        reason: 'step_up_required',
+      });
+    }
+  });
+
+  it('gives admins every migration permission and support agents none', () => {
+    expect(presetPermissions('admin')).toEqual(
+      expect.arrayContaining(['migration.review', 'migration.run', 'migration.manage']),
+    );
+    expect(presetPermissions('agent').filter((p) => p.startsWith('migration.'))).toEqual([]);
+  });
+});
+
+describe('developer platform permissions', () => {
+  it('lets API keys carry only permissions without step-up or MFA', () => {
+    expect(API_KEY_PERMISSIONS.length).toBeGreaterThan(0);
+    for (const permission of API_KEY_PERMISSIONS) {
+      expect(PERMISSION_KEYS).toContain(permission);
+      const spec = permissionSpec(permission) as { stepUp?: true; mfa?: true };
+      expect(spec.stepUp, permission).toBeUndefined();
+      expect(spec.mfa, permission).toBeUndefined();
+    }
+    expect(isApiKeyPermission('analytics.read')).toBe(true);
+    expect(isApiKeyPermission('api_keys.manage')).toBe(false);
+    expect(isApiKeyPermission('webhooks.manage')).toBe(false);
+  });
+
+  it('needs a fresh sign-in for every key, webhook, network and budget change', () => {
+    for (const permission of [
+      'api_keys.manage',
+      'webhooks.manage',
+      'network.manage',
+      'billing.manage',
+    ] as const) {
+      expect(permissionSpec(permission).stepUp, permission).toBe(true);
+      expect(permissionSpec(permission).scopes).toEqual(['tenant']);
+    }
+    expect((permissionSpec('api_keys.manage') as { mfa?: true }).mfa).toBe(true);
+    for (const permission of ['api_keys.read', 'webhooks.read', 'billing.read'] as const) {
+      expect((permissionSpec(permission) as { stepUp?: true }).stepUp).toBeUndefined();
+    }
+  });
+
+  it('gives developers keys and webhooks, administrators the network list, and billing its reads', () => {
+    expect(presetPermissions('developer')).toEqual(
+      expect.arrayContaining([
+        'api_keys.read',
+        'api_keys.manage',
+        'webhooks.read',
+        'webhooks.manage',
+      ]),
+    );
+    expect(presetPermissions('developer')).not.toContain('network.manage');
+    expect(presetPermissions('admin')).toEqual(
+      expect.arrayContaining(['network.manage', 'webhooks.manage', 'api_keys.manage']),
+    );
+    expect(presetPermissions('admin')).not.toContain('billing.read');
+    expect(presetPermissions('billing')).toEqual(
+      expect.arrayContaining(['billing.read', 'billing.manage']),
+    );
+    expect(presetPermissions('analyst')).not.toContain('billing.read');
+  });
+
+  it('keeps a workspace-scoped grant of key or webhook management inert', () => {
+    const scoped = staff(
+      [
+        grant({
+          permissions: ['api_keys.*', 'webhooks.*'],
+          scope: { type: 'workspace', id: 'W' },
+        }),
+      ],
+      { mfa: true },
+    );
+    expect(effectivePermissions(scoped, now).has('api_keys.manage')).toBe(false);
+    expect(authorize(scoped, 'webhooks.manage', { workspaceId: 'W' }, { now })).toMatchObject({
+      reason: 'no_grant',
+    });
+  });
+
+  it('refuses a service account every step-up permission even when its key lists it', () => {
+    const service: ServiceAccountPrincipal = {
+      kind: 'service_account',
+      tenantId: 't1',
+      serviceAccountId: 'sa1',
+      status: 'active',
+      keyScopes: ['*'],
+      grants: [grant({ permissions: ['*'], scope: { type: 'tenant' } })],
+    };
+    expect(authorize(service, 'webhooks.read', {}, { now }).allowed).toBe(true);
+    expect(authorize(service, 'webhooks.manage', {}, { now })).toMatchObject({
+      reason: 'mfa_required',
+    });
+    expect(authorize(service, 'api_keys.manage', {}, { now })).toMatchObject({
+      reason: 'mfa_required',
+    });
   });
 });

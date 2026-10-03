@@ -6,6 +6,8 @@ import {
   index,
   integer,
   jsonb,
+  type PgTableExtraConfigValue,
+  pgPolicy,
   pgTable,
   primaryKey,
   text,
@@ -19,6 +21,7 @@ import {
   createdAt,
   id,
   platformRead,
+  platformRole,
   tenantIsolation,
   tstz,
   updatedAt,
@@ -121,11 +124,14 @@ export const roleDefinitions = pgTable(
     permissions: text('permissions').array().notNull(),
     isPreset: boolean('is_preset').notNull().default(false),
     version: integer('version').notNull().default(1),
+    /** A retired custom role: kept for the grants and audit that name it, never granted again. */
+    archivedAt: tstz('archived_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     unique('role_definitions_tenant_id_id_key').on(t.tenantId, t.id),
+    check('role_definitions_archive_ck', sql`not (${t.isPreset} and ${t.archivedAt} is not null)`),
     uniqueIndex('role_definitions_key_key').on(t.tenantId, t.key),
     tenantIsolation(),
   ],
@@ -214,18 +220,29 @@ export const apiKeys = pgTable(
     id: id(),
     tenantId: tenantId(),
     serviceAccountId: uuid('service_account_id').notNull(),
-    /** Public lookup part of the key, e.g. `hv_live_8f3k2m1q`. */
+    /** Public lookup part of the key, e.g. `hv_live_8f3k2m1qa9bc`. */
     prefix: text('prefix').notNull(),
-    /** HMAC-SHA256 of the secret part with the server pepper; the secret is shown once. */
+    /**
+     * HMAC-SHA256 of the secret part with a key derived from the key-encryption key of version
+     * `hash_version`; the secret itself is shown once and never stored.
+     */
     secretHash: bytea('secret_hash').notNull(),
+    hashVersion: integer('hash_version').notNull().default(1),
+    /** Permissions the key may use (a subset of what an API key can carry). */
     scopes: text('scopes').array().notNull(),
+    /** Where the key's permissions apply, like a grant's scope. */
+    scopeType: text('scope_type', { enum: GRANT_SCOPES }).notNull().default('tenant'),
+    scopeId: uuid('scope_id'),
     lastUsedAt: tstz('last_used_at'),
     expiresAt: tstz('expires_at'),
     revokedAt: tstz('revoked_at'),
+    revokedBy: uuid('revoked_by'),
+    /** The key that replaced this one in a rotation (this one then expires soon after). */
+    replacedBy: uuid('replaced_by'),
     createdBy: uuid('created_by'),
     createdAt: createdAt(),
   },
-  (t) => [
+  (t): PgTableExtraConfigValue[] => [
     unique('api_keys_tenant_id_id_key').on(t.tenantId, t.id),
     uniqueIndex('api_keys_prefix_key').on(t.prefix),
     foreignKey({
@@ -233,6 +250,22 @@ export const apiKeys = pgTable(
       columns: [t.tenantId, t.serviceAccountId],
       foreignColumns: [serviceAccounts.tenantId, serviceAccounts.id],
     }),
+    foreignKey({
+      name: 'api_keys_replaced_by_fk',
+      columns: [t.tenantId, t.replacedBy],
+      foreignColumns: [t.tenantId, t.id],
+    }),
+    foreignKey({
+      name: 'api_keys_created_by_fk',
+      columns: [t.tenantId, t.createdBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    foreignKey({
+      name: 'api_keys_revoked_by_fk',
+      columns: [t.tenantId, t.revokedBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    check('api_keys_scope_ck', sql`(${t.scopeType} = 'tenant') = (${t.scopeId} is null)`),
     tenantIsolation(),
   ],
 );
@@ -288,19 +321,40 @@ export const invitations = pgTable(
   ],
 );
 
-/** Time-boxed access for platform support staff, approved by the tenant (A15). */
+export const SUPPORT_GRANT_STATUSES = ['pending', 'approved', 'declined'] as const;
+/** What a support grant lets an operator read. Support access is read-only. */
+export const SUPPORT_SCOPES = ['configuration', 'conversations', 'audit'] as const;
+
+/**
+ * Time-boxed, read-only access for a platform support operator (A18). The operator asks
+ * (`pending`, written through the platform role); a tenant owner approves or declines, and may
+ * revoke at any time. Access runs from approval until `expires_at`, unless revoked or ended.
+ */
 export const supportGrants = pgTable(
   'support_grants',
   {
     id: id(),
     tenantId: tenantId(),
+    /** The platform operator who asked (platform_operators.id). */
     platformUserId: text('platform_user_id').notNull(),
+    /** The operator's name when they asked, shown to the tenant. */
+    operatorName: text('operator_name').notNull().default(''),
+    status: text('status', { enum: SUPPORT_GRANT_STATUSES }).notNull().default('pending'),
     approvedBy: uuid('approved_by'),
+    declinedBy: uuid('declined_by'),
+    decidedAt: tstz('decided_at'),
+    /** Optional words from the tenant with the approval or decline. */
+    decisionNote: text('decision_note'),
     scopes: text('scopes').array().notNull(),
     reason: text('reason').notNull(),
+    durationMinutes: integer('duration_minutes').notNull().default(30),
+    requestedAt: tstz('requested_at').notNull().defaultNow(),
     startsAt: tstz('starts_at').notNull().defaultNow(),
     expiresAt: tstz('expires_at').notNull(),
     revokedAt: tstz('revoked_at'),
+    revokedBy: uuid('revoked_by'),
+    /** The operator ended the session early. */
+    endedAt: tstz('ended_at'),
     createdAt: createdAt(),
   },
   (t) => [
@@ -310,9 +364,47 @@ export const supportGrants = pgTable(
       columns: [t.tenantId, t.approvedBy],
       foreignColumns: [staffMembers.tenantId, staffMembers.id],
     }),
+    foreignKey({
+      name: 'support_grants_declined_by_fk',
+      columns: [t.tenantId, t.declinedBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    foreignKey({
+      name: 'support_grants_revoked_by_fk',
+      columns: [t.tenantId, t.revokedBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
     check('support_grants_window_ck', sql`${t.expiresAt} > ${t.startsAt}`),
+    check(
+      'support_grants_decision_ck',
+      sql`(${t.status} = 'approved') = (${t.approvedBy} is not null)
+        and (${t.status} = 'declined') = (${t.declinedBy} is not null)
+        and (${t.status} = 'pending') = (${t.decidedAt} is null)`,
+    ),
+    check(
+      'support_grants_duration_ck',
+      sql`${t.durationMinutes} between 5 and 1440 and cardinality(${t.scopes}) > 0`,
+    ),
+    index('support_grants_active_idx')
+      .on(t.tenantId, t.expiresAt)
+      .where(sql`${t.status} = 'approved' and ${t.revokedAt} is null and ${t.endedAt} is null`),
     tenantIsolation(),
     platformRead(),
+    // The platform role may only ask: a pending, undecided request.
+    pgPolicy('platform_request', {
+      as: 'permissive',
+      for: 'insert',
+      to: platformRole,
+      withCheck: sql`${t.status} = 'pending' and ${t.approvedBy} is null and ${t.declinedBy} is null and ${t.revokedAt} is null and ${t.endedAt} is null`,
+    }),
+    // …and end an approved session early (UPDATE is granted on ended_at only).
+    pgPolicy('platform_end', {
+      as: 'permissive',
+      for: 'update',
+      to: platformRole,
+      using: sql`${t.status} = 'approved'`,
+      withCheck: sql`${t.status} = 'approved'`,
+    }),
   ],
 );
 

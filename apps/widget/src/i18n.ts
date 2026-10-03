@@ -1,7 +1,9 @@
 import type { ReplyLanguage } from '@hamnivo/contracts';
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { ACTION_COPY } from './actions/copy.js';
 import { SHOP_COPY } from './commerce/copy.js';
+import { SURFACE_COPY } from './surface-copy.js';
 
 /** Widget chrome in the four launch languages (translations await native review). */
 export const resources = {
@@ -24,11 +26,14 @@ export const resources = {
       language: 'Language',
       startError: 'The chat could not start. Please try again.',
       typing: 'The assistant is writing…',
+      draftChecking: 'Checking this answer…',
       sources: 'Sources',
       languageQuestion: 'Which language should replies use?',
       languageNotNow: 'Not now',
       languageChosen: 'Replies will be in {{language}}.',
       shop: SHOP_COPY.en,
+      surface: SURFACE_COPY.en,
+      actions: ACTION_COPY.en,
       memory: {
         open: 'Memory',
         title: 'What we remember',
@@ -134,11 +139,14 @@ export const resources = {
       language: 'اللغة',
       startError: 'تعذّر بدء المحادثة. حاول مرة أخرى.',
       typing: 'المساعد يكتب…',
+      draftChecking: 'جارٍ التحقق من هذه الإجابة…',
       sources: 'المصادر',
       languageQuestion: 'بأي لغة تريد أن تصلك الردود؟',
       languageNotNow: 'ليس الآن',
       languageChosen: 'ستصلك الردود بهذه اللغة: {{language}}.',
       shop: SHOP_COPY.ar,
+      surface: SURFACE_COPY.ar,
+      actions: ACTION_COPY.ar,
       memory: {
         open: 'الذاكرة',
         title: 'ما نتذكره',
@@ -242,11 +250,14 @@ export const resources = {
       language: 'भाषा',
       startError: 'चैट शुरू नहीं हो सकी। कृपया फिर कोशिश करें।',
       typing: 'सहायक लिख रहा है…',
+      draftChecking: 'इस जवाब की जाँच हो रही है…',
       sources: 'स्रोत',
       languageQuestion: 'जवाब किस भाषा में चाहिए?',
       languageNotNow: 'अभी नहीं',
       languageChosen: 'जवाब इस भाषा में आएँगे: {{language}}।',
       shop: SHOP_COPY.hi,
+      surface: SURFACE_COPY.hi,
+      actions: ACTION_COPY.hi,
       memory: {
         open: 'मेमोरी',
         title: 'हम क्या याद रखते हैं',
@@ -352,11 +363,14 @@ export const resources = {
       language: 'زبان',
       startError: 'چیٹ شروع نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔',
       typing: 'اسسٹنٹ لکھ رہا ہے…',
+      draftChecking: 'اس جواب کی جانچ ہو رہی ہے…',
       sources: 'ذرائع',
       languageQuestion: 'جوابات کس زبان میں چاہییں؟',
       languageNotNow: 'ابھی نہیں',
       languageChosen: 'جوابات اس زبان میں آئیں گے: {{language}}۔',
       shop: SHOP_COPY.ur,
+      surface: SURFACE_COPY.ur,
+      actions: ACTION_COPY.ur,
       memory: {
         open: 'میموری',
         title: 'ہم کیا یاد رکھتے ہیں',

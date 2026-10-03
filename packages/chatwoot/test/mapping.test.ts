@@ -97,3 +97,78 @@ describe('toConversation (real v4.18.0 payloads)', () => {
     expect(toConversation(api.getConversation).snoozedUntil).toBeNull();
   });
 });
+
+describe('attachments and read markers (v4.18.0 shapes)', () => {
+  const blob =
+    'eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBDUT09IiwiZXhwIjpudWxsLCJwdXIiOiJibG9iX2lkIn19--47d3e6d126a3bdaef68c663c4d50515ae858a61e';
+
+  it('takes the file name from the blob URL, since the JSON has none', () => {
+    const m = toMessage({
+      ...api.createIncomingMessage,
+      attachments: [
+        {
+          id: 4,
+          message_id: 1,
+          file_type: 'image',
+          content_type: 'image/png',
+          data_url: `http://127.0.0.1:3000/rails/active_storage/blobs/redirect/${blob}/r%C3%A9sum%C3%A9.png`,
+          file_size: 70,
+        },
+      ],
+    });
+    expect(m.attachments).toEqual([
+      expect.objectContaining({
+        ref: '4',
+        fileType: 'image',
+        name: 'résumé.png',
+        mimeType: 'image/png',
+        size: 70,
+        coordinates: null,
+      }),
+    ]);
+  });
+
+  it('maps shared places and contacts (attachments without files)', () => {
+    const m = toMessage({
+      ...api.createIncomingMessage,
+      attachments: [
+        {
+          id: 5,
+          file_type: 'location',
+          coordinates_lat: 25.2048,
+          coordinates_long: 55.2708,
+          fallback_title: 'Al Fahidi, Dubai',
+          data_url: null,
+        },
+        {
+          id: 6,
+          file_type: 'contact',
+          fallback_title: '+971 4 123 4567',
+          meta: { firstName: 'Aisha', lastName: 'Khan' },
+          data_url: null,
+        },
+      ],
+    });
+    expect(m.attachments[0]).toMatchObject({
+      fileType: 'location',
+      coordinates: { latitude: 25.2048, longitude: 55.2708 },
+      fallbackTitle: 'Al Fahidi, Dubai',
+      name: null,
+    });
+    expect(m.attachments[1]).toMatchObject({
+      fileType: 'contact',
+      coordinates: null,
+      fallbackTitle: '+971 4 123 4567',
+      meta: { firstName: 'Aisha', lastName: 'Khan' },
+    });
+  });
+
+  it('reads when staff last saw the conversation (0 means never)', () => {
+    expect(
+      toConversation({ ...api.getConversation, agent_last_seen_at: 1790515970 }).staffLastSeenAt,
+    ).toEqual(new Date(1790515970 * 1000));
+    expect(
+      toConversation({ ...api.getConversation, agent_last_seen_at: 0 }).staffLastSeenAt,
+    ).toBeNull();
+  });
+});

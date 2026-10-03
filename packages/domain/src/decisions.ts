@@ -254,10 +254,14 @@ export interface ThresholdPolicy {
 const isUnit = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
 
-type AnyAnswer = ChoiceAnswer | ScoreAnswer | NoulAnswer;
+export type AnyAnswer = ChoiceAnswer | ScoreAnswer | NoulAnswer;
 
 /** Returns the answer to keep (a noul gains its verdict), or why it falls short. */
-function gate(name: string, answer: AnyAnswer, threshold?: QuestionThreshold): AnyAnswer | string {
+export function gateAnswer(
+  name: string,
+  answer: AnyAnswer,
+  threshold?: QuestionThreshold,
+): AnyAnswer | string {
   if (!threshold) return `no threshold for "${name}"`;
   if (threshold.type !== answer.type) return `the threshold for "${name}" is for another type`;
   if (threshold.type === 'noul' && answer.type === 'noul') {
@@ -317,7 +321,7 @@ export function applyThreshold<T extends DecisionAnswers>(
   const kept: [string, AnyAnswer][] = [];
   const failures: string[] = [];
   for (const [name, answer] of Object.entries(result.value as DecisionAnswers)) {
-    const outcome = gate(
+    const outcome = gateAnswer(
       name,
       answer,
       Object.hasOwn(thresholds, name) ? thresholds[name] : undefined,
