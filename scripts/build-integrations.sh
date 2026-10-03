@@ -130,6 +130,10 @@ build_gtm() {
   say "Google Tag Manager template"
   local src=$root/integrations/gtm/template.tpl
   [ -f "$src" ] || die "the template is not at $src."
+  local name
+  for name in TERMS_OF_SERVICE INFO TEMPLATE_PARAMETERS SANDBOXED_JS_FOR_WEB_TEMPLATE WEB_PERMISSIONS TESTS NOTES; do
+    grep -qx "___${name}___" "$src" || die "the template has no ${name} section: GTM would not import it."
+  done
   cp "$src" "$out/hamnivo-gtm-template.tpl"
   say "  hamnivo-gtm-template.tpl: $(du -h "$out/hamnivo-gtm-template.tpl" | cut -f1)"
 }

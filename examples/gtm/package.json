@@ -1,0 +1,19 @@
+{
+  "name": "@hamnivo/example-gtm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example: the checks of the Hamnivo Chat template for Google Tag Manager, and how to try it",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@hamnivo/widget-loader": "workspace:*",
+    "@types/node": "catalog:",
+    "jsdom": "30.1.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
