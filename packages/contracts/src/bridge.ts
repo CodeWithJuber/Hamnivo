@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PageContext } from './conversations.js';
+import { VisitorKey } from './visitors.js';
 
 /**
  * postMessage protocol between the host-page loader and the widget iframe (blueprint §10).
@@ -39,6 +40,12 @@ export const HostToFrame = z.discriminatedUnion('type', [
    * widget shows the brand's own words from its configuration, never text from the page.
    */
   z.object({ ...base, type: z.literal('proactive'), triggerId: z.string().max(32) }),
+  /**
+   * The random key the loader keeps for this browser on the brand's website, sent only while the
+   * brand tracks pages and the browser sends no Do Not Track or Global Privacy Control signal.
+   * The chat passes it on so staff can see the pages next to the conversation.
+   */
+  z.object({ ...base, type: z.literal('visitor'), key: VisitorKey }),
 ]);
 export type HostToFrame = z.infer<typeof HostToFrame>;
 

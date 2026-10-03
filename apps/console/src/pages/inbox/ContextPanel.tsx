@@ -31,6 +31,7 @@ import {
   useTags,
 } from '../../lib/inbox';
 import { ConversationStatusBadge, IdentityBadge, languageName } from './parts';
+import { VisitorDetails } from './VisitorDetails';
 
 function Block({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
@@ -646,6 +647,9 @@ export function ContextPanel({ detail }: { detail: InboxDetail }) {
       </Block>
       <Block id={`ctx-handoff-${detail.id}`} title={t('tools.handoff.title')}>
         <HandoffSummary conversationId={detail.id} />
+      </Block>
+      <Block id={`ctx-visitor-${detail.id}`} title={t('inboxAlerts.visitor.title')}>
+        <VisitorDetails conversationId={detail.id} />
       </Block>
       <Block id={`ctx-tags-${detail.id}`} title={t('inbox.tags.title')}>
         <Tags detail={detail} />

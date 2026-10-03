@@ -57,6 +57,7 @@ import { DeleteMessage, EMOJI_NAMES, Reactions } from './MessageActions.js';
 import { Contact, Files, fileSize, Place, Unknown } from './Parts.js';
 import { Settings } from './Settings.js';
 import { StaffTypingLine } from './StaffTyping.js';
+import { VisitorNotice } from './VisitorNotice.js';
 
 interface Source {
   id: string;
@@ -799,6 +800,8 @@ export function Chat(props: {
   prompt: string | null;
   /** The name of the person typing a reply ('' when unnamed), or null when nobody is. */
   staffTyping: string | null;
+  /** Says the website notes which pages are viewed (from the gateway), or null. */
+  visitorNotice: string | null;
   onLocale: (locale: Locale) => void;
   onSend: (text: string, attachments?: readonly OutgoingAttachment[]) => Promise<void>;
   onRetry: (clientMessageId: string) => void;
@@ -1266,6 +1269,7 @@ export function Chat(props: {
               onDismiss={props.language.dismiss}
             />
             <StaffTypingLine name={props.staffTyping} />
+            <VisitorNotice text={props.visitorNotice} />
             <Composer
               label={t('placeholder')}
               send={offline ? t('surface.offline.queue') : t('send')}

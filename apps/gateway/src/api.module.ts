@@ -100,6 +100,7 @@ import { SecretsController } from './secrets/secrets.controller.js';
 import { SupportController } from './support/support.controller.js';
 import { SupportService } from './support/support.service.js';
 import { APP_DB, AUTH, CONFIG, MAILER } from './tokens.js';
+import { VISITORS_API_CONTROLLERS, VISITORS_API_PROVIDERS } from './visitors/visitors.module.js';
 import { AuthorityContactsService } from './widget/contacts.service.js';
 import { WidgetConversationsService } from './widget/conversations.service.js';
 import { WidgetEventsService } from './widget/events.service.js';
@@ -163,6 +164,7 @@ export class ApiModule {
         ...COMMERCE_API_CONTROLLERS,
         ...DEVELOPER_API_CONTROLLERS,
         ...WIDGET_SURFACE_API_CONTROLLERS,
+        ...VISITORS_API_CONTROLLERS,
         ...ACTIONS_API_CONTROLLERS,
       ],
       providers: [
@@ -249,6 +251,7 @@ export class ApiModule {
         ...COMMERCE_API_PROVIDERS,
         ...developerApiProviders(overrides),
         ...widgetSurfaceApiProviders(config, overrides.scanner),
+        ...VISITORS_API_PROVIDERS,
         ...ACTIONS_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },

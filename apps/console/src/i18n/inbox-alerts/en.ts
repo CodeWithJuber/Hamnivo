@@ -77,6 +77,30 @@ export const inboxAlertsEn = {
   typing: {
     customer: '{{name}} is typing…',
   },
+  visitor: {
+    title: 'Website visit',
+    notNoted: 'This brand does not note which pages visitors view.',
+    none: 'No pages are noted for this customer. They may use Do Not Track, or the chat was opened where the website’s chat script does not run.',
+    online: 'On the website now',
+    left: 'Left the website {{when}}',
+    currentPage: 'Current page',
+    entryPage: 'Entered on',
+    visits: 'Visits',
+    visitor: 'Visitor',
+    returning: 'Returning',
+    new: 'New',
+    timeOnSite: 'Time on site',
+    underMinute: 'Less than a minute',
+    country: 'Country',
+    device: 'Device',
+    language: 'Language',
+    cameFrom: 'Came from',
+    pages: 'Pages in this visit',
+    untitled: 'Untitled page',
+    openPage: 'Open {{page}} in a new tab',
+    types: { desktop: 'Computer', mobile: 'Phone', tablet: 'Tablet', other: 'Device' },
+    privacy: 'Pages are noted without query strings and kept for 30 days. No IP address is stored.',
+  },
 } as const;
 
 type Strings<T> = { [K in keyof T]: T[K] extends string ? string : Strings<T[K]> };

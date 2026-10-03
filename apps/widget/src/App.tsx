@@ -13,6 +13,7 @@ import { useDisplay } from './useDisplay.js';
 import { useMemory } from './useMemory.js';
 import { useReplyLanguage } from './useReplyLanguage.js';
 import { useStaffTyping } from './useTyping.js';
+import { useVisitor } from './useVisitor.js';
 
 export interface WidgetParams {
   apiBase: string;
@@ -47,6 +48,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const actions = useActions(client, chat.state.conversation?.id ?? null, bridge);
   useEffect(() => onEvent(actions.onEvent), [onEvent, actions.onEvent]);
   const staffTyping = useStaffTyping(onEvent);
+  const visitor = useVisitor(client, chat.state.session?.principal.id ?? null, locale);
   const display = useDisplay(params.widgetId);
   // Embedded, the chat is on screen only while the loader shows it; on its own page, always.
   const [open, setOpen] = useState(
@@ -85,6 +87,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   }, [bridge]);
 
   const { identify, reset } = chat;
+  const { setKey: setVisitorKey } = visitor;
   useEffect(() => {
     bridge.post({ type: 'ready', widgetVersion: '0.1.0' });
     const identityChanged = (verified: boolean) =>
@@ -93,6 +96,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       if (message.type === 'open') setOpen(true);
       if (message.type === 'close') setOpen(false);
       if (message.type === 'proactive') setTrigger(message.triggerId);
+      if (message.type === 'visitor') setVisitorKey(message.key);
       if (message.type === 'set-locale')
         setLocale((message.locale.split('-')[0] as Locale) ?? 'en');
       if (message.type === 'identify') {
@@ -127,7 +131,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
         });
       }
     });
-  }, [bridge, identify, reset]);
+  }, [bridge, identify, reset, setVisitorKey]);
 
   if (chat.state.phase === 'loading') {
     return (
@@ -145,9 +149,12 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   }
   const session = chat.state.session;
   const mode = params.mode ?? session.config.layout?.mode ?? 'bubble';
-  // Only the brand's own words, from its configuration: the page sends nothing but the id.
+  // Only the brand's own words, from its configuration (the page sends nothing but the id), or a
+  // message the team left for this visitor, which comes from the gateway, not from the page.
   const prompt =
-    session.config.proactive?.triggers.find((t) => t.id === trigger)?.message[locale] ?? null;
+    session.config.proactive?.triggers.find((t) => t.id === trigger)?.message[locale] ??
+    visitor.state.invite?.message ??
+    null;
   // Inline and full-page chats have no launcher to go back to.
   const closable = Boolean(params.hostOrigin) && mode !== 'inline' && mode !== 'fullpage';
   return (
@@ -165,6 +172,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           display={display}
           prompt={prompt}
           staffTyping={staffTyping}
+          visitorNotice={visitor.state.notice}
           onLocale={(next) => {
             setLocale(next);
             void saveLocale(next);

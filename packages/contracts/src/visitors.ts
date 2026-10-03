@@ -63,6 +63,7 @@ export type VisitAck = z.infer<typeof VisitAck>;
 export const VisitorLinkRequest = z
   .object({ visitorKey: VisitorKey, locale: SupportedLocale.optional() })
   .meta({ id: 'VisitorLinkRequest' });
+export type VisitorLinkRequest = z.infer<typeof VisitorLinkRequest>;
 
 export const VisitorLinkResponse = z
   .object({
@@ -157,10 +158,12 @@ export type ConversationVisitor = z.infer<typeof ConversationVisitor>;
 export const VisitorInviteRequest = z
   .object({ message: z.string().trim().min(1).max(300) })
   .meta({ id: 'VisitorInviteRequest' });
+export type VisitorInviteRequest = z.infer<typeof VisitorInviteRequest>;
 
 export const VisitorInviteResult = z
   .object({ expiresAt: Timestamp })
   .meta({ id: 'VisitorInviteResult' });
+export type VisitorInviteResult = z.infer<typeof VisitorInviteResult>;
 
 // ------------------------------------------------------------------ brand settings
 

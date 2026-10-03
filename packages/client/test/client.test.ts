@@ -322,6 +322,36 @@ describe('outbox', () => {
   });
 });
 
+describe('visitor link', () => {
+  it('tells the gateway which browser the chat runs in and returns what to show the visitor', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => HttpResponse.json(session(), { status: 201 })),
+      http.post(`${API}/v1/widget/visitors/link`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({
+          tracking: true,
+          notice: 'To help you, this website notes which pages you view.',
+          invite: { id: 'abc', message: 'Need a hand?' },
+        });
+      }),
+    );
+    const c = client();
+    await c.connect();
+    const linked = await c.linkVisitor('k'.repeat(22), 'en');
+    expect(linked).toEqual({
+      tracking: true,
+      notice: 'To help you, this website notes which pages you view.',
+      invite: { id: 'abc', message: 'Need a hand?' },
+    });
+    await c.linkVisitor('k'.repeat(22));
+    expect(bodies).toEqual([
+      { visitorKey: 'k'.repeat(22), locale: 'en' },
+      { visitorKey: 'k'.repeat(22) },
+    ]);
+  });
+});
+
 describe('typing', () => {
   it('tells the gateway whether the visitor is typing, with the session', async () => {
     const calls: { path: string; auth: string | null; body: unknown }[] = [];

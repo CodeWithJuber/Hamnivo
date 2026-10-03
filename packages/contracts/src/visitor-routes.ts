@@ -95,7 +95,7 @@ export const visitorStaffRoutes = {
     path: '/v1/admin/brands/{brandId}/visitor-settings',
     operationId: 'updateVisitorSettings',
     summary:
-      'Turn page tracking on or off and choose whether query strings are kept; the loader follows within a minute (widget.configure)',
+      'Turn page tracking on or off and choose whether query strings are kept; it applies from each visitor’s next page view (widget.configure)',
     tags: ['Visitors'],
     auth: 'staff_session',
     params: brandParams,

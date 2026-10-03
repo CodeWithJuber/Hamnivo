@@ -19,6 +19,7 @@ import {
   type Trigger,
   visit,
 } from './proactive.js';
+import { track } from './visitor.js';
 
 type Listener = (payload: Record<string, unknown>) => void;
 type Mode = 'bubble' | 'panel' | 'inline' | 'fullpage';
@@ -238,18 +239,9 @@ declare global {
     remember(memory);
     button.focus();
   };
-  const showPrompt = (trigger: Trigger) => {
-    // Once per page view, never over an open chat, and within today's limit.
-    if (
-      prompted ||
-      open ||
-      !config ||
-      !eligible(config.proactive, memory, Date.now(), location.pathname).includes(trigger)
-    )
-      return;
-    prompted = true;
-    memory = shown(memory);
-    remember(memory);
+  /** The speech bubble next to the launcher; `opened` runs when the visitor chooses it. */
+  const bubble = (text: string, opened: () => void) => {
+    if (!config) return;
     prompt = document.createElement('div');
     prompt.setAttribute('data-hamnivo-prompt', '');
     prompt.setAttribute('role', 'status');
@@ -273,7 +265,7 @@ declare global {
     });
     const message = document.createElement('button');
     message.type = 'button';
-    message.textContent = trigger.message;
+    message.textContent = text;
     style(message, {
       background: 'none',
       border: '0',
@@ -286,7 +278,7 @@ declare global {
     });
     message.addEventListener('click', () => {
       hidePrompt();
-      send({ type: 'proactive', triggerId: trigger.id });
+      opened();
       setOpen(true);
     });
     const close = document.createElement('button');
@@ -306,6 +298,25 @@ declare global {
     close.addEventListener('click', dismissPrompt);
     prompt.append(message, close);
     document.body.appendChild(prompt);
+  };
+  const showPrompt = (trigger: Trigger) => {
+    // Once per page view, never over an open chat, and within today's limit.
+    if (
+      prompted ||
+      open ||
+      !config ||
+      !eligible(config.proactive, memory, Date.now(), location.pathname).includes(trigger)
+    )
+      return;
+    prompted = true;
+    memory = shown(memory);
+    remember(memory);
+    bubble(trigger.message, () => send({ type: 'proactive', triggerId: trigger.id }));
+  };
+  /** Staff invited this visitor to chat: shown like a prompt, but not counted against the limits. */
+  const showInvite = (message: string) => {
+    if (open || !launcherMode() || prompt) return;
+    bubble(message, () => undefined);
   };
   const schedulePrompts = () => {
     if (!config || !launcherMode()) return;
@@ -449,7 +460,63 @@ declare global {
     schedulePrompts();
   };
 
+  // Which page the visitor is on, for the brand's staff (see visitor.ts); never with Do Not Track.
+  const watchVisitor = () => {
+    const api = data.api?.replace(/\/$/, '');
+    if (!api || data.visitors === 'off') return;
+    const url = `${api}/v1/widget/visits`;
+    const type = 'text/plain;charset=UTF-8';
+    const invited = new Set<string>();
+    track({
+      widgetId,
+      page: () => ({
+        url: location.href,
+        title: document.title,
+        referrer: document.referrer,
+        language: navigator.language,
+      }),
+      optOut: () => {
+        const n = navigator as Navigator & { globalPrivacyControl?: boolean };
+        return (
+          n.doNotTrack === '1' ||
+          (window as Window & { doNotTrack?: string }).doNotTrack === '1' ||
+          n.globalPrivacyControl === true
+        );
+      },
+      visible: () => document.visibilityState === 'visible',
+      listen: (event, handler) => {
+        const target = event === 'pagehide' ? window : document;
+        target.addEventListener(event, handler);
+        return () => target.removeEventListener(event, handler);
+      },
+      storage: {
+        getItem: (key) => localStorage.getItem(key),
+        setItem: (key, value) => localStorage.setItem(key, value),
+      },
+      random: (bytes) => crypto.getRandomValues(new Uint8Array(bytes)),
+      post: (body) =>
+        fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': type },
+          body,
+          credentials: 'omit',
+          keepalive: true,
+        })
+          .then((response) => (response.ok ? response.json() : null))
+          .catch(() => null),
+      beacon: (body) => navigator.sendBeacon?.(url, new Blob([body], { type })),
+      onTracking: (key) => send({ type: 'visitor', key }),
+      onInvite: (invite) => {
+        if (!invited.has(invite.id)) {
+          invited.add(invite.id);
+          showInvite(invite.message);
+        }
+      },
+    });
+  };
+
   const start = () => {
+    watchVisitor();
     if (!data.api) {
       mount();
       return;
