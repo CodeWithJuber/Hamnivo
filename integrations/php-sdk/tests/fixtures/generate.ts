@@ -156,7 +156,10 @@ const customers: [string, IdentityAssertionOptions['customer']][] = [
     { id: 'h-1', name: 'आयशा खान', email: 'ayesha@example.in', emailVerified: true },
   ],
   ['an emoji name', { id: 'e-1', name: 'Sam 🙂 Lee' }],
-  ['text that JSON must escape', { id: 'j-1', name: 'say "hi" \\ a/b \u0001 \n \t     \u007f é' }],
+  [
+    'text that JSON must escape',
+    { id: 'j-1', name: 'say "hi" \\ a/b \u0001 \n \t \u2028 \u2029 \u007f é' },
+  ],
   ['a numeric-looking id', { id: '0', name: 'Zero' }],
   ['an id of 200 characters', { id: 'x'.repeat(200) }],
   ['an id of 100 emoji, which is 200 UTF-16 units', { id: '🙂'.repeat(100) }],
@@ -291,7 +294,7 @@ async function errorCases(): Promise<ErrorCase[]> {
     ['HS256 with an empty secret', hs({ secret: '' }), true],
     ['a secret with a line break', hs({ secret: `${secret}\n` }), true],
     ['a secret with a space inside', hs({ secret: 'abc def' }), true],
-    ['a secret with a no-break space', hs({ secret: `abc def` }), true],
+    ['a secret with a no-break space', hs({ secret: `abc\u00a0def` }), true],
     ['HS256 with a private key', hs({ secret, privateKey: keys.ES256.privateJwk }), true],
     ['ES256 without a private key', asym('ES256', {}), true],
     ['ES256 with a secret', asym('ES256', { secret }), true],
@@ -308,7 +311,7 @@ async function errorCases(): Promise<ErrorCase[]> {
     ['no customer', { ...base, customer: undefined }, false],
     ['an empty customer id', customer({ id: '' }), true],
     ['a blank customer id', customer({ id: '   ' }), true],
-    ['a customer id of only no-break spaces', customer({ id: ' 　﻿' }), true],
+    ['a customer id of only no-break spaces', customer({ id: '\u00a0\u3000\ufeff' }), true],
     ['a customer id of 201 characters', customer({ id: 'x'.repeat(201) }), true],
     [
       'a customer id of 101 emoji, which is 202 UTF-16 units',
@@ -580,7 +583,14 @@ const webhooks = {
   scenarios: await webhookScenarios(),
 };
 
-const text = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
+// Characters that are invisible or look like spaces are written as escapes, so that a reader of the
+// fixtures can see them. The JSON means the same.
+const INVISIBLE = /[\u2028\u2029\u00a0\u3000\ufeff]/g;
+const text = (value: unknown) =>
+  JSON.stringify(value, null, 2).replace(
+    INVISIBLE,
+    (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'),
+  ) + '\n';
 
 if (check) {
   const problems: string[] = [];
