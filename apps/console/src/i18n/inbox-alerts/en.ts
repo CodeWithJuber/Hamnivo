@@ -101,6 +101,68 @@ export const inboxAlertsEn = {
     types: { desktop: 'Computer', mobile: 'Phone', tablet: 'Tablet', other: 'Device' },
     privacy: 'Pages are noted without query strings and kept for 30 days. No IP address is stored.',
   },
+  live: {
+    link: 'Live visitors',
+    title: 'Live visitors',
+    description: 'People on your websites right now. The list updates every few seconds.',
+    back: 'Back to inbox',
+    brand: 'Brand',
+    allBrands: 'All brands',
+    loading: 'Loading visitors',
+    summary: 'On the website now: {{number}}',
+    updated: 'Updated {{time}}',
+    table: 'Visitors on the website now',
+    columns: {
+      visitor: 'Visitor',
+      page: 'Page',
+      time: 'Time on site',
+      country: 'Country',
+      device: 'Device',
+      visits: 'Visits',
+      actions: 'Actions',
+    },
+    returning: 'Returning · {{number}}',
+    new: 'New',
+    openChat: 'Open chat',
+    openChatFor: 'Open the chat with {{name}}',
+    invite: 'Start chat',
+    inviteFor: 'Start a chat with {{name}}',
+    empty: {
+      title: 'Nobody is on your website right now',
+      description:
+        'Visitors appear here while they have a page open. This needs the chat script on your website and page tracking turned on for the brand.',
+    },
+    forbidden: {
+      title: 'Live visitors are not available to you',
+      description: 'Your role does not include reading conversations.',
+    },
+    dialog: {
+      title: 'Start a chat with {{name}}',
+      description:
+        'Your message appears next to the chat button on the page they are viewing. If they open it, the chat starts with your words.',
+      message: 'Your message',
+      hint: 'Up to 300 characters.',
+      default: 'Hi! Can I help you find something?',
+      send: 'Send invitation',
+      sent: 'Invitation sent. It shows within a few seconds and waits for 3 minutes.',
+      gone: 'This visitor has left the website.',
+    },
+    settings: {
+      title: 'Visitor tracking',
+      description: 'Choose whether a brand notes which pages visitors view.',
+      brand: 'Brand',
+      tracking: 'Note which pages visitors view',
+      trackingHint:
+        'On by default. Visitors whose browser sends Do Not Track or Global Privacy Control are always left out, and the chat tells visitors that pages are noted.',
+      queries: 'Keep the part of a page address after the question mark',
+      queriesHint:
+        'Off by default: it is removed before anything is stored, because it can hold email addresses or order numbers. When it is on, values that look like passwords or tokens are still removed.',
+      retention:
+        'Pages and visits are deleted 30 days after the visitor was last seen. No IP address is stored.',
+      save: 'Save',
+      saved: 'Saved. It applies from each visitor’s next page view.',
+    },
+  },
 } as const;
 
 type Strings<T> = { [K in keyof T]: T[K] extends string ? string : Strings<T[K]> };

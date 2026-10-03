@@ -2,7 +2,8 @@ import { Button } from '@hamnivo/ui/components/button';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { NativeSelect, NativeSelectOption } from '@hamnivo/ui/components/native-select';
 import { cn } from '@hamnivo/ui/lib/utils';
-import { BellIcon, BellRingIcon, CircleIcon } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { BellIcon, BellRingIcon, CircleIcon, UsersIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -97,16 +98,24 @@ export function InboxToolbar() {
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
       <StatusControl />
-      <Button
-        variant="secondary"
-        size="sm"
-        aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-        data-testid="alert-settings-button"
-      >
-        {silent ? <BellIcon aria-hidden="true" /> : <BellRingIcon aria-hidden="true" />}
-        {t('inboxAlerts.settings.button')}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild variant="secondary" size="sm">
+          <Link to="/visitors" data-testid="live-visitors-link">
+            <UsersIcon aria-hidden="true" />
+            {t('inboxAlerts.live.link')}
+          </Link>
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-haspopup="dialog"
+          onClick={() => setOpen(true)}
+          data-testid="alert-settings-button"
+        >
+          {silent ? <BellIcon aria-hidden="true" /> : <BellRingIcon aria-hidden="true" />}
+          {t('inboxAlerts.settings.button')}
+        </Button>
+      </div>
       <AlertSettingsDialog open={open} onOpenChange={setOpen} />
     </div>
   );

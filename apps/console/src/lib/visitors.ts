@@ -16,6 +16,12 @@ export type VisitorSettings = C.VisitorSettings;
 export type VisitorSettingsView = C.VisitorSettingsView;
 export type DeviceType = C.DeviceType;
 
+/** What a brand has until it chooses (the same as the gateway's). */
+export const DEFAULT_VISITOR_SETTINGS: VisitorSettings = {
+  tracking: true,
+  keepQueryStrings: false,
+};
+
 export const visitorKeys = {
   conversation: (id: string) => ['visitors', 'conversation', id] as const,
   live: (brandId: string) => ['visitors', 'live', brandId] as const,
