@@ -23,6 +23,7 @@ import {
   PASSAGE_QUESTIONS,
   passageVerdict,
   SAFE_REPLIES,
+  SAFE_REPLIES_STAFF,
   splitSentences,
   unbackedClaims,
 } from '../src/checks.js';
@@ -513,6 +514,23 @@ describe('message guard', () => {
       expect(SAFE_REPLIES[language].length).toBeGreaterThan(40);
     expect(SAFE_REPLIES.en).toContain('emergency number');
     expect(SAFE_REPLIES['ur-Latn']).toContain('emergency number');
+  });
+
+  it('has staff wording in every reply language: the same help, then that the team was told', () => {
+    for (const language of REPLY_LANGUAGES) {
+      const passedOn = splitSentences(SAFE_REPLIES[language]);
+      const told = splitSentences(SAFE_REPLIES_STAFF[language]);
+      // Only the closing sentence differs, so the help text cannot drift apart.
+      expect(told, language).toHaveLength(passedOn.length);
+      expect(told.slice(0, -1), language).toEqual(passedOn.slice(0, -1));
+      expect(told.at(-1), language).not.toBe(passedOn.at(-1));
+      expect(SAFE_REPLIES_STAFF[language]).not.toContain(passedOn.at(-1) ?? '');
+    }
+    expect(SAFE_REPLIES_STAFF.en).toContain('emergency number');
+    expect(SAFE_REPLIES_STAFF.en).toMatch(
+      /I have told our team, and a person will reply here as soon as they can\.$/,
+    );
+    expect(SAFE_REPLIES_STAFF.en).not.toContain('passed this chat');
   });
 
   it('lets a payment or refund stand only with its receipt, and a promised refund once submitted', () => {

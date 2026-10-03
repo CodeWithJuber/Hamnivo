@@ -261,6 +261,10 @@ Rules that always hold:
 - A customer who asks for a person gets one; Jev never decides that.
 - If TypeSafe is slow or down, the fixed rule routes once the rubric's deadline passes (1.5 s by
   default).
+- With the message guard on (see "Message guard" below), Hamnivo also reads customer messages in
+  conversations your team handles, with personal data replaced by its kind, and sends them to
+  TypeSafe. This reading runs in the worker after the message is saved, so it never delays
+  delivery.
 - Each decision sends TypeSafe only the customer's latest messages and the conversation's status, as
   the rubric chooses. In the test that was about 670 tokens, at $0.042 per million input tokens
   (TypeSafe's price in October 2026): about $0.00003 per decision. Half of the decisions took 148 ms
@@ -289,22 +293,65 @@ Switch a check to **live** when its records look right.
   Roman Urdu), Jev picks one. When live, its choice is used if Jev is sure enough for that
   language; otherwise the customer is asked once, as before. Choosing Jev fills in the thresholds
   Hamnivo measured. A customer's own choice always wins.
-- **Message guard:** Jev reads what comes in and what goes out. When live, a customer who says
-  they want to hurt themselves, or that someone is in danger now, gets safety wording at once in
-  their language, pointing to local emergency help, and a person takes over with an urgent note.
-  This does not depend on the plan or the AI budget: the wording is fixed text and costs no
-  tokens, so it is sent even when the AI replies are used up. A customer who asks for a person is
-  handed over first, as ever; Jev is asked after that and, if it finds someone at risk, adds the
-  wording and an urgent note. A threat or abuse goes to a person. A draft reply that says or
-  promises a payment, refund or order change without a receipt or a submitted refund is written
-  again once, then passed to a person. The receipt check runs first and keeps the final say. These
-  questions have no measured thresholds yet: set them from what comparison mode records. The
-  safety wording in languages other than English is waiting for review by native speakers.
+- **Message guard:** Jev reads what comes in and what goes out. Someone who may be at risk gets
+  safety wording and an urgent note to your team, whoever has the conversation (see "Message
+  guard" below). A threat or abuse goes to a person while the AI has the conversation, and is
+  only recorded where people have it. A draft reply that says or promises a payment, refund or
+  order change without a receipt or a submitted refund is written again once, then passed to a
+  person. The receipt check runs first and keeps the final say. These questions have no measured
+  thresholds yet: set them from what comparison mode records.
 
 If Jev is slow or unavailable, or a language has no threshold, the reply goes out as it would
 without the check, and the check is recorded. A check sends TypeSafe only what it needs: the
 customer's latest messages or the draft reply, with personal data replaced by its kind, and the
 knowledge passages it checks.
+
+### Message guard
+
+The message guard is the one check that also reads conversations your team handles, so it has
+rules of its own.
+
+- **What it reads.** With the message guard on, in comparison mode or live, Hamnivo reads every
+  customer message: while the AI answers, while the conversation waits for a person, and while a
+  person handles it. It sends TypeSafe the customer's latest three messages up to that one, with
+  personal data replaced by its kind, and nothing else about the conversation. That is in addition
+  to what routing sends. The reading runs in the worker after the message is saved, so it never
+  delays delivery to the customer or to your team. If TypeSafe is slow or down, nothing changes,
+  and the check is recorded.
+- **What happens when someone may be at risk:** the customer says they want to hurt themselves, or
+  that someone is in danger now. In comparison mode only a record is made. Live, it depends on who
+  has the conversation:
+  - *The AI answers.* The customer gets safety wording at once, in their language, and a person
+    takes over with an urgent note. A customer who asks for a person is handed over first, as
+    ever, and the guard is asked after that. The same holds when the AI cannot answer: no
+    published agent, an agent that only suggests, or a kill switch. The wording is fixed text,
+    not something a model wrote, so a kill switch does not hold it back, and neither do the
+    plan's limits or the AI budget.
+  - *Nobody is assigned yet.* The conversation waits for a person: your team gets an urgent note
+    and the customer gets the safety wording, both at once.
+  - *A person is assigned.* The person gets the urgent note at once, with the wording in the
+    customer's language so they can send it themselves. If nobody has replied to the customer
+    after 2 minutes, Hamnivo sends it. It does not send it if the AI has the conversation again,
+    or if anyone, staff or a bot, has replied to the customer since their message (private notes
+    and activity do not count). A reply that lands in the moment between that check and the
+    sending can still be followed by the wording.
+
+  In a conversation people have, Hamnivo speaks only when nobody else is speaking: never over a
+  person, and never while the AI has the conversation again. The wording for a conversation a
+  person has says that the team was told and a person will reply, not that the chat was passed
+  on. The urgent note is a private note: the customer never sees it. Records keep the reasons,
+  never the message text.
+- **Limits.** A conversation gets at most one automatic safety wording in 24 hours, on every path
+  above. When that holds the wording back, the hand-off and the urgent note still happen, and the
+  note says that no wording was sent because one was sent in the last 24 hours. Where people have
+  the conversation, an urgent note goes out at most once in 10 minutes.
+- **Thresholds.** Start with 0.5 for `self_harm` and `in_danger`: set both **yes from** and **no
+  up to** to 0.5, so that no answer falls in between and is ignored. In a test of 15 messages,
+  messages about risk scored 0.97 to 0.99, and everyday phrases such as "this bill is killing me"
+  scored 0.14 or below. That is a small test, not your customers' words. Before you go live, look
+  at the scores in your own comparison records (the records API returns each answer's score) and
+  move the number if everyday messages come close to it.
+- The safety wording in languages other than English is waiting for review by native speakers.
 
 ### Bring your old chats
 

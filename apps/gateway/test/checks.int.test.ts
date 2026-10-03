@@ -3,10 +3,12 @@ import type { LanguageModelV4 } from '@ai-sdk/provider';
 import { createMockModel } from '@hamnivo/adapters/models';
 import { call, createChatwootClient, provisionStaffUser } from '@hamnivo/chatwoot';
 import { fromPublicId, newId, schema, withTenant } from '@hamnivo/db';
-import { SAFE_REPLIES } from '@hamnivo/domain';
-import { and, eq, isNull } from 'drizzle-orm';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { SAFE_REPLIES, SAFE_REPLIES_STAFF } from '@hamnivo/domain';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthorityRegistry } from '../src/authority/registry.js';
+import { LanguageService } from '../src/language/language.service.js';
+import { RepliesService } from '../src/runtime/replies.service.js';
 import { connectedTenant, type Slice, startSlice, Visitor } from './slice-harness.js';
 
 /** The mock model with scripted replies for the next calls; it keeps every system prompt. */
@@ -1678,6 +1680,832 @@ describe('message guard', () => {
         ]);
         // The person is told all the same: the urgent hand-off note was posted.
         expect(seen.notes).toContainEqual(expect.stringContaining('URGENT'));
+      });
+    });
+
+    // The guard reads every customer message, whoever has the conversation, and Hamnivo speaks only
+    // when nobody else is speaking.
+    describe('whoever has the conversation', () => {
+      /** A conversation the AI answered once, so that what comes next finds it in other hands. */
+      const answered = async () => {
+        escalates({});
+        return chat('Hello, I have a question about my order.');
+      };
+      /** The customer asked for a person: the conversation waits, with nobody assigned. */
+      const waiting = async () => {
+        escalates({});
+        return chat('I want to talk to a person.');
+      };
+      /** A person (the workspace's owner) took the conversation over. */
+      const handled = async () => {
+        const talk = await answered();
+        const taken = await shop.owner.post(
+          `/v1/conversations/${talk.conversationId}/takeover`,
+          {},
+        );
+        expect(taken.status, JSON.stringify(taken.body)).toBe(200);
+        await slice.drain();
+        return talk;
+      };
+      /** The customer writes, without the worker looking at it yet. */
+      const send = async (visitor: Visitor, conversationId: string, text: string) => {
+        const sent = await visitor.call(
+          'POST',
+          `/v1/widget/conversations/${conversationId}/messages`,
+          { clientMessageId: randomUUID(), parts: [{ type: 'text', text }] },
+        );
+        expect(sent.status, JSON.stringify(sent.body)).toBe(202);
+      };
+      const say = async (visitor: Visitor, conversationId: string, text: string) => {
+        await send(visitor, conversationId, text);
+        await slice.drain();
+      };
+      const urgentNotes = (seen: { notes: string[] }) =>
+        seen.notes.filter((note) => note.startsWith('URGENT'));
+      const wordings = async (conversationId: string) =>
+        (await publicationsOf(conversationId)).filter(
+          (publication) => (publication.detail as { safe?: unknown }).safe,
+        );
+      const lastGuardRecord = async (conversationId: string) =>
+        (await guardRecords(conversationId, 'inbound')).at(-1);
+      const ago = (ms: number) => new Date(Date.now() - ms);
+      const setMarks = (
+        conversationId: string,
+        marks: { safetyAlertedAt?: Date | null; safetyWordedAt?: Date | null },
+      ) =>
+        withTenant(slice.app, { tenantId }, (tx) =>
+          tx
+            .update(schema.conversationControls)
+            .set(marks)
+            .where(
+              eq(schema.conversationControls.id, fromPublicId('conversation', conversationId)),
+            ),
+        );
+      /** The delayed events that would say the wording for a person's silence. */
+      const fallbacks = async (conversationId: string) => {
+        const rows = await withTenant(slice.app, { tenantId }, (tx) =>
+          tx
+            .select({
+              availableAt: schema.outboxEvents.availableAt,
+              processedAt: schema.outboxEvents.processedAt,
+              payload: schema.outboxEvents.payload,
+            })
+            .from(schema.outboxEvents)
+            .where(eq(schema.outboxEvents.topic, 'conversation.safe_reply_fallback')),
+        );
+        const id = fromPublicId('conversation', conversationId);
+        return rows.filter(
+          (row) => (row.payload as { conversationId: string }).conversationId === id,
+        );
+      };
+      /** The two minutes pass: the conversation's delayed events become due, and the worker runs. */
+      const fallbackDue = async (conversationId: string) => {
+        await withTenant(slice.app, { tenantId }, (tx) =>
+          tx
+            .update(schema.outboxEvents)
+            .set({ availableAt: ago(1000) })
+            .where(
+              and(
+                eq(schema.outboxEvents.topic, 'conversation.safe_reply_fallback'),
+                isNull(schema.outboxEvents.processedAt),
+                sql`${schema.outboxEvents.payload} ->> 'conversationId' = ${fromPublicId('conversation', conversationId)}`,
+              ),
+            ),
+        );
+        await slice.drain();
+      };
+      /** The conversation's message-guard runs, with their steps. */
+      const guardRuns = async (conversationId: string) => {
+        const listed = await shop.owner.get(`/v1/admin/runs?conversationId=${conversationId}`);
+        expect(listed.status, JSON.stringify(listed.body)).toBe(200);
+        const runs = (listed.body.items as Array<Record<string, any>>).filter(
+          (run) => run.kind === 'guard',
+        );
+        return Promise.all(
+          runs.map(
+            async (run): Promise<{ steps: Array<Record<string, any>> } & Record<string, any>> => {
+              const detail = await shop.owner.get(`/v1/admin/runs/${run.id}`);
+              return { ...run, steps: detail.body.steps as Array<Record<string, any>> };
+            },
+          ),
+        );
+      };
+      const setGuardMode = async (mode: 'off' | 'shadow' | 'live') => {
+        const set = await shop.owner.put(`${checksPath()}/message-guard/mode`, { mode });
+        expect(set.status, JSON.stringify(set.body)).toBe(200);
+      };
+      /** The customer message's outbox event: done, and without an error. */
+      const jobsOf = async (conversationId: string) => {
+        const rows = await withTenant(slice.app, { tenantId }, (tx) =>
+          tx
+            .select({
+              processedAt: schema.outboxEvents.processedAt,
+              lastError: schema.outboxEvents.lastError,
+              payload: schema.outboxEvents.payload,
+            })
+            .from(schema.outboxEvents)
+            .where(eq(schema.outboxEvents.topic, 'conversation.customer_message')),
+        );
+        const id = fromPublicId('conversation', conversationId);
+        return rows.filter(
+          (row) => (row.payload as { conversationId: string }).conversationId === id,
+        );
+      };
+
+      afterEach(() => {
+        jev.state.mode = 'answer';
+        jev.state.before = null;
+      });
+
+      describe('a person has it', () => {
+        it('tells the person at once, and says the words itself only when nobody replies', async () => {
+          const { visitor, conversationId } = await handled();
+          const before = (await inspect(conversationId)).botReplies;
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          const seen = await inspect(conversationId);
+          expect(seen.control.ownerMode).toBe('HUMAN_ACTIVE');
+          // The note is there now, with the words the person may send first.
+          const notes = urgentNotes(seen);
+          expect(notes).toHaveLength(1);
+          expect(notes[0]).toContain('The customer may be thinking of hurting themselves.');
+          expect(notes[0]).toContain(SAFE_REPLIES_STAFF.en);
+          expect(notes[0]).toContain('If nobody has replied in 2 minutes');
+          // Nothing was said to the customer now.
+          expect(seen.botReplies).toEqual(before);
+          expect(await wordings(conversationId)).toEqual([]);
+          // The wording is queued for two minutes from now.
+          const queued = await fallbacks(conversationId);
+          expect(queued).toHaveLength(1);
+          const wait = (queued[0]?.availableAt.getTime() ?? 0) - Date.now();
+          expect(wait).toBeGreaterThan(100_000);
+          expect(wait).toBeLessThanOrEqual(120_000);
+          expect(seen.control.safetyAlertedAt).not.toBeNull();
+          expect(seen.control.safetyWordedAt).toBeNull();
+          // It was read like any other message, in a run of its own, and only reasons were kept.
+          const [run] = await guardRuns(conversationId);
+          expect(run).toMatchObject({ kind: 'guard', state: 'succeeded', outcome: 'handoff' });
+          expect(run?.steps.map((step) => step.name)).toEqual(['inbound_guard', 'safety_alert']);
+          expect(run?.steps[1]?.detail).toEqual({
+            holder: 'person',
+            note: 'sent',
+            wording: 'later',
+          });
+          const records = await guardRecords(conversationId, 'inbound');
+          expect(records.at(-1)).toMatchObject({
+            verdict: 'at_risk',
+            action: 'urgent',
+            applied: true,
+          });
+          expect(JSON.stringify([records, run?.steps])).not.toContain('end my life');
+          // Nobody replied: when it is due, Hamnivo says the staff wording, once.
+          await fallbackDue(conversationId);
+          const after = await inspect(conversationId);
+          expect(after.botReplies).toEqual([...before, SAFE_REPLIES_STAFF.en]);
+          expect(after.control.safetyWordedAt).not.toBeNull();
+          expect((await wordings(conversationId)).map((w) => w.state)).toEqual(['sent']);
+          expect((await fallbacks(conversationId)).every((row) => row.processedAt !== null)).toBe(
+            true,
+          );
+        });
+
+        it('does not say the words when the person replied in the meantime, and keeps the 24-hour limit', async () => {
+          const { visitor, conversationId } = await handled();
+          const before = (await inspect(conversationId)).botReplies;
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          const reply = await shop.owner.post(`/v1/conversations/${conversationId}/messages`, {
+            clientMessageId: randomUUID(),
+            text: 'I am here with you. Are you safe right now?',
+          });
+          expect(reply.status, JSON.stringify(reply.body)).toBe(202);
+          await slice.drain();
+          await fallbackDue(conversationId);
+          const seen = await inspect(conversationId);
+          expect(seen.botReplies).toEqual(before);
+          expect(await wordings(conversationId)).toEqual([]);
+          // Nothing was said, so nothing was used up: a later emergency still gets the wording.
+          expect(seen.control.safetyWordedAt).toBeNull();
+          expect((await fallbacks(conversationId)).every((row) => row.processedAt !== null)).toBe(
+            true,
+          );
+        });
+
+        it('does not say the words on a retry either, when the person replied since', async () => {
+          const { visitor, conversationId } = await handled();
+          const before = (await inspect(conversationId)).botReplies;
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          // The two minutes pass, but Chatwoot refuses the post: the wording is reserved, not said.
+          slice.fake.setRequestFault((method, url) =>
+            method === 'POST' && url.endsWith('/messages') ? 503 : null,
+          );
+          try {
+            await fallbackDue(conversationId);
+          } finally {
+            slice.fake.setRequestFault(null);
+          }
+          expect((await wordings(conversationId)).map((w) => w.state)).toEqual(['unknown']);
+          // The person replies before the relay tries again.
+          const reply = await shop.owner.post(`/v1/conversations/${conversationId}/messages`, {
+            clientMessageId: randomUUID(),
+            text: 'I am here with you. Are you safe right now?',
+          });
+          expect(reply.status, JSON.stringify(reply.body)).toBe(202);
+          await retryNow();
+          const seen = await inspect(conversationId);
+          expect(seen.botReplies).toEqual(before);
+          expect(await publicationsOf(conversationId)).toContainEqual(
+            expect.objectContaining({
+              state: 'aborted',
+              detail: expect.objectContaining({ reason: 'already_replied' }),
+            }),
+          );
+        });
+
+        it('does not say the words when a wording went out in the meantime', async () => {
+          const { visitor, conversationId } = await handled();
+          const before = (await inspect(conversationId)).botReplies;
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          // Another path sent a wording while the two minutes ran: the 24-hour limit counts it.
+          await setMarks(conversationId, { safetyWordedAt: new Date() });
+          await fallbackDue(conversationId);
+          const seen = await inspect(conversationId);
+          expect(seen.botReplies).toEqual(before);
+          expect(await wordings(conversationId)).toEqual([]);
+        });
+
+        it('does not take a private note, or activity, for a reply', async () => {
+          const { visitor, conversationId } = await handled();
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          const note = await shop.owner.post(`/v1/conversations/${conversationId}/messages`, {
+            clientMessageId: randomUUID(),
+            text: 'Internal: the customer sounds distressed, calling them now.',
+            visibility: 'internal',
+          });
+          expect(note.status, JSON.stringify(note.body)).toBe(202);
+          await slice.drain();
+          await fallbackDue(conversationId);
+          expect((await inspect(conversationId)).botReplies.at(-1)).toBe(SAFE_REPLIES_STAFF.en);
+        });
+
+        it('does not say the words once the AI has the conversation again', async () => {
+          const { visitor, conversationId } = await handled();
+          const before = (await inspect(conversationId)).botReplies;
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          const back = await shop.owner.post(
+            `/v1/conversations/${conversationId}/return-to-ai`,
+            {},
+          );
+          expect(back.status, JSON.stringify(back.body)).toBe(200);
+          await slice.drain();
+          await fallbackDue(conversationId);
+          const seen = await inspect(conversationId);
+          expect(seen.control.ownerMode).toBe('AI_ACTIVE');
+          expect(seen.botReplies).toEqual(before);
+          expect(await wordings(conversationId)).toEqual([]);
+          expect(seen.control.safetyWordedAt).toBeNull();
+        });
+
+        it('tells a person it is paused with an owner, the same way', async () => {
+          const { visitor, conversationId } = await handled();
+          await withTenant(slice.app, { tenantId }, (tx) =>
+            tx
+              .update(schema.conversationControls)
+              .set({ ownerMode: 'PAUSED' })
+              .where(
+                eq(schema.conversationControls.id, fromPublicId('conversation', conversationId)),
+              ),
+          );
+          const before = (await inspect(conversationId)).botReplies;
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          const seen = await inspect(conversationId);
+          expect(seen.control.ownerMode).toBe('PAUSED');
+          expect(urgentNotes(seen)).toEqual([expect.stringContaining(SAFE_REPLIES_STAFF.en)]);
+          expect(seen.botReplies).toEqual(before);
+          expect(await fallbacks(conversationId)).toHaveLength(1);
+        });
+
+        it('shows no wording to promise when one went out in the last 24 hours', async () => {
+          const { visitor, conversationId } = await handled();
+          await setMarks(conversationId, { safetyWordedAt: ago(3_600_000) });
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          const seen = await inspect(conversationId);
+          const notes = urgentNotes(seen);
+          expect(notes).toEqual([
+            expect.stringContaining(
+              'No safety wording was sent: one was sent to this customer in the last 24 hours.',
+            ),
+          ]);
+          expect(notes[0]).not.toContain(SAFE_REPLIES_STAFF.en);
+          expect(await fallbacks(conversationId)).toEqual([]);
+        });
+      });
+
+      describe('nobody has it yet', () => {
+        it('sends the note and the wording at once', async () => {
+          const { visitor, conversationId } = await waiting();
+          expect((await inspect(conversationId)).control.ownerMode).toBe('WAITING_HUMAN');
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          const seen = await inspect(conversationId);
+          expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+          expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+          expect(urgentNotes(seen)).toEqual([
+            expect.stringContaining('Hamnivo sent safety wording to the customer.'),
+          ]);
+          // The urgent note is private: the customer never gets it.
+          expect(seen.botReplies.join(' ')).not.toContain('URGENT');
+          expect(await fallbacks(conversationId)).toEqual([]);
+          expect((await wordings(conversationId)).map((w) => w.state)).toEqual(['sent']);
+          expect(seen.control.safetyAlertedAt).not.toBeNull();
+          expect(seen.control.safetyWordedAt).not.toBeNull();
+          // No model wrote it, and the record names a guard run that handed it to people.
+          expect(scripted.prompts).toEqual([]);
+          const [run] = await guardRuns(conversationId);
+          expect(run).toMatchObject({ kind: 'guard', outcome: 'handoff' });
+          expect(run?.steps[1]?.detail).toEqual({ holder: 'nobody', note: 'sent', wording: 'now' });
+        });
+
+        it("uses the customer's language for the wording", async () => {
+          const { visitor, conversationId } = await waiting();
+          escalates({ in_danger: 0.95 });
+          await say(visitor, conversationId, 'میرے گھر میں آگ لگ گئی ہے، مدد کریں۔');
+          const seen = await inspect(conversationId);
+          expect(seen.botReplies).toEqual([SAFE_REPLIES.ur]);
+          expect(urgentNotes(seen)).toEqual([
+            expect.stringContaining('The customer says someone may be in danger now.'),
+          ]);
+        });
+
+        it('speaks while it is paused with nobody assigned', async () => {
+          const { visitor, conversationId } = await waiting();
+          await withTenant(slice.app, { tenantId }, (tx) =>
+            tx
+              .update(schema.conversationControls)
+              .set({ ownerMode: 'PAUSED' })
+              .where(
+                eq(schema.conversationControls.id, fromPublicId('conversation', conversationId)),
+              ),
+          );
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          const seen = await inspect(conversationId);
+          expect(seen.control.ownerMode).toBe('PAUSED');
+          expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+          expect((await wordings(conversationId))[0]?.detail).toMatchObject({
+            safe: { fence: { kind: 'queue', ownerMode: 'PAUSED' } },
+          });
+        });
+
+        it('never says the wording over a person who took the conversation before it was posted', async () => {
+          const { visitor, conversationId } = await waiting();
+          escalates({ self_harm: 0.97 });
+          await send(visitor, conversationId, atRisk);
+          // Chatwoot refuses every post for now: the wording is reserved, and cannot be said yet.
+          slice.fake.setRequestFault((method, url) =>
+            method === 'POST' && url.endsWith('/messages') ? 503 : null,
+          );
+          try {
+            await slice.drain();
+            expect(await statesOf(conversationId)).toEqual(['unknown']);
+            const taken = await shop.owner.post(`/v1/conversations/${conversationId}/takeover`, {});
+            expect(taken.status, JSON.stringify(taken.body)).toBe(200);
+          } finally {
+            slice.fake.setRequestFault(null);
+          }
+          await retryNow();
+          const seen = await inspect(conversationId);
+          expect(seen.control.ownerMode).toBe('HUMAN_ACTIVE');
+          expect(seen.botReplies).toEqual([]);
+          expect(await statesOf(conversationId)).toEqual(['aborted']);
+          // The person is told all the same.
+          expect(urgentNotes(seen)).toHaveLength(1);
+        });
+      });
+
+      describe('the AI cannot answer', () => {
+        /** Stops AI replies for the brand; returns what puts them back. */
+        const stopAi = async () => {
+          const stop = await shop.owner.post('/v1/admin/kill-switches', {
+            scope: 'brand',
+            targetId: shop.brand.id,
+            reason: 'Incident: message guard test',
+          });
+          expect(stop.status, JSON.stringify(stop.body)).toBe(201);
+          return async () => {
+            const cleared = await shop.owner.post(`/v1/admin/kill-switches/${stop.body.id}/clear`);
+            expect(cleared.status, JSON.stringify(cleared.body)).toBe(200);
+          };
+        };
+        /** Archives the brand's agent, so no agent is published; returns what restores it. */
+        const archiveAgent = async () => {
+          const archived = await shop.owner.patch(`/v1/admin/agents/${shop.agentId}`, {
+            status: 'archived',
+          });
+          expect(archived.status, JSON.stringify(archived.body)).toBe(200);
+          return async () => {
+            const restored = await shop.owner.patch(`/v1/admin/agents/${shop.agentId}`, {
+              status: 'active',
+            });
+            expect(restored.status, JSON.stringify(restored.body)).toBe(200);
+          };
+        };
+        /** Publishes the agent in assist mode; returns what publishes the earlier version again. */
+        const assistOnly = async () => {
+          const detail = await shop.owner.get(`/v1/admin/agents/${shop.agentId}`);
+          const { config, version } = detail.body.published;
+          const draft = await shop.owner.put(`/v1/admin/agents/${shop.agentId}/draft`, {
+            config: { ...config, mode: 'assist' },
+          });
+          expect(draft.status, JSON.stringify(draft.body)).toBe(200);
+          const published = await shop.owner.post(`/v1/admin/agents/${shop.agentId}/publish`, {});
+          expect(published.status, JSON.stringify(published.body)).toBe(200);
+          return async () => {
+            const restored = await shop.owner.post(`/v1/admin/agents/${shop.agentId}/publish`, {
+              version,
+            });
+            expect(restored.status, JSON.stringify(restored.body)).toBe(200);
+          };
+        };
+        const cases: Array<[string, string, () => Promise<() => Promise<void>>]> = [
+          ['a kill switch', 'ai_stopped', stopAi],
+          ['no agent', 'no_agent', archiveAgent],
+          ['an agent that only suggests', 'assist_mode', assistOnly],
+        ];
+
+        for (const [name, reason, change] of cases) {
+          it(`hands over, then sends the note and the wording to someone at risk: ${name}`, async () => {
+            const { visitor, conversationId } = await answered();
+            const restore = await change();
+            try {
+              escalates({ self_harm: 0.97 });
+              scripted.prompts.length = 0;
+              await say(visitor, conversationId, atRisk);
+            } finally {
+              await restore();
+            }
+            const seen = await inspect(conversationId);
+            expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+            expect(seen.control.ownerReason).toBe(reason);
+            // The AI said hello earlier; now only Hamnivo's fixed words, which no model wrote.
+            expect(seen.botReplies).toHaveLength(2);
+            expect(seen.botReplies.at(-1)).toBe(SAFE_REPLIES.en);
+            expect(scripted.prompts).toEqual([]);
+            expect(seen.notes).toContainEqual(
+              expect.stringContaining('The AI sent safety wording and stepped back.'),
+            );
+            expect(seen.notes).toContainEqual(
+              expect.stringContaining('The customer may be thinking of hurting themselves.'),
+            );
+            expect(await handoffAudits(conversationId)).toHaveLength(1);
+            expect((await wordings(conversationId)).map((w) => w.state)).toEqual(['sent']);
+            expect(seen.control.safetyWordedAt).not.toBeNull();
+            expect(await lastGuardRecord(conversationId)).toMatchObject({
+              verdict: 'at_risk',
+              action: 'urgent',
+              applied: true,
+            });
+          });
+        }
+
+        it('shadow: hands over as before and records what it finds, nothing more', async () => {
+          const { visitor, conversationId } = await answered();
+          const restore = await stopAi();
+          await setGuardMode('shadow');
+          try {
+            escalates({ self_harm: 0.97 });
+            await say(visitor, conversationId, atRisk);
+          } finally {
+            await restore();
+            await setGuardMode('live');
+          }
+          const seen = await inspect(conversationId);
+          expect(seen.control.ownerReason).toBe('ai_stopped');
+          expect(seen.botReplies).toHaveLength(1);
+          expect(urgentNotes(seen)).toEqual([]);
+          expect(seen.notes.join('\n')).not.toContain('URGENT');
+          expect(await wordings(conversationId)).toEqual([]);
+          expect(await lastGuardRecord(conversationId)).toMatchObject({
+            mode: 'shadow',
+            verdict: 'at_risk',
+            action: 'urgent',
+            applied: false,
+          });
+        });
+
+        it('hands over, and says nothing more, when Jev is unavailable', async () => {
+          const { visitor, conversationId } = await answered();
+          const restore = await stopAi();
+          try {
+            jev.state.mode = 'error';
+            await say(visitor, conversationId, atRisk);
+          } finally {
+            await restore();
+          }
+          const seen = await inspect(conversationId);
+          expect(seen.control.ownerReason).toBe('ai_stopped');
+          expect(seen.botReplies).toHaveLength(1);
+          expect(seen.notes.join('\n')).not.toContain('URGENT');
+          expect(await lastGuardRecord(conversationId)).toMatchObject({
+            status: 'unavailable',
+            action: 'continue',
+            applied: false,
+          });
+        });
+
+        it('keeps the 24-hour limit: the hand-off and the note still happen, without a second wording', async () => {
+          const { visitor, conversationId } = await answered();
+          await setMarks(conversationId, { safetyWordedAt: ago(3_600_000) });
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          const seen = await inspect(conversationId);
+          expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
+          expect(seen.control.ownerReason).toBe('ai_escalated');
+          expect(seen.botReplies).toHaveLength(1);
+          expect(seen.notes).toContainEqual(
+            expect.stringContaining(
+              'No safety wording was sent: one was sent to this customer in the last 24 hours.',
+            ),
+          );
+          expect(seen.notes.join('\n')).not.toContain('The AI sent safety wording');
+          expect(seen.control.safetyAlertedAt).not.toBeNull();
+          expect(await wordings(conversationId)).toEqual([]);
+          expect(await publicationsOf(conversationId)).toContainEqual(
+            expect.objectContaining({
+              state: 'aborted',
+              detail: expect.objectContaining({ reason: 'wording_limited' }),
+            }),
+          );
+        });
+      });
+
+      describe('shadow mode', () => {
+        it('records what it finds in every state, and posts nothing', async () => {
+          await setGuardMode('shadow');
+          try {
+            const person = await handled();
+            const queue = await waiting();
+            escalates({ self_harm: 0.97 });
+            await say(person.visitor, person.conversationId, atRisk);
+            await say(queue.visitor, queue.conversationId, atRisk);
+            for (const { conversationId } of [person, queue]) {
+              const seen = await inspect(conversationId);
+              expect(seen.notes.join('\n')).not.toContain('URGENT');
+              expect(await wordings(conversationId)).toEqual([]);
+              expect(await fallbacks(conversationId)).toEqual([]);
+              expect(seen.control.safetyAlertedAt).toBeNull();
+              expect(seen.control.safetyWordedAt).toBeNull();
+              expect(await lastGuardRecord(conversationId)).toMatchObject({
+                mode: 'shadow',
+                verdict: 'at_risk',
+                action: 'urgent',
+                applied: false,
+                detail: { direction: 'inbound', reasons: ['self_harm'] },
+              });
+              const [run] = await guardRuns(conversationId);
+              expect(run).toMatchObject({ kind: 'guard', state: 'skipped', outcome: 'skipped' });
+            }
+            expect((await inspect(queue.conversationId)).botReplies).toEqual([]);
+          } finally {
+            await setGuardMode('live');
+          }
+        });
+      });
+
+      describe('the limits', () => {
+        it('tells people at most once in 10 minutes', async () => {
+          const { visitor, conversationId } = await waiting();
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          await say(visitor, conversationId, atRisk);
+          let seen = await inspect(conversationId);
+          // The second message was read, and found at risk, but people were told a moment ago.
+          expect(urgentNotes(seen)).toHaveLength(1);
+          expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+          const runs = await guardRuns(conversationId);
+          expect(runs.map((run) => run.outcome).sort()).toEqual(['handoff', 'skipped']);
+          expect(
+            runs.flatMap((run) => run.steps.filter((step) => step.name === 'safety_alert')),
+          ).toContainEqual(
+            expect.objectContaining({
+              detail: { holder: 'nobody', note: 'limited', wording: 'held' },
+            }),
+          );
+          // Ten minutes on, they are told again.
+          await setMarks(conversationId, { safetyAlertedAt: ago(11 * 60_000) });
+          await say(visitor, conversationId, atRisk);
+          seen = await inspect(conversationId);
+          expect(urgentNotes(seen)).toHaveLength(2);
+        });
+
+        it('sends safety wording once in 24 hours, and the note says why there is no second', async () => {
+          const { visitor, conversationId } = await waiting();
+          escalates({ self_harm: 0.97 });
+          await say(visitor, conversationId, atRisk);
+          expect((await inspect(conversationId)).botReplies).toEqual([SAFE_REPLIES.en]);
+          // People are told again (10 minutes passed), but a wording went out today.
+          await setMarks(conversationId, { safetyAlertedAt: ago(11 * 60_000) });
+          await say(visitor, conversationId, atRisk);
+          let seen = await inspect(conversationId);
+          expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+          expect(urgentNotes(seen).at(-1)).toContain(
+            'No safety wording was sent: one was sent to this customer in the last 24 hours.',
+          );
+          expect(urgentNotes(seen).at(-1)).toContain(
+            'The customer may be thinking of hurting themselves.',
+          );
+          // A day later it may be said again.
+          await setMarks(conversationId, {
+            safetyAlertedAt: ago(11 * 60_000),
+            safetyWordedAt: ago(25 * 3_600_000),
+          });
+          await say(visitor, conversationId, atRisk);
+          seen = await inspect(conversationId);
+          expect(seen.botReplies).toEqual([SAFE_REPLIES.en, SAFE_REPLIES.en]);
+          expect(urgentNotes(seen).at(-1)).toContain(
+            'Hamnivo sent safety wording to the customer.',
+          );
+        });
+      });
+
+      describe('a burst of messages', () => {
+        it('reads each message in the window that ends at it, so none is pushed out', async () => {
+          const { visitor, conversationId } = await waiting();
+          // Jev finds risk in any window that holds the first message of the burst.
+          jev.state.answer = (question, body) => ({
+            type: 'noul',
+            noul:
+              question === 'self_harm' &&
+              JSON.stringify(body.state?.messages ?? []).includes('end my life')
+                ? 0.97
+                : 0.05,
+          });
+          jev.calls.length = 0;
+          const burst = [
+            'I cannot do this anymore. I want to end my life.',
+            'Are you there?',
+            'Hello?',
+            'Anyone at all?',
+          ];
+          // All four are saved before the worker looks at any of them.
+          for (const text of burst) await send(visitor, conversationId, text);
+          await slice.drain();
+          const windows = inboundCalls().map((call) => call.body.state.messages as string[]);
+          // No job was skipped for a newer message, and none read past its own.
+          expect(windows).toHaveLength(4);
+          expect(windows.map((window) => window.at(-1))).toEqual(burst);
+          expect(windows[3]).toEqual(burst.slice(1));
+          const seen = await inspect(conversationId);
+          expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+          expect(urgentNotes(seen)).toHaveLength(1);
+          escalates({});
+        });
+      });
+
+      describe('the checks run in the worker', () => {
+        /** The agent only suggests: the job reads the customer's words first, then writes. */
+        const suggesting = async () => {
+          const detail = await shop.owner.get(`/v1/admin/agents/${shop.agentId}`);
+          const { config, version } = detail.body.published;
+          await shop.owner.put(`/v1/admin/agents/${shop.agentId}/draft`, {
+            config: { ...config, mode: 'assist' },
+          });
+          const published = await shop.owner.post(`/v1/admin/agents/${shop.agentId}/publish`, {});
+          expect(published.status, JSON.stringify(published.body)).toBe(200);
+          return () => shop.owner.post(`/v1/admin/agents/${shop.agentId}/publish`, { version });
+        };
+        const suggestions = (seen: { notes: string[] }) =>
+          seen.notes.filter((note) => note.startsWith('AI suggestion (not sent to the customer)'));
+
+        it('asks Jev before the suggestion is written, and does both', async () => {
+          const restore = await suggesting();
+          try {
+            escalates({ self_harm: 0.97 });
+            const modelCallsWhenAsked: number[] = [];
+            jev.state.before = async () => {
+              modelCallsWhenAsked.push(scripted.prompts.length);
+            };
+            const { conversationId } = await chat(atRisk);
+            expect(modelCallsWhenAsked).toEqual([0]);
+            const seen = await inspect(conversationId);
+            expect(suggestions(seen)).toHaveLength(1);
+            expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
+            expect(urgentNotes(seen)).toHaveLength(1);
+          } finally {
+            await restore();
+          }
+        });
+
+        it('posts nothing, fails nothing and still writes the suggestion when Jev is unavailable', async () => {
+          const restore = await suggesting();
+          try {
+            jev.state.mode = 'error';
+            const { conversationId } = await chat(atRisk);
+            const seen = await inspect(conversationId);
+            expect(suggestions(seen)).toHaveLength(1);
+            expect(seen.botReplies).toEqual([]);
+            expect(seen.notes.join('\n')).not.toContain('URGENT');
+            expect(await fallbacks(conversationId)).toEqual([]);
+            expect(await lastGuardRecord(conversationId)).toMatchObject({
+              status: 'unavailable',
+              action: 'continue',
+              applied: false,
+            });
+            const [run] = await guardRuns(conversationId);
+            expect(run).toMatchObject({ kind: 'guard', state: 'skipped', outcome: 'skipped' });
+            // The job was done, not left to be tried again.
+            const jobs = await jobsOf(conversationId);
+            expect(jobs.length).toBeGreaterThan(0);
+            for (const job of jobs) {
+              expect(job.processedAt).not.toBeNull();
+              expect(job.lastError).toBeNull();
+            }
+          } finally {
+            await restore();
+          }
+        });
+
+        it('logs its own failure, and still writes the suggestion without failing the job', async () => {
+          const restore = await suggesting();
+          const language = slice.worker.get(LanguageService);
+          const failing = vi
+            .spyOn(language, 'forReply')
+            .mockRejectedValueOnce(new Error('language store unavailable'));
+          try {
+            escalates({ self_harm: 0.97 });
+            const { conversationId } = await chat(atRisk);
+            expect(failing).toHaveBeenCalled();
+            const seen = await inspect(conversationId);
+            expect(suggestions(seen)).toHaveLength(1);
+            expect(seen.botReplies).toEqual([]);
+            expect(seen.notes.join('\n')).not.toContain('URGENT');
+            // The run says it failed; the job does not.
+            const [run] = await guardRuns(conversationId);
+            expect(run).toMatchObject({ kind: 'guard', state: 'failed', outcome: 'error' });
+            for (const job of await jobsOf(conversationId)) {
+              expect(job.processedAt).not.toBeNull();
+              expect(job.lastError).toBeNull();
+            }
+          } finally {
+            failing.mockRestore();
+            await restore();
+          }
+        });
+
+        it('reads nothing while the message guard is switched off', async () => {
+          const { visitor, conversationId } = await waiting();
+          await setGuardMode('off');
+          const read = vi.spyOn(slice.worker.get(RepliesService) as any, 'history');
+          try {
+            escalates({ self_harm: 0.97 });
+            jev.calls.length = 0;
+            await say(visitor, conversationId, atRisk);
+            expect(read).not.toHaveBeenCalled();
+            expect(inboundCalls()).toEqual([]);
+            expect(await guardRuns(conversationId)).toEqual([]);
+            const seen = await inspect(conversationId);
+            expect(seen.botReplies).toEqual([]);
+            expect(urgentNotes(seen)).toEqual([]);
+          } finally {
+            read.mockRestore();
+            await setGuardMode('live');
+            escalates({});
+          }
+        });
+
+        it('reads nothing, not even the conversation, for a brand without a message guard', async () => {
+          const bare = await connectedTenant(slice, 'no-guard');
+          const visitor = new Visitor(slice.baseUrl, bare.brand.widgetId, bare.hostOrigin);
+          await visitor.open();
+          const started = await visitor.call('POST', '/v1/widget/conversations', {
+            firstMessage: 'I want to talk to a person.',
+            clientMessageId: randomUUID(),
+          });
+          expect(started.status).toBe(201);
+          await slice.drain();
+          const conversationId = started.body.id as string;
+          const read = vi.spyOn(slice.worker.get(RepliesService) as any, 'history');
+          try {
+            escalates({ self_harm: 0.97 });
+            jev.calls.length = 0;
+            await say(visitor, conversationId, atRisk);
+            expect(read).not.toHaveBeenCalled();
+            expect(inboundCalls()).toEqual([]);
+            const runs = await bare.owner.get(`/v1/admin/runs?conversationId=${conversationId}`);
+            expect(
+              (runs.body.items as Array<Record<string, any>>).filter((run) => run.kind === 'guard'),
+            ).toEqual([]);
+          } finally {
+            read.mockRestore();
+            escalates({});
+          }
+        });
       });
     });
   });

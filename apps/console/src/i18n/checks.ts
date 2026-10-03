@@ -35,7 +35,7 @@ export const checksEn = {
     'message-guard': {
       title: 'Message guard',
       description:
-        'Jev reads what comes in and what goes out. Coming in: does someone want to hurt themselves, or is someone in danger now? Does the customer threaten or abuse? Going out: does the draft say or promise a payment, refund or order change? Code decides what the answers mean. When live, someone at risk gets safety wording at once, and a person takes over. A threat or abuse goes to a person. A draft that claims something without a receipt or commitment is written again, or passed to a person. The receipt check runs first and keeps the final say.',
+        'Jev reads what comes in and what goes out. Every customer message is read, whoever has the conversation: does someone want to hurt themselves, or is someone in danger now? Does the customer threaten or abuse? Each draft reply is read before it is sent: does it say or promise a payment, refund or order change? Code decides what the answers mean. When live, what happens to someone at risk depends on who has the conversation. If the AI has it, it sends safety wording at once and a person takes over with an urgent note. If nobody is assigned, the team gets an urgent note and the customer gets the wording at once. If a person is assigned, they get the note first, with the words to send, and Hamnivo sends the wording itself after 2 minutes if nobody has replied. A conversation gets safety wording once in 24 hours at most. A threat or abuse goes to a person when the AI has the conversation, and is only recorded otherwise. A draft that claims something without a receipt or commitment is written again, or passed to a person. The receipt check runs first and keeps the final say.',
     },
   },
   versions: {
@@ -118,10 +118,10 @@ export const checksEn = {
     handoff: 'Pass to a person',
     drop: 'Leave passages out',
     keep: 'Use all passages',
-    continue: 'Let the AI answer',
+    continue: 'Carry on as before',
     use: 'Reply in that language',
     ask: 'Ask the customer',
-    urgent: 'Safety wording, then a person',
+    urgent: 'Urgent note and safety wording',
   },
 };
 
@@ -158,7 +158,7 @@ export const checksAr: typeof checksEn = {
     'message-guard': {
       title: 'حارس الرسائل',
       description:
-        'يقرأ Jev ما يصل وما يُرسَل. الوارد: هل يريد أحد إيذاء نفسه، أو هل أحد في خطر الآن؟ هل يهدد العميل أو يسيء؟ الصادر: هل تقول مسودة الرد أو تعد بدفعة أو استرداد أو تغيير في طلب؟ الكود هو الذي يقرر معنى الإجابات. عند التفعيل، يتلقى من قد يكون في خطر كلمات أمان فورًا، ويتولى شخص المحادثة. ويذهب التهديد أو الإساءة إلى شخص. وتُكتب المسودة التي تدّعي شيئًا بلا إيصال أو التزام من جديد، أو تُحال إلى شخص. يعمل فحص الإيصالات أولًا ويبقى القرار الأخير له.',
+        'يقرأ Jev ما يصل وما يُرسَل. تُقرأ كل رسالة من العميل أيًّا كان من يتولى المحادثة: هل يريد أحد إيذاء نفسه، أو هل أحد في خطر الآن؟ هل يهدد العميل أو يسيء؟ وتُقرأ كل مسودة رد قبل إرسالها: هل تقول أو تعد بدفعة أو استرداد أو تغيير في طلب؟ الكود هو الذي يقرر معنى الإجابات. عند التفعيل، يتوقف ما يحدث لمن قد يكون في خطر على من يتولى المحادثة. فإن كان الذكاء الاصطناعي يتولاها، أرسل كلمات أمان فورًا وتولى شخص المحادثة مع ملاحظة عاجلة. وإن لم يكن أحد مكلّفًا بها، يتلقى الفريق ملاحظة عاجلة ويتلقى العميل كلمات الأمان فورًا. وإن كان شخص مكلّفًا بها، تصله الملاحظة أولًا ومعها الكلمات ليرسلها بنفسه، ويرسلها Hamnivo بعد دقيقتين إن لم يرد أحد. تُرسل كلمات الأمان للمحادثة الواحدة مرة واحدة كل 24 ساعة على الأكثر. ويذهب التهديد أو الإساءة إلى شخص حين يتولى الذكاء الاصطناعي المحادثة، وإلا فيُسجَّل فقط. وتُكتب المسودة التي تدّعي شيئًا بلا إيصال أو التزام من جديد، أو تُحال إلى شخص. يعمل فحص الإيصالات أولًا ويبقى القرار الأخير له.',
     },
   },
   versions: {
@@ -238,10 +238,10 @@ export const checksAr: typeof checksEn = {
     handoff: 'إحالته إلى شخص',
     drop: 'استبعاد مقاطع',
     keep: 'استخدام كل المقاطع',
-    continue: 'ترك الذكاء الاصطناعي يجيب',
+    continue: 'المتابعة كما كان',
     use: 'الرد بتلك اللغة',
     ask: 'سؤال العميل',
-    urgent: 'كلمات أمان ثم شخص',
+    urgent: 'ملاحظة عاجلة وكلمات أمان',
   },
 };
 
@@ -278,7 +278,7 @@ export const checksHi: typeof checksEn = {
     'message-guard': {
       title: 'संदेश गार्ड',
       description:
-        'Jev आने वाले और जाने वाले संदेश पढ़ता है। आने वाले: क्या कोई खुद को नुकसान पहुँचाना चाहता है, या कोई अभी खतरे में है? क्या ग्राहक धमकी देता है या गाली देता है? जाने वाले: क्या जवाब का मसौदा किसी भुगतान, रिफ़ंड या ऑर्डर बदलाव की बात या वादा करता है? जवाबों का मतलब कोड तय करता है। चालू होने पर, खतरे में हो सकने वाले व्यक्ति को तुरंत सुरक्षा संदेश मिलता है, और एक व्यक्ति बातचीत संभालता है। धमकी या गाली किसी व्यक्ति के पास जाती है। बिना रसीद या प्रतिबद्धता के दावा करने वाला मसौदा दोबारा लिखा जाता है, या किसी व्यक्ति को दिया जाता है। रसीद जाँच पहले चलती है और आख़िरी फ़ैसला उसी का है।',
+        'Jev आने वाले और जाने वाले संदेश पढ़ता है। ग्राहक का हर संदेश पढ़ा जाता है, चाहे बातचीत कोई भी संभाल रहा हो: क्या कोई खुद को नुकसान पहुँचाना चाहता है, या कोई अभी खतरे में है? क्या ग्राहक धमकी देता है या गाली देता है? जवाब का हर मसौदा भेजने से पहले पढ़ा जाता है: क्या वह किसी भुगतान, रिफ़ंड या ऑर्डर बदलाव की बात या वादा करता है? जवाबों का मतलब कोड तय करता है। चालू होने पर, खतरे में हो सकने वाले व्यक्ति के साथ क्या होता है, यह इस पर निर्भर है कि बातचीत कौन संभाल रहा है। अगर AI संभाल रहा है, तो वह तुरंत सुरक्षा संदेश भेजता है और एक व्यक्ति ज़रूरी नोट के साथ बातचीत संभालता है। अगर किसी को सौंपी नहीं गई है, तो टीम को ज़रूरी नोट मिलता है और ग्राहक को तुरंत सुरक्षा संदेश। अगर कोई व्यक्ति सौंपा गया है, तो उसे पहले नोट मिलता है, भेजने के लिए शब्दों के साथ, और अगर 2 मिनट तक किसी ने जवाब नहीं दिया तो Hamnivo खुद सुरक्षा संदेश भेज देता है। एक बातचीत में 24 घंटे में ज़्यादा से ज़्यादा एक बार सुरक्षा संदेश जाता है। AI के संभालने पर धमकी या गाली किसी व्यक्ति के पास जाती है, वरना सिर्फ़ दर्ज होती है। बिना रसीद या प्रतिबद्धता के दावा करने वाला मसौदा दोबारा लिखा जाता है, या किसी व्यक्ति को दिया जाता है। रसीद जाँच पहले चलती है और आख़िरी फ़ैसला उसी का है।',
     },
   },
   versions: {
@@ -358,10 +358,10 @@ export const checksHi: typeof checksEn = {
     handoff: 'किसी व्यक्ति को सौंपें',
     drop: 'कुछ अंश छोड़ें',
     keep: 'सभी अंश इस्तेमाल करें',
-    continue: 'AI को जवाब देने दें',
+    continue: 'पहले जैसा चलने दें',
     use: 'उसी भाषा में जवाब',
     ask: 'ग्राहक से पूछें',
-    urgent: 'सुरक्षा संदेश, फिर व्यक्ति',
+    urgent: 'ज़रूरी नोट और सुरक्षा संदेश',
   },
 };
 
@@ -398,7 +398,7 @@ export const checksUr: typeof checksEn = {
     'message-guard': {
       title: 'پیغام گارڈ',
       description:
-        'Jev آنے والے اور جانے والے پیغامات پڑھتا ہے۔ آنے والے: کیا کوئی خود کو نقصان پہنچانا چاہتا ہے، یا کوئی ابھی خطرے میں ہے؟ کیا گاہک دھمکی دیتا ہے یا گالی دیتا ہے؟ جانے والے: کیا جواب کا مسودہ کسی ادائیگی، رقم کی واپسی یا آرڈر میں تبدیلی کی بات یا وعدہ کرتا ہے؟ جوابوں کا مطلب کوڈ طے کرتا ہے۔ فعال ہونے پر، خطرے میں ہو سکنے والے شخص کو فوراً حفاظتی پیغام ملتا ہے، اور ایک فرد بات چیت سنبھالتا ہے۔ دھمکی یا گالی کسی فرد کے پاس جاتی ہے۔ رسید یا وعدے کے بغیر دعویٰ کرنے والا مسودہ دوبارہ لکھا جاتا ہے، یا کسی فرد کو دیا جاتا ہے۔ رسید کی جانچ پہلے چلتی ہے اور آخری فیصلہ اسی کا ہے۔',
+        'Jev آنے والے اور جانے والے پیغامات پڑھتا ہے۔ گاہک کا ہر پیغام پڑھا جاتا ہے، چاہے بات چیت کوئی بھی سنبھال رہا ہو: کیا کوئی خود کو نقصان پہنچانا چاہتا ہے، یا کوئی ابھی خطرے میں ہے؟ کیا گاہک دھمکی دیتا ہے یا گالی دیتا ہے؟ جواب کا ہر مسودہ بھیجنے سے پہلے پڑھا جاتا ہے: کیا وہ کسی ادائیگی، رقم کی واپسی یا آرڈر میں تبدیلی کی بات یا وعدہ کرتا ہے؟ جوابوں کا مطلب کوڈ طے کرتا ہے۔ فعال ہونے پر، خطرے میں ہو سکنے والے شخص کے ساتھ کیا ہوتا ہے، اس کا انحصار اس پر ہے کہ بات چیت کون سنبھال رہا ہے۔ اگر AI سنبھال رہا ہو تو وہ فوراً حفاظتی پیغام بھیجتا ہے اور ایک فرد فوری نوٹ کے ساتھ بات چیت سنبھال لیتا ہے۔ اگر کسی کو سونپی نہ گئی ہو تو ٹیم کو فوری نوٹ ملتا ہے اور گاہک کو فوراً حفاظتی پیغام۔ اگر کوئی فرد سونپا گیا ہو تو اسے پہلے نوٹ ملتا ہے، بھیجنے کے لیے الفاظ کے ساتھ، اور اگر 2 منٹ تک کسی نے جواب نہ دیا تو Hamnivo خود حفاظتی پیغام بھیج دیتا ہے۔ ایک بات چیت میں 24 گھنٹے میں زیادہ سے زیادہ ایک بار حفاظتی پیغام جاتا ہے۔ جب AI سنبھال رہا ہو تو دھمکی یا گالی کسی فرد کے پاس جاتی ہے، ورنہ صرف ریکارڈ ہوتی ہے۔ رسید یا وعدے کے بغیر دعویٰ کرنے والا مسودہ دوبارہ لکھا جاتا ہے، یا کسی فرد کو دیا جاتا ہے۔ رسید کی جانچ پہلے چلتی ہے اور آخری فیصلہ اسی کا ہے۔',
     },
   },
   versions: {
@@ -480,9 +480,9 @@ export const checksUr: typeof checksEn = {
     handoff: 'کسی شخص کے حوالے کریں',
     drop: 'کچھ حصے چھوڑیں',
     keep: 'تمام حصے استعمال کریں',
-    continue: 'AI کو جواب دینے دیں',
+    continue: 'پہلے کی طرح چلنے دیں',
     use: 'اسی زبان میں جواب',
     ask: 'گاہک سے پوچھیں',
-    urgent: 'حفاظتی پیغام، پھر فرد',
+    urgent: 'فوری نوٹ اور حفاظتی پیغام',
   },
 };

@@ -30136,7 +30136,8 @@
             "type": "string",
             "enum": [
               "reply",
-              "draft"
+              "draft",
+              "guard"
             ]
           },
           "state": {

@@ -1,0 +1,2 @@
+ALTER TABLE "conversation_controls" ADD COLUMN "safety_alerted_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "conversation_controls" ADD COLUMN "safety_worded_at" timestamp with time zone;

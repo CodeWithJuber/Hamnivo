@@ -231,7 +231,8 @@ export const RUN_OUTCOMES = [
 
 /**
  * One AI run: what triggered it, which agent version and model ran, and how it ended (G12).
- * It stores hashes and counts, never prompt or reply text (X11).
+ * It stores hashes and counts, never prompt or reply text (X11). A `guard` run is the message
+ * guard reading a customer's message in a conversation the AI does not have; no model runs in it.
  */
 export const runs = pgTable(
   'runs',
@@ -244,7 +245,7 @@ export const runs = pgTable(
     agentVersionId: uuid('agent_version_id'),
     /** What started the run, unique per conversation, e.g. `reply:{ledgerId}`. */
     triggerRef: text('trigger_ref').notNull(),
-    kind: text('kind', { enum: ['reply', 'draft'] }).notNull(),
+    kind: text('kind', { enum: ['reply', 'draft', 'guard'] }).notNull(),
     state: text('state', { enum: ['running', 'succeeded', 'failed', 'skipped'] })
       .notNull()
       .default('running'),

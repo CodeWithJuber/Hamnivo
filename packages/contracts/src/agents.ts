@@ -283,7 +283,7 @@ export const Run = z
     conversationId: typeId('conversation'),
     agentId: typeId('agent').nullable(),
     agentVersion: z.int().positive().nullable(),
-    kind: z.enum(['reply', 'draft']),
+    kind: z.enum(['reply', 'draft', 'guard']),
     state: z.enum(['running', 'succeeded', 'failed', 'skipped']),
     outcome: z
       .enum(['replied', 'drafted', 'handoff', 'fenced', 'blocked', 'error', 'skipped', 'cancelled'])

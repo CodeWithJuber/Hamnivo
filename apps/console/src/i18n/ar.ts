@@ -852,7 +852,7 @@ export const ar: Translation = {
         skipped: 'تُخطّي',
       },
       kind: 'النوع',
-      kinds: { reply: 'رد على العميل', draft: 'مسودة للموظفين' },
+      kinds: { reply: 'رد على العميل', draft: 'مسودة للموظفين', guard: 'حارس الرسائل' },
       conversation: 'المحادثة',
       started: 'البدء',
       finished: 'الانتهاء',

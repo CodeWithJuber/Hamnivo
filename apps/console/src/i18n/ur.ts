@@ -874,7 +874,7 @@ export const ur: Translation = {
         skipped: 'چھوڑ دیا گیا',
       },
       kind: 'قسم',
-      kinds: { reply: 'گاہک کو جواب', draft: 'عملے کے لیے ڈرافٹ' },
+      kinds: { reply: 'گاہک کو جواب', draft: 'عملے کے لیے ڈرافٹ', guard: 'پیغام گارڈ' },
       conversation: 'گفتگو',
       started: 'آغاز',
       finished: 'اختتام',
