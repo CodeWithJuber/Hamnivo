@@ -199,9 +199,12 @@
       "deploy/compose/chatwoot.yml",
       "packages/chatwoot/src/provisioning.ts",
       "packages/chatwoot/test/contract/suite.ts",
-      "scripts/chatwoot/up.sh"
+      "scripts/chatwoot/up.sh",
+      "apps/gateway/src/authority/provisioning.service.ts",
+      "apps/gateway/test/saas-operator.int.test.ts",
+      "apps/console/src/components/ProvisioningProgress.tsx"
     ],
-    "note": "Admin API connects a brand to Chatwoot: account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed webhooks and Copilot dashboard app; every credential stored with the secret broker (tested end to end against the fake, provisioning also against real Chatwoot v4.18.0-ce). Health checks, reconnect instructions and the Studio screen pending."
+    "note": "A brand gets its Chatwoot account by itself: the first brand of a workspace (through the outbox, after a short wait) and a brand a billing system creates with its workspace (the tenant.created handler). Account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed webhooks and Copilot dashboard app; every step is recorded before the next (credentials with the secret broker), so a retry continues the same account, and Connect in Studio is the retry. Studio shows the set-up's progress or why it stopped (tested end to end against the fake, with failures and retries; provisioning also against real Chatwoot v4.18.0-ce). Health checks and reconnect instructions pending."
   },
   "E06": {
     "status": "in-progress",
@@ -1997,9 +2000,16 @@
       "packages/db/src/operators.ts",
       "apps/gateway/test/platform-support.int.test.ts",
       "apps/console/src/pages/platform/PlatformPage.tsx",
-      "apps/console/e2e/platform.spec.ts"
+      "apps/console/e2e/platform.spec.ts",
+      "apps/gateway/src/platform/tenant-lifecycle.ts",
+      "apps/gateway/src/platform/saas-console.controller.ts",
+      "apps/gateway/src/platform/operator-keys.ts",
+      "apps/gateway/src/identity/tenants.readonly.ts",
+      "apps/gateway/test/saas-operator.int.test.ts",
+      "apps/console/src/pages/platform/TenantPlanPanel.tsx",
+      "apps/console/src/pages/platform/SaasView.tsx"
     ],
-    "note": "Platform console at /platform for operators named by the server administrator, with platform roles separate from workspace roles and the hamnivo_platform database role: workspaces with metadata only, service health (API, database, Valkey, queue, connectors), support access, AI stops per workspace, incident banners that every workspace sees, and a hash-chained platform audit log. Not built: tenant lifecycle actions (suspend, reactivate), abuse controls, and stopping AI or switching providers from the platform; AI stops are shown, not operated."
+    "note": "Platform console at /platform for operators named by the server administrator, with platform roles separate from workspace roles and the hamnivo_platform database role: workspaces with metadata only, their plan, trial and usage, service health (API, database, Valkey, queue, connectors), support access, AI stops per workspace, incident banners that every workspace sees, and a hash-chained platform audit log. Platform admins suspend and reactivate workspaces (a suspended workspace is read-only for its staff and its website chat shows offline), change their plan or start a trial, turn public sign-up on or off and manage operator API keys (stored as HMACs) for billing systems. Not built: abuse controls, and stopping AI or switching providers from the platform; AI stops are shown, not operated."
   },
   "A18": {
     "status": "implemented",
@@ -2090,9 +2100,11 @@
       "apps/gateway/src/operations/platform.service.ts",
       "apps/console/src/pages/platform/TenantsView.tsx",
       "apps/gateway/test/platform-support.int.test.ts",
-      "apps/console/e2e/platform.spec.ts"
+      "apps/console/e2e/platform.spec.ts",
+      "apps/console/src/pages/platform/TenantPlanPanel.tsx",
+      "apps/gateway/test/saas-operator.int.test.ts"
     ],
-    "note": "Workspace ID, state, workspaces, brands, connectors, AI stops, model providers and support history, read through column grants that leave out content; support access is asked from here. Plan and region are not modelled yet, and owners are reached through the support request, not by address."
+    "note": "Workspace ID, state, plan, trial, billing provider, usage this period, workspaces, brands, connectors, AI stops, model providers and support history, read through column grants that leave out content; support access is asked from here. Region is not modelled yet, and owners are reached through the support request, not by address."
   },
   "HNV-26-03": {
     "status": "implemented",
@@ -2186,9 +2198,11 @@
       "packages/domain/src/billing/limits.ts",
       "apps/gateway/test/billing.int.test.ts",
       "apps/gateway/test/api-keys.int.test.ts",
-      "apps/console/e2e/reports.spec.ts"
+      "apps/console/e2e/reports.spec.ts",
+      "packages/db/migrations/20261003150847_saas_security.sql",
+      "apps/gateway/test/saas-signup.int.test.ts"
     ],
-    "note": "Workspace limits per calendar month (conversations, AI replies, AI tokens) and at any time (knowledge storage, seats, webhook endpoints), metered from usage_entries and enforced with 402 PLAN_LIMIT_REACHED and the numbers (database guards for seats and storage). Past the AI limits or the workspace's own token budget, conversations go to people instead. Alerts at 50/80/90/100% are audited and sent as webhook events; each API key has its own rate limit (429 with Retry-After). Per-agent and per-tool budgets are not built."
+    "note": "Workspace limits per calendar month (conversations, AI replies, AI tokens) and at any time (knowledge storage, seats, webhook endpoints), metered from usage_entries and enforced with 402 PLAN_LIMIT_REACHED and the numbers (database guards for seats and storage). New workspaces start on the free plan with limits (HAMNIVO_DEFAULT_PLAN=unlimited keeps the old no-limit behaviour for self-hosting). Past the AI limits or the workspace's own token budget, conversations go to people instead. Alerts at 50/80/90/100% are audited and sent as webhook events; each API key has its own rate limit (429 with Retry-After). Per-agent and per-tool budgets are not built."
   },
   "A15": {
     "status": "partial",
@@ -2199,12 +2213,17 @@
       "packages/db/src/schema/billing.ts",
       "packages/domain/test/billing.test.ts",
       "apps/gateway/test/billing.int.test.ts",
-      "apps/console/e2e/reports.spec.ts"
+      "apps/console/e2e/reports.spec.ts",
+      "apps/gateway/src/billing/plans.ts",
+      "apps/gateway/src/billing/lifecycle.service.ts",
+      "apps/gateway/src/platform/tenant-lifecycle.ts",
+      "apps/gateway/test/saas-signup.int.test.ts",
+      "apps/gateway/test/saas-operator.int.test.ts"
     ],
-    "note": "The operator defines plans (seat, volume, storage and endpoint limits, metered prices) and assigns them with the billing command; each workspace keeps a copy as its entitlements, independent of roles and permissions. Studio shows usage against them. Feature entitlements (features switched on per plan) are not built."
+    "note": "The operator defines plans (seat, volume, storage and endpoint limits, metered prices, trial days, a Stripe price) with the billing command and assigns them there, in the platform console or through the operator API; each workspace keeps a copy as its entitlements, independent of roles and permissions. New workspaces start on the server's default plan (free unless HAMNIVO_DEFAULT_PLAN says otherwise), as a trial when the plan has trial days; a trial falls back to the free plan when it ends. Studio shows usage against the limits. Feature entitlements (features switched on per plan) are not built."
   },
   "A16": {
-    "status": "partial",
+    "status": "implemented-live-unverified",
     "evidence": [
       "apps/gateway/src/billing/operations.ts",
       "apps/gateway/src/billing/billing.service.ts",
@@ -2213,9 +2232,20 @@
       "packages/adapters/src/billing/index.ts",
       "apps/gateway/test/billing.int.test.ts",
       "apps/console/e2e/reports.spec.ts",
-      "docs/self-hosting.md"
+      "docs/self-hosting.md",
+      "packages/adapters/src/billing/port.ts",
+      "packages/adapters/src/billing/stripe.ts",
+      "packages/adapters/test/billing/stripe.test.ts",
+      "apps/gateway/src/billing/subscriptions.service.ts",
+      "apps/gateway/src/billing/lifecycle.ts",
+      "apps/gateway/src/billing/notices.ts",
+      "apps/gateway/test/saas-billing.int.test.ts",
+      "apps/gateway/test/saas-operator.int.test.ts",
+      "integrations/whmcs/modules/servers/hamnivo/hamnivo.php",
+      "docs/guide/saas/stripe.md",
+      "docs/guide/saas/whmcs.md"
     ],
-    "note": "Invoices drafted per calendar month from the usage ledger (plan price and metered usage beyond what it includes, only for workspaces that had the plan before the month ended), then issued, paid or voided, with payment failures and retry dates, audited in the workspace; overdue invoices make the workspace past due in Studio. Collection is manual or through the InvoicePaymentPort, which has no payment provider adapter yet (interface only). Grace periods and suspending or restoring access are not built."
+    "note": "Invoices drafted per calendar month from the usage ledger (plan price and metered usage), issued, paid or voided, with payment failures and retry dates, audited in the workspace. Billing providers behind a port: free (default), Stripe (Checkout for subscriptions, the Customer Portal, provider invoices, and signed webhooks applied once each and in any order: subscription changes, paid invoices with a receipt email, failed payments with a grace period after which the workspace falls back to the free plan) and WHMCS (a provisioning module that creates, suspends, unsuspends, terminates and re-plans workspaces through the operator API). Workspaces billed by Stripe or WHMCS get no invoice from this server. Tested against a fake Stripe Billing server and with the WHMCS module driving the gateway; not yet against live Stripe or a WHMCS installation."
   },
   "O04": {
     "status": "partial",
@@ -2321,9 +2351,12 @@
     "evidence": [
       "apps/console/src/pages/reports/BillingTab.tsx",
       "apps/gateway/src/billing/billing.service.ts",
-      "apps/console/e2e/reports.spec.ts"
+      "apps/console/e2e/reports.spec.ts",
+      "apps/console/src/pages/settings/BillingPage.tsx",
+      "apps/gateway/src/billing/subscriptions.service.ts",
+      "apps/gateway/test/saas-billing.int.test.ts"
     ],
-    "note": "Plan, usage against each limit for the current billing month, the AI budget and the invoice history. Plans are changed by the operator, not from Studio, and there is no usage forecast."
+    "note": "Plan and billing in Studio settings shows the plan, its trial or grace period, usage against each limit for the current billing month and the invoices; Reports keeps the AI budget and the invoice details. With Stripe, Upgrade opens Checkout and Manage the Customer Portal; with WHMCS, Manage opens the provider's client area. There is no usage forecast."
   },
   "HNV-23-05": {
     "status": "implemented",
@@ -2341,9 +2374,12 @@
     "evidence": [
       "apps/console/src/pages/reports/BillingTab.tsx",
       "apps/gateway/src/billing/operations.ts",
-      "apps/console/e2e/reports.spec.ts"
+      "apps/console/e2e/reports.spec.ts",
+      "apps/console/src/pages/settings/BillingPage.tsx",
+      "apps/gateway/src/billing/lifecycle.ts",
+      "apps/gateway/test/saas-billing.int.test.ts"
     ],
-    "note": "Invoice status, overdue and failed payments, due dates and the past-due notice are shown. Updating a payment method and plan changes with effective dates need a payment provider, which is not connected yet."
+    "note": "Invoice status, overdue and failed payments, due dates and the past-due notice are shown. With Stripe, a failed payment shows the grace period's end and emails the owners; the payment method and plan are changed in the Customer Portal, and the workspace follows Stripe's events. Plan changes with a chosen effective date are not offered."
   },
   "W02": {
     "status": "implemented",

@@ -21,16 +21,16 @@ export const Route = createFileRoute('/_studio')({
       throw error;
     }
     let tenantId = activeTenantId();
-    const usable = me.memberships.filter(
-      (m) => m.status === 'active' && m.tenant.status === 'active',
-    );
+    // A suspended workspace still opens, read-only (it says so on every page).
+    const opens = (status: string) => status === 'active' || status === 'suspended';
+    const usable = me.memberships.filter((m) => m.status === 'active' && opens(m.tenant.status));
     // Nothing remembered (a new browser, or after signing out) and only one choice: open it.
     if (!tenantId && usable.length === 1 && usable[0]) {
       tenantId = usable[0].tenant.id;
       chooseTenant(tenantId);
     }
     const membership = me.memberships.find((m) => m.tenant.id === tenantId);
-    if (membership?.status !== 'active' || membership.tenant.status !== 'active') {
+    if (membership?.status !== 'active' || !opens(membership.tenant.status)) {
       throw redirect({ to: '/tenants', search: { redirect: location.href } });
     }
     return { tenant: membership.tenant };

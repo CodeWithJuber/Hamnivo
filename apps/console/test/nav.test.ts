@@ -52,7 +52,7 @@ describe('the menu', () => {
       ],
       sales: ['/orders', '/finance'],
       reports: ['/reports'],
-      settings: ['/brands', '/team', '/security', '/developer', '/migration'],
+      settings: ['/brands', '/team', '/security', '/developer', '/migration', '/settings/billing'],
     });
   });
 
@@ -82,6 +82,7 @@ describe('the menu', () => {
       '/security': ['security.manage', 'support.grant'],
       '/developer': ['api_keys.read', 'webhooks.read', 'network.manage'],
       '/migration': 'migration.review',
+      '/settings/billing': ['billing.read', 'settings.manage'],
     });
   });
 
@@ -89,7 +90,7 @@ describe('the menu', () => {
     const folder = fileURLToPath(new URL('../src/routes/_studio', import.meta.url));
     const pages = new Set(
       readdirSync(folder, { withFileTypes: true }).map(
-        (entry) => `/${entry.name.replace(/\.tsx$/, '')}`,
+        (entry) => `/${entry.name.replace(/\.tsx$/, '').replaceAll('.', '/')}`,
       ),
     );
     // Stop AI is a button in the header; Account security is in the account menu.
@@ -123,7 +124,11 @@ describe('who sees which entry', () => {
       ['home', '/overview'],
       ['inbox', '/inbox'],
     ]);
-    expect(entries(holding('billing.read')).map(([id]) => id)).toEqual(['home', 'reports']);
+    expect(entries(holding('billing.read')).map(([id]) => id)).toEqual([
+      'home',
+      'reports',
+      'settings',
+    ]);
     expect(entries(holding('support.grant')).map(([id]) => id)).toEqual(['home', 'settings']);
   });
 
@@ -149,6 +154,7 @@ describe('who sees which entry', () => {
       ['home', '/overview'],
       ['ai', '/runs'],
       ['reports', '/reports'],
+      ['settings', '/settings/billing'],
     ]);
     expect(entries(role('developer'))).toContainEqual(['settings', '/team']);
   });
@@ -175,7 +181,7 @@ describe('who sees which entry', () => {
       ],
       sales: ['/orders', '/finance'],
       reports: ['/reports'],
-      settings: ['/brands', '/team', '/security', '/developer', '/migration'],
+      settings: ['/brands', '/team', '/security', '/developer', '/migration', '/settings/billing'],
     };
     const home = { home: ['/overview'] };
     expect(pagesOf('owner')).toEqual(everything);
@@ -215,7 +221,12 @@ describe('who sees which entry', () => {
       ai: ['/checks', '/decisions', '/runs'],
       reports: ['/reports'],
     });
-    expect(pagesOf('billing')).toEqual({ ...home, ai: ['/runs'], reports: ['/reports'] });
+    expect(pagesOf('billing')).toEqual({
+      ...home,
+      ai: ['/runs'],
+      reports: ['/reports'],
+      settings: ['/settings/billing'],
+    });
   });
 });
 
@@ -243,6 +254,7 @@ describe('where the person is', () => {
       '/reports': 'reports',
       '/brands': 'settings',
       '/migration': 'settings',
+      '/settings/billing': 'settings',
       '/stop-ai': undefined,
       '/account': undefined,
       '/platform': undefined,

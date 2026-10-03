@@ -10,6 +10,7 @@ import {
   HeadsetIcon,
   LockIcon,
   SirenIcon,
+  UserPlusIcon,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +25,7 @@ import type { PlatformView } from '../../routes/platform';
 import { AuditView } from './AuditView';
 import { HealthView } from './HealthView';
 import { IncidentsView } from './IncidentsView';
+import { SaasView } from './SaasView';
 import { SupportView } from './SupportView';
 import { TenantsView } from './TenantsView';
 
@@ -39,6 +41,7 @@ const NAV: NavItem[] = [
   { view: 'support', icon: HeadsetIcon, permission: 'platform.support.request' },
   { view: 'incidents', icon: SirenIcon, permission: 'platform.health.read' },
   { view: 'audit', icon: FileClockIcon, permission: 'platform.audit.read' },
+  { view: 'saas', icon: UserPlusIcon, permission: 'platform.tenants.read' },
 ];
 
 export const canPlatform = (operator: PlatformOperator, permission: string) =>
@@ -52,7 +55,10 @@ function Console({ operator }: { operator: PlatformOperator }) {
     items.find((item) => item.view === (search.view ?? 'tenants'))?.view ??
     items[0]?.view ??
     'tenants';
-  useDocumentTitle(t(`platform.nav.${view}`));
+  // The SaaS view's text lives with the rest of plans and billing (i18n/billing).
+  const label = (name: PlatformView) =>
+    name === 'saas' ? t('billing.platform.nav') : t(`platform.nav.${name}`);
+  useDocumentTitle(label(view));
   return (
     <div
       className="min-h-dvh bg-bg lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]"
@@ -80,7 +86,7 @@ function Console({ operator }: { operator: PlatformOperator }) {
                   className="relative flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-text-secondary hover:bg-surface-sunken hover:text-text aria-[current=page]:bg-surface-sunken aria-[current=page]:text-text"
                 >
                   <item.icon className="size-[18px] shrink-0" aria-hidden />
-                  {t(`platform.nav.${item.view}`)}
+                  {label(item.view)}
                 </Link>
               </li>
             ))}
@@ -116,13 +122,14 @@ function Console({ operator }: { operator: PlatformOperator }) {
           className="flex min-w-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8"
         >
           <h1 id="page-title" tabIndex={-1} className="text-2xl font-semibold text-text">
-            {t(`platform.nav.${view}`)}
+            {label(view)}
           </h1>
           {view === 'tenants' ? <TenantsView operator={operator} /> : null}
           {view === 'health' ? <HealthView /> : null}
           {view === 'support' ? <SupportView operator={operator} /> : null}
           {view === 'incidents' ? <IncidentsView operator={operator} /> : null}
           {view === 'audit' ? <AuditView /> : null}
+          {view === 'saas' ? <SaasView operator={operator} /> : null}
         </main>
       </div>
     </div>

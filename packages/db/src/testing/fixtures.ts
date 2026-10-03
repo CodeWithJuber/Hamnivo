@@ -5,6 +5,7 @@ import type { Db } from '../client.js';
 import { newId, toPublicId } from '../ids.js';
 import * as s from '../schema/index.js';
 import { type TenantTx, withTenant } from '../tenant.js';
+import { seedSaas } from './saas-fixtures.js';
 
 export interface SeededTenant {
   tenantId: string;
@@ -1335,6 +1336,11 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       agentId: ids.agentId,
       agentVersionId: ids.agentVersionId,
       runId: ids.runId,
+    });
+    await seedSaas(tx, tenantId, suffix, {
+      brandId: ids.brandId,
+      connectionId: ids.connectionId,
+      staffMemberId: ids.staffMemberId,
     });
     // Last: the plan's limits it sets would hold any row seeded after it.
     await seedDeveloperPlatform(tx, tenantId, {

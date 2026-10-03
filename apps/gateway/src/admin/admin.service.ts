@@ -61,7 +61,8 @@ import { scopeFromRow } from '../identity/principal.service.js';
 import { endSessionsIfNoAccessLeft } from '../identity/sessions.js';
 import { enforce } from '../identity/staff.guard.js';
 import { TenantsService } from '../identity/tenants.service.js';
-import type { Mailer } from '../platform/mailer.js';
+import { type Mailer, sendTemplate } from '../platform/mailer.js';
+import { senderNameOf } from '../platform/workspace-email.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, MAILER } from '../tokens.js';
 import { delegationError, revocationError } from './delegation-errors.js';
 import { loadHierarchy } from './hierarchy.js';
@@ -1005,13 +1006,25 @@ export class AdminService {
     return row ?? null;
   }
 
-  private async sendInvitation(created: InvitationT, token: string) {
-    await this.mailer.send({
-      to: created.email,
-      template: 'members.invitation',
-      subject: 'You have been invited to Hamnivo',
-      text: `You were invited to join a Hamnivo workspace as ${created.role.name}.\n\nAccept within 7 days:\n${this.config.PUBLIC_CONSOLE_ORIGIN}/invitations/accept?token=${encodeURIComponent(token)}\n\nSign in with this email address (${created.email}) to accept.`,
+  /** The invitation email (HTML and plain text), from the workspace's own sender name. */
+  private async sendInvitation(principal: StaffPrincipal, created: InvitationT, token: string) {
+    const { workspace, senderName } = await this.tx(principal, async (tx) => {
+      const [tenant] = await tx.select({ name: schema.tenants.name }).from(schema.tenants);
+      return { workspace: tenant?.name ?? null, senderName: await senderNameOf(tx) };
     });
+    await sendTemplate(
+      this.mailer,
+      { to: created.email, template: 'members.invitation', senderName },
+      {
+        kind: 'invitation',
+        workspace,
+        role: created.role.name,
+        acceptUrl: `${this.config.PUBLIC_CONSOLE_ORIGIN.replace(/\/$/, '')}/invitations/accept?token=${encodeURIComponent(token)}`,
+        email: created.email,
+        inviter: created.invitedBy?.displayName ?? null,
+        days: Math.round(INVITATION_TTL_MS / 86_400_000),
+      },
+    );
   }
 
   private checkInvitationCeiling(
@@ -1103,7 +1116,7 @@ export class AdminService {
       return view;
     });
     const token = `${created.id}.${secret}`;
-    await this.sendInvitation(created, token);
+    await this.sendInvitation(principal, created, token);
     return { ...created, token };
   }
 
@@ -1148,7 +1161,7 @@ export class AdminService {
       return this.invitationView(updated, role, await this.inviter(tx, updated.invitedBy));
     });
     const token = `${created.id}.${secret}`;
-    await this.sendInvitation(created, token);
+    await this.sendInvitation(principal, created, token);
     return { ...created, token };
   }
 

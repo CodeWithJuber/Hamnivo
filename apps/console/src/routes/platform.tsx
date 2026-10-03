@@ -3,8 +3,15 @@ import { isSignedOut } from '../lib/api';
 import { meQuery } from '../lib/queries';
 import { PlatformPage } from '../pages/platform/PlatformPage';
 
-export type PlatformView = 'tenants' | 'health' | 'support' | 'incidents' | 'audit';
-const VIEWS: readonly PlatformView[] = ['tenants', 'health', 'support', 'incidents', 'audit'];
+export type PlatformView = 'tenants' | 'health' | 'support' | 'incidents' | 'audit' | 'saas';
+const VIEWS: readonly PlatformView[] = [
+  'tenants',
+  'health',
+  'support',
+  'incidents',
+  'audit',
+  'saas',
+];
 const AREAS = ['configuration', 'conversations', 'audit'] as const;
 
 export interface PlatformSearch {

@@ -18,6 +18,7 @@ import { authorize, type Permission, type StaffPrincipal } from '@hamnivo/policy
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
+import { queueFirstBrandSetup } from '../authority/provisioning.service.js';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { enforce } from '../identity/staff.guard.js';
@@ -108,6 +109,8 @@ export class BrandsService {
         outcome: 'success',
         data: { name: row.name, allowedOrigins: row.allowedOrigins },
       });
+      // The workspace's first brand gets its Chatwoot account by itself (SaaS onboarding).
+      await queueFirstBrandSetup(tx, this.config, principal.tenantId, row.id, this.clock());
       return brandView(row);
     });
   }

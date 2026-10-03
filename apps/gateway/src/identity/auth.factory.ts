@@ -6,9 +6,9 @@ import { betterAuthSchema } from '@hamnivo/db/schema';
 import { hash, verify } from '@node-rs/argon2';
 import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
-import { twoFactor } from 'better-auth/plugins';
+import { captcha, twoFactor } from 'better-auth/plugins';
 import type { AppConfig } from '../config.js';
-import type { Mailer } from '../platform/mailer.js';
+import { type Mailer, sendTemplate } from '../platform/mailer.js';
 import type { SsoRuntime } from './sso/sso-runtime.js';
 
 /** Better Auth paths of the SSO plugin that are never used: SSO is managed per tenant. */
@@ -29,6 +29,17 @@ const SSO_REQUIRED = {
   message: 'Your organization requires single sign-on for this address. Continue with SSO.',
 };
 
+const SIGNUP_CLOSED = {
+  code: 'SIGNUP_CLOSED',
+  message:
+    'New accounts need an invitation on this server. Use the link in your invitation email, or ask for one.',
+};
+
+/** Decides whether an address may create an account (the sign-up switch, platform/signup.ts). */
+export interface SignupGate {
+  mayCreateAccount(email: string): Promise<boolean>;
+}
+
 /**
  * Staff authentication (ADR 0005) with Better Auth: email + password (argon2id), email
  * verification, TOTP two-factor with backup codes, passkeys and per-tenant OIDC single sign-on.
@@ -39,7 +50,13 @@ const SSO_REQUIRED = {
  * client secret from the secret broker, and decides who an SSO identity is. Implicit account
  * linking is off everywhere, so an identity is only ever linked where Hamnivo decided it.
  */
-export function createAuth(config: AppConfig, db: Db, mailer: Mailer, runtime: SsoRuntime) {
+export function createAuth(
+  config: AppConfig,
+  db: Db,
+  mailer: Mailer,
+  runtime: SsoRuntime,
+  signup: SignupGate,
+) {
   const secure = config.NODE_ENV === 'production';
   const consoleUrl = new URL(config.PUBLIC_CONSOLE_ORIGIN);
   const ssoOptions = {
@@ -87,24 +104,22 @@ export function createAuth(config: AppConfig, db: Db, mailer: Mailer, runtime: S
       sendResetPassword: async ({ user, url }) => {
         // Addresses that must use SSO have no password to reset (the answer stays the same).
         if (await runtime.ssoRequired(user.email)) return;
-        await mailer.send({
-          to: user.email,
-          template: 'auth.reset-password',
-          subject: 'Reset your Hamnivo password',
-          text: `Use this link within one hour to choose a new password:\n\n${url}\n\nIf you did not ask for this, you can ignore this email.`,
-        });
+        await sendTemplate(
+          mailer,
+          { to: user.email, template: 'auth.reset-password' },
+          { kind: 'password-reset', url },
+        );
       },
     },
     emailVerification: {
       sendOnSignUp: true,
       autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user, url }) => {
-        await mailer.send({
-          to: user.email,
-          template: 'auth.verify-email',
-          subject: 'Confirm your email for Hamnivo',
-          text: `Confirm this address to finish creating your account:\n\n${url}\n\nIf you did not sign up, you can ignore this email.`,
-        });
+        await sendTemplate(
+          mailer,
+          { to: user.email, template: 'auth.verify-email' },
+          { kind: 'verification', url },
+        );
       },
     },
     session: {
@@ -126,9 +141,30 @@ export function createAuth(config: AppConfig, db: Db, mailer: Mailer, runtime: S
         if (typeof email === 'string' && (await runtime.ssoRequired(email))) {
           throw new APIError('FORBIDDEN', SSO_REQUIRED);
         }
+        // The sign-up switch: when closed, only invited addresses may create an account.
+        if (
+          ctx.path === '/sign-up/email' &&
+          typeof email === 'string' &&
+          !(await signup.mayCreateAccount(email))
+        ) {
+          throw new APIError('FORBIDDEN', SIGNUP_CLOSED);
+        }
       }),
     },
     plugins: [
+      // Cloudflare Turnstile on sign-up, when both keys are set (token in x-captcha-response).
+      ...(config.TURNSTILE_SECRET_KEY
+        ? [
+            captcha({
+              provider: 'cloudflare-turnstile',
+              secretKey: config.TURNSTILE_SECRET_KEY,
+              endpoints: ['/sign-up/email'],
+              ...(config.TURNSTILE_VERIFY_URL
+                ? { siteVerifyURLOverride: config.TURNSTILE_VERIFY_URL }
+                : {}),
+            }),
+          ]
+        : []),
       twoFactor({ issuer: 'Hamnivo' }),
       passkey({
         rpID: consoleUrl.hostname,

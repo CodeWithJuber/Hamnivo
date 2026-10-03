@@ -47,15 +47,15 @@ entry is there, and a list names the pages you can open in it.
 
 | Role | Home | Inbox | AI assistant | Sales | Reports | Settings |
 |---|---|---|---|---|---|---|
-| Owner | ✓ | ✓ | all nine pages | both pages | ✓ | all five pages |
-| Administrator | ✓ | ✓ | all nine pages | both pages | ✓ | all five pages |
+| Owner | ✓ | ✓ | all nine pages | both pages | ✓ | all six pages |
+| Administrator | ✓ | ✓ | all nine pages | both pages | ✓ | all six pages (Plan and billing shows only the email sender name) |
 | Supervisor | ✓ | ✓ | all but Model connections | both pages | ✓ | Team and access |
 | Support agent | ✓ | ✓ | Knowledge, Tools and permissions, Answer caching | both pages | | Team and access (read only) |
 | Finance | ✓ | | Activity | both pages | ✓ | Team and access |
 | Knowledge editor | ✓ | ✓ | AI agents, Knowledge, Answer caching | | | |
 | Developer | ✓ | | AI agents, Model connections | | | Team and access, Developer |
 | Analyst | ✓ | ✓ | Safety checks, Decision rules, Activity | | ✓ | |
-| Billing manager | ✓ | | Activity | | ✓ | |
+| Billing manager | ✓ | | Activity | | ✓ | Plan and billing |
 
 A custom role works the same way: the entry is there when one of its pages is allowed, and the row
 lists only the allowed pages. The gateway checks every request again, so typing the address of a

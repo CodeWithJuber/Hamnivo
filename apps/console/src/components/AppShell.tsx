@@ -47,6 +47,7 @@ import { chooseTenant, useTenant } from '../lib/tenant';
 import type { PlatformOperator } from '../lib/types';
 import { LanguageSelect, TranslationNote } from './LanguageSelect';
 import { type SectionTab, SectionTabs } from './SectionTabs';
+import { SuspendedNotice } from './SuspendedNotice';
 import { WorkspaceNotices } from './WorkspaceNotices';
 
 type NavIcon = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
@@ -110,6 +111,7 @@ function useMenu(pathname: string): { entries: MenuEntry[]; section: MenuSection
     '/security': t('nav.security'),
     '/developer': t('developer.nav'),
     '/migration': t('migration.nav'),
+    '/settings/billing': t('billing.nav'),
   } satisfies Record<NavPath, string>;
 
   const menu = menuFor(can);
@@ -388,6 +390,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <KillSwitchBanner />
+        <SuspendedNotice />
         <WorkspaceNotices />
         <main
           id="main"

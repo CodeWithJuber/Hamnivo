@@ -34,6 +34,16 @@ export const PLATFORM_PERMISSIONS = {
     mfa: true,
     stepUp: true,
   },
+  'platform.tenants.manage': {
+    description: 'Suspend or reactivate workspaces and change their plan',
+    mfa: true,
+    stepUp: true,
+  },
+  'platform.settings.manage': {
+    description: 'Turn public sign-up on or off and manage operator API keys',
+    mfa: true,
+    stepUp: true,
+  },
 } as const satisfies Record<string, PlatformPermissionSpec>;
 
 export type PlatformPermission = keyof typeof PLATFORM_PERMISSIONS;

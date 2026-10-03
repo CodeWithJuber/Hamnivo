@@ -155,6 +155,9 @@ try {
     CHATWOOT_WEBHOOK_BASE_URL: origin(ports.api),
     STREAM_HEARTBEAT_SECONDS: '5',
     RATE_LIMIT_PER_MINUTE: '100000',
+    // Workspaces without plan limits, and brands connected by hand, as these journeys expect.
+    HAMNIVO_DEFAULT_PLAN: 'unlimited',
+    CHATWOOT_AUTO_PROVISION: 'false',
     COMMERCE_STRIPE_API_BASE: stripe.url,
   };
   delete env.WIDGET_SIGNING_KEY;

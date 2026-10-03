@@ -20,6 +20,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { decodeProtectedHeader, importJWK, type JWK, jwtVerify } from 'jose';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
+import { assertWidgetOnline, widgetLoads } from '../identity/tenants.readonly.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { filesScannable } from './attachments.service.js';
@@ -73,7 +74,7 @@ export class WidgetSessionsService {
    */
   async framePolicy(widgetId: string): Promise<WidgetFramePolicy> {
     const widget = await resolveWidget(this.db, widgetId);
-    if (widget?.brandStatus !== 'active' || widget.tenantStatus !== 'active') {
+    if (widget?.brandStatus !== 'active' || !widgetLoads(widget.tenantStatus)) {
       throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
     }
     return {
@@ -92,7 +93,7 @@ export class WidgetSessionsService {
     locale: string | undefined,
   ): Promise<LauncherConfig> {
     const widget = await resolveWidget(this.db, widgetId);
-    if (widget?.brandStatus !== 'active' || widget.tenantStatus !== 'active') {
+    if (widget?.brandStatus !== 'active' || !widgetLoads(widget.tenantStatus)) {
       throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
     }
     if (origin !== undefined) this.checkOrigin(widget.allowedOrigins, origin);
@@ -113,9 +114,10 @@ export class WidgetSessionsService {
     hostOrigin?: string;
   }): Promise<WidgetSession> {
     const widget = await resolveWidget(this.db, input.widgetId);
-    if (widget?.brandStatus !== 'active' || widget.tenantStatus !== 'active') {
+    if (widget?.brandStatus !== 'active') {
       throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
     }
+    assertWidgetOnline(widget.tenantStatus);
     this.checkOrigin(widget.allowedOrigins, input.hostOrigin);
     if (input.resumeToken) {
       try {
@@ -226,6 +228,9 @@ export class WidgetSessionsService {
     if (!tenantId) throw expired();
     const now = this.clock();
     const outcome = await withTenant(this.db, { tenantId, actorId: 'widget' }, async (tx) => {
+      const [tenant] = await tx.select({ status: schema.tenants.status }).from(schema.tenants);
+      // The session outlives a suspension; the chat is offline until the workspace is back.
+      assertWidgetOnline(tenant?.status ?? 'closing');
       const [session] = await tx
         .select()
         .from(schema.widgetSessions)

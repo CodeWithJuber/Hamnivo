@@ -71,6 +71,7 @@ export const ID_PREFIX = {
   ssoConnection: 'ssoc',
   supportGrant: 'sgr',
   operator: 'opr',
+  operatorKey: 'opk',
   incident: 'inc',
   mcpServer: 'mcp',
   simulation: 'sim',

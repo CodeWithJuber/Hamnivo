@@ -8,7 +8,7 @@ import type { HostBridge } from './bridge.js';
 import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
 import { applyLocale, type Locale } from './i18n.js';
-import { useChat } from './useChat.js';
+import { CHAT_OFFLINE, useChat } from './useChat.js';
 import { useDisplay } from './useDisplay.js';
 import { useMemory } from './useMemory.js';
 import { useReplyLanguage } from './useReplyLanguage.js';
@@ -137,7 +137,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   if (chat.state.phase === 'error' || !chat.state.session) {
     return (
       <p className="p-6 text-sm text-text" role="alert">
-        {t('startError')}
+        {chat.state.error === CHAT_OFFLINE ? t('chatOffline') : t('startError')}
       </p>
     );
   }
