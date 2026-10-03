@@ -1,0 +1,90 @@
+{%- comment -%}
+  Hamnivo Chat as an app embed block: it puts the chat on every page of the online store.
+
+  A merchant turns it on in the theme editor, under App embeds, and fills in the three settings.
+  Nothing is added to a page until the widget ID and the chat address look right, and every value
+  is escaped, so a wrong value cannot break the page.
+
+  The loader is read from the chat address, not copied into this extension, so the loader and the
+  chat are always the same version. It loads async, so it never slows the page down.
+{%- endcomment -%}
+
+{%- liquid
+  assign widget_id = block.settings.widget_id | strip
+  assign chat = block.settings.chat_address | strip
+  assign api = block.settings.api_address | strip
+
+  assign widget_ok = false
+  assign id_start = widget_id | slice: 0, 4
+  if id_start == 'wid_' and widget_id.size == 30
+    unless widget_id contains ' '
+      assign widget_ok = true
+    endunless
+  endif
+
+  assign chat_origin = ''
+  unless chat contains ' ' or chat contains '@'
+    assign chat_parts = chat | split: '/'
+    if chat_parts.size > 2 and chat_parts[1] == '' and chat_parts[2] != ''
+      if chat_parts[0] == 'https:' or chat_parts[0] == 'http:'
+        assign chat_origin = chat_parts[0] | append: '//' | append: chat_parts[2]
+      endif
+    endif
+  endunless
+
+  assign api_address = ''
+  unless api contains ' ' or api contains '@'
+    assign api_parts = api | split: '/'
+    if api_parts.size > 2 and api_parts[1] == '' and api_parts[2] != ''
+      if api_parts[0] == 'https:' or api_parts[0] == 'http:'
+        assign api_address = api
+        for attempt in (1..5)
+          assign api_last = api_address | slice: -1
+          if api_last == '/'
+            assign api_address = api_address | remove_last: '/'
+          endif
+        endfor
+      endif
+    endif
+  endunless
+-%}
+
+{%- if widget_ok and chat_origin != '' -%}
+  <script
+    async
+    src="{{ chat_origin | append: '/loader.js' | escape }}"
+    data-widget-id="{{ widget_id | escape }}"
+    {%- if api_address != '' %}
+    data-api="{{ api_address | escape }}"
+    {%- endif %}
+  ></script>
+{%- else -%}
+  <!-- Hamnivo Chat is on, but the widget ID or the chat address is missing or wrong. In the theme editor, open App embeds, then Hamnivo Chat. -->
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Hamnivo Chat",
+  "target": "body",
+  "settings": [
+    {
+      "type": "text",
+      "id": "widget_id",
+      "label": "t:blocks.hamnivo_chat.settings.widget_id.label",
+      "info": "t:blocks.hamnivo_chat.settings.widget_id.info"
+    },
+    {
+      "type": "text",
+      "id": "chat_address",
+      "label": "t:blocks.hamnivo_chat.settings.chat_address.label",
+      "info": "t:blocks.hamnivo_chat.settings.chat_address.info"
+    },
+    {
+      "type": "text",
+      "id": "api_address",
+      "label": "t:blocks.hamnivo_chat.settings.api_address.label",
+      "info": "t:blocks.hamnivo_chat.settings.api_address.info"
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,20 @@
+{
+  "blocks": {
+    "hamnivo_chat": {
+      "settings": {
+        "widget_id": {
+          "label": "Widget ID",
+          "info": "Starts with wid_. Hamnivo Studio shows it in the install code, as data-widget-id."
+        },
+        "chat_address": {
+          "label": "Chat address",
+          "info": "Where Hamnivo Chat runs, for example https://chat.example.com. It is the start of the install code's src, before /loader.js."
+        },
+        "api_address": {
+          "label": "API address (optional)",
+          "info": "The Hamnivo API of the same installation, for example https://api.example.com. It is the install code's data-api. Leave it empty to use the chat's own default."
+        }
+      }
+    }
+  }
+}
