@@ -421,6 +421,26 @@ describe('custom roles (A12)', () => {
     const [archived] = (await audit(owner, 'action=role.archived')).items;
     expect(archived?.data).toEqual({ key: 'triage' });
   });
+
+  it('lets a role read what it manages after an older sign-in, and asks again only to change it', async () => {
+    const network = await owner.post('/v1/admin/roles', {
+      key: 'network',
+      name: 'Network',
+      permissions: ['network.manage'],
+    });
+    expect(network.status, JSON.stringify(network.body)).toBe(201);
+    const { client: nadia } = await join(gw, owner, 'Nadia', 'nadia@example.com', network.body.id);
+    await ageSessions(gw, 'nadia@example.com');
+    // A developer-platform route (@ApiRoute) reads like every other Studio page.
+    const hosts = await nadia.get('/v1/admin/network/egress');
+    expect(hosts.status, JSON.stringify(hosts.body)).toBe(200);
+    const save = await nadia.put('/v1/admin/network/egress', {
+      hosts: [{ pattern: 'api.example.com' }],
+      version: hosts.body.version,
+    });
+    expect(save.status).toBe(401);
+    expect(save.body.code).toBe('REAUTH_REQUIRED');
+  });
 });
 
 describe('audit trail (A09)', () => {

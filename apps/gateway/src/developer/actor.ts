@@ -21,7 +21,7 @@ import type { FastifyRequest } from 'fastify';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { PrincipalService } from '../identity/principal.service.js';
-import { enforce, tenantIdFromHeader } from '../identity/staff.guard.js';
+import { enforce, principalForRequest, tenantIdFromHeader } from '../identity/staff.guard.js';
 import { assertWritable } from '../identity/tenants.readonly.js';
 import { CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { ApiKeysService } from './api-keys.service.js';
@@ -163,10 +163,12 @@ export class ActorGuard implements CanActivate {
     const session = await this.principals.session(request);
     if (!session) throw new AppError('AUTH_REQUIRED');
     const tenantId = tenantIdFromHeader(request);
-    const principal = await this.principals.principal(session, tenantId);
+    const member = await this.principals.principal(session, tenantId);
     // Not a member (or no such tenant): indistinguishable on purpose.
-    if (!principal) throw new AppError('NOT_FOUND');
-    assertWritable(principal, request);
+    if (!member) throw new AppError('NOT_FOUND');
+    assertWritable(member, request);
+    // Reads need no recent sign-in here either (GET /v1/admin/network/egress, the webhook log).
+    const principal = principalForRequest(member, request);
     request.hamnivo = { session, principal };
     return {
       kind: 'staff',
