@@ -34,6 +34,7 @@ import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage, publicationFacts } from '../authority/views.js';
 import { EntitlementsService } from '../billing/entitlements.service.js';
 import { AppError } from '../common/app-error.js';
+import { AvailabilityService } from '../inbox/availability.service.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
@@ -69,6 +70,7 @@ export class WidgetConversationsService {
     private readonly agents: AgentsService,
     private readonly entitlements: EntitlementsService,
     private readonly attachments: WidgetAttachmentsService,
+    private readonly availability: AvailabilityService,
   ) {}
 
   private tx<T>(claims: WidgetClaims, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -419,7 +421,14 @@ export class WidgetConversationsService {
       const [brand] = control.brandId
         ? await tx.select().from(schema.brands).where(eq(schema.brands.id, control.brandId))
         : [];
-      outcome = handoffOutcome(brand, locale, now);
+      // A person is "available" only when someone who can answer this brand is online right now.
+      const staffOnline =
+        brand !== undefined &&
+        (await this.availability.anyOnline(tx, claims.tenantId, {
+          workspaceId: brand.workspaceId,
+          brandId: brand.id,
+        }));
+      outcome = handoffOutcome(brand, locale, now, staffOnline);
       if (control.ownerMode !== 'AI_ACTIVE' && control.ownerMode !== 'PAUSED') return [];
       const note = input.note?.trim();
       const result = await this.ownership.transition(

@@ -25,6 +25,20 @@ export interface VisibleScope {
   teamIds: string[];
 }
 
+/** Where a conversation lives for authorization: its workspace, brand, inbox and team. */
+export function resourceOf(
+  control: { brandId: string | null; inboxId: string },
+  workspaceId: string | null,
+  teamId: string | null,
+): ResourceScope {
+  return {
+    ...(workspaceId ? { workspaceId } : {}),
+    ...(control.brandId ? { brandId: control.brandId } : {}),
+    inboxId: control.inboxId,
+    ...(teamId ? { teamId } : {}),
+  };
+}
+
 /** A conversation loaded for a staff action, with where it lives for authorization. */
 export interface ConversationAccess {
   control: ControlRow;
@@ -151,12 +165,7 @@ export class InboxAccess {
       control,
       workspaceId,
       teamId,
-      resource: {
-        ...(workspaceId ? { workspaceId } : {}),
-        ...(control.brandId ? { brandId: control.brandId } : {}),
-        inboxId: control.inboxId,
-        ...(teamId ? { teamId } : {}),
-      },
+      resource: resourceOf(control, workspaceId, teamId),
     };
   }
 

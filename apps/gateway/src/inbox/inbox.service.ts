@@ -19,8 +19,10 @@ import { authorityMessageUuid } from '../authority/uuid.js';
 import { senderOf } from '../authority/views.js';
 import { AppError } from '../common/app-error.js';
 import { AgentsService } from '../runtime/agents.service.js';
-import { type ConversationAccess, InboxAccess, type VisibleScope } from './access.js';
+import { type ConversationAccess, InboxAccess, resourceOf, type VisibleScope } from './access.js';
 import { InboxSignals } from './signals.service.js';
+import { TypingSignals } from './typing.service.js';
+import { unreadCounts } from './unread.js';
 import {
   channelTypes,
   type InboxRow,
@@ -110,6 +112,7 @@ export class InboxService {
     private readonly registry: AuthorityRegistry,
     private readonly staffLinks: StaffLinksService,
     private readonly signals: InboxSignals,
+    private readonly typing: TypingSignals,
     private readonly agents: AgentsService,
   ) {}
 
@@ -172,6 +175,7 @@ export class InboxService {
         tx,
         page.map((r) => r.control.id),
       );
+      const unread = await this.unreadFor(tx, principal, page);
       const tail = page.at(-1);
       const [counts] = await tx
         .select({
@@ -196,7 +200,9 @@ export class InboxService {
         .leftJoin(schema.brands, eq(schema.brands.id, c.brandId))
         .where(filters);
       return {
-        items: page.map((row) => toInboxConversation(row, last.get(row.control.id))),
+        items: page.map((row) =>
+          toInboxConversation(row, last.get(row.control.id), unread.get(row.control.id) ?? 0),
+        ),
         nextCursor:
           rows.length > query.limit && tail
             ? encodeCursor({ t: tail.activityKey, id: tail.control.id })
@@ -206,18 +212,56 @@ export class InboxService {
     });
   }
 
+  /**
+   * Customer messages the caller has not read, for the rows that are theirs to answer: a chat that
+   * is theirs or waits for a person, in a place where they may reply. Other rows are not unread.
+   */
+  private unreadFor(
+    tx: TenantTx,
+    principal: StaffPrincipal,
+    rows: Pick<InboxRow, 'control' | 'workspaceId' | 'teamId'>[],
+  ): Promise<Map<string, number>> {
+    return unreadCounts(
+      tx,
+      principal.staffMemberId,
+      rows
+        .filter((row) =>
+          this.access.can(
+            principal,
+            'conversations.reply',
+            resourceOf(row.control, row.workspaceId, row.teamId),
+          ),
+        )
+        .map((row) => ({
+          id: row.control.id,
+          ownerMode: row.control.ownerMode,
+          ownerStaffId: row.control.ownerStaffId,
+        })),
+    );
+  }
+
   /** One row by id, in the caller's transaction (after authorization). */
-  async row(tx: TenantTx, conversationId: string): Promise<InboxConversation> {
+  async row(
+    tx: TenantTx,
+    conversationId: string,
+    /** Whose unread count to show; without one the count is 0. */
+    viewer?: StaffPrincipal,
+  ): Promise<InboxConversation> {
     const [row] = await selectRows(tx).where(eq(c.id, conversationId));
     if (!row) throw new AppError('NOT_FOUND', { detail: 'Conversation not found.' });
     const last = await lastMessages(tx, [conversationId]);
-    return toInboxConversation(row as InboxRow, last.get(conversationId));
+    const unread = viewer ? await this.unreadFor(tx, viewer, [row]) : new Map<string, number>();
+    return toInboxConversation(
+      row as InboxRow,
+      last.get(conversationId),
+      unread.get(conversationId),
+    );
   }
 
   async detail(principal: StaffPrincipal, publicId: string): Promise<InboxConversationDetail> {
     const { found, conversation, aiAvailable } = await this.access.tx(principal, async (tx) => {
       const found = await this.access.authorized(tx, principal, publicId, 'conversations.read');
-      const conversation = await this.row(tx, found.control.id);
+      const conversation = await this.row(tx, found.control.id, principal);
       const answering = found.control.brandId
         ? await this.agents.answering(tx, found.control.brandId)
         : { answering: false as const };
@@ -236,6 +280,7 @@ export class InboxService {
     const can = (permission: Parameters<InboxAccess['can']>[1]) =>
       this.access.can(principal, permission, found.resource);
     const presence = await this.signals.presence(principal.tenantId, found.control.id);
+    const customerTyping = await this.typing.customerTyping(principal.tenantId, found.control.id);
     return {
       ...conversation,
       permissions: {
@@ -250,6 +295,7 @@ export class InboxService {
       },
       presence: InboxSignals.view(presence, principal.staffMemberId),
       aiAvailable,
+      customerTyping,
     };
   }
 
@@ -386,6 +432,7 @@ export class InboxService {
         tx,
         rows.map((r) => r.control.id),
       );
+      const unread = await this.unreadFor(tx, principal, rows);
       // Only accounts where the caller can see conversations: searching elsewhere would create a
       // Chatwoot user for them in accounts their grants do not reach.
       const connections = await tx
@@ -395,7 +442,9 @@ export class InboxService {
         .leftJoin(st, eq(st.conversationId, c.id))
         .where(InboxAccess.condition(scope));
       return {
-        conversations: rows.map((row) => toInboxConversation(row, last.get(row.control.id))),
+        conversations: rows.map((row) =>
+          toInboxConversation(row, last.get(row.control.id), unread.get(row.control.id) ?? 0),
+        ),
         connections: connections.map((row) => row.id),
       };
     });

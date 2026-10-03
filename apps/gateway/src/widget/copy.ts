@@ -62,6 +62,14 @@ const AWAY_UNKNOWN: Record<Locale, string> = {
   ur: 'ہماری ٹیم ابھی موجود نہیں ہے۔ آپ کے پیغامات یہاں محفوظ ہیں، اور کوئی شخص انہیں پڑھے گا۔',
 };
 
+/** "A person is here": said only when someone who can answer is online now; translations await native review. */
+const PERSON_ONLINE: Record<Locale, string> = {
+  en: 'A person from our team is online and will join this chat shortly.',
+  ar: 'أحد أفراد فريقنا متصل الآن وسينضم إلى هذه المحادثة قريبًا.',
+  hi: 'हमारी टीम का एक व्यक्ति ऑनलाइन है और जल्द ही इस चैट में जुड़ेगा।',
+  ur: 'ہماری ٹیم کا ایک فرد آن لائن ہے اور جلد اس چیٹ میں شامل ہوگا۔',
+};
+
 const localeOf = (locale: string | null | undefined): Locale =>
   (['en', 'ar', 'hi', 'ur'] as const).find((l) => l === locale) ?? 'en';
 
@@ -245,11 +253,15 @@ export function handoffOutcome(
   brand: typeof schema.brands.$inferSelect | undefined,
   locale: string | null | undefined,
   now: Date,
+  /** Someone who can answer is online right now (staff availability); false when unknown. */
+  staffOnline = false,
 ): Pick<HandoffResponse, 'availability' | 'message' | 'followUp'> {
   const lang = localeOf(locale);
   const hours = brand?.businessHours;
   if (!hours || isOpen(hours, now)) {
-    return { availability: 'queued', message: COPY[lang].offlineMessage, followUp: null };
+    return staffOnline
+      ? { availability: 'person_available', message: PERSON_ONLINE[lang], followUp: null }
+      : { availability: 'queued', message: COPY[lang].offlineMessage, followUp: null };
   }
   const back = nextOpening(hours, now);
   if (!back) {

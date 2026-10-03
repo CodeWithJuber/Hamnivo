@@ -45,11 +45,15 @@ import { SsoRuntime } from './identity/sso/sso-runtime.js';
 import { StaffGuard } from './identity/staff.guard.js';
 import { TenantsService } from './identity/tenants.service.js';
 import { InboxAccess } from './inbox/access.js';
+import { InboxAlertsController } from './inbox/alerts.controller.js';
+import { InboxAlertsService } from './inbox/alerts.service.js';
 import { AnnotationsService } from './inbox/annotations.service.js';
 import { AssignmentService } from './inbox/assignment.service.js';
 import { AssistService } from './inbox/assist.service.js';
+import { AvailabilityService } from './inbox/availability.service.js';
 import { BulkService } from './inbox/bulk.service.js';
 import { CollaborationService } from './inbox/collaboration.service.js';
+import { CustomerTypingService } from './inbox/customer-typing.service.js';
 import { DraftsService } from './inbox/drafts.service.js';
 import { InboxController, TeamsController } from './inbox/inbox.controller.js';
 import { InboxService } from './inbox/inbox.service.js';
@@ -58,6 +62,7 @@ import { InboxMessagesService } from './inbox/messages.service.js';
 import { InboxSignals } from './inbox/signals.service.js';
 import { StatusService } from './inbox/status.service.js';
 import { TeamsService } from './inbox/teams.service.js';
+import { TypingSignals } from './inbox/typing.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { KnowledgeController } from './knowledge/knowledge.controller.js';
 import { KnowledgeService } from './knowledge/knowledge.service.js';
@@ -104,6 +109,7 @@ import {
   widgetSurfaceApiProviders,
 } from './widget/surface.module.js';
 import { WidgetTokens } from './widget/tokens.service.js';
+import { WidgetTypingController } from './widget/typing.controller.js';
 import { WidgetController } from './widget/widget.controller.js';
 import { WidgetGuard } from './widget/widget.guard.js';
 
@@ -148,7 +154,9 @@ export class ApiModule {
         WidgetMemoryController,
         AdminMemoryController,
         InboxController,
+        InboxAlertsController,
         TeamsController,
+        WidgetTypingController,
         SsoController,
         SupportController,
         PlatformController,
@@ -197,6 +205,10 @@ export class ApiModule {
         StaffLinksService,
         InboxAccess,
         InboxSignals,
+        TypingSignals,
+        AvailabilityService,
+        InboxAlertsService,
+        CustomerTypingService,
         DraftsService,
         StaffConversationsService,
         InboxService,

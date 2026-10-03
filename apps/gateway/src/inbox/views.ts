@@ -146,6 +146,8 @@ const REASONS = new Set<string>(OwnerReasons.options);
 export function toInboxConversation(
   row: InboxRow,
   last: LastMessage | undefined,
+  /** Customer messages the caller has not read (0 for chats that are not theirs to handle). */
+  unreadCount = 0,
 ): InboxConversation {
   const control = row.control;
   const view = customerView(control.ownerMode, control.authorityStatus);
@@ -198,6 +200,7 @@ export function toInboxConversation(
     waitingSince: waiting
       ? (control.ownerChangedAt ?? control.lastCustomerMessageAt ?? control.createdAt).toISOString()
       : null,
+    unreadCount,
     lastActivityAt: control.lastActivityAt.toISOString(),
     createdAt: control.createdAt.toISOString(),
   };
