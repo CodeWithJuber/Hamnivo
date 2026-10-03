@@ -411,9 +411,33 @@
     "note": "Framework-free SDK: sessions with single-flight renewal, typed conversation calls, exactly-once send outbox and resumable streams (unit-tested with msw, used by the widget)."
   },
   "D03": {
-    "status": "in-progress",
-    "evidence": ["apps/widget/src/components/Chat.tsx", "apps/widget/src/useChat.ts"],
-    "note": "The widget maps SDK state into assistant-ui's external-store runtime; a published React package (@hamnivo/react) is pending."
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "packages/react/src/chat.ts",
+      "packages/react/src/embed.ts",
+      "packages/react/src/use-hamnivo.ts",
+      "packages/react/src/client.ts",
+      "packages/react/test/chat.test.ts",
+      "packages/react/test/client.test.ts",
+      "docs/guide/integrations/react-vue-next.md",
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/useChat.ts"
+    ],
+    "note": "@hamnivo/react: a component that puts the chat on a React or Next.js page (marked use client; hidden when it unmounts; verifies the signed-in customer and signs the chat out with them), useHamnivo for the chat window, and hooks on @hamnivo/client for a custom chat (useHamnivoClient, useOutbox, useConversationStream). Tested in a real React against stand-ins for the loader and the API, and its Next.js snippets are type-checked. Not yet published to npm (a tag and the NPM_TOKEN secret do that), and not tried in a real app. The widget itself maps SDK state into assistant-ui's external-store runtime."
+  },
+  "D04": {
+    "status": "partial",
+    "evidence": [
+      "packages/vue/src/chat.ts",
+      "packages/vue/src/plugin.ts",
+      "packages/vue/src/use-hamnivo.ts",
+      "packages/vue/test/chat.test.ts",
+      "packages/vue/test/use-hamnivo.test.ts",
+      "packages/react/src/chat.ts",
+      ".github/workflows/release-packages.yml",
+      "docs/guide/integrations/react-vue-next.md"
+    ],
+    "note": "@hamnivo/vue (plugin, component and composable for Vue 3 and Nuxt) and @hamnivo/react load the same loader and share one tested file for loading it; a tag-only workflow publishes either to npm. Tested in a real Vue against a stand-in for the loader; not yet published. They wrap the loader, not the headless client, and there is no Angular wrapper."
   },
   "U04": {
     "status": "in-progress",
@@ -780,9 +804,23 @@
     "note": "Each brand shows a copyable install snippet, and its allowed websites can be changed (tested); an event test comes later."
   },
   "D05": {
-    "status": "in-progress",
-    "evidence": ["examples/wordpress/hamnivo-chat.php", "examples/wordpress/README.md"],
-    "note": "A WordPress plugin adds the chat loader and signs assertions for signed-in WordPress users. It passes php -l but is not yet tested against a real WordPress installation."
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "integrations/wordpress/hamnivo-chat/hamnivo-chat.php",
+      "integrations/wordpress/tests/plugin.test.mjs",
+      "integrations/wordpress/tests/woocommerce.test.mjs",
+      "integrations/whmcs/modules/addons/hamnivo/hamnivo.php",
+      "integrations/whmcs/modules/addons/hamnivo/tests/suite.php",
+      "integrations/shopify/extensions/hamnivo-chat/blocks/hamnivo-chat.liquid",
+      "examples/shopify/test/app-embed.test.ts",
+      "integrations/gtm/template.tpl",
+      "examples/gtm/test/template-behavior.test.ts",
+      "integrations/php-sdk/src/functions.php",
+      "integrations/php-sdk/tests/IdentityFixturesTest.php",
+      "scripts/build-integrations.sh",
+      "docs/guide/integrations/README.md"
+    ],
+    "note": "One-click installs for four platforms, with a guide for each: a WordPress plugin (settings page, Test connection, verified customers for WordPress users and WooCommerce customers; tested in a real WordPress and WooCommerce on PHP 7.4 to 8.5), a WHMCS addon (loader, verified clients, optional product names; tested with stand-ins for WHMCS on PHP 7.4 to 8.5), a Shopify app embed (rendered with LiquidJS, and Shopify's Theme Check finds no offenses), and a Google Tag Manager template (run in a stand-in for its sandbox). All sign with a PHP SDK that matches @hamnivo/server byte for byte against its fixtures. pnpm build:integrations writes the zips and the template. Nothing is tried in a real WHMCS, Shopify store or Tag Manager yet, and the Shopify app and the Gallery listing need the owner's Partner and Google accounts."
   },
   "L01": {
     "status": "implemented",

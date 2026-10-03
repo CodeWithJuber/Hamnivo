@@ -586,11 +586,8 @@ const webhooks = {
 // Characters that are invisible or look like spaces are written as escapes, so that a reader of the
 // fixtures can see them. The JSON means the same.
 const INVISIBLE = /[\u2028\u2029\u00a0\u3000\ufeff]/g;
-const text = (value: unknown) =>
-  JSON.stringify(value, null, 2).replace(
-    INVISIBLE,
-    (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'),
-  ) + '\n';
+const escaped = (c: string) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`;
+const text = (value: unknown) => `${JSON.stringify(value, null, 2).replace(INVISIBLE, escaped)}\n`;
 
 if (check) {
   const problems: string[] = [];
