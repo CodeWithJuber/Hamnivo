@@ -1,0 +1,43 @@
+.hamnivo-chat-status {
+  font-weight: 600;
+}
+
+.hamnivo-chat-status--on::before {
+  content: "\2713\00a0";
+  color: #00a32a;
+}
+
+.hamnivo-chat-status--off::before {
+  content: "\2022\00a0";
+  color: #dba617;
+}
+
+.hamnivo-chat-test-results {
+  margin: 0.5em 0 1em;
+  max-width: 50em;
+}
+
+.hamnivo-chat-test-results li {
+  margin: 0 0 0.5em;
+  padding: 0.5em 0.75em;
+  border-inline-start: 4px solid #787c82;
+  background: #fff;
+}
+
+.hamnivo-chat-test-results .hamnivo-chat-ok {
+  border-inline-start-color: #00a32a;
+}
+
+.hamnivo-chat-test-results .hamnivo-chat-problem {
+  border-inline-start-color: #d63638;
+}
+
+.hamnivo-chat-help {
+  margin: 1em 0 2em;
+  max-width: 50em;
+}
+
+.hamnivo-chat-help summary {
+  cursor: pointer;
+  font-weight: 600;
+}

@@ -1,0 +1,357 @@
+# Copyright (C) 2026 Juber Shaikh
+# This file is distributed under the MIT license.
+msgid ""
+msgstr ""
+"Project-Id-Version: Hamnivo Chat 0.2.0\n"
+"Report-Msgid-Bugs-To: https://github.com/CodeWithJuber/Hamnivo/issues\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"X-Generator: integrations/wordpress/tools/make-pot.php\n"
+"X-Domain: hamnivo-chat\n"
+
+#: includes/class-admin.php:40
+#: includes/class-admin.php:41
+msgid "Hamnivo Chat"
+msgstr ""
+
+#: includes/class-admin.php:75
+msgid "Settings"
+msgstr ""
+
+#: includes/class-admin.php:91
+msgid "Hamnivo Chat is installed, but it is not set up yet, so the chat is not on your site."
+msgstr ""
+
+#: includes/class-admin.php:93
+msgid "Set it up now"
+msgstr ""
+
+#: includes/class-admin.php:116
+msgid "Testing…"
+msgstr ""
+
+#: includes/class-admin.php:117
+msgid "Everything works. Save your changes to keep these settings."
+msgstr ""
+
+#: includes/class-admin.php:118
+msgid "Something needs a look. See below."
+msgstr ""
+
+#: includes/class-admin.php:119
+msgid "The test could not run. Reload this page and try again."
+msgstr ""
+
+#: includes/class-admin.php:120
+msgid "Works"
+msgstr ""
+
+#: includes/class-admin.php:121
+msgid "Problem"
+msgstr ""
+
+#: includes/class-admin.php:136
+msgid "You are not allowed to do this."
+msgstr ""
+
+#: includes/class-admin.php:158
+msgid "The chat is on. It appears on every public page of this site."
+msgstr ""
+
+#: includes/class-admin.php:160
+msgid "The chat is off. Enter the widget ID and the chat address to turn it on."
+msgstr ""
+
+#: includes/class-admin.php:166
+msgid "Connect your chat"
+msgstr ""
+
+#: includes/class-admin.php:168
+msgid "You find these in Hamnivo Studio, under Settings, Brands and install. Choose your brand, and under \"Install the chat\" click \"Copy install code\"."
+msgstr ""
+
+#: includes/class-admin.php:169
+#: includes/class-admin.php:211
+msgid "How to find these"
+msgstr ""
+
+#: includes/class-admin.php:169
+#: includes/class-admin.php:232
+msgid "(opens in a new tab)"
+msgstr ""
+
+#: includes/class-admin.php:174
+msgid "Install code"
+msgstr ""
+
+#: includes/class-admin.php:177
+msgid "Optional. Paste the install code here, and the three values below are read from it when you test or save. You can also type them yourself."
+msgstr ""
+
+#: includes/class-admin.php:181
+#: includes/class-connection-test.php:63
+#: includes/class-connection-test.php:67
+msgid "Widget ID"
+msgstr ""
+
+#: includes/class-admin.php:184
+msgid "The brand's widget ID. It starts with wid_. It is not a secret."
+msgstr ""
+
+#: includes/class-admin.php:188
+#: includes/class-connection-test.php:77
+msgid "Chat address"
+msgstr ""
+
+#: includes/class-admin.php:191
+msgid "Where Hamnivo Chat runs. Your visitors' browsers load the chat from here."
+msgstr ""
+
+#: includes/class-admin.php:195
+msgid "API address"
+msgstr ""
+
+#: includes/class-admin.php:198
+msgid "The Hamnivo API of the same installation."
+msgstr ""
+
+#: includes/class-admin.php:204
+msgid "Test connection"
+msgstr ""
+
+#: includes/class-admin.php:208
+msgid "The test asks the chat address and the API the way a visitor's browser does. It only reads. Nothing is created in Hamnivo."
+msgstr ""
+
+#: includes/class-admin.php:213
+msgid "Sign in to Hamnivo Studio, the dashboard where your team answers customers."
+msgstr ""
+
+#: includes/class-admin.php:214
+msgid "Open Settings, then Brands and install, and choose your brand."
+msgstr ""
+
+#: includes/class-admin.php:215
+msgid "Under \"Install the chat\", click \"Copy install code\". Paste it into the Install code box above."
+msgstr ""
+
+#: includes/class-admin.php:216
+msgid "Still in Hamnivo Studio, add the address of this website to the brand's allowed websites. The chat opens only on those websites."
+msgstr ""
+
+#. translators: %s: this website's address, such as https://shop.example.com
+#: includes/class-admin.php:221
+#, php-format
+msgid "The address of this website is %s."
+msgstr ""
+
+#: includes/class-admin.php:229
+#: includes/class-connection-test.php:192
+msgid "Verified customers"
+msgstr ""
+
+#: includes/class-admin.php:231
+msgid "Optional. When a customer is signed in to this site, the chat can show them their own conversations on any device. This works for WordPress users and for WooCommerce customers. This site vouches for each customer with a short-lived signature, made on this server with a key you register in Hamnivo."
+msgstr ""
+
+#: includes/class-admin.php:232
+msgid "How it works"
+msgstr ""
+
+#: includes/class-admin.php:236
+msgid "A key is saved. Leave this empty to keep it."
+msgstr ""
+
+#: includes/class-admin.php:244
+msgid "Verify signed-in customers"
+msgstr ""
+
+#: includes/class-admin.php:248
+msgid "Tell the chat who is signed in"
+msgstr ""
+
+#: includes/class-admin.php:253
+msgid "Key ID"
+msgstr ""
+
+#: includes/class-admin.php:256
+msgid "The ID of the identity key you registered in Hamnivo."
+msgstr ""
+
+#: includes/class-admin.php:260
+msgid "Key"
+msgstr ""
+
+#: includes/class-admin.php:263
+msgid "The key comes from HAMNIVO_CHAT_IDENTITY_SECRET in wp-config.php."
+msgstr ""
+
+#: includes/class-admin.php:266
+msgid "Paste the secret that Hamnivo showed you once when you registered an HS256 key, exactly as shown. It is never shown here again."
+msgstr ""
+
+#: includes/class-admin.php:268
+msgid "Remove the saved key"
+msgstr ""
+
+#: includes/class-admin.php:271
+msgid "To keep the key out of the database, define HAMNIVO_CHAT_IDENTITY_SECRET in wp-config.php instead."
+msgstr ""
+
+#: includes/class-admin.php:275
+msgid "Email addresses"
+msgstr ""
+
+#: includes/class-admin.php:279
+msgid "This site confirms email addresses before people can sign in"
+msgstr ""
+
+#: includes/class-admin.php:281
+msgid "Turn this on only if it is true. Hamnivo then keeps each customer's email address, so your team can see it. When it is off, the chat gets the name only."
+msgstr ""
+
+#: includes/class-connection-test.php:64
+msgid "Enter the widget ID. It is wid_ followed by 26 lowercase letters and digits."
+msgstr ""
+
+#: includes/class-connection-test.php:67
+msgid "The widget ID has the right shape."
+msgstr ""
+
+#: includes/class-connection-test.php:79
+msgid "Enter the chat address, for example https://chat.example.com."
+msgstr ""
+
+#: includes/class-connection-test.php:82
+msgid "The chat address starts with http://, but this site uses https://. Browsers block the chat then. Use the https:// address."
+msgstr ""
+
+#. translators: %s: the reason, in English, such as "cURL error 6: Could not resolve host".
+#: includes/class-connection-test.php:90
+#, php-format
+msgid "This site could not reach the chat address. %s"
+msgstr ""
+
+#. translators: %d: an HTTP status such as 404
+#: includes/class-connection-test.php:101
+#, php-format
+msgid "The chat address answered with status %d instead of the loader. Check the address."
+msgstr ""
+
+#: includes/class-connection-test.php:107
+msgid "The address answered, but what it sent is not the Hamnivo loader. Check the address."
+msgstr ""
+
+#: includes/class-connection-test.php:109
+msgid "The chat address serves the loader."
+msgstr ""
+
+#: includes/class-connection-test.php:122
+msgid "API address and allowed website"
+msgstr ""
+
+#: includes/class-connection-test.php:124
+msgid "No API address is set, so the chat uses its own default. Nothing to check here."
+msgstr ""
+
+#: includes/class-connection-test.php:127
+msgid "Enter a valid widget ID first."
+msgstr ""
+
+#: includes/class-connection-test.php:130
+msgid "The API address starts with http://, but this site uses https://. Browsers block it then. Use the https:// address."
+msgstr ""
+
+#. translators: %s: the reason, in English, such as "cURL error 6: Could not resolve host".
+#: includes/class-connection-test.php:145
+#, php-format
+msgid "This site could not reach the API address. %s"
+msgstr ""
+
+#. translators: %s: this website's address, such as https://shop.example.com
+#: includes/class-connection-test.php:158
+#, php-format
+msgid "Hamnivo knows this widget ID and allows %s to use it."
+msgstr ""
+
+#. translators: %s: this website's address, such as https://shop.example.com
+#: includes/class-connection-test.php:168
+#, php-format
+msgid "Hamnivo knows this widget ID, but %s is not in the brand's allowed websites. In Hamnivo Studio, open the brand and add this address to its allowed websites. The chat opens only there."
+msgstr ""
+
+#: includes/class-connection-test.php:174
+msgid "Hamnivo does not know this widget ID, or the brand is not active. Check the widget ID, and that the API address belongs to the same Hamnivo as the chat address."
+msgstr ""
+
+#. translators: %d: an HTTP status such as 500
+#: includes/class-connection-test.php:180
+#, php-format
+msgid "The API answered with status %d. Check the API address."
+msgstr ""
+
+#: includes/class-connection-test.php:195
+msgid "Verified customers are on, but the key ID or the key is empty."
+msgstr ""
+
+#: includes/class-connection-test.php:201
+msgid "The key works. Signed-in customers will be verified."
+msgstr ""
+
+#: includes/class-connection-test.php:237
+msgid "This site could not find that address. Check it for typing mistakes."
+msgstr ""
+
+#: includes/class-connection-test.php:242
+msgid "WordPress does not let a site call an address on a private network or on an unusual port. Your visitors' browsers can still reach it."
+msgstr ""
+
+#. translators: %s: the PHP version of this site, such as 7.4.33
+#: includes/class-identity.php:56
+#, php-format
+msgid "Verified customers need PHP 8.1 or newer, and this site runs PHP %s. The chat itself works. Ask your host to move the site to a newer PHP."
+msgstr ""
+
+#: includes/class-identity.php:61
+msgid "The SDK that signs identities is missing from this copy of the plugin. Install the plugin again from the zip file."
+msgstr ""
+
+#: includes/class-identity.php:128
+msgid "The key looks like JSON, but it is not a private key that Hamnivo accepts (ES256, EdDSA or RS256). Paste the HS256 secret, or the private key as Hamnivo Studio or @hamnivo/server made it."
+msgstr ""
+
+#: includes/class-identity.php:202
+msgid "The chat could not verify you right now."
+msgstr ""
+
+#: includes/class-identity.php:258
+msgid "Sign in first."
+msgstr ""
+
+#: includes/class-settings.php:108
+msgid "The widget ID is wid_ followed by 26 lowercase letters and digits. Copy it again from Hamnivo Studio."
+msgstr ""
+
+#: includes/class-settings.php:113
+msgid "The chat address starts with https:// (or http:// for local testing). It is where Hamnivo Chat runs, for example https://chat.example.com."
+msgstr ""
+
+#: includes/class-settings.php:120
+msgid "The API address starts with https:// (or http:// for local testing), for example https://api.example.com."
+msgstr ""
+
+#: includes/class-settings.php:132
+msgid "The key ID has 1 to 64 letters, digits, dots, underscores or dashes. Copy it again from Hamnivo Studio."
+msgstr ""
+
+#: hamnivo-chat.php
+msgctxt "Plugin Name of the plugin"
+msgid "Hamnivo Chat"
+msgstr ""
+
+#: hamnivo-chat.php
+msgctxt "Description of the plugin"
+msgid "Adds Hamnivo Chat to your site, and shows signed-in customers their own conversations. Works with WooCommerce."
+msgstr ""
