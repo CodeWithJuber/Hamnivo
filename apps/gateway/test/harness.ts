@@ -37,6 +37,10 @@ export function testEnv(
     RATE_LIMIT_PER_MINUTE: '100000',
     // Each test run keeps its cache entries apart on the shared Valkey.
     CACHE_KEY_PREFIX: `hv:test:${process.pid}:${randomBytes(4).toString('hex')}:`,
+    // New workspaces get no plan and brands are connected by hand, unless a test says otherwise
+    // (the SaaS tests do).
+    HAMNIVO_DEFAULT_PLAN: 'unlimited',
+    CHATWOOT_AUTO_PROVISION: 'false',
     ...extra,
   };
 }

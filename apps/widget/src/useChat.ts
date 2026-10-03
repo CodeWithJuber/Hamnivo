@@ -116,6 +116,13 @@ const EMPTY: ChatState = {
 const PAGE = 50;
 const messageOf = (error: unknown) => String((error as Error)?.message ?? error);
 
+/** The error a suspended workspace's chat starts with: it shows offline until the workspace is back. */
+export const CHAT_OFFLINE = 'workspace_suspended';
+const startErrorOf = (error: unknown) =>
+  (error as { problem?: { reason?: unknown } })?.problem?.reason === CHAT_OFFLINE
+    ? CHAT_OFFLINE
+    : messageOf(error);
+
 /**
  * The visitor's side of one conversation: session, history, live stream and the send outbox.
  * Confirmed messages come only from the server (history or stream); unsent ones from the outbox.
@@ -324,7 +331,7 @@ export function useChat(client: HamnivoClient) {
       const session = await client.connect();
       if (!cancelled) await begin(session);
     }).catch((error) => {
-      if (!cancelled) setState((s) => ({ ...s, phase: 'error', error: messageOf(error) }));
+      if (!cancelled) setState((s) => ({ ...s, phase: 'error', error: startErrorOf(error) }));
     });
     const offline = () => setState((s) => ({ ...s, connection: 'offline' }));
     const online = () =>
@@ -347,7 +354,7 @@ export function useChat(client: HamnivoClient) {
     try {
       await begin(await client.connect());
     } catch (error) {
-      setState({ ...EMPTY, phase: 'error', error: messageOf(error) });
+      setState({ ...EMPTY, phase: 'error', error: startErrorOf(error) });
     }
   }, [begin, client]);
 

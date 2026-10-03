@@ -31,7 +31,8 @@ export type NavPath =
   | '/team'
   | '/security'
   | '/developer'
-  | '/migration';
+  | '/migration'
+  | '/settings/billing';
 
 export type NavGroupId = 'home' | 'inbox' | 'ai' | 'sales' | 'reports' | 'settings';
 
@@ -85,6 +86,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/security', anyOf: ['security.manage', 'support.grant'] },
       { to: '/developer', anyOf: ['api_keys.read', 'webhooks.read', 'network.manage'] },
       { to: '/migration', permission: 'migration.review' },
+      { to: '/settings/billing', anyOf: ['billing.read', 'settings.manage'] },
     ],
   },
 ];

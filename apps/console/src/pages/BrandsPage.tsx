@@ -22,6 +22,7 @@ import { ConnectionBadge } from '../components/Badges';
 import { CopyButton } from '../components/CopyButton';
 import { SelectField, TextareaField, TextField } from '../components/Fields';
 import { PageHeader } from '../components/PageHeader';
+import { ProvisioningProgress } from '../components/ProvisioningProgress';
 import { ActionError, QueryState } from '../components/States';
 import { api, newIdempotencyKey } from '../lib/api';
 import { GATEWAY_ORIGIN, WIDGET_ORIGIN } from '../lib/config';
@@ -347,6 +348,7 @@ function ChatConnection({
   return (
     <div className="flex flex-col items-start gap-3" data-testid="chat-connection">
       <ConnectionBadge status="none" />
+      <ProvisioningProgress brandId={brand.id} />
       <ReasonedAction reason={can('integrations.manage') ? null : t('brands.chat.noPermission')}>
         <Button variant="secondary" onClick={() => setOpen(true)}>
           <PlugZapIcon aria-hidden="true" />

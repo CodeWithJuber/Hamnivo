@@ -50,7 +50,14 @@ export async function createApiApp(
     origin: [config.PUBLIC_CONSOLE_ORIGIN],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['content-type', 'x-hamnivo-tenant', 'idempotency-key', 'x-request-id'],
+    allowedHeaders: [
+      'content-type',
+      'x-hamnivo-tenant',
+      'idempotency-key',
+      'x-request-id',
+      // The Cloudflare Turnstile token of a sign-up.
+      'x-captcha-response',
+    ],
     exposedHeaders: ['x-request-id', 'idempotent-replayed', 'retry-after'],
   };
   const widgetCors = {

@@ -81,6 +81,8 @@ import { SupportSessionsService } from './operations/support-sessions.service.js
 import { HealthController } from './platform/health.controller.js';
 import type { Mailer } from './platform/mailer.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
+import { SAAS_API_CONTROLLERS, SAAS_API_PROVIDERS } from './platform/saas.module.js';
+import { SignupPolicy } from './platform/signup.js';
 import { AgentsController } from './runtime/agents.controller.js';
 import { AgentsService } from './runtime/agents.service.js';
 import { KillSwitchesController } from './runtime/kill-switches.controller.js';
@@ -156,13 +158,19 @@ export class ApiModule {
         ...DEVELOPER_API_CONTROLLERS,
         ...WIDGET_SURFACE_API_CONTROLLERS,
         ...ACTIONS_API_CONTROLLERS,
+        ...SAAS_API_CONTROLLERS,
       ],
       providers: [
         {
           provide: AUTH,
-          inject: [CONFIG, APP_DB, MAILER, SsoRuntime],
-          useFactory: (cfg: AppConfig, db: Db, mailer: Mailer, sso: SsoRuntime) =>
-            createAuth(cfg, db, mailer, sso),
+          inject: [CONFIG, APP_DB, MAILER, SsoRuntime, SignupPolicy],
+          useFactory: (
+            cfg: AppConfig,
+            db: Db,
+            mailer: Mailer,
+            sso: SsoRuntime,
+            signup: SignupPolicy,
+          ) => createAuth(cfg, db, mailer, sso, signup),
         },
         {
           provide: DNS_RESOLVER,
@@ -238,6 +246,7 @@ export class ApiModule {
         ...developerApiProviders(overrides),
         ...widgetSurfaceApiProviders(config, overrides.scanner),
         ...ACTIONS_API_PROVIDERS,
+        ...SAAS_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

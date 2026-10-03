@@ -219,6 +219,34 @@ const EnvSchema = z.object({
   ANALYTICS_MIN_GROUP_SIZE: z.coerce.number().int().min(2).max(50).default(5),
   /** Days between issuing a platform invoice and its due date. */
   BILLING_INVOICE_DUE_DAYS: z.coerce.number().int().min(1).max(90).default(14),
+
+  /**
+   * SaaS. Anyone may create an account and a workspace; the platform console can override it.
+   * When off, only people with an invitation may sign up (the first account of a server always).
+   */
+  HAMNIVO_PUBLIC_SIGNUP: bool.default(true),
+  /** The plan every new workspace starts on, or `unlimited` for no plan (self-hosting). */
+  HAMNIVO_DEFAULT_PLAN: z
+    .string()
+    .regex(/^[a-z][a-z0-9-]{1,39}$/)
+    .default('free'),
+  /** Cloudflare Turnstile on sign-up; off unless both keys are set. */
+  TURNSTILE_SITE_KEY: z.string().min(1).optional(),
+  TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+  /** Another Turnstile verification URL: tests only, refused in production. */
+  TURNSTILE_VERIFY_URL: z.url().optional(),
+  /** Who bills workspaces: nobody (`free`), Stripe Billing or WHMCS. */
+  BILLING_PROVIDER: z.enum(['free', 'stripe', 'whmcs']).default('free'),
+  STRIPE_SECRET_KEY: z.string().min(8).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(8).optional(),
+  /** Another Stripe API origin (stripe-mock, a fake server): tests only, refused in production. */
+  STRIPE_API_BASE: z.url().optional(),
+  /** Days a workspace keeps its paid plan after a failed payment, then falls back to free. */
+  BILLING_GRACE_DAYS: z.coerce.number().int().min(0).max(60).default(7),
+  /** The WHMCS client area, where Studio's Manage button sends WHMCS customers. */
+  WHMCS_CLIENT_AREA_URL: z.url().optional(),
+  /** Sets up a brand's Chatwoot account by itself (first brand of a workspace). */
+  CHATWOOT_AUTO_PROVISION: bool.default(true),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema> & {
@@ -244,6 +272,24 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (parsed.data.NODE_ENV === 'production' && parsed.data.TOOLS_EGRESS_ALLOW_PRIVATE) {
     throw new Error('Invalid configuration:\n  TOOLS_EGRESS_ALLOW_PRIVATE is for tests only');
+  }
+  for (const key of ['STRIPE_API_BASE', 'TURNSTILE_VERIFY_URL'] as const) {
+    if (parsed.data.NODE_ENV === 'production' && parsed.data[key]) {
+      throw new Error(`Invalid configuration:\n  ${key} is for tests only`);
+    }
+  }
+  if (Boolean(parsed.data.TURNSTILE_SITE_KEY) !== Boolean(parsed.data.TURNSTILE_SECRET_KEY)) {
+    throw new Error(
+      'Invalid configuration:\n  set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY, or neither',
+    );
+  }
+  if (
+    parsed.data.BILLING_PROVIDER === 'stripe' &&
+    (!parsed.data.STRIPE_SECRET_KEY || !parsed.data.STRIPE_WEBHOOK_SECRET)
+  ) {
+    throw new Error(
+      'Invalid configuration:\n  BILLING_PROVIDER=stripe needs STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET',
+    );
   }
   const retired = new Map<number, Buffer>();
   for (const pair of parsed.data.HAMNIVO_KEK_RETIRED.split(',').filter(Boolean)) {

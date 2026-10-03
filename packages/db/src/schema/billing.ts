@@ -65,12 +65,20 @@ export const plans = pgTable(
     status: text('status', { enum: ['active', 'retired'] })
       .notNull()
       .default('active'),
+    /** Days a workspace may try the plan before it falls back to the free plan; 0: no trial. */
+    trialDays: integer('trial_days').notNull().default(0),
+    /** The Stripe price a subscription to this plan uses (`price_…`); null: not sold on Stripe. */
+    stripePriceId: text('stripe_price_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     uniqueIndex('plans_key_key').on(t.key),
+    uniqueIndex('plans_stripe_price_key')
+      .on(t.stripePriceId)
+      .where(sql`${t.stripePriceId} is not null`),
     check('plans_price_ck', sql`${t.priceMinor} >= 0`),
+    check('plans_trial_ck', sql`${t.trialDays} between 0 and 365`),
     platformManage(),
   ],
 );
@@ -150,6 +158,8 @@ export const tenantEntitlements = pgTable(
     metered: jsonb('metered').$type<MeteredPriceJson[]>().notNull().default([]),
     assignedAt: tstz('assigned_at'),
     assignedBy: text('assigned_by'),
+    /** While set, the plan is a trial that falls back to the free plan at this time. */
+    trialEndsAt: tstz('trial_ends_at'),
     /** The tenant's own ceiling on AI tokens per period (A08); null: none. */
     aiTokenBudget: bigint('ai_token_budget', { mode: 'number' }),
     alertThresholds: integer('alert_thresholds')

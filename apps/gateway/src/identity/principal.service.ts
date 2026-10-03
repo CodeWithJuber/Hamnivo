@@ -6,6 +6,7 @@ import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import { APP_DB, AUTH } from '../tokens.js';
 import type { Auth, AuthSession } from './auth.factory.js';
+import { markSuspended, readOnlyGrants } from './tenants.readonly.js';
 
 export function scopeFromRow(type: string, id: string | null): Scope {
   if (type === 'tenant' || !id) return { type: 'tenant' };
@@ -31,7 +32,9 @@ export class PrincipalService {
   async principal(session: AuthSession, tenantId: string): Promise<StaffPrincipal | null> {
     const memberships = await resolveStaffMemberships(this.db, session.user.id);
     const membership = memberships.find((m) => m.tenantId === tenantId);
-    if (membership?.tenantStatus !== 'active') return null;
+    // A suspended workspace stays readable (tenants.readonly.ts); a closing one is gone.
+    const readOnly = membership?.tenantStatus === 'suspended';
+    if (!membership || (membership.tenantStatus !== 'active' && !readOnly)) return null;
 
     const rows = await withTenant(
       this.db,
@@ -88,14 +91,15 @@ export class PrincipalService {
       expiresAt: row.expiresAt,
       revokedAt: row.revokedAt,
     }));
-    return {
+    const principal: StaffPrincipal = {
       kind: 'staff',
       tenantId,
       staffMemberId: membership.staffMemberId,
       status: membership.staffStatus as StaffPrincipal['status'],
       mfa: Boolean((session.user as { twoFactorEnabled?: boolean | null }).twoFactorEnabled),
       authenticatedAt: new Date(session.session.createdAt),
-      grants,
+      grants: readOnly ? readOnlyGrants(grants) : grants,
     };
+    return readOnly ? markSuspended(principal) : principal;
   }
 }

@@ -39,7 +39,8 @@
 	encode zstd gzip
 	root * /srv/studio
 	header {
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		# {$HAMNIVO_CAPTCHA_ORIGIN}: Cloudflare Turnstile on sign-up, only when its keys are set.
+		Content-Security-Policy "default-src 'self'; script-src 'self' {$HAMNIVO_CAPTCHA_ORIGIN}; frame-src 'self' {$HAMNIVO_CAPTCHA_ORIGIN}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 		X-Frame-Options DENY
 	}
 	@assets path /assets/*

@@ -35,6 +35,7 @@ import { adminMemoryRoutes, widgetMemoryRoutes } from './memory-routes.js';
 import { migrationRoutes } from './migration-routes.js';
 import { AttachmentPart } from './parts.js';
 import { platformRoutes } from './platform-routes.js';
+import { saasRoutes } from './saas.js';
 import { securityRoutes } from './security-routes.js';
 import {
   StaffConversation,
@@ -62,7 +63,9 @@ export type RouteAuth =
   /** A staff session (with X-Hamnivo-Tenant) or an API key (its own tenant). */
   | 'staff_or_api_key'
   | 'integration_signature'
-  | 'provider_signature';
+  | 'provider_signature'
+  /** An operator API key (hvop_…) of a billing system such as WHMCS. */
+  | 'operator_key';
 
 export interface RouteDef {
   method: HttpMethod;
@@ -418,4 +421,5 @@ export const allRoutes: Record<string, RouteDef> = {
   ...toolAdminRoutes,
   ...actionInboxRoutes,
   ...actionWidgetRoutes,
+  ...saasRoutes,
 };

@@ -127,6 +127,14 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/gateway/**"],
+      "linter": {
+        "domains": {
+          "react": "none"
+        }
+      }
     }
   ]
 }

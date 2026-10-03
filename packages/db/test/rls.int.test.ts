@@ -47,6 +47,10 @@ const GLOBAL_TABLES: Record<string, string> = {
     'Plans are defined by the platform operator for every workspace; a workspace keeps a copy of its plan’s limits in tenant_entitlements',
   invoices:
     'Invoices are the platform operator’s billing records; a workspace reads its own through app.tenant_invoices() and cannot change them',
+  platform_settings:
+    'Settings for the whole server, such as whether anyone may sign up; changed in the platform console',
+  operator_api_keys:
+    'Keys a billing system such as WHMCS uses to call the operator API; they act on the platform, not inside one workspace',
 };
 
 /** Tables the application role may only insert into. */
@@ -62,6 +66,7 @@ const APPEND_ONLY = new Set([
   'customer_notifications',
   'action_approvals',
   'handoff_packets',
+  'billing_events',
 ]);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
@@ -86,6 +91,7 @@ const NEVER_DELETED = new Set([
   'tool_definitions',
   'mcp_servers',
   'action_settings',
+  'billing_accounts',
 ]);
 
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
@@ -325,6 +331,10 @@ describe('two-tenant isolation', () => {
     'handoff_packets',
     'simulation_suites',
     'simulation_runs',
+    'billing_accounts',
+    'billing_events',
+    'chatwoot_provisioning',
+    'workspace_email_settings',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -500,6 +510,10 @@ describe('two-tenant isolation', () => {
       'handoff_packets',
       'simulation_suites',
       'simulation_runs',
+      'billing_accounts',
+      'billing_events',
+      'chatwoot_provisioning',
+      'workspace_email_settings',
       'audit_heads',
       'audit_events',
     ]);

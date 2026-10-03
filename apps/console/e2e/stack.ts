@@ -280,6 +280,9 @@ try {
     CHATWOOT_WEBHOOK_BASE_URL: origin(ports.api),
     STREAM_HEARTBEAT_SECONDS: '5',
     RATE_LIMIT_PER_MINUTE: '100000',
+    // Workspaces without plan limits, and brands connected by hand, as these journeys expect.
+    HAMNIVO_DEFAULT_PLAN: 'unlimited',
+    CHATWOOT_AUTO_PROVISION: 'false',
     EMBEDDING_PROVIDER: 'mock',
     SSO_TRUSTED_IDP_ORIGINS: idp.issuer,
     SSO_DNS_SERVERS: `127.0.0.1:${ports.dns}`,

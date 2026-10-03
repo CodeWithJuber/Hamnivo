@@ -109,6 +109,7 @@ describe('the row of pages above a page', () => {
       '/security',
       '/developer',
       '/migration',
+      '/settings/billing',
     ]);
     expect(current(settings)).toEqual(['/security']);
   });

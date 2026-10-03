@@ -9,8 +9,10 @@ import { useTranslation } from 'react-i18next';
 import { AuthLayout } from '../components/AuthLayout';
 import { TextField } from '../components/Fields';
 import { EMAIL, PasswordInput } from '../components/SignIn';
+import { Turnstile } from '../components/Turnstile';
 import { authClient } from '../lib/auth-client';
 import { reauth } from '../lib/reauth';
+import { useSignupSettings } from '../lib/saas';
 
 /** "Check your email", after signing up or asking for a password reset. */
 export function CheckEmail({
@@ -83,6 +85,11 @@ export function SignUpPage() {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [verify, setVerify] = useState<string | null>(null);
+  // Cloudflare Turnstile, when the server turned it on: a token per attempt.
+  const signup = useSignupSettings();
+  const siteKey = signup.data?.turnstileSiteKey ?? null;
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const callbackURL = `${window.location.origin}/tenants`;
 
   const submit = async (event: FormEvent) => {
@@ -96,6 +103,12 @@ export function SignUpPage() {
     else if (password.length > 256) next.password = t('auth.signUp.passwordLong');
     setErrors(next);
     if (Object.keys(next).length > 0) return;
+    if (siteKey && !captcha) {
+      const text = t('billing.signup.captchaMissing');
+      setFailure(text);
+      announce(text, 'assertive');
+      return;
+    }
     setBusy(true);
     setFailure(null);
     try {
@@ -104,11 +117,26 @@ export function SignUpPage() {
         email: email.trim(),
         password,
         callbackURL,
+        ...(captcha ? { fetchOptions: { headers: { 'x-captcha-response': captcha } } } : {}),
       });
       if (error) {
-        const text = error.status === 429 ? t('auth.rateLimited') : t('auth.signUp.failed');
+        const text =
+          error.status === 429
+            ? t('auth.rateLimited')
+            : error.code === 'SIGNUP_CLOSED'
+              ? t('billing.signup.closedError')
+              : error.code === 'MISSING_RESPONSE'
+                ? t('billing.signup.captchaMissing')
+                : error.code === 'VERIFICATION_FAILED'
+                  ? t('billing.signup.captchaFailed')
+                  : t('auth.signUp.failed');
         setFailure(text);
         announce(text, 'assertive');
+        // A Turnstile token works once: the next attempt needs a new check.
+        if (siteKey) {
+          setCaptcha(null);
+          setAttempt((n) => n + 1);
+        }
         return;
       }
       setPassword('');
@@ -147,6 +175,14 @@ export function SignUpPage() {
     <AuthLayout title={t('auth.signUp.title')} description={t('auth.signUp.description')}>
       <form className="flex flex-col gap-5" onSubmit={submit} noValidate>
         <FormErrorSummary title={t('auth.errorSummary')} errors={summary} />
+        {signup.data?.open === false ? (
+          <p
+            className="rounded-lg border border-info/30 bg-info-subtle p-3 text-sm text-text"
+            data-testid="signup-closed"
+          >
+            {t('billing.signup.closed')}
+          </p>
+        ) : null}
         {failure ? (
           <p role="alert" className="text-sm text-danger">
             {failure}
@@ -179,6 +215,7 @@ export function SignUpPage() {
           hint={t('auth.signUp.passwordHint')}
           error={errors.password}
         />
+        {siteKey ? <Turnstile key={attempt} siteKey={siteKey} onToken={setCaptcha} /> : null}
         <Button type="submit" busy={busy} className="w-full">
           {t('auth.signUp.submit')}
         </Button>

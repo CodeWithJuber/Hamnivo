@@ -73,6 +73,16 @@ x-gateway: &gateway
     WEBHOOK_CONCURRENCY: ${WEBHOOK_CONCURRENCY:-8}
     ANALYTICS_MIN_GROUP_SIZE: ${ANALYTICS_MIN_GROUP_SIZE:-5}
     BILLING_INVOICE_DUE_DAYS: ${BILLING_INVOICE_DUE_DAYS:-14}
+    HAMNIVO_PUBLIC_SIGNUP: ${HAMNIVO_PUBLIC_SIGNUP:-true}
+    HAMNIVO_DEFAULT_PLAN: ${HAMNIVO_DEFAULT_PLAN:-free}
+    TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+    TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+    BILLING_PROVIDER: ${BILLING_PROVIDER:-free}
+    STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+    STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    BILLING_GRACE_DAYS: ${BILLING_GRACE_DAYS:-7}
+    WHMCS_CLIENT_AREA_URL: ${WHMCS_CLIENT_AREA_URL:-}
+    CHATWOOT_AUTO_PROVISION: ${CHATWOOT_AUTO_PROVISION:-true}
   depends_on: &gateway-deps
     migrate:
       condition: service_completed_successfully
@@ -233,6 +243,8 @@ services:
       HAMNIVO_SUPPORT_HOST: ${HAMNIVO_SUPPORT_HOST:?run hamnivo.sh setup}
       HAMNIVO_SITE_HOSTS: ${HAMNIVO_SITE_HOSTS:?run hamnivo.sh setup}
       HAMNIVO_API_ORIGIN: ${HAMNIVO_API_ORIGIN:?run hamnivo.sh setup}
+      # Studio may load Cloudflare Turnstile's check on sign-up when its site key is set.
+      HAMNIVO_CAPTCHA_ORIGIN: ${TURNSTILE_SITE_KEY:+https://challenges.cloudflare.com}
       # "webhook" turns on the route to deploy-hook (hamnivo.sh autodeploy enable).
       HAMNIVO_AUTODEPLOY: ${HAMNIVO_AUTODEPLOY:-off}
       # Proxies whose visitor addresses are believed: Cloudflare's ranges when HAMNIVO_CLOUDFLARE
