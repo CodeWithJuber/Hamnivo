@@ -106,6 +106,7 @@ describe('database roles', () => {
         'app.lapsed_billing(timestamp with time zone,integer)',
         'app.purge_expired(integer)',
         'app.purge_migration_files(integer)',
+        'app.purge_visitors(integer)',
         'app.purge_webhook_events(integer,integer)',
         'app.purge_widget_uploads(integer)',
         'app.resolve_api_key(text)',

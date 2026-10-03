@@ -45,19 +45,25 @@ import { SsoRuntime } from './identity/sso/sso-runtime.js';
 import { StaffGuard } from './identity/staff.guard.js';
 import { TenantsService } from './identity/tenants.service.js';
 import { InboxAccess } from './inbox/access.js';
+import { InboxAlertsController } from './inbox/alerts.controller.js';
+import { InboxAlertsService } from './inbox/alerts.service.js';
 import { AnnotationsService } from './inbox/annotations.service.js';
 import { AssignmentService } from './inbox/assignment.service.js';
 import { AssistService } from './inbox/assist.service.js';
+import { AvailabilityService } from './inbox/availability.service.js';
 import { BulkService } from './inbox/bulk.service.js';
 import { CollaborationService } from './inbox/collaboration.service.js';
+import { CustomerTypingService } from './inbox/customer-typing.service.js';
 import { DraftsService } from './inbox/drafts.service.js';
 import { InboxController, TeamsController } from './inbox/inbox.controller.js';
 import { InboxService } from './inbox/inbox.service.js';
+import { LIBRARY_API_CONTROLLERS, LIBRARY_API_PROVIDERS } from './inbox/library.module.js';
 import { InboxLiveService } from './inbox/live.service.js';
 import { InboxMessagesService } from './inbox/messages.service.js';
 import { InboxSignals } from './inbox/signals.service.js';
 import { StatusService } from './inbox/status.service.js';
 import { TeamsService } from './inbox/teams.service.js';
+import { TypingSignals } from './inbox/typing.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { KnowledgeController } from './knowledge/knowledge.controller.js';
 import { KnowledgeService } from './knowledge/knowledge.service.js';
@@ -98,6 +104,7 @@ import { SETUP_API_CONTROLLERS, SETUP_API_PROVIDERS } from './setup/setup.module
 import { SupportController } from './support/support.controller.js';
 import { SupportService } from './support/support.service.js';
 import { APP_DB, AUTH, CONFIG, MAILER } from './tokens.js';
+import { VISITORS_API_CONTROLLERS, VISITORS_API_PROVIDERS } from './visitors/visitors.module.js';
 import { AuthorityContactsService } from './widget/contacts.service.js';
 import { WidgetConversationsService } from './widget/conversations.service.js';
 import { WidgetEventsService } from './widget/events.service.js';
@@ -107,6 +114,7 @@ import {
   widgetSurfaceApiProviders,
 } from './widget/surface.module.js';
 import { WidgetTokens } from './widget/tokens.service.js';
+import { WidgetTypingController } from './widget/typing.controller.js';
 import { WidgetController } from './widget/widget.controller.js';
 import { WidgetGuard } from './widget/widget.guard.js';
 
@@ -151,7 +159,9 @@ export class ApiModule {
         WidgetMemoryController,
         AdminMemoryController,
         InboxController,
+        InboxAlertsController,
         TeamsController,
+        WidgetTypingController,
         SsoController,
         SupportController,
         PlatformController,
@@ -159,6 +169,8 @@ export class ApiModule {
         ...DEVELOPER_API_CONTROLLERS,
         ...WIDGET_SURFACE_API_CONTROLLERS,
         ...SETUP_API_CONTROLLERS,
+        ...VISITORS_API_CONTROLLERS,
+        ...LIBRARY_API_CONTROLLERS,
         ...ACTIONS_API_CONTROLLERS,
         ...SAAS_API_CONTROLLERS,
       ],
@@ -207,6 +219,10 @@ export class ApiModule {
         StaffLinksService,
         InboxAccess,
         InboxSignals,
+        TypingSignals,
+        AvailabilityService,
+        InboxAlertsService,
+        CustomerTypingService,
         DraftsService,
         StaffConversationsService,
         InboxService,
@@ -248,6 +264,8 @@ export class ApiModule {
         ...developerApiProviders(overrides),
         ...widgetSurfaceApiProviders(config, overrides.scanner),
         ...SETUP_API_PROVIDERS,
+        ...VISITORS_API_PROVIDERS,
+        ...LIBRARY_API_PROVIDERS,
         ...ACTIONS_API_PROVIDERS,
         ...SAAS_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },

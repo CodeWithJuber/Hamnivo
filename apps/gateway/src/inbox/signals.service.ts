@@ -19,7 +19,14 @@ export interface PresenceRecord {
 export interface InboxSignal {
   /** Conversation UUID. */
   conversationId: string;
-  kind: 'change' | 'presence';
+  /**
+   * `change`: the conversation changed; `presence`: who is here changed; `typing`: the customer
+   * started or stopped typing; `read`: one staff member read the conversation (only their own
+   * streams act on it).
+   */
+  kind: 'change' | 'presence' | 'typing' | 'read';
+  /** For `read`: the staff member who read it (UUID). */
+  staffMemberId?: string;
 }
 
 /** A viewer who has not sent a heartbeat for this long is gone. */
@@ -46,12 +53,20 @@ export class InboxSignals implements OnApplicationShutdown {
   ) {}
 
   /** Announces changes after the transaction that made them committed. Never throws. */
-  async changed(tenantId: string, conversationIds: string[], kind: InboxSignal['kind'] = 'change') {
+  async changed(
+    tenantId: string,
+    conversationIds: string[],
+    kind: InboxSignal['kind'] = 'change',
+    staffMemberId?: string,
+  ) {
     if (conversationIds.length === 0) return;
     try {
       const pipeline = this.redis.pipeline();
       for (const id of new Set(conversationIds)) {
-        pipeline.publish(channelOf(tenantId), JSON.stringify({ c: id, k: kind }));
+        pipeline.publish(
+          channelOf(tenantId),
+          JSON.stringify({ c: id, k: kind, ...(staffMemberId ? { s: staffMemberId } : {}) }),
+        );
       }
       await pipeline.exec();
     } catch (error) {
@@ -65,7 +80,7 @@ export class InboxSignals implements OnApplicationShutdown {
     if (!this.subscriber) {
       this.subscriber = this.redis.duplicate();
       this.subscriber.on('message', (name: string, message: string) => {
-        let parsed: { c?: unknown; k?: unknown };
+        let parsed: { c?: unknown; k?: unknown; s?: unknown };
         try {
           parsed = JSON.parse(message);
         } catch {
@@ -74,7 +89,11 @@ export class InboxSignals implements OnApplicationShutdown {
         if (typeof parsed.c !== 'string') return;
         const signal: InboxSignal = {
           conversationId: parsed.c,
-          kind: parsed.k === 'presence' ? 'presence' : 'change',
+          kind:
+            parsed.k === 'presence' || parsed.k === 'typing' || parsed.k === 'read'
+              ? parsed.k
+              : 'change',
+          ...(typeof parsed.s === 'string' ? { staffMemberId: parsed.s } : {}),
         };
         for (const fn of this.listeners.get(name) ?? []) fn(signal);
       });

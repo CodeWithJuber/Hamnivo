@@ -42,6 +42,7 @@
     "@scalar/fastify-api-reference": "1.72.1",
     "ai": "7.0.116",
     "better-auth": "1.7.6",
+    "bowser": "2.14.1",
     "bullmq": "6.3.9",
     "canonicalize": "5.1.0",
     "drizzle-orm": "0.45.3",

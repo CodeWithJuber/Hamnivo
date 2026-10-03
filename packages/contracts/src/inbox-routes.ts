@@ -80,7 +80,8 @@ export const inboxRoutes = {
     method: 'get',
     path: '/v1/inbox/events',
     operationId: 'streamInboxEvents',
-    summary: 'Server-Sent Events: which conversations changed and who is viewing or typing',
+    summary:
+      'Server-Sent Events: which conversations changed, who is viewing or typing, whether the customer is typing, and alerts (a chat is waiting, a customer wrote, a chat was assigned to you)',
     tags: tag,
     auth: 'staff_session',
     success: {

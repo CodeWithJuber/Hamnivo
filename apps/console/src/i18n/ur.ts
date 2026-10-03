@@ -1259,7 +1259,7 @@ export const ur: Translation = {
       remove: 'ٹیگ {{name}} ہٹائیں',
       added: 'ٹیگ {{name}} شامل کیا گیا۔',
       removed: 'ٹیگ {{name}} ہٹایا گیا۔',
-      noneDefined: 'اس برانڈ کے لیے ابھی کوئی ٹیگ نہیں بنے۔ ایڈمن انہیں Chatwoot میں شامل کرتا ہے۔',
+      noneDefined: 'اس برانڈ کے لیے ابھی کوئی ٹیگ نہیں بنے۔',
     },
     fields: {
       title: 'حسبِ ضرورت فیلڈز',

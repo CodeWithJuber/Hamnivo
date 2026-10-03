@@ -1,17 +1,27 @@
-import { schema, toPublicId } from '@hamnivo/db';
-import type { StaffPrincipal } from '@hamnivo/policy';
+import { schema, type TenantTx, toPublicId } from '@hamnivo/db';
+import type { ResourceScope, StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { uuidV5 } from '../authority/uuid.js';
 import type { AppConfig } from '../config.js';
 import type { AuthSession } from '../identity/auth.factory.js';
 import { PrincipalService } from '../identity/principal.service.js';
 import { CLOCK, type Clock, CONFIG } from '../tokens.js';
-import { InboxAccess } from './access.js';
+import { InboxAccess, resourceOf } from './access.js';
+import type { AlertChat } from './alerts.js';
+import { InboxAlertsService } from './alerts.service.js';
 import { type InboxSignal, InboxSignals } from './signals.service.js';
+import { TypingSignals } from './typing.service.js';
 
 /** Signals are gathered this long before visibility is checked and a batch is sent. */
 const BATCH_MS = 250;
+/**
+ * Alerts look this far back before the previous batch, so a message saved just before the last
+ * look is not missed to a difference between the clocks of the servers; a stream sends each alert
+ * once, so the overlap never repeats one.
+ */
+const ALERT_OVERLAP_MS = 5000;
 
 /**
  * Live staff views (H08): presence ("who else is here, who is typing") and a Server-Sent Events
@@ -26,6 +36,8 @@ export class InboxLiveService {
   constructor(
     private readonly access: InboxAccess,
     private readonly signals: InboxSignals,
+    private readonly typing: TypingSignals,
+    private readonly alerts: InboxAlertsService,
     private readonly principals: PrincipalService,
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -55,35 +67,74 @@ export class InboxLiveService {
     const found = await this.access.tx(principal, (tx) =>
       this.access.authorized(tx, principal, publicId, 'conversations.read'),
     );
+    const name = await this.nameOf(principal);
+    const before = (await this.signals.presence(principal.tenantId, found.control.id)).find(
+      (record) => record.staffMemberId === principal.staffMemberId,
+    );
     const changed = await this.signals.setPresence(
       principal.tenantId,
       found.control.id,
-      { staffMemberId: principal.staffMemberId, displayName: await this.nameOf(principal) },
+      { staffMemberId: principal.staffMemberId, displayName: name },
       input.state,
       input.lane ?? null,
     );
     if (changed) await this.signals.changed(principal.tenantId, [found.control.id], 'presence');
+    // The customer hears that a person is writing a reply, never that one is writing a note.
+    const writingReply = input.state === 'typing' && input.lane === 'public';
+    const wasWritingReply = before?.state === 'typing' && before.lane === 'public';
+    if (
+      (writingReply || wasWritingReply) &&
+      this.access.can(principal, 'conversations.reply', found.resource)
+    ) {
+      await this.typing.publishStaffTyping(principal.tenantId, found.control.id, {
+        participantId: toPublicId(
+          'participant',
+          uuidV5(found.control.id, `typing:${principal.staffMemberId}`),
+        ),
+        displayName: name,
+        typing: writingReply,
+      });
+    }
     const records = await this.signals.presence(principal.tenantId, found.control.id);
     return { viewers: InboxSignals.view(records, principal.staffMemberId) };
   }
 
-  /** Which of these conversations (UUIDs) the principal may read. */
-  private async visible(principal: StaffPrincipal, ids: string[]): Promise<string[]> {
+  /** The conversations (UUIDs) among `ids` that the principal may read, as alerts see them. */
+  private async visibleChats(
+    principal: StaffPrincipal,
+    tx: TenantTx,
+    ids: string[],
+  ): Promise<(AlertChat & { resource: ResourceScope })[]> {
     const scope = this.access.scope(principal);
     if (!scope || ids.length === 0) return [];
     const c = schema.conversationControls;
-    const rows = await this.access.tx(principal, (tx) =>
-      tx
-        .select({ id: c.id })
-        .from(c)
-        .leftJoin(schema.brands, eq(schema.brands.id, c.brandId))
-        .leftJoin(
-          schema.conversationInboxState,
-          eq(schema.conversationInboxState.conversationId, c.id),
-        )
-        .where(and(inArray(c.id, ids), InboxAccess.condition(scope))),
-    );
-    return rows.map((r) => r.id);
+    const rows = await tx
+      .select({
+        id: c.id,
+        authorityStatus: c.authorityStatus,
+        ownerMode: c.ownerMode,
+        ownerStaffId: c.ownerStaffId,
+        ownerReason: c.ownerReason,
+        ownerChangedAt: c.ownerChangedAt,
+        createdAt: c.createdAt,
+        customerName: schema.customerPrincipals.displayName,
+        brandId: c.brandId,
+        inboxId: c.inboxId,
+        workspaceId: schema.brands.workspaceId,
+        teamId: schema.conversationInboxState.teamId,
+      })
+      .from(c)
+      .leftJoin(schema.brands, eq(schema.brands.id, c.brandId))
+      .leftJoin(
+        schema.conversationInboxState,
+        eq(schema.conversationInboxState.conversationId, c.id),
+      )
+      .leftJoin(schema.customerPrincipals, eq(schema.customerPrincipals.id, c.principalId))
+      .where(and(inArray(c.id, ids), InboxAccess.condition(scope)));
+    return rows.map(({ brandId, inboxId, workspaceId, teamId, ...chat }) => ({
+      ...chat,
+      resource: resourceOf({ brandId, inboxId }, workspaceId, teamId),
+    }));
   }
 
   async stream(
@@ -115,21 +166,64 @@ export class InboxLiveService {
 
     const changed = new Set<string>();
     const presence = new Set<string>();
+    const typed = new Set<string>();
+    /** Alerts already sent on this stream, so one never repeats. */
+    const alerted = new Map<string, number>();
+    const opened = this.clock().getTime();
+    /** Alerts cover what happened after this; the first look starts when the stream opened. */
+    let since = opened;
     let timer: NodeJS.Timeout | undefined;
     const flush = async () => {
       timer = undefined;
       const ids = [...changed];
       const who = [...presence];
+      const typing = [...typed];
       changed.clear();
       presence.clear();
+      typed.clear();
+      const lookedAt = this.clock().getTime();
       try {
-        const allowed = new Set(await this.visible(principal, [...new Set([...ids, ...who])]));
+        const wanted = [...new Set([...ids, ...who, ...typing])];
+        const { chats, decision } = await this.access.tx(principal, async (tx) => {
+          const chats = await this.visibleChats(principal, tx, wanted);
+          const known = new Set(ids);
+          // Alerts are for people who can answer the chat, not for everyone who may read it.
+          const decision = await this.alerts.derive(
+            principal,
+            tx,
+            chats.filter(
+              (chat) =>
+                known.has(chat.id) &&
+                this.access.can(principal, 'conversations.reply', chat.resource),
+            ),
+            new Date(since),
+            new Set(alerted.keys()),
+          );
+          return { chats, decision };
+        });
+        since = lookedAt - ALERT_OVERLAP_MS;
+        for (const key of decision.looked) alerted.set(key, lookedAt);
+        const allowed = new Set(chats.map((chat) => chat.id));
         const visibleChanges = ids.filter((id) => allowed.has(id));
         if (visibleChanges.length) {
           write('inbox.changed', {
             type: 'inbox.changed',
             conversationIds: visibleChanges.map((id) => toPublicId('conversation', id)),
           });
+        }
+        for (const alert of decision.alerts) {
+          alerted.set(alert.key, lookedAt);
+          write('alert', {
+            type: 'alert',
+            kind: alert.kind,
+            conversationId: toPublicId('conversation', alert.conversationId),
+            customerName: alert.customerName,
+            preview: alert.preview,
+            at: alert.at.toISOString(),
+          });
+        }
+        for (const [key, at] of alerted) {
+          if (lookedAt - at > 10 * 60_000) alerted.delete(key);
         }
         for (const id of who.filter((w) => allowed.has(w))) {
           const records = await this.signals.presence(principal.tenantId, id);
@@ -139,12 +233,25 @@ export class InboxLiveService {
             viewers: InboxSignals.view(records, principal.staffMemberId),
           });
         }
+        for (const id of typing.filter((t) => allowed.has(t))) {
+          write('customer_typing', {
+            type: 'customer_typing',
+            conversationId: toPublicId('conversation', id),
+            typing: await this.typing.customerTyping(principal.tenantId, id),
+          });
+        }
       } catch (error) {
         this.logger.warn(`inbox stream flush failed: ${String(error)}`);
       }
     };
     const onSignal = (signal: InboxSignal) => {
-      (signal.kind === 'presence' ? presence : changed).add(signal.conversationId);
+      if (signal.kind === 'read') {
+        // Reading is one person's: only their own streams (other tabs) update.
+        if (signal.staffMemberId !== principal.staffMemberId) return;
+        changed.add(signal.conversationId);
+      } else if (signal.kind === 'presence') presence.add(signal.conversationId);
+      else if (signal.kind === 'typing') typed.add(signal.conversationId);
+      else changed.add(signal.conversationId);
       timer ??= setTimeout(() => void flush(), BATCH_MS);
     };
 

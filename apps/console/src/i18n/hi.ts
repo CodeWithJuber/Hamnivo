@@ -1239,7 +1239,7 @@ export const hi: Translation = {
       remove: 'टैग {{name}} हटाएँ',
       added: 'टैग {{name}} जोड़ा गया।',
       removed: 'टैग {{name}} हटाया गया।',
-      noneDefined: 'इस ब्रांड के लिए अभी कोई टैग नहीं बने हैं। एडमिन इन्हें Chatwoot में जोड़ता है।',
+      noneDefined: 'इस ब्रांड के लिए अभी कोई टैग नहीं बने हैं।',
     },
     fields: {
       title: 'कस्टम फ़ील्ड',

@@ -25,6 +25,21 @@ export interface ContractTarget {
 
 const email = (kind: string) => `hv-${kind}-${randomUUID()}@hamnivo.invalid`;
 
+/** Reads until `done` is true (for what Chatwoot finishes in a background job), or gives up. */
+async function eventually<T>(
+  read: () => Promise<T>,
+  done: (value: T) => boolean,
+  timeoutMs = 20_000,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  let value = await read();
+  while (!done(value) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    value = await read();
+  }
+  return value;
+}
+
 /**
  * The ConversationAuthority contract, run against the fake Chatwoot on every test run and against
  * a real Chatwoot v4.18.0-ce when one is configured.
@@ -510,6 +525,74 @@ export function authorityContract(
         );
       });
 
+      it('renames, recolours and removes a tag; a rename follows the conversations', async () => {
+        const title = `rn-${randomUUID().slice(0, 8)}`;
+        const created = await authority.createLabel({
+          title,
+          description: 'Before',
+          color: '#112233',
+        });
+        expect(created).toMatchObject({ title, description: 'Before', color: '#112233' });
+        expect(created.ref).toMatch(/^\d+$/);
+        expect(await authority.listLabels(asStaff())).toContainEqual(
+          expect.objectContaining({ ref: created.ref, title }),
+        );
+        // The tag is on a conversation, so a rename has something to follow.
+        const ref = state.conversationRef;
+        const before = (await authority.getState(ref)).labels;
+        await authority.annotate(ref, { labels: [...before, title] }, asStaff());
+
+        const renamed = `${title}-2`;
+        const changed = await authority.updateLabel(created.ref, {
+          title: renamed.toUpperCase(),
+          description: null,
+          color: '#445566',
+        });
+        expect(changed).toMatchObject({
+          ref: created.ref,
+          title: renamed,
+          description: null,
+          color: '#445566',
+        });
+        const listed = await authority.listLabels(asStaff());
+        expect(listed.find((l) => l.ref === created.ref)).toMatchObject({
+          title: renamed,
+          description: null,
+          color: '#445566',
+        });
+        expect(listed.some((l) => l.title === title)).toBe(false);
+        // Chatwoot moves the tag on conversations in a background job: allow it a moment.
+        const moved = await eventually(
+          () => authority.getState(ref),
+          (conversation) => conversation.labels.includes(renamed),
+        );
+        expect(moved.labels).toContain(renamed);
+        expect(moved.labels).not.toContain(title);
+
+        // A name in use is refused, as a typed error that is not worth retrying.
+        const other = await authority.createLabel({ title: `${title}-other` });
+        const clash = await authority
+          .updateLabel(other.ref, { title: renamed })
+          .catch((error) => error);
+        expect(clash).toBeInstanceOf(ChatwootError);
+        expect(clash).toMatchObject({ status: 422, retryable: false });
+
+        // Deleting a tag also takes it off the conversations that carry it, in a background job.
+        await authority.deleteLabel(created.ref);
+        await authority.deleteLabel(other.ref);
+        const after = await authority.listLabels(asStaff());
+        expect(after.some((l) => l.ref === created.ref || l.ref === other.ref)).toBe(false);
+        const cleared = await eventually(
+          () => authority.getState(ref),
+          (conversation) => !conversation.labels.includes(renamed),
+        );
+        expect(cleared.labels).not.toContain(renamed);
+        expect(await authority.deleteLabel(created.ref).catch((error) => error)).toMatchObject({
+          status: 404,
+        });
+        await authority.annotate(ref, { labels: before }, asStaff());
+      });
+
       it('lists conversation fields and replaces all attribute values on write', async () => {
         const key = `order_${randomUUID().slice(0, 8).replace(/-/g, '')}`;
         await authority.createFieldDefinition({ key, name: 'Order', type: 'list', options: ['a'] });
@@ -542,6 +625,46 @@ export function authorityContract(
         expect(byCode.map((r) => r.ref)).toContain(created.ref);
         const byText = await authority.listSavedReplies('before dispatch', asStaff());
         expect(byText.map((r) => r.ref)).toContain(created.ref);
+      });
+
+      it('changes and removes a saved reply, and keeps short codes unique', async () => {
+        // Hamnivo changes the shared library as the integration user (an administrator).
+        const admin = { kind: 'integration' as const };
+        const code = `upd${randomUUID().slice(0, 6)}`;
+        const created = await authority.createSavedReply(
+          { shortCode: code, content: 'First text' },
+          admin,
+        );
+        const taken = await authority.createSavedReply(
+          { shortCode: `${code}b`, content: 'Another' },
+          admin,
+        );
+        expect(
+          await authority.updateSavedReply(created.ref, { content: 'Second text' }, admin),
+        ).toEqual({ ref: created.ref, shortCode: code, content: 'Second text' });
+        expect(
+          await authority.updateSavedReply(created.ref, { shortCode: `${code}c` }, admin),
+        ).toEqual({ ref: created.ref, shortCode: `${code}c`, content: 'Second text' });
+        // Staff see the change, as the composer does.
+        expect(await authority.listSavedReplies(`${code}c`, asStaff())).toContainEqual({
+          ref: created.ref,
+          shortCode: `${code}c`,
+          content: 'Second text',
+        });
+        const clash = await authority
+          .updateSavedReply(created.ref, { shortCode: `${code}b` }, admin)
+          .catch((error) => error);
+        expect(clash).toBeInstanceOf(ChatwootError);
+        expect(clash).toMatchObject({ status: 422, retryable: false });
+
+        await authority.deleteSavedReply(created.ref, admin);
+        await authority.deleteSavedReply(taken.ref, admin);
+        expect((await authority.listSavedReplies(code, asStaff())).map((r) => r.ref)).not.toContain(
+          created.ref,
+        );
+        expect(
+          await authority.deleteSavedReply(created.ref, admin).catch((error) => error),
+        ).toMatchObject({ status: 404 });
       });
 
       it('reads the contact without the secret contact-inbox id', async () => {

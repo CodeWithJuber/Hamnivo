@@ -76,6 +76,7 @@ export const ID_PREFIX = {
   mcpServer: 'mcp',
   simulation: 'sim',
   simulationRun: 'simr',
+  visitor: 'vis',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

@@ -62,6 +62,10 @@ export interface InboxSearch {
 
 export const inboxKeys = {
   all: ['inbox'] as const,
+  /** How many chats need this person, for the tab title. */
+  unread: ['inbox', 'unread'] as const,
+  /** This person's alert sounds and availability. */
+  preferences: ['inbox', 'preferences'] as const,
   lists: ['inbox', 'list'] as const,
   list: (search: InboxSearch) => ['inbox', 'list', search] as const,
   search: (q: string) => ['inbox', 'search', q] as const,
@@ -316,146 +320,6 @@ export function sendPresence(
     headers: { 'content-type': 'application/json', 'x-hamnivo-tenant': tenantId },
     body: JSON.stringify({ state, ...(lane ? { lane } : {}) }),
   }).catch(() => undefined);
-}
-
-// ------------------------------------------------------------------ live stream
-
-export type StreamState = 'connecting' | 'open' | 'reconnecting' | 'offline';
-
-interface ServerEvent {
-  event: string;
-  data: string;
-}
-
-/** Splits a Server-Sent Events body into events (comments and ids are not used here). */
-async function readEvents(
-  body: ReadableStream<Uint8Array>,
-  onEvent: (event: ServerEvent) => void,
-  onActivity: () => void,
-): Promise<void> {
-  const reader = body
-    .pipeThrough(new TextDecoderStream() as unknown as TransformStream<Uint8Array, string>)
-    .getReader();
-  let buffer = '';
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) return;
-    onActivity();
-    buffer += value;
-    const blocks = buffer.split(/\r?\n\r?\n/);
-    buffer = blocks.pop() ?? '';
-    for (const block of blocks) {
-      let event = 'message';
-      const data: string[] = [];
-      for (const line of block.split(/\r?\n/)) {
-        if (line.startsWith(':')) continue;
-        const at = line.indexOf(':');
-        const field = at < 0 ? line : line.slice(0, at);
-        const text = at < 0 ? '' : line.slice(at + 1).replace(/^ /, '');
-        if (field === 'event') event = text;
-        else if (field === 'data') data.push(text);
-      }
-      if (data.length > 0) onEvent({ event, data: data.join('\n') });
-    }
-  }
-}
-
-const backoff = (attempt: number) => Math.min(30_000, 1000 * 2 ** Math.min(attempt, 5));
-
-/**
- * Keeps the inbox current: the gateway's staff stream says which visible conversations changed
- * and who is viewing or typing; Studio reloads those through the API. While the stream is down,
- * views poll every 15 seconds, and a reconnect reloads everything once in case something was missed.
- */
-export function useInboxStream(enabled: boolean): StreamState {
-  const { tenantId } = useTenant();
-  const client = useQueryClient();
-  const [state, setState] = useState<StreamState>('connecting');
-
-  useEffect(() => {
-    if (!enabled) return;
-    let closed = false;
-    let controller: AbortController | undefined;
-    let idle: ReturnType<typeof setTimeout> | undefined;
-    let attempt = 0;
-    let connectedBefore = false;
-    const armIdle = () => {
-      if (idle) clearTimeout(idle);
-      // Heartbeats arrive well within a minute; silence means the connection is gone.
-      idle = setTimeout(() => controller?.abort(), 60_000);
-    };
-    const changed = (ids: string[]) => {
-      void client.invalidateQueries({ queryKey: [tenantId, ...inboxKeys.lists] });
-      for (const id of ids) {
-        void client.invalidateQueries({ queryKey: [tenantId, ...inboxKeys.conversation(id)] });
-      }
-    };
-    const onEvent = ({ event, data }: ServerEvent) => {
-      let payload: Record<string, unknown>;
-      try {
-        payload = JSON.parse(data) as Record<string, unknown>;
-      } catch {
-        return;
-      }
-      if (event === 'inbox.changed' && Array.isArray(payload.conversationIds)) {
-        changed(payload.conversationIds.filter((id): id is string => typeof id === 'string'));
-      } else if (event === 'presence' && typeof payload.conversationId === 'string') {
-        const viewers = Array.isArray(payload.viewers) ? (payload.viewers as PresenceEntry[]) : [];
-        client.setQueryData<InboxDetail>(
-          [tenantId, ...inboxKeys.conversation(payload.conversationId)],
-          (detail) => (detail ? { ...detail, presence: viewers } : detail),
-        );
-      } else if (event === 'control' && payload.control === 'auth_expired') {
-        // The session ended: asking for "me" again opens the sign-in dialog over the page.
-        void client.invalidateQueries({ queryKey: ['me', tenantId] });
-        controller?.abort();
-      }
-    };
-
-    const run = async () => {
-      while (!closed) {
-        controller = new AbortController();
-        try {
-          const response = await fetch(`${API_BASE}/v1/inbox/events`, {
-            headers: { accept: 'text/event-stream', 'x-hamnivo-tenant': tenantId },
-            credentials: 'include',
-            signal: controller.signal,
-          });
-          if (response.ok && response.body) {
-            attempt = 0;
-            setState('open');
-            setPolling(false);
-            if (connectedBefore) changed([]);
-            connectedBefore = true;
-            armIdle();
-            await readEvents(response.body, onEvent, armIdle);
-          } else if (response.status === 401) {
-            void client.invalidateQueries({ queryKey: ['me', tenantId] });
-          }
-        } catch {
-          // Reconnect below.
-        }
-        if (idle) clearTimeout(idle);
-        if (closed) return;
-        setState(navigator.onLine === false ? 'offline' : 'reconnecting');
-        setPolling(15_000);
-        await new Promise((resolve) => setTimeout(resolve, backoff(attempt)));
-        attempt += 1;
-      }
-    };
-    void run();
-    const online = () => controller?.abort();
-    window.addEventListener('online', online);
-    return () => {
-      closed = true;
-      window.removeEventListener('online', online);
-      if (idle) clearTimeout(idle);
-      controller?.abort();
-      setPolling(false);
-    };
-  }, [enabled, tenantId, client]);
-
-  return state;
 }
 
 /** Whether the browser says it is offline (drafts then stay in this browser until it is back). */

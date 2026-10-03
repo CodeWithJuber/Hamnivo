@@ -47,6 +47,7 @@ import { renderMarkdown } from '../markdown.js';
 import type { ChatState } from '../useChat.js';
 import type { DisplayControls } from '../useDisplay.js';
 import type { MemoryControls } from '../useMemory.js';
+import { useTypingReports } from '../useTyping.js';
 import { BidiText, directionOf } from './BidiText.js';
 import { BrandMark } from './BrandMark.js';
 import { Conversations } from './Conversations.js';
@@ -58,6 +59,8 @@ import { DeleteMessage, EMOJI_NAMES, Reactions } from './MessageActions.js';
 import { Contact, Files, fileSize, Place, Unknown } from './Parts.js';
 import { PrivacyLink } from './PrivacyLink.js';
 import { Settings } from './Settings.js';
+import { StaffTypingLine } from './StaffTyping.js';
+import { VisitorNotice } from './VisitorNotice.js';
 
 interface Source {
   id: string;
@@ -589,6 +592,8 @@ function Composer(props: {
   label: string;
   send: string;
   draftScope: string;
+  /** The conversation the words go to; null before there is one (nothing is reported then). */
+  conversationId: string | null;
   client: HamnivoClient;
   chips: readonly Chip[];
   attach: { allowed: boolean; accept: string; maxFiles: number; maxMb: number };
@@ -607,6 +612,12 @@ function Composer(props: {
   const ready = props.chips.some((c) => c.state === 'ready');
   const { drafts } = props.client;
   const scope = props.draftScope;
+  const { conversationId, client } = props;
+  // Staff see "typing…" while the visitor writes.
+  useTypingReports(
+    conversationId ? (typing) => client.reportTyping(conversationId, typing) : null,
+    text,
+  );
 
   // The draft comes back after a reload; typing keeps it for this person and conversation.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the scope changes
@@ -790,6 +801,10 @@ export function Chat(props: {
   display: DisplayControls;
   /** The proactive prompt the visitor opened the chat from (W19). */
   prompt: string | null;
+  /** The name of the person typing a reply ('' when unnamed), or null when nobody is. */
+  staffTyping: string | null;
+  /** Says the website notes which pages are viewed (from the gateway), or null. */
+  visitorNotice: string | null;
   onLocale: (locale: Locale) => void;
   onSend: (text: string, attachments?: readonly OutgoingAttachment[]) => Promise<void>;
   onRetry: (clientMessageId: string) => void;
@@ -1260,10 +1275,13 @@ export function Chat(props: {
               onChoose={props.language.choose}
               onDismiss={props.language.dismiss}
             />
+            <StaffTypingLine name={props.staffTyping} />
+            <VisitorNotice text={props.visitorNotice} />
             <Composer
               label={t('placeholder')}
               send={offline ? t('surface.offline.queue') : t('send')}
               draftScope={draftScope}
+              conversationId={conversation?.id ?? null}
               client={client}
               chips={chips}
               attach={{

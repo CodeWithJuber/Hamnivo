@@ -12,6 +12,11 @@ export interface StreamControlFrame {
 export interface StreamHandlers {
   /** A journal event (message.created, conversation.updated, …) in sequence order. */
   onEvent(event: Record<string, unknown> & { sequence: number; type: string }): void;
+  /**
+   * A live-only event, such as a person typing a reply. It has no sequence: it is never replayed,
+   * never moves the cursor and is not checked for duplicates.
+   */
+  onTransient?(event: Record<string, unknown> & { type: string }): void;
   /** History must be reloaded (the cursor is older than the retained journal). */
   onResync?(): void;
   onStatus?(status: StreamStatus): void;
@@ -129,13 +134,19 @@ export class EventStream {
       return undefined;
     }
     const event = JSON.parse(message.data) as Record<string, unknown> & {
-      sequence: number;
+      sequence: number | null;
       type: string;
     };
+    // Without a sequence (typing) the event is only for now: the cursor must not move, or a
+    // reconnect would ask for the whole conversation again.
+    if (event.sequence === null || event.sequence === undefined) {
+      this.handlers.onTransient?.(event);
+      return undefined;
+    }
     const sequence = Number(event.sequence);
     if (this.cursor !== undefined && sequence <= this.cursor) return undefined;
     this.cursor = sequence;
-    this.handlers.onEvent(event);
+    this.handlers.onEvent({ ...event, sequence });
     return undefined;
   }
 

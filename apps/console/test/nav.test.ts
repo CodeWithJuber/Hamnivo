@@ -99,7 +99,7 @@ describe('the menu', () => {
     });
   });
 
-  it('gives every Studio page a place, except the three that live elsewhere', () => {
+  it('gives every Studio page a place, except the ones that live elsewhere', () => {
     const folder = fileURLToPath(new URL('../src/routes/_studio', import.meta.url));
     const pages = new Set(
       readdirSync(folder, { withFileTypes: true }).map(
@@ -107,8 +107,10 @@ describe('the menu', () => {
       ),
     );
     // Stop AI is a button in the header; Account security is in the account menu; the guided
-    // setup is opened from Home and after a workspace is created.
-    const elsewhere = ['/stop-ai', '/account', '/onboarding'];
+    // setup is opened from Home and after a workspace is created; Live visitors and Saved replies
+    // and tags are buttons above the list of chats in the inbox (a row of tabs for them would push
+    // the inbox down).
+    const elsewhere = ['/stop-ai', '/account', '/onboarding', '/visitors', '/saved-replies'];
     const placed = NAV_GROUPS.flatMap((group) => group.routes.map((route) => route.to));
     expect([...pages].filter((page) => !elsewhere.includes(page)).sort()).toEqual(
       [...placed].sort(),

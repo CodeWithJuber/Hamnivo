@@ -12,6 +12,7 @@ import { isSignedOut } from '../lib/api';
 import { meInTenantQuery } from '../lib/queries';
 import { chooseTenant, TenantProvider } from '../lib/tenant';
 import type { TenantSummary } from '../lib/types';
+import { InboxAlerts } from './inbox/InboxAlerts';
 
 /** Membership or permissions were removed: clear this tenant's data from the tab (HNV-02-06). */
 function Revoked({ tenant }: { tenant: TenantSummary }) {
@@ -55,6 +56,7 @@ export function StudioLayout() {
   if (!me.data.current || membership?.status !== 'active') return <Revoked tenant={tenant} />;
   return (
     <TenantProvider me={me.data} tenant={membership.tenant}>
+      <InboxAlerts />
       <AppShell>
         <Outlet />
       </AppShell>

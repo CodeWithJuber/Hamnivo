@@ -28,6 +28,8 @@ import {
 import { decisionRoutes } from './decision-routes.js';
 import { apiKeyRoutes, networkRoutes, webhookRoutes } from './developer-routes.js';
 import { HamnivoEvent, StreamControl } from './events.js';
+import { inboxAlertRoutes } from './inbox-alert-routes.js';
+import { inboxLibraryRoutes } from './inbox-library-routes.js';
 import { inboxRoutes } from './inbox-routes.js';
 import { knowledgeRoutes } from './knowledge-routes.js';
 import { languageRoutes } from './language-routes.js';
@@ -45,6 +47,7 @@ import {
   TakeoverRequest,
 } from './staff-conversations.js';
 import { actionInboxRoutes, actionWidgetRoutes, toolAdminRoutes } from './tool-routes.js';
+import { visitorStaffRoutes, visitorWidgetRoutes } from './visitor-routes.js';
 import {
   CreateWidgetSessionRequest,
   IdentifyRequest,
@@ -412,6 +415,10 @@ export const allRoutes: Record<string, RouteDef> = {
   ...cacheRoutes,
   ...languageRoutes,
   ...inboxRoutes,
+  ...inboxAlertRoutes,
+  ...inboxLibraryRoutes,
+  ...visitorWidgetRoutes,
+  ...visitorStaffRoutes,
   ...securityRoutes,
   ...platformRoutes,
   ...commerceAdminRoutes,

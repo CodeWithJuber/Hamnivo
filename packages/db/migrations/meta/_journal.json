@@ -316,6 +316,20 @@
       "when": 1791046440977,
       "tag": "20261003165400_setup_security",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1791048779717,
+      "tag": "20261003173259_visitors",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1791048781352,
+      "tag": "20261003173301_visitors_security",
+      "breakpoints": true
     }
   ]
 }

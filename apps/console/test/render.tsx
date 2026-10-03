@@ -32,6 +32,8 @@ const PATHS = [
   '/overview',
   '/inbox',
   '/inbox/$conversationId',
+  '/visitors',
+  '/saved-replies',
   '/agents',
   '/agents/$agentId',
   '/knowledge',

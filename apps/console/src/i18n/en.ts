@@ -1245,7 +1245,7 @@ export const en = {
       remove: 'Remove tag {{name}}',
       added: 'Tag {{name}} added.',
       removed: 'Tag {{name}} removed.',
-      noneDefined: 'No tags are set up for this brand yet. An administrator adds them in Chatwoot.',
+      noneDefined: 'No tags are set up for this brand yet.',
     },
     fields: {
       title: 'Custom fields',

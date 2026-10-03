@@ -7,6 +7,10 @@ import { billingHi } from './billing/hi';
 import { billingUr } from './billing/ur';
 import { en } from './en';
 import { hi } from './hi';
+import { inboxAlertsAr } from './inbox-alerts/ar';
+import { inboxAlertsEn } from './inbox-alerts/en';
+import { inboxAlertsHi } from './inbox-alerts/hi';
+import { inboxAlertsUr } from './inbox-alerts/ur';
 import { migrationAr } from './migration/ar';
 import { migrationEn } from './migration/en';
 import { migrationHi } from './migration/hi';
@@ -25,6 +29,7 @@ declare module 'i18next' {
         migration: typeof migrationEn;
         billing: typeof billingEn;
         setup: typeof setupEn;
+        inboxAlerts: typeof inboxAlertsEn;
       };
     };
   }
@@ -69,10 +74,42 @@ export function initialLocale(): Locale {
 export async function initI18n(locale: Locale) {
   await i18next.use(initReactI18next).init({
     resources: {
-      en: { translation: { ...en, migration: migrationEn, billing: billingEn, setup: setupEn } },
-      ar: { translation: { ...ar, migration: migrationAr, billing: billingAr, setup: setupAr } },
-      hi: { translation: { ...hi, migration: migrationHi, billing: billingHi, setup: setupHi } },
-      ur: { translation: { ...ur, migration: migrationUr, billing: billingUr, setup: setupUr } },
+      en: {
+        translation: {
+          ...en,
+          migration: migrationEn,
+          billing: billingEn,
+          setup: setupEn,
+          inboxAlerts: inboxAlertsEn,
+        },
+      },
+      ar: {
+        translation: {
+          ...ar,
+          migration: migrationAr,
+          billing: billingAr,
+          setup: setupAr,
+          inboxAlerts: inboxAlertsAr,
+        },
+      },
+      hi: {
+        translation: {
+          ...hi,
+          migration: migrationHi,
+          billing: billingHi,
+          setup: setupHi,
+          inboxAlerts: inboxAlertsHi,
+        },
+      },
+      ur: {
+        translation: {
+          ...ur,
+          migration: migrationUr,
+          billing: billingUr,
+          setup: setupUr,
+          inboxAlerts: inboxAlertsUr,
+        },
+      },
     },
     lng: locale,
     fallbackLng: 'en',
