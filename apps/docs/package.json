@@ -6,8 +6,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "astro dev --port 5191",
-    "build": "astro check && astro build",
+    "dev": "node scripts/sync-guides.mjs && astro dev --port 5191",
+    "build": "node scripts/sync-guides.mjs && astro check && astro build",
     "preview": "astro preview --port 5191",
     "typecheck": "astro check"
   },

@@ -58,7 +58,6 @@ export default defineConfig({
       ],
       pagefind: true,
       social: [
-        { icon: "github", href: "https://github.com/juber-shaikh/hamnivo", label: "GitHub" },
       ],
       lastUpdated: true,
     }),

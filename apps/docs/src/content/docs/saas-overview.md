@@ -78,7 +78,7 @@ Scale by:
 2. Adding CPU (more API workers)
 3. Load-balancing across multiple servers (advanced)
 
-For small SaaS operations (hundreds of customers), a single $50/month server handles it easily.
+Start on one server and watch `hamnivo.sh doctor` and your usage as customers join; move to a bigger server when memory or disk runs low.
 
 ## Next steps
 

@@ -19,7 +19,7 @@ Run Hamnivo on your own server with automatic HTTPS and backups. No DevOps exper
 2. Your chat appears on your website
 3. Your team can answer customers
 4. AI is ready to help (optional)
-5. Backups run daily
+5. Backups run when you schedule them (see below)
 
 All automatic. No code to write.
 
@@ -38,9 +38,13 @@ sudo usermod -aG docker "$USER"
 
 ### 2. Get the code
 
+The code is in a private repository, so the server reads it with its own read-only
+deploy key. The full guide (`docs/self-hosting.md`, section A3) shows how to create one.
+
 ```bash
-git clone https://github.com/juber-shaikh/hamnivo.git
-cd hamnivo
+sudo mkdir -p /opt/hamnivo && sudo chown "$USER" /opt/hamnivo
+git clone git@github.com:CodeWithJuber/Hamnivo.git /opt/hamnivo
+cd /opt/hamnivo
 ```
 
 ### 3. Set up your domain
@@ -85,33 +89,37 @@ This tells you if everything is running. If anything is wrong, it suggests fixes
 
 ## Backups and restore
 
-Backups run every day at midnight. They store:
-- Your database (conversations, users, AI settings)
-- Uploaded files
-- Configuration
-
-To restore from a backup:
+Make a backup any time:
 
 ```bash
-./deploy/production/hamnivo.sh restore --from 2026-10-03
+./deploy/production/hamnivo.sh backup
 ```
 
-Replace the date with when you want to restore to.
+It saves your database, uploaded files and settings in a folder under
+`deploy/production/backups/`, named after the time. To run it every night at 03:15:
+
+```bash
+( crontab -l 2>/dev/null; echo '15 3 * * * /opt/hamnivo/deploy/production/hamnivo.sh backup >> "$HOME/hamnivo-backup.log" 2>&1' ) | crontab -
+```
+
+Backups stay on the server, so copy them somewhere else too.
+
+To restore, give the backup folder:
+
+```bash
+./deploy/production/hamnivo.sh restore deploy/production/backups/20261003T031500Z
+```
 
 ## Update Hamnivo
 
-New versions come out regularly with bug fixes and features.
+With automatic deploys on, every change on GitHub goes live by itself. To update by hand:
 
 ```bash
-git pull
-./deploy/production/hamnivo.sh up
+./deploy/production/hamnivo.sh update
 ```
 
-It:
-- Downloads the new code
-- Checks everything is healthy
-- Restarts with the new version
-- Rolls back if something breaks
+It downloads the new version, checks and builds it, starts it, and goes back to the
+previous version if it does not stay healthy.
 
 ## Troubleshooting
 
@@ -130,21 +138,18 @@ It should show your server's IP.
 Run `hamnivo.sh doctor`. It checks certificates and DNS.
 
 If your domain is behind Cloudflare:
-1. Set SSL/TLS mode to "Full (strict)"
-2. Turn "Always Use HTTPS" **off**
-3. Caddy gets certificates itself
+1. Run `./deploy/production/hamnivo.sh setup --cloudflare on`, then `up`
+2. Set SSL/TLS mode to "Full (strict)"
+3. Turn "Always Use HTTPS" **off** until Caddy has its certificates
 
 ### Can't send emails
 
 Sign-ups and invitations need email. If emails aren't sending:
 
-1. Add your SMTP details to `.env`:
+1. Add your email details to `deploy/production/.env`:
    ```
-   MAIL_HOST=smtp.yourprovider.com
-   MAIL_PORT=587
-   MAIL_FROM=no-reply@example.com
-   MAIL_USER=your-email@example.com
-   MAIL_PASSWORD=your-password
+   SMTP_URL=smtps://user:password@smtp.example.com:465
+   MAIL_FROM="Hamnivo <no-reply@example.com>"
    ```
 
 2. Restart:
@@ -152,23 +157,20 @@ Sign-ups and invitations need email. If emails aren't sending:
    ./deploy/production/hamnivo.sh up
    ```
 
-3. Test:
-   ```bash
-   ./deploy/production/hamnivo.sh mail you@example.com
-   ```
+3. Test: ask for a password reset on the sign-in page and check your inbox.
 
-### The database fills up
+### The disk fills up
 
-Hamnivo stores everything, including audit logs. To free space:
-1. Delete conversations older than 1 year (in Studio)
-2. Clear audit logs older than 90 days (in Settings)
+Run `./deploy/production/hamnivo.sh doctor`. It shows free space and the size of Docker's
+build cache, and how to clear it (`docker builder prune -af`). Never run
+`docker volume prune`: it deletes your data.
 
 ## Security
 
 - **HTTPS** is automatic and required
-- **Two-step verification** is mandatory for publishing changes
+- **Two-step sign-in** (an authenticator app or a passkey) protects admin accounts
 - **Audit logs** track everything (who answered, when settings changed)
-- **Backups** are encrypted and stored on the server
+- **Backups** stay on your server: copy them somewhere safe as well
 
 For more security:
 - Use Cloudflare's proxy to hide your server IP
@@ -187,4 +189,4 @@ Running Hamnivo costs:
 
 See `docs/self-hosting.md` in the code repository for detailed setup, automatic deploys, and troubleshooting.
 
-Or run `./deploy/production/hamnivo.sh --help` for all commands.
+Or run `./deploy/production/hamnivo.sh help` for all commands.
