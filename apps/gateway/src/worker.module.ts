@@ -41,7 +41,11 @@ import { PlatformModule, type PlatformOverrides } from './platform/platform.modu
 import { AgentsService } from './runtime/agents.service.js';
 import { KillSwitchesService } from './runtime/kill-switches.service.js';
 import { LANGUAGE_MODEL, ModelFactory } from './runtime/models.js';
-import { RepliesService, SAFE_REPLY_TOPIC } from './runtime/replies.service.js';
+import {
+  RepliesService,
+  SAFE_REPLY_FALLBACK_TOPIC,
+  SAFE_REPLY_TOPIC,
+} from './runtime/replies.service.js';
 import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
 import { AuthorityContactsService } from './widget/contacts.service.js';
@@ -169,6 +173,7 @@ export class WorkerModule {
                 },
               ],
               [SAFE_REPLY_TOPIC, (event) => replies.onSafeReply(event)],
+              [SAFE_REPLY_FALLBACK_TOPIC, (event) => replies.onSafeReplyFallback(event)],
               ['knowledge.ingest', (event) => ingestion.onIngest(event)],
               ['migration.scan', (event) => migration.onScan(event)],
               ['migration.dry_run', (event) => migration.onDryRun(event)],

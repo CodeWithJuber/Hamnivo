@@ -59,7 +59,12 @@ import { enqueueOutbox } from '../outbox/outbox.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
 import { type ActiveAgent, AgentsService } from './agents.service.js';
-import { type AiHandoffReason, HANDOFF_NOTES } from './handoff-notes.js';
+import {
+  type AiHandoffReason,
+  HANDOFF_NOTES,
+  type UrgentOutcome,
+  urgentNote,
+} from './handoff-notes.js';
 import { checkHonesty } from './honesty.js';
 import { KillSwitchesService } from './kill-switches.service.js';
 import { ModelFactory, ModelUnavailableError } from './models.js';
@@ -123,6 +128,26 @@ function latestCustomerText(history: AuthorityMessage[]): string {
   return incoming.at(-1)?.text?.trim() ?? '';
 }
 
+/** The conversation as it stood at one of the customer's messages: nothing that came after it. */
+function endingAt(messages: AuthorityMessage[], ref: number): AuthorityMessage[] {
+  return messages.filter((m) => Number(m.ref) <= ref);
+}
+
+/** Whether a message the customer can see came from the team or a bot, not from them. */
+function saidToCustomer(message: AuthorityMessage): boolean {
+  return !message.private && (message.direction === 'outgoing' || message.direction === 'template');
+}
+
+/** Whether a safety limit's mark is still in force at `now`. */
+function within(at: Date | null, ms: number, now: Date): boolean {
+  return at !== null && now.getTime() - at.getTime() < ms;
+}
+
+/** The key of a customer message's publication in Chatwoot: one per message, wording or reply. */
+function publicationKey(payload: CustomerMessageEvent): string {
+  return `hv1:p:${uuidV5(payload.conversationId, `reply:${payload.ledgerId}`)}`;
+}
+
 /** Passages retrieved per run. */
 const PASSAGES = 5;
 
@@ -135,23 +160,86 @@ function excerptOf(text: string): string {
 }
 
 /** Why a reply was not published, recorded on the publication for review. */
-type AbortReason = 'owner_changed' | 'preflight_owner_mismatch' | 'not_ai_owned';
+type AbortReason =
+  | 'owner_changed'
+  | 'preflight_owner_mismatch'
+  | 'not_ai_owned'
+  /** A safety wording went out in the last 24 hours, so none goes out now. */
+  | 'wording_limited'
+  /** Someone said something to the customer since their message, so the wording stays unsaid. */
+  | 'already_replied';
 
 /** The outbox topic that posts a reserved safety wording, at least once. */
 export const SAFE_REPLY_TOPIC = 'conversation.safe_reply';
 
+/**
+ * The outbox topic of the delayed safety wording for a conversation a person has: it posts only
+ * if nobody has replied to the customer by then (`onSafeReplyFallback`).
+ */
+export const SAFE_REPLY_FALLBACK_TOPIC = 'conversation.safe_reply_fallback';
+
 /** A safety wording claimed this recently is assumed to be still in flight. */
 const IN_FLIGHT_MS = 30_000;
 
+/** How long a person who has the conversation has to reply before Hamnivo sends the wording. */
+const STAFF_FALLBACK_MS = 120_000;
+
+/** At most one urgent note per conversation in this time, where people have the conversation. */
+const ALERT_EVERY_MS = 10 * 60_000;
+
+/** At most one automatic safety wording per conversation in this time, on every path. */
+const WORDING_EVERY_MS = 24 * 60 * 60_000;
+
+/** The guard's time to answer when there is no agent whose run limit could give it one. */
+const GUARD_DEADLINE_MS = 1_500;
+
 type UrgentVerdict = Extract<InboundVerdict, { action: 'urgent' }>;
+
+/** The owner modes in which nobody has the conversation. */
+type QueueMode = 'WAITING_HUMAN' | 'PAUSED';
+
+/**
+ * When a reserved safety wording may still be posted. `queue`: nobody else is speaking, so only in
+ * the owner mode and at the epoch it was reserved under, never in a person's turn or the AI's.
+ * `person`: a person has the conversation and the wording is for their silence, so it is posted
+ * unless the AI has the conversation or anyone has said something to the customer since their
+ * message `afterMessage`.
+ */
+type SafeFence = { kind: 'queue'; ownerMode: QueueMode } | { kind: 'person'; afterMessage: number };
 
 /**
  * What the publications ledger keeps of a safety wording, so that every retry posts the same
- * words, as the same bot, without asking a model or Jev again.
+ * words, as the same bot, without asking a model or Jev again. A wording reserved before fences
+ * were kept has none: it is the queue fence of WAITING_HUMAN, as it always was.
  */
 interface SafeReplyDetail extends PublicationFacts {
-  safe: { text: string; botRef: string };
+  safe: { text: string; botRef: string; fence?: SafeFence };
 }
+
+/** What the delayed `conversation.safe_reply_fallback` event carries: the words people were shown. */
+interface SafeFallbackEvent {
+  conversationId: string;
+  sourceKey: string;
+  /** The customer's message in Chatwoot; nobody may have said anything to them since. */
+  afterMessage: number;
+  text: string;
+  botRef: string;
+  displayName: string;
+}
+
+/** What the guard did for someone at risk in a conversation the AI does not have (labels only). */
+type Alerted = {
+  /** Who had the conversation when this was decided. */
+  holder: 'nobody' | 'person' | 'ai';
+  /** `limited`: an urgent note went out in the last 10 minutes. */
+  note: 'sent' | 'limited';
+  /**
+   * `now`: reserved, posted at once. `later`: the delayed event sends it if nobody has replied.
+   * `held`: one went out in the last 24 hours. `none`: the AI has the conversation, or no bot is
+   * set up.
+   */
+  wording: 'now' | 'later' | 'held' | 'none';
+};
 
 /**
  * Someone may be at risk: what the reply job needs to put the safety wording out (J04). Either
@@ -162,7 +250,8 @@ interface SafeReplyDetail extends PublicationFacts {
 type SafeReplyInput = {
   tenantId: string;
   control: ControlRow;
-  agent: ActiveAgent;
+  /** The name the wording shows under: the agent's, or the brand's when there is no agent. */
+  displayName: string;
   runId: string;
   payload: CustomerMessageEvent;
   /** The key of this customer message's publication: one per message, wording or reply. */
@@ -222,9 +311,15 @@ const FALLBACK_KINDS = new Set(['rate_limited', 'overloaded', 'unavailable', 'ti
  * Safety is not an AI reply, and the limits of AI replies never hold it back. Someone at risk
  * (message guard) gets Hamnivo's fixed wording, which costs no tokens, whatever the plan or the AI
  * budget say. A customer who asked for a person is handed over first, before Jev is asked (J04);
- * the guard then adds the wording and an urgent note. The wording is reserved in the transaction
- * that hands the conversation to people, and the outbox posts it (`conversation.safe_reply`) at
- * least once: a worker that stops in between loses neither the hand-off nor the wording.
+ * the guard then adds the wording and an urgent note, and so it does when the AI cannot answer
+ * (no agent, assist mode, a kill switch). The wording is reserved in the transaction that hands
+ * the conversation to people, and the outbox posts it (`conversation.safe_reply`) at least once:
+ * a worker that stops in between loses neither the hand-off nor the wording.
+ *
+ * Every customer message is screened in every ownership state. Where people have the conversation
+ * or wait for it, the guard runs before any suggestion (`guardPeople`) and Hamnivo speaks only
+ * when nobody else is speaking: never over a person or the AI. One automatic wording per
+ * conversation in 24 hours, on every path.
  */
 @Injectable()
 export class RepliesService {
@@ -324,7 +419,13 @@ export class RepliesService {
     if (!context) return;
     if (context.control.ownerMode === 'AI_ACTIVE') {
       await this.reply(event, payload, context);
-    } else if (context.agent?.config.mode === 'assist' && !context.stopped) {
+      return;
+    }
+    // People have the conversation, or are waiting to. The customer's message is still read for
+    // risk, before any suggestion is written. This runs here, in the worker, after the message was
+    // committed: screening never delays its delivery.
+    await this.guardPeople(event, payload, context);
+    if (context.agent?.config.mode === 'assist' && !context.stopped) {
       await this.suggest(event, payload, context);
     }
   }
@@ -332,7 +433,7 @@ export class RepliesService {
   private async reply(event: ClaimedOutboxEvent, payload: CustomerMessageEvent, context: Context) {
     const tenantId = event.tenantId;
     const { control, agent } = context;
-    const sourceKey = `hv1:p:${uuidV5(payload.conversationId, `reply:${payload.ledgerId}`)}`;
+    const sourceKey = publicationKey(payload);
     const [publication] = await this.tx(tenantId, (tx) =>
       tx.select().from(schema.publications).where(eq(schema.publications.sourceKey, sourceKey)),
     );
@@ -373,18 +474,30 @@ export class RepliesService {
       return;
     }
     if (await this.skipIfSuperseded(tenantId, run.id, payload)) return;
-    if (agent?.config.mode !== 'answer') {
-      await this.handOff(
+    // The AI cannot answer, so people have the conversation. Someone at risk is still looked for
+    // once that hand-off is committed, and still gets the safety wording and an urgent note.
+    const handOffAndGuard = async (reason: 'no_agent' | 'assist_mode' | 'ai_stopped') => {
+      const handedOffAt = await this.handOff(tenantId, control, run.id, payload.epoch, reason);
+      if (handedOffAt === null) return;
+      await this.guardAfterHandoff({
         tenantId,
-        control,
-        run.id,
-        payload.epoch,
-        agent ? 'assist_mode' : 'no_agent',
-      );
+        context,
+        runId: run.id,
+        payload,
+        sourceKey,
+        botRef: String(bot.externalBotId),
+        history: () => this.history(tenantId, runtime, control),
+        handedOffAt,
+      });
+    };
+    if (agent?.config.mode !== 'answer') {
+      await handOffAndGuard(agent ? 'assist_mode' : 'no_agent');
       return;
     }
     if (context.stopped) {
-      await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_stopped');
+      // A kill switch stops what a model says. The safety wording is fixed text, not model output,
+      // so it still goes out to someone at risk.
+      await handOffAndGuard('ai_stopped');
       return;
     }
     const history = await this.history(tenantId, runtime, control);
@@ -430,14 +543,12 @@ export class RepliesService {
       if (handedOffAt !== null) {
         await this.guardAfterHandoff({
           tenantId,
-          control,
-          agent,
+          context,
           runId: run.id,
           payload,
           sourceKey,
           botRef: String(bot.externalBotId),
-          history,
-          question,
+          history: async () => history,
           handedOffAt,
         });
       }
@@ -502,7 +613,7 @@ export class RepliesService {
       await this.safeReply({
         tenantId,
         control,
-        agent,
+        displayName: agent.config.displayName,
         runId: run.id,
         payload,
         sourceKey,
@@ -766,37 +877,43 @@ export class RepliesService {
   }
 
   /**
-   * After a customer's request for a person was handed over: whether they also write of hurting
-   * themselves, or of danger now (message guard). Jev only adds here: the hand-off is committed
-   * before anything asks it, and nothing it says, or fails to say, changes that. With Jev down,
-   * or no message guard set for the brand, the hand-off stands as it is.
+   * After people were given a conversation the AI had (the customer asked for a person, or the AI
+   * cannot answer: no agent, assist mode, a kill switch): whether the customer also writes of
+   * hurting themselves, or of danger now (message guard). Jev only adds here: the hand-off is
+   * committed before anything asks it, and nothing it says, or fails to say, changes that. With
+   * Jev down, or no message guard set for the brand, the hand-off stands as it is.
    */
   private async guardAfterHandoff(input: {
     tenantId: string;
-    control: ControlRow;
-    agent: ActiveAgent;
+    context: Context;
     runId: string;
     payload: CustomerMessageEvent;
     sourceKey: string;
     botRef: string;
-    history: { messages: AuthorityMessage[] };
-    question: string;
+    /** The conversation so far, read only once the brand is known to have a message guard. */
+    history: () => Promise<{ messages: AuthorityMessage[] }>;
     handedOffAt: number;
   }): Promise<void> {
-    const { tenantId, control, agent, history, question } = input;
+    const { tenantId, context } = input;
+    const { control, agent } = context;
     try {
+      // No message guard for the brand: nothing to read, not even the conversation.
+      if (!(await this.checks.hasMessageGuard(tenantId, control.brandId))) return;
+      const history = await input.history();
+      // The guard's time starts here, not before the conversation was read.
       const checks = await this.checks.forRun({
         tenantId,
         brandId: control.brandId,
         conversationId: control.id,
         runId: input.runId,
-        budgetMs: agent.config.limits.timeoutMs,
+        // Without an agent there is no run limit to borrow: the guard has its own.
+        budgetMs: agent?.config.limits.timeoutMs ?? GUARD_DEADLINE_MS,
       });
       if (!checks?.setting('message-guard')) return;
       const chosen = await this.language.forReply(
         tenantId,
         control.principalId,
-        question,
+        latestCustomerText(history.messages),
         checks.languageDecider(),
       );
       const verdict = await checks.inboundGuard({
@@ -808,7 +925,7 @@ export class RepliesService {
       await this.safeReply({
         tenantId,
         control,
-        agent,
+        displayName: agent?.config.displayName ?? context.brandName,
         runId: input.runId,
         payload: input.payload,
         sourceKey: input.sourceKey,
@@ -833,12 +950,12 @@ export class RepliesService {
     const { tenantId, control, sourceKey } = input;
     const reserved = await this.tx(tenantId, (tx) => this.reserveSafeReply(tx, input));
     await this.journal.notify(tenantId, control.id, reserved.journal);
+    if (reserved.handedOff) {
+      this.logger.log(`conversation ${control.id} handed to people: ${input.urgent.reason}`);
+    }
     if (reserved.reason) {
       this.logger.log(`safety wording for ${control.id} not published: ${reserved.reason}`);
       return;
-    }
-    if (input.handedOffAt === undefined) {
-      this.logger.log(`conversation ${control.id} handed to people: ${input.urgent.reason}`);
     }
     // Now, without waiting for the relay; if this fails, the outbox event posts it.
     await this.publishSafeReply(tenantId, control.id, sourceKey).catch((error: unknown) =>
@@ -848,20 +965,28 @@ export class RepliesService {
 
   /**
    * The one transaction behind a safety wording. The AI still has the conversation: it goes to
-   * people here, with the urgent note. People have it already (they were asked for first): the
-   * urgent note is queued for them, whatever happened since, and the wording follows only while
-   * nobody has answered. The wording's publication is reserved under the epoch the hand-off made,
-   * and the outbox event that posts it is queued with it.
+   * people here, with the urgent note. People have it already (they were asked for first, or the
+   * AI could not answer): the urgent note is queued for them, whatever happened since, and the
+   * wording follows only while nobody has answered. The wording's publication is reserved under
+   * the epoch the hand-off made, and the outbox event that posts it is queued with it.
+   *
+   * One automatic wording per conversation in 24 hours, whoever asks for it: when one went out,
+   * the hand-off and the note still happen, and the note says why there is no wording. The marks
+   * of both limits are set under the control row's lock, in this transaction, with what they
+   * stand for.
    */
   private async reserveSafeReply(
     tx: TenantTx,
     input: SafeReplyInput,
-  ): Promise<{ reason: AbortReason | null; journal: JournalEntry[] }> {
+  ): Promise<{ reason: AbortReason | null; journal: JournalEntry[]; handedOff: boolean }> {
     const { tenantId, control, payload, urgent } = input;
     const locked = await this.ownership.lock(tx, control.id);
+    const now = this.clock();
+    const held = within(locked.safetyWordedAt, WORDING_EVERY_MS, now);
     let epoch = payload.epoch;
     let reason: AbortReason | null;
     let journal: JournalEntry[] = [];
+    let handedOff = false;
     if (input.handedOffAt === undefined) {
       reason = this.fenced(locked, payload.epoch);
       if (reason) {
@@ -874,60 +999,139 @@ export class RepliesService {
           epoch: payload.epoch,
           reason: urgent.reason,
           handoff: input.handoff,
-          note: urgent.note,
+          note: urgentNote(held ? 'held' : 'ai_sent', urgent.reasons),
         });
         epoch = handed.epoch;
         journal = handed.journal;
+        handedOff = true;
+        reason = held ? 'wording_limited' : null;
       }
     } else {
       epoch = input.handedOffAt;
       reason =
-        locked.ownerMode === 'WAITING_HUMAN' && locked.ownershipEpoch === epoch
-          ? null
-          : 'owner_changed';
-      await enqueueOutbox(tx, tenantId, {
-        topic: 'conversation.note',
-        aggregateType: 'conversation',
-        aggregateId: locked.id,
-        payload: {
-          conversationId: locked.id,
-          key: `hv1:n:${uuidV5(locked.id, `urgent:${payload.ledgerId}`)}`,
-          text: reason
-            ? `${urgent.note} No safety wording was sent: the conversation changed hands first.`
-            : urgent.note,
-        },
-      });
+        locked.ownerMode !== 'WAITING_HUMAN' || locked.ownershipEpoch !== epoch
+          ? 'owner_changed'
+          : held
+            ? 'wording_limited'
+            : null;
+      await this.queueNote(
+        tx,
+        tenantId,
+        locked.id,
+        `hv1:n:${uuidV5(locked.id, `urgent:${payload.ledgerId}`)}`,
+        urgentNote(
+          reason === 'owner_changed' ? 'changed_hands' : held ? 'held' : 'ai_sent',
+          urgent.reasons,
+        ),
+      );
     }
-    const detail: SafeReplyDetail = {
-      sources: [],
-      displayName: input.agent.config.displayName,
-      safe: { text: urgent.text, botRef: input.botRef },
-    };
-    const values = {
+    // The urgent note went to people with the hand-off, or was queued just above.
+    if (handedOff || input.handedOffAt !== undefined) {
+      await tx
+        .update(schema.conversationControls)
+        .set({ safetyAlertedAt: now, ...(reason ? {} : { safetyWordedAt: now }) })
+        .where(eq(schema.conversationControls.id, locked.id));
+    }
+    const written = await this.reserveWording(tx, {
+      tenantId,
+      conversationId: locked.id,
+      sourceKey: input.sourceKey,
       epoch,
-      contentHash: sha256(urgent.text),
-      state: reason ? ('aborted' as const) : ('reserved' as const),
-      detail: reason ? { reason, currentEpoch: locked.ownershipEpoch } : detail,
+      text: urgent.text,
+      reason,
+      currentEpoch: handedOff ? epoch : locked.ownershipEpoch,
+      detail: {
+        sources: [],
+        displayName: input.displayName,
+        safe: {
+          text: urgent.text,
+          botRef: input.botRef,
+          fence: { kind: 'queue', ownerMode: 'WAITING_HUMAN' },
+        },
+      },
+    });
+    if (written && !reason) await this.queueSafeReply(tx, tenantId, locked.id, input.sourceKey);
+    return { reason, journal, handedOff };
+  }
+
+  /**
+   * Records a safety wording's publication, unless a reply or wording is already out for this
+   * message. With a `reason` it records that nothing will be posted. Returns whether a row was
+   * written.
+   */
+  private async reserveWording(
+    tx: TenantTx,
+    input: {
+      tenantId: string;
+      conversationId: string;
+      sourceKey: string;
+      epoch: number;
+      text: string;
+      reason: AbortReason | null;
+      currentEpoch: number;
+      detail: SafeReplyDetail;
+    },
+  ): Promise<boolean> {
+    const values = {
+      epoch: input.epoch,
+      contentHash: sha256(input.text),
+      state: input.reason ? ('aborted' as const) : ('reserved' as const),
+      detail: input.reason
+        ? { reason: input.reason, currentEpoch: input.currentEpoch }
+        : input.detail,
     };
-    const [row] = await tx
-      .insert(schema.publications)
-      .values({ tenantId, conversationId: locked.id, sourceKey: input.sourceKey, ...values })
-      .onConflictDoUpdate({
-        target: schema.publications.sourceKey,
-        set: { ...values, updatedAt: this.clock() },
-        // A reply or wording already out for this message stays as it is.
-        setWhere: inArray(schema.publications.state, ['reserved', 'unknown']),
-      })
-      .returning({ id: schema.publications.id });
-    if (row && !reason) {
-      await enqueueOutbox(tx, tenantId, {
-        topic: SAFE_REPLY_TOPIC,
-        aggregateType: 'conversation',
-        aggregateId: locked.id,
-        payload: { conversationId: locked.id, sourceKey: input.sourceKey },
-      });
-    }
-    return { reason, journal };
+    const insert = tx.insert(schema.publications).values({
+      tenantId: input.tenantId,
+      conversationId: input.conversationId,
+      sourceKey: input.sourceKey,
+      ...values,
+    });
+    const returning = { id: schema.publications.id };
+    const rows =
+      input.reason === 'wording_limited'
+        ? // The limit may be held by this message's own wording, reserved by an earlier attempt:
+          // that one stays as it is.
+          await insert.onConflictDoNothing().returning(returning)
+        : await insert
+            .onConflictDoUpdate({
+              target: schema.publications.sourceKey,
+              set: { ...values, updatedAt: this.clock() },
+              // A reply or wording already out for this message stays as it is.
+              setWhere: inArray(schema.publications.state, ['reserved', 'unknown']),
+            })
+            .returning(returning);
+    return rows.length > 0;
+  }
+
+  /** Queues the outbox event that posts a reserved safety wording, at least once. */
+  private queueSafeReply(
+    tx: TenantTx,
+    tenantId: string,
+    conversationId: string,
+    sourceKey: string,
+  ): Promise<void> {
+    return enqueueOutbox(tx, tenantId, {
+      topic: SAFE_REPLY_TOPIC,
+      aggregateType: 'conversation',
+      aggregateId: conversationId,
+      payload: { conversationId, sourceKey },
+    });
+  }
+
+  /** Queues a private note for people; the outbox posts it once, by its key. */
+  private queueNote(
+    tx: TenantTx,
+    tenantId: string,
+    conversationId: string,
+    key: string,
+    text: string,
+  ): Promise<void> {
+    return enqueueOutbox(tx, tenantId, {
+      topic: 'conversation.note',
+      aggregateType: 'conversation',
+      aggregateId: conversationId,
+      payload: { conversationId, key, text },
+    });
   }
 
   /** Outbox handler for `conversation.safe_reply`. Safe to run more than once. */
@@ -942,11 +1146,14 @@ export class RepliesService {
   }
 
   /**
-   * Posts a reserved safety wording as the bot that held the conversation, and records it. It goes
-   * out only while the conversation still waits for people at the epoch their hand-off made, so it
-   * is never said over a person, and Chatwoot is asked once more right before the post. Safe to
-   * run more than once, and from more than one worker: a claim keeps a second copy from being
-   * posted, and a retry looks for the first copy by its key before it posts.
+   * Posts a reserved safety wording as the bot that was to speak, and records it. It goes out
+   * only under the fence it was reserved with (`SafeFence`), so it is never said over a person or
+   * the AI: while nobody else speaks, that is, in the owner mode and at the epoch it was reserved
+   * under (WAITING_HUMAN or PAUSED); or, for the wording that waits for a person's silence, while
+   * the AI does not have the conversation and nobody has replied to the customer. Chatwoot is
+   * asked once more right before the post. Safe to run more than once, and from more than one
+   * worker: a claim keeps a second copy from being posted, and a retry looks for the first copy
+   * by its key before it posts.
    */
   private async publishSafeReply(
     tenantId: string,
@@ -967,8 +1174,14 @@ export class RepliesService {
         return { kind: 'done' as const };
       }
       // Not a safety wording (this message was answered another way since): nothing to post.
-      if (!(publication.detail as Partial<SafeReplyDetail>).safe) return { kind: 'done' as const };
-      if (control.ownerMode !== 'WAITING_HUMAN' || control.ownershipEpoch !== publication.epoch) {
+      const safe = (publication.detail as Partial<SafeReplyDetail>).safe;
+      if (!safe) return { kind: 'done' as const };
+      const fence: SafeFence = safe.fence ?? { kind: 'queue', ownerMode: 'WAITING_HUMAN' };
+      const open =
+        fence.kind === 'queue'
+          ? control.ownerMode === fence.ownerMode && control.ownershipEpoch === publication.epoch
+          : control.ownerMode !== 'AI_ACTIVE';
+      if (!open) {
         const reason: AbortReason = 'owner_changed';
         await tx
           .update(schema.publications)
@@ -995,6 +1208,7 @@ export class RepliesService {
         kind: 'claimed' as const,
         control,
         publication,
+        fence,
         lookup: publication.state !== 'reserved' || attempt > 1,
       };
     });
@@ -1004,7 +1218,7 @@ export class RepliesService {
       return;
     }
     if (claimed.kind === 'busy') throw new Error(`safety wording ${sourceKey} is being posted`);
-    const { control, publication } = claimed;
+    const { control, publication, fence } = claimed;
     const detail = publication.detail as SafeReplyDetail;
     const ref = String(control.externalConversationId);
     const facts: PublicationFacts = {
@@ -1017,18 +1231,14 @@ export class RepliesService {
         ? await runtime.authority.findByKey(ref, sourceKey, publication.createdAt)
         : null;
       if (!posted) {
-        // A person already on it in Chatwoot, not yet seen here, must not be talked over.
-        const state = await runtime.authority.getState(ref);
-        if (state.owner.kind === 'user') {
+        const stop = await this.postBlock(runtime, ref, fence, sourceKey);
+        if (stop) {
           await this.tx(tenantId, (tx) =>
             tx
               .update(schema.publications)
               .set({
                 state: 'aborted',
-                detail: {
-                  reason: 'preflight_owner_mismatch' satisfies AbortReason,
-                  authorityOwner: state.owner,
-                },
+                detail: { reason: stop.reason, ...stop.detail },
                 updatedAt: this.clock(),
               })
               .where(
@@ -1038,7 +1248,7 @@ export class RepliesService {
                 ),
               ),
           );
-          this.logger.log(`safety wording ${sourceKey} not published: preflight_owner_mismatch`);
+          this.logger.log(`safety wording ${sourceKey} not published: ${stop.reason}`);
           return;
         }
         ({ message: posted } = await runtime.authority.appendMessage({
@@ -1066,6 +1276,411 @@ export class RepliesService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Why a safety wording must not be posted now, read from Chatwoot right before the post; null
+   * when it may. Queue fence: a person already on it in Chatwoot, not yet seen here, must not be
+   * talked over. Person fence: nobody, staff or bot, may have said anything the customer can see
+   * since their message (private notes and activity do not count). A reply that lands between this
+   * read and the post is an accepted race: the customer then hears twice, never not at all.
+   */
+  private async postBlock(
+    runtime: ConnectionRuntime,
+    ref: string,
+    fence: SafeFence,
+    sourceKey: string,
+  ): Promise<{ reason: AbortReason; detail: Record<string, unknown> } | null> {
+    if (fence.kind === 'queue') {
+      const state = await runtime.authority.getState(ref);
+      return state.owner.kind === 'user'
+        ? { reason: 'preflight_owner_mismatch', detail: { authorityOwner: state.owner } }
+        : null;
+    }
+    return (await this.saidSince(runtime, ref, fence.afterMessage, sourceKey))
+      ? { reason: 'already_replied', detail: {} }
+      : null;
+  }
+
+  /**
+   * Whether anyone, staff or a bot, has said something the customer can see since their message.
+   * Read from Chatwoot, where a person may have replied without Hamnivo knowing yet. The wording's
+   * own message, from an earlier attempt, is not counted.
+   */
+  private async saidSince(
+    runtime: ConnectionRuntime,
+    ref: string,
+    afterMessage: number,
+    ownKey: string,
+  ): Promise<boolean> {
+    const later = await runtime.authority.listMessages(ref, {
+      view: 'staff',
+      after: String(afterMessage),
+    });
+    return later.some((m) => saidToCustomer(m) && m.key !== ownKey);
+  }
+
+  /**
+   * Message guard for a conversation the AI does not have: people do, or are waiting to. Nothing
+   * here answers the customer's question; the message is still read for risk, in every ownership
+   * state, and Hamnivo speaks only when nobody else is speaking. Live, when someone may be at risk
+   * (self-harm, or danger now):
+   * - nobody is assigned: people get an urgent note and the customer gets the safety wording, at
+   *   once;
+   * - a person is assigned: they get the urgent note now, with the words for the customer so they
+   *   can send them first, and if nobody has replied after `STAFF_FALLBACK_MS`, Hamnivo sends
+   *   them itself (`onSafeReplyFallback`).
+   * Shadow mode only records. It catches and logs its own errors: it never fails the job, and
+   * never holds up the suggestion that may follow.
+   */
+  private async guardPeople(
+    event: ClaimedOutboxEvent,
+    payload: CustomerMessageEvent,
+    context: Context,
+  ): Promise<void> {
+    const tenantId = event.tenantId;
+    const { control, agent } = context;
+    let runId: string | null = null;
+    try {
+      // No message guard for the brand: nothing to read, not even the conversation.
+      if (!(await this.checks.hasMessageGuard(tenantId, control.brandId))) return;
+      const run = await this.tx(tenantId, (tx) =>
+        this.runs.start(tx, {
+          tenantId,
+          conversationId: control.id,
+          brandId: control.brandId,
+          agentId: agent?.profile.id ?? null,
+          agentVersionId: agent?.version.id ?? null,
+          triggerRef: `guard:${payload.ledgerId}`,
+          kind: 'guard',
+          epoch: payload.epoch,
+        }),
+      );
+      runId = run.id;
+      // An earlier attempt did it all.
+      if (run.state === 'succeeded' || run.state === 'skipped') return;
+      await this.screenForPeople(tenantId, payload, context, run.id);
+    } catch (error) {
+      this.logger.error(`message guard for ${control.id} failed: ${String(error)}`);
+      const failed = runId;
+      if (failed) {
+        await this.tx(tenantId, (tx) =>
+          this.runs.finish(tx, failed, { outcome: 'error', errorKind: 'guard_failed' }),
+        ).catch(() => undefined);
+      }
+    }
+  }
+
+  private async screenForPeople(
+    tenantId: string,
+    payload: CustomerMessageEvent,
+    context: Context,
+    runId: string,
+  ): Promise<void> {
+    const { control, agent } = context;
+    const skipped = () =>
+      this.tx(tenantId, (tx) =>
+        this.runs.finish(tx, runId, { outcome: 'skipped', state: 'skipped' }),
+      );
+    const [ledger] = await this.tx(tenantId, (tx) =>
+      tx
+        .select({ ref: schema.messageLedger.authorityMessageId })
+        .from(schema.messageLedger)
+        .where(eq(schema.messageLedger.id, payload.ledgerId)),
+    );
+    const own = ledger?.ref ?? null;
+    if (own === null) return skipped();
+    const runtime = await this.registry.get(tenantId, control.connectionId);
+    const history = await this.history(tenantId, runtime, control);
+    // The guard's time starts here, not before the conversation was read.
+    const checks = await this.checks.forRun({
+      tenantId,
+      brandId: control.brandId,
+      conversationId: control.id,
+      runId,
+      budgetMs: agent?.config.limits.timeoutMs ?? GUARD_DEADLINE_MS,
+    });
+    if (!checks?.setting('message-guard')) return skipped();
+    // The window that ends at this job's own message. A job is never skipped for a newer message
+    // (the AI's is): in a burst longer than the window, each message is the last of one, so none
+    // is pushed out of every window.
+    const messages = endingAt(history.messages, own);
+    const chosen = await this.language.forReply(
+      tenantId,
+      control.principalId,
+      latestCustomerText(messages),
+      checks.languageDecider(),
+    );
+    const verdict = await checks.inboundGuard({
+      messages,
+      language: chosen.detection.language ?? chosen.resolution.language,
+      replyLanguage: chosen.resolution.language,
+    });
+    if (verdict.action !== 'urgent') return skipped();
+    const sourceKey = publicationKey(payload);
+    const alerted = await this.tx(tenantId, async (tx) => {
+      const done = await this.reserveAlert(tx, {
+        tenantId,
+        control,
+        payload,
+        urgent: verdict,
+        sourceKey,
+        displayName: agent?.config.displayName ?? context.brandName,
+        botRef: runtime.primaryBot ? String(runtime.primaryBot.externalBotId) : null,
+        message: own,
+      });
+      await this.runs.step(tx, tenantId, runId, {
+        kind: 'decision',
+        name: 'safety_alert',
+        status: 'ok',
+        detail: { ...done },
+      });
+      const acted = done.note === 'sent' || done.wording === 'now' || done.wording === 'later';
+      await this.runs.finish(
+        tx,
+        runId,
+        acted ? { outcome: 'handoff' } : { outcome: 'skipped', state: 'skipped' },
+      );
+      return done;
+    });
+    this.logger.log(
+      `message guard in ${control.id}: urgent note ${alerted.note}, wording ${alerted.wording}`,
+    );
+    // Now, without waiting for the relay; if this fails, the outbox event posts it.
+    if (alerted.wording === 'now') {
+      await this.publishSafeReply(tenantId, control.id, sourceKey).catch((error: unknown) =>
+        this.logger.warn(`safety wording ${sourceKey} not posted yet, the outbox will: ${error}`),
+      );
+    }
+  }
+
+  /**
+   * The one transaction behind an urgent alert in a conversation the AI does not have. Who has the
+   * conversation is read from the locked row, not from when the message arrived:
+   * - nobody: the note is queued and the wording reserved, to be posted at once;
+   * - a person: the note is queued with the words for the customer, and the delayed event that
+   *   sends them if nobody has replied;
+   * - the AI again (it was handed back meanwhile): the note only, never wording over its turn.
+   * The two limits are independent. A note goes out at most once in 10 minutes (it only keeps
+   * people from being told again and again); the wording at most once in 24 hours, and then the
+   * note says there is none. The marks are set under the lock, with what they stand for.
+   */
+  private async reserveAlert(
+    tx: TenantTx,
+    input: {
+      tenantId: string;
+      control: ControlRow;
+      payload: CustomerMessageEvent;
+      urgent: UrgentVerdict;
+      sourceKey: string;
+      displayName: string;
+      /** The bot that speaks for the brand; null when none is set up. */
+      botRef: string | null;
+      /** The customer's message in Chatwoot. */
+      message: number;
+    },
+  ): Promise<Alerted> {
+    const { tenantId, payload, urgent } = input;
+    const locked = await this.ownership.lock(tx, input.control.id);
+    const now = this.clock();
+    const holder: Alerted['holder'] =
+      locked.ownerMode === 'AI_ACTIVE'
+        ? 'ai'
+        : locked.ownerStaffId !== null || locked.ownerExternalUserId !== null
+          ? 'person'
+          : 'nobody';
+    const noteDue = !within(locked.safetyAlertedAt, ALERT_EVERY_MS, now);
+    const marks: { safetyAlertedAt?: Date; safetyWordedAt?: Date } = {};
+    // Wording is never said over the AI's turn, and needs a bot to say it as.
+    const botRef = input.botRef;
+    const canSpeak = holder !== 'ai' && botRef !== null;
+    let wording: Alerted['wording'] = !canSpeak
+      ? 'none'
+      : within(locked.safetyWordedAt, WORDING_EVERY_MS, now)
+        ? 'held'
+        : holder === 'nobody'
+          ? 'now'
+          : 'later';
+    if (canSpeak && wording === 'now') {
+      const written = await this.reserveWording(tx, {
+        tenantId,
+        conversationId: locked.id,
+        sourceKey: input.sourceKey,
+        epoch: locked.ownershipEpoch,
+        text: urgent.text,
+        reason: null,
+        currentEpoch: locked.ownershipEpoch,
+        detail: {
+          sources: [],
+          displayName: input.displayName,
+          safe: {
+            text: urgent.text,
+            botRef,
+            fence: {
+              kind: 'queue',
+              ownerMode: locked.ownerMode === 'PAUSED' ? 'PAUSED' : 'WAITING_HUMAN',
+            },
+          },
+        },
+      });
+      if (written) {
+        await this.queueSafeReply(tx, tenantId, locked.id, input.sourceKey);
+        marks.safetyWordedAt = now;
+      } else {
+        // A reply or wording is already out for this message: nothing more to say to the customer.
+        wording = 'held';
+      }
+    } else if (canSpeak && wording === 'later') {
+      // Reserved only if it is still needed when it is due (`onSafeReplyFallback`).
+      const event: SafeFallbackEvent = {
+        conversationId: locked.id,
+        sourceKey: input.sourceKey,
+        afterMessage: input.message,
+        text: urgent.staffText,
+        botRef,
+        displayName: input.displayName,
+      };
+      await enqueueOutbox(tx, tenantId, {
+        topic: SAFE_REPLY_FALLBACK_TOPIC,
+        aggregateType: 'conversation',
+        aggregateId: locked.id,
+        payload: { ...event },
+        availableAt: new Date(now.getTime() + STAFF_FALLBACK_MS),
+      });
+    }
+    if (noteDue) {
+      const outcome: UrgentOutcome =
+        holder === 'ai'
+          ? 'ai_again'
+          : botRef === null
+            ? 'no_bot'
+            : wording === 'held'
+              ? 'held'
+              : holder === 'nobody'
+                ? 'sent'
+                : 'person';
+      await this.queueNote(
+        tx,
+        tenantId,
+        locked.id,
+        `hv1:n:${uuidV5(locked.id, `urgent:${payload.ledgerId}`)}`,
+        urgentNote(
+          outcome,
+          urgent.reasons,
+          wording === 'later'
+            ? { text: urgent.staffText, waitMinutes: STAFF_FALLBACK_MS / 60_000 }
+            : undefined,
+        ),
+      );
+      marks.safetyAlertedAt = now;
+    }
+    if (marks.safetyAlertedAt || marks.safetyWordedAt) {
+      await tx
+        .update(schema.conversationControls)
+        .set(marks)
+        .where(eq(schema.conversationControls.id, locked.id));
+    }
+    return { holder, note: noteDue ? 'sent' : 'limited', wording };
+  }
+
+  /**
+   * Outbox handler for `conversation.safe_reply_fallback`, due `STAFF_FALLBACK_MS` after people
+   * were told that someone may be at risk while a person had the conversation. Hamnivo sends the
+   * safety wording itself only if all of these hold:
+   * (a) the AI does not have the conversation;
+   * (b) Chatwoot shows nothing said to the customer since their message, by staff or a bot
+   *     (private notes and activity do not count);
+   * (c) no automatic wording went out in the last 24 hours.
+   * It reserves, claims, looks for its own copy by key on a retry and records the way a wording
+   * for a waiting conversation does (`publishSafeReply`). Safe to run more than once.
+   */
+  async onSafeReplyFallback(event: ClaimedOutboxEvent): Promise<void> {
+    const payload = event.payload as SafeFallbackEvent;
+    const tenantId = event.tenantId;
+    const [reserved] = await this.tx(tenantId, (tx) =>
+      tx
+        .select({ id: schema.publications.id })
+        .from(schema.publications)
+        .where(eq(schema.publications.sourceKey, payload.sourceKey)),
+    );
+    // An earlier attempt reserved it: finish what it started, without asking again.
+    if (!reserved && !(await this.reserveFallback(tenantId, payload))) return;
+    await this.publishSafeReply(
+      tenantId,
+      payload.conversationId,
+      payload.sourceKey,
+      event.attempts,
+    );
+  }
+
+  /** Reserves the delayed wording when it is still needed; false when there is nothing to post. */
+  private async reserveFallback(tenantId: string, payload: SafeFallbackEvent): Promise<boolean> {
+    const [control] = await this.tx(tenantId, (tx) =>
+      tx
+        .select()
+        .from(schema.conversationControls)
+        .where(eq(schema.conversationControls.id, payload.conversationId)),
+    );
+    // (a), read first so that nothing is asked of Chatwoot for a conversation the AI has again.
+    if (!control || control.ownerMode === 'AI_ACTIVE') {
+      this.logger.log(
+        `safety wording ${payload.sourceKey} not needed: the AI has the conversation`,
+      );
+      return false;
+    }
+    // (b), before anything is reserved, so a person's reply leaves the 24-hour limit untouched.
+    // The post checks again, since a retry may come later.
+    const runtime = await this.registry.get(tenantId, control.connectionId);
+    if (
+      await this.saidSince(
+        runtime,
+        String(control.externalConversationId),
+        payload.afterMessage,
+        payload.sourceKey,
+      )
+    ) {
+      this.logger.log(`safety wording ${payload.sourceKey} not needed: someone has replied`);
+      return false;
+    }
+    return this.tx(tenantId, async (tx) => {
+      const locked = await this.ownership.lock(tx, payload.conversationId);
+      const now = this.clock();
+      // (a) and (c), again under the lock that sets the mark.
+      if (locked.ownerMode === 'AI_ACTIVE') {
+        this.logger.log(
+          `safety wording ${payload.sourceKey} not sent: the AI has the conversation`,
+        );
+        return false;
+      }
+      if (within(locked.safetyWordedAt, WORDING_EVERY_MS, now)) {
+        this.logger.log(`safety wording ${payload.sourceKey} not sent: one went out in 24 hours`);
+        return false;
+      }
+      const written = await this.reserveWording(tx, {
+        tenantId,
+        conversationId: locked.id,
+        sourceKey: payload.sourceKey,
+        epoch: locked.ownershipEpoch,
+        text: payload.text,
+        reason: null,
+        currentEpoch: locked.ownershipEpoch,
+        detail: {
+          sources: [],
+          displayName: payload.displayName,
+          safe: {
+            text: payload.text,
+            botRef: payload.botRef,
+            fence: { kind: 'person', afterMessage: payload.afterMessage },
+          },
+        },
+      });
+      if (!written) return false;
+      await tx
+        .update(schema.conversationControls)
+        .set({ safetyWordedAt: now })
+        .where(eq(schema.conversationControls.id, locked.id));
+      return true;
+    });
   }
 
   /** Assist mode (G03): a suggestion for staff as an internal note, never a customer reply. */

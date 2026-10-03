@@ -729,6 +729,46 @@ export const SAFE_REPLIES: Readonly<Record<ReplyLanguage, string>> = {
     'ek fard ke hawale kar di hai.',
 };
 
+/**
+ * The same words for a conversation a person has already: the help text is the one above, but the
+ * last sentence says the team was told and a person will reply here, not that the chat was passed
+ * on. Staff may send it themselves; Hamnivo sends it after a short wait when nobody has replied.
+ * Every language but English is pending native review.
+ */
+export const SAFE_REPLIES_STAFF: Readonly<Record<ReplyLanguage, string>> = {
+  en:
+    "I'm sorry you are going through this. Your safety comes first. If you or someone else is " +
+    'in danger now, please call your local emergency number. If you are thinking of hurting ' +
+    'yourself, please talk to someone you trust or a crisis line now. I have told our team, ' +
+    'and a person will reply here as soon as they can.',
+  ar:
+    'أنا آسف لما تمر به. سلامتك هي الأهم. إذا كنت أنت أو أي شخص آخر في خطر الآن، فاتصل برقم ' +
+    'الطوارئ المحلي. إذا كنت تفكر في إيذاء نفسك، فتحدث الآن مع شخص تثق به أو مع خط مساعدة ' +
+    'للأزمات. لقد أبلغت فريقنا، وسيرد عليك شخص هنا في أقرب وقت ممكن.',
+  hi:
+    'मुझे दुख है कि आप इससे गुज़र रहे हैं। आपकी सुरक्षा सबसे ज़रूरी है। अगर आप या कोई और अभी ' +
+    'खतरे में है, तो कृपया अपने स्थानीय आपातकालीन नंबर पर कॉल करें। अगर आप खुद को नुकसान ' +
+    'पहुँचाने के बारे में सोच रहे हैं, तो कृपया अभी किसी भरोसेमंद व्यक्ति या संकट हेल्पलाइन से ' +
+    'बात करें। मैंने हमारी टीम को बता दिया है, और एक व्यक्ति जल्द से जल्द यहीं जवाब देगा।',
+  ur:
+    'مجھے افسوس ہے کہ آپ اس سے گزر رہے ہیں۔ آپ کی حفاظت سب سے اہم ہے۔ اگر آپ یا کوئی اور ابھی ' +
+    'خطرے میں ہے تو براہ کرم اپنے مقامی ایمرجنسی نمبر پر کال کریں۔ اگر آپ خود کو نقصان پہنچانے ' +
+    'کا سوچ رہے ہیں تو براہ کرم ابھی کسی قابلِ اعتماد شخص یا کسی بحرانی ہیلپ لائن سے بات کریں۔ ' +
+    'میں نے ہماری ٹیم کو بتا دیا ہے، اور ایک فرد جلد از جلد یہیں جواب دے گا۔',
+  'hi-Latn':
+    'Mujhe dukh hai ki aap is se guzar rahe hain. Aapki suraksha sabse zaroori hai. Agar aap ya ' +
+    'koi aur abhi khatre mein hai, to please apne local emergency number par call karein. Agar ' +
+    'aap khud ko nuksan pahunchane ke baare mein soch rahe hain, to please abhi kisi bharosemand ' +
+    'insaan ya crisis helpline se baat karein. Maine hamari team ko bata diya hai, aur ek vyakti ' +
+    'jaldi se jaldi yahin jawab dega.',
+  'ur-Latn':
+    'Mujhe afsos hai ke aap is se guzar rahe hain. Aap ki hifazat sab se zaroori hai. Agar aap ' +
+    'ya koi aur abhi khatre mein hai to meharbani kar ke apne local emergency number par call ' +
+    'karein. Agar aap khud ko nuqsan pohanchane ka soch rahe hain to meharbani kar ke abhi kisi ' +
+    'qabil-e-aitmaad shakhs ya crisis helpline se baat karein. Main ne hamari team ko bata ' +
+    'diya hai, aur ek fard jald az jald yahin jawab dega.',
+};
+
 /** Questions about the draft reply, one exact condition each. */
 export const OUTBOUND_GUARD_QUESTIONS = {
   says_paid: {

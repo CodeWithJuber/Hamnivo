@@ -857,7 +857,7 @@ export const hi: Translation = {
         skipped: 'छोड़ा गया',
       },
       kind: 'प्रकार',
-      kinds: { reply: 'ग्राहक को जवाब', draft: 'स्टाफ़ के लिए ड्राफ़्ट' },
+      kinds: { reply: 'ग्राहक को जवाब', draft: 'स्टाफ़ के लिए ड्राफ़्ट', guard: 'संदेश गार्ड' },
       conversation: 'बातचीत',
       started: 'शुरू हुआ',
       finished: 'खत्म हुआ',

@@ -6,6 +6,8 @@ export interface OutboxMessage {
   aggregateId: string;
   payload: Record<string, unknown>;
   headers?: Record<string, unknown>;
+  /** Not relayed before this time (a delayed event); due at once when left out. */
+  availableAt?: Date;
 }
 
 /**
@@ -24,5 +26,6 @@ export async function enqueueOutbox(
     aggregateId: message.aggregateId,
     payload: message.payload,
     headers: message.headers ?? {},
+    ...(message.availableAt ? { availableAt: message.availableAt } : {}),
   });
 }

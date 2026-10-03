@@ -28,6 +28,7 @@ import {
   type ReplyLanguage,
   redactPersonalData,
   SAFE_REPLIES,
+  SAFE_REPLIES_STAFF,
   SLICE_OF_LANGUAGE,
   unbackedClaims,
 } from '@hamnivo/domain';
@@ -69,11 +70,20 @@ export type InboundVerdict =
   | { action: 'continue' }
   | { action: 'handoff'; reason: AiHandoffReason; note: string }
   /**
-   * Someone may be at risk: Hamnivo's safe wording (no model's) is published at once, and the
-   * conversation is with people, with this note, from the moment the wording is reserved: the
-   * reply job commits the two together, so neither can be left without the other.
+   * Someone may be at risk: Hamnivo's safe wording (no model's) goes to the customer, and people
+   * are told with an urgent note. Who has the conversation decides the rest, so the caller picks
+   * the wording (`staffText` for a conversation a person has: it says the team was told, not that
+   * the chat was passed on) and writes the note from `reasons`. While the AI has it, the reply
+   * job commits the hand-off and the wording's reservation together, so neither can be left
+   * without the other.
    */
-  | { action: 'urgent'; reason: AiHandoffReason; note: string; text: string };
+  | {
+      action: 'urgent';
+      reason: AiHandoffReason;
+      reasons: InboundGuardReason[];
+      text: string;
+      staffText: string;
+    };
 
 interface RunContext {
   tenantId: string;
@@ -98,11 +108,8 @@ function customerTexts(messages: readonly AuthorityMessage[], count: number): st
     .map((m) => (m.text ?? '').trim().slice(0, 1000));
 }
 
-function guardNote(urgent: boolean, reasons: readonly InboundGuardReason[]): string {
-  return [
-    urgent ? CHECK_HANDOFF_NOTES.urgent : CHECK_HANDOFF_NOTES.guard,
-    ...reasons.map((reason) => GUARD_NOTES[reason]),
-  ].join(' ');
+function guardNote(reasons: readonly InboundGuardReason[]): string {
+  return [CHECK_HANDOFF_NOTES.guard, ...reasons.map((reason) => GUARD_NOTES[reason])].join(' ');
 }
 
 /**
@@ -191,11 +198,11 @@ export class RunChecks {
   }
 
   /**
-   * The message guard's check of what comes in, without the escalation advice, for the two cases
+   * The message guard's check of what comes in, without the escalation advice, for the cases
    * where a hand-off to people is no news: a customer who asked for a person (handed over at
-   * once, before anything asked Jev, J04) and a workspace whose AI replies are used up. Only
-   * someone at risk changes anything there: safe wording, and for people an urgent note. A threat
-   * or abuse is recorded, never acted on.
+   * once, before anything asked Jev, J04), a workspace whose AI replies are used up, and a
+   * conversation people have or are waiting to take. Only someone at risk changes anything there:
+   * safe wording, and for people an urgent note. A threat or abuse is recorded, never acted on.
    */
   inboundGuard(input: Parameters<RunChecks['inbound']>[0]): Promise<InboundVerdict> {
     return this.service.inboundGuard(this, { ...input, urgentOnly: true });
@@ -283,6 +290,18 @@ export class ReplyChecksService {
       },
       settings,
     );
+  }
+
+  /**
+   * Whether the message guard runs for a brand (shadow or live): one read of its settings. Callers
+   * that would otherwise start a run and read the conversation ask this first.
+   */
+  async hasMessageGuard(tenantId: string, brandId: string | null): Promise<boolean> {
+    if (!brandId) return false;
+    const settings = await withTenant(this.db, { tenantId, actorId: 'ai' }, (tx) =>
+      this.checks.settings(tx, brandId),
+    );
+    return settings.has('message-guard');
   }
 
   /** Records a check and its step in the run, so the run's timeline shows it with its usage. */
@@ -420,13 +439,16 @@ export class ReplyChecksService {
       { name: 'inbound_guard', status: live && action !== 'continue' ? 'blocked' : 'ok' },
     );
     if (!live || action === 'continue') return { action: 'continue' };
-    const note = guardNote(verdict.urgent, verdict.reasons);
-    if (action === 'handoff') return { action: 'handoff', reason: 'ai_escalated', note };
+    if (action === 'handoff') {
+      return { action: 'handoff', reason: 'ai_escalated', note: guardNote(verdict.reasons) };
+    }
+    const language = input.replyLanguage ?? input.language ?? 'en';
     return {
       action: 'urgent',
       reason: 'ai_escalated',
-      note,
-      text: SAFE_REPLIES[input.replyLanguage ?? input.language ?? 'en'],
+      reasons: verdict.reasons,
+      text: SAFE_REPLIES[language],
+      staffText: SAFE_REPLIES_STAFF[language],
     };
   }
 

@@ -1,3 +1,5 @@
+import type { InboundGuardReason } from '@hamnivo/domain';
+
 /** Why a conversation the AI could have held went to people instead. */
 export type AiHandoffReason =
   | 'no_agent'
@@ -34,9 +36,6 @@ export const CHECK_HANDOFF_NOTES = {
     'The AI reply was held back: it said or promised a payment, refund or order change that ' +
     'Hamnivo has no receipt or commitment for. Please answer.',
   guard: 'The message guard passed this conversation to people. Please answer.',
-  urgent:
-    'URGENT: the message guard found that someone may be at risk. The AI sent safety wording ' +
-    'and stepped back. Please answer now.',
 } as const;
 
 /** Why the message guard passed a conversation to people, one sentence per reason. */
@@ -46,6 +45,53 @@ export const GUARD_NOTES = {
   threat: 'The customer threatens to hurt someone or damage something.',
   abuse: 'The customer insults or abuses the team or the assistant.',
 } as const;
+
+/**
+ * What the urgent note (staff lane) says came of the safety wording for someone at risk. It comes
+ * before the reasons: a hand-off packet is cut at a fixed length, so a reason may be lost, but not
+ * whether wording was sent.
+ */
+const URGENT_OUTCOMES = {
+  /** The AI had the conversation: it sent the wording and stepped back. */
+  ai_sent: 'The AI sent safety wording and stepped back. Please answer now.',
+  /** Nobody had it: Hamnivo sent the wording at once. */
+  sent: 'Hamnivo sent safety wording to the customer. Please answer now.',
+  /** A person has it: the wording is theirs to send, or follows (see `urgentNote`). */
+  person: 'Please answer now.',
+  /** One went out in the last 24 hours, so none goes out now. */
+  held: 'No safety wording was sent: one was sent to this customer in the last 24 hours. Please answer now.',
+  changed_hands:
+    'No safety wording was sent: the conversation changed hands first. Please answer now.',
+  ai_again:
+    'No safety wording was sent: the AI has this conversation again. Please look at it now.',
+  no_bot:
+    'No safety wording was sent: no bot is set up to speak for this brand. Please answer now.',
+} as const;
+export type UrgentOutcome = keyof typeof URGENT_OUTCOMES;
+
+/**
+ * The urgent note for people when someone may be at risk (message guard): the finding, what came
+ * of the safety wording, why, and, when a person has the conversation and the wording is still
+ * to come, the words themselves, so they can send them first.
+ */
+export function urgentNote(
+  outcome: UrgentOutcome,
+  reasons: readonly InboundGuardReason[],
+  wording?: { text: string; waitMinutes: number },
+): string {
+  return [
+    'URGENT: the message guard found that someone may be at risk.',
+    URGENT_OUTCOMES[outcome],
+    ...reasons.map((reason) => GUARD_NOTES[reason]),
+    ...(wording
+      ? [
+          `You can send this message yourself: “${wording.text}” If nobody has replied in ` +
+            `${wording.waitMinutes} ${wording.waitMinutes === 1 ? 'minute' : 'minutes'}, Hamnivo ` +
+            'will send that message itself.',
+        ]
+      : []),
+  ].join(' ');
+}
 
 /** Why the escalation check (J04) passed a conversation to people, one sentence per reason. */
 export const ESCALATION_NOTES = {

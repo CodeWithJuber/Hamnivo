@@ -312,6 +312,33 @@ a reply, drop a passage or hand the conversation to people.
   nobody has answered, the wording follows. Jev can only add; if it is unavailable, or the brand
   has no message guard, the hand-off stands as it is. There is no deterministic detector of
   self-harm or danger to fall back on.
+- **The AI cannot answer** (no published agent, assist mode, a kill switch). The hand-off to
+  people is committed first and the guard is asked after it, exactly as after a request for a
+  person (`guardAfterHandoff`; without an agent the brand name is the display name and the guard's
+  own deadline, 1.5 s, applies). A kill switch does not stop the wording: it is fixed text, not
+  model output.
+- **Conversations people have or wait for** (`WAITING_HUMAN`, `HUMAN_ACTIVE`, `PAUSED`).
+  `onCustomerMessage` reads the customer's message for risk before any assist suggestion, in its
+  own run (`kind: guard`, trigger `guard:{ledgerId}`), only for a brand that has the message
+  guard (checked before the conversation is read), and logs its own failures: it never fails the
+  job or holds up the suggestion. The window ends at the job's own message
+  (`authorityMessageId`) and no job is skipped for a newer message, so a burst longer than the
+  window hides none. Shadow records only. Live, when someone is at risk, who has the conversation
+  is read under the control row's lock: with nobody assigned, the urgent note is queued and the
+  wording (`SAFE_REPLIES`) is reserved and posted at once; with a person assigned, the note
+  carries the staff wording (`SAFE_REPLIES_STAFF`, in the reply language) and a delayed outbox
+  event (`conversation.safe_reply_fallback`, `STAFF_FALLBACK_MS`) posts it only if the AI does not
+  have the conversation, Chatwoot shows no public outgoing message since the customer's message
+  (read right before the post; a reply between the check and the post is an accepted race) and the
+  24-hour limit allows it. A wording is posted under a fence kept with its reservation
+  (`publishSafeReply`): in `WAITING_HUMAN` or `PAUSED` only while the owner mode and epoch are
+  unchanged, never in `AI_ACTIVE` or `HUMAN_ACTIVE`; the fallback instead needs a conversation
+  the AI does not have.
+- **Limits.** One automatic safety wording per conversation in 24 hours, on every path
+  (`conversation_controls.safety_worded_at`), and one urgent note per conversation in 10 minutes
+  where people have it (`safety_alerted_at`). Both are read and set under the control row's lock,
+  in the transaction that reserves the wording or queues the note. When the wording is held back,
+  the hand-off and the note still happen and the note says why.
 
 ## Reply language (U01, U07)
 

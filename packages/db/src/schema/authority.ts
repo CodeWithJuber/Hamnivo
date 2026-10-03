@@ -297,6 +297,14 @@ export const conversationControls = pgTable(
     staffJournalSeq: bigint('staff_journal_seq', { mode: 'number' }).notNull().default(0),
     agentJournalSeq: bigint('agent_journal_seq', { mode: 'number' }).notNull().default(0),
     lastCustomerMessageAt: tstz('last_customer_message_at'),
+    /**
+     * The message guard's limits on its own output, read and set under this row's lock in the
+     * transaction that queues the note or reserves the wording: when people were last sent an
+     * urgent note (at most one in 10 minutes), and when the customer was last sent safety wording
+     * (at most one in 24 hours).
+     */
+    safetyAlertedAt: tstz('safety_alerted_at'),
+    safetyWordedAt: tstz('safety_worded_at'),
     lastActivityAt: tstz('last_activity_at').notNull().defaultNow(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

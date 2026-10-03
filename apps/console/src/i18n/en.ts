@@ -862,7 +862,7 @@ export const en = {
         skipped: 'Skipped',
       },
       kind: 'Kind',
-      kinds: { reply: 'Reply to customer', draft: 'Draft for staff' },
+      kinds: { reply: 'Reply to customer', draft: 'Draft for staff', guard: 'Message guard' },
       conversation: 'Conversation',
       started: 'Started',
       finished: 'Finished',
