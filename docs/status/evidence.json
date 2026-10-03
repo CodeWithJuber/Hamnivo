@@ -19,9 +19,23 @@
     "note": "Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence and status checks, Chatwoot contract, accessibility, browser journeys) run with pnpm ci:local; --with-production also builds the images and checks the deployment. Every push to main can deploy itself without hosted CI. A signed GitHub webhook and a 5-minute check trigger it. The server checks and builds a clean copy of each version (Biome, type checks, unit tests, commit-tagged images), backs up before database changes, and starts the new version behind health checks and a soak period. Unhealthy versions are rolled back automatically. Changes a rollback cannot undo (destructive migrations, new versions of Chatwoot or PostgreSQL) wait for a deploy by hand, and migration mistakes stop the deploy. GitHub deployment statuses are reported when a token is set. All of this is tested end to end against a stand-in for GitHub."
   },
   "W03": {
-    "status": "in-progress",
-    "evidence": ["packages/brand/src/contrast.ts", "packages/brand/test/contrast.test.ts"],
-    "note": "Contrast validation implemented; widget studio UI pending."
+    "status": "partial",
+    "evidence": [
+      "packages/brand/src/contrast.ts",
+      "packages/brand/test/contrast.test.ts",
+      "apps/gateway/src/widget/appearance.ts",
+      "apps/gateway/src/widget/appearance.service.ts",
+      "apps/gateway/test/appearance.test.ts",
+      "apps/gateway/test/setup.int.test.ts",
+      "apps/widget/src/theme.ts",
+      "apps/widget/test/appearance.test.tsx",
+      "apps/console/src/pages/settings/AppearanceDialog.tsx",
+      "apps/console/src/pages/settings/WidgetPreview.tsx",
+      "apps/console/src/lib/appearance.ts",
+      "packages/db/src/schema/setup.ts",
+      "docs/guide/setup/widget-look.md"
+    ],
+    "note": "Each brand sets its main colour, logo, corner radius, greeting, offline text, rating on or off and privacy link in Studio, with a live picture of the chat in each language. The gateway refuses a colour whose text cannot be read or that fades into a white page (the same contrast check as the brand package) and Studio suggests a darker one. The widget draws itself from design tokens; a brand that changes nothing looks as before. Typography is not configurable, and the launcher position is a chat setting (W02)."
   },
   "HNV-24-01": {
     "status": "implemented",
@@ -121,9 +135,14 @@
       "apps/gateway/src/developer/keys.ts",
       "apps/gateway/src/developer/api-keys.service.ts",
       "apps/gateway/test/api-keys.int.test.ts",
-      "apps/console/e2e/developer.spec.ts"
+      "apps/console/e2e/developer.spec.ts",
+      "apps/gateway/src/runtime/model-connections.service.ts",
+      "apps/gateway/test/setup.int.test.ts",
+      "apps/console/src/pages/ModelsPage.tsx",
+      "apps/console/src/pages/models/ReplaceKeyDialog.tsx",
+      "docs/guide/setup/ai-keys.md"
     ],
-    "note": "Write-only, masked, envelope-encrypted secrets with rotation, revocation, KEK rotation and MFA + fresh sign-in. API keys for service accounts: scoped and expiring, shown once, stored as an HMAC, rotated with an overlap, revoked at once, rate-limited per key and audited."
+    "note": "Write-only, masked, envelope-encrypted secrets with rotation, revocation, KEK rotation and MFA + fresh sign-in. API keys for service accounts: scoped and expiring, shown once, stored as an HMAC, rotated with an overlap, revoked at once, rate-limited per key and audited. A workspace’s AI keys are replaced in place from Studio (the new key is stored, the old one revoked, agents carry on) and each can be tested with one tiny real call; Studio shows only yes or no for the keys the server holds."
   },
   "O05": {
     "status": "in-progress",
@@ -281,9 +300,12 @@
       "packages/client/test/client.test.ts",
       "packages/server-sdk/src/assertion.ts",
       "packages/server-sdk/test/assertion.test.ts",
-      "packages/widget-loader/src/loader.ts"
+      "packages/widget-loader/src/loader.ts",
+      "apps/console/src/pages/settings/IdentityPage.tsx",
+      "apps/console/src/lib/identity.ts",
+      "apps/console/test/setup-screens.test.tsx"
     ],
-    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, and identity assertions signed by the tenant: kid, audience, a five-minute lifetime and a single-use jti. A new identity is a new principal: the old session and its streams end. Brands register their keys through the admin API, with two-step verification and a recent sign-in: ES256, EdDSA or RS256 public keys, or an HS256 secret shown once. Keys can be retired, or revoked, which also ends the chats they signed in. Assertions may be dated up to 5 seconds ahead. @hamnivo/server signs assertions. In the widget, identify shows the customer's own chats; reset clears the screen, ends the session in Hamnivo and in the browser, forgets unsent messages and clears other tabs; a late token renewal cannot undo either. All of this is tested, including in Chromium with a real key. The widget does not yet show the signed-in customer's name."
+    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, and identity assertions signed by the tenant: kid, audience, a five-minute lifetime and a single-use jti. A new identity is a new principal: the old session and its streams end. Brands register their keys through the admin API, with two-step verification and a recent sign-in: ES256, EdDSA or RS256 public keys, or an HS256 secret shown once. Keys can be retired, or revoked, which also ends the chats they signed in. Assertions may be dated up to 5 seconds ahead. @hamnivo/server signs assertions. In the widget, identify shows the customer's own chats; reset clears the screen, ends the session in Hamnivo and in the browser, forgets unsent messages and clears other tabs; a late token renewal cannot undo either. All of this is tested, including in Chromium with a real key. The widget does not yet show the signed-in customer's name. Studio manages the keys too: create one (a shared secret is shown once, to copy), replace one (a new key of the same kind, the old one marked retiring) and revoke one."
   },
   "H08": {
     "status": "implemented",
@@ -344,9 +366,13 @@
       "packages/adapters/src/models/mock.ts",
       "packages/adapters/src/models/registry.ts",
       "packages/adapters/test/mock.test.ts",
-      "packages/adapters/test/models/contract.test.ts"
+      "packages/adapters/test/models/contract.test.ts",
+      "packages/adapters/src/models/probe.ts",
+      "packages/adapters/test/models/probe.test.ts",
+      "apps/gateway/src/runtime/model-connections.service.ts",
+      "apps/gateway/test/setup.int.test.ts"
     ],
-    "note": "Anthropic, OpenAI, Google Gemini and OpenAI-compatible adapters (AI SDK 7) plus deterministic mocks, a sourced capability table and error normalization; agents use them with tenant or platform keys, checked at publication, with fallback models on overload (tested against provider fixtures and with the mock end to end). No live provider call has run in the checks."
+    "note": "Anthropic, OpenAI, Google Gemini and OpenAI-compatible adapters (AI SDK 7) plus deterministic mocks, a sourced capability table and error normalization; agents use them with tenant or platform keys, checked at publication, with fallback models on overload (tested against provider fixtures and with the mock end to end). No live provider call has run in the checks. A key can be tested with one minimal call (a few tokens, a 10 second limit, through the egress guard) and the failures are put in plain words: wrong key, no credit, model not found, network. That call is tested against provider fixtures only."
   },
   "W01": {
     "status": "in-progress",
@@ -667,9 +693,11 @@
       "apps/gateway/test/conversation-flow.int.test.ts",
       "apps/widget/e2e/surface.spec.ts",
       "packages/domain/src/business-hours.ts",
-      "packages/domain/test/business-hours.test.ts"
+      "packages/domain/test/business-hours.test.ts",
+      "apps/console/src/pages/settings/HoursPage.tsx",
+      "apps/console/src/lib/hours.ts"
     ],
-    "note": "Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; \"talk to a person\" answers queued or offline with the return time in the customer's language. Offline, the widget shows a banner with the last update and a way to try again, and messages wait and go out once (tested). Verified customers can get an email when a reply waits (W25). Syncing Chatwoot working hours and a contact path for anonymous visitors are pending."
+    "note": "Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; \"talk to a person\" answers queued or offline with the return time in the customer's language. Offline, the widget shows a banner with the last update and a way to try again, and messages wait and go out once (tested). Verified customers can get an email when a reply waits (W25). Syncing Chatwoot working hours and a contact path for anonymous visitors are pending. Studio now edits the hours and holidays (A05), and a brand can write its own offline message (W03)."
   },
   "A04": {
     "status": "in-progress",
@@ -964,9 +992,10 @@
       "apps/gateway/src/inbox/assignment.service.ts",
       "apps/gateway/src/inbox/teams.service.ts",
       "apps/gateway/test/inbox-workspace.int.test.ts",
-      "apps/gateway/test/inbox.int.test.ts"
+      "apps/gateway/test/inbox.int.test.ts",
+      "apps/console/src/pages/settings/TeamsPage.tsx"
     ],
-    "note": "Manual routing: claim, assign to a colleague who may reply there, back to the queue, back to the AI, and team queues (teams belong to Hamnivo and are mirrored to Chatwoot with their members). Every owner change goes through the ownership epoch and is audited. Round-robin and capacity checks are not built yet."
+    "note": "Manual routing: claim, assign to a colleague who may reply there, back to the queue, back to the AI, and team queues (teams belong to Hamnivo and are mirrored to Chatwoot with their members). Every owner change goes through the ownership epoch and is audited. Round-robin and capacity checks are not built yet. Studio lists the teams and adds or takes out people (the Support teams page)."
   },
   "H03": {
     "status": "implemented",
@@ -2757,5 +2786,102 @@
       "apps/gateway/test/checks.live.test.ts"
     ],
     "note": "Evidence: before the model sees retrieved passages, the passage relevance check asks Jev three questions per passage, one request each with only the question and that passage: is it about the question, does it answer it, does it carry instructions for the assistant. Code decides, first match wins: instructions drop it, off-topic drops it, an answer keeps it, no answer drops it; an unsure passage is kept. Live drops them and records which (document ids and reasons, no text); shadow, every brand's start, records only; a passage Jev could not judge is kept. Verified live on 2026-10-02 with jev-1.13.0: a passage carrying instructions and an off-topic one were left out and the returns policy kept (247 ms for three passages in parallel). No thresholds were evaluated yet: brands set them per language. Skill ranking is not built."
+  },
+  "A01": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/onboarding/OnboardingPage.tsx",
+      "apps/console/src/pages/onboarding/BrandStep.tsx",
+      "apps/console/src/pages/onboarding/EngineStep.tsx",
+      "apps/console/src/pages/onboarding/AiKeyStep.tsx",
+      "apps/console/src/pages/onboarding/TestChatStep.tsx",
+      "apps/console/src/pages/onboarding/InstallStep.tsx",
+      "apps/console/src/pages/onboarding/TeamStep.tsx",
+      "apps/console/src/lib/onboarding.ts",
+      "apps/console/src/lib/install.ts",
+      "apps/gateway/src/setup/onboarding.service.ts",
+      "apps/console/test/setup-screens.test.tsx",
+      "apps/console/test/setup.test.ts",
+      "apps/gateway/test/setup.int.test.ts",
+      "docs/guide/setup/getting-started.md"
+    ],
+    "note": "A guided setup opens after a workspace is created and from Home: workspace, brand and website, the chat engine (connected by itself), an AI key with a test, a test chat, install with a guide per website platform, and the team. Every step can be skipped, and what was done or skipped is kept at the gateway, so the owner resumes where they stopped. Home’s checklist now puts the brand first, adds the AI key, and does not count an agent that answers with the offline practice model. Knowledge, a handoff team and publishing the agent are not steps of the guide yet (Home’s list covers publishing), and Studio cannot check that the install code is on the website. Screens are tested as rendered HTML and the logic in unit tests; there is no browser journey for it."
+  },
+  "A05": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/business-hours.ts",
+      "packages/domain/test/business-hours.test.ts",
+      "apps/console/src/pages/settings/HoursPage.tsx",
+      "apps/console/src/pages/settings/HoursSummary.tsx",
+      "apps/console/src/lib/hours.ts",
+      "apps/console/test/setup.test.ts",
+      "apps/console/test/setup-screens.test.tsx",
+      "apps/gateway/src/widget/copy.ts",
+      "docs/guide/setup/business-hours.md"
+    ],
+    "note": "Owners set each brand’s hours in Studio: a time zone, a week of opening spans (several on one day, such as a lunch break), quick starts, and whole days closed such as public holidays. The times are checked before saving and the hours can be removed, after which the chat never claims a person is available. Clock changes are handled by the domain rules. The page is tested as rendered HTML and its logic in unit tests; there is no browser journey for it."
+  },
+  "HNV-01-01": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/TenantsPage.tsx",
+      "apps/console/src/pages/onboarding/OnboardingPage.tsx"
+    ],
+    "note": "A new workspace opens the guided setup. It has seven skippable steps, not three, and shows no region or data location."
+  },
+  "HNV-01-02": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/onboarding/BrandStep.tsx",
+      "apps/console/src/pages/onboarding/InstallStep.tsx"
+    ],
+    "note": "Brand name and website, then the install step. Website is the only channel, so there is no choice of channel."
+  },
+  "HNV-01-03": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/onboarding/InstallStep.tsx",
+      "apps/console/src/lib/install.ts",
+      "apps/console/test/setup-screens.test.tsx"
+    ],
+    "note": "The install code with a copy confirmation, the allowed websites, readable steps and a guide for the website platform. There is no connection check: Studio cannot see the website, and the step says so and how to check by hand."
+  },
+  "HNV-01-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/onboarding/OnboardingPage.tsx",
+      "apps/console/src/pages/onboarding/Rail.tsx",
+      "apps/console/src/lib/onboarding.ts",
+      "apps/gateway/test/setup.int.test.ts",
+      "apps/console/test/setup-screens.test.tsx"
+    ],
+    "note": "The step list shows what is done, skipped or still to do; leaving keeps all of it; Home links back in and the guide opens at the first step still open. Any step can be skipped."
+  },
+  "HNV-04-01": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/settings/AppearanceDialog.tsx",
+      "apps/console/src/pages/settings/WidgetPreview.tsx",
+      "apps/console/src/lib/setup.ts",
+      "apps/console/test/setup-screens.test.tsx"
+    ],
+    "note": "A live picture of the chat (any of the four languages, team online or away), a contrast check with a darker suggestion to apply, reset to the saved look. Changes save straight to the chat (there is no draft), and there is no mobile viewport or launcher placement here."
+  },
+  "HNV-04-02": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/settings/AppearanceDialog.tsx",
+      "apps/console/src/pages/settings/HoursPage.tsx"
+    ],
+    "note": "The greeting and the offline message in four languages (English first), and the business hours on their own page. No journey preview and no identity label settings."
+  },
+  "HNV-04-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/settings/AppearanceDialog.tsx",
+      "apps/console/test/setup-screens.test.tsx"
+    ],
+    "note": "An invalid colour, address or text is explained next to its field and in a linked error summary, and what was typed is kept. The gateway checks again and its reasons are shown the same way."
   }
 }

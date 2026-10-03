@@ -32,14 +32,15 @@
 }
 
 # Studio, the staff console: a static app in which every path falls back to index.html. It talks
-# only to the API, and no website may frame it.
+# only to the API, and no website may frame it. The one page it frames is the chat host's, for the
+# test chat on a brand (the chat page names Studio as allowed to do so for test sessions only).
 {$HAMNIVO_APP_HOST} {
 	import tls
 	import headers
 	encode zstd gzip
 	root * /srv/studio
 	header {
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; frame-src https://{$HAMNIVO_CHAT_HOST}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 		X-Frame-Options DENY
 	}
 	@assets path /assets/*

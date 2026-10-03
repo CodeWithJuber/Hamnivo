@@ -30,3 +30,16 @@ export function defaultStorage(): KeyValueStorage {
     return new MemoryStorage();
   }
 }
+
+/**
+ * The same storage under its own names: every key gets a prefix, so what it keeps (the session,
+ * unsent messages, drafts) never meets what the same device keeps without it. A test chat opened
+ * in Studio uses this, so it never takes over or continues a real visitor's session.
+ */
+export function prefixedStorage(storage: KeyValueStorage, prefix: string): KeyValueStorage {
+  return {
+    getItem: (key) => storage.getItem(`${prefix}${key}`),
+    setItem: (key, value) => storage.setItem(`${prefix}${key}`, value),
+    removeItem: (key) => storage.removeItem(`${prefix}${key}`),
+  };
+}

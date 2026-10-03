@@ -20,7 +20,14 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
     provider asks who they are again; a passkey works too. Signing in as someone else there
     signs Studio out instead of continuing.
 - **Workspace choice.** Lists the person's workspaces and creates new ones. The choice is
-  remembered in this browser. With only one workspace, Studio opens it.
+  remembered in this browser. With only one workspace, Studio opens it. A workspace that was just
+  created opens the guided setup.
+- **Guided setup** (`/onboarding`, board 01). Seven steps an owner can do in order, skip, leave and
+  come back to: workspace, brand and website, the chat engine (it connects by itself), an AI key
+  with a test, a test chat, install (a picker for the website platform, linking its guide) and the
+  team. What was done or skipped is kept at the gateway (`/v1/admin/onboarding`). Studio cannot see
+  a website, so the install step says it cannot check the code and how to check by hand. The steps
+  are in `src/pages/onboarding/`, their logic in `src/lib/onboarding.ts` and `src/lib/install.ts`.
 - **Menu** (`src/lib/nav.ts`). Six entries: Home, Inbox, AI assistant, Sales, Reports and Settings.
   Each is a group of pages that already existed, with the permission each page always had.
   - An entry shows when the person can see at least one of its pages, and opens the first one they
@@ -37,17 +44,38 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
   - Someone who does not manage brands (support agents, supervisors) gets **Your chats**: how many
     customers wait for a person and how many chats are assigned to them (the inbox's own counts),
     and an "Open inbox" button.
-  - Anyone who can do a setup step gets **Get set up**: the steps still open (connect the chat engine, add a brand
-    and install the chat, publish an AI agent, invite a teammate), each linking to its page. A
-    step is shown only when the person can do it and the lists they can read say whether it is
-    done; nothing detects the install code on a website, so "install" counts once a brand has an
-    allowed website. The list is gone once every step is done.
+  - Anyone who can do a setup step gets **Get set up**: the steps still open, in the order to do
+    them (add a brand and its website, connect the chat engine, add an AI key, publish an AI agent,
+    invite a teammate), each linking to its page, and a button into the guided setup. A step is
+    shown only when the person can do it and the lists they can read say whether it is done.
+    "Add an AI key" is done by a key of the workspace's own or one the server holds, and "publish
+    an AI agent" does not count an agent that answers with the offline practice model. Nothing
+    detects the install code on a website, so "add a brand" counts once a brand has an allowed
+    website. The list is gone once every step is done.
 - **Brands and install.**
   - Create a brand with its allowed websites, and edit its name and websites later. Studio warns
     that a website taken off the list ends the chats open there.
   - Connect it to Chatwoot. The dialog says that Chatwoot is only the chat engine: people work in
     Studio and do not need to open it.
   - Copy the loader snippet with the brand's widget ID.
+  - **Look and wording** (W03): the main colour (checked for readable text and shown against a
+    white page, with a darker colour to apply when it fails), logo, corner roundness, greeting,
+    offline message, rating on or off and privacy link, with a live picture of the chat in each
+    language. Nothing reaches customers until it is saved.
+  - **Test chat**: the real chat for the brand in a window inside Studio, as a test conversation
+    that reports and counts leave out. It needs the chat engine, and the page that serves the chat
+    must allow Studio to frame it (`frame-src` in the Studio policy, `deploy/production/Caddyfile`).
+  - The brand's business hours in words, with a link to edit them.
+- **Business hours** (`/hours`, A05). A brand's time zone, weekly opening times (several on one
+  day), quick starts and the days closed, such as public holidays.
+- **Support teams** (`/support-teams`). The teams, with people added and taken out one at a time.
+- **Customer sign-in** (`/customer-identity`, W12). The keys that verify who a signed-in customer
+  is: create (a shared secret is shown once, to copy, or register a public key), replace (a new
+  key of the same kind, the old one marked retiring) and revoke.
+- **AI keys** (`/models`). Add a key with the provider's models in a dropdown (and the recommended
+  one chosen), test it with one tiny real message and read what came back in plain words (wrong
+  key, no credit, model not found, no connection), replace it in place, and see which keys the
+  server holds and whether Jev is set up (yes or no, never a key).
 - **AI agents.**
   - List and create agents.
   - Edit every draft setting: identity, behaviour, model and fallbacks, limits and knowledge.
@@ -190,9 +218,16 @@ pnpm --filter @hamnivo/console typecheck
 git.
 
 `pnpm --filter @hamnivo/console test` runs the unit and component tests in `test/`: text coverage
-in every language, who sees which menu entry and setup step, and the menu, the header and Home
-rendered to HTML in Node (`test/render.tsx` fills the query cache first, so nothing is fetched).
-The browser journeys are in `e2e/`.
+in every language, who sees which menu entry and setup step, and the menu, the header, Home and the
+setup screens rendered to HTML in Node (`test/render.tsx` fills the query cache first, so nothing is
+fetched). The files named `flows-*` mount a screen in a DOM (jsdom, `test/dom.tsx`) and type, press
+buttons and read back what was sent to the gateway, which `fakeGateway` stands in for. The
+browser journeys are in `e2e/`.
+
+Studio takes only the types of `@hamnivo/contracts`, so the schema library stays out of the page.
+The few lists it needs as data (the models in the dropdown, the chat's starting words, the steps of
+the guided setup) are in `src/lib/setup-data.ts`; `test/setup.test.ts` fails when they differ from
+the contracts.
 
 ## Settings
 

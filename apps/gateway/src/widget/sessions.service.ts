@@ -24,7 +24,7 @@ import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { filesScannable } from './attachments.service.js';
 import { launcherConfig, widgetConfig } from './copy.js';
-import { LOCAL_ANCESTORS, originAllowed, sessionOrigin } from './origins.js';
+import { frameAncestors, originAllowed, sessionOrigin } from './origins.js';
 import { SessionSignals } from './session-signals.service.js';
 import { brandSurface } from './settings.service.js';
 import {
@@ -60,8 +60,11 @@ export class WidgetSessionsService {
     private readonly signals: SessionSignals,
   ) {}
 
-  private checkOrigin(allowed: string[], hostOrigin: string | undefined) {
-    if (originAllowed(allowed, hostOrigin)) return;
+  /** `test`: a test chat opened from Studio, whose page is Studio itself (and never anyone else's). */
+  private checkOrigin(allowed: string[], hostOrigin: string | undefined, test = false) {
+    if (originAllowed(allowed, hostOrigin, test ? this.config.PUBLIC_CONSOLE_ORIGIN : undefined)) {
+      return;
+    }
     throw new AppError('ORIGIN_NOT_ALLOWED', {
       detail: 'Add this website to the brand’s allowed websites to use the chat here.',
     });
@@ -69,16 +72,20 @@ export class WidgetSessionsService {
 
   /**
    * Websites that may show this widget in a frame, matching the session origin check. The TLS
-   * proxy sends it as CSP frame-ancestors on the widget page.
+   * proxy sends it as CSP frame-ancestors on the widget page. A test chat (`test`) may also be
+   * framed by Studio.
    */
-  async framePolicy(widgetId: string): Promise<WidgetFramePolicy> {
+  async framePolicy(widgetId: string, test = false): Promise<WidgetFramePolicy> {
     const widget = await resolveWidget(this.db, widgetId);
     if (widget?.brandStatus !== 'active' || widget.tenantStatus !== 'active') {
       throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
     }
     return {
       widgetId,
-      frameAncestors: widget.allowedOrigins.length > 0 ? widget.allowedOrigins : LOCAL_ANCESTORS,
+      frameAncestors: frameAncestors(
+        widget.allowedOrigins,
+        test ? { studioOrigin: this.config.PUBLIC_CONSOLE_ORIGIN } : null,
+      ),
     };
   }
 
@@ -111,12 +118,13 @@ export class WidgetSessionsService {
     locale?: string;
     resumeToken?: string;
     hostOrigin?: string;
+    test?: boolean;
   }): Promise<WidgetSession> {
     const widget = await resolveWidget(this.db, input.widgetId);
     if (widget?.brandStatus !== 'active' || widget.tenantStatus !== 'active') {
       throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
     }
-    this.checkOrigin(widget.allowedOrigins, input.hostOrigin);
+    this.checkOrigin(widget.allowedOrigins, input.hostOrigin, input.test === true);
     if (input.resumeToken) {
       try {
         return await this.refresh(input.resumeToken, input.widgetId);
@@ -253,8 +261,15 @@ export class WidgetSessionsService {
       if (brand?.status !== 'active' || (widgetId && brand.widgetPublicId !== widgetId)) {
         return { error: true as const };
       }
-      // A website removed from the brand's list can no longer keep its chats going.
-      if (!originAllowed(brand.allowedOrigins, sessionOrigin(session.hostOrigin))) {
+      // A website removed from the brand's list can no longer keep its chats going. A test chat
+      // from Studio never was on the list: it began as a test, which is the only way in.
+      if (
+        !originAllowed(
+          brand.allowedOrigins,
+          sessionOrigin(session.hostOrigin),
+          this.config.PUBLIC_CONSOLE_ORIGIN,
+        )
+      ) {
         return { error: true as const };
       }
       const next = newRefreshSecret();

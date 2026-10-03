@@ -194,7 +194,14 @@ export class InboxService {
         .leftJoin(st, eq(st.conversationId, c.id))
         .leftJoin(p, eq(p.id, c.principalId))
         .leftJoin(schema.brands, eq(schema.brands.id, c.brandId))
-        .where(filters);
+        // The list shows a chat the owner opened to try the widget (it can be answered), but the
+        // counts leave it out.
+        .where(
+          and(
+            filters,
+            sql`not exists (select 1 from ${schema.testConversations} tc where tc.tenant_id = ${c.tenantId} and tc.conversation_id = ${c.id})`,
+          ),
+        );
       return {
         items: page.map((row) => toInboxConversation(row, last.get(row.control.id))),
         nextCursor:

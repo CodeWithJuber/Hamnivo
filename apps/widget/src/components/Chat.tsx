@@ -48,12 +48,15 @@ import type { ChatState } from '../useChat.js';
 import type { DisplayControls } from '../useDisplay.js';
 import type { MemoryControls } from '../useMemory.js';
 import { BidiText, directionOf } from './BidiText.js';
+import { BrandMark } from './BrandMark.js';
 import { Conversations } from './Conversations.js';
+import { Csat } from './Csat.js';
 import { Home } from './Home.js';
 import { MemoryConsent } from './MemoryConsent.js';
 import { MemoryPanel, useSlotLabel } from './MemoryPanel.js';
 import { DeleteMessage, EMOJI_NAMES, Reactions } from './MessageActions.js';
 import { Contact, Files, fileSize, Place, Unknown } from './Parts.js';
+import { PrivacyLink } from './PrivacyLink.js';
 import { Settings } from './Settings.js';
 
 interface Source {
@@ -1030,6 +1033,7 @@ export function Chat(props: {
         data-mode={props.mode}
       >
         <header className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b border-border bg-surface px-4 py-3">
+          <BrandMark url={config.brand.logoUrl} />
           <div className="min-w-0 flex-1 basis-40">
             <h1 className="truncate text-base font-semibold text-text">{config.brand.name}</h1>
             <p className="text-sm text-text-muted" data-testid="ai-disclosure">
@@ -1115,6 +1119,9 @@ export function Chat(props: {
           >
             {banner}
           </p>
+        ) : null}
+        {config.features.csat && conversation?.status === 'resolved' ? (
+          <Csat client={client} conversationId={conversation.id} />
         ) : null}
         {offline ? (
           <div
@@ -1270,6 +1277,7 @@ export function Chat(props: {
               onSendFiles={sendFiles}
               locale={locale}
             />
+            <PrivacyLink url={config.privacyPolicyUrl} />
           </div>
         </ThreadPrimitive.Root>
       </section>

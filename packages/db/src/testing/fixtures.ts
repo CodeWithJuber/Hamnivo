@@ -574,6 +574,7 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     conversationId: newId(),
     sessionId: newId(),
     modelSecretId: newId(),
+    modelConnectionId: newId(),
     knowledgeSourceId: newId(),
     documentId: newId(),
     documentVersionId: newId(),
@@ -901,6 +902,7 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       kekVersion: 1,
     });
     await tx.insert(s.modelConnections).values({
+      id: ids.modelConnectionId,
       tenantId,
       provider: 'openai-compatible',
       label: 'Local models',
@@ -1316,6 +1318,31 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       language: 'en',
       hits: 3,
       misses: 1,
+    });
+    // Setup: how the chat looks, a test chat, the last test of the AI key and the wizard's progress.
+    await tx.insert(s.brandAppearance).values({
+      tenantId,
+      brandId: ids.brandId,
+      appearance: { primaryColor: '#192A30', radius: 12, csat: true },
+    });
+    // The second conversation is the one an owner opened to try the chat; the first one carries
+    // the order and the run that reports are built on, so it must stay a real one.
+    await tx.insert(s.testConversations).values({
+      tenantId,
+      conversationId: otherConversationId,
+      brandId: ids.brandId,
+    });
+    await tx.insert(s.modelConnectionTests).values({
+      tenantId,
+      connectionId: ids.modelConnectionId,
+      ok: true,
+      kind: 'ok',
+      modelId: 'seed-model',
+    });
+    await tx.insert(s.onboardingProgress).values({
+      tenantId,
+      steps: { workspace: 'done', team: 'skipped' },
+      brandId: ids.brandId,
     });
     await seedCommerce(tx, tenantId, suffix, {
       workspaceId: ids.workspaceId,

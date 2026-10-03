@@ -42,6 +42,8 @@ export * from './platform-routes.js';
 export * from './routes.js';
 export * from './security.js';
 export * from './security-routes.js';
+export * from './setup.js';
+export * from './setup-routes.js';
 export * from './staff-conversations.js';
 export * from './tool-routes.js';
 export * from './tools.js';

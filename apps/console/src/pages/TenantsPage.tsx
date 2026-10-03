@@ -54,11 +54,11 @@ export function TenantsPage() {
   // One key per creation attempt, so a retry after a lost response can't create a second tenant.
   const idempotencyKey = useMemo(() => newIdempotencyKey(), []);
 
-  const open = async (tenantId: string) => {
+  const open = async (tenantId: string, to?: string) => {
     chooseTenant(tenantId);
     // Nothing from another tenant may stay on screen (HNV-03-06).
     client.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
-    await router.navigate({ href: search.redirect ?? '/overview' });
+    await router.navigate({ href: to ?? search.redirect ?? '/overview' });
   };
 
   const create = async (event: FormEvent) => {
@@ -79,7 +79,8 @@ export function TenantsPage() {
       });
       announce(t('tenants.create.created'));
       await client.invalidateQueries({ queryKey: ['me'] });
-      await open(membership.tenant.id);
+      // A new workspace starts with the guided setup.
+      await open(membership.tenant.id, '/onboarding');
     } catch (error) {
       if (error instanceof ApiError && error.fields.some((f) => f.path === 'slug')) {
         setErrors({ slug: t('tenants.create.slugTaken') });

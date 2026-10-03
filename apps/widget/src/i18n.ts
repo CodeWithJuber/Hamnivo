@@ -2,6 +2,7 @@ import type { ReplyLanguage } from '@hamnivo/contracts';
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { ACTION_COPY } from './actions/copy.js';
+import { APPEARANCE_COPY } from './appearance-copy.js';
 import { SHOP_COPY } from './commerce/copy.js';
 import { SURFACE_COPY } from './surface-copy.js';
 
@@ -34,6 +35,7 @@ export const resources = {
       shop: SHOP_COPY.en,
       surface: SURFACE_COPY.en,
       actions: ACTION_COPY.en,
+      appearance: APPEARANCE_COPY.en,
       memory: {
         open: 'Memory',
         title: 'What we remember',
@@ -147,6 +149,7 @@ export const resources = {
       shop: SHOP_COPY.ar,
       surface: SURFACE_COPY.ar,
       actions: ACTION_COPY.ar,
+      appearance: APPEARANCE_COPY.ar,
       memory: {
         open: 'الذاكرة',
         title: 'ما نتذكره',
@@ -258,6 +261,7 @@ export const resources = {
       shop: SHOP_COPY.hi,
       surface: SURFACE_COPY.hi,
       actions: ACTION_COPY.hi,
+      appearance: APPEARANCE_COPY.hi,
       memory: {
         open: 'मेमोरी',
         title: 'हम क्या याद रखते हैं',
@@ -371,6 +375,7 @@ export const resources = {
       shop: SHOP_COPY.ur,
       surface: SURFACE_COPY.ur,
       actions: ACTION_COPY.ur,
+      appearance: APPEARANCE_COPY.ur,
       memory: {
         open: 'میموری',
         title: 'ہم کیا یاد رکھتے ہیں',

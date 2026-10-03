@@ -36,6 +36,7 @@ import { migrationRoutes } from './migration-routes.js';
 import { AttachmentPart } from './parts.js';
 import { platformRoutes } from './platform-routes.js';
 import { securityRoutes } from './security-routes.js';
+import { setupRoutes } from './setup-routes.js';
 import {
   StaffConversation,
   StaffMessageRequest,
@@ -105,7 +106,12 @@ export const widgetRoutes = {
     summary: 'Websites allowed to embed this widget (used by the proxy for CSP frame-ancestors)',
     tags: ['Widget'],
     auth: 'public',
-    query: z.object({ widgetId: z.string().meta({ description: 'Widget ID (wid_…)' }) }),
+    query: z.object({
+      widgetId: z.string().meta({ description: 'Widget ID (wid_…)' }),
+      test: z.string().optional().meta({
+        description: 'Set to 1 when Studio frames the widget for a test chat: Studio may frame it',
+      }),
+    }),
     success: {
       status: 200,
       description:
@@ -391,6 +397,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...identityRoutes,
   ...adminRoutes,
   ...agentRoutes,
+  ...setupRoutes,
   ...knowledgeRoutes,
   ...migrationRoutes,
   ...widgetMemoryRoutes,

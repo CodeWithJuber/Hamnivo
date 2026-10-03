@@ -32,6 +32,11 @@ export interface HamnivoClientOptions {
   widgetId: string;
   /** Origin of the page embedding the widget (checked against the brand's allowed websites). */
   hostOrigin?: string;
+  /**
+   * A test chat the owner opened in Studio to try the widget: Studio's own page may then use it,
+   * and the conversations it starts are marked as tests (left out of reports and counts).
+   */
+  test?: boolean;
   locale?: string;
   storage?: KeyValueStorage;
   fetch?: typeof fetch;
@@ -146,6 +151,7 @@ export class HamnivoClient {
       widgetId: this.options.widgetId,
       ...(this.options.locale ? { locale: this.options.locale } : {}),
       ...(this.options.hostOrigin ? { hostOrigin: this.options.hostOrigin } : {}),
+      ...(this.options.test ? { test: true } : {}),
       ...(resumeToken ? { resumeToken } : {}),
     });
     if (!response.ok) throw await problemOf(response);

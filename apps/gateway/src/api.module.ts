@@ -92,6 +92,7 @@ import { RunsController } from './runtime/runs.controller.js';
 import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
 import { SecretsController } from './secrets/secrets.controller.js';
+import { SETUP_API_CONTROLLERS, SETUP_API_PROVIDERS } from './setup/setup.module.js';
 import { SupportController } from './support/support.controller.js';
 import { SupportService } from './support/support.service.js';
 import { APP_DB, AUTH, CONFIG, MAILER } from './tokens.js';
@@ -155,6 +156,7 @@ export class ApiModule {
         ...COMMERCE_API_CONTROLLERS,
         ...DEVELOPER_API_CONTROLLERS,
         ...WIDGET_SURFACE_API_CONTROLLERS,
+        ...SETUP_API_CONTROLLERS,
         ...ACTIONS_API_CONTROLLERS,
       ],
       providers: [
@@ -237,6 +239,7 @@ export class ApiModule {
         ...COMMERCE_API_PROVIDERS,
         ...developerApiProviders(overrides),
         ...widgetSurfaceApiProviders(config, overrides.scanner),
+        ...SETUP_API_PROVIDERS,
         ...ACTIONS_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },

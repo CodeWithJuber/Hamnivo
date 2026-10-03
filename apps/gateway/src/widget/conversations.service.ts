@@ -34,13 +34,16 @@ import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage, publicationFacts } from '../authority/views.js';
 import { EntitlementsService } from '../billing/entitlements.service.js';
 import { AppError } from '../common/app-error.js';
+import type { AppConfig } from '../config.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
-import { APP_DB, CLOCK, type Clock } from '../tokens.js';
+import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
+import { parseAppearance } from './appearance.js';
 import { WidgetAttachmentsService } from './attachments.service.js';
 import { AuthorityContactsService } from './contacts.service.js';
 import { handoffOutcome } from './copy.js';
+import { isStudioOrigin } from './origins.js';
 import {
   advanceCustomerRead,
   markCustomerSeenSynced,
@@ -61,6 +64,7 @@ export class WidgetConversationsService {
   constructor(
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(CONFIG) private readonly config: AppConfig,
     private readonly registry: AuthorityRegistry,
     private readonly contacts: AuthorityContactsService,
     private readonly journal: JournalService,
@@ -187,6 +191,18 @@ export class WidgetConversationsService {
         authorityStatus: status,
         authorityUpdatedAt: version,
       });
+      // A chat the owner opened from Studio to try the widget is a test: reports and counts skip it.
+      const [session] = await tx
+        .select({ hostOrigin: schema.widgetSessions.hostOrigin })
+        .from(schema.widgetSessions)
+        .where(eq(schema.widgetSessions.id, claims.sessionId));
+      if (isStudioOrigin(this.config.PUBLIC_CONSOLE_ORIGIN, session?.hostOrigin)) {
+        await tx.insert(schema.testConversations).values({
+          tenantId: claims.tenantId,
+          conversationId,
+          brandId: claims.brandId,
+        });
+      }
       // The reconciler follows the conversation from its first message (webhooks can be lost).
       await tx.insert(schema.reconcileCursors).values({
         tenantId: claims.tenantId,
@@ -419,7 +435,13 @@ export class WidgetConversationsService {
       const [brand] = control.brandId
         ? await tx.select().from(schema.brands).where(eq(schema.brands.id, control.brandId))
         : [];
-      outcome = handoffOutcome(brand, locale, now);
+      const [look] = brand
+        ? await tx
+            .select({ appearance: schema.brandAppearance.appearance })
+            .from(schema.brandAppearance)
+            .where(eq(schema.brandAppearance.brandId, brand.id))
+        : [];
+      outcome = handoffOutcome(brand, locale, now, parseAppearance(look?.appearance).offlineText);
       if (control.ownerMode !== 'AI_ACTIVE' && control.ownerMode !== 'PAUSED') return [];
       const note = input.note?.trim();
       const result = await this.ownership.transition(

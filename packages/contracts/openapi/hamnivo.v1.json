@@ -77,6 +77,15 @@
             },
             "required": true,
             "description": "Widget ID (wid_…)"
+          },
+          {
+            "in": "query",
+            "name": "test",
+            "schema": {
+              "description": "Set to 1 when Studio frames the widget for a test chat: Studio may frame it",
+              "type": "string"
+            },
+            "description": "Set to 1 when Studio frames the widget for a test chat: Studio may frame it"
           }
         ],
         "responses": {
@@ -4423,6 +4432,411 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/model-connections/status": {
+      "get": {
+        "operationId": "getModelSetupStatus",
+        "summary": "Which AI keys the server holds (yes or no), whether Jev is set up, and the last test of each connection (integrations.manage)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Setup status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelSetupStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/model-connections/{connectionId}/test": {
+      "post": {
+        "operationId": "testModelConnection",
+        "summary": "Make one real call of a few tokens with the connection’s key and say in plain words whether it worked (integrations.manage)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "schema": {
+              "type": "string",
+              "description": "mcn_…"
+            },
+            "required": true,
+            "description": "mcn_…"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestModelConnectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The outcome of the test",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProbeResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/model-connections/{connectionId}/rotate": {
+      "post": {
+        "operationId": "rotateModelConnectionKey",
+        "summary": "Replace the connection’s key in place; agents that use it keep working (integrations.manage, fresh sign-in)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connectionId",
+            "schema": {
+              "type": "string",
+              "description": "mcn_…"
+            },
+            "required": true,
+            "description": "mcn_…"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceModelKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Key replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConnection"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/appearance": {
+      "get": {
+        "operationId": "getWidgetAppearance",
+        "summary": "How the brand’s chat looks and what it says (widget.configure)",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Appearance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetAppearanceView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "setWidgetAppearance",
+        "summary": "Set the chat’s colour, logo, corners, greeting, offline text, rating and privacy link; the colour must be readable (widget.configure)",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWidgetAppearanceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Appearance saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetAppearanceView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/onboarding": {
+      "get": {
+        "operationId": "getOnboarding",
+        "summary": "Where the owner is in the setup wizard (brands.manage)",
+        "tags": [
+          "Administration"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingProgress"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateOnboarding",
+        "summary": "Mark wizard steps done or skipped, or finish it (brands.manage)",
+        "tags": [
+          "Administration"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOnboardingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingProgress"
                 }
               }
             }
@@ -19968,6 +20382,9 @@
             "type": "string",
             "maxLength": 300,
             "format": "uri"
+          },
+          "test": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -21242,6 +21659,205 @@
         "required": [
           "scope",
           "reason"
+        ]
+      },
+      "TestModelConnectionRequest": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
+      "ReplaceModelKeyRequest": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "apiKey"
+        ]
+      },
+      "UpdateWidgetAppearanceRequest": {
+        "$ref": "#/components/schemas/WidgetAppearance"
+      },
+      "WidgetAppearance": {
+        "type": "object",
+        "properties": {
+          "primaryColor": {
+            "default": "#192A30",
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "logoUrl": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "radius": {
+            "default": 12,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "greeting": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "en": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "ar": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "hi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "ur": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "en"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "offlineText": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "en": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "ar": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "hi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "ur": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "en"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "csat": {
+            "default": false,
+            "type": "boolean"
+          },
+          "privacyUrl": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "UpdateOnboardingRequest": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/OnboardingStep"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/OnboardingStepState"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "brandId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "brand identifier (TypeID with prefix \"brd\")",
+                "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OnboardingStep": {
+        "type": "string",
+        "enum": [
+          "workspace",
+          "brand",
+          "engine",
+          "aikey",
+          "testchat",
+          "install",
+          "team"
+        ]
+      },
+      "OnboardingStepState": {
+        "type": "string",
+        "enum": [
+          "done",
+          "skipped"
         ]
       },
       "CreateKnowledgeSourceRequest": {
@@ -30365,6 +30981,266 @@
           "outputTokens",
           "latencyMs",
           "detail"
+        ],
+        "additionalProperties": false
+      },
+      "ModelSetupStatus": {
+        "type": "object",
+        "properties": {
+          "serverKeys": {
+            "$ref": "#/components/schemas/ServerKeys"
+          },
+          "jev": {
+            "type": "object",
+            "properties": {
+              "configured": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "configured"
+            ],
+            "additionalProperties": false
+          },
+          "embeddings": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "mock",
+                  "openai",
+                  "google",
+                  "openai-compatible"
+                ]
+              },
+              "ready": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "provider",
+              "ready"
+            ],
+            "additionalProperties": false
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelConnectionTest"
+            }
+          }
+        },
+        "required": [
+          "serverKeys",
+          "jev",
+          "embeddings",
+          "tests"
+        ],
+        "additionalProperties": false
+      },
+      "ServerKeys": {
+        "type": "object",
+        "properties": {
+          "anthropic": {
+            "type": "boolean"
+          },
+          "openai": {
+            "type": "boolean"
+          },
+          "google": {
+            "type": "boolean"
+          },
+          "openaiCompatible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "anthropic",
+          "openai",
+          "google",
+          "openaiCompatible"
+        ],
+        "additionalProperties": false
+      },
+      "ModelConnectionTest": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "description": "modelConnection identifier (TypeID with prefix \"mcn\")",
+            "example": "mcn_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ModelProbeKind"
+          },
+          "modelId": {
+            "type": "string"
+          },
+          "testedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "connectionId",
+          "ok",
+          "kind",
+          "modelId",
+          "testedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ModelProbeKind": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "wrong_key",
+          "no_credit",
+          "model_not_found",
+          "network",
+          "blocked",
+          "rate_limited",
+          "unavailable",
+          "unknown"
+        ]
+      },
+      "ModelProbeResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ModelProbeKind"
+          },
+          "message": {
+            "type": "string"
+          },
+          "modelId": {
+            "type": "string"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "testedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "ok",
+          "kind",
+          "message",
+          "modelId",
+          "latencyMs",
+          "testedAt"
+        ],
+        "additionalProperties": false
+      },
+      "WidgetAppearanceView": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "appearance": {
+            "$ref": "#/components/schemas/WidgetAppearanceOutput"
+          },
+          "configVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "brandId",
+          "appearance",
+          "configVersion",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "OnboardingProgress": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/OnboardingStep"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/OnboardingStepState"
+            }
+          },
+          "brandId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "brand identifier (TypeID with prefix \"brd\")",
+                "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "steps",
+          "brandId",
+          "finishedAt",
+          "updatedAt"
         ],
         "additionalProperties": false
       },
@@ -47645,6 +48521,136 @@
         "required": [
           "toolId",
           "autopilot"
+        ],
+        "additionalProperties": false
+      },
+      "WidgetAppearanceOutput": {
+        "type": "object",
+        "properties": {
+          "primaryColor": {
+            "default": "#192A30",
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "logoUrl": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "radius": {
+            "default": 12,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 24
+          },
+          "greeting": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "en": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "ar": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "hi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "ur": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "en"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "offlineText": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "en": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "ar": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "hi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "ur": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "en"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "csat": {
+            "default": false,
+            "type": "boolean"
+          },
+          "privacyUrl": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "primaryColor",
+          "logoUrl",
+          "radius",
+          "greeting",
+          "offlineText",
+          "csat",
+          "privacyUrl"
         ],
         "additionalProperties": false
       },

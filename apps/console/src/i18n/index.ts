@@ -7,12 +7,18 @@ import { migrationAr } from './migration/ar';
 import { migrationEn } from './migration/en';
 import { migrationHi } from './migration/hi';
 import { migrationUr } from './migration/ur';
+import { setupAr } from './setup/ar';
+import { setupEn } from './setup/en';
+import { setupHi } from './setup/hi';
+import { setupUr } from './setup/ur';
 import { ur } from './ur';
 
 declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'translation';
-    resources: { translation: typeof en & { migration: typeof migrationEn } };
+    resources: {
+      translation: typeof en & { migration: typeof migrationEn; setup: typeof setupEn };
+    };
   }
 }
 
@@ -55,10 +61,10 @@ export function initialLocale(): Locale {
 export async function initI18n(locale: Locale) {
   await i18next.use(initReactI18next).init({
     resources: {
-      en: { translation: { ...en, migration: migrationEn } },
-      ar: { translation: { ...ar, migration: migrationAr } },
-      hi: { translation: { ...hi, migration: migrationHi } },
-      ur: { translation: { ...ur, migration: migrationUr } },
+      en: { translation: { ...en, migration: migrationEn, setup: setupEn } },
+      ar: { translation: { ...ar, migration: migrationAr, setup: setupAr } },
+      hi: { translation: { ...hi, migration: migrationHi, setup: setupHi } },
+      ur: { translation: { ...ur, migration: migrationUr, setup: setupUr } },
     },
     lng: locale,
     fallbackLng: 'en',

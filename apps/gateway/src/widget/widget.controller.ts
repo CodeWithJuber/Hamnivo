@@ -39,13 +39,14 @@ export class WidgetController {
       ...(input.locale ? { locale: input.locale } : {}),
       ...(input.resumeToken ? { resumeToken: input.resumeToken } : {}),
       ...(input.hostOrigin ? { hostOrigin: input.hostOrigin } : {}),
+      ...(input.test ? { test: true } : {}),
     });
   }
 
   @Get('frame-policy')
   async framePolicy(@Query() query: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
     const input = parseInput(widgetRoutes.framePolicy.query, query);
-    const policy = await this.sessions.framePolicy(input.widgetId);
+    const policy = await this.sessions.framePolicy(input.widgetId, input.test === '1');
     reply.header('x-hamnivo-frame-ancestors', policy.frameAncestors.join(' '));
     reply.header('cache-control', 'no-store');
     return policy;

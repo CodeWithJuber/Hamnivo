@@ -288,6 +288,20 @@
       "when": 1790998464033,
       "tag": "20261003033424_safety_marks",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791039910648,
+      "tag": "20261003150510_setup",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791039917112,
+      "tag": "20261003150517_setup_security",
+      "breakpoints": true
     }
   ]
 }
