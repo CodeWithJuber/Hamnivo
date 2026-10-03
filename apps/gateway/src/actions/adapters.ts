@@ -4,7 +4,13 @@ import {
   type McpEndpoint,
   readMcpResource,
 } from '@hamnivo/adapters/mcp';
-import { checkUrl, EgressError, type EgressPolicy, hostAllowed } from '@hamnivo/adapters/net';
+import {
+  checkUrl,
+  EgressError,
+  type EgressPolicy,
+  hostAllowed,
+  safeRequest,
+} from '@hamnivo/adapters/net';
 import { DemoActionsStore, DemoToolError } from '@hamnivo/adapters/tools';
 import { AgentConfig } from '@hamnivo/contracts';
 import { type Db, fromPublicId, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo/db';
@@ -20,7 +26,9 @@ import { and, desc, eq } from 'drizzle-orm';
 import { moneyText } from '../commerce/common.js';
 import type { AppConfig } from '../config.js';
 import { EgressService } from '../developer/egress.service.js';
+import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CONFIG } from '../tokens.js';
+import { type BuiltRequest, buildRequest, HttpArgumentError, interpret } from './http/request.js';
 import { McpCredentials, McpTokenUnavailable } from './mcp-credentials.service.js';
 import { mcpTrustedOrigins } from './mcp-origins.js';
 
@@ -175,13 +183,16 @@ const RESOURCE_CHUNK_CHARS = 3500;
 /** The most of one resource that agents read, however many pieces it takes. */
 const RESOURCE_READ_LIMIT = 100_000;
 const RESOURCE_RESPONSE_BYTES = 1_048_576;
+/** The most of an answer from a custom HTTP tool's service that is read. */
+const HTTP_RESPONSE_BYTES = 1_048_576;
 
 const text = (value: unknown) => (typeof value === 'string' ? value : String(value ?? ''));
 
 /**
  * The tools behind the registry: Hamnivo's own records (`order_status`), the in-memory demo order
- * service, and remote MCP servers through the egress guard. Every call is scoped to the
- * conversation's customer: an order of someone else does not exist for the call.
+ * service, remote MCP servers and customers' own HTTP services, both through the egress guard.
+ * Every call is scoped to the conversation's customer: an order of someone else does not exist
+ * for the call.
  */
 @Injectable()
 export class ToolAdapters {
@@ -190,6 +201,7 @@ export class ToolAdapters {
     @Inject(CONFIG) private readonly config: AppConfig,
     private readonly egress: EgressService,
     private readonly credentials: McpCredentials,
+    private readonly secrets: SecretBroker,
   ) {}
 
   /** Demo tools are offered outside production, or where demos are switched on. */
@@ -218,6 +230,7 @@ export class ToolAdapters {
 
   /** The action as it would be proposed: its resource, revision, changes and amount. */
   async prepare(tx: TenantTx, tool: ToolRow, args: Args, scope: ToolScope): Promise<Prepared> {
+    if (tool.source === 'http') return this.prepareHttp(tx, tool, args);
     if (tool.source === 'mcp') {
       return {
         ok: true,
@@ -428,6 +441,7 @@ export class ToolAdapters {
     scope: ToolScope,
     options: { idempotencyKey: string; signal: AbortSignal },
   ): Promise<ToolOutcome> {
+    if (tool.source === 'http') return this.executeHttp(tool, args, scope, options);
     if (tool.source === 'mcp') {
       const { serverId, endpoint } = await this.mcpEndpoint(tool, scope);
       try {
@@ -508,6 +522,182 @@ export class ToolAdapters {
       if (error instanceof ToolCallFailure) throw error;
       throw new ToolCallFailure('unexpected', 'The tool failed.', true);
     }
+  }
+
+  /** The request a custom HTTP tool is, with the service it goes to. */
+  private async httpEndpoint(tx: TenantTx, toolId: string) {
+    const [row] = await tx
+      .select({ endpoint: schema.httpToolEndpoints, source: schema.httpToolSources })
+      .from(schema.httpToolEndpoints)
+      .innerJoin(
+        schema.httpToolSources,
+        eq(schema.httpToolSources.id, schema.httpToolEndpoints.sourceId),
+      )
+      .where(eq(schema.httpToolEndpoints.toolId, toolId));
+    return row ?? null;
+  }
+
+  /** What a custom HTTP tool would send, in words, for an approver (the arguments are exact). */
+  private async prepareHttp(tx: TenantTx, tool: ToolRow, args: Args): Promise<Prepared> {
+    const found = await this.httpEndpoint(tx, tool.id);
+    if (found?.source.status !== 'active') {
+      return { ok: false, summary: 'This tool’s service is turned off.' };
+    }
+    return {
+      ok: true,
+      proposal: {
+        summary: tool.title,
+        effects: [
+          `Sends a ${found.endpoint.method} request to ${new URL(found.source.baseUrl).host}.`,
+        ],
+        changes: Object.entries(args).map(([field, value]) => ({
+          field,
+          from: null,
+          to: (typeof value === 'string' ? value : JSON.stringify(value)).slice(0, 300),
+        })),
+        resource: null,
+        amount: null,
+      },
+    };
+  }
+
+  /**
+   * A failure to send or to hear back: where it happened decides whether it may have applied. A
+   * call that ran out of time because of the deadline the caller set (its own signal, which can
+   * end the request before the request's own deadline does) is a timeout like any other.
+   */
+  private httpFailure(error: unknown, writes: boolean, signal: AbortSignal): ToolCallFailure {
+    const reason: unknown = signal.aborted ? signal.reason : null;
+    const ranOut = reason instanceof Error && reason.name === 'TimeoutError';
+    if (error instanceof EgressError) {
+      switch (error.problem) {
+        // Refused before any byte of the request left.
+        case 'invalid_url':
+        case 'insecure_url':
+        case 'host_not_allowed':
+        case 'private_address':
+        case 'unresolvable':
+        case 'tls':
+          return new ToolCallFailure('egress', error.message, false);
+        case 'timeout':
+          return new ToolCallFailure('timeout', error.message, writes);
+        default:
+          return ranOut
+            ? new ToolCallFailure('timeout', 'The request timed out.', writes)
+            : new ToolCallFailure('network', error.message, writes);
+      }
+    }
+    return new ToolCallFailure(ranOut ? 'timeout' : 'unexpected', 'The tool failed.', writes);
+  }
+
+  /**
+   * One request to a customer's own service. The address is checked against the tool's host list
+   * and the workspace's policy, the credential is read from the secret broker only after the
+   * arguments made a request that may be sent, and a change carries the action's idempotency key.
+   * An answer that is not a success is told apart: the service refused (nothing happened) or it may
+   * have done it (never sent again, a person checks).
+   */
+  private async executeHttp(
+    tool: ToolRow,
+    args: Args,
+    scope: ToolScope,
+    options: { idempotencyKey: string; signal: AbortSignal },
+  ): Promise<ToolOutcome> {
+    const plan = await withTenant(
+      this.db,
+      { tenantId: scope.tenantId, actorId: 'ai' },
+      async (tx) => {
+        const found = await this.httpEndpoint(tx, tool.id);
+        if (found?.source.status !== 'active') {
+          throw new ToolCallFailure('server_disabled', 'The tool’s service is turned off.', false);
+        }
+        const { source, endpoint } = found;
+        const workspace = await this.egress.policyIn(
+          tx,
+          mcpTrustedOrigins(this.config, source.baseUrl),
+        );
+        try {
+          checkMcpServer(source.baseUrl, tool.egressHosts, workspace);
+        } catch (error) {
+          if (error instanceof EgressError) {
+            throw new ToolCallFailure('egress', error.message, false);
+          }
+          throw error;
+        }
+        let request: BuiltRequest;
+        try {
+          request = buildRequest(endpoint, source.baseUrl, args);
+        } catch (error) {
+          if (error instanceof HttpArgumentError) {
+            throw new ToolCallFailure('arguments', error.message, false);
+          }
+          throw error;
+        }
+        let credential: string | null = null;
+        if (source.authSecretId) {
+          try {
+            credential = await this.secrets.reveal(tx, scope.tenantId, source.authSecretId);
+          } catch {
+            throw new ToolCallFailure('auth', 'The service’s credential is missing.', false);
+          }
+        }
+        return { request, workspace, credential, source };
+      },
+    );
+    const { request, source } = plan;
+    const writes = request.method !== 'GET';
+    const headers: Record<string, string> = { ...request.headers, 'user-agent': 'Hamnivo-Tools/1' };
+    if (plan.credential !== null && source.authHeader) {
+      headers[source.authHeader.toLowerCase()] =
+        source.authKind === 'bearer' ? `Bearer ${plan.credential}` : plan.credential;
+    }
+    // A service that keeps keys answers the same request once; one that does not is not harmed.
+    if (writes) headers['idempotency-key'] = options.idempotencyKey;
+    let response: Awaited<ReturnType<typeof safeRequest>>;
+    try {
+      response = await safeRequest(
+        {
+          url: request.url,
+          method: request.method,
+          headers,
+          ...(request.body !== undefined ? { body: request.body } : {}),
+          timeoutMs: tool.timeoutMs,
+          maxResponseBytes: Math.min(
+            Math.max(tool.maxOutputBytes * 4, 65_536),
+            HTTP_RESPONSE_BYTES,
+          ),
+          signal: options.signal,
+        },
+        plan.workspace,
+      );
+    } catch (error) {
+      throw this.httpFailure(error, writes, options.signal);
+    }
+    const verdict = interpret({
+      status: response.status,
+      contentType: String(response.headers['content-type'] ?? ''),
+      body: response.body,
+      truncated: response.truncated,
+    });
+    if (verdict.kind === 'ok') {
+      return {
+        status: 'succeeded',
+        output: verdict.output,
+        reference: null,
+        summary: `${tool.title}: completed.`,
+      };
+    }
+    if (verdict.kind === 'refused') {
+      if (verdict.credential) {
+        throw new ToolCallFailure('auth', 'The service did not accept the credential.', false);
+      }
+      return {
+        status: 'failed',
+        reason: verdict.reason,
+        summary: `${tool.title}: the service did not accept the request (${verdict.status}).`,
+      };
+    }
+    throw new ToolCallFailure(verdict.reason, 'The service answered with an error.', writes);
   }
 
   /** A resource of one of the brand's active servers that a person allowed agents to read. */

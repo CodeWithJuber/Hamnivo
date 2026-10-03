@@ -632,7 +632,7 @@ Packages: 1009. Needing review: 0.
 | jose | 6.2.12 | MIT | permissive |
 | js-levenshtein | 1.1.6 | MIT | permissive |
 | js-tokens | 4.0.0 | MIT | permissive |
-| js-yaml | 4.3.2 | MIT | permissive |
+| js-yaml | 4.3.2, 5.4.2 | MIT | permissive |
 | jsdom | 30.1.1 | MIT | permissive |
 | jsesc | 3.1.0 | MIT | permissive |
 | json-schema | 0.4.0 | (AFL-2.1 OR BSD-3-Clause) | permissive |

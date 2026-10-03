@@ -22,6 +22,7 @@ import {
   PlusIcon,
   RefreshCwIcon,
   Trash2Icon,
+  UploadIcon,
   UserCheckIcon,
   WrenchIcon,
   XIcon,
@@ -40,6 +41,10 @@ import {
 } from '../components/Fields';
 import { PageHeader, Section } from '../components/PageHeader';
 import { ActionError, QueryState } from '../components/States';
+import { HttpEndpointDialog } from '../components/tools/HttpEndpointDialog';
+import { HttpImportDialog } from '../components/tools/HttpImportDialog';
+import { RequestLine } from '../components/tools/HttpToolForms';
+import { HttpToolSources } from '../components/tools/HttpToolSources';
 import { McpCatalogSheet } from '../components/tools/McpCatalogSheet';
 import {
   EditServerDialog,
@@ -66,7 +71,12 @@ import {
   useMcpServers,
   useTools,
 } from '../lib/actions';
-import { presetText, useMcpPresets } from '../lib/ai-power';
+import {
+  type HttpToolSource,
+  presetText,
+  useHttpToolSources,
+  useMcpPresets,
+} from '../lib/ai-power';
 import { api, isApiError, newIdempotencyKey } from '../lib/api';
 import { returnFocus, useOpener } from '../lib/focus';
 import { formatDateTime } from '../lib/format';
@@ -113,11 +123,13 @@ function serverName(servers: McpServer[], id: string | null) {
 function ToolTable({
   tools,
   servers,
+  httpSources,
   selected,
   onOpen,
 }: {
   tools: ToolDefinition[];
   servers: McpServer[];
+  httpSources: HttpToolSource[];
   selected: string | undefined;
   onOpen: (toolId: string) => void;
 }) {
@@ -130,6 +142,13 @@ function ToolTable({
       const key = tool.mcpServerId ?? '';
       external.set(key, [...(external.get(key) ?? []), tool]);
     }
+    // Custom HTTP tools are grouped by the service they belong to.
+    const custom = new Map<string, ToolDefinition[]>();
+    for (const tool of tools.filter((x) => x.source === 'http')) {
+      const owner = httpSources.find((s) => s.endpoints.some((e) => e.toolId === tool.id));
+      const key = owner?.id ?? '';
+      custom.set(key, [...(custom.get(key) ?? []), tool]);
+    }
     return [
       ...(builtin.length
         ? [{ id: 'builtin', title: t('tools.list.builtin'), items: builtin }]
@@ -139,8 +158,15 @@ function ToolTable({
         title: t('tools.list.from', { server: serverName(servers, id) }),
         items,
       })),
+      ...[...custom.entries()].map(([id, items]) => ({
+        id: `http:${id}`,
+        title: t('tools.list.from', {
+          server: httpSources.find((s) => s.id === id)?.name ?? id,
+        }),
+        items,
+      })),
     ];
-  }, [tools, servers, t]);
+  }, [tools, servers, httpSources, t]);
 
   // `relative` keeps the visually hidden header text inside the scroll area: without it, that
   // text sits at its place in the wide table and makes the whole page scroll sideways on a phone.
@@ -236,6 +262,8 @@ function ToolTable({
 }
 
 interface PolicyForm {
+  title: string;
+  description: string;
   status: ToolDefinition['status'];
   risk: RiskClass;
   approver: 'customer' | 'staff';
@@ -249,6 +277,8 @@ interface PolicyForm {
 }
 
 const toPolicyForm = (tool: ToolDefinition): PolicyForm => ({
+  title: tool.title,
+  description: tool.description,
   status: tool.status,
   risk: tool.risk,
   approver: tool.approver,
@@ -276,6 +306,16 @@ function policyChanges(
 ): { body: Record<string, unknown>; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
   const body: Record<string, unknown> = {};
+  // What a person reads and what the AI is told: the words of a tool from outside are theirs to check.
+  if (tool.source !== 'builtin') {
+    if (!form.title.trim()) errors['tool-title'] = t('aiPower.http.tool.errors.title');
+    else if (form.title.trim() !== tool.title) body.title = form.title.trim();
+    if (!form.description.trim()) {
+      errors['tool-description'] = t('aiPower.http.tool.errors.description');
+    } else if (form.description.trim() !== tool.description) {
+      body.description = form.description.trim();
+    }
+  }
   if (form.status !== tool.status) body.status = form.status;
   if (form.risk !== tool.risk) body.risk = form.risk;
   if (form.approver !== tool.approver) body.approver = form.approver;
@@ -298,7 +338,7 @@ function policyChanges(
   const kb = whole(form.maxOutputKb, 1, 256);
   if (kb === null) errors['tool-maxOutput'] = t('tools.errors.number', { min: 1, max: 256 });
   else if (kb * 1024 !== tool.maxOutputBytes) body.maxOutputBytes = kb * 1024;
-  if (tool.source === 'mcp') {
+  if (tool.source !== 'builtin') {
     const hosts = form.egressHosts
       .split(/[\s,]+/)
       .map((h) => h.trim().toLowerCase())
@@ -317,10 +357,12 @@ function policyChanges(
 function ToolDetail({
   tool,
   servers,
+  httpSources,
   onSaved,
 }: {
   tool: ToolDefinition;
   servers: McpServer[];
+  httpSources: HttpToolSource[];
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
@@ -335,6 +377,8 @@ function ToolDetail({
   const [stopReason, setStopReason] = useState('');
   const recent = useActionLog({ toolId: tool.id, limit: 5 });
   const server = servers.find((s) => s.id === tool.mcpServerId);
+  const service = httpSources.find((s) => s.endpoints.some((e) => e.toolId === tool.id));
+  const request = service?.endpoints.find((e) => e.toolId === tool.id);
 
   useEffect(() => {
     setForm(toPolicyForm(tool));
@@ -462,6 +506,52 @@ function ToolDetail({
         </section>
       ) : null}
 
+      {tool.source === 'http' ? (
+        <section aria-labelledby="tool-service" className="flex flex-col gap-2">
+          <h3 id="tool-service" className="text-sm font-semibold text-text">
+            {t('aiPower.http.tool.service')}
+          </h3>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+            <dt className="text-text-secondary">{t('tools.servers.columns.name')}</dt>
+            <dd>
+              <bdi>{service?.name ?? '—'}</bdi>{' '}
+              {service ? (
+                <StatusBadge tone={service.status === 'active' ? 'success' : 'neutral'}>
+                  {t(`aiPower.http.source.status.${service.status}`)}
+                </StatusBadge>
+              ) : null}
+            </dd>
+            <dt className="text-text-secondary">{t('aiPower.http.tool.request')}</dt>
+            <dd className="min-w-0">
+              {request ? <RequestLine method={request.method} path={request.path} /> : '—'}
+            </dd>
+            <dt className="text-text-secondary">{t('tools.drawer.credential')}</dt>
+            <dd>
+              <bdi dir="ltr" className="font-mono text-xs">
+                {service?.auth.masked ?? t('tools.drawer.noCredential')}
+              </bdi>
+            </dd>
+            <dt className="text-text-secondary">{t('tools.drawer.hosts')}</dt>
+            <dd className="min-w-0 break-all">
+              <bdi dir="ltr" className="font-mono text-xs">
+                {tool.egressHosts.join(', ') || '—'}
+              </bdi>
+            </dd>
+          </dl>
+          {tool.remoteDescription ? (
+            <figure className="flex flex-col gap-1 rounded-lg border border-dashed border-border p-3">
+              <figcaption className="text-xs font-medium text-text-secondary">
+                {t('tools.drawer.remote')}
+              </figcaption>
+              <blockquote className="text-sm text-text">
+                <bdi>{tool.remoteDescription}</bdi>
+              </blockquote>
+              <p className="text-xs text-text-secondary">{t('tools.drawer.remoteNote')}</p>
+            </figure>
+          ) : null}
+        </section>
+      ) : null}
+
       {tool.status === 'review' && manage ? (
         <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
           <p className="text-sm text-text">{t('tools.drawer.reviewNote')}</p>
@@ -479,6 +569,30 @@ function ToolDetail({
       <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)} noValidate>
         <h3 className="text-sm font-semibold text-text">{t('tools.drawer.settings')}</h3>
         <FormErrorSummary title={t('auth.errorSummary')} errors={summary} />
+        {tool.source !== 'builtin' ? (
+          <>
+            <TextField
+              id="tool-title"
+              label={t('aiPower.http.tool.titleLabel')}
+              value={form.title}
+              maxLength={120}
+              onChange={(event) => set('title', event.target.value)}
+              error={errors['tool-title']}
+              disabled={!manage}
+            />
+            <TextareaField
+              id="tool-description"
+              label={t('aiPower.http.tool.descriptionLabel')}
+              hint={t('aiPower.http.tool.descriptionHint')}
+              value={form.description}
+              rows={3}
+              maxLength={1000}
+              onChange={(event) => set('description', event.target.value)}
+              error={errors['tool-description']}
+              disabled={!manage}
+            />
+          </>
+        ) : null}
         {tool.status !== 'review' ? (
           <CheckboxField
             id="tool-status"
@@ -577,7 +691,7 @@ function ToolDetail({
             disabled={!manage}
           />
         </div>
-        {tool.source === 'mcp' ? (
+        {tool.source !== 'builtin' ? (
           <TextareaField
             id="tool-hosts"
             label={t('tools.drawer.hosts')}
@@ -1371,9 +1485,12 @@ export function ToolsPage() {
   const brandId = chosen?.id;
   const tools = useTools(brandId);
   const servers = useMcpServers(brandId);
+  const httpSources = useHttpToolSources(brandId);
   const agents = useAgents();
   const [addOpen, setAddOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [writeOpen, setWriteOpen] = useState(false);
   const dir = directionOf(isLocale(i18n.language) ? i18n.language : 'en');
   const toolOpener = useOpener(Boolean(search.tool));
   const manage = can('tools.manage');
@@ -1461,6 +1578,7 @@ export function ToolsPage() {
                 <ToolTable
                   tools={data.items}
                   servers={servers.data?.items ?? []}
+                  httpSources={httpSources.data?.items ?? []}
                   selected={search.tool}
                   onOpen={(toolId) => go({ brand: brandId, tool: toolId })}
                 />
@@ -1498,6 +1616,49 @@ export function ToolsPage() {
           </Section>
 
           <Section
+            id="tools-http"
+            title={t('aiPower.http.title')}
+            description={t('aiPower.http.description')}
+            actions={
+              manage ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setImportOpen(true)}
+                    data-testid="import-http"
+                  >
+                    <UploadIcon aria-hidden="true" />
+                    {t('aiPower.http.importLabel')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setWriteOpen(true)}
+                    data-testid="write-http"
+                  >
+                    <PlusIcon aria-hidden="true" />
+                    {t('aiPower.http.writeLabel')}
+                  </Button>
+                </div>
+              ) : null
+            }
+          >
+            <QueryState
+              query={httpSources}
+              label={t('aiPower.http.loading')}
+              isEmpty={(data) => data.items.length === 0}
+              empty={<p className="text-sm text-text-secondary">{t('aiPower.http.empty')}</p>}
+            >
+              {(data) => (
+                <HttpToolSources
+                  sources={data.items}
+                  manage={manage}
+                  onOpenTool={(toolId) => go({ brand: brandId, tool: toolId })}
+                />
+              )}
+            </QueryState>
+          </Section>
+
+          <Section
             id="tools-settings"
             title={t('tools.settings.title')}
             description={t('tools.settings.description')}
@@ -1520,6 +1681,11 @@ export function ToolsPage() {
             existing={tools.data?.items ?? []}
           />
           <ConnectServerDialog open={connectOpen} onOpenChange={setConnectOpen} brandId={brandId} />
+          <HttpImportDialog open={importOpen} onOpenChange={setImportOpen} brandId={brandId} />
+          <HttpEndpointDialog
+            mode={writeOpen ? { kind: 'create', brandId } : null}
+            onOpenChange={setWriteOpen}
+          />
         </>
       ) : null}
 
@@ -1559,6 +1725,7 @@ export function ToolsPage() {
               <ToolDetail
                 tool={selected}
                 servers={servers.data?.items ?? []}
+                httpSources={httpSources.data?.items ?? []}
                 onSaved={() => undefined}
               />
             ) : null}

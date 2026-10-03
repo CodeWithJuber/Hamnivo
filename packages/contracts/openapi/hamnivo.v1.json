@@ -19517,6 +19517,463 @@
         }
       }
     },
+    "/v1/admin/http-tools/sources": {
+      "get": {
+        "operationId": "listHttpToolSources",
+        "summary": "Services whose requests are custom HTTP tools, with their tools (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "brandId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Services",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HttpToolSource"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createHttpToolSource",
+        "summary": "Add a service with custom HTTP tools, from chosen operations of an OpenAPI description or one request written by hand; the tools start in review and its credential goes to the secret broker (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Retry-safe key bound to the request body hash; reuse with a different body returns 409",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHttpSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Service added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpToolSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/http-tools/preview": {
+      "post": {
+        "operationId": "previewHttpSpec",
+        "summary": "Read an OpenAPI 3 description (pasted, or fetched from an address through the egress guard) and list the tools it could become; nothing is saved (tools.manage)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewHttpSpecRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpSpecPreview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/http-tools/sources/{sourceId}": {
+      "patch": {
+        "operationId": "updateHttpToolSource",
+        "summary": "Rename a service, change its address, replace its credential or turn it off (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "description": "Custom tool source ID (hsrc_…)"
+            },
+            "required": true,
+            "description": "Custom tool source ID (hsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHttpSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpToolSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteHttpToolSource",
+        "summary": "Remove a service: its tools are turned off, pending requests are cancelled and its credential is revoked; what its tools did stays on record (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "description": "Custom tool source ID (hsrc_…)"
+            },
+            "required": true,
+            "description": "Custom tool source ID (hsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/http-tools/sources/{sourceId}/endpoints": {
+      "post": {
+        "operationId": "addHttpToolEndpoints",
+        "summary": "Add more tools to a service: operations of an OpenAPI description, or one request written by hand; they start in review (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "description": "Custom tool source ID (hsrc_…)"
+            },
+            "required": true,
+            "description": "Custom tool source ID (hsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Retry-safe key bound to the request body hash; reuse with a different body returns 409",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddHttpEndpointsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Service with the new tools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpToolSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/http-tools/sources/{sourceId}/endpoints/{toolId}": {
+      "put": {
+        "operationId": "updateHttpToolEndpoint",
+        "summary": "Replace a request written by hand; the tool goes back to review and requests waiting on it are cancelled (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "description": "Custom tool source ID (hsrc_…)"
+            },
+            "required": true,
+            "description": "Custom tool source ID (hsrc_…)"
+          },
+          {
+            "in": "path",
+            "name": "toolId",
+            "schema": {
+              "type": "string",
+              "description": "Tool ID (tool_…)"
+            },
+            "required": true,
+            "description": "Tool ID (tool_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHttpEndpointRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpToolSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/inbox/conversations/{conversationId}/actions": {
       "get": {
         "operationId": "listConversationActions",
@@ -25549,6 +26006,339 @@
         "required": [
           "role",
           "text"
+        ]
+      },
+      "CreateHttpSourceRequest": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "baseUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "auth": {
+            "default": {
+              "kind": "none"
+            },
+            "$ref": "#/components/schemas/HttpToolAuthInput"
+          },
+          "openapi": {
+            "$ref": "#/components/schemas/HttpOpenApiImport"
+          },
+          "endpoint": {
+            "$ref": "#/components/schemas/HttpEndpointInput"
+          }
+        },
+        "required": [
+          "brandId",
+          "name",
+          "baseUrl"
+        ]
+      },
+      "HttpToolAuthInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "none"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "bearer"
+              },
+              "token": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 4000
+              }
+            },
+            "required": [
+              "kind",
+              "token"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "header"
+              },
+              "header": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "required": [
+              "kind",
+              "header",
+              "value"
+            ]
+          }
+        ],
+        "type": "object"
+      },
+      "HttpOpenApiImport": {
+        "type": "object",
+        "properties": {
+          "spec": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 900000
+          },
+          "specUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "specHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "operations": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 400
+            }
+          }
+        },
+        "required": [
+          "operations"
+        ]
+      },
+      "HttpEndpointInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpToolMethod"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\/[A-Za-z0-9\\-._~!$&'()*+,;=:@%/{}]*$"
+          },
+          "arguments": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpToolArgumentInput"
+            }
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "method",
+          "path"
+        ]
+      },
+      "HttpToolMethod": {
+        "type": "string",
+        "enum": [
+          "GET",
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE"
+        ],
+        "description": "The request method of a custom HTTP tool."
+      },
+      "HttpToolArgumentInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+          },
+          "in": {
+            "$ref": "#/components/schemas/HttpToolArgumentIn"
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "type": {
+            "default": "string",
+            "$ref": "#/components/schemas/HttpToolArgumentType"
+          },
+          "required": {
+            "default": false,
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "name",
+          "in"
+        ]
+      },
+      "HttpToolArgumentIn": {
+        "type": "string",
+        "enum": [
+          "path",
+          "query",
+          "header",
+          "body"
+        ],
+        "description": "Where an argument goes in the request: the address path, the query string, a header, or a field of the JSON body."
+      },
+      "HttpToolArgumentType": {
+        "type": "string",
+        "enum": [
+          "string",
+          "integer",
+          "number",
+          "boolean"
+        ]
+      },
+      "PreviewHttpSpecRequest": {
+        "type": "object",
+        "properties": {
+          "spec": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 900000
+          },
+          "specUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "httpSource identifier (TypeID with prefix \"hsrc\")",
+            "example": "hsrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          }
+        }
+      },
+      "UpdateHttpSourceRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "baseUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "auth": {
+            "$ref": "#/components/schemas/HttpToolAuthInput"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          }
+        }
+      },
+      "AddHttpEndpointsRequest": {
+        "type": "object",
+        "properties": {
+          "openapi": {
+            "$ref": "#/components/schemas/HttpOpenApiImport"
+          },
+          "endpoint": {
+            "$ref": "#/components/schemas/HttpEndpointInput"
+          }
+        }
+      },
+      "UpdateHttpEndpointRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpToolMethod"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\/[A-Za-z0-9\\-._~!$&'()*+,;=:@%/{}]*$"
+          },
+          "arguments": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpToolArgumentInput"
+            }
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "method",
+          "path",
+          "expectedRevision"
         ]
       },
       "DecideActionRequest": {
@@ -48922,6 +49712,380 @@
         },
         "required": [
           "customerId"
+        ],
+        "additionalProperties": false
+      },
+      "HttpToolSource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "httpSource identifier (TypeID with prefix \"hsrc\")",
+            "example": "hsrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "openapi",
+              "manual"
+            ]
+          },
+          "baseUrl": {
+            "type": "string"
+          },
+          "auth": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "$ref": "#/components/schemas/HttpToolAuthKind"
+              },
+              "header": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "masked": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "header",
+              "masked"
+            ],
+            "additionalProperties": false
+          },
+          "specTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "specVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpToolEndpoint"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "name",
+          "kind",
+          "baseUrl",
+          "auth",
+          "specTitle",
+          "specVersion",
+          "status",
+          "endpoints",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "HttpToolAuthKind": {
+        "type": "string",
+        "enum": [
+          "none",
+          "bearer",
+          "header"
+        ],
+        "description": "`bearer`: a token sent as `Authorization: Bearer …`. `header`: a secret value sent in a header of your choice."
+      },
+      "HttpToolEndpoint": {
+        "type": "object",
+        "properties": {
+          "toolId": {
+            "type": "string",
+            "description": "tool identifier (TypeID with prefix \"tool\")",
+            "example": "tool_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "toolName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpToolMethod"
+          },
+          "path": {
+            "type": "string"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ToolStatus"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpToolArgument"
+            }
+          }
+        },
+        "required": [
+          "toolId",
+          "toolName",
+          "title",
+          "description",
+          "method",
+          "path",
+          "risk",
+          "status",
+          "revision",
+          "editable",
+          "arguments"
+        ],
+        "additionalProperties": false
+      },
+      "HttpToolArgument": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "in": {
+            "$ref": "#/components/schemas/HttpToolArgumentIn"
+          },
+          "key": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "in",
+          "key",
+          "required",
+          "type",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "HttpSpecPreview": {
+        "type": "object",
+        "properties": {
+          "openapi": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hash": {
+            "type": "string"
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "auth": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "$ref": "#/components/schemas/HttpToolAuthKind"
+              },
+              "header": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "unsupported": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "header",
+              "unsupported"
+            ],
+            "additionalProperties": false
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpOperationPreview"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "openapi",
+          "title",
+          "version",
+          "hash",
+          "servers",
+          "auth",
+          "operations",
+          "skipped"
+        ],
+        "additionalProperties": false
+      },
+      "HttpOperationPreview": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpToolMethod"
+          },
+          "path": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "toolName": {
+            "type": "string"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpOperationArgument"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "imported": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "method",
+          "path",
+          "title",
+          "summary",
+          "toolName",
+          "risk",
+          "arguments",
+          "notes",
+          "imported"
+        ],
+        "additionalProperties": false
+      },
+      "HttpOperationArgument": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "in": {
+            "$ref": "#/components/schemas/HttpToolArgumentIn"
+          },
+          "type": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "in",
+          "type",
+          "required"
         ],
         "additionalProperties": false
       },

@@ -4,7 +4,7 @@ import { Timestamp } from './common.js';
 import { typeId } from './ids.js';
 import { KnowledgeVisibility } from './knowledge.js';
 import type { RouteDef } from './routes.js';
-import { McpServer } from './tools.js';
+import { McpServer, RiskClass, ToolStatus } from './tools.js';
 
 /**
  * AI power tools (D10, G04, G17): signing in to MCP servers with OAuth, what they list besides
@@ -356,6 +356,288 @@ export const ConversationMemoryCustomer = z
   .meta({ id: 'ConversationMemoryCustomer' });
 export type ConversationMemoryCustomer = z.infer<typeof ConversationMemoryCustomer>;
 
+// ── Custom HTTP tools ────────────────────────────────────────────────────────────────────
+
+/** The largest OpenAPI description Studio sends or Hamnivo reads, in characters. */
+export const HTTP_SPEC_MAX_CHARS = 900_000;
+
+export const HttpToolMethod = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).meta({
+  id: 'HttpToolMethod',
+  description: 'The request method of a custom HTTP tool.',
+});
+export const HttpToolArgumentIn = z.enum(['path', 'query', 'header', 'body']).meta({
+  id: 'HttpToolArgumentIn',
+  description:
+    'Where an argument goes in the request: the address path, the query string, a header, or a field of the JSON body.',
+});
+export const HttpToolArgumentType = z
+  .enum(['string', 'integer', 'number', 'boolean'])
+  .meta({ id: 'HttpToolArgumentType' });
+export const HttpToolAuthKind = z.enum(['none', 'bearer', 'header']).meta({
+  id: 'HttpToolAuthKind',
+  description:
+    '`bearer`: a token sent as `Authorization: Bearer …`. `header`: a secret value sent in a header of your choice.',
+});
+export type HttpToolMethod = z.infer<typeof HttpToolMethod>;
+export type HttpToolArgumentIn = z.infer<typeof HttpToolArgumentIn>;
+export type HttpToolAuthKind = z.infer<typeof HttpToolAuthKind>;
+
+const HttpHeaderName = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9_-]{1,64}$/, 'Letters, digits, hyphens and underscores');
+
+/** What the tools of a source send as their credential. It is stored in the secret broker. */
+export const HttpToolAuthInput = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('none') }),
+    z.object({ kind: z.literal('bearer'), token: z.string().trim().min(8).max(4000) }),
+    z.object({
+      kind: z.literal('header'),
+      header: HttpHeaderName,
+      value: z.string().trim().min(1).max(4000),
+    }),
+  ])
+  .meta({ id: 'HttpToolAuthInput' });
+
+/** One argument of a tool written by hand: its name, where it goes and what it is. */
+export const HttpToolArgumentInput = z
+  .object({
+    /** What the AI calls it. */
+    name: z
+      .string()
+      .regex(
+        /^[A-Za-z][A-Za-z0-9_]{0,63}$/,
+        'Letters, digits and underscores, starting with a letter',
+      ),
+    in: HttpToolArgumentIn,
+    /** The name in the request, when it is not the argument's own name. */
+    key: z.string().trim().min(1).max(100).optional(),
+    type: HttpToolArgumentType.default('string'),
+    required: z.boolean().default(false),
+    description: z.string().trim().max(300).optional(),
+  })
+  .meta({ id: 'HttpToolArgumentInput' });
+
+/** One request written by hand: the address path (with `{placeholders}`), method and arguments. */
+export const HttpEndpointInput = z
+  .object({
+    title: z.string().trim().min(1).max(120),
+    /** What the AI is told the tool does. */
+    description: z.string().trim().min(1).max(1000),
+    method: HttpToolMethod,
+    /** Starts with `/`; `{orderId}` is filled in from the argument of that name. */
+    path: z
+      .string()
+      .trim()
+      .min(1)
+      .max(300)
+      .regex(/^\/[A-Za-z0-9\-._~!$&'()*+,;=:@%/{}]*$/, 'Start with / and leave out ? and #'),
+    arguments: z.array(HttpToolArgumentInput).max(20).default([]),
+    /** By default from the method: GET reads, DELETE cannot be undone, the others change something. */
+    risk: RiskClass.optional(),
+  })
+  .meta({ id: 'HttpEndpointInput' });
+
+const onlyOne = (value: { spec?: string | undefined; specUrl?: string | undefined }) =>
+  Number(value.spec !== undefined) + Number(value.specUrl !== undefined) === 1;
+
+/** The operations of an OpenAPI description to turn into tools, named as the preview names them. */
+export const HttpOpenApiImport = z
+  .object({
+    spec: z.string().min(2).max(HTTP_SPEC_MAX_CHARS).optional(),
+    specUrl: z
+      .url({ protocol: /^https?$/ })
+      .max(500)
+      .optional(),
+    /** The hash the preview of a description read from an address gave; a changed one is refused. */
+    specHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
+    /** `GET /orders/{orderId}` and so on, as listed by the preview. */
+    operations: z.array(z.string().max(400)).min(1).max(100),
+  })
+  .refine(onlyOne, { message: 'Send the description or its address' })
+  .meta({ id: 'HttpOpenApiImport' });
+
+/** Read an OpenAPI 3 description and list what could become tools. Nothing is saved. */
+export const PreviewHttpSpecRequest = z
+  .object({
+    spec: z.string().min(2).max(HTTP_SPEC_MAX_CHARS).optional(),
+    specUrl: z
+      .url({ protocol: /^https?$/ })
+      .max(500)
+      .optional(),
+    /** When adding to a service that is there, so the operations it already has are marked. */
+    sourceId: typeId('httpSource').optional(),
+  })
+  .refine(onlyOne, { message: 'Send the description or its address' })
+  .meta({ id: 'PreviewHttpSpecRequest' });
+
+export const HttpOperationArgument = z
+  .object({
+    name: z.string(),
+    in: HttpToolArgumentIn,
+    type: z.string(),
+    required: z.boolean(),
+  })
+  .meta({ id: 'HttpOperationArgument' });
+
+/** One operation of a description, as it would become a tool. */
+export const HttpOperationPreview = z
+  .object({
+    /** `GET /orders/{orderId}`: how an import names it. */
+    key: z.string(),
+    method: HttpToolMethod,
+    path: z.string(),
+    /** What the description called it (untrusted text). */
+    title: z.string(),
+    /** What the description said about it (untrusted text, shown quoted). */
+    summary: z.string().nullable(),
+    /** The name the tool would get. */
+    toolName: z.string(),
+    risk: RiskClass,
+    arguments: z.array(HttpOperationArgument),
+    /** What was left out of it, and why. */
+    notes: z.array(z.string()),
+    /** The service already has a tool for it (only when adding to a service that is there). */
+    imported: z.boolean(),
+  })
+  .meta({ id: 'HttpOperationPreview' });
+
+export const HttpSpecPreview = z
+  .object({
+    /** The version of the OpenAPI standard the description follows. */
+    openapi: z.string(),
+    title: z.string().nullable(),
+    version: z.string().nullable(),
+    /** SHA-256 of the text that was read. */
+    hash: z.string(),
+    /** The addresses the description says the service is at (untrusted: check before using). */
+    servers: z.array(z.string()),
+    /** How the description says the service wants to be called, when Hamnivo can do it. */
+    auth: z.object({
+      kind: HttpToolAuthKind,
+      header: z.string().nullable(),
+      /** A kind of sign-in the description asks for that tools cannot use (`oauth2`, `basic`…). */
+      unsupported: z.string().nullable(),
+    }),
+    operations: z.array(HttpOperationPreview),
+    /** Operations that cannot become tools, and why. */
+    skipped: z.array(z.object({ key: z.string(), reason: z.string() })),
+  })
+  .meta({ id: 'HttpSpecPreview' });
+export type HttpSpecPreview = z.infer<typeof HttpSpecPreview>;
+export type HttpOperationPreview = z.infer<typeof HttpOperationPreview>;
+
+const HttpSourceName = z.string().trim().min(1).max(80);
+const HttpBaseUrl = z.url({ protocol: /^https?$/ }).max(500);
+
+const exactlyOneWay = (value: { openapi?: unknown; endpoint?: unknown }) =>
+  Number(value.openapi !== undefined) + Number(value.endpoint !== undefined) === 1;
+
+/**
+ * Adds a service with its tools: an OpenAPI description (the chosen operations) or one request
+ * written by hand. The tools start in review, like tools from an MCP server.
+ */
+export const CreateHttpSourceRequest = z
+  .object({
+    brandId: typeId('brand'),
+    name: HttpSourceName,
+    /** Every call goes below this address; its host is the only one the tools may reach. */
+    baseUrl: HttpBaseUrl,
+    auth: HttpToolAuthInput.default({ kind: 'none' }),
+    openapi: HttpOpenApiImport.optional(),
+    endpoint: HttpEndpointInput.optional(),
+  })
+  .refine(exactlyOneWay, { message: 'Send an OpenAPI import or one request written by hand' })
+  .meta({ id: 'CreateHttpSourceRequest' });
+
+/** More tools for a service that is already there. */
+export const AddHttpEndpointsRequest = z
+  .object({
+    openapi: HttpOpenApiImport.optional(),
+    endpoint: HttpEndpointInput.optional(),
+  })
+  .refine(exactlyOneWay, { message: 'Send an OpenAPI import or one request written by hand' })
+  .meta({ id: 'AddHttpEndpointsRequest' });
+
+export const UpdateHttpSourceRequest = z
+  .object({
+    name: HttpSourceName.optional(),
+    baseUrl: HttpBaseUrl.optional(),
+    /** Replaces the credential; `none` removes it. */
+    auth: HttpToolAuthInput.optional(),
+    status: z.enum(['active', 'disabled']).optional(),
+  })
+  .meta({ id: 'UpdateHttpSourceRequest' });
+
+/** Replaces a request written by hand; the tool goes back to review. */
+export const UpdateHttpEndpointRequest = HttpEndpointInput.extend({
+  expectedRevision: z.int().positive(),
+}).meta({ id: 'UpdateHttpEndpointRequest' });
+
+export const HttpToolArgument = z
+  .object({
+    name: z.string(),
+    in: HttpToolArgumentIn,
+    /** The name in the request. */
+    key: z.string(),
+    required: z.boolean(),
+    /** `string`, `integer`, `number`, `boolean`, `array` or `object`. */
+    type: z.string(),
+    description: z.string().nullable(),
+  })
+  .meta({ id: 'HttpToolArgument' });
+
+export const HttpToolEndpoint = z
+  .object({
+    toolId: typeId('tool'),
+    toolName: z.string(),
+    title: z.string(),
+    /** What the AI is told the tool does. */
+    description: z.string(),
+    method: HttpToolMethod,
+    path: z.string(),
+    risk: RiskClass,
+    status: ToolStatus,
+    revision: z.int().positive(),
+    /** Written by hand, so it can be edited here. An imported one is changed by importing again. */
+    editable: z.boolean(),
+    arguments: z.array(HttpToolArgument),
+  })
+  .meta({ id: 'HttpToolEndpoint' });
+export type HttpToolEndpoint = z.infer<typeof HttpToolEndpoint>;
+
+/** A service whose requests are tools: its address, how it is signed in to, and its tools. */
+export const HttpToolSource = z
+  .object({
+    id: typeId('httpSource'),
+    brandId: typeId('brand'),
+    name: z.string(),
+    kind: z.enum(['openapi', 'manual']),
+    baseUrl: z.string(),
+    auth: z.object({
+      kind: HttpToolAuthKind,
+      header: z.string().nullable(),
+      /** The last characters of the credential; never more. */
+      masked: z.string().nullable(),
+    }),
+    /** What the imported description called itself (untrusted text). */
+    specTitle: z.string().nullable(),
+    specVersion: z.string().nullable(),
+    status: z.enum(['active', 'disabled']),
+    endpoints: z.array(HttpToolEndpoint),
+    createdAt: Timestamp,
+  })
+  .meta({ id: 'HttpToolSource' });
+export type HttpToolSource = z.infer<typeof HttpToolSource>;
+
+const httpSourceParams = z.object({
+  sourceId: z.string().meta({ description: 'Custom tool source ID (hsrc_…)' }),
+});
+
 // ── Hamnivo's own MCP server ─────────────────────────────────────────────────────────────
 
 /** A JSON-RPC 2.0 message of the Model Context Protocol (Streamable HTTP, no sessions). */
@@ -547,5 +829,92 @@ export const aiPowerRoutes = {
       description: 'Memory customer',
       schema: ConversationMemoryCustomer,
     },
+  },
+  listHttpToolSources: {
+    method: 'get',
+    path: '/v1/admin/http-tools/sources',
+    operationId: 'listHttpToolSources',
+    summary: 'Services whose requests are custom HTTP tools, with their tools (tools.read)',
+    tags: ['Tools'],
+    auth: 'staff_session',
+    query: z.object({ brandId: z.string().optional() }),
+    success: {
+      status: 200,
+      description: 'Services',
+      schema: z.object({ items: z.array(HttpToolSource) }),
+    },
+  },
+  previewHttpSpec: {
+    method: 'post',
+    path: '/v1/admin/http-tools/preview',
+    operationId: 'previewHttpSpec',
+    summary:
+      'Read an OpenAPI 3 description (pasted, or fetched from an address through the egress guard) and list the tools it could become; nothing is saved (tools.manage)',
+    tags: ['Tools'],
+    auth: 'staff_session',
+    body: PreviewHttpSpecRequest,
+    success: { status: 200, description: 'What was found', schema: HttpSpecPreview },
+  },
+  createHttpToolSource: {
+    method: 'post',
+    path: '/v1/admin/http-tools/sources',
+    operationId: 'createHttpToolSource',
+    summary:
+      'Add a service with custom HTTP tools, from chosen operations of an OpenAPI description or one request written by hand; the tools start in review and its credential goes to the secret broker (tools.manage, fresh sign-in)',
+    tags: ['Tools'],
+    auth: 'staff_session',
+    body: CreateHttpSourceRequest,
+    idempotent: true,
+    success: { status: 201, description: 'Service added', schema: HttpToolSource },
+  },
+  updateHttpToolSource: {
+    method: 'patch',
+    path: '/v1/admin/http-tools/sources/{sourceId}',
+    operationId: 'updateHttpToolSource',
+    summary:
+      'Rename a service, change its address, replace its credential or turn it off (tools.manage, fresh sign-in)',
+    tags: ['Tools'],
+    auth: 'staff_session',
+    params: httpSourceParams,
+    body: UpdateHttpSourceRequest,
+    success: { status: 200, description: 'Service', schema: HttpToolSource },
+  },
+  deleteHttpToolSource: {
+    method: 'delete',
+    path: '/v1/admin/http-tools/sources/{sourceId}',
+    operationId: 'deleteHttpToolSource',
+    summary:
+      'Remove a service: its tools are turned off, pending requests are cancelled and its credential is revoked; what its tools did stays on record (tools.manage, fresh sign-in)',
+    tags: ['Tools'],
+    auth: 'staff_session',
+    params: httpSourceParams,
+    success: { status: 204, description: 'Removed' },
+  },
+  addHttpToolEndpoints: {
+    method: 'post',
+    path: '/v1/admin/http-tools/sources/{sourceId}/endpoints',
+    operationId: 'addHttpToolEndpoints',
+    summary:
+      'Add more tools to a service: operations of an OpenAPI description, or one request written by hand; they start in review (tools.manage, fresh sign-in)',
+    tags: ['Tools'],
+    auth: 'staff_session',
+    params: httpSourceParams,
+    body: AddHttpEndpointsRequest,
+    idempotent: true,
+    success: { status: 201, description: 'Service with the new tools', schema: HttpToolSource },
+  },
+  updateHttpToolEndpoint: {
+    method: 'put',
+    path: '/v1/admin/http-tools/sources/{sourceId}/endpoints/{toolId}',
+    operationId: 'updateHttpToolEndpoint',
+    summary:
+      'Replace a request written by hand; the tool goes back to review and requests waiting on it are cancelled (tools.manage, fresh sign-in)',
+    tags: ['Tools'],
+    auth: 'staff_session',
+    params: httpSourceParams.extend({
+      toolId: z.string().meta({ description: 'Tool ID (tool_…)' }),
+    }),
+    body: UpdateHttpEndpointRequest,
+    success: { status: 200, description: 'Service', schema: HttpToolSource },
   },
 } as const satisfies Record<string, RouteDef>;

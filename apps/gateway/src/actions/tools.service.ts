@@ -64,6 +64,7 @@ import { storeCatalog } from './mcp-catalog.service.js';
 import { McpCredentials, McpTokenUnavailable } from './mcp-credentials.service.js';
 import { dropSignIn } from './mcp-oauth.service.js';
 import { serverViews } from './server-views.js';
+import { supersedePending } from './supersede.js';
 import { toolView } from './views.js';
 
 type CreateTool = z.output<typeof CreateToolRequest>;
@@ -236,14 +237,24 @@ export class ToolsService {
 
   async list(principal: StaffPrincipal, brandPublicId?: string): Promise<ToolDefinition[]> {
     return this.tx(principal, async (tx) => {
-      // The tools of a removed server are kept for the record of what they did, and not listed.
+      // The tools of a removed server or custom service are kept for the record of what they did,
+      // and not listed.
       const found = await tx
         .select({ tool: schema.toolDefinitions })
         .from(schema.toolDefinitions)
         .leftJoin(schema.mcpServers, eq(schema.mcpServers.id, schema.toolDefinitions.mcpServerId))
+        .leftJoin(
+          schema.httpToolEndpoints,
+          eq(schema.httpToolEndpoints.toolId, schema.toolDefinitions.id),
+        )
+        .leftJoin(
+          schema.httpToolSources,
+          eq(schema.httpToolSources.id, schema.httpToolEndpoints.sourceId),
+        )
         .where(
           and(
             or(isNull(schema.mcpServers.id), ne(schema.mcpServers.status, 'deleted')),
+            or(isNull(schema.httpToolSources.id), ne(schema.httpToolSources.status, 'deleted')),
             brandPublicId
               ? eq(schema.toolDefinitions.brandId, fromPublicId('brand', brandPublicId))
               : undefined,
@@ -670,38 +681,14 @@ export class ToolsService {
   }
 
   /** Supersedes what still waits on these tools, and tells the conversations it was in. */
-  private async supersedePending(
+  private supersedePending(
     tx: TenantTx,
     effects: Effects,
     tenantId: string,
     toolIds: string[],
     now: Date,
   ) {
-    if (toolIds.length === 0) return 0;
-    const pending = await tx
-      .update(schema.actions)
-      .set({ state: 'superseded', reason: 'tool_changed', updatedAt: now })
-      .where(
-        and(
-          inArray(schema.actions.toolId, toolIds),
-          inArray(schema.actions.state, ['awaiting_approval', 'approved']),
-        ),
-      )
-      .returning();
-    for (const action of pending) {
-      effects.add(
-        tenantId,
-        action.conversationId,
-        await this.journal.append(tx, tenantId, action.conversationId, [
-          {
-            lane: action.approver === 'customer' ? 'customer' : 'staff',
-            type: 'approval.updated',
-            data: { approvalId: toPublicId('action', action.id), status: 'superseded' },
-          },
-        ]),
-      );
-    }
-    return pending.length;
+    return supersedePending(tx, this.journal, effects, tenantId, toolIds, now);
   }
 
   async updateServer(

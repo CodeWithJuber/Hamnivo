@@ -1,7 +1,8 @@
 /**
  * AI power tools (D10, G04, G17, G11, H06): signing in to MCP servers, what they list besides tools,
- * the catalog of services whose vendors run an MCP server, websites as knowledge, the memory card
- * beside a conversation and the answer of "Test your AI": API shapes and queries. Everything a
+ * the catalog of services whose vendors run an MCP server, custom HTTP tools, websites as
+ * knowledge, the memory card beside a conversation and the answer of "Test your AI": API shapes
+ * and queries. Everything a
  * service says about itself is untrusted text; the pages show it quoted.
  */
 import type * as C from '@hamnivo/contracts';
@@ -23,6 +24,15 @@ export type PlaygroundAction = C.PlaygroundAction;
 export type PlaygroundSource = C.PlaygroundSource;
 export type PlaygroundStep = C.PlaygroundStep;
 export type ConversationMemoryCustomer = C.ConversationMemoryCustomer;
+export type HttpToolSource = C.HttpToolSource;
+export type HttpToolEndpoint = C.HttpToolEndpoint;
+export type HttpToolMethod = C.HttpToolMethod;
+export type HttpToolArgumentIn = C.HttpToolArgumentIn;
+export type HttpSpecPreview = C.HttpSpecPreview;
+export type HttpOperationPreview = C.HttpOperationPreview;
+
+/** The most an OpenAPI description may be, as the gateway reads it (in characters). */
+export const HTTP_SPEC_MAX_CHARS = 900_000;
 
 export const aiPowerKeys = {
   presets: ['mcp-presets'] as const,
@@ -34,6 +44,8 @@ export const aiPowerKeys = {
   /** Under the memory key, so what a memory change reloads includes the inbox card. */
   conversationMemory: (conversationId: string) =>
     ['memory', 'conversations', conversationId] as const,
+  /** Under the tools' key, so a change to a tool reloads the services that hold it. */
+  httpSources: (brandId: string) => ['tools', 'http-sources', brandId] as const,
 };
 
 /** Remote MCP servers that vendors run themselves, each with the vendor page that names it. */
@@ -51,6 +63,16 @@ export function useMcpCatalog(serverId: string | undefined) {
     aiPowerKeys.catalog(serverId ?? ''),
     `/v1/admin/mcp-servers/${serverId}/catalog`,
     { enabled: can('tools.read') && Boolean(serverId) },
+  );
+}
+
+/** The brand's services of custom HTTP tools, with their tools. */
+export function useHttpToolSources(brandId: string | undefined) {
+  const { can } = useTenant();
+  return useStudioQuery<Items<HttpToolSource>>(
+    aiPowerKeys.httpSources(brandId ?? ''),
+    `/v1/admin/http-tools/sources?${new URLSearchParams({ brandId: brandId ?? '' })}`,
+    { enabled: can('tools.read') && Boolean(brandId) },
   );
 }
 

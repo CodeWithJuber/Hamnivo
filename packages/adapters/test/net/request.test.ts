@@ -112,10 +112,17 @@ describe('safeRequest', () => {
       policy,
     );
     expect(head.body.length).toBe(0);
+    await safeRequest(
+      { url: `${target.origin}/d`, method: 'PATCH', body: '{"a":1}', timeoutMs: 5000 },
+      policy,
+    );
+    await safeRequest({ url: `${target.origin}/e`, method: 'DELETE', timeoutMs: 5000 }, policy);
     expect(target.hits.map((hit) => [hit.method, hit.url, hit.body])).toEqual([
       ['GET', '/a', ''],
       ['PUT', '/b', 'x'],
       ['HEAD', '/c', ''],
+      ['PATCH', '/d', '{"a":1}'],
+      ['DELETE', '/e', ''],
     ]);
   });
 

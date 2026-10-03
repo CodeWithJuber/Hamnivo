@@ -11,6 +11,8 @@ import { ActionApprovals } from './approvals.service.js';
 import { ActionExecutor } from './executor.service.js';
 import { ToolGateway } from './gateway.service.js';
 import { HandoffPackets } from './handoff.service.js';
+import { HttpToolsController } from './http/controller.js';
+import { HttpToolsService } from './http/service.js';
 import { InboxActions } from './inbox-actions.service.js';
 import { McpController } from './mcp.controller.js';
 import { McpCatalogService } from './mcp-catalog.service.js';
@@ -41,6 +43,7 @@ const shared = [
 export const ACTIONS_API_CONTROLLERS = [
   ToolsController,
   McpController,
+  HttpToolsController,
   InboxActionsController,
   WidgetActionsController,
   SimulationsController,
@@ -51,6 +54,7 @@ export const ACTIONS_API_PROVIDERS = [
   ToolsService,
   McpOAuthService,
   McpCatalogService,
+  HttpToolsService,
   InboxActions,
   SimulationService,
 ];
