@@ -225,6 +225,91 @@ describe('the chat engine step', () => {
     expect(gateway.writes()).toEqual([]);
   });
 
+  const setupRecord = (state: string, lastError: string | null = null) => ({
+    brandId: 'brd_1',
+    state,
+    step: 'account_user',
+    attempts: 1,
+    lastError,
+    updatedAt: NOW,
+    finishedAt: null,
+  });
+
+  it('shows how far the set-up got while another attempt is running it', async () => {
+    fakeGateway({
+      'POST /v1/admin/authority/connections': {
+        problem: { status: 409, code: 'VERSION_CONFLICT' },
+      },
+      'GET /v1/admin/authority/connections': { json: { items: [] } },
+      'GET /v1/admin/authority/provisioning': { json: { items: [setupRecord('running')] } },
+    });
+    await engine();
+    expect(await screen.findByText('Setting up chat: creating the inbox')).toBeTruthy();
+    expect(screen.getByTestId('engine-working')).toBeTruthy();
+    expect(screen.queryByTestId('engine-stopped')).toBeNull();
+  });
+
+  it('says why the set-up stopped, and trying again carries it on', async () => {
+    let attempt = 0;
+    const gateway = fakeGateway({
+      'POST /v1/admin/authority/connections': () =>
+        ++attempt === 1
+          ? { problem: { status: 503, code: 'AUTHORITY_UNAVAILABLE' } }
+          : { status: 201, json: chatEngine() },
+      'GET /v1/admin/authority/connections': () => ({
+        json: { items: attempt > 1 ? [chatEngine()] : [] },
+      }),
+      'GET /v1/admin/authority/provisioning': () => ({
+        json: {
+          items: attempt > 1 ? [] : [setupRecord('failed', 'Chatwoot inbox failed (HTTP 500).')],
+        },
+      }),
+      'GET /v1/admin/agents': { json: { items: [] } },
+    });
+    await engine();
+    expect(await screen.findByTestId('engine-reason')).toBeTruthy();
+    expect(
+      screen.getByText(/The set-up stopped: Chatwoot inbox failed \(HTTP 500\)\./),
+    ).toBeTruthy();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByTestId('engine-ready')).toBeTruthy();
+    expect(gateway.to('POST', '/v1/admin/authority/connections')).toHaveLength(2);
+  });
+
+  it('says when the set-up takes longer than usual, and that the step can be skipped', async () => {
+    fakeGateway({ 'GET /v1/admin/authority/connections': { json: { items: [] } } });
+    const answer = globalThis.fetch;
+    // The request to set it up does not come back.
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) =>
+      init?.method === 'POST' ? new Promise<Response>(() => undefined) : answer(input, init),
+    );
+    await mountStudio({
+      permissions: owner,
+      screen: <EngineStep brand={brand} onDone={() => undefined} slowAfterMs={20} />,
+      seed: seeded(put(keys.connections, { items: [] })),
+    });
+    expect(await screen.findByTestId('engine-slow')).toBeTruthy();
+    expect(screen.getByText(/taking longer than usual/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
+  it('asks for a fresh sign-in instead of spinning when the list needs one', async () => {
+    const gateway = fakeGateway({
+      'GET /v1/admin/authority/connections': {
+        problem: { status: 401, code: 'REAUTH_REQUIRED' },
+      },
+    });
+    await mountStudio({
+      permissions: owner,
+      screen: <EngineStep brand={brand} onDone={() => undefined} />,
+    });
+    expect(await screen.findByText('Sign in again to continue')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign in again' })).toBeTruthy();
+    expect(screen.queryByTestId('engine-working')).toBeNull();
+    expect(gateway.writes()).toEqual([]);
+  });
+
   it('says so when the connection is turned off, and does not set up another', async () => {
     const gateway = fakeGateway({});
     await mountStudio({

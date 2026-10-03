@@ -11,8 +11,13 @@ export interface PermissionSpec {
   description: string;
   /** The narrowest scope types a grant of this permission can carry. */
   scopes: readonly ScopeType[];
-  /** Requires a recent authentication (fresh session) before use. */
+  /**
+   * Requires a recent authentication (fresh session) before a change. Reading (a GET request)
+   * does not, unless `stepUpReads` says the read is the sensitive act.
+   */
   stepUp?: true;
+  /** Reading also requires a recent authentication: exports, where the read is what matters. */
+  stepUpReads?: true;
   /** Requires a session that passed multi-factor authentication. */
   mfa?: true;
   /**
@@ -56,6 +61,7 @@ export const PERMISSIONS = {
     description: 'Export conversation transcripts',
     scopes: BRAND,
     stepUp: true,
+    stepUpReads: true,
   },
   'inbox.manage': {
     description: 'Configure inboxes, routing and business hours',
@@ -72,7 +78,12 @@ export const PERMISSIONS = {
     stepUp: true,
   },
   'audit.read': { description: 'Read the audit log', scopes: WORKSPACE },
-  'audit.export': { description: 'Export the audit log', scopes: TENANT, stepUp: true },
+  'audit.export': {
+    description: 'Export the audit log',
+    scopes: TENANT,
+    stepUp: true,
+    stepUpReads: true,
+  },
   'brands.manage': { description: 'Create brands and set allowed websites', scopes: WORKSPACE },
   'widget.configure': { description: 'Configure the chat widget', scopes: BRAND },
   'widget.proactive': {
@@ -119,6 +130,7 @@ export const PERMISSIONS = {
     description: 'Export everything remembered about a customer',
     scopes: BRAND,
     stepUp: true,
+    stepUpReads: true,
   },
   'commerce.read': {
     description: 'See carts, quotes, orders, payments and refunds',

@@ -102,10 +102,14 @@ export class StaffGuard implements CanActivate {
     if (!options.tenant) return true;
 
     const tenantId = tenantIdFromHeader(request);
-    const principal = await this.principals.principal(session, tenantId);
+    const member = await this.principals.principal(session, tenantId);
     // Not a member (or no such tenant): indistinguishable on purpose.
-    if (!principal) throw new AppError('NOT_FOUND');
-    assertWritable(principal, request);
+    if (!member) throw new AppError('NOT_FOUND');
+    assertWritable(member, request);
+    // A request that only reads needs no recent sign-in: step-up guards changes (and exports,
+    // whose permissions ask for it on reads too). The services check the same principal.
+    const reading = request.method === 'GET' || request.method === 'HEAD';
+    const principal = reading ? { ...member, reading: true } : member;
     request.hamnivo.principal = principal;
 
     if (options.permission) {

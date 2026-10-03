@@ -71,7 +71,7 @@ const STEPS = [
 ] as const;
 
 /** The step a running set-up is on: the one after the last completed. */
-function stepOf(done: string | null): (typeof STEPS)[number] {
+export function stepOf(done: string | null): (typeof STEPS)[number] {
   const index = done === null ? -1 : STEPS.indexOf(done as (typeof STEPS)[number]);
   return STEPS[Math.min(index + 1, STEPS.length - 1)] ?? 'account';
 }

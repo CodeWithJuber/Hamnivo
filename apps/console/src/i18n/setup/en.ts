@@ -482,6 +482,9 @@ export const setupEn = {
       ready: 'Your chat engine is ready.',
       retry: 'Try again',
       disabled: 'The connection is turned off. Ask an administrator to turn it on.',
+      slow: 'This is taking longer than usual. You can wait here, or skip this step and connect the chat engine later under Brands and install.',
+      stopped: 'The set-up stopped: {{error}} Try again: it carries on where it stopped.',
+      cancelled: 'The sign-in was closed, so the set-up did not start.',
     },
     aikey: {
       noPermission:

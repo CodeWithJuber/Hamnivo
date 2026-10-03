@@ -795,3 +795,31 @@ describe('plans and budgets', () => {
     });
   });
 });
+
+describe('a session signed in a while ago', () => {
+  it('reads the AI keys and the chat engine, and signs in again only to change them', async () => {
+    const before = offsetMs;
+    offsetMs = before + 30 * 60_000;
+    try {
+      for (const path of [
+        '/v1/admin/model-connections',
+        '/v1/admin/model-connections/status',
+        '/v1/admin/authority/connections',
+      ]) {
+        const read = await shop.owner.get(path);
+        expect(read.status, `${path}: ${JSON.stringify(read.body)}`).toBe(200);
+      }
+      const change = await shop.owner.post('/v1/admin/model-connections', {
+        provider: 'openai',
+        label: 'Signed in long ago',
+        apiKey: 'sk-test-not-sent',
+      });
+      expect(change.status).toBe(401);
+      expect(change.body.code).toBe('REAUTH_REQUIRED');
+      const exported = await shop.owner.get('/v1/admin/audit/export');
+      expect(exported.body.code).toBe('REAUTH_REQUIRED');
+    } finally {
+      offsetMs = before;
+    }
+  });
+});
