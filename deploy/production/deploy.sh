@@ -330,7 +330,7 @@ check_guards() { # check_guards FROM TO
   while IFS= read -r file; do
     [[ -n "$file" ]] || continue
     sql="$(git_ show "$to:$file")"
-    if grep -qiE 'drop[[:space:]]+(table|column|schema)|rename[[:space:]]+(to|column)|set[[:space:]]+data[[:space:]]+type|alter[[:space:]]+column[^;]*[[:space:]]type[[:space:]]|set[[:space:]]+not[[:space:]]+null|truncate' <<<"$sql"; then
+    if destructive_sql <<<"$sql"; then
       guard_reason="the migration $(basename "$file") drops, renames or retypes data"
       return 2
     fi

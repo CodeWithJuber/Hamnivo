@@ -13,6 +13,7 @@ import type {
   NotificationPreferences,
   ReactionEmoji,
   SetWidgetLanguageRequest,
+  VisitorLinkResponse,
   WidgetLanguageState,
   WidgetSession,
 } from '@hamnivo/contracts';
@@ -32,6 +33,11 @@ export interface HamnivoClientOptions {
   widgetId: string;
   /** Origin of the page embedding the widget (checked against the brand's allowed websites). */
   hostOrigin?: string;
+  /**
+   * A test chat the owner opened in Studio to try the widget: Studio's own page may then use it,
+   * and the conversations it starts are marked as tests (left out of reports and counts).
+   */
+  test?: boolean;
   locale?: string;
   storage?: KeyValueStorage;
   fetch?: typeof fetch;
@@ -146,6 +152,7 @@ export class HamnivoClient {
       widgetId: this.options.widgetId,
       ...(this.options.locale ? { locale: this.options.locale } : {}),
       ...(this.options.hostOrigin ? { hostOrigin: this.options.hostOrigin } : {}),
+      ...(this.options.test ? { test: true } : {}),
       ...(resumeToken ? { resumeToken } : {}),
     });
     if (!response.ok) throw await problemOf(response);
@@ -313,6 +320,30 @@ export class HamnivoClient {
       `/v1/widget/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
       { clientMessageId, emoji },
     );
+  }
+
+  /**
+   * Tells staff the visitor is typing. Send it every few seconds while they type, and `false` when
+   * they stop or send. It is best effort: a failure changes nothing the visitor needs.
+   */
+  reportTyping(conversationId: string, typing: boolean): Promise<void> {
+    return this.request(
+      'POST',
+      `/v1/widget/conversations/${encodeURIComponent(conversationId)}/typing`,
+      { typing },
+    );
+  }
+
+  /**
+   * Tells the gateway which browser this chat runs in (the key the loader keeps on the website),
+   * so staff see its pages next to the conversation. The answer says whether pages are noted,
+   * with the line to show the visitor, and carries an invitation staff left for them, if any.
+   */
+  linkVisitor(visitorKey: string, locale?: string): Promise<VisitorLinkResponse> {
+    return this.request('POST', '/v1/widget/visitors/link', {
+      visitorKey,
+      ...(locale ? { locale } : {}),
+    });
   }
 
   /** The visitor saw the conversation up to this sequence (W05, W06). */

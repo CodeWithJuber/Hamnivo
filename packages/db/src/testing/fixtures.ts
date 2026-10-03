@@ -5,6 +5,8 @@ import type { Db } from '../client.js';
 import { newId, toPublicId } from '../ids.js';
 import * as s from '../schema/index.js';
 import { type TenantTx, withTenant } from '../tenant.js';
+import { seedAiPower } from './ai-power-fixtures.js';
+import { seedSaas } from './saas-fixtures.js';
 
 export interface SeededTenant {
   tenantId: string;
@@ -548,6 +550,58 @@ async function seedDeveloperPlatform(
   });
 }
 
+/** One staff member's inbox settings and read marker, and one visitor with a visit and a page view. */
+async function seedVisitors(
+  tx: TenantTx,
+  tenantId: string,
+  ref: { brandId: string; staffMemberId: string; principalId: string; conversationId: string },
+) {
+  await tx.insert(s.staffInboxPreferences).values({ tenantId, staffMemberId: ref.staffMemberId });
+  await tx.insert(s.staffConversationReads).values({
+    tenantId,
+    staffMemberId: ref.staffMemberId,
+    conversationId: ref.conversationId,
+    readSeq: 1,
+  });
+  await tx.insert(s.brandVisitorSettings).values({ tenantId, brandId: ref.brandId });
+  const visitorId = newId();
+  const sessionId = newId();
+  await tx.insert(s.visitors).values({
+    id: visitorId,
+    tenantId,
+    brandId: ref.brandId,
+    keyHash: bytes(),
+    principalId: ref.principalId,
+    visitCount: 2,
+  });
+  await tx.insert(s.visitorSessions).values({
+    id: sessionId,
+    tenantId,
+    brandId: ref.brandId,
+    visitorId,
+    country: 'AE',
+    browser: 'Chrome',
+    browserVersion: '141',
+    os: 'Android',
+    osVersion: '14',
+    deviceType: 'mobile',
+    language: 'en',
+    referrer: 'https://search.example/results',
+    entryUrl: 'https://shop.example/pricing',
+    currentUrl: 'https://shop.example/pricing',
+    currentTitle: 'Pricing',
+    pageCount: 1,
+  });
+  await tx.insert(s.visitorPageViews).values({
+    tenantId,
+    brandId: ref.brandId,
+    visitorId,
+    sessionId,
+    url: 'https://shop.example/pricing',
+    title: 'Pricing',
+  });
+}
+
 /**
  * Creates a tenant with at least one row in every tenant-owned table, through the application
  * role and row-level security (as production code would). Used by the RLS test suite, which
@@ -574,6 +628,7 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
     conversationId: newId(),
     sessionId: newId(),
     modelSecretId: newId(),
+    modelConnectionId: newId(),
     knowledgeSourceId: newId(),
     documentId: newId(),
     documentVersionId: newId(),
@@ -901,6 +956,7 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       kekVersion: 1,
     });
     await tx.insert(s.modelConnections).values({
+      id: ids.modelConnectionId,
       tenantId,
       provider: 'openai-compatible',
       label: 'Local models',
@@ -1192,6 +1248,7 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       rating: 4,
       note: 'Clear and kind.',
     });
+    await seedVisitors(tx, tenantId, ids);
     // Decisions, language and cache: the inbox team above routes for the brand.
     await tx.insert(s.teamRouting).values({
       tenantId,
@@ -1317,6 +1374,31 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       hits: 3,
       misses: 1,
     });
+    // Setup: how the chat looks, a test chat, the last test of the AI key and the wizard's progress.
+    await tx.insert(s.brandAppearance).values({
+      tenantId,
+      brandId: ids.brandId,
+      appearance: { primaryColor: '#192A30', radius: 12, csat: true },
+    });
+    // The second conversation is the one an owner opened to try the chat; the first one carries
+    // the order and the run that reports are built on, so it must stay a real one.
+    await tx.insert(s.testConversations).values({
+      tenantId,
+      conversationId: otherConversationId,
+      brandId: ids.brandId,
+    });
+    await tx.insert(s.modelConnectionTests).values({
+      tenantId,
+      connectionId: ids.modelConnectionId,
+      ok: true,
+      kind: 'ok',
+      modelId: 'seed-model',
+    });
+    await tx.insert(s.onboardingProgress).values({
+      tenantId,
+      steps: { workspace: 'done', team: 'skipped' },
+      brandId: ids.brandId,
+    });
     await seedCommerce(tx, tenantId, suffix, {
       workspaceId: ids.workspaceId,
       brandId: ids.brandId,
@@ -1335,6 +1417,19 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       agentId: ids.agentId,
       agentVersionId: ids.agentVersionId,
       runId: ids.runId,
+    });
+    await seedSaas(tx, tenantId, suffix, {
+      brandId: ids.brandId,
+      connectionId: ids.connectionId,
+      staffMemberId: ids.staffMemberId,
+    });
+    await seedAiPower(tx, tenantId, suffix, {
+      workspaceId: ids.workspaceId,
+      brandId: ids.brandId,
+      secretId: ids.secretId,
+      staffMemberId: ids.staffMemberId,
+      knowledgeSourceId: ids.knowledgeSourceId,
+      documentId: ids.documentId,
     });
     // Last: the plan's limits it sets would hold any row seeded after it.
     await seedDeveloperPlatform(tx, tenantId, {

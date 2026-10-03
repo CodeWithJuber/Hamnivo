@@ -34,13 +34,13 @@ You and your team work in **Hamnivo Studio**. That's the only app you need day t
 - **Add your team**: Invite people, give them roles and permissions
 - **See what happened**: Reports show you which conversations were handled by AI, which by people
 - **Install on your website**: One line of HTML, no coding needed
-- **Connect to Chatwoot**: Studio sets it up for you, one click
+- **Chatwoot ready for you**: each new workspace gets its Chatwoot account set up automatically
 - **Export and import conversations**: Move from another system, keep your history
 
 ## Start here
 
-New to Hamnivo? Read **[10-minute start](start)** — it shows you how to sign up, add your team, and put the chat on your website in a few clicks.
+New to Hamnivo? Read **[10-minute start](/docs/start/)** — it shows you how to sign up, add your team, and put the chat on your website in a few clicks.
 
-Questions? See the **[FAQ](faq)** or **[Glossary](glossary)**.
+Questions? See the **[FAQ](/docs/faq/)** or **[Glossary](/docs/glossary/)**.
 
-If you're running Hamnivo on your own server, see **[Self-hosting made simple](self-hosting)**.
+If you're running Hamnivo on your own server, see **[Self-hosting made simple](/docs/self-hosting/)**.

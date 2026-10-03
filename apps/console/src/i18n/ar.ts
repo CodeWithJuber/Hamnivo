@@ -1234,7 +1234,7 @@ export const ar: Translation = {
       remove: 'إزالة الوسم {{name}}',
       added: 'أُضيف الوسم {{name}}.',
       removed: 'أُزيل الوسم {{name}}.',
-      noneDefined: 'لم تُعدّ وسوم لهذه العلامة التجارية بعد. يضيفها المسؤول في Chatwoot.',
+      noneDefined: 'لم تُعدّ وسوم لهذه العلامة التجارية بعد.',
     },
     fields: {
       title: 'الحقول المخصصة',
@@ -2272,6 +2272,7 @@ export const ar: Translation = {
     api_keys: 'مفاتيح واجهة البرمجة',
     webhooks: 'خطافات الويب',
     network: 'المضيفات المسموح بها',
+    mcp: 'مساعدو الذكاء الاصطناعي (MCP)',
     integrations: 'التكاملات',
     secrets: 'بيانات الاعتماد',
     extensions: 'الإضافات',
@@ -2356,6 +2357,9 @@ export const ar: Translation = {
       manage: 'إعداد خطافات الويب الصادرة',
     },
     network: { manage: 'اختيار المضيفات الخارجية التي يمكن لـ Hamnivo الاتصال بها' },
+    mcp: {
+      read: 'اسمح لمساعدي الذكاء الاصطناعي مثل Claude بقراءة المحادثات والمعرفة وذاكرة العملاء عبر خادم MCP في Hamnivo',
+    },
     integrations: { manage: 'ربط القنوات وخدمات الجهات الخارجية' },
     secrets: { manage: 'تخزين بيانات الاعتماد وتدويرها' },
     extensions: { manage: 'تثبيت الإضافات وإزالتها' },

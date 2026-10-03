@@ -28,7 +28,7 @@ export const ToolStatus = z.enum(['enabled', 'disabled', 'review']).meta({
 export const ToolSchema = z.record(z.string(), z.unknown()).meta({ id: 'ToolSchema' });
 
 export const BuiltinToolKey = z
-  .enum(['order_status', 'demo_update_address', 'demo_issue_credit'])
+  .enum(['order_status', 'demo_update_address', 'demo_issue_credit', 'read_resource'])
   .meta({ id: 'BuiltinToolKey' });
 export type BuiltinToolKey = z.infer<typeof BuiltinToolKey>;
 
@@ -53,7 +53,7 @@ export const ToolDefinition = z
     description: z.string(),
     /** What the MCP server said about the tool: untrusted, shown quoted, never sent as is. */
     remoteDescription: z.string().nullable(),
-    source: z.enum(['builtin', 'mcp']),
+    source: z.enum(['builtin', 'mcp', 'http']),
     builtin: BuiltinToolKey.nullable(),
     mcpServerId: typeId('mcpServer').nullable(),
     inputSchema: ToolSchema,
@@ -145,8 +145,19 @@ export const McpServer = z
     label: z.string(),
     url: z.string(),
     status: z.enum(['active', 'disabled']),
-    /** Credential sent as a bearer token; only its last characters are shown. */
+    /** A pasted token, sent as a bearer token; only its last characters are shown. */
     credential: z.object({ masked: z.string() }).nullable(),
+    /** How requests to the server are signed in (a pasted token, or an OAuth sign-in). */
+    auth: z.object({
+      kind: z.enum(['none', 'token', 'oauth']),
+      /** OAuth only: `needs_reconnect` when the saved sign-in stopped working. */
+      status: z.enum(['connected', 'needs_reconnect']).nullable(),
+      /** OAuth only: the host of the service that signs people in. */
+      authorizationHost: z.string().nullable(),
+      /** OAuth only: when the access token stops working, if the service said. */
+      expiresAt: Timestamp.nullable(),
+      scope: z.string().nullable(),
+    }),
     protocolVersion: z.string().nullable(),
     serverName: z.string().nullable(),
     toolCount: z.int(),
@@ -172,8 +183,17 @@ export const CreateMcpServerRequest = z
 export const UpdateMcpServerRequest = z
   .object({
     label: z.string().trim().min(1).max(80).optional(),
+    /**
+     * A new address. Its tools go back to review and what it lists is read again. A pasted token
+     * stays only when the new address is on the same site, and an OAuth sign-in always ends (it
+     * was made for the old address): a credential is never sent to another site.
+     */
+    url: z
+      .url({ protocol: /^https?$/ })
+      .max(500)
+      .optional(),
     status: z.enum(['active', 'disabled']).optional(),
-    /** A new token replaces the stored one; null removes it. */
+    /** A new token replaces the stored one (and ends an OAuth sign-in); null removes it. */
     token: z.string().trim().min(8).max(4000).nullable().optional(),
   })
   .meta({ id: 'UpdateMcpServerRequest' });

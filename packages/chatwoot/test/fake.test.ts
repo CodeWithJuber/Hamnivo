@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ChatwootAuthority } from '../src/authority.js';
 import { ChatwootError, call, createChatwootClient } from '../src/client.js';
 import { type FakeChatwoot, startFakeChatwoot } from '../src/fake/index.js';
-import { provisionAccount } from '../src/provisioning.js';
+import { provisionAccount, provisionStaffUser } from '../src/provisioning.js';
 import { type Receiver, startReceiver } from './contract/receiver.js';
 
 let fake: FakeChatwoot | undefined;
@@ -145,6 +145,156 @@ describe('fake Chatwoot files', () => {
     // A deleted message takes its files with it.
     await authority.deleteMessage(conversationRef, message.ref, { kind: 'integration' });
     await expect(authority.downloadAttachment(file)).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('fake Chatwoot tags and saved replies', () => {
+  const person = { kind: 'integration' } as const;
+
+  it('lets only administrators manage tags; a rename follows the conversations', async () => {
+    const { fake, receiver, authority, account, open } = await setup();
+    const agent = await provisionStaffUser({
+      baseUrl: fake.url,
+      platformToken: fake.platformToken,
+      accountId: account.accountId,
+      name: 'Sara Agent',
+      email: `hv-agent-${randomUUID()}@hamnivo.invalid`,
+      role: 'agent',
+    });
+    const asAgent = createChatwootClient({ baseUrl: fake.url, token: agent.token });
+    const label = await authority.createLabel({ title: 'VIP', description: 'Top customers' });
+    expect(label).toMatchObject({ title: 'vip', description: 'Top customers' });
+    const path = { account_id: account.accountId, id: Number(label.ref) };
+
+    // An agent sees the tags but cannot change them.
+    const renamedByAgent = await call(
+      'updateLabel',
+      asAgent.PATCH('/api/v1/accounts/{account_id}/labels/{id}', {
+        params: { path },
+        body: { title: 'gold' } as never,
+      }) as never,
+    ).catch((error) => error);
+    expect(renamedByAgent).toMatchObject({ status: 401 });
+    const deletedByAgent = await call(
+      'deleteLabel',
+      asAgent.DELETE('/api/v1/accounts/{account_id}/labels/{id}', { params: { path } }) as never,
+    ).catch((error) => error);
+    expect(deletedByAgent).toMatchObject({ status: 401 });
+    const visible = await call<{ payload: { title: string }[] }>(
+      'listLabels',
+      asAgent.GET('/api/v1/accounts/{account_id}/labels', {
+        params: { path: { account_id: account.accountId } },
+      }) as never,
+    );
+    expect(visible.payload.map((l) => l.title)).toEqual(['vip']);
+
+    // A rename reaches the conversations that have the tag, and tells the account webhook.
+    const { conversationRef } = await open();
+    await authority.annotate(conversationRef, { labels: ['vip', 'other'] }, person);
+    await fake.flush();
+    const seen = receiver.received.length;
+    await authority.createLabel({ title: 'taken' });
+    expect(
+      await authority.updateLabel(label.ref, { title: 'taken' }).catch((error) => error),
+    ).toMatchObject({ status: 422 });
+    // Chatwoot's name rule: two characters or more, starting with a letter or number, no spaces,
+    // and no combining marks (so Hindi vowel signs are refused).
+    for (const bad of ['bad name!', 'x', '-dash', '_under', 'टैग']) {
+      expect(
+        await authority.updateLabel(label.ref, { title: bad }).catch((e) => e),
+        bad,
+      ).toMatchObject({ status: 422 });
+    }
+    expect(await authority.createLabel({ title: 'order-2_x' }).catch((e) => e)).toMatchObject({
+      title: 'order-2_x',
+    });
+    const gold = await authority.updateLabel(label.ref, { title: 'Gold', description: null });
+    expect(gold).toMatchObject({ ref: label.ref, title: 'gold', description: null });
+    expect((await authority.getState(conversationRef)).labels).toEqual(['gold', 'other']);
+    await fake.flush();
+    const updates = receiver.received
+      .slice(seen)
+      .filter((r) => r.path === '/account' && r.body.includes('"conversation_updated"'));
+    expect(updates.some((r) => r.body.includes('label_list'))).toBe(true);
+
+    // Deleting a tag takes it off the conversations too, quietly: no webhook says so.
+    await fake.flush();
+    const before = receiver.received.length;
+    await authority.deleteLabel(label.ref);
+    expect((await authority.getState(conversationRef)).labels).toEqual(['other']);
+    await fake.flush();
+    expect(receiver.received).toHaveLength(before);
+    expect(await authority.deleteLabel(label.ref).catch((error) => error)).toMatchObject({
+      status: 404,
+    });
+  });
+
+  it('changes and removes saved replies, for agents too, each short code once', async () => {
+    const { fake, authority, account } = await setup();
+    const agent = await provisionStaffUser({
+      baseUrl: fake.url,
+      platformToken: fake.platformToken,
+      accountId: account.accountId,
+      name: 'Sara Agent',
+      email: `hv-agent-${randomUUID()}@hamnivo.invalid`,
+      role: 'agent',
+    });
+    const hello = await authority.createSavedReply(
+      { shortCode: 'hello', content: 'Hi there' },
+      person,
+    );
+    const bye = await authority.createSavedReply({ shortCode: 'bye', content: 'Goodbye' }, person);
+    expect(
+      await authority
+        .createSavedReply({ shortCode: 'hello', content: 'Again' }, person)
+        .catch((error) => error),
+    ).toMatchObject({ status: 422 });
+    expect(
+      await authority.updateSavedReply(bye.ref, { shortCode: 'hello' }, person).catch((e) => e),
+    ).toMatchObject({ status: 422 });
+    expect(
+      await authority.updateSavedReply(bye.ref, { content: '  ' }, person).catch((e) => e),
+    ).toMatchObject({ status: 422 });
+
+    // Changing one thing keeps the other.
+    expect(await authority.updateSavedReply(hello.ref, { content: 'Hello!' }, person)).toEqual({
+      ref: hello.ref,
+      shortCode: 'hello',
+      content: 'Hello!',
+    });
+    expect(await authority.updateSavedReply(hello.ref, { shortCode: 'hi' }, person)).toEqual({
+      ref: hello.ref,
+      shortCode: 'hi',
+      content: 'Hello!',
+    });
+
+    // Chatwoot checks no role here: an agent changes and removes them as an administrator does.
+    const staff = new ChatwootAuthority({
+      baseUrl: fake.url,
+      accountId: account.accountId,
+      integrationToken: account.integration.token,
+      botToken: () => account.bot.token,
+      staffToken: async () => agent.token,
+      inbox: () => ({ identifier: account.inbox.identifier, hmacToken: account.inbox.hmacToken }),
+    });
+    const actor = { kind: 'staff', userRef: String(agent.userId) } as const;
+    expect(await staff.updateSavedReply(hello.ref, { content: 'Mine now' }, actor)).toEqual({
+      ref: hello.ref,
+      shortCode: 'hi',
+      content: 'Mine now',
+    });
+
+    // A removed one is gone, and an unknown number is not found.
+    await staff.deleteSavedReply(hello.ref, actor);
+    expect((await authority.listSavedReplies(undefined, person)).map((r) => r.shortCode)).toEqual([
+      'bye',
+    ]);
+    expect(
+      await authority.deleteSavedReply(hello.ref, person).catch((error) => error),
+    ).toMatchObject({ status: 404 });
+    expect(
+      await authority.updateSavedReply('999999', { content: 'x' }, person).catch((error) => error),
+    ).toMatchObject({ status: 404 });
   });
 });
 

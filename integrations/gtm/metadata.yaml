@@ -1,0 +1,10 @@
+# For the Community Template Gallery. The Gallery reads template.tpl, metadata.yaml and LICENSE from
+# the root of a GitHub repository, so submitting means copying these files (and README.md) into a
+# repository of their own. The steps are in README.md.
+homepage: "https://github.com/CodeWithJuber/Hamnivo"
+documentation: "https://github.com/CodeWithJuber/Hamnivo/blob/main/docs/guide/integrations/gtm.md"
+versions:
+  # sha is the commit, in the repository you submit, that holds this version of template.tpl.
+  # Fill it in when you submit.
+  - sha: ""
+    changeNotes: First version. Loads Hamnivo Chat from the chat address, with the widget ID and the API address.

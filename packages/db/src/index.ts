@@ -1,4 +1,5 @@
 export * from './actions-resolvers.js';
+export * from './ai-power-resolvers.js';
 export * from './audit.js';
 export * from './client.js';
 export * from './commerce-resolvers.js';
@@ -10,3 +11,4 @@ export * from './resolvers.js';
 export * as schema from './schema/index.js';
 export * from './tenant.js';
 export * from './uploads.js';
+export * from './visitors.js';

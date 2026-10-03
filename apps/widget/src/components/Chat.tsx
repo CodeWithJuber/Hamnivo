@@ -47,14 +47,20 @@ import { renderMarkdown } from '../markdown.js';
 import type { ChatState } from '../useChat.js';
 import type { DisplayControls } from '../useDisplay.js';
 import type { MemoryControls } from '../useMemory.js';
+import { useTypingReports } from '../useTyping.js';
 import { BidiText, directionOf } from './BidiText.js';
+import { BrandMark } from './BrandMark.js';
 import { Conversations } from './Conversations.js';
+import { Csat } from './Csat.js';
 import { Home } from './Home.js';
 import { MemoryConsent } from './MemoryConsent.js';
 import { MemoryPanel, useSlotLabel } from './MemoryPanel.js';
 import { DeleteMessage, EMOJI_NAMES, Reactions } from './MessageActions.js';
 import { Contact, Files, fileSize, Place, Unknown } from './Parts.js';
+import { PrivacyLink } from './PrivacyLink.js';
 import { Settings } from './Settings.js';
+import { StaffTypingLine } from './StaffTyping.js';
+import { VisitorNotice } from './VisitorNotice.js';
 
 interface Source {
   id: string;
@@ -586,6 +592,8 @@ function Composer(props: {
   label: string;
   send: string;
   draftScope: string;
+  /** The conversation the words go to; null before there is one (nothing is reported then). */
+  conversationId: string | null;
   client: HamnivoClient;
   chips: readonly Chip[];
   attach: { allowed: boolean; accept: string; maxFiles: number; maxMb: number };
@@ -604,6 +612,12 @@ function Composer(props: {
   const ready = props.chips.some((c) => c.state === 'ready');
   const { drafts } = props.client;
   const scope = props.draftScope;
+  const { conversationId, client } = props;
+  // Staff see "typing…" while the visitor writes.
+  useTypingReports(
+    conversationId ? (typing) => client.reportTyping(conversationId, typing) : null,
+    text,
+  );
 
   // The draft comes back after a reload; typing keeps it for this person and conversation.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the scope changes
@@ -787,6 +801,10 @@ export function Chat(props: {
   display: DisplayControls;
   /** The proactive prompt the visitor opened the chat from (W19). */
   prompt: string | null;
+  /** The name of the person typing a reply ('' when unnamed), or null when nobody is. */
+  staffTyping: string | null;
+  /** Says the website notes which pages are viewed (from the gateway), or null. */
+  visitorNotice: string | null;
   onLocale: (locale: Locale) => void;
   onSend: (text: string, attachments?: readonly OutgoingAttachment[]) => Promise<void>;
   onRetry: (clientMessageId: string) => void;
@@ -1030,6 +1048,7 @@ export function Chat(props: {
         data-mode={props.mode}
       >
         <header className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b border-border bg-surface px-4 py-3">
+          <BrandMark url={config.brand.logoUrl} />
           <div className="min-w-0 flex-1 basis-40">
             <h1 className="truncate text-base font-semibold text-text">{config.brand.name}</h1>
             <p className="text-sm text-text-muted" data-testid="ai-disclosure">
@@ -1115,6 +1134,9 @@ export function Chat(props: {
           >
             {banner}
           </p>
+        ) : null}
+        {config.features.csat && conversation?.status === 'resolved' ? (
+          <Csat client={client} conversationId={conversation.id} />
         ) : null}
         {offline ? (
           <div
@@ -1253,10 +1275,13 @@ export function Chat(props: {
               onChoose={props.language.choose}
               onDismiss={props.language.dismiss}
             />
+            <StaffTypingLine name={props.staffTyping} />
+            <VisitorNotice text={props.visitorNotice} />
             <Composer
               label={t('placeholder')}
               send={offline ? t('surface.offline.queue') : t('send')}
               draftScope={draftScope}
+              conversationId={conversation?.id ?? null}
               client={client}
               chips={chips}
               attach={{
@@ -1270,6 +1295,7 @@ export function Chat(props: {
               onSendFiles={sendFiles}
               locale={locale}
             />
+            <PrivacyLink url={config.privacyPolicyUrl} />
           </div>
         </ThreadPrimitive.Root>
       </section>

@@ -8,9 +8,9 @@ Your team works together in Studio. Everyone logs in with email and two-step ver
 ## Invite someone
 
 1. Go to **Settings** → **Team and access**
-2. Click **Invite**
+2. Click **Invite teammate**
 3. Enter their email and choose a role
-4. Click **Send**
+4. Click **Send invite**
 
 They get an email with a link. They click it and create their account.
 
@@ -66,41 +66,27 @@ Use this for: Someone tracking your performance metrics.
 
 Don't see the right fit? Create your own.
 
-1. Go to **Settings** → **Team and access**
-2. Click **Custom roles**
-3. Click **Create role**
-4. Enter a name (e.g., "Sales agent")
-5. Check the permissions you want:
-   - Inbox (answer chats)
-   - Inbox (manage chats)
-   - AI (create and edit agents)
-   - Knowledge (upload files)
-   - Reports (see metrics)
-   - Settings (change team)
-   - Billing (manage plan)
-6. Click **Create**
+1. Go to **Settings** → **Team and access** and open the **Roles** tab.
+2. Click **New role**.
+3. Give it a name (for example "Sales agent") and tick what the role may do.
+4. Save it.
 
-**What you'll see:** Your custom role in the list. You can now pick it when inviting people.
+**What you'll see:** your role in the list. You can now give it to people.
 
 ## Remove someone from your team
 
-1. Go to **Settings** → **Team and access**
-2. Click on their name
-3. Click **Remove**
-4. Confirm
+1. Go to **Settings** → **Team and access**, **Members** tab.
+2. Open the person's menu and choose **Remove**, then confirm.
 
-**What you'll see:** They're gone from the list. They can no longer log into Studio.
-
-Their chats stay in the Inbox, unassigned. You or someone else can take them over.
+**What you'll see:** they lose access to this workspace at once. Their roles are removed and they
+leave their teams. Their chats stay in the Inbox for someone else to take over.
 
 ## Change someone's role
 
-1. Go to **Settings** → **Team and access**
-2. Click on their name
-3. Choose a new role
-4. Click **Update**
+1. Go to **Settings** → **Team and access**, **Members** tab.
+2. Open the person's access and add a role, or press **Remove role** next to one.
 
-The change takes effect immediately.
+The change applies on their next click in Studio.
 
 ## Two-step verification
 
@@ -138,7 +124,7 @@ Hamnivo keeps an audit log of:
 - When people were invited or removed
 - Changes to knowledge
 
-You can view it in **Settings** → **Team and access** → **Audit log**. Download it as a report.
+You can view it in **Settings** → **Team and access** → **Audit log**, and download it with **Export** (as a spreadsheet file, or as NDJSON with hashes).
 
 ## Permissions details
 

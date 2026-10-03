@@ -3,6 +3,7 @@ import { ClientMessageId, Cursor, LanguageTag, Timestamp } from './common.js';
 import { CustomerConversationStatus, Message } from './conversations.js';
 import { ErrorCode } from './errors.js';
 import { typeId } from './ids.js';
+import { AvailabilityStatus, CustomerTypingSignal, InboxAlertEvent } from './inbox-alerts.js';
 import { Sender } from './participants.js';
 import { SourcePart } from './parts.js';
 import { OwnerMode } from './staff-conversations.js';
@@ -103,6 +104,11 @@ export const InboxConversation = z
     snoozedUntil: Timestamp.nullable(),
     /** When the customer last wrote while nobody has answered yet (waiting for a person). */
     waitingSince: Timestamp.nullable(),
+    /**
+     * Customer messages this person has not read yet, from the read marker the server keeps for
+     * them. Only chats that are theirs or waiting for a person count; every other chat shows 0.
+     */
+    unreadCount: z.int().nonnegative(),
     lastActivityAt: Timestamp,
     createdAt: Timestamp,
   })
@@ -183,6 +189,8 @@ export const InboxConversationDetail = InboxConversation.extend({
   presence: z.array(PresenceEntry),
   /** Whether handing the conversation back to the AI can work right now. */
   aiAvailable: z.boolean(),
+  /** The customer is typing a message right now. */
+  customerTyping: z.boolean(),
 }).meta({ id: 'InboxConversationDetail' });
 export type InboxConversationDetail = z.infer<typeof InboxConversationDetail>;
 
@@ -239,6 +247,8 @@ export const AssigneeOptions = z
         staffMemberId: typeId('staff'),
         displayName: z.string(),
         current: z.boolean(),
+        /** Online, away or offline right now. */
+        status: AvailabilityStatus,
       }),
     ),
     teams: z.array(InboxTeamRef),
@@ -629,6 +639,8 @@ export const InboxStreamEvent = z
       conversationId: z.string(),
       viewers: z.array(PresenceEntry),
     }),
+    InboxAlertEvent,
+    CustomerTypingSignal,
   ])
   .meta({ id: 'InboxStreamEvent' });
 export type InboxStreamEvent = z.infer<typeof InboxStreamEvent>;

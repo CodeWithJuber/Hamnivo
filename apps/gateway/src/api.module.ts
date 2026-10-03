@@ -45,25 +45,39 @@ import { SsoRuntime } from './identity/sso/sso-runtime.js';
 import { StaffGuard } from './identity/staff.guard.js';
 import { TenantsService } from './identity/tenants.service.js';
 import { InboxAccess } from './inbox/access.js';
+import { InboxAlertsController } from './inbox/alerts.controller.js';
+import { InboxAlertsService } from './inbox/alerts.service.js';
 import { AnnotationsService } from './inbox/annotations.service.js';
 import { AssignmentService } from './inbox/assignment.service.js';
 import { AssistService } from './inbox/assist.service.js';
+import { AvailabilityService } from './inbox/availability.service.js';
 import { BulkService } from './inbox/bulk.service.js';
 import { CollaborationService } from './inbox/collaboration.service.js';
+import { CustomerTypingService } from './inbox/customer-typing.service.js';
 import { DraftsService } from './inbox/drafts.service.js';
 import { InboxController, TeamsController } from './inbox/inbox.controller.js';
 import { InboxService } from './inbox/inbox.service.js';
+import { LIBRARY_API_CONTROLLERS, LIBRARY_API_PROVIDERS } from './inbox/library.module.js';
 import { InboxLiveService } from './inbox/live.service.js';
 import { InboxMessagesService } from './inbox/messages.service.js';
 import { InboxSignals } from './inbox/signals.service.js';
 import { StatusService } from './inbox/status.service.js';
 import { TeamsService } from './inbox/teams.service.js';
+import { TypingSignals } from './inbox/typing.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { KnowledgeController } from './knowledge/knowledge.controller.js';
 import { KnowledgeService } from './knowledge/knowledge.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
 import type { Scanner } from './knowledge/scanner.js';
+import {
+  KNOWLEDGE_WEB_API_CONTROLLERS,
+  KNOWLEDGE_WEB_API_PROVIDERS,
+} from './knowledge/web/web.module.js';
 import { LanguageController } from './language/language.controller.js';
+import {
+  MCP_SERVER_API_CONTROLLERS,
+  MCP_SERVER_API_PROVIDERS,
+} from './mcp-server/mcp-server.module.js';
 import { AdminMemoryController } from './memory/admin-memory.controller.js';
 import { AdminMemoryService } from './memory/admin-memory.service.js';
 import { MemoryCache } from './memory/cache.js';
@@ -81,6 +95,8 @@ import { SupportSessionsService } from './operations/support-sessions.service.js
 import { HealthController } from './platform/health.controller.js';
 import type { Mailer } from './platform/mailer.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
+import { SAAS_API_CONTROLLERS, SAAS_API_PROVIDERS } from './platform/saas.module.js';
+import { SignupPolicy } from './platform/signup.js';
 import { AgentsController } from './runtime/agents.controller.js';
 import { AgentsService } from './runtime/agents.service.js';
 import { KillSwitchesController } from './runtime/kill-switches.controller.js';
@@ -88,13 +104,19 @@ import { KillSwitchesService } from './runtime/kill-switches.service.js';
 import { ModelConnectionsController } from './runtime/model-connections.controller.js';
 import { ModelConnectionsService } from './runtime/model-connections.service.js';
 import { LANGUAGE_MODEL, ModelFactory } from './runtime/models.js';
+import {
+  PLAYGROUND_API_CONTROLLERS,
+  PLAYGROUND_API_PROVIDERS,
+} from './runtime/playground.module.js';
 import { RunsController } from './runtime/runs.controller.js';
 import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
 import { SecretsController } from './secrets/secrets.controller.js';
+import { SETUP_API_CONTROLLERS, SETUP_API_PROVIDERS } from './setup/setup.module.js';
 import { SupportController } from './support/support.controller.js';
 import { SupportService } from './support/support.service.js';
 import { APP_DB, AUTH, CONFIG, MAILER } from './tokens.js';
+import { VISITORS_API_CONTROLLERS, VISITORS_API_PROVIDERS } from './visitors/visitors.module.js';
 import { AuthorityContactsService } from './widget/contacts.service.js';
 import { WidgetConversationsService } from './widget/conversations.service.js';
 import { WidgetEventsService } from './widget/events.service.js';
@@ -104,6 +126,7 @@ import {
   widgetSurfaceApiProviders,
 } from './widget/surface.module.js';
 import { WidgetTokens } from './widget/tokens.service.js';
+import { WidgetTypingController } from './widget/typing.controller.js';
 import { WidgetController } from './widget/widget.controller.js';
 import { WidgetGuard } from './widget/widget.guard.js';
 
@@ -148,21 +171,35 @@ export class ApiModule {
         WidgetMemoryController,
         AdminMemoryController,
         InboxController,
+        InboxAlertsController,
         TeamsController,
+        WidgetTypingController,
         SsoController,
         SupportController,
         PlatformController,
         ...COMMERCE_API_CONTROLLERS,
         ...DEVELOPER_API_CONTROLLERS,
         ...WIDGET_SURFACE_API_CONTROLLERS,
+        ...SETUP_API_CONTROLLERS,
+        ...VISITORS_API_CONTROLLERS,
+        ...LIBRARY_API_CONTROLLERS,
         ...ACTIONS_API_CONTROLLERS,
+        ...SAAS_API_CONTROLLERS,
+        ...MCP_SERVER_API_CONTROLLERS,
+        ...KNOWLEDGE_WEB_API_CONTROLLERS,
+        ...PLAYGROUND_API_CONTROLLERS,
       ],
       providers: [
         {
           provide: AUTH,
-          inject: [CONFIG, APP_DB, MAILER, SsoRuntime],
-          useFactory: (cfg: AppConfig, db: Db, mailer: Mailer, sso: SsoRuntime) =>
-            createAuth(cfg, db, mailer, sso),
+          inject: [CONFIG, APP_DB, MAILER, SsoRuntime, SignupPolicy],
+          useFactory: (
+            cfg: AppConfig,
+            db: Db,
+            mailer: Mailer,
+            sso: SsoRuntime,
+            signup: SignupPolicy,
+          ) => createAuth(cfg, db, mailer, sso, signup),
         },
         {
           provide: DNS_RESOLVER,
@@ -197,6 +234,10 @@ export class ApiModule {
         StaffLinksService,
         InboxAccess,
         InboxSignals,
+        TypingSignals,
+        AvailabilityService,
+        InboxAlertsService,
+        CustomerTypingService,
         DraftsService,
         StaffConversationsService,
         InboxService,
@@ -237,7 +278,14 @@ export class ApiModule {
         ...COMMERCE_API_PROVIDERS,
         ...developerApiProviders(overrides),
         ...widgetSurfaceApiProviders(config, overrides.scanner),
+        ...SETUP_API_PROVIDERS,
+        ...VISITORS_API_PROVIDERS,
+        ...LIBRARY_API_PROVIDERS,
         ...ACTIONS_API_PROVIDERS,
+        ...SAAS_API_PROVIDERS,
+        ...MCP_SERVER_API_PROVIDERS,
+        ...KNOWLEDGE_WEB_API_PROVIDERS,
+        ...PLAYGROUND_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

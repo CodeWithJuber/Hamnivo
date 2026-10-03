@@ -1,9 +1,10 @@
-import { type Db, schema, withTenant } from '@hamnivo/db';
+import { type Db, newId, schema, toPublicId, withTenant } from '@hamnivo/db';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { JournalService } from '../authority/journal.service.js';
 import type { AppConfig } from '../config.js';
+import { type StaffTyping, TypingSignals } from '../inbox/typing.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { SessionSignals } from './session-signals.service.js';
 import type { WidgetClaims } from './tokens.service.js';
@@ -25,6 +26,7 @@ export class WidgetEventsService {
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly journal: JournalService,
     private readonly signals: SessionSignals,
+    private readonly typing: TypingSignals,
   ) {}
 
   private async sessionActive(claims: WidgetClaims): Promise<boolean> {
@@ -131,9 +133,34 @@ export class WidgetEventsService {
       control({ control: 'auth_expired' });
       end();
     });
+    // A person writing a reply is live-only: it has no sequence, so it never moves the cursor and
+    // is never replayed (the contract's transient events).
+    const unsubscribeTyping = await this.typing.onStaffTyping(
+      tenantId,
+      conversationId,
+      (signal: StaffTyping) => {
+        const event = {
+          schemaVersion: '1.0',
+          eventId: toPublicId('event', newId()),
+          conversationId: toPublicId('conversation', conversationId),
+          sequence: null,
+          occurredAt: this.clock().toISOString(),
+          correlationId: null,
+          lane: 'customer',
+          type: 'typing',
+          data: {
+            participantId: signal.participantId,
+            displayName: signal.displayName,
+            typing: signal.typing,
+          },
+        };
+        write(`event: typing\ndata: ${JSON.stringify(event)}\n\n`);
+      },
+    );
     unsubscribe = () => {
       unsubscribeJournal();
       unsubscribeSession();
+      unsubscribeTyping();
     };
     if (closed) {
       unsubscribe();

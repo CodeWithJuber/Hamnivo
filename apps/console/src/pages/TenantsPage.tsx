@@ -13,8 +13,10 @@ import { ActionError, QueryState } from '../components/States';
 import { LANGUAGE_NAMES, LOCALES } from '../i18n';
 import { ApiError, api, newIdempotencyKey } from '../lib/api';
 import { authClient } from '../lib/auth-client';
+import { usePlatformMe } from '../lib/platform';
 import { meQuery } from '../lib/queries';
 import { reauth } from '../lib/reauth';
+import { reasonOf, useSignupSettings } from '../lib/saas';
 import { activeTenantId, chooseTenant } from '../lib/tenant';
 import type { Membership } from '../lib/types';
 
@@ -31,7 +33,9 @@ export function slugify(name: string): string {
     .replace(/-+$/g, '');
 }
 
-const usable = (m: Membership) => m.status === 'active' && m.tenant.status === 'active';
+/** Workspaces that open: active ones, and suspended ones (read-only). */
+const usable = (m: Membership) =>
+  m.status === 'active' && (m.tenant.status === 'active' || m.tenant.status === 'suspended');
 
 /** Tenant choice after sign-in: pick one of yours or create one; the choice is remembered. */
 export function TenantsPage() {
@@ -41,6 +45,8 @@ export function TenantsPage() {
   const client = useQueryClient();
   const announce = useAnnouncer();
   const me = useQuery(meQuery());
+  const signup = useSignupSettings();
+  const operator = usePlatformMe();
   const current = activeTenantId();
 
   const [name, setName] = useState('');
@@ -51,14 +57,15 @@ export function TenantsPage() {
   const [attempted, setAttempted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
+  const [closedNotice, setClosedNotice] = useState(false);
   // One key per creation attempt, so a retry after a lost response can't create a second tenant.
   const idempotencyKey = useMemo(() => newIdempotencyKey(), []);
 
-  const open = async (tenantId: string) => {
+  const open = async (tenantId: string, to?: string) => {
     chooseTenant(tenantId);
     // Nothing from another tenant may stay on screen (HNV-03-06).
     client.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
-    await router.navigate({ href: search.redirect ?? '/overview' });
+    await router.navigate({ href: to ?? search.redirect ?? '/overview' });
   };
 
   const create = async (event: FormEvent) => {
@@ -79,10 +86,14 @@ export function TenantsPage() {
       });
       announce(t('tenants.create.created'));
       await client.invalidateQueries({ queryKey: ['me'] });
-      await open(membership.tenant.id);
+      // A new workspace starts with the guided setup.
+      await open(membership.tenant.id, '/onboarding');
     } catch (error) {
       if (error instanceof ApiError && error.fields.some((f) => f.path === 'slug')) {
         setErrors({ slug: t('tenants.create.slugTaken') });
+      } else if (reasonOf(error) === 'signup_closed') {
+        setFailure(null);
+        setClosedNotice(true);
       } else {
         setFailure(error);
       }
@@ -102,6 +113,11 @@ export function TenantsPage() {
   const summary = attempted
     ? Object.entries(errors).map(([field, message]) => ({ fieldId: `tenant-${field}`, message }))
     : [];
+  // With public sign-up closed, workspaces come from the provider (platform operators, and the
+  // first person on a new server, may still create one: the gateway decides).
+  const closed =
+    closedNotice ||
+    (signup.data?.open === false && !operator.data && (me.data?.memberships.length ?? 0) > 0);
 
   return (
     <AuthLayout title={t('tenants.title')} description={t('tenants.description')} wide>
@@ -149,6 +165,9 @@ export function TenantsPage() {
                         {m.tenant.id === current ? (
                           <StatusBadge tone="info">{t('tenants.current')}</StatusBadge>
                         ) : null}
+                        {usable(m) && m.tenant.status === 'suspended' ? (
+                          <StatusBadge tone="warning">{t('billing.tenants.suspended')}</StatusBadge>
+                        ) : null}
                         {usable(m) ? (
                           <Button
                             variant={m.tenant.id === current ? 'default' : 'secondary'}
@@ -183,46 +202,55 @@ export function TenantsPage() {
           <h2 id="tenants-create" className="text-md font-semibold text-text">
             {t('tenants.create.title')}
           </h2>
-          <form className="flex flex-col gap-5" onSubmit={create} noValidate>
-            <FormErrorSummary title={t('auth.errorSummary')} errors={summary} />
-            <ActionError error={failure} />
-            <TextField
-              id="tenant-name"
-              label={t('tenants.create.name')}
-              hint={t('tenants.create.nameHint')}
-              value={name}
-              error={errors.name}
-              autoComplete="organization"
-              onChange={(event) => {
-                setName(event.target.value);
-                if (!slugEdited) setSlug(slugify(event.target.value));
-              }}
-            />
-            <TextField
-              id="tenant-slug"
-              label={t('tenants.create.slug')}
-              hint={t('tenants.create.slugHint')}
-              value={slug}
-              error={errors.slug}
-              dir="ltr"
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => {
-                setSlugEdited(true);
-                setSlug(event.target.value.toLowerCase());
-              }}
-            />
-            <SelectField
-              id="tenant-locale"
-              label={t('tenants.create.language')}
-              value={locale}
-              onChange={(event) => setLocale(event.target.value)}
-              options={LOCALES.map((l) => ({ value: l, label: LANGUAGE_NAMES[l] }))}
-            />
-            <Button type="submit" busy={busy} className="self-start">
-              {t('tenants.create.submit')}
-            </Button>
-          </form>
+          {closed ? (
+            <p
+              className="rounded-lg border border-border bg-surface-muted p-4 text-sm text-text"
+              data-testid="create-closed"
+            >
+              {t('billing.tenants.createClosed')}
+            </p>
+          ) : (
+            <form className="flex flex-col gap-5" onSubmit={create} noValidate>
+              <FormErrorSummary title={t('auth.errorSummary')} errors={summary} />
+              <ActionError error={failure} />
+              <TextField
+                id="tenant-name"
+                label={t('tenants.create.name')}
+                hint={t('tenants.create.nameHint')}
+                value={name}
+                error={errors.name}
+                autoComplete="organization"
+                onChange={(event) => {
+                  setName(event.target.value);
+                  if (!slugEdited) setSlug(slugify(event.target.value));
+                }}
+              />
+              <TextField
+                id="tenant-slug"
+                label={t('tenants.create.slug')}
+                hint={t('tenants.create.slugHint')}
+                value={slug}
+                error={errors.slug}
+                dir="ltr"
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(event) => {
+                  setSlugEdited(true);
+                  setSlug(event.target.value.toLowerCase());
+                }}
+              />
+              <SelectField
+                id="tenant-locale"
+                label={t('tenants.create.language')}
+                value={locale}
+                onChange={(event) => setLocale(event.target.value)}
+                options={LOCALES.map((l) => ({ value: l, label: LANGUAGE_NAMES[l] }))}
+              />
+              <Button type="submit" busy={busy} className="self-start">
+                {t('tenants.create.submit')}
+              </Button>
+            </form>
+          )}
         </section>
       </div>
     </AuthLayout>

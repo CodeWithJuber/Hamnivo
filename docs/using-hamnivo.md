@@ -15,8 +15,9 @@ Chatwoot is the engine underneath. Nobody has to open it day to day.
 | **Chat widget and website** | Your customers | Whenever they need help | The chat on your website. Customers never see Studio or Chatwoot. |
 
 You and your team work in Studio. Studio has no link to Chatwoot, and staff never need its
-address. An administrator may open Chatwoot for the few things Studio does not do yet: defining
-tags and custom fields, and editing or deleting saved replies.
+address. An administrator may open Chatwoot for the one thing Studio does not do yet: defining
+custom fields. Saved replies and tags are set up in Studio, from the inbox (see
+[Saved replies and tags](guide/inbox/saved-replies.md)).
 
 ## The menu in Studio
 
@@ -31,14 +32,17 @@ as a row of links above the page, so each one is a click away.
 | **AI assistant** | AI agents, Knowledge, Customer memory, Tools and permissions, Safety checks, Decision rules, Activity, Answer caching, Model connections |
 | **Sales** | Orders, Finance exceptions |
 | **Reports** | Reports |
-| **Settings** | Brands and install, Team and access, Security, Developer, Import history |
+| **Settings** | Brands and install, Business hours, Team and access, Support teams, Security, Developer, Customer sign-in, Import history |
 
-Two things are not in the menu:
+Some pages are not in the menu:
 
 - **Stop AI** is a red button in the header, on every page, for people who can stop the AI
   (permission to publish agents). It opens the Stop AI page.
 - **Account security** and the **Platform console** (operators only) are in the account area at
   the bottom of the menu, which is a sheet on a phone.
+- [**Live visitors**](guide/inbox/live-visitors.md) (everyone who can read chats) and
+  [**Saved replies and tags**](guide/inbox/saved-replies.md) (people who manage the inbox) are
+  buttons above the list of chats in the inbox. A row of links for them would push the inbox down.
 
 ## What each role sees
 
@@ -47,15 +51,15 @@ entry is there, and a list names the pages you can open in it.
 
 | Role | Home | Inbox | AI assistant | Sales | Reports | Settings |
 |---|---|---|---|---|---|---|
-| Owner | ✓ | ✓ | all nine pages | both pages | ✓ | all five pages |
-| Administrator | ✓ | ✓ | all nine pages | both pages | ✓ | all five pages |
-| Supervisor | ✓ | ✓ | all but Model connections | both pages | ✓ | Team and access |
-| Support agent | ✓ | ✓ | Knowledge, Tools and permissions, Answer caching | both pages | | Team and access (read only) |
-| Finance | ✓ | | Activity | both pages | ✓ | Team and access |
+| Owner | ✓ | ✓ | all nine pages | both pages | ✓ | all nine pages |
+| Administrator | ✓ | ✓ | all nine pages | both pages | ✓ | all nine pages (Plan and billing shows only the email sender name) |
+| Supervisor | ✓ | ✓ | all but Model connections | both pages | ✓ | Team and access, Support teams |
+| Support agent | ✓ | ✓ | Knowledge, Tools and permissions, Answer caching | both pages | | Team and access, Support teams (both read only) |
+| Finance | ✓ | | Activity | both pages | ✓ | Team and access, Support teams |
 | Knowledge editor | ✓ | ✓ | AI agents, Knowledge, Answer caching | | | |
-| Developer | ✓ | | AI agents, Model connections | | | Team and access, Developer |
+| Developer | ✓ | | AI agents, Model connections | | | Team and access, Support teams, Developer |
 | Analyst | ✓ | ✓ | Safety checks, Decision rules, Activity | | ✓ | |
-| Billing manager | ✓ | | Activity | | ✓ | |
+| Billing manager | ✓ | | Activity | | ✓ | Plan and billing |
 
 A custom role works the same way: the entry is there when one of its pages is allowed, and the row
 lists only the allowed pages. The gateway checks every request again, so typing the address of a
@@ -68,12 +72,32 @@ Home starts with a block that depends on what you do:
 - If you do not manage brands (support agents and supervisors, for example), it shows **Your
   chats**: how many customers are waiting for a person and how many chats are assigned to you,
   with an **Open inbox** button.
-- If you can do any setup step, it shows **Get set up**, with the steps that are still open: connect the chat
-  engine, add a brand and install the chat, publish an AI agent, invite a teammate. Each step links
-  to its page, and a step shows only if you can do it. The list disappears when every step is done.
-  Studio cannot tell whether the install code is on your website, so "install the chat" counts as
-  done once a brand has a website allowed to load it. When no open step is one you can do, this
-  block shows nothing.
+- If you can do any setup step, it shows **Get set up**, with the steps that are still open, in
+  the order to do them: add a brand and its website, connect the chat engine for it, add an AI
+  key, publish an AI agent, invite a teammate. Each step links to its page, and a step shows only
+  if you can do it. The list disappears when every step is done. A button on it, **Open guided
+  setup**, opens the step-by-step guide at `/onboarding` (see the
+  [setup guide](guide/setup/getting-started.md)). Two steps look further than a list can:
+  - "Add an AI key" is done when the workspace has a key of its own that is on, or when the server
+    holds a key for any provider.
+  - "Publish an AI agent" counts only an agent that answers with a real model. An agent that
+    answers with the offline practice model (the default until you choose a model) does not count,
+    because customers would only get canned replies.
+
+  Studio cannot tell whether the install code is on your website, so "add a brand" counts once a
+  brand has a website allowed to load it. When no open step is one you can do, this block shows
+  nothing.
 
 Below that, Home is the same for everyone: your brands with their chat connection and AI status,
 the AI stop switches, and the latest runs.
+
+## Setting up without help
+
+A business owner can set Hamnivo up from Studio alone. The guides for it are in
+[`docs/guide/setup`](guide/setup/getting-started.md):
+
+- [Getting started](guide/setup/getting-started.md): the guided setup, step by step.
+- [AI keys](guide/setup/ai-keys.md): add, test and replace the key your AI agents use.
+- [How the chat looks](guide/setup/widget-look.md): colour, logo, corners and words.
+- [Test chat](guide/setup/test-chat.md): try the real chat before any customer sees it.
+- [Business hours](guide/setup/business-hours.md): when your team answers, and the days you are closed.

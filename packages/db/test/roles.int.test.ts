@@ -89,19 +89,25 @@ describe('database roles', () => {
     const definers = rows.filter((r) => r.secdef);
     expect(definers.map((r) => r.fn).sort()).toEqual(
       [
+        'app.active_plans()',
         'app.apply_memory_tombstones()',
+        'app.billing_account_tenant(text,text,text)',
         'app.claim_commerce_events(integer,integer)',
         'app.claim_commerce_work(integer,integer)',
         'app.claim_integration_inbox(integer,integer)',
         'app.claim_outbox(integer,integer)',
         'app.claim_reconcile_cursors(integer,integer)',
         'app.claim_webhook_deliveries(integer,integer)',
+        'app.due_web_syncs(integer,timestamp with time zone)',
         'app.ensure_audit_partitions(integer)',
         'app.ensure_reconcile_cursors()',
         'app.expired_actions(integer,timestamp with time zone)',
         'app.expired_memory_subjects(integer)',
+        'app.invitation_pending_for(text)',
+        'app.lapsed_billing(timestamp with time zone,integer)',
         'app.purge_expired(integer)',
         'app.purge_migration_files(integer)',
+        'app.purge_visitors(integer)',
         'app.purge_webhook_events(integer,integer)',
         'app.purge_widget_uploads(integer)',
         'app.resolve_api_key(text)',
@@ -115,6 +121,7 @@ describe('database roles', () => {
         'app.resolve_widget(text)',
         'app.resolve_widget_session(uuid)',
         'app.tenant_invoices(uuid)',
+        'app.tenants_exist()',
       ].sort(),
     );
     for (const fn of definers) {

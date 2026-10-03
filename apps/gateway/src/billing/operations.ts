@@ -14,6 +14,7 @@ import {
 } from '@hamnivo/domain/billing';
 import { and, asc, eq, gte, inArray, isNotNull, lt, ne, sql, sum } from 'drizzle-orm';
 import { z } from 'zod';
+import { applyPlan, NO_PLAN, planByKey, trialEnd } from './plans.js';
 
 /**
  * Platform billing (A16): plans, assigning a plan to a tenant, invoices from metered usage and
@@ -27,7 +28,10 @@ const Count = z.int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const Minor = z.string().regex(/^(0|[1-9][0-9]{0,17})$/, 'an amount in minor units, as a string');
 
 export const PlanInput = z.object({
-  key: z.string().regex(/^[a-z][a-z0-9-]{1,39}$/),
+  key: z
+    .string()
+    .regex(/^[a-z][a-z0-9-]{1,39}$/)
+    .refine((key) => key !== NO_PLAN, `"${NO_PLAN}" means no plan; choose another key`),
   name: z.string().trim().min(1).max(80),
   currency: z.string().regex(/^[A-Z]{3}$/),
   priceMinor: Minor,
@@ -42,6 +46,14 @@ export const PlanInput = z.object({
       }),
     )
     .default([]),
+  /** Days of trial a workspace may get before it falls back to the free plan. */
+  trialDays: z.int().min(0).max(365).default(0),
+  /** The Stripe price (`price_…`) a Stripe subscription to this plan uses. */
+  stripePriceId: z
+    .string()
+    .regex(/^price_[A-Za-z0-9_]+$/)
+    .nullable()
+    .default(null),
 });
 export type PlanInput = z.input<typeof PlanInput>;
 
@@ -130,6 +142,8 @@ export class BillingOperations {
       priceMinor: BigInt(plan.priceMinor),
       limits,
       metered: plan.metered,
+      trialDays: plan.trialDays,
+      stripePriceId: plan.stripePriceId,
     };
     const [row] = await this.platform
       .insert(schema.plans)
@@ -158,63 +172,40 @@ export class BillingOperations {
     return row.id;
   }
 
-  /** Copies a plan into the tenant's entitlements (keeping the tenant's own budget). */
-  async assignPlan(tenantReference: string, planKey: string) {
+  /**
+   * Copies a plan into the tenant's entitlements (keeping the tenant's own budget, lowered to a
+   * smaller plan's tokens). With `startTrial`, the plan is a trial that falls back to the free
+   * plan after the plan's trial days.
+   */
+  async assignPlan(
+    tenantReference: string,
+    planKey: string,
+    options: { startTrial?: boolean } = {},
+  ) {
     const tenantId = await this.tenantId(tenantReference);
-    const [plan] = await this.platform
-      .select()
-      .from(schema.plans)
-      .where(and(eq(schema.plans.key, planKey), eq(schema.plans.status, 'active')));
-    if (!plan) throw new BillingOperationError(`No active plan ${planKey}`);
     const now = this.clock();
-    await withTenant(
+    const trialEndsAt = await withTenant(
       this.options.app,
       { tenantId, actorId: `platform:${this.options.operator}` },
       async (tx) => {
-        const values = {
-          planKey: plan.key,
-          planName: plan.name,
-          currency: plan.currency,
-          priceMinor: plan.priceMinor,
-          limits: plan.limits,
-          metered: plan.metered,
-          assignedAt: now,
-          assignedBy: this.options.operator,
-          updatedAt: now,
-        };
-        const [current] = await tx.select().from(schema.tenantEntitlements).for('update');
-        if (current) {
-          await tx
-            .update(schema.tenantEntitlements)
-            .set(values)
-            .where(eq(schema.tenantEntitlements.id, current.id));
-        } else {
-          await tx.insert(schema.tenantEntitlements).values({ tenantId, ...values });
+        const plan = await planByKey(tx, planKey);
+        if (!plan) throw new BillingOperationError(`No active plan ${planKey}`);
+        if (options.startTrial && plan.trialDays === 0) {
+          throw new BillingOperationError(`The plan ${planKey} has no trial days.`);
         }
-        // The workspace's own budget cannot stay above a smaller plan.
-        const tokens = plan.limits.aiTokens;
-        if (
-          typeof tokens === 'number' &&
-          current?.aiTokenBudget &&
-          current.aiTokenBudget > tokens
-        ) {
-          await tx
-            .update(schema.tenantEntitlements)
-            .set({ aiTokenBudget: tokens })
-            .where(eq(schema.tenantEntitlements.tenantId, tenantId));
-        }
-        await appendAudit(tx, {
+        const ends = options.startTrial ? trialEnd(plan, now) : null;
+        await applyPlan(tx, tenantId, plan, {
           actorType: 'platform',
           actorId: this.options.operator,
-          action: 'billing.plan_assigned',
-          targetType: 'tenant',
-          targetId: toPublicId('tenant', tenantId),
-          outcome: 'success',
-          data: { plan: plan.key, previous: current?.planKey ?? null, limits: plan.limits },
+          source: 'operator',
+          trialEndsAt: ends,
+          now,
+          force: true,
         });
+        return ends;
       },
     );
-    return { tenantId, plan: plan.key };
+    return { tenantId, plan: planKey, trialEndsAt };
   }
 
   /** Usage of a tenant's period limits in one billing period, from the usage ledger. */
@@ -260,9 +251,21 @@ export class BillingOperations {
     }
     const e = schema.tenantEntitlements;
     const entitled = await this.platform.select().from(e).where(isNotNull(e.planKey));
+    // Workspaces paying through Stripe or WHMCS are invoiced there, never twice.
+    const elsewhere = new Set(
+      (
+        await this.platform
+          .select({ tenantId: schema.billingAccounts.tenantId })
+          .from(schema.billingAccounts)
+          .where(inArray(schema.billingAccounts.provider, ['stripe', 'whmcs']))
+      ).map((row) => row.tenantId),
+    );
     const created: InvoiceRow[] = [];
     for (const entitlement of entitled) {
       if (!entitlement.planKey || !entitlement.planName || !entitlement.currency) continue;
+      if (elsewhere.has(entitlement.tenantId)) continue;
+      // A trial is free; it falls back to the free plan when it ends.
+      if (entitlement.trialEndsAt) continue;
       // Assigned after the period: it had no plan then, so nothing is owed for it.
       if (!entitlement.assignedAt || entitlement.assignedAt >= period.end) continue;
       const [existing] = await this.platform
@@ -288,6 +291,8 @@ export class BillingOperations {
         usage,
         period,
       );
+      // Nothing is owed (the free plan without metered usage): no invoice.
+      if (draft.totalMinor === 0n) continue;
       const [{ n } = { n: 0 }] = await this.platform
         .select({ n: sql<number>`count(*)`.mapWith(Number) })
         .from(schema.invoices)

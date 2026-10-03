@@ -38,6 +38,7 @@ import type {
   SupportScope,
 } from '../../lib/types';
 import { canPlatform } from './PlatformPage';
+import { TenantPlanPanel } from './TenantPlanPanel';
 
 const TENANT_TONE: Record<PlatformTenant['status'], StatusTone> = {
   active: 'success',
@@ -239,6 +240,7 @@ function TenantDetail({ id, operator }: { id: string; operator: PlatformOperator
                 brands: formatNumber(tenant.brands),
               })}
             </p>
+            <TenantPlanPanel tenantId={tenant.id} name={tenant.name} operator={operator} />
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <h3 className="font-semibold text-text">{t('platform.tenants.connectors')}</h3>

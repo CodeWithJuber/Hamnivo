@@ -4,7 +4,14 @@
  * endpoints and permissions already give.
  */
 import type { Can } from './nav';
-import type { Agent, AuthorityConnection, Brand, Invitation, Member } from './types';
+import type {
+  Agent,
+  AuthorityConnection,
+  Brand,
+  Invitation,
+  Member,
+  ModelConnection,
+} from './types';
 
 /**
  * Someone who does not manage brands is staff, not an administrator: Home leads with their chats.
@@ -24,24 +31,38 @@ const SETUP_PERMISSIONS = [
 
 export const canSetUp = (can: Can) => SETUP_PERMISSIONS.some((permission) => can(permission));
 
-export type SetupStepId = 'engine' | 'brand' | 'agent' | 'team';
+export type SetupStepId = 'brand' | 'engine' | 'aikey' | 'agent' | 'team';
 
 export interface SetupStep {
   id: SetupStepId;
   /** The page where the step is done. */
-  to: '/brands' | '/agents' | '/team';
+  to: '/brands' | '/models' | '/agents' | '/team';
   done: boolean;
 }
+
+/** An agent as the checklist reads it: whether its published version answers with the practice model. */
+export type AgentFact = Pick<Agent, 'status' | 'publishedVersion'> & {
+  /** The published version's model is the offline practice model; `undefined` when not known. */
+  usesMock?: boolean | undefined;
+};
 
 /** What each list says, or `undefined` when this person cannot read it or it did not load. */
 export interface SetupFacts {
   connections: readonly Pick<AuthorityConnection, 'status'>[] | undefined;
   brands: readonly Pick<Brand, 'status' | 'allowedOrigins'>[] | undefined;
-  agents: readonly Pick<Agent, 'status' | 'publishedVersion'>[] | undefined;
+  agents: readonly AgentFact[] | undefined;
   members: readonly Pick<Member, 'id'>[] | undefined;
   invitations: readonly Pick<Invitation, 'status'>[] | undefined;
   /** The signed-in person's staff member ID: they are not the teammate to invite. */
   selfId: string | undefined;
+  /**
+   * AI keys: the workspace's own connections, and whether the server holds a key of its own for
+   * any provider. Left out, the step is not shown.
+   */
+  models?: {
+    connections: readonly Pick<ModelConnection, 'status'>[] | undefined;
+    serverKey: boolean | undefined;
+  };
 }
 
 /** Whether anyone besides this person is in the workspace or invited: unknown if not readable. */
@@ -54,12 +75,41 @@ function hasTeammate(facts: SetupFacts): boolean | undefined {
 }
 
 /**
- * The setup steps this person can do and the lists can tell about, in the order to do them. A
+ * Whether the workspace has an AI key to answer with: one of its own that is on, or one the
+ * server holds. `undefined` when the lists cannot say.
+ */
+function hasAiKey(models: NonNullable<SetupFacts['models']>): boolean | undefined {
+  if (models.connections?.some((c) => c.status === 'active')) return true;
+  if (models.serverKey === true) return true;
+  return models.connections && models.serverKey !== undefined ? false : undefined;
+}
+
+/**
+ * Whether an AI agent is live with a real model. An agent that answers with the offline practice
+ * model does not count: customers would get canned replies. `undefined` when an agent is
+ * published but its model is not known (so nothing is guessed either way).
+ */
+function hasLiveAgent(agents: readonly AgentFact[]): boolean | undefined {
+  const published = agents.filter((a) => a.status === 'active' && a.publishedVersion !== null);
+  if (published.some((a) => a.usesMock === false)) return true;
+  return published.some((a) => a.usesMock === undefined) ? undefined : false;
+}
+
+/**
+ * The setup steps this person can do and the lists can tell about, in the order to do them: the
+ * brand and its website first, then the chat engine for it, an AI key, the agent and the team. A
  * step the lists cannot tell about is left out, never guessed. Nothing detects the install code
- * running on a website, so "install the chat" counts once a brand has a website allowed to load it.
+ * running on a website, so "add a brand" counts once a brand has a website allowed to load it.
  */
 export function setupSteps(facts: SetupFacts, can: Can): SetupStep[] {
   const steps: SetupStep[] = [];
+  if (can('brands.manage') && facts.brands) {
+    steps.push({
+      id: 'brand',
+      to: '/brands',
+      done: facts.brands.some((b) => b.status === 'active' && b.allowedOrigins.length > 0),
+    });
+  }
   if (can('integrations.manage') && facts.connections) {
     // A connection that needs attention is still connected; its page says what is wrong.
     steps.push({
@@ -68,19 +118,13 @@ export function setupSteps(facts: SetupFacts, can: Can): SetupStep[] {
       done: facts.connections.some((c) => c.status === 'active' || c.status === 'degraded'),
     });
   }
-  if (can('brands.manage') && facts.brands) {
-    steps.push({
-      id: 'brand',
-      to: '/brands',
-      done: facts.brands.some((b) => b.status === 'active' && b.allowedOrigins.length > 0),
-    });
+  if (can('integrations.manage') && facts.models) {
+    const key = hasAiKey(facts.models);
+    if (key !== undefined) steps.push({ id: 'aikey', to: '/models', done: key });
   }
   if (can('agents.publish') && facts.agents) {
-    steps.push({
-      id: 'agent',
-      to: '/agents',
-      done: facts.agents.some((a) => a.status === 'active' && a.publishedVersion !== null),
-    });
+    const live = hasLiveAgent(facts.agents);
+    if (live !== undefined) steps.push({ id: 'agent', to: '/agents', done: live });
   }
   const teammate = hasTeammate(facts);
   if (can('members.invite') && teammate !== undefined) {

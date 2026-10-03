@@ -1,13 +1,16 @@
 import {
+  DEFAULT_WIDGET_TEXT,
   type HandoffResponse,
   type LauncherConfig,
   type LocalizedText,
   ProactiveSettings,
+  WidgetAppearance,
   type WidgetConfig,
   WidgetSettings,
 } from '@hamnivo/contracts';
 import type { schema } from '@hamnivo/db';
 import { isOpen, nextOpening } from '@hamnivo/domain';
+import { onPrimary } from './appearance.js';
 import type { BrandSurface } from './settings.service.js';
 
 type Locale = 'en' | 'ar' | 'hi' | 'ur';
@@ -15,27 +18,27 @@ type Locale = 'en' | 'ar' | 'hi' | 'ur';
 /** Default widget copy (design kit §5 microcopy). Tenants override it; translations await native review. */
 const COPY: Record<Locale, WidgetConfig['copy'][Locale]> = {
   en: {
-    greeting: 'Assalamu alaikum! How can we help today?',
+    greeting: DEFAULT_WIDGET_TEXT.greeting.en,
     aiDisclosure: "I'm {brand}'s AI assistant. I can help here, or connect you with a person.",
     offlineMessage:
       'Your request is with the support team. You can keep this chat open or leave a reply address.',
     privacyNotice: null,
   },
   ar: {
-    greeting: 'السلام عليكم! كيف يمكننا مساعدتك اليوم؟',
+    greeting: DEFAULT_WIDGET_TEXT.greeting.ar,
     aiDisclosure: 'أنا المساعد الذكي لدى {brand}. يمكنني المساعدة هنا، أو إيصالك بشخص من الفريق.',
     offlineMessage: 'طلبك لدى فريق الدعم. يمكنك إبقاء هذه المحادثة مفتوحة أو ترك عنوان للرد.',
     privacyNotice: null,
   },
   hi: {
-    greeting: 'अस्सलामु अलैकुम! आज हम आपकी क्या मदद कर सकते हैं?',
+    greeting: DEFAULT_WIDGET_TEXT.greeting.hi,
     aiDisclosure: 'मैं {brand} का एआई सहायक हूँ। मैं यहाँ मदद कर सकता हूँ, या आपको किसी व्यक्ति से जोड़ सकता हूँ।',
     offlineMessage:
       'आपका अनुरोध सपोर्ट टीम के पास है। आप यह चैट खुली रख सकते हैं या जवाब के लिए पता छोड़ सकते हैं।',
     privacyNotice: null,
   },
   ur: {
-    greeting: 'السلام علیکم! آج ہم آپ کی کیا مدد کر سکتے ہیں؟',
+    greeting: DEFAULT_WIDGET_TEXT.greeting.ur,
     aiDisclosure:
       'میں {brand} کا اے آئی اسسٹنٹ ہوں۔ میں یہاں مدد کر سکتا ہوں، یا آپ کو کسی شخص سے ملا سکتا ہوں۔',
     offlineMessage:
@@ -44,22 +47,17 @@ const COPY: Record<Locale, WidgetConfig['copy'][Locale]> = {
   },
 };
 
-/** "People are away" with the time they are back; translations await native review. */
-const AWAY: Record<Locale, (when: string) => string> = {
-  en: (when) =>
-    `Our team is away right now and answers again ${when}. Your messages are kept here, and you can keep chatting with the AI assistant.`,
-  ar: (when) =>
-    `فريقنا غير متاح الآن ويعود للرد ${when}. رسائلك محفوظة هنا، ويمكنك متابعة الحديث مع المساعد الذكي.`,
-  hi: (when) =>
-    `हमारी टीम अभी उपलब्ध नहीं है और ${when} फिर से जवाब देगी। आपके संदेश यहाँ सुरक्षित हैं, और आप एआई सहायक से बात जारी रख सकते हैं।`,
-  ur: (when) =>
-    `ہماری ٹیم ابھی موجود نہیں ہے اور ${when} دوبارہ جواب دے گی۔ آپ کے پیغامات یہاں محفوظ ہیں، اور آپ اے آئی اسسٹنٹ سے بات جاری رکھ سکتے ہیں۔`,
-};
-const AWAY_UNKNOWN: Record<Locale, string> = {
-  en: 'Our team is away right now. Your messages are kept here, and a person will read them.',
-  ar: 'فريقنا غير متاح الآن. رسائلك محفوظة هنا، وسيقرؤها شخص من الفريق.',
-  hi: 'हमारी टीम अभी उपलब्ध नहीं है। आपके संदेश यहाँ सुरक्षित हैं, और कोई व्यक्ति उन्हें पढ़ेगा।',
-  ur: 'ہماری ٹیم ابھی موجود نہیں ہے۔ آپ کے پیغامات یہاں محفوظ ہیں، اور کوئی شخص انہیں پڑھے گا۔',
+/** "People are away" with the time they are back, or without it when that is not known. */
+const AWAY = (lang: Locale, when: string): string =>
+  DEFAULT_WIDGET_TEXT.away[lang].replace('{when}', when);
+const AWAY_UNKNOWN = DEFAULT_WIDGET_TEXT.awayUnknown;
+
+/** "A person is here": said only when someone who can answer is online now; translations await native review. */
+const PERSON_ONLINE: Record<Locale, string> = {
+  en: 'A person from our team is online and will join this chat shortly.',
+  ar: 'أحد أفراد فريقنا متصل الآن وسينضم إلى هذه المحادثة قريبًا.',
+  hi: 'हमारी टीम का एक व्यक्ति ऑनलाइन है और जल्द ही इस चैट में जुड़ेगा।',
+  ur: 'ہماری ٹیم کا ایک فرد آن لائن ہے اور جلد اس چیٹ میں شامل ہوگا۔',
 };
 
 const localeOf = (locale: string | null | undefined): Locale =>
@@ -81,10 +79,13 @@ export function availabilityOf(
   };
 }
 
+const DEFAULT_APPEARANCE = WidgetAppearance.parse({});
+
 /** Defaults for a brand that has saved no settings. */
 export const DEFAULT_SURFACE: BrandSurface = {
   settings: WidgetSettings.parse({}),
   proactive: ProactiveSettings.parse({}),
+  appearance: DEFAULT_APPEARANCE,
   settingsUpdatedAt: null,
   proactiveUpdatedAt: null,
 };
@@ -94,6 +95,37 @@ const LOCALES: Locale[] = ['en', 'ar', 'hi', 'ur'];
 /** A brand's text in one language, falling back to its English. */
 const textIn = (text: LocalizedText, locale: Locale): string => text[locale] ?? text.en;
 
+/** "Monday 9:00 AM GMT+5": when people are back, in the customer's language and the brand's time zone. */
+function whenText(lang: Locale, timezone: string, back: Date): string {
+  return new Intl.DateTimeFormat(lang, {
+    weekday: 'long',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: timezone,
+    timeZoneName: 'short',
+  }).format(back);
+}
+
+/**
+ * The brand's own words for "nobody is online", in the customer's language, or null when it has
+ * none. Where the text says `{when}` it becomes the time people are back; when that is not known,
+ * the built-in sentence for an unknown return is shown instead of a gap.
+ */
+export function offlineText(
+  text: LocalizedText | null | undefined,
+  lang: Locale,
+  hours: typeof schema.brands.$inferSelect.businessHours,
+  now: Date,
+): string | null {
+  if (!text) return null;
+  const own = textIn(text, lang);
+  if (!own.includes('{when}')) return own;
+  const back = hours ? nextOpening(hours, now) : null;
+  return back && hours
+    ? own.replaceAll('{when}', whenText(lang, hours.timezone, back))
+    : AWAY_UNKNOWN[lang];
+}
+
 export function widgetConfig(
   brand: typeof schema.brands.$inferSelect,
   now: Date = new Date(),
@@ -101,12 +133,20 @@ export function widgetConfig(
   /** Files are offered only where they can be scanned (ClamAV in production). */
   options: { filesScannable?: boolean } = {},
 ): WidgetConfig {
-  const theme = brand.theme ?? {};
   const { settings, proactive } = surface;
+  const appearance = surface.appearance ?? DEFAULT_APPEARANCE;
   const copy = Object.fromEntries(
     (Object.keys(COPY) as Locale[]).map((locale) => [
       locale,
-      { ...COPY[locale], aiDisclosure: COPY[locale].aiDisclosure.replace('{brand}', brand.name) },
+      {
+        ...COPY[locale],
+        aiDisclosure: COPY[locale].aiDisclosure.replace('{brand}', brand.name),
+        // The brand's own words replace the built-in ones; a language it left empty shows its English.
+        greeting: appearance.greeting ? textIn(appearance.greeting, locale) : COPY[locale].greeting,
+        offlineMessage:
+          offlineText(appearance.offlineText, locale, brand.businessHours, now) ??
+          COPY[locale].offlineMessage,
+      },
     ]),
   ) as WidgetConfig['copy'];
   const availability = availabilityOf(brand, now);
@@ -117,10 +157,10 @@ export function widgetConfig(
     version: brand.configVersion,
     brand: {
       name: brand.name,
-      logoUrl: theme.logoUrl ?? null,
-      accent: theme.accent ?? '#192A30',
-      onAccent: theme.onAccent ?? '#FFFFFF',
-      radius: theme.radius ?? 12,
+      logoUrl: appearance.logoUrl,
+      accent: appearance.primaryColor.toUpperCase(),
+      onAccent: onPrimary(appearance.primaryColor),
+      radius: appearance.radius,
       launcherPosition: settings.layout.position,
     },
     locales: { default: 'en', available: ['en', 'ar', 'hi', 'ur'] },
@@ -129,11 +169,11 @@ export function widgetConfig(
     features: {
       attachments: settings.attachments.enabled && options.filesScannable !== false,
       helpCenter: settings.help.search,
-      csat: false,
+      csat: appearance.csat,
       voice: false,
       identityRequiredForHistory: false,
     },
-    privacyPolicyUrl: null,
+    privacyPolicyUrl: appearance.privacyUrl,
     attachmentLimits: {
       maxBytes: settings.attachments.maxMegabytes * 1024 * 1024,
       allowedMimeTypes: [...settings.attachments.allowedTypes],
@@ -245,26 +285,26 @@ export function handoffOutcome(
   brand: typeof schema.brands.$inferSelect | undefined,
   locale: string | null | undefined,
   now: Date,
+  /** The brand's own words for "nobody is online" (its appearance), when it has set some. */
+  offline?: LocalizedText | null,
+  /** Someone who can answer is online right now (staff availability); false when unknown. */
+  staffOnline = false,
 ): Pick<HandoffResponse, 'availability' | 'message' | 'followUp'> {
   const lang = localeOf(locale);
   const hours = brand?.businessHours;
   if (!hours || isOpen(hours, now)) {
-    return { availability: 'queued', message: COPY[lang].offlineMessage, followUp: null };
+    return staffOnline
+      ? { availability: 'person_available', message: PERSON_ONLINE[lang], followUp: null }
+      : { availability: 'queued', message: COPY[lang].offlineMessage, followUp: null };
   }
   const back = nextOpening(hours, now);
+  const own = offlineText(offline, lang, hours, now);
   if (!back) {
-    return { availability: 'offline', message: AWAY_UNKNOWN[lang], followUp: null };
+    return { availability: 'offline', message: own ?? AWAY_UNKNOWN[lang], followUp: null };
   }
-  const when = new Intl.DateTimeFormat(lang, {
-    weekday: 'long',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: hours.timezone,
-    timeZoneName: 'short',
-  }).format(back);
   return {
     availability: 'offline',
-    message: AWAY[lang](when),
+    message: own ?? AWAY(lang, whenText(lang, hours.timezone, back)),
     followUp: { channel: 'this_chat', expectedBy: back.toISOString() },
   };
 }

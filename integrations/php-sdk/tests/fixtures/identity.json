@@ -1,0 +1,1814 @@
+{
+  "generatedBy": "integrations/php-sdk/tests/fixtures/generate.ts, with @hamnivo/server",
+  "note": "Throwaway test keys. They sign nothing real.",
+  "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+  "now": 1789459200,
+  "keys": {
+    "HS256": {
+      "kid": "hk_fixture",
+      "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+    },
+    "ES256": {
+      "kid": "fixture-es256",
+      "privateJwk": {
+        "kty": "EC",
+        "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+        "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA",
+        "crv": "P-256",
+        "d": "98UqyFA1K88devZ81KpwT_EPNB3Z3-Zn4ag5RemiVa4"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+        "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA"
+      }
+    },
+    "EdDSA": {
+      "kid": "fixture-eddsa",
+      "privateJwk": {
+        "crv": "Ed25519",
+        "d": "c_YzVtwAcj89_4w4_KmvXWn4sEXSmST8AaZFtb0NmqA",
+        "x": "O8Z-vekQc_9u6bzR_EXDWek99r5HFXih-eyOSsaljKQ",
+        "kty": "OKP"
+      },
+      "publicJwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "O8Z-vekQc_9u6bzR_EXDWek99r5HFXih-eyOSsaljKQ"
+      }
+    },
+    "RS256": {
+      "kid": "fixture-rs256",
+      "privateJwk": {
+        "kty": "RSA",
+        "n": "3fLLntlmJ-JFveruqceeRTHiIBH8q_qYmozR68Qsz9A_0f22owb_0MeiwcXVy1L6g51-BaHp3BFvdKp955FHSm2aAQ9cbhnR3nd82v707JWkwdnYutAfetMNmb9yoEkywbdl2gfiPlufb-_o-EGq-aE_HmRsCwLncQI6xNFiRGeV-6XwLXUI75KMoip20oZgVSkyAxeL7FErYWEUerbm4lGn5Nz0ssmwbv17jQW-VWUo34RE4lLI1jAiVFbC_x30amfUjUYoayv9PJO0Fjj9JzCaQdbhMZUXHk771KIK0Wa9z4oJCvCgLfFPiBftBb-Kz62rOe2zJs3Hj_MG30jsuw",
+        "e": "AQAB",
+        "d": "A11WY-KUz175Qq9Ije9WQWNHs8fCBlNms9UVq5bOPRpBlWvctGz7PM2B9KEMpCfuX0dobSpusqTbBTA-d1-27nRp5ME4W_ztNwulq2Y5DUsZc8zbIb3c9E41wxJpaO-jItemZh8_eUWHTbmb1QOd1Wnx3IKWNraFDqwDew9Xh4TpPwfsLzysM1mjxoM6059yn6ItKWmkbprxRvy8b8xavN-DhFJ32oshMUQIxwh6fwARqXVy6HorDL6B9DEFcq9o-x7vdjDRuNWOedSrgbMVQtcZdgWz_lqbPOYEA4Ilgxo-W_gWWjAu-7QOilJCknfvtxPbBbeNhTP7yHiYHMwAWQ",
+        "p": "-wrcjn6RmdUmE-9bv0I9VcUUMWAu4x4uik0ZbqEDHtBG0UEfFWbFHip2SDzYjj5klpPPGqO91q7xVFs6PCzYI1wzpDeaISz28AdWWsy4PFEWIyTNgTuJ3e7GfAbJJA_xOpKQM5RwgNfUQMHZTcbQSXhRX5GmaZ1oFizTCpcDXeM",
+        "q": "4lTZj0AgAPD6rPea9z9OAJ8UJ0O_mardu0BWvc4pJKVeGISRHs-Qr4ptrfL2CbOm29rRSS87AqrGCGn6vDxXrqXd-azSkrwCd6ggBAfF0f3SPRru1ItXNryLfDDAzbJysCXMh3H7YCu3Np3XUmZbTXLI4TgKrCkGnUzeIMV47Uk",
+        "dp": "U5oFY0rRMDqkiKUAl8v2YxbTp7HRS39knlgYrRff0yYnP06BjH4CDQ60_0-MCqrKkr68jLGU6eaupZoP5bRFclklNX3yzTONNNgssOZWQHf8eE2sRmpOemMnJGyaFXFds1TVwuefI7k8jShBNr6L5Lu11a7KjYeG_0OEMJWj4GM",
+        "dq": "a9shfkmBttEftFOejpqlUlh8oyV-5fzuA3DqpTLcmnEPwUFTYsppWa3vDIkOxJrPNlA1kdmnFmNJUfMnIJLk-f5jJLs98d0Uk-8TqrgFhked666tB66LVjNNiVY2Ww_h5Z1ttVIVB8RtX-KiHMtYUTUVE3bAZ0B5vXZHGHjiYrk",
+        "qi": "FjJmwvykC-5aWz7pt5z9XuzMssqEx4t4gwkjpc08F40goajGPj0Ojm0-QVHuVkJ7CBo08DhawXL5P_6hUkYUzGS__rSloAGAAoFqa0KLtlw3kLddVuajfA89YjIHJawNA5jrmz9XOOS2rzPJsWDdRt_aJeILp3HZ1TGGHbnJNcM"
+      },
+      "publicJwk": {
+        "kty": "RSA",
+        "n": "3fLLntlmJ-JFveruqceeRTHiIBH8q_qYmozR68Qsz9A_0f22owb_0MeiwcXVy1L6g51-BaHp3BFvdKp955FHSm2aAQ9cbhnR3nd82v707JWkwdnYutAfetMNmb9yoEkywbdl2gfiPlufb-_o-EGq-aE_HmRsCwLncQI6xNFiRGeV-6XwLXUI75KMoip20oZgVSkyAxeL7FErYWEUerbm4lGn5Nz0ssmwbv17jQW-VWUo34RE4lLI1jAiVFbC_x30amfUjUYoayv9PJO0Fjj9JzCaQdbhMZUXHk771KIK0Wa9z4oJCvCgLfFPiBftBb-Kz62rOe2zJs3Hj_MG30jsuw",
+        "e": "AQAB"
+      }
+    }
+  },
+  "weakRsaJwk": {
+    "key_ops": ["sign"],
+    "ext": true,
+    "alg": "RS256",
+    "kty": "RSA",
+    "n": "wU8Im39456w78C1q_1El3rzn-jMZHTE1D7hJQTIm3V-B-aV9xbVij6Z2U1_4oxN-DUkpDB50HpAHC1FREfn4tnRZneydo1FN7DtP0z0q-np48vZzzY84AhN9Mv0y08_dXD53-IfDz9x3Oqfr0Z3LrFTaNdUMUK0IbiUu_f5EA-c",
+    "e": "AQAB",
+    "d": "O0vKASDV7oK3lBHqe0ziB_P8WJQqBPleJGdMGTKQF2G_ldt8vBPKmvPd4e9TbnqBNQQXEj-ZMPLPJlqYOqJp9sybMsHyzOrIdsiLn2Md-Gdbk1j68t2j5RAtIMouMwWSDE6xuZxa2LDicYeJEpUSbUnseKcqoHz0bC4fHQNLUxE",
+    "p": "9LNH28ydLIwnFUiogbUDx54ZZu6Qiiwz1Tgockmn_EPdhkafs5QqfjCsIfz4Y96RlK4Scgq8nlmuTUs-UYkPiQ",
+    "q": "yjw6d-T-R22Jlu0ZtazA0_Bs-trnnX4tXlHde_x5WAlhkt4mLtyxgfFovYydHjQH1enCVGIsXcb38blaqP6r7w",
+    "dp": "Y8cSvwJg-IAxk5Er_K-12diSnREb6Ot7Oy8J9wgnskpt8smrZws8hHYOSlGfawGfNRQBu3S7UopY83WB9LdBmQ",
+    "dq": "pZT4nk_s7li-TcelxD1EyILTB_WRrD6yMMbAnJKUW8Oak2C2TKo_4E_jXUczIZaiT8AMb4DOKJ4PRmhn1XRnGw",
+    "qi": "hs-klvC5adb29T8nVPN4yBr4uXn6wSAjRE5F1eSrBk1xNjmUPHx5gMNCfq8IGSPdSRIatp9QNuy6Eawx9yKNsA"
+  },
+  "cases": [
+    {
+      "name": "HS256: a full customer",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "puabeMYPSydiWzRm-2h28Q",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci00MiIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5MzE1LCJqdGkiOiJwdWFiZU1ZUFN5ZGlXelJtLTJoMjhRIiwibmFtZSI6IkF5ZXNoYSBLaGFuIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.i3mh7aXt1_rjl1BOusNWeAtVjf8bi2_V6Wl4UB61uuA",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: only an id",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "mcNPxatio819KiueG8M1UQ",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-7"
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci03IiwiYXVkIjoid2lkXzAxajl6azd3M3hxOHI0dDJ2Nm01bjFwMGNlIiwiaWF0IjoxNzg5NDU5MTk1LCJleHAiOjE3ODk0NTkzMTUsImp0aSI6Im1jTlB4YXRpbzgxOUtpdWVHOE0xVVEifQ.mSnrr7WBnkOyxpjqm-dIFkpEskZh9nBS7TNf2kSwGHo",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: optional fields set to null",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "bN6KtUlnOsOfry62jmiuyA",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-8",
+          "name": null,
+          "email": null,
+          "emailVerified": null
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci04IiwiYXVkIjoid2lkXzAxajl6azd3M3hxOHI0dDJ2Nm01bjFwMGNlIiwiaWF0IjoxNzg5NDU5MTk1LCJleHAiOjE3ODk0NTkzMTUsImp0aSI6ImJONkt0VWxuT3NPZnJ5NjJqbWl1eUEifQ.8wrRNG2oJ5MPpLEc_vcN9QlAiJS09OmJGMOemYlRWto",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: an unverified email",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "n8KtQ2XenjEnXgji6rcWow",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-9",
+          "email": "omar@example.com",
+          "emailVerified": false
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci05IiwiYXVkIjoid2lkXzAxajl6azd3M3hxOHI0dDJ2Nm01bjFwMGNlIiwiaWF0IjoxNzg5NDU5MTk1LCJleHAiOjE3ODk0NTkzMTUsImp0aSI6Im44S3RRMlhlbmpFblhnamk2cmNXb3ciLCJlbWFpbCI6Im9tYXJAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2V9.W5fcraHmoJCwgsYaMSrVMIKvjaJHRS_oyrmg2M6Vy9M",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: an Urdu name",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "0axNcFX5TwXMUZIOPIfV4g",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "u-1",
+          "name": "عائشة خان",
+          "email": "ayesha@example.pk",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJ1LTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiMGF4TmNGWDVUd1hNVVpJT1BJZlY0ZyIsIm5hbWUiOiLYudin2KbYtNipINiu2KfZhiIsImVtYWlsIjoiYXllc2hhQGV4YW1wbGUucGsiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.9jhg0fSEEnNRNnrBxQvAyQ4ONUeXg8MlLTf-pb7YwzA",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: a Hindi name",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "ZgFp9a5yZOUNCC35dJuTlQ",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "h-1",
+          "name": "आयशा खान",
+          "email": "ayesha@example.in",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJoLTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiWmdGcDlhNXlaT1VOQ0MzNWRKdVRsUSIsIm5hbWUiOiLgpIbgpK_gpLbgpL4g4KSW4KS-4KSoIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5pbiIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlfQ.vxicM_yRd_l95AdAhBQARGcDyA7pbfWl9Dx4ounRMsw",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: an emoji name",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "_iegNJ5VYz8eCg_lAQ36kw",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "e-1",
+          "name": "Sam 🙂 Lee"
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJlLTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiX2llZ05KNVZZejhlQ2dfbEFRMzZrdyIsIm5hbWUiOiJTYW0g8J-ZgiBMZWUifQ.3C2yWEohvgi-94z2e_FpxOOStVgS_cVLLDq22CQ-8t0",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: text that JSON must escape",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "QpIwNZ7Eud3C0_Wbp7rJLA",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "j-1",
+          "name": "say \"hi\" \\ a/b \u0001 \n \t \u2028 \u2029  é"
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJqLTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiUXBJd05aN0V1ZDNDMF9XYnA3ckpMQSIsIm5hbWUiOiJzYXkgXCJoaVwiIFxcIGEvYiBcdTAwMDEgXG4gXHQg4oCoIOKAqSB_IMOpIn0.V7DNap-PBsOeNiOI-L3G2E-mJEjw7nPeTZtdmz90DZQ",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: a numeric-looking id",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "6OoaoOGl-DGCJkf-AKzHvg",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "0",
+          "name": "Zero"
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiIwIiwiYXVkIjoid2lkXzAxajl6azd3M3hxOHI0dDJ2Nm01bjFwMGNlIiwiaWF0IjoxNzg5NDU5MTk1LCJleHAiOjE3ODk0NTkzMTUsImp0aSI6IjZPb2FvT0dsLURHQ0prZi1BS3pIdmciLCJuYW1lIjoiWmVybyJ9.UjAQaI0hnsV8Tx5wRBTi8DHVv2iCgF1DbdEEBMpjAPQ",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: an id of 200 characters",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "0pz39PEaJOanQ-pgOfCEMQ",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJ4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eCIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5MzE1LCJqdGkiOiIwcHozOVBFYUpPYW5RLXBnT2ZDRU1RIn0.8mLah97mP7hKKD48ZbrMYChhBgXJitODB2Il7Un859Q",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: an id of 100 emoji, which is 200 UTF-16 units",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "LC8OObxQRMgjC0vUyw2Mtw",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂"
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mCIiwiYXVkIjoid2lkXzAxajl6azd3M3hxOHI0dDJ2Nm01bjFwMGNlIiwiaWF0IjoxNzg5NDU5MTk1LCJleHAiOjE3ODk0NTkzMTUsImp0aSI6IkxDOE9PYnhRUk1nakMwdlV5dzJNdHcifQ.aIoTcUQ8Ys4Y4LGMTpXzSpwGzA9VrBRbvYRLCB0gfLc",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: a name of 120 characters",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "XQ-ZKk-Rx0z3G9q0U-lxPw",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "n-1",
+          "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJuLTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiWFEtWktrLVJ4MHozRzlxMFUtbHhQdyIsIm5hbWUiOiJubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm4ifQ.IKb7Y-oc5jjT2g9v_-VecO6ZgXGm11gpYg2BHigjwOc",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: a name of 60 emoji, which is 120 UTF-16 units",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "VgU5FlL34YMjfRdNeMkbQg",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "n-2",
+          "name": "🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂"
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJuLTIiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiVmdVNUZsTDM0WU1qZlJkTmVNa2JRZyIsIm5hbWUiOiLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYLwn5mC8J-ZgvCfmYIifQ.xqlR4dqVfmzRGyCHaiceyrcCeNRBeIV2AXDOWAq4xz4",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: a name with a leading and a trailing space",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "yl3jFdPaCorCxHdoBNvZAA",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "n-3",
+          "name": "  Padded Name  "
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJuLTMiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoieWwzakZkUGFDb3JDeEhkb0JOdlpBQSIsIm5hbWUiOiIgIFBhZGRlZCBOYW1lICAifQ.Ar_y1Tji_aGM-b1q72EBWp9Kqiu0iOiPfpmiV09EVNs",
+      "deterministic": true
+    },
+    {
+      "name": "ES256: a full customer",
+      "alg": "ES256",
+      "now": 1789459200,
+      "jti": "2sciLHfjnfFUPHed12KKmQ",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-es256",
+          "alg": "ES256",
+          "privateKey": {
+            "kty": "EC",
+            "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+            "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA",
+            "crv": "P-256",
+            "d": "98UqyFA1K88devZ81KpwT_EPNB3Z3-Zn4ag5RemiVa4"
+          }
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImZpeHR1cmUtZXMyNTYiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci00MiIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5MzE1LCJqdGkiOiIyc2NpTEhmam5mRlVQSGVkMTJLS21RIiwibmFtZSI6IkF5ZXNoYSBLaGFuIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.lBfwnf97pqwp4paJ6Hukw3Ap7e5rpCROP3YAh_lHNoNaSdSDFY3cQQyK2GgpiztqkaiHiDEt-Hj-Md4j35vz8Q",
+      "deterministic": false
+    },
+    {
+      "name": "ES256: only an id",
+      "alg": "ES256",
+      "now": 1789459200,
+      "jti": "XQrkoeMRJJmY_vl0ZyQxjA",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-es256",
+          "alg": "ES256",
+          "privateKey": {
+            "kty": "EC",
+            "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+            "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA",
+            "crv": "P-256",
+            "d": "98UqyFA1K88devZ81KpwT_EPNB3Z3-Zn4ag5RemiVa4"
+          }
+        },
+        "customer": {
+          "id": "customer-7"
+        }
+      },
+      "expected": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImZpeHR1cmUtZXMyNTYiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci03IiwiYXVkIjoid2lkXzAxajl6azd3M3hxOHI0dDJ2Nm01bjFwMGNlIiwiaWF0IjoxNzg5NDU5MTk1LCJleHAiOjE3ODk0NTkzMTUsImp0aSI6IlhRcmtvZU1SSkptWV92bDBaeVF4akEifQ.kZ4zemAfa42X9pcqSxiUCHqAdU0Yxx6HLKK5Jd87vbwhKsOpuEHjNcVO34qArY86onzf4j4JxYPi7bosYECWuQ",
+      "deterministic": false
+    },
+    {
+      "name": "ES256: an Urdu name",
+      "alg": "ES256",
+      "now": 1789459200,
+      "jti": "OG7adzUKO3AnYfjslAe9vw",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-es256",
+          "alg": "ES256",
+          "privateKey": {
+            "kty": "EC",
+            "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+            "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA",
+            "crv": "P-256",
+            "d": "98UqyFA1K88devZ81KpwT_EPNB3Z3-Zn4ag5RemiVa4"
+          }
+        },
+        "customer": {
+          "id": "u-1",
+          "name": "عائشة خان",
+          "email": "ayesha@example.pk",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImZpeHR1cmUtZXMyNTYiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJ1LTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiT0c3YWR6VUtPM0FuWWZqc2xBZTl2dyIsIm5hbWUiOiLYudin2KbYtNipINiu2KfZhiIsImVtYWlsIjoiYXllc2hhQGV4YW1wbGUucGsiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.c37R9645DNjliBRcqTuDaSIysBdCpDxcm8XFgnFU59IhsIX2GgDjHe5w4fQKkXc-Gzy0WgeBacCKhjgdLLjESw",
+      "deterministic": false
+    },
+    {
+      "name": "ES256: an emoji name",
+      "alg": "ES256",
+      "now": 1789459200,
+      "jti": "7ACzJPsqGJCHcflFjiSHxA",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-es256",
+          "alg": "ES256",
+          "privateKey": {
+            "kty": "EC",
+            "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+            "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA",
+            "crv": "P-256",
+            "d": "98UqyFA1K88devZ81KpwT_EPNB3Z3-Zn4ag5RemiVa4"
+          }
+        },
+        "customer": {
+          "id": "e-1",
+          "name": "Sam 🙂 Lee"
+        }
+      },
+      "expected": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImZpeHR1cmUtZXMyNTYiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJlLTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiN0FDekpQc3FHSkNIY2ZsRmppU0h4QSIsIm5hbWUiOiJTYW0g8J-ZgiBMZWUifQ.hyfHAVxENhXs1Lmk0zQwXTaEVCPgDI_6qr7DEGRIreU0qLYqQUKv1E7wcRZg_E7S3L8T190-x5eFkVNWIX7NJw",
+      "deterministic": false
+    },
+    {
+      "name": "ES256: text that JSON must escape",
+      "alg": "ES256",
+      "now": 1789459200,
+      "jti": "tEzSeTr6Wf9vVyQFmpqfCg",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-es256",
+          "alg": "ES256",
+          "privateKey": {
+            "kty": "EC",
+            "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+            "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA",
+            "crv": "P-256",
+            "d": "98UqyFA1K88devZ81KpwT_EPNB3Z3-Zn4ag5RemiVa4"
+          }
+        },
+        "customer": {
+          "id": "j-1",
+          "name": "say \"hi\" \\ a/b \u0001 \n \t \u2028 \u2029  é"
+        }
+      },
+      "expected": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImZpeHR1cmUtZXMyNTYiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJqLTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoidEV6U2VUcjZXZjl2VnlRRm1wcWZDZyIsIm5hbWUiOiJzYXkgXCJoaVwiIFxcIGEvYiBcdTAwMDEgXG4gXHQg4oCoIOKAqSB_IMOpIn0.IK7xoCYsuGc8ia2MemA-qtt8ed3gNCVGWcZ3DBwIr9mXiVxUMTu3b3cIF14EprfsMN5Y34plL7KRJUtQLpFDAQ",
+      "deterministic": false
+    },
+    {
+      "name": "EdDSA: a full customer",
+      "alg": "EdDSA",
+      "now": 1789459200,
+      "jti": "wKlVAvNmump0HrsV1yiiXA",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-eddsa",
+          "alg": "EdDSA",
+          "privateKey": {
+            "crv": "Ed25519",
+            "d": "c_YzVtwAcj89_4w4_KmvXWn4sEXSmST8AaZFtb0NmqA",
+            "x": "O8Z-vekQc_9u6bzR_EXDWek99r5HFXih-eyOSsaljKQ",
+            "kty": "OKP"
+          }
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJFZERTQSIsImtpZCI6ImZpeHR1cmUtZWRkc2EiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci00MiIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5MzE1LCJqdGkiOiJ3S2xWQXZObXVtcDBIcnNWMXlpaVhBIiwibmFtZSI6IkF5ZXNoYSBLaGFuIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.rDc-dEy6JBEW4ZSY0gUdz4Sa3RjzJrODnrdSXQhkrpJX_kn_Fv6DE4h9nm5Bt05tbpeowqCuALTX4RlPVkkhBQ",
+      "deterministic": true
+    },
+    {
+      "name": "EdDSA: only an id",
+      "alg": "EdDSA",
+      "now": 1789459200,
+      "jti": "zu3RYThFoepTG73gHp0gHA",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-eddsa",
+          "alg": "EdDSA",
+          "privateKey": {
+            "crv": "Ed25519",
+            "d": "c_YzVtwAcj89_4w4_KmvXWn4sEXSmST8AaZFtb0NmqA",
+            "x": "O8Z-vekQc_9u6bzR_EXDWek99r5HFXih-eyOSsaljKQ",
+            "kty": "OKP"
+          }
+        },
+        "customer": {
+          "id": "customer-7"
+        }
+      },
+      "expected": "eyJhbGciOiJFZERTQSIsImtpZCI6ImZpeHR1cmUtZWRkc2EiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci03IiwiYXVkIjoid2lkXzAxajl6azd3M3hxOHI0dDJ2Nm01bjFwMGNlIiwiaWF0IjoxNzg5NDU5MTk1LCJleHAiOjE3ODk0NTkzMTUsImp0aSI6Inp1M1JZVGhGb2VwVEc3M2dIcDBnSEEifQ.pBLVSqziB33c0Ly9ULu_oW_LJcqZPUC_ZqDn4UqlwxgxaPm2gmWrRSm6aGkLqtt3vj3Zn1RmO7ijPn4MwUUwBg",
+      "deterministic": true
+    },
+    {
+      "name": "EdDSA: an Urdu name",
+      "alg": "EdDSA",
+      "now": 1789459200,
+      "jti": "bc5aiLGFDGhxm30lGFTiWw",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-eddsa",
+          "alg": "EdDSA",
+          "privateKey": {
+            "crv": "Ed25519",
+            "d": "c_YzVtwAcj89_4w4_KmvXWn4sEXSmST8AaZFtb0NmqA",
+            "x": "O8Z-vekQc_9u6bzR_EXDWek99r5HFXih-eyOSsaljKQ",
+            "kty": "OKP"
+          }
+        },
+        "customer": {
+          "id": "u-1",
+          "name": "عائشة خان",
+          "email": "ayesha@example.pk",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJFZERTQSIsImtpZCI6ImZpeHR1cmUtZWRkc2EiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJ1LTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiYmM1YWlMR0ZER2h4bTMwbEdGVGlXdyIsIm5hbWUiOiLYudin2KbYtNipINiu2KfZhiIsImVtYWlsIjoiYXllc2hhQGV4YW1wbGUucGsiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.8qR9txGj--nSYrMcdoQZ8KI9AbTxWTf9p8dHb4sh8LJi0O7xNhKs6ZUbA3nF0zqLIUsUk6LE_qGqgzkmN0SRAw",
+      "deterministic": true
+    },
+    {
+      "name": "EdDSA: an emoji name",
+      "alg": "EdDSA",
+      "now": 1789459200,
+      "jti": "I8e0ZIhT8y-onjMnukHyrg",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-eddsa",
+          "alg": "EdDSA",
+          "privateKey": {
+            "crv": "Ed25519",
+            "d": "c_YzVtwAcj89_4w4_KmvXWn4sEXSmST8AaZFtb0NmqA",
+            "x": "O8Z-vekQc_9u6bzR_EXDWek99r5HFXih-eyOSsaljKQ",
+            "kty": "OKP"
+          }
+        },
+        "customer": {
+          "id": "e-1",
+          "name": "Sam 🙂 Lee"
+        }
+      },
+      "expected": "eyJhbGciOiJFZERTQSIsImtpZCI6ImZpeHR1cmUtZWRkc2EiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJlLTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiSThlMFpJaFQ4eS1vbmpNbnVrSHlyZyIsIm5hbWUiOiJTYW0g8J-ZgiBMZWUifQ._SXehQyBSsAItBd5CaofhbvwhTYf6ZeOzxPSFQupHGQwFwvJJuHUmkL_5KyIC2vHGfSvA4p28Y1vMuXyKI4wDw",
+      "deterministic": true
+    },
+    {
+      "name": "EdDSA: text that JSON must escape",
+      "alg": "EdDSA",
+      "now": 1789459200,
+      "jti": "xGd7Rq_mblnwqHCIvTBVlg",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-eddsa",
+          "alg": "EdDSA",
+          "privateKey": {
+            "crv": "Ed25519",
+            "d": "c_YzVtwAcj89_4w4_KmvXWn4sEXSmST8AaZFtb0NmqA",
+            "x": "O8Z-vekQc_9u6bzR_EXDWek99r5HFXih-eyOSsaljKQ",
+            "kty": "OKP"
+          }
+        },
+        "customer": {
+          "id": "j-1",
+          "name": "say \"hi\" \\ a/b \u0001 \n \t \u2028 \u2029  é"
+        }
+      },
+      "expected": "eyJhbGciOiJFZERTQSIsImtpZCI6ImZpeHR1cmUtZWRkc2EiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJqLTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoieEdkN1JxX21ibG53cUhDSXZUQlZsZyIsIm5hbWUiOiJzYXkgXCJoaVwiIFxcIGEvYiBcdTAwMDEgXG4gXHQg4oCoIOKAqSB_IMOpIn0.de7q85OnRTSlzdGw0AbiFPYyy2qlw_o769VRyVdYaNx1k1wLk_1ajyDEKFxvV9uDcSsaK7WRDbP6_IzmSY5gBQ",
+      "deterministic": true
+    },
+    {
+      "name": "RS256: a full customer",
+      "alg": "RS256",
+      "now": 1789459200,
+      "jti": "MamFCBIPY2CKoADGu8ELgQ",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-rs256",
+          "alg": "RS256",
+          "privateKey": {
+            "kty": "RSA",
+            "n": "3fLLntlmJ-JFveruqceeRTHiIBH8q_qYmozR68Qsz9A_0f22owb_0MeiwcXVy1L6g51-BaHp3BFvdKp955FHSm2aAQ9cbhnR3nd82v707JWkwdnYutAfetMNmb9yoEkywbdl2gfiPlufb-_o-EGq-aE_HmRsCwLncQI6xNFiRGeV-6XwLXUI75KMoip20oZgVSkyAxeL7FErYWEUerbm4lGn5Nz0ssmwbv17jQW-VWUo34RE4lLI1jAiVFbC_x30amfUjUYoayv9PJO0Fjj9JzCaQdbhMZUXHk771KIK0Wa9z4oJCvCgLfFPiBftBb-Kz62rOe2zJs3Hj_MG30jsuw",
+            "e": "AQAB",
+            "d": "A11WY-KUz175Qq9Ije9WQWNHs8fCBlNms9UVq5bOPRpBlWvctGz7PM2B9KEMpCfuX0dobSpusqTbBTA-d1-27nRp5ME4W_ztNwulq2Y5DUsZc8zbIb3c9E41wxJpaO-jItemZh8_eUWHTbmb1QOd1Wnx3IKWNraFDqwDew9Xh4TpPwfsLzysM1mjxoM6059yn6ItKWmkbprxRvy8b8xavN-DhFJ32oshMUQIxwh6fwARqXVy6HorDL6B9DEFcq9o-x7vdjDRuNWOedSrgbMVQtcZdgWz_lqbPOYEA4Ilgxo-W_gWWjAu-7QOilJCknfvtxPbBbeNhTP7yHiYHMwAWQ",
+            "p": "-wrcjn6RmdUmE-9bv0I9VcUUMWAu4x4uik0ZbqEDHtBG0UEfFWbFHip2SDzYjj5klpPPGqO91q7xVFs6PCzYI1wzpDeaISz28AdWWsy4PFEWIyTNgTuJ3e7GfAbJJA_xOpKQM5RwgNfUQMHZTcbQSXhRX5GmaZ1oFizTCpcDXeM",
+            "q": "4lTZj0AgAPD6rPea9z9OAJ8UJ0O_mardu0BWvc4pJKVeGISRHs-Qr4ptrfL2CbOm29rRSS87AqrGCGn6vDxXrqXd-azSkrwCd6ggBAfF0f3SPRru1ItXNryLfDDAzbJysCXMh3H7YCu3Np3XUmZbTXLI4TgKrCkGnUzeIMV47Uk",
+            "dp": "U5oFY0rRMDqkiKUAl8v2YxbTp7HRS39knlgYrRff0yYnP06BjH4CDQ60_0-MCqrKkr68jLGU6eaupZoP5bRFclklNX3yzTONNNgssOZWQHf8eE2sRmpOemMnJGyaFXFds1TVwuefI7k8jShBNr6L5Lu11a7KjYeG_0OEMJWj4GM",
+            "dq": "a9shfkmBttEftFOejpqlUlh8oyV-5fzuA3DqpTLcmnEPwUFTYsppWa3vDIkOxJrPNlA1kdmnFmNJUfMnIJLk-f5jJLs98d0Uk-8TqrgFhked666tB66LVjNNiVY2Ww_h5Z1ttVIVB8RtX-KiHMtYUTUVE3bAZ0B5vXZHGHjiYrk",
+            "qi": "FjJmwvykC-5aWz7pt5z9XuzMssqEx4t4gwkjpc08F40goajGPj0Ojm0-QVHuVkJ7CBo08DhawXL5P_6hUkYUzGS__rSloAGAAoFqa0KLtlw3kLddVuajfA89YjIHJawNA5jrmz9XOOS2rzPJsWDdRt_aJeILp3HZ1TGGHbnJNcM"
+          }
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImZpeHR1cmUtcnMyNTYiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci00MiIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5MzE1LCJqdGkiOiJNYW1GQ0JJUFkyQ0tvQURHdThFTGdRIiwibmFtZSI6IkF5ZXNoYSBLaGFuIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.p7d24ASmBeF19z_E54uAYmU-PtNRacjFTKTGwC34BLpk9E2GCD4r9wOsU0-m4cfmieJk1Yv9JVcRJGtff9KfcV_nJdeN_2g-EVjOQGtdqntWLQcNqbdZbmdosPPauLSDEd0sMo8k5_zRhYC7hXe-e0vXpC-zSv3YPtr_EmJVNconJw87gp0Wt8mITLa8TaWImJ7aGniZzh-eRVykFtKuarQPG-dvjyETajJx6P7pLMS1J9zRhZSgNb0sTPfaSe3ztNGBIWHntJK4_k8dzALHl4N-r5IlmeP5RaG3hG9uj28dI3cGgEuxa5WEDi1ppNKG9DlLqxBWfyMvc5APV2nwAA",
+      "deterministic": true
+    },
+    {
+      "name": "RS256: only an id",
+      "alg": "RS256",
+      "now": 1789459200,
+      "jti": "Z067jed_wkKhtHdtT-C3MA",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-rs256",
+          "alg": "RS256",
+          "privateKey": {
+            "kty": "RSA",
+            "n": "3fLLntlmJ-JFveruqceeRTHiIBH8q_qYmozR68Qsz9A_0f22owb_0MeiwcXVy1L6g51-BaHp3BFvdKp955FHSm2aAQ9cbhnR3nd82v707JWkwdnYutAfetMNmb9yoEkywbdl2gfiPlufb-_o-EGq-aE_HmRsCwLncQI6xNFiRGeV-6XwLXUI75KMoip20oZgVSkyAxeL7FErYWEUerbm4lGn5Nz0ssmwbv17jQW-VWUo34RE4lLI1jAiVFbC_x30amfUjUYoayv9PJO0Fjj9JzCaQdbhMZUXHk771KIK0Wa9z4oJCvCgLfFPiBftBb-Kz62rOe2zJs3Hj_MG30jsuw",
+            "e": "AQAB",
+            "d": "A11WY-KUz175Qq9Ije9WQWNHs8fCBlNms9UVq5bOPRpBlWvctGz7PM2B9KEMpCfuX0dobSpusqTbBTA-d1-27nRp5ME4W_ztNwulq2Y5DUsZc8zbIb3c9E41wxJpaO-jItemZh8_eUWHTbmb1QOd1Wnx3IKWNraFDqwDew9Xh4TpPwfsLzysM1mjxoM6059yn6ItKWmkbprxRvy8b8xavN-DhFJ32oshMUQIxwh6fwARqXVy6HorDL6B9DEFcq9o-x7vdjDRuNWOedSrgbMVQtcZdgWz_lqbPOYEA4Ilgxo-W_gWWjAu-7QOilJCknfvtxPbBbeNhTP7yHiYHMwAWQ",
+            "p": "-wrcjn6RmdUmE-9bv0I9VcUUMWAu4x4uik0ZbqEDHtBG0UEfFWbFHip2SDzYjj5klpPPGqO91q7xVFs6PCzYI1wzpDeaISz28AdWWsy4PFEWIyTNgTuJ3e7GfAbJJA_xOpKQM5RwgNfUQMHZTcbQSXhRX5GmaZ1oFizTCpcDXeM",
+            "q": "4lTZj0AgAPD6rPea9z9OAJ8UJ0O_mardu0BWvc4pJKVeGISRHs-Qr4ptrfL2CbOm29rRSS87AqrGCGn6vDxXrqXd-azSkrwCd6ggBAfF0f3SPRru1ItXNryLfDDAzbJysCXMh3H7YCu3Np3XUmZbTXLI4TgKrCkGnUzeIMV47Uk",
+            "dp": "U5oFY0rRMDqkiKUAl8v2YxbTp7HRS39knlgYrRff0yYnP06BjH4CDQ60_0-MCqrKkr68jLGU6eaupZoP5bRFclklNX3yzTONNNgssOZWQHf8eE2sRmpOemMnJGyaFXFds1TVwuefI7k8jShBNr6L5Lu11a7KjYeG_0OEMJWj4GM",
+            "dq": "a9shfkmBttEftFOejpqlUlh8oyV-5fzuA3DqpTLcmnEPwUFTYsppWa3vDIkOxJrPNlA1kdmnFmNJUfMnIJLk-f5jJLs98d0Uk-8TqrgFhked666tB66LVjNNiVY2Ww_h5Z1ttVIVB8RtX-KiHMtYUTUVE3bAZ0B5vXZHGHjiYrk",
+            "qi": "FjJmwvykC-5aWz7pt5z9XuzMssqEx4t4gwkjpc08F40goajGPj0Ojm0-QVHuVkJ7CBo08DhawXL5P_6hUkYUzGS__rSloAGAAoFqa0KLtlw3kLddVuajfA89YjIHJawNA5jrmz9XOOS2rzPJsWDdRt_aJeILp3HZ1TGGHbnJNcM"
+          }
+        },
+        "customer": {
+          "id": "customer-7"
+        }
+      },
+      "expected": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImZpeHR1cmUtcnMyNTYiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci03IiwiYXVkIjoid2lkXzAxajl6azd3M3hxOHI0dDJ2Nm01bjFwMGNlIiwiaWF0IjoxNzg5NDU5MTk1LCJleHAiOjE3ODk0NTkzMTUsImp0aSI6IlowNjdqZWRfd2tLaHRIZHRULUMzTUEifQ.TQH1Cjc4w4uBZRhXKV57_k8UdxDzOc5BxpQXygXuhdHbU5WU5ujrLQty0huw0rPx7RTOm2ImjzuSgj7khdGnDoZEsRXt1Yzf8DlcjrR2DTxZBZf2hxRpJXzTf_8-8pxIQykUDU4VBoAmCoiBXopDOTeoqISL-_TlBGwSCxCG0l9oHhN2-yYbPDYQxV20-qEeKWo0eQv1YX_YLJ6cdpIpLbOb0EJKfHqesoFz13zYTmlQkGeAuqP0M8K651E5vNuOyNXR3uHvN8cpl70pJqQrXjtOlX99mSkcgrghr5kYZKbTi53_41p6cIxM1HoXmiw07KisIgR7S2t_fgVyBDR0mA",
+      "deterministic": true
+    },
+    {
+      "name": "RS256: an Urdu name",
+      "alg": "RS256",
+      "now": 1789459200,
+      "jti": "vWwLUZQH89duY5quvhCyng",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-rs256",
+          "alg": "RS256",
+          "privateKey": {
+            "kty": "RSA",
+            "n": "3fLLntlmJ-JFveruqceeRTHiIBH8q_qYmozR68Qsz9A_0f22owb_0MeiwcXVy1L6g51-BaHp3BFvdKp955FHSm2aAQ9cbhnR3nd82v707JWkwdnYutAfetMNmb9yoEkywbdl2gfiPlufb-_o-EGq-aE_HmRsCwLncQI6xNFiRGeV-6XwLXUI75KMoip20oZgVSkyAxeL7FErYWEUerbm4lGn5Nz0ssmwbv17jQW-VWUo34RE4lLI1jAiVFbC_x30amfUjUYoayv9PJO0Fjj9JzCaQdbhMZUXHk771KIK0Wa9z4oJCvCgLfFPiBftBb-Kz62rOe2zJs3Hj_MG30jsuw",
+            "e": "AQAB",
+            "d": "A11WY-KUz175Qq9Ije9WQWNHs8fCBlNms9UVq5bOPRpBlWvctGz7PM2B9KEMpCfuX0dobSpusqTbBTA-d1-27nRp5ME4W_ztNwulq2Y5DUsZc8zbIb3c9E41wxJpaO-jItemZh8_eUWHTbmb1QOd1Wnx3IKWNraFDqwDew9Xh4TpPwfsLzysM1mjxoM6059yn6ItKWmkbprxRvy8b8xavN-DhFJ32oshMUQIxwh6fwARqXVy6HorDL6B9DEFcq9o-x7vdjDRuNWOedSrgbMVQtcZdgWz_lqbPOYEA4Ilgxo-W_gWWjAu-7QOilJCknfvtxPbBbeNhTP7yHiYHMwAWQ",
+            "p": "-wrcjn6RmdUmE-9bv0I9VcUUMWAu4x4uik0ZbqEDHtBG0UEfFWbFHip2SDzYjj5klpPPGqO91q7xVFs6PCzYI1wzpDeaISz28AdWWsy4PFEWIyTNgTuJ3e7GfAbJJA_xOpKQM5RwgNfUQMHZTcbQSXhRX5GmaZ1oFizTCpcDXeM",
+            "q": "4lTZj0AgAPD6rPea9z9OAJ8UJ0O_mardu0BWvc4pJKVeGISRHs-Qr4ptrfL2CbOm29rRSS87AqrGCGn6vDxXrqXd-azSkrwCd6ggBAfF0f3SPRru1ItXNryLfDDAzbJysCXMh3H7YCu3Np3XUmZbTXLI4TgKrCkGnUzeIMV47Uk",
+            "dp": "U5oFY0rRMDqkiKUAl8v2YxbTp7HRS39knlgYrRff0yYnP06BjH4CDQ60_0-MCqrKkr68jLGU6eaupZoP5bRFclklNX3yzTONNNgssOZWQHf8eE2sRmpOemMnJGyaFXFds1TVwuefI7k8jShBNr6L5Lu11a7KjYeG_0OEMJWj4GM",
+            "dq": "a9shfkmBttEftFOejpqlUlh8oyV-5fzuA3DqpTLcmnEPwUFTYsppWa3vDIkOxJrPNlA1kdmnFmNJUfMnIJLk-f5jJLs98d0Uk-8TqrgFhked666tB66LVjNNiVY2Ww_h5Z1ttVIVB8RtX-KiHMtYUTUVE3bAZ0B5vXZHGHjiYrk",
+            "qi": "FjJmwvykC-5aWz7pt5z9XuzMssqEx4t4gwkjpc08F40goajGPj0Ojm0-QVHuVkJ7CBo08DhawXL5P_6hUkYUzGS__rSloAGAAoFqa0KLtlw3kLddVuajfA89YjIHJawNA5jrmz9XOOS2rzPJsWDdRt_aJeILp3HZ1TGGHbnJNcM"
+          }
+        },
+        "customer": {
+          "id": "u-1",
+          "name": "عائشة خان",
+          "email": "ayesha@example.pk",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImZpeHR1cmUtcnMyNTYiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJ1LTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoidld3TFVaUUg4OWR1WTVxdXZoQ3luZyIsIm5hbWUiOiLYudin2KbYtNipINiu2KfZhiIsImVtYWlsIjoiYXllc2hhQGV4YW1wbGUucGsiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.eVC0UXRIeDTHMZQZCotDtu14sAkQQPmOR9RtV1GLxmN8bRNtj_TX6MPyc-nBX3Zq78-Ifrp9gGKZtwA2yowSsZVGmlF0JjrSgxC43RPyhlDHYcCXMoeDcfx8Wt4ZElItzYb5MLPNgugu5yVQSpemxdKvrTSw_FwtV10t4CTbhLtl52MPbl8hbzTNT1YmyJVU3nAVY_1q8NykT7d9kgrjLkkPahvTWI0QGuEAvh5IHQtVLHSowj9HQmtPYGjapWMLds3fNs4ruanU5DjUy4P_4YQOcESNWf7G2V4eWShnEih4og8wzVRS8nKwWmqFXFSsImFXpwfTEwimio-cWL4AAQ",
+      "deterministic": true
+    },
+    {
+      "name": "RS256: an emoji name",
+      "alg": "RS256",
+      "now": 1789459200,
+      "jti": "y0ZOsuo_70_NML3SnmwtKQ",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-rs256",
+          "alg": "RS256",
+          "privateKey": {
+            "kty": "RSA",
+            "n": "3fLLntlmJ-JFveruqceeRTHiIBH8q_qYmozR68Qsz9A_0f22owb_0MeiwcXVy1L6g51-BaHp3BFvdKp955FHSm2aAQ9cbhnR3nd82v707JWkwdnYutAfetMNmb9yoEkywbdl2gfiPlufb-_o-EGq-aE_HmRsCwLncQI6xNFiRGeV-6XwLXUI75KMoip20oZgVSkyAxeL7FErYWEUerbm4lGn5Nz0ssmwbv17jQW-VWUo34RE4lLI1jAiVFbC_x30amfUjUYoayv9PJO0Fjj9JzCaQdbhMZUXHk771KIK0Wa9z4oJCvCgLfFPiBftBb-Kz62rOe2zJs3Hj_MG30jsuw",
+            "e": "AQAB",
+            "d": "A11WY-KUz175Qq9Ije9WQWNHs8fCBlNms9UVq5bOPRpBlWvctGz7PM2B9KEMpCfuX0dobSpusqTbBTA-d1-27nRp5ME4W_ztNwulq2Y5DUsZc8zbIb3c9E41wxJpaO-jItemZh8_eUWHTbmb1QOd1Wnx3IKWNraFDqwDew9Xh4TpPwfsLzysM1mjxoM6059yn6ItKWmkbprxRvy8b8xavN-DhFJ32oshMUQIxwh6fwARqXVy6HorDL6B9DEFcq9o-x7vdjDRuNWOedSrgbMVQtcZdgWz_lqbPOYEA4Ilgxo-W_gWWjAu-7QOilJCknfvtxPbBbeNhTP7yHiYHMwAWQ",
+            "p": "-wrcjn6RmdUmE-9bv0I9VcUUMWAu4x4uik0ZbqEDHtBG0UEfFWbFHip2SDzYjj5klpPPGqO91q7xVFs6PCzYI1wzpDeaISz28AdWWsy4PFEWIyTNgTuJ3e7GfAbJJA_xOpKQM5RwgNfUQMHZTcbQSXhRX5GmaZ1oFizTCpcDXeM",
+            "q": "4lTZj0AgAPD6rPea9z9OAJ8UJ0O_mardu0BWvc4pJKVeGISRHs-Qr4ptrfL2CbOm29rRSS87AqrGCGn6vDxXrqXd-azSkrwCd6ggBAfF0f3SPRru1ItXNryLfDDAzbJysCXMh3H7YCu3Np3XUmZbTXLI4TgKrCkGnUzeIMV47Uk",
+            "dp": "U5oFY0rRMDqkiKUAl8v2YxbTp7HRS39knlgYrRff0yYnP06BjH4CDQ60_0-MCqrKkr68jLGU6eaupZoP5bRFclklNX3yzTONNNgssOZWQHf8eE2sRmpOemMnJGyaFXFds1TVwuefI7k8jShBNr6L5Lu11a7KjYeG_0OEMJWj4GM",
+            "dq": "a9shfkmBttEftFOejpqlUlh8oyV-5fzuA3DqpTLcmnEPwUFTYsppWa3vDIkOxJrPNlA1kdmnFmNJUfMnIJLk-f5jJLs98d0Uk-8TqrgFhked666tB66LVjNNiVY2Ww_h5Z1ttVIVB8RtX-KiHMtYUTUVE3bAZ0B5vXZHGHjiYrk",
+            "qi": "FjJmwvykC-5aWz7pt5z9XuzMssqEx4t4gwkjpc08F40goajGPj0Ojm0-QVHuVkJ7CBo08DhawXL5P_6hUkYUzGS__rSloAGAAoFqa0KLtlw3kLddVuajfA89YjIHJawNA5jrmz9XOOS2rzPJsWDdRt_aJeILp3HZ1TGGHbnJNcM"
+          }
+        },
+        "customer": {
+          "id": "e-1",
+          "name": "Sam 🙂 Lee"
+        }
+      },
+      "expected": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImZpeHR1cmUtcnMyNTYiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJlLTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoieTBaT3N1b183MF9OTUwzU25td3RLUSIsIm5hbWUiOiJTYW0g8J-ZgiBMZWUifQ.Jw99wHFvXyI_-rNpMm2ZTPQ_InjIiN2XtI-yZuzRXI6YC9AbtLWs-xEg-fpOpgDEWKJHyPv4e3SuuSYOvpn4Z3K4w4VRww2PLFLiHQxvwEf4nhd-30kczBn7YeIYlI8gQCc7YWjpaZJHwUNKH9iKdnEETQWu_coT0AQSiKDHceP2Esi379J0uau__-nZ1G7JK4Qj6FuAckpEll5fonf0iyzX7fCGkbvFRw7VXBoN1wGH86LVdCnTjtBxQ2nTxTqKfR1d067-FO2jcerHTLUwEcnKe435VMsixPQ0EAuJPJoo0i0u57VRDH2HaOXirbvhvhuoIlPFM8H8LQ-92dQYbw",
+      "deterministic": true
+    },
+    {
+      "name": "RS256: text that JSON must escape",
+      "alg": "RS256",
+      "now": 1789459200,
+      "jti": "3xxZStkCyhlTE6j-OLj90A",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "fixture-rs256",
+          "alg": "RS256",
+          "privateKey": {
+            "kty": "RSA",
+            "n": "3fLLntlmJ-JFveruqceeRTHiIBH8q_qYmozR68Qsz9A_0f22owb_0MeiwcXVy1L6g51-BaHp3BFvdKp955FHSm2aAQ9cbhnR3nd82v707JWkwdnYutAfetMNmb9yoEkywbdl2gfiPlufb-_o-EGq-aE_HmRsCwLncQI6xNFiRGeV-6XwLXUI75KMoip20oZgVSkyAxeL7FErYWEUerbm4lGn5Nz0ssmwbv17jQW-VWUo34RE4lLI1jAiVFbC_x30amfUjUYoayv9PJO0Fjj9JzCaQdbhMZUXHk771KIK0Wa9z4oJCvCgLfFPiBftBb-Kz62rOe2zJs3Hj_MG30jsuw",
+            "e": "AQAB",
+            "d": "A11WY-KUz175Qq9Ije9WQWNHs8fCBlNms9UVq5bOPRpBlWvctGz7PM2B9KEMpCfuX0dobSpusqTbBTA-d1-27nRp5ME4W_ztNwulq2Y5DUsZc8zbIb3c9E41wxJpaO-jItemZh8_eUWHTbmb1QOd1Wnx3IKWNraFDqwDew9Xh4TpPwfsLzysM1mjxoM6059yn6ItKWmkbprxRvy8b8xavN-DhFJ32oshMUQIxwh6fwARqXVy6HorDL6B9DEFcq9o-x7vdjDRuNWOedSrgbMVQtcZdgWz_lqbPOYEA4Ilgxo-W_gWWjAu-7QOilJCknfvtxPbBbeNhTP7yHiYHMwAWQ",
+            "p": "-wrcjn6RmdUmE-9bv0I9VcUUMWAu4x4uik0ZbqEDHtBG0UEfFWbFHip2SDzYjj5klpPPGqO91q7xVFs6PCzYI1wzpDeaISz28AdWWsy4PFEWIyTNgTuJ3e7GfAbJJA_xOpKQM5RwgNfUQMHZTcbQSXhRX5GmaZ1oFizTCpcDXeM",
+            "q": "4lTZj0AgAPD6rPea9z9OAJ8UJ0O_mardu0BWvc4pJKVeGISRHs-Qr4ptrfL2CbOm29rRSS87AqrGCGn6vDxXrqXd-azSkrwCd6ggBAfF0f3SPRru1ItXNryLfDDAzbJysCXMh3H7YCu3Np3XUmZbTXLI4TgKrCkGnUzeIMV47Uk",
+            "dp": "U5oFY0rRMDqkiKUAl8v2YxbTp7HRS39knlgYrRff0yYnP06BjH4CDQ60_0-MCqrKkr68jLGU6eaupZoP5bRFclklNX3yzTONNNgssOZWQHf8eE2sRmpOemMnJGyaFXFds1TVwuefI7k8jShBNr6L5Lu11a7KjYeG_0OEMJWj4GM",
+            "dq": "a9shfkmBttEftFOejpqlUlh8oyV-5fzuA3DqpTLcmnEPwUFTYsppWa3vDIkOxJrPNlA1kdmnFmNJUfMnIJLk-f5jJLs98d0Uk-8TqrgFhked666tB66LVjNNiVY2Ww_h5Z1ttVIVB8RtX-KiHMtYUTUVE3bAZ0B5vXZHGHjiYrk",
+            "qi": "FjJmwvykC-5aWz7pt5z9XuzMssqEx4t4gwkjpc08F40goajGPj0Ojm0-QVHuVkJ7CBo08DhawXL5P_6hUkYUzGS__rSloAGAAoFqa0KLtlw3kLddVuajfA89YjIHJawNA5jrmz9XOOS2rzPJsWDdRt_aJeILp3HZ1TGGHbnJNcM"
+          }
+        },
+        "customer": {
+          "id": "j-1",
+          "name": "say \"hi\" \\ a/b \u0001 \n \t \u2028 \u2029  é"
+        }
+      },
+      "expected": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImZpeHR1cmUtcnMyNTYiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJqLTEiLCJhdWQiOiJ3aWRfMDFqOXprN3czeHE4cjR0MnY2bTVuMXAwY2UiLCJpYXQiOjE3ODk0NTkxOTUsImV4cCI6MTc4OTQ1OTMxNSwianRpIjoiM3h4WlN0a0N5aGxURTZqLU9MajkwQSIsIm5hbWUiOiJzYXkgXCJoaVwiIFxcIGEvYiBcdTAwMDEgXG4gXHQg4oCoIOKAqSB_IMOpIn0.XV4gxpZB65310Jgcjl2Y8Z_5_PaiUy_plG0G3aS4h2qw1_xZv6LVqZ7dJ_hNdkcomKw0lmGROQMv1GRu-oZBdIz1yexrtDpH12yc7Gbqu4vq3I7FyrJa-wnJjgMt8sbMCOBEvdky1BQQlYgggZeibGAzi1F_grZa-tRHG1N7SVla5KWR5QKhreGCWsoXLjw2qK7x8rvJQ98u4DnsPxcR2iqARIQDPuG2G03zYU_fgRQ-fNSzIdcTPHpWqL6G7eBzBrIKXrxW8zxhcd4Sx_bb3-_WB5xfHC7L6qMKB1c6JtkY3dOEY24gmBNr3IOE8Y7Yf6PIcc2fn0zQKW4osNbtyQ",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: the default lifetime",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "iSAiiIjHdPEqiMuXtuLANw",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci00MiIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5MzE1LCJqdGkiOiJpU0FpaUlqSGRQRXFpTXVYdHVMQU53IiwibmFtZSI6IkF5ZXNoYSBLaGFuIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.4qms809IFFEJdP-DT14997CQDy2zS57hsbR8e7HyUhQ",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: the shortest lifetime",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "mB3xq9e5ui3tMYa91If-Uw",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        },
+        "ttlSeconds": 10
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci00MiIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5MjA1LCJqdGkiOiJtQjN4cTllNXVpM3RNWWE5MUlmLVV3IiwibmFtZSI6IkF5ZXNoYSBLaGFuIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.SCes6q7PQPKxFXCFqjs7KuMtKCaPfS1q75FFCLIYBkQ",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: a lifetime of 60 seconds",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "NH1DodKbKTq1wqBzzw5GQQ",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        },
+        "ttlSeconds": 60
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci00MiIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5MjU1LCJqdGkiOiJOSDFEb2RLYktUcTF3cUJ6enc1R1FRIiwibmFtZSI6IkF5ZXNoYSBLaGFuIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.5Ub6JEX5-9RUXEQLwV5gU53D8QX_Facs1tVgxdfubsw",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: the longest lifetime",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "wXZcR8cJrK6O3DF3Y-4-lw",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        },
+        "ttlSeconds": 300
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci00MiIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5NDk1LCJqdGkiOiJ3WFpjUjhjSnJLNk8zREYzWS00LWx3IiwibmFtZSI6IkF5ZXNoYSBLaGFuIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.cgWSVHTWLfESCzxCm7e6PxRQ12cMeH6i5Lk_lBwGxg0",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: a lifetime over the maximum, which is capped",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "4VuWo0vvyQ7JZCLCxhH2ZA",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        },
+        "ttlSeconds": 86400
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImhrX2ZpeHR1cmUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJjdXN0b21lci00MiIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5NDk1LCJqdGkiOiI0VnVXbzB2dnlRN0paQ0xDeGhIMlpBIiwibmFtZSI6IkF5ZXNoYSBLaGFuIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.sHYgzx7rpaJAT_PENAGzXs1eY-CqDndcXvubgb73swI",
+      "deterministic": true
+    },
+    {
+      "name": "HS256: a key id of 64 characters with dots, dashes and underscores",
+      "alg": "HS256",
+      "now": 1789459200,
+      "jti": "u5C4YF8NiP0iPz635ZJKUw",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "a.b-c_b-c_b-c_b-c_b-c_b-c_b-c_b-c_b-c_b-c_b-c_b-c_b-c_b-c_b-c_z",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "expected": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImEuYi1jX2ItY19iLWNfYi1jX2ItY19iLWNfYi1jX2ItY19iLWNfYi1jX2ItY19iLWNfYi1jX2ItY19iLWNfeiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjdXN0b21lci00MiIsImF1ZCI6IndpZF8wMWo5ems3dzN4cThyNHQydjZtNW4xcDBjZSIsImlhdCI6MTc4OTQ1OTE5NSwiZXhwIjoxNzg5NDU5MzE1LCJqdGkiOiJ1NUM0WUY4TmlQMGlQejYzNVpKS1V3IiwibmFtZSI6IkF5ZXNoYSBLaGFuIiwiZW1haWwiOiJheWVzaGFAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.HOUgFLR6DDDL1RdT6nI76-3moDP5T_XpSPxG9TIEufc",
+      "deterministic": true
+    }
+  ],
+  "errors": [
+    {
+      "name": "no widget ID",
+      "options": {
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "widgetId must be the brand's widget ID, which starts with wid_.",
+      "sameMessage": true
+    },
+    {
+      "name": "a brand ID instead of the widget ID",
+      "options": {
+        "widgetId": "brd_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "widgetId must be the brand's widget ID, which starts with wid_.",
+      "sameMessage": true
+    },
+    {
+      "name": "a widget ID that is not text",
+      "options": {
+        "widgetId": 42,
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "widgetId must be the brand's widget ID, which starts with wid_.",
+      "sameMessage": true
+    },
+    {
+      "name": "no key",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key is required: { kid, alg, privateKey }, or { kid, alg: \"HS256\", secret }.",
+      "sameMessage": false
+    },
+    {
+      "name": "a kid with a space",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "shop key",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.kid must be the key id registered with Hamnivo: 1 to 64 letters, digits, dots, underscores or dashes.",
+      "sameMessage": true
+    },
+    {
+      "name": "a kid of 65 characters",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.kid must be the key id registered with Hamnivo: 1 to 64 letters, digits, dots, underscores or dashes.",
+      "sameMessage": true
+    },
+    {
+      "name": "an empty kid",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.kid must be the key id registered with Hamnivo: 1 to 64 letters, digits, dots, underscores or dashes.",
+      "sameMessage": true
+    },
+    {
+      "name": "an algorithm Hamnivo does not accept",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "HS512",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.alg must be ES256, EdDSA, RS256 or HS256.",
+      "sameMessage": true
+    },
+    {
+      "name": "the none algorithm",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "none",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.alg must be ES256, EdDSA, RS256 or HS256.",
+      "sameMessage": true
+    },
+    {
+      "name": "HS256 without a secret",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "HS256"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "HS256 needs key.secret: the secret Hamnivo showed when you registered the key.",
+      "sameMessage": true
+    },
+    {
+      "name": "HS256 with an empty secret",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "HS256",
+          "secret": ""
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "HS256 needs key.secret: the secret Hamnivo showed when you registered the key.",
+      "sameMessage": true
+    },
+    {
+      "name": "a secret with a line break",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak\n"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.secret contains spaces or line breaks. Use it exactly as Hamnivo showed it.",
+      "sameMessage": true
+    },
+    {
+      "name": "a secret with a space inside",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "HS256",
+          "secret": "abc def"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.secret contains spaces or line breaks. Use it exactly as Hamnivo showed it.",
+      "sameMessage": true
+    },
+    {
+      "name": "a secret with a no-break space",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "HS256",
+          "secret": "abc\u00a0def"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.secret contains spaces or line breaks. Use it exactly as Hamnivo showed it.",
+      "sameMessage": true
+    },
+    {
+      "name": "HS256 with a private key",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak",
+          "privateKey": {
+            "kty": "EC",
+            "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+            "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA",
+            "crv": "P-256",
+            "d": "98UqyFA1K88devZ81KpwT_EPNB3Z3-Zn4ag5RemiVa4"
+          }
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "HS256 signs with key.secret. key.privateKey is for ES256, EdDSA and RS256.",
+      "sameMessage": true
+    },
+    {
+      "name": "ES256 without a private key",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "ES256"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "ES256 needs key.privateKey: the private key whose public key you registered.",
+      "sameMessage": true
+    },
+    {
+      "name": "ES256 with a secret",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "ES256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "ES256 signs with key.privateKey. key.secret is for HS256 only.",
+      "sameMessage": true
+    },
+    {
+      "name": "an Ed25519 key for ES256",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "ES256",
+          "privateKey": {
+            "crv": "Ed25519",
+            "d": "c_YzVtwAcj89_4w4_KmvXWn4sEXSmST8AaZFtb0NmqA",
+            "x": "O8Z-vekQc_9u6bzR_EXDWek99r5HFXih-eyOSsaljKQ",
+            "kty": "OKP"
+          }
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "ES256 needs an EC P-256 private key, and key.privateKey is another kind of key. Check that key.alg matches the key.",
+      "sameMessage": true
+    },
+    {
+      "name": "an RSA key for EdDSA",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "EdDSA",
+          "privateKey": {
+            "kty": "RSA",
+            "n": "3fLLntlmJ-JFveruqceeRTHiIBH8q_qYmozR68Qsz9A_0f22owb_0MeiwcXVy1L6g51-BaHp3BFvdKp955FHSm2aAQ9cbhnR3nd82v707JWkwdnYutAfetMNmb9yoEkywbdl2gfiPlufb-_o-EGq-aE_HmRsCwLncQI6xNFiRGeV-6XwLXUI75KMoip20oZgVSkyAxeL7FErYWEUerbm4lGn5Nz0ssmwbv17jQW-VWUo34RE4lLI1jAiVFbC_x30amfUjUYoayv9PJO0Fjj9JzCaQdbhMZUXHk771KIK0Wa9z4oJCvCgLfFPiBftBb-Kz62rOe2zJs3Hj_MG30jsuw",
+            "e": "AQAB",
+            "d": "A11WY-KUz175Qq9Ije9WQWNHs8fCBlNms9UVq5bOPRpBlWvctGz7PM2B9KEMpCfuX0dobSpusqTbBTA-d1-27nRp5ME4W_ztNwulq2Y5DUsZc8zbIb3c9E41wxJpaO-jItemZh8_eUWHTbmb1QOd1Wnx3IKWNraFDqwDew9Xh4TpPwfsLzysM1mjxoM6059yn6ItKWmkbprxRvy8b8xavN-DhFJ32oshMUQIxwh6fwARqXVy6HorDL6B9DEFcq9o-x7vdjDRuNWOedSrgbMVQtcZdgWz_lqbPOYEA4Ilgxo-W_gWWjAu-7QOilJCknfvtxPbBbeNhTP7yHiYHMwAWQ",
+            "p": "-wrcjn6RmdUmE-9bv0I9VcUUMWAu4x4uik0ZbqEDHtBG0UEfFWbFHip2SDzYjj5klpPPGqO91q7xVFs6PCzYI1wzpDeaISz28AdWWsy4PFEWIyTNgTuJ3e7GfAbJJA_xOpKQM5RwgNfUQMHZTcbQSXhRX5GmaZ1oFizTCpcDXeM",
+            "q": "4lTZj0AgAPD6rPea9z9OAJ8UJ0O_mardu0BWvc4pJKVeGISRHs-Qr4ptrfL2CbOm29rRSS87AqrGCGn6vDxXrqXd-azSkrwCd6ggBAfF0f3SPRru1ItXNryLfDDAzbJysCXMh3H7YCu3Np3XUmZbTXLI4TgKrCkGnUzeIMV47Uk",
+            "dp": "U5oFY0rRMDqkiKUAl8v2YxbTp7HRS39knlgYrRff0yYnP06BjH4CDQ60_0-MCqrKkr68jLGU6eaupZoP5bRFclklNX3yzTONNNgssOZWQHf8eE2sRmpOemMnJGyaFXFds1TVwuefI7k8jShBNr6L5Lu11a7KjYeG_0OEMJWj4GM",
+            "dq": "a9shfkmBttEftFOejpqlUlh8oyV-5fzuA3DqpTLcmnEPwUFTYsppWa3vDIkOxJrPNlA1kdmnFmNJUfMnIJLk-f5jJLs98d0Uk-8TqrgFhked666tB66LVjNNiVY2Ww_h5Z1ttVIVB8RtX-KiHMtYUTUVE3bAZ0B5vXZHGHjiYrk",
+            "qi": "FjJmwvykC-5aWz7pt5z9XuzMssqEx4t4gwkjpc08F40goajGPj0Ojm0-QVHuVkJ7CBo08DhawXL5P_6hUkYUzGS__rSloAGAAoFqa0KLtlw3kLddVuajfA89YjIHJawNA5jrmz9XOOS2rzPJsWDdRt_aJeILp3HZ1TGGHbnJNcM"
+          }
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "EdDSA needs an Ed25519 private key, and key.privateKey is another kind of key. Check that key.alg matches the key.",
+      "sameMessage": true
+    },
+    {
+      "name": "an EC key for RS256",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "RS256",
+          "privateKey": {
+            "kty": "EC",
+            "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+            "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA",
+            "crv": "P-256",
+            "d": "98UqyFA1K88devZ81KpwT_EPNB3Z3-Zn4ag5RemiVa4"
+          }
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "RS256 needs an RSA private key, and key.privateKey is another kind of key. Check that key.alg matches the key.",
+      "sameMessage": true
+    },
+    {
+      "name": "a public key for ES256",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "ES256",
+          "privateKey": {
+            "kty": "EC",
+            "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+            "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA",
+            "crv": "P-256"
+          }
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.privateKey is a public key. Sign with the private key (the JWK with \"d\").",
+      "sameMessage": true
+    },
+    {
+      "name": "a key marked for another algorithm",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "ES256",
+          "privateKey": {
+            "kty": "EC",
+            "x": "E5Qxu4uzZDXIybPcih3D6iU3SCV9rrCfdak6bMpg6Kw",
+            "y": "-fzLoqcAM_eZcO3pWxz3yQr9yv9F6N80O_-kjgzHvxA",
+            "crv": "P-256",
+            "d": "98UqyFA1K88devZ81KpwT_EPNB3Z3-Zn4ag5RemiVa4",
+            "alg": "RS256"
+          }
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.privateKey is marked for another algorithm than ES256.",
+      "sameMessage": true
+    },
+    {
+      "name": "an RSA key under 2048 bits",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "k1",
+          "alg": "RS256",
+          "privateKey": {
+            "key_ops": ["sign"],
+            "ext": true,
+            "alg": "RS256",
+            "kty": "RSA",
+            "n": "wU8Im39456w78C1q_1El3rzn-jMZHTE1D7hJQTIm3V-B-aV9xbVij6Z2U1_4oxN-DUkpDB50HpAHC1FREfn4tnRZneydo1FN7DtP0z0q-np48vZzzY84AhN9Mv0y08_dXD53-IfDz9x3Oqfr0Z3LrFTaNdUMUK0IbiUu_f5EA-c",
+            "e": "AQAB",
+            "d": "O0vKASDV7oK3lBHqe0ziB_P8WJQqBPleJGdMGTKQF2G_ldt8vBPKmvPd4e9TbnqBNQQXEj-ZMPLPJlqYOqJp9sybMsHyzOrIdsiLn2Md-Gdbk1j68t2j5RAtIMouMwWSDE6xuZxa2LDicYeJEpUSbUnseKcqoHz0bC4fHQNLUxE",
+            "p": "9LNH28ydLIwnFUiogbUDx54ZZu6Qiiwz1Tgockmn_EPdhkafs5QqfjCsIfz4Y96RlK4Scgq8nlmuTUs-UYkPiQ",
+            "q": "yjw6d-T-R22Jlu0ZtazA0_Bs-trnnX4tXlHde_x5WAlhkt4mLtyxgfFovYydHjQH1enCVGIsXcb38blaqP6r7w",
+            "dp": "Y8cSvwJg-IAxk5Er_K-12diSnREb6Ot7Oy8J9wgnskpt8smrZws8hHYOSlGfawGfNRQBu3S7UopY83WB9LdBmQ",
+            "dq": "pZT4nk_s7li-TcelxD1EyILTB_WRrD6yMMbAnJKUW8Oak2C2TKo_4E_jXUczIZaiT8AMb4DOKJ4PRmhn1XRnGw",
+            "qi": "hs-klvC5adb29T8nVPN4yBr4uXn6wSAjRE5F1eSrBk1xNjmUPHx5gMNCfq8IGSPdSRIatp9QNuy6Eawx9yKNsA"
+          }
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "key.privateKey cannot sign RS256: RS256 requires key modulusLength to be 2048 bits or larger",
+      "sameMessage": true
+    },
+    {
+      "name": "no customer",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        }
+      },
+      "message": "customer is required: { id, name?, email?, emailVerified? }.",
+      "sameMessage": false
+    },
+    {
+      "name": "an empty customer id",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.id is empty. Use your stable id for this customer account.",
+      "sameMessage": true
+    },
+    {
+      "name": "a blank customer id",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "   ",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.id is empty. Use your stable id for this customer account.",
+      "sameMessage": true
+    },
+    {
+      "name": "a customer id of only no-break spaces",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "\u00a0\u3000\ufeff",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.id is empty. Use your stable id for this customer account.",
+      "sameMessage": true
+    },
+    {
+      "name": "a customer id of 201 characters",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.id is longer than 200 characters.",
+      "sameMessage": true
+    },
+    {
+      "name": "a customer id of 101 emoji, which is 202 UTF-16 units",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.id is longer than 200 characters.",
+      "sameMessage": true
+    },
+    {
+      "name": "a name of 121 characters",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.name is longer than 120 characters.",
+      "sameMessage": true
+    },
+    {
+      "name": "a name of 61 emoji, which is 122 UTF-16 units",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.name is longer than 120 characters.",
+      "sameMessage": true
+    },
+    {
+      "name": "a name that is not text",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": 7,
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.name must be a string.",
+      "sameMessage": true
+    },
+    {
+      "name": "an email without a domain",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "nobody",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.email is not an address Hamnivo accepts. Correct it or leave it out.",
+      "sameMessage": true
+    },
+    {
+      "name": "an email with no dot in the domain",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "a@b",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.email is not an address Hamnivo accepts. Correct it or leave it out.",
+      "sameMessage": true
+    },
+    {
+      "name": "an email with a space",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "a b@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.email is not an address Hamnivo accepts. Correct it or leave it out.",
+      "sameMessage": true
+    },
+    {
+      "name": "an email with a trailing space",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "a@example.com ",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.email is not an address Hamnivo accepts. Correct it or leave it out.",
+      "sameMessage": true
+    },
+    {
+      "name": "an email with a trailing line break",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "a@example.com\n",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.email is not an address Hamnivo accepts. Correct it or leave it out.",
+      "sameMessage": true
+    },
+    {
+      "name": "an email with a non-ASCII letter",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "josé@example.com",
+          "emailVerified": true
+        }
+      },
+      "message": "customer.email is not an address Hamnivo accepts. Correct it or leave it out.",
+      "sameMessage": true
+    },
+    {
+      "name": "an email that is not text",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": 5,
+          "emailVerified": true
+        }
+      },
+      "message": "customer.email is not an address Hamnivo accepts. Correct it or leave it out.",
+      "sameMessage": true
+    },
+    {
+      "name": "an emailVerified that is not true or false",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": "yes"
+        }
+      },
+      "message": "customer.emailVerified must be true or false.",
+      "sameMessage": true
+    },
+    {
+      "name": "a lifetime of 9 seconds",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        },
+        "ttlSeconds": 9
+      },
+      "message": "ttlSeconds must be a whole number of seconds, at least 10.",
+      "sameMessage": true
+    },
+    {
+      "name": "a lifetime of zero",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        },
+        "ttlSeconds": 0
+      },
+      "message": "ttlSeconds must be a whole number of seconds, at least 10.",
+      "sameMessage": true
+    },
+    {
+      "name": "a negative lifetime",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        },
+        "ttlSeconds": -60
+      },
+      "message": "ttlSeconds must be a whole number of seconds, at least 10.",
+      "sameMessage": true
+    },
+    {
+      "name": "a lifetime that is not whole",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        },
+        "ttlSeconds": 90.5
+      },
+      "message": "ttlSeconds must be a whole number of seconds, at least 10.",
+      "sameMessage": true
+    },
+    {
+      "name": "a lifetime in text",
+      "options": {
+        "widgetId": "wid_01j9zk7w3xq8r4t2v6m5n1p0ce",
+        "key": {
+          "kid": "hk_fixture",
+          "alg": "HS256",
+          "secret": "O8zuRb_Tzo39yWyTyOqHmarxVDyvtuCpWDNQZNkv-ak"
+        },
+        "customer": {
+          "id": "customer-42",
+          "name": "Ayesha Khan",
+          "email": "ayesha@example.com",
+          "emailVerified": true
+        },
+        "ttlSeconds": "60"
+      },
+      "message": "ttlSeconds must be a whole number of seconds, at least 10.",
+      "sameMessage": true
+    }
+  ]
+}

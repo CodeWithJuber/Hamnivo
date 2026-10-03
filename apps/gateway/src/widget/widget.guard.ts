@@ -11,6 +11,7 @@ import { Reflector } from '@nestjs/core';
 import { eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import { AppError } from '../common/app-error.js';
+import { assertWidgetOnline } from '../identity/tenants.readonly.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { type WidgetClaims, WidgetTokens } from './tokens.service.js';
 
@@ -60,13 +61,17 @@ export class WidgetGuard implements CanActivate {
         .select({
           revokedAt: schema.widgetSessions.revokedAt,
           expiresAt: schema.widgetSessions.expiresAt,
+          tenantStatus: schema.tenants.status,
         })
         .from(schema.widgetSessions)
+        .innerJoin(schema.tenants, eq(schema.tenants.id, schema.widgetSessions.tenantId))
         .where(eq(schema.widgetSessions.id, claims.sessionId)),
     );
     if (!session || session.revokedAt || session.expiresAt <= this.clock()) {
       throw new AppError('SESSION_EXPIRED', { detail: 'This chat session has ended.' });
     }
+    // A suspended workspace's chat is offline; a closed one's is gone.
+    assertWidgetOnline(session.tenantStatus);
     request.widget = claims;
     return true;
   }

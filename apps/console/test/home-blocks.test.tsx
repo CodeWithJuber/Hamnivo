@@ -5,6 +5,7 @@ import { initI18n } from '../src/i18n';
 import { accessKeys } from '../src/lib/access';
 import { inboxKeys } from '../src/lib/inbox';
 import { keys } from '../src/lib/queries';
+import { setupKeys } from '../src/lib/setup';
 import { OverviewPage } from '../src/pages/OverviewPage';
 import { anchors, renderStudio, SELF_ID, TENANT_ID, textOf } from './render';
 
@@ -73,9 +74,15 @@ const me = member(SELF_ID, 'Omar');
 interface Lists {
   connections: unknown[];
   brands: unknown[];
-  agents: unknown[];
+  agents: { id: string }[];
   members: unknown[];
   invitations: unknown[];
+  /** The workspace's own AI keys. */
+  modelConnections: unknown[];
+  /** Whether the server holds an AI key of its own. */
+  serverKey: boolean;
+  /** The model each published agent answers with; `openai` unless said. */
+  providers: Record<string, 'openai' | 'mock'>;
 }
 const workspaceWith = (lists: Partial<Lists>) => (client: QueryClient) => {
   const all: Lists = {
@@ -84,6 +91,9 @@ const workspaceWith = (lists: Partial<Lists>) => (client: QueryClient) => {
     agents: [],
     members: [me],
     invitations: [],
+    modelConnections: [],
+    serverKey: false,
+    providers: {},
     ...lists,
   };
   client.setQueryData([TENANT_ID, ...keys.connections], { items: all.connections });
@@ -91,6 +101,29 @@ const workspaceWith = (lists: Partial<Lists>) => (client: QueryClient) => {
   client.setQueryData([TENANT_ID, ...keys.agents], { items: all.agents });
   client.setQueryData([TENANT_ID, ...keys.members], { items: all.members });
   client.setQueryData([TENANT_ID, ...accessKeys.invitations], { items: all.invitations });
+  client.setQueryData([TENANT_ID, ...keys.modelConnections], { items: all.modelConnections });
+  client.setQueryData([TENANT_ID, ...setupKeys.modelStatus], {
+    serverKeys: {
+      anthropic: false,
+      openai: all.serverKey,
+      google: false,
+      openaiCompatible: false,
+    },
+    jev: { configured: false },
+    embeddings: { provider: 'mock', ready: true },
+    tests: [],
+  });
+  // Which model a published agent answers with is in its details, not in the list.
+  for (const item of all.agents) {
+    client.setQueryData([TENANT_ID, ...keys.agent(item.id)], {
+      agent: item,
+      published: {
+        version: 1,
+        config: { model: { provider: all.providers[item.id] ?? 'openai', modelId: 'm' } },
+      },
+      draft: null,
+    });
+  }
 };
 const chatsWith =
   (counts: Record<'mine' | 'unassigned' | 'ai' | 'team' | 'all', number>) =>
@@ -144,24 +177,42 @@ describe('Home for staff who do not run the workspace', () => {
   });
 });
 
+const key = { id: 'mcn_1', status: 'active' };
+
 describe('Home for people who run the workspace', () => {
   it('lists every step of a new workspace, each linking to its page', async () => {
     const html = await home(owner, workspaceWith({}));
     expect(html).toContain('Get set up');
+    // The brand and its website come first: the chat engine is connected for a brand.
     expect(setUp(html)).toEqual([
-      ['engine', '/brands'],
       ['brand', '/brands'],
+      ['engine', '/brands'],
+      ['aikey', '/models'],
       ['agent', '/agents'],
       ['team', '/team'],
     ]);
     const titles = anchors(html)
       .filter((link) => link.attrs['data-step'])
       .map((link) => link.text);
-    expect(titles[0]).toContain('Connect the chat engine');
-    expect(titles[1]).toContain('Add a brand and install the chat');
-    expect(titles[2]).toContain('Publish an AI agent');
-    expect(titles[3]).toContain('Invite a teammate');
+    expect(titles[0]).toContain('Add your brand and website');
+    expect(titles[1]).toContain('Connect the chat engine');
+    expect(titles[2]).toContain('Add an AI key');
+    expect(titles[3]).toContain('Publish an AI agent');
+    expect(titles[4]).toContain('Invite a teammate');
     expect(html).not.toContain('Your chats');
+  });
+
+  it('links to the guided setup', async () => {
+    const html = await home(owner, workspaceWith({}));
+    const guided = anchors(html).find((link) => link.attrs['data-testid'] === 'guided-setup');
+    expect(guided?.href).toBe('/onboarding');
+    expect(guided?.text).toBe('Open guided setup');
+  });
+
+  it('does not offer the guided setup to someone who cannot manage brands', async () => {
+    const html = await home(['integrations.manage'], workspaceWith({}));
+    expect(html).toContain('Get set up');
+    expect(html).not.toContain('guided-setup');
   });
 
   it('shows only the steps that are not done', async () => {
@@ -170,9 +221,35 @@ describe('Home for people who run the workspace', () => {
       workspaceWith({ connections: [connection], brands: [brand], agents: [] }),
     );
     expect(setUp(html)).toEqual([
+      ['aikey', '/models'],
       ['agent', '/agents'],
       ['team', '/team'],
     ]);
+  });
+
+  it('counts a key the server holds as the AI key', async () => {
+    const html = await home(
+      owner,
+      workspaceWith({ connections: [connection], brands: [brand], serverKey: true }),
+    );
+    expect(setUp(html).map(([id]) => id)).toEqual(['agent', 'team']);
+  });
+
+  it('does not count an agent that answers with the offline practice model', async () => {
+    const html = await home(
+      owner,
+      workspaceWith({
+        connections: [connection],
+        brands: [brand],
+        modelConnections: [key],
+        agents: [agent],
+        providers: { agt_1: 'mock' },
+        members: [me, member('staff_2', 'Sara')],
+      }),
+    );
+    expect(setUp(html)).toEqual([['agent', '/agents']]);
+    const title = anchors(html).find((link) => link.attrs['data-step'] === 'agent');
+    expect(title?.text).toContain('real AI model, not the offline practice one');
   });
 
   it('hides the whole list once every step is done', async () => {
@@ -181,6 +258,7 @@ describe('Home for people who run the workspace', () => {
       workspaceWith({
         connections: [connection],
         brands: [brand],
+        modelConnections: [key],
         agents: [agent],
         members: [me, member('staff_2', 'Sara')],
       }),
@@ -197,6 +275,7 @@ describe('Home for people who run the workspace', () => {
       workspaceWith({
         connections: [connection],
         brands: [brand],
+        modelConnections: [key],
         agents: [agent],
         invitations: [{ id: 'inv_1', email: 'sara@example.com', status: 'pending' }],
       }),

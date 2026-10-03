@@ -13,6 +13,7 @@ import {
   TextareaField,
   TextField,
 } from '../../components/Fields';
+import { CustomerMemoryCard } from '../../components/memory/CustomerMemoryCard';
 import { ActionError, ErrorPanel, ListSkeleton } from '../../components/States';
 import { api, isApiError } from '../../lib/api';
 import { formatDateTime } from '../../lib/format';
@@ -30,7 +31,9 @@ import {
   useReviews,
   useTags,
 } from '../../lib/inbox';
+import { NoTagsHint } from '../library/LibraryHints';
 import { ConversationStatusBadge, IdentityBadge, languageName } from './parts';
+import { VisitorDetails } from './VisitorDetails';
 
 function Block({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
@@ -261,7 +264,7 @@ function Tags({ detail }: { detail: InboxDetail }) {
         </form>
       ) : null}
       {editable && tags.data.options.length === 0 ? (
-        <p className="text-xs text-text-secondary">{t('inbox.tags.noneDefined')}</p>
+        <NoTagsHint brandId={detail.brand?.id} />
       ) : null}
       <ActionError error={change.error} />
     </div>
@@ -641,11 +644,15 @@ export function ContextPanel({ detail }: { detail: InboxDetail }) {
       <Block id={`ctx-customer-${detail.id}`} title={t('inbox.customer.title')}>
         <Customer detail={detail} />
       </Block>
+      <CustomerMemoryCard conversationId={detail.id} />
       <Block id={`ctx-actions-${detail.id}`} title={t('tools.inbox.title')}>
         <ConversationActions conversationId={detail.id} />
       </Block>
       <Block id={`ctx-handoff-${detail.id}`} title={t('tools.handoff.title')}>
         <HandoffSummary conversationId={detail.id} />
+      </Block>
+      <Block id={`ctx-visitor-${detail.id}`} title={t('inboxAlerts.visitor.title')}>
+        <VisitorDetails conversationId={detail.id} />
       </Block>
       <Block id={`ctx-tags-${detail.id}`} title={t('inbox.tags.title')}>
         <Tags detail={detail} />

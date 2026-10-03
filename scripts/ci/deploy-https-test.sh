@@ -15,6 +15,8 @@
 #      the history and GitHub, and is tried again every 30 minutes without ever counting as failed;
 #      an HTTP error at that point does not stop it; --force skips the check; a TLS failure after the
 #      switch restarts the edge once, then goes on or rolls back with the reason
+#   D  the migration guard: SQL that loses data (drops, renames, retypes or empties) holds a version
+#      for a person; comments and privilege changes such as REVOKE ... TRUNCATE do not
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -481,6 +483,22 @@ deploy --latest
 check 'the deploy fails' exit_is 1
 check 'the edge was not restarted' test "$(calls 'restart edge')" -eq 0
 check 'the history says the API does not answer' history_has "${c2:0:12}${tab}rolled-back.*https://api.example.test/health/ready does not answer over HTTPS"
+
+# --- D: the migration guard ----------------------------------------------------------------------
+say 'D  the migration guard holds a version for lost data only'
+destructive() { here="$root/deploy/production" bash -c 'source "$here/lib.sh" && printf "%b" "$1" | destructive_sql' _ "$1"; }
+harmless() { ! destructive "$1"; }
+check 'REVOKE ... TRUNCATE takes rights away: no hold' \
+  harmless 'REVOKE UPDATE, DELETE, TRUNCATE ON billing_events FROM hamnivo_app;'
+check 'a GRANT on a column named like an action: no hold' \
+  harmless 'GRANT SELECT (truncated) ON t TO hamnivo_app;'
+check 'a comment that names a drop: no hold' \
+  harmless '-- drop table old\nCREATE TABLE t (id uuid);\n--> statement-breakpoint\nALTER TABLE t ADD COLUMN n text;'
+check 'TRUNCATE empties a table: hold' destructive 'CREATE TABLE t (id uuid);\nTRUNCATE t;'
+check 'DROP COLUMN: hold' destructive 'ALTER TABLE t DROP COLUMN n;'
+check 'SET NOT NULL: hold' destructive 'ALTER TABLE "t" ALTER COLUMN "n" SET NOT NULL;'
+check 'SET DATA TYPE: hold' destructive 'ALTER TABLE "t" ALTER COLUMN "n" SET DATA TYPE integer;'
+check 'RENAME TO: hold' destructive 'ALTER TABLE t RENAME TO u;'
 
 if ((failures > 0)); then
   printf '\n%d check(s) failed\n' "$failures"

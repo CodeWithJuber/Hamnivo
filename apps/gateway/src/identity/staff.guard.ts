@@ -16,6 +16,7 @@ import { OperatorsService } from '../operations/operators.service.js';
 import { CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { PrincipalService } from './principal.service.js';
 import { PLATFORM_ROUTE, STAFF_ROUTE, type StaffRouteOptions } from './request-auth.js';
+import { assertWritable } from './tenants.readonly.js';
 
 /** Turns a policy decision into the matching public error (MFA, step-up or plain denial). */
 export function enforce(
@@ -104,6 +105,7 @@ export class StaffGuard implements CanActivate {
     const principal = await this.principals.principal(session, tenantId);
     // Not a member (or no such tenant): indistinguishable on purpose.
     if (!principal) throw new AppError('NOT_FOUND');
+    assertWritable(principal, request);
     request.hamnivo.principal = principal;
 
     if (options.permission) {

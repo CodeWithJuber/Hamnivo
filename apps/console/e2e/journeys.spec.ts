@@ -317,7 +317,7 @@ test('HNV-17-02 HNV-19-02 · a model key is write-only: after saving, only its l
   const keyField = dialog.getByLabel('API key');
   await expect(keyField).toHaveAttribute('type', 'password');
   await keyField.fill(key);
-  await dialog.getByRole('button', { name: 'Save connection' }).click();
+  await dialog.getByRole('button', { name: 'Save and test' }).click();
   await expect(dialog).toBeHidden();
 
   await expect(page.getByTestId('connection-added')).toContainText(

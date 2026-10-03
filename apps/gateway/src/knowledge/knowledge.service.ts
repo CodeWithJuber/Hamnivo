@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   type AddDocumentRequest,
   type AddDocumentVersionRequest,
@@ -28,9 +27,9 @@ import { AppError } from '../common/app-error.js';
 import { iso } from '../common/views.js';
 import type { AppConfig } from '../config.js';
 import { enforce } from '../identity/staff.guard.js';
-import { enqueueOutbox } from '../outbox/outbox.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { RetrievalService } from './retrieval.service.js';
+import { queueVersionIn } from './versions.js';
 
 type SourceRow = typeof schema.knowledgeSources.$inferSelect;
 type DocumentRow = typeof schema.knowledgeDocuments.$inferSelect;
@@ -343,41 +342,23 @@ export class KnowledgeService {
   }
 
   /** Stores the upload in quarantine and queues ingestion. */
-  private async queueVersion(
+  private queueVersion(
     tx: TenantTx,
     principal: StaffPrincipal,
     document: DocumentRow,
     content: Content,
   ): Promise<VersionRow> {
-    const bytes = contentBytes(content);
-    const [latest] = await tx
-      .select({ version: schema.documentVersions.version })
-      .from(schema.documentVersions)
-      .where(eq(schema.documentVersions.documentId, document.id))
-      .orderBy(desc(schema.documentVersions.version))
-      .limit(1);
-    const [version] = await tx
-      .insert(schema.documentVersions)
-      .values({
-        tenantId: principal.tenantId,
-        documentId: document.id,
-        version: (latest?.version ?? 0) + 1,
+    return queueVersionIn(
+      tx,
+      principal.tenantId,
+      document,
+      {
         mediaType: content.mediaType,
-        byteSize: bytes.byteLength,
-        contentHash: createHash('sha256').update(bytes).digest(),
-        raw: bytes,
+        bytes: contentBytes(content),
         validUntil: content.validUntil ? new Date(content.validUntil) : null,
-        createdBy: principal.staffMemberId,
-      })
-      .returning();
-    if (!version) throw new Error('version insert returned nothing');
-    await enqueueOutbox(tx, principal.tenantId, {
-      topic: 'knowledge.ingest',
-      aggregateType: 'document_version',
-      aggregateId: version.id,
-      payload: { versionId: version.id },
-    });
-    return version;
+      },
+      principal.staffMemberId,
+    );
   }
 
   async addDocument(

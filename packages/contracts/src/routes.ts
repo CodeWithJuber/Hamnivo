@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { adminRoutes, identityRoutes } from './admin-routes.js';
 import { agentRoutes } from './agent-routes.js';
+import { aiPowerRoutes } from './ai-power.js';
 import { analyticsRoutes, billingRoutes } from './billing-routes.js';
 import { cacheRoutes } from './cache-routes.js';
 import { checkRoutes } from './check-routes.js';
@@ -28,6 +29,8 @@ import {
 import { decisionRoutes } from './decision-routes.js';
 import { apiKeyRoutes, networkRoutes, webhookRoutes } from './developer-routes.js';
 import { HamnivoEvent, StreamControl } from './events.js';
+import { inboxAlertRoutes } from './inbox-alert-routes.js';
+import { inboxLibraryRoutes } from './inbox-library-routes.js';
 import { inboxRoutes } from './inbox-routes.js';
 import { knowledgeRoutes } from './knowledge-routes.js';
 import { languageRoutes } from './language-routes.js';
@@ -35,7 +38,9 @@ import { adminMemoryRoutes, widgetMemoryRoutes } from './memory-routes.js';
 import { migrationRoutes } from './migration-routes.js';
 import { AttachmentPart } from './parts.js';
 import { platformRoutes } from './platform-routes.js';
+import { saasRoutes } from './saas.js';
 import { securityRoutes } from './security-routes.js';
+import { setupRoutes } from './setup-routes.js';
 import {
   StaffConversation,
   StaffMessageRequest,
@@ -43,6 +48,7 @@ import {
   TakeoverRequest,
 } from './staff-conversations.js';
 import { actionInboxRoutes, actionWidgetRoutes, toolAdminRoutes } from './tool-routes.js';
+import { visitorStaffRoutes, visitorWidgetRoutes } from './visitor-routes.js';
 import {
   CreateWidgetSessionRequest,
   IdentifyRequest,
@@ -62,7 +68,9 @@ export type RouteAuth =
   /** A staff session (with X-Hamnivo-Tenant) or an API key (its own tenant). */
   | 'staff_or_api_key'
   | 'integration_signature'
-  | 'provider_signature';
+  | 'provider_signature'
+  /** An operator API key (hvop_…) of a billing system such as WHMCS. */
+  | 'operator_key';
 
 export interface RouteDef {
   method: HttpMethod;
@@ -105,7 +113,12 @@ export const widgetRoutes = {
     summary: 'Websites allowed to embed this widget (used by the proxy for CSP frame-ancestors)',
     tags: ['Widget'],
     auth: 'public',
-    query: z.object({ widgetId: z.string().meta({ description: 'Widget ID (wid_…)' }) }),
+    query: z.object({
+      widgetId: z.string().meta({ description: 'Widget ID (wid_…)' }),
+      test: z.string().optional().meta({
+        description: 'Set to 1 when Studio frames the widget for a test chat: Studio may frame it',
+      }),
+    }),
     success: {
       status: 200,
       description:
@@ -391,6 +404,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...identityRoutes,
   ...adminRoutes,
   ...agentRoutes,
+  ...setupRoutes,
   ...knowledgeRoutes,
   ...migrationRoutes,
   ...widgetMemoryRoutes,
@@ -402,6 +416,10 @@ export const allRoutes: Record<string, RouteDef> = {
   ...cacheRoutes,
   ...languageRoutes,
   ...inboxRoutes,
+  ...inboxAlertRoutes,
+  ...inboxLibraryRoutes,
+  ...visitorWidgetRoutes,
+  ...visitorStaffRoutes,
   ...securityRoutes,
   ...platformRoutes,
   ...commerceAdminRoutes,
@@ -416,6 +434,8 @@ export const allRoutes: Record<string, RouteDef> = {
   ...notificationRoutes,
   ...customerSurfaceAdminRoutes,
   ...toolAdminRoutes,
+  ...aiPowerRoutes,
   ...actionInboxRoutes,
   ...actionWidgetRoutes,
+  ...saasRoutes,
 };

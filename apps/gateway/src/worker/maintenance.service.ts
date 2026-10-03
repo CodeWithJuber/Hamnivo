@@ -4,6 +4,7 @@ import {
   ensureReconcileCursors,
   purgeExpired,
   purgeMigrationFiles,
+  purgeVisitors,
   purgeWebhookEvents,
   purgeWidgetUploads,
 } from '@hamnivo/db';
@@ -48,11 +49,16 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       case 'purge-expired': {
         // Quarantined customer files never sent lose their bytes (W09).
         const uploads = await purgeWidgetUploads(this.db);
+        // Website visitors and their page views leave 30 days after they were last seen.
+        const visitors = await purgeVisitors(this.db);
         return {
           ...(await purgeExpired(this.db)),
           migration_files: await purgeMigrationFiles(this.db),
           widget_uploads_expired: uploads.expired,
           widget_uploads_removed: uploads.removed,
+          visitor_page_views_removed: visitors.pageViews,
+          visitor_sessions_removed: visitors.sessions,
+          visitors_removed: visitors.visitors,
         };
       }
       case 'reconcile-cursors':

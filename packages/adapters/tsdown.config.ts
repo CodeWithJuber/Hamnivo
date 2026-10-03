@@ -9,6 +9,7 @@ export default defineConfig({
     'commerce/testing': 'src/commerce/testing.ts',
     'net/index': 'src/net/index.ts',
     'billing/index': 'src/billing/index.ts',
+    'billing/testing': 'src/billing/testing.ts',
     'mcp/index': 'src/mcp/index.ts',
     'mcp/testing': 'src/mcp/testing.ts',
     'tools/index': 'src/tools/index.ts',

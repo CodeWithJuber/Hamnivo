@@ -12,11 +12,17 @@ import { StatusBadge } from '@hamnivo/ui/components/status-badge';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import {
+  BookOpenIcon,
   CircleOffIcon,
   HourglassIcon,
+  LogInIcon,
+  LogOutIcon,
   OctagonPauseIcon,
+  PencilIcon,
   PlusIcon,
   RefreshCwIcon,
+  Trash2Icon,
+  UploadIcon,
   UserCheckIcon,
   WrenchIcon,
   XIcon,
@@ -35,6 +41,18 @@ import {
 } from '../components/Fields';
 import { PageHeader, Section } from '../components/PageHeader';
 import { ActionError, QueryState } from '../components/States';
+import { HttpEndpointDialog } from '../components/tools/HttpEndpointDialog';
+import { HttpImportDialog } from '../components/tools/HttpImportDialog';
+import { RequestLine } from '../components/tools/HttpToolForms';
+import { HttpToolSources } from '../components/tools/HttpToolSources';
+import { McpCatalogSheet } from '../components/tools/McpCatalogSheet';
+import {
+  EditServerDialog,
+  RemoveServerDialog,
+  SignInDialog,
+  SignOutDialog,
+  startMcpSignIn,
+} from '../components/tools/McpServerDialogs';
 import { directionOf, isLocale } from '../i18n';
 import {
   type AiAction,
@@ -53,6 +71,12 @@ import {
   useMcpServers,
   useTools,
 } from '../lib/actions';
+import {
+  type HttpToolSource,
+  presetText,
+  useHttpToolSources,
+  useMcpPresets,
+} from '../lib/ai-power';
 import { api, isApiError, newIdempotencyKey } from '../lib/api';
 import { returnFocus, useOpener } from '../lib/focus';
 import { formatDateTime } from '../lib/format';
@@ -99,11 +123,13 @@ function serverName(servers: McpServer[], id: string | null) {
 function ToolTable({
   tools,
   servers,
+  httpSources,
   selected,
   onOpen,
 }: {
   tools: ToolDefinition[];
   servers: McpServer[];
+  httpSources: HttpToolSource[];
   selected: string | undefined;
   onOpen: (toolId: string) => void;
 }) {
@@ -116,6 +142,13 @@ function ToolTable({
       const key = tool.mcpServerId ?? '';
       external.set(key, [...(external.get(key) ?? []), tool]);
     }
+    // Custom HTTP tools are grouped by the service they belong to.
+    const custom = new Map<string, ToolDefinition[]>();
+    for (const tool of tools.filter((x) => x.source === 'http')) {
+      const owner = httpSources.find((s) => s.endpoints.some((e) => e.toolId === tool.id));
+      const key = owner?.id ?? '';
+      custom.set(key, [...(custom.get(key) ?? []), tool]);
+    }
     return [
       ...(builtin.length
         ? [{ id: 'builtin', title: t('tools.list.builtin'), items: builtin }]
@@ -125,8 +158,15 @@ function ToolTable({
         title: t('tools.list.from', { server: serverName(servers, id) }),
         items,
       })),
+      ...[...custom.entries()].map(([id, items]) => ({
+        id: `http:${id}`,
+        title: t('tools.list.from', {
+          server: httpSources.find((s) => s.id === id)?.name ?? id,
+        }),
+        items,
+      })),
     ];
-  }, [tools, servers, t]);
+  }, [tools, servers, httpSources, t]);
 
   // `relative` keeps the visually hidden header text inside the scroll area: without it, that
   // text sits at its place in the wide table and makes the whole page scroll sideways on a phone.
@@ -222,6 +262,8 @@ function ToolTable({
 }
 
 interface PolicyForm {
+  title: string;
+  description: string;
   status: ToolDefinition['status'];
   risk: RiskClass;
   approver: 'customer' | 'staff';
@@ -235,6 +277,8 @@ interface PolicyForm {
 }
 
 const toPolicyForm = (tool: ToolDefinition): PolicyForm => ({
+  title: tool.title,
+  description: tool.description,
   status: tool.status,
   risk: tool.risk,
   approver: tool.approver,
@@ -262,6 +306,16 @@ function policyChanges(
 ): { body: Record<string, unknown>; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
   const body: Record<string, unknown> = {};
+  // What a person reads and what the AI is told: the words of a tool from outside are theirs to check.
+  if (tool.source !== 'builtin') {
+    if (!form.title.trim()) errors['tool-title'] = t('aiPower.http.tool.errors.title');
+    else if (form.title.trim() !== tool.title) body.title = form.title.trim();
+    if (!form.description.trim()) {
+      errors['tool-description'] = t('aiPower.http.tool.errors.description');
+    } else if (form.description.trim() !== tool.description) {
+      body.description = form.description.trim();
+    }
+  }
   if (form.status !== tool.status) body.status = form.status;
   if (form.risk !== tool.risk) body.risk = form.risk;
   if (form.approver !== tool.approver) body.approver = form.approver;
@@ -284,7 +338,7 @@ function policyChanges(
   const kb = whole(form.maxOutputKb, 1, 256);
   if (kb === null) errors['tool-maxOutput'] = t('tools.errors.number', { min: 1, max: 256 });
   else if (kb * 1024 !== tool.maxOutputBytes) body.maxOutputBytes = kb * 1024;
-  if (tool.source === 'mcp') {
+  if (tool.source !== 'builtin') {
     const hosts = form.egressHosts
       .split(/[\s,]+/)
       .map((h) => h.trim().toLowerCase())
@@ -303,10 +357,12 @@ function policyChanges(
 function ToolDetail({
   tool,
   servers,
+  httpSources,
   onSaved,
 }: {
   tool: ToolDefinition;
   servers: McpServer[];
+  httpSources: HttpToolSource[];
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
@@ -321,6 +377,8 @@ function ToolDetail({
   const [stopReason, setStopReason] = useState('');
   const recent = useActionLog({ toolId: tool.id, limit: 5 });
   const server = servers.find((s) => s.id === tool.mcpServerId);
+  const service = httpSources.find((s) => s.endpoints.some((e) => e.toolId === tool.id));
+  const request = service?.endpoints.find((e) => e.toolId === tool.id);
 
   useEffect(() => {
     setForm(toPolicyForm(tool));
@@ -417,8 +475,60 @@ function ToolDetail({
             </dd>
             <dt className="text-text-secondary">{t('tools.drawer.credential')}</dt>
             <dd>
+              {server?.auth.kind === 'oauth' ? (
+                <bdi>
+                  {t('aiPower.mcp.auth.oauth', { host: server.auth.authorizationHost ?? '' })}
+                </bdi>
+              ) : (
+                <bdi dir="ltr" className="font-mono text-xs">
+                  {server?.credential?.masked ?? t('tools.drawer.noCredential')}
+                </bdi>
+              )}
+            </dd>
+            <dt className="text-text-secondary">{t('tools.drawer.hosts')}</dt>
+            <dd className="min-w-0 break-all">
               <bdi dir="ltr" className="font-mono text-xs">
-                {server?.credential?.masked ?? t('tools.drawer.noCredential')}
+                {tool.egressHosts.join(', ') || '—'}
+              </bdi>
+            </dd>
+          </dl>
+          {tool.remoteDescription ? (
+            <figure className="flex flex-col gap-1 rounded-lg border border-dashed border-border p-3">
+              <figcaption className="text-xs font-medium text-text-secondary">
+                {t('tools.drawer.remote')}
+              </figcaption>
+              <blockquote className="text-sm text-text">
+                <bdi>{tool.remoteDescription}</bdi>
+              </blockquote>
+              <p className="text-xs text-text-secondary">{t('tools.drawer.remoteNote')}</p>
+            </figure>
+          ) : null}
+        </section>
+      ) : null}
+
+      {tool.source === 'http' ? (
+        <section aria-labelledby="tool-service" className="flex flex-col gap-2">
+          <h3 id="tool-service" className="text-sm font-semibold text-text">
+            {t('aiPower.http.tool.service')}
+          </h3>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+            <dt className="text-text-secondary">{t('tools.servers.columns.name')}</dt>
+            <dd>
+              <bdi>{service?.name ?? '—'}</bdi>{' '}
+              {service ? (
+                <StatusBadge tone={service.status === 'active' ? 'success' : 'neutral'}>
+                  {t(`aiPower.http.source.status.${service.status}`)}
+                </StatusBadge>
+              ) : null}
+            </dd>
+            <dt className="text-text-secondary">{t('aiPower.http.tool.request')}</dt>
+            <dd className="min-w-0">
+              {request ? <RequestLine method={request.method} path={request.path} /> : '—'}
+            </dd>
+            <dt className="text-text-secondary">{t('tools.drawer.credential')}</dt>
+            <dd>
+              <bdi dir="ltr" className="font-mono text-xs">
+                {service?.auth.masked ?? t('tools.drawer.noCredential')}
               </bdi>
             </dd>
             <dt className="text-text-secondary">{t('tools.drawer.hosts')}</dt>
@@ -459,6 +569,30 @@ function ToolDetail({
       <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)} noValidate>
         <h3 className="text-sm font-semibold text-text">{t('tools.drawer.settings')}</h3>
         <FormErrorSummary title={t('auth.errorSummary')} errors={summary} />
+        {tool.source !== 'builtin' ? (
+          <>
+            <TextField
+              id="tool-title"
+              label={t('aiPower.http.tool.titleLabel')}
+              value={form.title}
+              maxLength={120}
+              onChange={(event) => set('title', event.target.value)}
+              error={errors['tool-title']}
+              disabled={!manage}
+            />
+            <TextareaField
+              id="tool-description"
+              label={t('aiPower.http.tool.descriptionLabel')}
+              hint={t('aiPower.http.tool.descriptionHint')}
+              value={form.description}
+              rows={3}
+              maxLength={1000}
+              onChange={(event) => set('description', event.target.value)}
+              error={errors['tool-description']}
+              disabled={!manage}
+            />
+          </>
+        ) : null}
         {tool.status !== 'review' ? (
           <CheckboxField
             id="tool-status"
@@ -557,7 +691,7 @@ function ToolDetail({
             disabled={!manage}
           />
         </div>
-        {tool.source === 'mcp' ? (
+        {tool.source !== 'builtin' ? (
           <TextareaField
             id="tool-hosts"
             label={t('tools.drawer.hosts')}
@@ -775,22 +909,40 @@ function ConnectServerDialog({
   onOpenChange: (open: boolean) => void;
   brandId: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const announce = useAnnouncer();
   const [label, setLabel] = useState('');
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
+  const [presetId, setPresetId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
+  const presets = useMcpPresets();
+  const preset = presets.data?.items.find((item) => item.id === presetId);
 
   useEffect(() => {
     if (!open) return;
     setLabel('');
     setUrl('');
     setToken('');
+    setPresetId('');
     setErrors({});
     setIdempotencyKey(newIdempotencyKey());
   }, [open]);
+
+  const choosePreset = (id: string) => {
+    setPresetId(id);
+    const chosenPreset = presets.data?.items.find((item) => item.id === id);
+    if (!chosenPreset) return;
+    setLabel(chosenPreset.name);
+    setUrl(chosenPreset.url);
+    setErrors({});
+  };
+
+  const signInNow = useStudioMutation(
+    (serverId: string, tenant) => startMcpSignIn(serverId, {}, tenant),
+    [],
+  );
 
   const connect = useStudioMutation(
     (body: { label: string; url: string; token?: string }, tenant) =>
@@ -824,6 +976,11 @@ function ConnectServerDialog({
       });
       announce(t('tools.servers.connected', { name: server.label }));
       onOpenChange(false);
+      // A service that signs in with the browser: go there now. If that does not work, the
+      // server's card has the Sign in button.
+      if (preset?.auth === 'oauth' && !token.trim()) {
+        await signInNow.mutateAsync(server.id).catch(() => undefined);
+      }
     } catch (error) {
       if (isApiError(error, 'VALIDATION_FAILED')) {
         const fields: Record<string, string> = {};
@@ -844,6 +1001,47 @@ function ConnectServerDialog({
       testId="connect-server-dialog"
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+        {presets.data && presets.data.items.length > 0 ? (
+          <>
+            <SelectField
+              id="server-preset"
+              label={t('aiPower.mcp.preset.label')}
+              hint={t('aiPower.mcp.preset.hint')}
+              value={presetId}
+              placeholder={t('aiPower.mcp.preset.other')}
+              onChange={(event) => choosePreset(event.target.value)}
+              options={presets.data.items.map((item) => ({ value: item.id, label: item.name }))}
+            />
+            {preset ? (
+              <div
+                className="flex flex-col gap-1 rounded-lg border border-border bg-surface-sunken p-3 text-sm"
+                data-testid="preset-details"
+              >
+                <p className="text-text">
+                  <bdi>{presetText(t, i18n, 'summaries', preset)}</bdi>
+                </p>
+                <p className="text-text-secondary">{t(`aiPower.mcp.preset.auth.${preset.auth}`)}</p>
+                {preset.note ? (
+                  <p className="text-xs text-text-secondary">
+                    <bdi>{presetText(t, i18n, 'notes', preset)}</bdi>
+                  </p>
+                ) : null}
+                <p className="text-xs text-text-secondary">
+                  <a
+                    href={preset.docsUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-link underline"
+                  >
+                    {t('aiPower.mcp.preset.docs')}
+                  </a>
+                  {' · '}
+                  {t('aiPower.mcp.preset.verified', { date: preset.verifiedOn })}
+                </p>
+              </div>
+            ) : null}
+          </>
+        ) : null}
         <TextField
           id="server-label"
           label={t('tools.servers.label')}
@@ -914,6 +1112,9 @@ function ServerRow({ server }: { server: McpServer }) {
       }),
     [toolKeys.servers],
   );
+  const [dialog, setDialog] = useState<'edit' | 'remove' | 'signIn' | 'signOut' | 'catalog' | null>(
+    null,
+  );
   const host = (() => {
     try {
       return new URL(server.url).host;
@@ -921,6 +1122,15 @@ function ServerRow({ server }: { server: McpServer }) {
       return server.url;
     }
   })();
+  const needsSignIn = server.auth.kind === 'oauth' && server.auth.status === 'needs_reconnect';
+  const authText =
+    server.auth.kind === 'oauth'
+      ? needsSignIn
+        ? t('aiPower.mcp.auth.needsReconnect')
+        : t('aiPower.mcp.auth.oauth', { host: server.auth.authorizationHost ?? '' })
+      : server.auth.kind === 'token'
+        ? t('aiPower.mcp.auth.token', { masked: server.credential?.masked ?? '' })
+        : t('aiPower.mcp.auth.none');
   return (
     <li
       className="flex flex-col gap-2 rounded-lg border border-border p-3"
@@ -951,7 +1161,15 @@ function ServerRow({ server }: { server: McpServer }) {
         {server.lastSyncedAt
           ? t('tools.servers.checked', { time: formatDateTime(server.lastSyncedAt) })
           : t('tools.servers.never')}
-        {server.credential ? ` · ${t('tools.drawer.credential')}: ${server.credential.masked}` : ''}
+      </p>
+      <p
+        className={`text-xs ${needsSignIn ? 'font-medium text-danger' : 'text-text-secondary'}`}
+        data-testid="server-auth"
+      >
+        <bdi>{authText}</bdi>
+        {server.auth.kind === 'oauth' && !needsSignIn && server.auth.expiresAt
+          ? ` · ${t('aiPower.mcp.auth.expires', { time: formatDateTime(server.auth.expiresAt) })}`
+          : ''}
       </p>
       {server.lastError ? (
         <p className="text-sm text-danger" role="alert">
@@ -971,8 +1189,8 @@ function ServerRow({ server }: { server: McpServer }) {
         </p>
       ) : null}
       <ActionError error={isCancelled(sync.error) ? null : (sync.error ?? toggle.error)} />
-      {can('tools.manage') ? (
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
+        {can('tools.manage') ? (
           <Button
             variant="secondary"
             size="sm"
@@ -998,20 +1216,104 @@ function ServerRow({ server }: { server: McpServer }) {
             <RefreshCwIcon aria-hidden="true" />
             {t('tools.servers.sync')}
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            busy={toggle.isPending}
-            onClick={() =>
-              void toggle
-                .mutateAsync(server.status === 'active' ? 'disabled' : 'active')
-                .catch(() => undefined)
-            }
-          >
-            {server.status === 'active' ? t('tools.servers.turnOff') : t('tools.servers.turnOn')}
-          </Button>
-        </div>
-      ) : null}
+        ) : null}
+        {can('tools.manage') ? (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              busy={toggle.isPending}
+              onClick={() =>
+                void toggle
+                  .mutateAsync(server.status === 'active' ? 'disabled' : 'active')
+                  .catch(() => undefined)
+              }
+            >
+              {server.status === 'active' ? t('tools.servers.turnOff') : t('tools.servers.turnOn')}
+            </Button>
+            {server.auth.kind === 'oauth' && !needsSignIn ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDialog('signOut')}
+                aria-label={t('aiPower.mcp.actions.signOutLabel', { name: server.label })}
+              >
+                <LogOutIcon aria-hidden="true" />
+                {t('aiPower.mcp.actions.signOut')}
+              </Button>
+            ) : null}
+            {server.status === 'active' && (server.auth.kind !== 'oauth' || needsSignIn) ? (
+              <Button
+                variant={needsSignIn ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setDialog('signIn')}
+                aria-label={t('aiPower.mcp.actions.signInLabel', { name: server.label })}
+                data-testid="sign-in"
+              >
+                <LogInIcon aria-hidden="true" />
+                {needsSignIn
+                  ? t('aiPower.mcp.actions.signInAgain')
+                  : t('aiPower.mcp.actions.signIn')}
+              </Button>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDialog('edit')}
+              aria-label={t('aiPower.mcp.actions.editLabel', { name: server.label })}
+              data-testid="edit-server"
+            >
+              <PencilIcon aria-hidden="true" />
+              {t('aiPower.mcp.actions.edit')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDialog('remove')}
+              aria-label={t('aiPower.mcp.actions.removeLabel', { name: server.label })}
+              data-testid="remove-server"
+            >
+              <Trash2Icon aria-hidden="true" />
+              {t('aiPower.mcp.actions.remove')}
+            </Button>
+          </>
+        ) : null}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setDialog('catalog')}
+          aria-label={t('aiPower.mcp.actions.catalogLabel', { name: server.label })}
+          data-testid="open-catalog"
+        >
+          <BookOpenIcon aria-hidden="true" />
+          {t('aiPower.mcp.actions.catalog')}
+        </Button>
+      </div>
+      <SignInDialog
+        server={server}
+        open={dialog === 'signIn'}
+        onOpenChange={(o) => setDialog(o ? 'signIn' : null)}
+      />
+      <SignOutDialog
+        server={server}
+        open={dialog === 'signOut'}
+        onOpenChange={(o) => setDialog(o ? 'signOut' : null)}
+      />
+      <EditServerDialog
+        server={server}
+        open={dialog === 'edit'}
+        onOpenChange={(o) => setDialog(o ? 'edit' : null)}
+      />
+      <RemoveServerDialog
+        server={server}
+        open={dialog === 'remove'}
+        onOpenChange={(o) => setDialog(o ? 'remove' : null)}
+      />
+      <McpCatalogSheet
+        server={server}
+        open={dialog === 'catalog'}
+        onOpenChange={(o) => setDialog(o ? 'catalog' : null)}
+      />
     </li>
   );
 }
@@ -1183,9 +1485,12 @@ export function ToolsPage() {
   const brandId = chosen?.id;
   const tools = useTools(brandId);
   const servers = useMcpServers(brandId);
+  const httpSources = useHttpToolSources(brandId);
   const agents = useAgents();
   const [addOpen, setAddOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [writeOpen, setWriteOpen] = useState(false);
   const dir = directionOf(isLocale(i18n.language) ? i18n.language : 'en');
   const toolOpener = useOpener(Boolean(search.tool));
   const manage = can('tools.manage');
@@ -1273,6 +1578,7 @@ export function ToolsPage() {
                 <ToolTable
                   tools={data.items}
                   servers={servers.data?.items ?? []}
+                  httpSources={httpSources.data?.items ?? []}
                   selected={search.tool}
                   onOpen={(toolId) => go({ brand: brandId, tool: toolId })}
                 />
@@ -1310,6 +1616,49 @@ export function ToolsPage() {
           </Section>
 
           <Section
+            id="tools-http"
+            title={t('aiPower.http.title')}
+            description={t('aiPower.http.description')}
+            actions={
+              manage ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setImportOpen(true)}
+                    data-testid="import-http"
+                  >
+                    <UploadIcon aria-hidden="true" />
+                    {t('aiPower.http.importLabel')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setWriteOpen(true)}
+                    data-testid="write-http"
+                  >
+                    <PlusIcon aria-hidden="true" />
+                    {t('aiPower.http.writeLabel')}
+                  </Button>
+                </div>
+              ) : null
+            }
+          >
+            <QueryState
+              query={httpSources}
+              label={t('aiPower.http.loading')}
+              isEmpty={(data) => data.items.length === 0}
+              empty={<p className="text-sm text-text-secondary">{t('aiPower.http.empty')}</p>}
+            >
+              {(data) => (
+                <HttpToolSources
+                  sources={data.items}
+                  manage={manage}
+                  onOpenTool={(toolId) => go({ brand: brandId, tool: toolId })}
+                />
+              )}
+            </QueryState>
+          </Section>
+
+          <Section
             id="tools-settings"
             title={t('tools.settings.title')}
             description={t('tools.settings.description')}
@@ -1332,6 +1681,11 @@ export function ToolsPage() {
             existing={tools.data?.items ?? []}
           />
           <ConnectServerDialog open={connectOpen} onOpenChange={setConnectOpen} brandId={brandId} />
+          <HttpImportDialog open={importOpen} onOpenChange={setImportOpen} brandId={brandId} />
+          <HttpEndpointDialog
+            mode={writeOpen ? { kind: 'create', brandId } : null}
+            onOpenChange={setWriteOpen}
+          />
         </>
       ) : null}
 
@@ -1371,6 +1725,7 @@ export function ToolsPage() {
               <ToolDetail
                 tool={selected}
                 servers={servers.data?.items ?? []}
+                httpSources={httpSources.data?.items ?? []}
                 onSaved={() => undefined}
               />
             ) : null}

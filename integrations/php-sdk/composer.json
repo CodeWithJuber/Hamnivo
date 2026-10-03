@@ -1,0 +1,54 @@
+{
+  "name": "hamnivo/hamnivo-php",
+  "description": "Hamnivo Connect for PHP servers: sign the identity assertions that verify a website's signed-in customers to Hamnivo Chat, and verify signed webhooks. The output is the same as @hamnivo/server.",
+  "type": "library",
+  "license": "MIT",
+  "keywords": [
+    "hamnivo",
+    "chat",
+    "identity",
+    "jwt",
+    "webhooks",
+    "standard-webhooks",
+    "wordpress",
+    "whmcs"
+  ],
+  "homepage": "https://github.com/CodeWithJuber/Hamnivo/tree/main/integrations/php-sdk",
+  "support": {
+    "issues": "https://github.com/CodeWithJuber/Hamnivo/issues",
+    "source": "https://github.com/CodeWithJuber/Hamnivo/tree/main/integrations/php-sdk"
+  },
+  "require": {
+    "php": ">=8.1",
+    "ext-hash": "*",
+    "ext-json": "*",
+    "ext-openssl": "*",
+    "ext-pcre": "*"
+  },
+  "require-dev": {
+    "firebase/php-jwt": "^6.10 || ^7.0",
+    "phpunit/phpunit": "^10.5 || ^11.5 || ^12.0 || ^13.0"
+  },
+  "suggest": {
+    "ext-sodium": "Needed to sign with EdDSA (Ed25519) keys. WordPress provides it when the extension is missing."
+  },
+  "autoload": {
+    "psr-4": {
+      "Hamnivo\\": "src/"
+    },
+    "files": ["src/functions.php"]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Hamnivo\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit"
+  },
+  "config": {
+    "sort-packages": true,
+    "optimize-autoloader": true
+  },
+  "minimum-stability": "stable"
+}

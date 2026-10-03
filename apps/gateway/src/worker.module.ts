@@ -7,11 +7,13 @@ import { ActionsWorker } from './actions/worker.service.js';
 import { JournalService } from './authority/journal.service.js';
 import { OwnershipService } from './authority/ownership.service.js';
 import { InboxProcessor } from './authority/processor.service.js';
+import { ChatwootProvisioning } from './authority/provisioning.service.js';
 import { PublicationsService } from './authority/publications.service.js';
 import { ReconcilerService } from './authority/reconciler.service.js';
 import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
 import { AuthoritySyncService } from './authority/sync.service.js';
+import { BillingNotices } from './billing/notices.js';
 import { cacheProviders } from './cache/cache.providers.js';
 import { CARD_TOPIC, CommerceCardsService } from './commerce/card-publisher.service.js';
 import { COMMERCE_WORKER_PROVIDERS } from './commerce/commerce.module.js';
@@ -26,6 +28,7 @@ import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
 import { type Scanner, scannerFromUrl } from './knowledge/scanner.js';
+import { KNOWLEDGE_WEB_WORKER_PROVIDERS } from './knowledge/web/web.module.js';
 import { MemoryCache } from './memory/cache.js';
 import { ConversationHistory } from './memory/conversation-history.js';
 import { MemoryDeletionService } from './memory/deletion.service.js';
@@ -38,6 +41,7 @@ import { MigrationEngine } from './migration/engine.service.js';
 import { MigrationExporter } from './migration/export.service.js';
 import { OUTBOX_HANDLERS, type OutboxHandler, OutboxRelay } from './outbox/relay.service.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
+import { SAAS_WORKER_PROVIDERS, saasOutboxHandlers } from './platform/saas.module.js';
 import { AgentsService } from './runtime/agents.service.js';
 import { KillSwitchesService } from './runtime/kill-switches.service.js';
 import { LANGUAGE_MODEL, ModelFactory } from './runtime/models.js';
@@ -58,7 +62,6 @@ import { MaintenanceService } from './worker/maintenance.service.js';
 export function defaultOutboxHandlers(): Map<string, OutboxHandler> {
   const logger = new Logger('outbox');
   return new Map<string, OutboxHandler>([
-    ['tenant.created', async (event) => logger.log(`tenant created: ${event.aggregateId}`)],
     [
       'authority.connected',
       async (event) => logger.log(`authority connected: ${event.aggregateId}`),
@@ -124,6 +127,8 @@ export class WorkerModule {
         ...COMMERCE_WORKER_PROVIDERS,
         ...WIDGET_SURFACE_WORKER_PROVIDERS,
         ...ACTIONS_WORKER_PROVIDERS,
+        ...SAAS_WORKER_PROVIDERS,
+        ...KNOWLEDGE_WEB_WORKER_PROVIDERS,
         {
           provide: OUTBOX_HANDLERS,
           inject: [
@@ -141,6 +146,8 @@ export class WorkerModule {
             CustomerEmailsService,
             ActionExecutor,
             ActionsWorker,
+            ChatwootProvisioning,
+            BillingNotices,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -157,6 +164,8 @@ export class WorkerModule {
             emails: CustomerEmailsService,
             executor: ActionExecutor,
             actions: ActionsWorker,
+            provisioning: ChatwootProvisioning,
+            notices: BillingNotices,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -190,6 +199,7 @@ export class WorkerModule {
               [REPLY_WAITING_TOPIC, (event) => emails.onReplyWaiting(event)],
               [ACTION_EXECUTE_TOPIC, (event) => executor.onExecute(event)],
               [ACTION_RECONCILE_TOPIC, (event) => actions.onReconcile(event)],
+              ...saasOutboxHandlers(provisioning, notices),
             ]),
         },
         OutboxRelay,

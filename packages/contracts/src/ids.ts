@@ -27,11 +27,13 @@ export const ID_PREFIX = {
   decision: 'dcs',
   check: 'chk',
   tool: 'tool',
+  httpSource: 'hsrc',
   action: 'act',
   approval: 'apr',
   operation: 'op',
   receipt: 'rcp',
   source: 'ksrc',
+  webSource: 'wsrc',
   document: 'doc',
   memory: 'mem',
   memoryDeletion: 'mdel',
@@ -71,10 +73,13 @@ export const ID_PREFIX = {
   ssoConnection: 'ssoc',
   supportGrant: 'sgr',
   operator: 'opr',
+  operatorKey: 'opk',
   incident: 'inc',
   mcpServer: 'mcp',
+  mcpItem: 'mci',
   simulation: 'sim',
   simulationRun: 'simr',
+  visitor: 'vis',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

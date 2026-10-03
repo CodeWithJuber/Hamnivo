@@ -1,0 +1,44 @@
+{
+  "name": "@hamnivo/vue",
+  "version": "0.1.0",
+  "description": "Hamnivo Chat for Vue and Nuxt: a plugin and a component that put the chat on your site, and a composable for the chat window",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "keywords": [
+    "hamnivo",
+    "chat",
+    "customer-support",
+    "vue",
+    "nuxt"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "tsdown && vitest run"
+  },
+  "peerDependencies": {
+    "vue": ">=3.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vue/test-utils": "2.5.1",
+    "jsdom": "30.1.1",
+    "tsdown": "0.23.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vue": "3.5.43"
+  }
+}

@@ -1,4 +1,4 @@
-import { HamnivoClient } from '@hamnivo/client';
+import { defaultStorage, HamnivoClient, prefixedStorage } from '@hamnivo/client';
 import type { WidgetLayoutMode } from '@hamnivo/contracts';
 import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
 import { useEffect, useMemo, useState } from 'react';
@@ -8,10 +8,13 @@ import type { HostBridge } from './bridge.js';
 import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
 import { applyLocale, type Locale } from './i18n.js';
-import { useChat } from './useChat.js';
+import { applyTheme } from './theme.js';
+import { CHAT_OFFLINE, useChat } from './useChat.js';
 import { useDisplay } from './useDisplay.js';
 import { useMemory } from './useMemory.js';
 import { useReplyLanguage } from './useReplyLanguage.js';
+import { useStaffTyping } from './useTyping.js';
+import { useVisitor } from './useVisitor.js';
 
 export interface WidgetParams {
   apiBase: string;
@@ -20,6 +23,8 @@ export interface WidgetParams {
   locale: Locale;
   /** How the loader placed the chat on the page (W02); null when the brand's choice applies. */
   mode: WidgetLayoutMode | null;
+  /** Studio's test chat: its own session, and the conversations it starts are marked as tests. */
+  test?: boolean;
 }
 
 export function App({ params, bridge }: { params: WidgetParams; bridge: HostBridge }) {
@@ -32,6 +37,8 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
         widgetId: params.widgetId,
         locale: params.locale,
         ...(params.hostOrigin ? { hostOrigin: params.hostOrigin } : {}),
+        // A test chat keeps its own session, never a real visitor's.
+        ...(params.test ? { test: true, storage: prefixedStorage(defaultStorage(), 'test:') } : {}),
       }),
     [params],
   );
@@ -45,7 +52,18 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const memory = useMemory(client, chat.state.session?.principal.id ?? null);
   const actions = useActions(client, chat.state.conversation?.id ?? null, bridge);
   useEffect(() => onEvent(actions.onEvent), [onEvent, actions.onEvent]);
+  const staffTyping = useStaffTyping(onEvent);
+  const visitor = useVisitor(client, chat.state.session?.principal.id ?? null, locale);
   const display = useDisplay(params.widgetId);
+  // The brand's colour and corners (W03); Hamnivo's own look stays as it is.
+  const accent = chat.state.session?.config.brand.accent;
+  const onAccent = chat.state.session?.config.brand.onAccent;
+  const radius = chat.state.session?.config.brand.radius;
+  useEffect(() => {
+    if (accent !== undefined && onAccent !== undefined && radius !== undefined) {
+      applyTheme(document.documentElement, { accent, onAccent, radius });
+    }
+  }, [accent, onAccent, radius]);
   // Embedded, the chat is on screen only while the loader shows it; on its own page, always.
   const [open, setOpen] = useState(
     !params.hostOrigin || params.mode === 'inline' || params.mode === 'fullpage',
@@ -83,6 +101,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   }, [bridge]);
 
   const { identify, reset } = chat;
+  const { setKey: setVisitorKey } = visitor;
   useEffect(() => {
     bridge.post({ type: 'ready', widgetVersion: '0.1.0' });
     const identityChanged = (verified: boolean) =>
@@ -91,6 +110,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       if (message.type === 'open') setOpen(true);
       if (message.type === 'close') setOpen(false);
       if (message.type === 'proactive') setTrigger(message.triggerId);
+      if (message.type === 'visitor') setVisitorKey(message.key);
       if (message.type === 'set-locale')
         setLocale((message.locale.split('-')[0] as Locale) ?? 'en');
       if (message.type === 'identify') {
@@ -125,7 +145,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
         });
       }
     });
-  }, [bridge, identify, reset]);
+  }, [bridge, identify, reset, setVisitorKey]);
 
   if (chat.state.phase === 'loading') {
     return (
@@ -137,15 +157,18 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   if (chat.state.phase === 'error' || !chat.state.session) {
     return (
       <p className="p-6 text-sm text-text" role="alert">
-        {t('startError')}
+        {chat.state.error === CHAT_OFFLINE ? t('chatOffline') : t('startError')}
       </p>
     );
   }
   const session = chat.state.session;
   const mode = params.mode ?? session.config.layout?.mode ?? 'bubble';
-  // Only the brand's own words, from its configuration: the page sends nothing but the id.
+  // Only the brand's own words, from its configuration (the page sends nothing but the id), or a
+  // message the team left for this visitor, which comes from the gateway, not from the page.
   const prompt =
-    session.config.proactive?.triggers.find((t) => t.id === trigger)?.message[locale] ?? null;
+    session.config.proactive?.triggers.find((t) => t.id === trigger)?.message[locale] ??
+    visitor.state.invite?.message ??
+    null;
   // Inline and full-page chats have no launcher to go back to.
   const closable = Boolean(params.hostOrigin) && mode !== 'inline' && mode !== 'fullpage';
   return (
@@ -162,6 +185,8 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           visible={open && pageShown}
           display={display}
           prompt={prompt}
+          staffTyping={staffTyping}
+          visitorNotice={visitor.state.notice}
           onLocale={(next) => {
             setLocale(next);
             void saveLocale(next);

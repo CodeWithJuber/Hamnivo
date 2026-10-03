@@ -19,9 +19,23 @@
     "note": "Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence and status checks, Chatwoot contract, accessibility, browser journeys) run with pnpm ci:local; --with-production also builds the images and checks the deployment. Every push to main can deploy itself without hosted CI. A signed GitHub webhook and a 5-minute check trigger it. The server checks and builds a clean copy of each version (Biome, type checks, unit tests, commit-tagged images), backs up before database changes, and starts the new version behind health checks and a soak period. Unhealthy versions are rolled back automatically. Changes a rollback cannot undo (destructive migrations, new versions of Chatwoot or PostgreSQL) wait for a deploy by hand, and migration mistakes stop the deploy. GitHub deployment statuses are reported when a token is set. All of this is tested end to end against a stand-in for GitHub."
   },
   "W03": {
-    "status": "in-progress",
-    "evidence": ["packages/brand/src/contrast.ts", "packages/brand/test/contrast.test.ts"],
-    "note": "Contrast validation implemented; widget studio UI pending."
+    "status": "partial",
+    "evidence": [
+      "packages/brand/src/contrast.ts",
+      "packages/brand/test/contrast.test.ts",
+      "apps/gateway/src/widget/appearance.ts",
+      "apps/gateway/src/widget/appearance.service.ts",
+      "apps/gateway/test/appearance.test.ts",
+      "apps/gateway/test/setup.int.test.ts",
+      "apps/widget/src/theme.ts",
+      "apps/widget/test/appearance.test.tsx",
+      "apps/console/src/pages/settings/AppearanceDialog.tsx",
+      "apps/console/src/pages/settings/WidgetPreview.tsx",
+      "apps/console/src/lib/appearance.ts",
+      "packages/db/src/schema/setup.ts",
+      "docs/guide/setup/widget-look.md"
+    ],
+    "note": "Each brand sets its main colour, logo, corner radius, greeting, offline text, rating on or off and privacy link in Studio, with a live picture of the chat in each language. The gateway refuses a colour whose text cannot be read or that fades into a white page (the same contrast check as the brand package) and Studio suggests a darker one. The widget draws itself from design tokens; a brand that changes nothing looks as before. Typography is not configurable, and the launcher position is a chat setting (W02)."
   },
   "HNV-24-01": {
     "status": "implemented",
@@ -121,9 +135,14 @@
       "apps/gateway/src/developer/keys.ts",
       "apps/gateway/src/developer/api-keys.service.ts",
       "apps/gateway/test/api-keys.int.test.ts",
-      "apps/console/e2e/developer.spec.ts"
+      "apps/console/e2e/developer.spec.ts",
+      "apps/gateway/src/runtime/model-connections.service.ts",
+      "apps/gateway/test/setup.int.test.ts",
+      "apps/console/src/pages/ModelsPage.tsx",
+      "apps/console/src/pages/models/ReplaceKeyDialog.tsx",
+      "docs/guide/setup/ai-keys.md"
     ],
-    "note": "Write-only, masked, envelope-encrypted secrets with rotation, revocation, KEK rotation and MFA + fresh sign-in. API keys for service accounts: scoped and expiring, shown once, stored as an HMAC, rotated with an overlap, revoked at once, rate-limited per key and audited."
+    "note": "Write-only, masked, envelope-encrypted secrets with rotation, revocation, KEK rotation and MFA + fresh sign-in. API keys for service accounts: scoped and expiring, shown once, stored as an HMAC, rotated with an overlap, revoked at once, rate-limited per key and audited. A workspace’s AI keys are replaced in place from Studio (the new key is stored, the old one revoked, agents carry on) and each can be tested with one tiny real call; Studio shows only yes or no for the keys the server holds."
   },
   "O05": {
     "status": "in-progress",
@@ -178,9 +197,11 @@
     "evidence": [
       "apps/gateway/src/authority/registry.ts",
       "apps/gateway/src/secrets/secret-broker.service.ts",
-      "apps/gateway/test/secrets.int.test.ts"
+      "apps/gateway/test/secrets.int.test.ts",
+      "apps/gateway/test/http-tools.int.test.ts",
+      "apps/gateway/test/mcp-power.int.test.ts"
     ],
-    "note": "Secret broker reveals credentials only to server code inside the owning tenant; scoped short-lived credentials for tools and agents pending."
+    "note": "Secret broker reveals credentials only to server code inside the owning tenant; scoped short-lived credentials for tools and agents pending. MCP tokens, OAuth sign-ins (access and refresh tokens, client registrations) and the credentials of custom HTTP tools live in it and are never returned, logged or put in the audit log (tested); a credential replaced or removed is revoked."
   },
   "O01": {
     "status": "in-progress",
@@ -199,9 +220,12 @@
       "deploy/compose/chatwoot.yml",
       "packages/chatwoot/src/provisioning.ts",
       "packages/chatwoot/test/contract/suite.ts",
-      "scripts/chatwoot/up.sh"
+      "scripts/chatwoot/up.sh",
+      "apps/gateway/src/authority/provisioning.service.ts",
+      "apps/gateway/test/saas-operator.int.test.ts",
+      "apps/console/src/components/ProvisioningProgress.tsx"
     ],
-    "note": "Admin API connects a brand to Chatwoot: account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed webhooks and Copilot dashboard app; every credential stored with the secret broker (tested end to end against the fake, provisioning also against real Chatwoot v4.18.0-ce). Health checks, reconnect instructions and the Studio screen pending."
+    "note": "A brand gets its Chatwoot account by itself: the first brand of a workspace (through the outbox, after a short wait) and a brand a billing system creates with its workspace (the tenant.created handler). Account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed webhooks and Copilot dashboard app; every step is recorded before the next (credentials with the secret broker), so a retry continues the same account, and Connect in Studio is the retry. Studio shows the set-up's progress or why it stopped (tested end to end against the fake, with failures and retries; provisioning also against real Chatwoot v4.18.0-ce). Health checks and reconnect instructions pending."
   },
   "E06": {
     "status": "in-progress",
@@ -281,27 +305,35 @@
       "packages/client/test/client.test.ts",
       "packages/server-sdk/src/assertion.ts",
       "packages/server-sdk/test/assertion.test.ts",
-      "packages/widget-loader/src/loader.ts"
+      "packages/widget-loader/src/loader.ts",
+      "apps/console/src/pages/settings/IdentityPage.tsx",
+      "apps/console/src/lib/identity.ts",
+      "apps/console/test/setup-screens.test.tsx"
     ],
-    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, and identity assertions signed by the tenant: kid, audience, a five-minute lifetime and a single-use jti. A new identity is a new principal: the old session and its streams end. Brands register their keys through the admin API, with two-step verification and a recent sign-in: ES256, EdDSA or RS256 public keys, or an HS256 secret shown once. Keys can be retired, or revoked, which also ends the chats they signed in. Assertions may be dated up to 5 seconds ahead. @hamnivo/server signs assertions. In the widget, identify shows the customer's own chats; reset clears the screen, ends the session in Hamnivo and in the browser, forgets unsent messages and clears other tabs; a late token renewal cannot undo either. All of this is tested, including in Chromium with a real key. The widget does not yet show the signed-in customer's name."
+    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, and identity assertions signed by the tenant: kid, audience, a five-minute lifetime and a single-use jti. A new identity is a new principal: the old session and its streams end. Brands register their keys through the admin API, with two-step verification and a recent sign-in: ES256, EdDSA or RS256 public keys, or an HS256 secret shown once. Keys can be retired, or revoked, which also ends the chats they signed in. Assertions may be dated up to 5 seconds ahead. @hamnivo/server signs assertions. In the widget, identify shows the customer's own chats; reset clears the screen, ends the session in Hamnivo and in the browser, forgets unsent messages and clears other tabs; a late token renewal cannot undo either. All of this is tested, including in Chromium with a real key. The widget does not yet show the signed-in customer's name. Studio manages the keys too: create one (a shared secret is shown once, to copy), replace one (a new key of the same kind, the old one marked retiring) and revoke one."
   },
   "H08": {
     "status": "implemented",
     "evidence": [
       "apps/console/e2e/inbox.spec.ts",
       "apps/console/src/pages/inbox/ConversationPane.tsx",
+      "apps/console/src/pages/inbox/Typing.tsx",
       "apps/gateway/src/authority/ownership.service.ts",
       "apps/gateway/src/authority/processor.service.ts",
       "apps/gateway/src/conversations/staff-conversations.service.ts",
       "apps/gateway/src/inbox/assignment.service.ts",
+      "apps/gateway/src/inbox/customer-typing.service.ts",
       "apps/gateway/src/inbox/live.service.ts",
       "apps/gateway/src/inbox/signals.service.ts",
+      "apps/gateway/src/inbox/typing.service.ts",
+      "apps/gateway/test/inbox-alerts.int.test.ts",
       "apps/gateway/test/inbox-workspace.int.test.ts",
       "apps/gateway/test/inbox.int.test.ts",
       "apps/gateway/test/reconciler.int.test.ts",
-      "apps/gateway/test/slice.int.test.ts"
+      "apps/gateway/test/slice.int.test.ts",
+      "apps/widget/src/useTyping.ts"
     ],
-    "note": "Atomic claim and takeover through the ownership epoch; an AI reply still being written when staff take over is fenced, and takeovers made inside Chatwoot are adopted (all tested). A reply from an out-of-date view (expected epoch) or over a colleague is refused and nothing is sent. Taking a conversation from a colleague needs conversations.assign; others ask for a transfer. Studio shows who else is viewing or typing, and ownership changes, live over the staff stream."
+    "note": "Atomic claim and takeover through the ownership epoch; an AI reply still being written when staff take over is fenced, and takeovers made inside Chatwoot are adopted (all tested). A reply from an out-of-date view (expected epoch) or over a colleague is refused and nothing is sent. Taking a conversation from a colleague needs conversations.assign; others ask for a transfer. Studio shows who else is viewing or typing, and ownership changes, live over the staff stream. Typing also goes between staff and the customer, as short-lived signals that are never stored, and each person’s online, away or offline status shows in the inbox."
   },
   "R05": {
     "status": "in-progress",
@@ -344,9 +376,13 @@
       "packages/adapters/src/models/mock.ts",
       "packages/adapters/src/models/registry.ts",
       "packages/adapters/test/mock.test.ts",
-      "packages/adapters/test/models/contract.test.ts"
+      "packages/adapters/test/models/contract.test.ts",
+      "packages/adapters/src/models/probe.ts",
+      "packages/adapters/test/models/probe.test.ts",
+      "apps/gateway/src/runtime/model-connections.service.ts",
+      "apps/gateway/test/setup.int.test.ts"
     ],
-    "note": "Anthropic, OpenAI, Google Gemini and OpenAI-compatible adapters (AI SDK 7) plus deterministic mocks, a sourced capability table and error normalization; agents use them with tenant or platform keys, checked at publication, with fallback models on overload (tested against provider fixtures and with the mock end to end). No live provider call has run in the checks."
+    "note": "Anthropic, OpenAI, Google Gemini and OpenAI-compatible adapters (AI SDK 7) plus deterministic mocks, a sourced capability table and error normalization; agents use them with tenant or platform keys, checked at publication, with fallback models on overload (tested against provider fixtures and with the mock end to end). No live provider call has run in the checks. A key can be tested with one minimal call (a few tokens, a 10 second limit, through the egress guard) and the failures are put in plain words: wrong key, no credit, model not found, network. That call is tested against provider fixtures only."
   },
   "W01": {
     "status": "in-progress",
@@ -411,9 +447,33 @@
     "note": "Framework-free SDK: sessions with single-flight renewal, typed conversation calls, exactly-once send outbox and resumable streams (unit-tested with msw, used by the widget)."
   },
   "D03": {
-    "status": "in-progress",
-    "evidence": ["apps/widget/src/components/Chat.tsx", "apps/widget/src/useChat.ts"],
-    "note": "The widget maps SDK state into assistant-ui's external-store runtime; a published React package (@hamnivo/react) is pending."
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "packages/react/src/chat.ts",
+      "packages/react/src/embed.ts",
+      "packages/react/src/use-hamnivo.ts",
+      "packages/react/src/client.ts",
+      "packages/react/test/chat.test.ts",
+      "packages/react/test/client.test.ts",
+      "docs/guide/integrations/react-vue-next.md",
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/useChat.ts"
+    ],
+    "note": "@hamnivo/react: a component that puts the chat on a React or Next.js page (marked use client; hidden when it unmounts; verifies the signed-in customer and signs the chat out with them), useHamnivo for the chat window, and hooks on @hamnivo/client for a custom chat (useHamnivoClient, useOutbox, useConversationStream). Tested in a real React against stand-ins for the loader and the API, and its Next.js snippets are type-checked. Not yet published to npm (a tag and the NPM_TOKEN secret do that), and not tried in a real app. The widget itself maps SDK state into assistant-ui's external-store runtime."
+  },
+  "D04": {
+    "status": "partial",
+    "evidence": [
+      "packages/vue/src/chat.ts",
+      "packages/vue/src/plugin.ts",
+      "packages/vue/src/use-hamnivo.ts",
+      "packages/vue/test/chat.test.ts",
+      "packages/vue/test/use-hamnivo.test.ts",
+      "packages/react/src/chat.ts",
+      ".github/workflows/release-packages.yml",
+      "docs/guide/integrations/react-vue-next.md"
+    ],
+    "note": "@hamnivo/vue (plugin, component and composable for Vue 3 and Nuxt) and @hamnivo/react load the same loader and share one tested file for loading it; a tag-only workflow publishes either to npm. Tested in a real Vue against a stand-in for the loader; not yet published. They wrap the loader, not the headless client, and there is no Angular wrapper."
   },
   "U04": {
     "status": "in-progress",
@@ -502,13 +562,19 @@
     "note": "Saved drafts are not live; publishing freezes a version with its configuration hash (a database trigger rejects changes), one version is live at a time, and publishing an earlier version is the rollback (tested). Studio screens pending."
   },
   "G04": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/knowledge/knowledge.service.ts",
       "apps/gateway/test/knowledge.int.test.ts",
-      "packages/db/src/schema/knowledge.ts"
+      "packages/db/src/schema/knowledge.ts",
+      "apps/gateway/src/knowledge/web/crawler.ts",
+      "apps/gateway/src/knowledge/web/sync.service.ts",
+      "apps/gateway/src/knowledge/web/sources.service.ts",
+      "apps/gateway/test/web-knowledge.test.ts",
+      "apps/gateway/test/web-knowledge.int.test.ts",
+      "docs/guide/ai/teach-your-ai-your-website.md"
     ],
-    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). URL crawling and Studio screens pending."
+    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). A website can be a source: its pages become documents, found through its sitemap and the links between them within one site and the folder of the address, with robots.txt followed, limits on pages and link depth, read on a schedule or on request. A changed page becomes a new version, and a page that is gone or now off limits is retired; a site that is down loses nothing (tested against a made-up site over real HTTP). The website panel in Studio is rendered in unit tests; there is no browser test of it."
   },
   "G05": {
     "status": "in-progress",
@@ -543,9 +609,12 @@
       "apps/gateway/src/knowledge/scanner.ts",
       "apps/gateway/src/knowledge/text.ts",
       "apps/gateway/test/knowledge.int.test.ts",
-      "apps/gateway/test/knowledge.test.ts"
+      "apps/gateway/test/knowledge.test.ts",
+      "apps/gateway/src/knowledge/web/crawler.ts",
+      "apps/gateway/src/knowledge/versions.ts",
+      "apps/gateway/test/web-knowledge.int.test.ts"
     ],
-    "note": "Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Parsing runs in-process (no sandbox) and URL sources are pending."
+    "note": "Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Pages of a website enter the same pipeline: the crawler (one request at a time, every request through the egress guard, size and unpacking limits) hands over each page as an upload, in its own character set converted to UTF-8; a page whose text is built by JavaScript is left out (tested). Parsing runs in-process (no sandbox)."
   },
   "X09": {
     "status": "implemented",
@@ -556,9 +625,10 @@
       "packages/domain/src/actions/output.ts",
       "apps/gateway/test/tools.int.test.ts",
       "apps/gateway/src/checks/reply-checks.service.ts",
-      "apps/gateway/test/checks.int.test.ts"
+      "apps/gateway/test/checks.int.test.ts",
+      "apps/gateway/test/http-tools.int.test.ts"
     ],
-    "note": "Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool results reach the model fenced as untrusted data from a named tool, size-limited and checked, and a write proposed after reading another system’s data needs approval (tested). With the passage relevance check live, Jev also leaves out passages that carry instructions for the assistant (tested; verified live on one planted passage). Measuring injection resistance with an adversarial suite is X12."
+    "note": "Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool results reach the model fenced as untrusted data from a named tool, size-limited and checked, and a write proposed after reading another system’s data needs approval (tested). With the passage relevance check live, Jev also leaves out passages that carry instructions for the assistant (tested; verified live on one planted passage). Measuring injection resistance with an adversarial suite is X12. The answer of a custom HTTP tool is handled the same way (tested): fenced as data, size-limited, and a change proposed after reading it waits for a person."
   },
   "W08": {
     "status": "in-progress",
@@ -667,9 +737,11 @@
       "apps/gateway/test/conversation-flow.int.test.ts",
       "apps/widget/e2e/surface.spec.ts",
       "packages/domain/src/business-hours.ts",
-      "packages/domain/test/business-hours.test.ts"
+      "packages/domain/test/business-hours.test.ts",
+      "apps/console/src/pages/settings/HoursPage.tsx",
+      "apps/console/src/lib/hours.ts"
     ],
-    "note": "Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; \"talk to a person\" answers queued or offline with the return time in the customer's language. Offline, the widget shows a banner with the last update and a way to try again, and messages wait and go out once (tested). Verified customers can get an email when a reply waits (W25). Syncing Chatwoot working hours and a contact path for anonymous visitors are pending."
+    "note": "Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; \"talk to a person\" answers queued or offline with the return time in the customer's language. Offline, the widget shows a banner with the last update and a way to try again, and messages wait and go out once (tested). Verified customers can get an email when a reply waits (W25). Syncing Chatwoot working hours and a contact path for anonymous visitors are pending. Studio now edits the hours and holidays (A05), and a brand can write its own offline message (W03)."
   },
   "A04": {
     "status": "in-progress",
@@ -751,13 +823,23 @@
   },
   "HNV-14-01": {
     "status": "in-progress",
-    "evidence": ["apps/console/src/pages/KnowledgePage.tsx", "apps/console/e2e/journeys.spec.ts"],
-    "note": "The knowledge library lists sources with their status (tested)."
+    "evidence": [
+      "apps/console/src/pages/KnowledgePage.tsx",
+      "apps/console/e2e/journeys.spec.ts",
+      "apps/console/src/components/knowledge/WebSourcePanel.tsx",
+      "apps/console/test/web-sources.test.tsx"
+    ],
+    "note": "The knowledge library lists sources with their status (tested); a website says so under its name with how its reading stands (unit-tested)."
   },
   "HNV-14-02": {
     "status": "in-progress",
-    "evidence": ["apps/console/src/pages/KnowledgePage.tsx", "apps/console/e2e/journeys.spec.ts"],
-    "note": "An uploaded file shows its progress until it is ready to search (tested); cancelling an import comes later."
+    "evidence": [
+      "apps/console/src/pages/KnowledgePage.tsx",
+      "apps/console/e2e/journeys.spec.ts",
+      "apps/console/src/components/knowledge/WebSourcePanel.tsx",
+      "apps/console/test/web-sources.test.tsx"
+    ],
+    "note": "An uploaded file shows its progress until it is ready to search (tested); a website shows that it is waiting or being read, how its last read went and each page’s state (unit-tested, no browser test); cancelling an import comes later."
   },
   "HNV-14-04": {
     "status": "in-progress",
@@ -780,9 +862,23 @@
     "note": "Each brand shows a copyable install snippet, and its allowed websites can be changed (tested); an event test comes later."
   },
   "D05": {
-    "status": "in-progress",
-    "evidence": ["examples/wordpress/hamnivo-chat.php", "examples/wordpress/README.md"],
-    "note": "A WordPress plugin adds the chat loader and signs assertions for signed-in WordPress users. It passes php -l but is not yet tested against a real WordPress installation."
+    "status": "implemented-live-unverified",
+    "evidence": [
+      "integrations/wordpress/hamnivo-chat/hamnivo-chat.php",
+      "integrations/wordpress/tests/plugin.test.mjs",
+      "integrations/wordpress/tests/woocommerce.test.mjs",
+      "integrations/whmcs/modules/addons/hamnivo/hamnivo.php",
+      "integrations/whmcs/modules/addons/hamnivo/tests/suite.php",
+      "integrations/shopify/extensions/hamnivo-chat/blocks/hamnivo-chat.liquid",
+      "examples/shopify/test/app-embed.test.ts",
+      "integrations/gtm/template.tpl",
+      "examples/gtm/test/template-behavior.test.ts",
+      "integrations/php-sdk/src/functions.php",
+      "integrations/php-sdk/tests/IdentityFixturesTest.php",
+      "scripts/build-integrations.sh",
+      "docs/guide/integrations/README.md"
+    ],
+    "note": "One-click installs for four platforms, with a guide for each: a WordPress plugin (settings page, Test connection, verified customers for WordPress users and WooCommerce customers; tested in a real WordPress and WooCommerce on PHP 7.4 to 8.5), a WHMCS addon (loader, verified clients, optional product names; tested with stand-ins for WHMCS on PHP 7.4 to 8.5), a Shopify app embed (rendered with LiquidJS, and Shopify's Theme Check finds no offenses), and a Google Tag Manager template (run in a stand-in for its sandbox). All sign with a PHP SDK that matches @hamnivo/server byte for byte against its fixtures. pnpm build:integrations writes the zips and the template. Nothing is tried in a real WHMCS, Shopify store or Tag Manager yet, and the Shopify app and the Gallery listing need the owner's Partner and Google accounts."
   },
   "L01": {
     "status": "implemented",
@@ -829,9 +925,12 @@
       "apps/widget/e2e/memory.spec.ts",
       "apps/gateway/test/memory.int.test.ts",
       "apps/console/src/pages/CustomerMemoryPage.tsx",
-      "apps/console/e2e/memory.spec.ts"
+      "apps/console/e2e/memory.spec.ts",
+      "apps/console/src/components/memory/CustomerMemoryCard.tsx",
+      "apps/console/test/customer-memory-card.test.tsx",
+      "apps/gateway/test/conversation-memory.int.test.ts"
     ],
-    "note": "Customers agree or decline, see what is remembered with its source and expiry, correct, confirm, delete, forget everything and turn memory off in the widget; staff do the same in Studio within their grants (tested in the API and in browsers, including right to left). Retention is fixed per memory type; letting brands or customers configure it is pending."
+    "note": "Customers agree or decline, see what is remembered with its source and expiry, correct, confirm, delete, forget everything and turn memory off in the widget; staff do the same in Studio within their grants (tested in the API and in browsers, including right to left). Retention is fixed per memory type; letting brands or customers configure it is pending. Staff also see, correct and delete a customer’s memory beside the conversation in the inbox (unit-tested, no browser test)."
   },
   "L05": {
     "status": "in-progress",
@@ -900,9 +999,11 @@
       "apps/console/e2e/memory.spec.ts",
       "apps/console/src/pages/MemoryPage.tsx",
       "apps/widget/src/components/MemoryPanel.tsx",
-      "apps/widget/e2e/memory.spec.ts"
+      "apps/widget/e2e/memory.spec.ts",
+      "apps/console/src/components/memory/CustomerMemoryCard.tsx",
+      "apps/console/test/customer-memory-card.test.tsx"
     ],
-    "note": "Studio lists customers with memory and shows each memory with purpose, source message, who recorded it, scope, expiry and history; customers see theirs in the widget (tested, including right to left)."
+    "note": "Studio lists customers with memory and shows each memory with purpose, source message, who recorded it, scope, expiry and history; customers see theirs in the widget (tested, including right to left). The inbox panel lists each memory with its source and the day it was observed."
   },
   "HNV-15-03": {
     "status": "implemented",
@@ -948,13 +1049,16 @@
     "status": "implemented",
     "evidence": [
       "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/lib/inbox-alerts.ts",
       "apps/console/src/pages/inbox/InboxPage.tsx",
       "apps/gateway/src/inbox/access.ts",
+      "apps/gateway/src/inbox/alerts.service.ts",
       "apps/gateway/src/inbox/inbox.controller.ts",
       "apps/gateway/src/inbox/inbox.service.ts",
+      "apps/gateway/test/inbox-alerts.int.test.ts",
       "apps/gateway/test/inbox.int.test.ts"
     ],
-    "note": "Queues for mine, waiting for a person, AI answering, my teams and all, with counts, keyset paging and filters by status (open or pending, snoozed, resolved), brand, channel, customer language and tag. Lists, counts, search and the staff stream all apply the same grant filter (workspace, brand, inbox or team): a conversation outside a person's grants is not found. Tested through the API and in the browser."
+    "note": "Queues for mine, waiting for a person, AI answering, my teams and all, with counts, keyset paging and filters by status (open or pending, snoozed, resolved), brand, channel, customer language and tag. Lists, counts, search and the staff stream all apply the same grant filter (workspace, brand, inbox or team): a conversation outside a person's grants is not found. Tested through the API and in the browser. Each person sees which chats have news for them: unread is kept by the server per person, not per browser, and shows in the list, the page title and the tab icon, with sounds and desktop alerts that are theirs to set (tested)."
   },
   "H02": {
     "status": "in-progress",
@@ -964,9 +1068,10 @@
       "apps/gateway/src/inbox/assignment.service.ts",
       "apps/gateway/src/inbox/teams.service.ts",
       "apps/gateway/test/inbox-workspace.int.test.ts",
-      "apps/gateway/test/inbox.int.test.ts"
+      "apps/gateway/test/inbox.int.test.ts",
+      "apps/console/src/pages/settings/TeamsPage.tsx"
     ],
-    "note": "Manual routing: claim, assign to a colleague who may reply there, back to the queue, back to the AI, and team queues (teams belong to Hamnivo and are mirrored to Chatwoot with their members). Every owner change goes through the ownership epoch and is audited. Round-robin and capacity checks are not built yet."
+    "note": "Manual routing: claim, assign to a colleague who may reply there, back to the queue, back to the AI, and team queues (teams belong to Hamnivo and are mirrored to Chatwoot with their members). Every owner change goes through the ownership epoch and is audited. Round-robin and capacity checks are not built yet. Studio lists the teams and adds or takes out people (the Support teams page)."
   },
   "H03": {
     "status": "implemented",
@@ -984,30 +1089,45 @@
     "status": "implemented",
     "evidence": [
       "apps/console/src/pages/inbox/ContextPanel.tsx",
+      "apps/console/src/pages/library/TagsSection.tsx",
       "apps/gateway/src/inbox/annotations.service.ts",
+      "apps/gateway/src/inbox/library.service.ts",
       "apps/gateway/src/inbox/projection.ts",
-      "apps/gateway/test/inbox-workspace.int.test.ts"
+      "apps/gateway/test/inbox-library.int.test.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "packages/chatwoot/test/contract/suite.ts"
     ],
-    "note": "Only tags defined for the brand (Chatwoot labels) are accepted, and custom fields are checked against their definitions (text, number, list, date, link, checkbox); Chatwoot's other attributes are kept. Tags are copied into Hamnivo for queue filters. New tags and fields are still defined in Chatwoot."
+    "note": "Only tags defined for the brand (Chatwoot labels) are accepted, and custom fields are checked against their definitions (text, number, list, date, link, checkbox); Chatwoot's other attributes are kept. Tags are copied into Hamnivo for queue filters. People who manage the inbox add, rename, recolour and delete tags in Studio (Saved replies and tags, inbox.manage on the brand): a rename or a delete reaches the conversations in Chatwoot and in Hamnivo’s copy, open inboxes are told, and each change is audited. Tag names follow Chatwoot’s own rule (two characters or more, letters and numbers, no vowel signs). The Chatwoot calls are covered by the fake and by contract cases whose run against a real Chatwoot is left to CI. New custom fields are still defined in Chatwoot."
   },
   "H05": {
     "status": "implemented",
     "evidence": [
       "apps/console/src/pages/inbox/Composer.tsx",
+      "apps/console/src/pages/library/RepliesSection.tsx",
       "apps/gateway/src/inbox/annotations.service.ts",
-      "apps/gateway/test/inbox-workspace.int.test.ts"
+      "apps/gateway/src/inbox/library.service.ts",
+      "apps/gateway/test/inbox-library.int.test.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "packages/chatwoot/test/contract/suite.ts"
     ],
-    "note": "Chatwoot canned responses, searched as the staff member, with variables filled from verified facts only (an address nobody verified is never filled in) and missing variables listed. Adding one needs inbox.manage. Editing and deleting saved replies is still done in Chatwoot."
+    "note": "Chatwoot canned responses, searched as the staff member, with variables filled from verified facts only (an address nobody verified is never filled in) and missing variables listed. People who manage the inbox add, edit and delete saved replies in Studio (Saved replies and tags): each short code is used once, a detail such as the customer’s first name is added with a button, the composer sees every change at once, and each change is audited without the text of the reply. The contract cases against a real Chatwoot are left to CI."
   },
   "H06": {
     "status": "implemented",
     "evidence": [
       "apps/console/e2e/inbox.spec.ts",
       "apps/console/src/pages/inbox/ContextPanel.tsx",
+      "apps/console/src/pages/inbox/VisitorDetails.tsx",
       "apps/gateway/src/inbox/inbox.service.ts",
-      "apps/gateway/test/inbox-workspace.int.test.ts"
+      "apps/gateway/src/visitors/tracker.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "apps/gateway/test/visitors.int.test.ts",
+      "apps/console/src/components/memory/CustomerMemoryCard.tsx",
+      "apps/console/test/customer-memory-card.test.tsx",
+      "apps/gateway/test/conversation-memory.int.test.ts",
+      "docs/guide/ai/see-what-the-ai-remembers.md"
     ],
-    "note": "Verified or anonymous identity and what that means, a verified email apart from an address nobody verified, language, brand, Chatwoot contact attributes (Hamnivo's internal ones left out) and the other conversations the person can see. A third column on wide screens, a sheet otherwise."
+    "note": "Verified or anonymous identity and what that means, a verified email apart from an address nobody verified, language, brand, Chatwoot contact attributes (Hamnivo's internal ones left out) and the other conversations the person can see. A third column on wide screens, a sheet otherwise. A Website visit card shows the customer’s current page, the pages seen, device, country and number of visits. Browsers that send Do Not Track are left out, no IP address is stored, page addresses lose their query string unless the brand chooses otherwise, and everything is deleted 30 days after the visitor was last seen (tested). Beside the customer, the panel shows what the AI remembers about them, each memory with its source, for people who may read memory in the brand; people with the right grants correct or delete a memory there (tested in the gateway and in unit tests; no browser test)."
   },
   "H07": {
     "status": "implemented",
@@ -1997,9 +2117,16 @@
       "packages/db/src/operators.ts",
       "apps/gateway/test/platform-support.int.test.ts",
       "apps/console/src/pages/platform/PlatformPage.tsx",
-      "apps/console/e2e/platform.spec.ts"
+      "apps/console/e2e/platform.spec.ts",
+      "apps/gateway/src/platform/tenant-lifecycle.ts",
+      "apps/gateway/src/platform/saas-console.controller.ts",
+      "apps/gateway/src/platform/operator-keys.ts",
+      "apps/gateway/src/identity/tenants.readonly.ts",
+      "apps/gateway/test/saas-operator.int.test.ts",
+      "apps/console/src/pages/platform/TenantPlanPanel.tsx",
+      "apps/console/src/pages/platform/SaasView.tsx"
     ],
-    "note": "Platform console at /platform for operators named by the server administrator, with platform roles separate from workspace roles and the hamnivo_platform database role: workspaces with metadata only, service health (API, database, Valkey, queue, connectors), support access, AI stops per workspace, incident banners that every workspace sees, and a hash-chained platform audit log. Not built: tenant lifecycle actions (suspend, reactivate), abuse controls, and stopping AI or switching providers from the platform; AI stops are shown, not operated."
+    "note": "Platform console at /platform for operators named by the server administrator, with platform roles separate from workspace roles and the hamnivo_platform database role: workspaces with metadata only, their plan, trial and usage, service health (API, database, Valkey, queue, connectors), support access, AI stops per workspace, incident banners that every workspace sees, and a hash-chained platform audit log. Platform admins suspend and reactivate workspaces (a suspended workspace is read-only for its staff and its website chat shows offline), change their plan or start a trial, turn public sign-up on or off and manage operator API keys (stored as HMACs) for billing systems. Not built: abuse controls, and stopping AI or switching providers from the platform; AI stops are shown, not operated."
   },
   "A18": {
     "status": "implemented",
@@ -2090,9 +2217,11 @@
       "apps/gateway/src/operations/platform.service.ts",
       "apps/console/src/pages/platform/TenantsView.tsx",
       "apps/gateway/test/platform-support.int.test.ts",
-      "apps/console/e2e/platform.spec.ts"
+      "apps/console/e2e/platform.spec.ts",
+      "apps/console/src/pages/platform/TenantPlanPanel.tsx",
+      "apps/gateway/test/saas-operator.int.test.ts"
     ],
-    "note": "Workspace ID, state, workspaces, brands, connectors, AI stops, model providers and support history, read through column grants that leave out content; support access is asked from here. Plan and region are not modelled yet, and owners are reached through the support request, not by address."
+    "note": "Workspace ID, state, plan, trial, billing provider, usage this period, workspaces, brands, connectors, AI stops, model providers and support history, read through column grants that leave out content; support access is asked from here. Region is not modelled yet, and owners are reached through the support request, not by address."
   },
   "HNV-26-03": {
     "status": "implemented",
@@ -2172,9 +2301,13 @@
       "apps/gateway/src/migration/source-guard.ts",
       "apps/gateway/src/runtime/models.ts",
       "apps/gateway/test/egress.test.ts",
-      "apps/gateway/test/egress.int.test.ts"
+      "apps/gateway/test/egress.int.test.ts",
+      "apps/gateway/src/actions/http/network.ts",
+      "apps/gateway/test/http-tools.int.test.ts",
+      "apps/gateway/src/knowledge/web/sync.service.ts",
+      "apps/gateway/test/web-knowledge.int.test.ts"
     ],
-    "note": "Every request the server makes at an address a tenant can name goes through one guard (@hamnivo/adapters/net): webhooks, tool calls to remote MCP servers, identity providers’ discovery documents, migration sources and a tenant’s own model servers. HTTPS only, no credentials in the address, public addresses only: private, loopback, link-local and special-use addresses (one list, the union of what the earlier guards refused) are refused at connect time, on the address actually connected to, so DNS rebinding fails; redirects are never followed; responses have size and time limits. Each workspace can restrict the rest to listed hosts (with wildcards), which MCP servers and model servers follow too; webhook endpoints the list would refuse are shown. Only the server administrator can trust extra origins, and each caller keeps its own setting (EGRESS_TRUSTED_ORIGINS for webhooks and model servers, SSO_TRUSTED_IDP_ORIGINS, and for development TOOLS_EGRESS_ALLOW_PRIVATE and MIGRATION_SOURCE_ALLOW_PRIVATE). One exception: Better Auth’s SSO plugin fetches an identity provider’s token, key and user-info endpoints itself with the global fetch and has no option to replace it. Those addresses are checked with the guard when a connection is saved, and the plugin refuses redirects and private addresses on its own, but its single lookup is not pinned to the connection, so DNS rebinding is not stopped for those three calls."
+    "note": "Every request the server makes at an address a tenant can name goes through one guard (@hamnivo/adapters/net): webhooks, tool calls to remote MCP servers and to custom HTTP tools (and the OpenAPI description they are read from), the websites read for knowledge, identity providers’ discovery documents, migration sources and a tenant’s own model servers. HTTPS only, no credentials in the address, public addresses only: private, loopback, link-local and special-use addresses (one list, the union of what the earlier guards refused) are refused at connect time, on the address actually connected to, so DNS rebinding fails; redirects are never followed; responses have size and time limits. Each workspace can restrict the rest to listed hosts (with wildcards), which MCP servers and model servers follow too; webhook endpoints the list would refuse are shown. Only the server administrator can trust extra origins, and each caller keeps its own setting (EGRESS_TRUSTED_ORIGINS for webhooks and model servers, SSO_TRUSTED_IDP_ORIGINS, and for development TOOLS_EGRESS_ALLOW_PRIVATE and MIGRATION_SOURCE_ALLOW_PRIVATE). One exception: Better Auth’s SSO plugin fetches an identity provider’s token, key and user-info endpoints itself with the global fetch and has no option to replace it. Those addresses are checked with the guard when a connection is saved, and the plugin refuses redirects and private addresses on its own, but its single lookup is not pinned to the connection, so DNS rebinding is not stopped for those three calls."
   },
   "A08": {
     "status": "partial",
@@ -2186,9 +2319,11 @@
       "packages/domain/src/billing/limits.ts",
       "apps/gateway/test/billing.int.test.ts",
       "apps/gateway/test/api-keys.int.test.ts",
-      "apps/console/e2e/reports.spec.ts"
+      "apps/console/e2e/reports.spec.ts",
+      "packages/db/migrations/20261003150847_saas_security.sql",
+      "apps/gateway/test/saas-signup.int.test.ts"
     ],
-    "note": "Workspace limits per calendar month (conversations, AI replies, AI tokens) and at any time (knowledge storage, seats, webhook endpoints), metered from usage_entries and enforced with 402 PLAN_LIMIT_REACHED and the numbers (database guards for seats and storage). Past the AI limits or the workspace's own token budget, conversations go to people instead. Alerts at 50/80/90/100% are audited and sent as webhook events; each API key has its own rate limit (429 with Retry-After). Per-agent and per-tool budgets are not built."
+    "note": "Workspace limits per calendar month (conversations, AI replies, AI tokens) and at any time (knowledge storage, seats, webhook endpoints), metered from usage_entries and enforced with 402 PLAN_LIMIT_REACHED and the numbers (database guards for seats and storage). New workspaces start on the free plan with limits (HAMNIVO_DEFAULT_PLAN=unlimited keeps the old no-limit behaviour for self-hosting). Past the AI limits or the workspace's own token budget, conversations go to people instead. Alerts at 50/80/90/100% are audited and sent as webhook events; each API key has its own rate limit (429 with Retry-After). Per-agent and per-tool budgets are not built."
   },
   "A15": {
     "status": "partial",
@@ -2199,12 +2334,17 @@
       "packages/db/src/schema/billing.ts",
       "packages/domain/test/billing.test.ts",
       "apps/gateway/test/billing.int.test.ts",
-      "apps/console/e2e/reports.spec.ts"
+      "apps/console/e2e/reports.spec.ts",
+      "apps/gateway/src/billing/plans.ts",
+      "apps/gateway/src/billing/lifecycle.service.ts",
+      "apps/gateway/src/platform/tenant-lifecycle.ts",
+      "apps/gateway/test/saas-signup.int.test.ts",
+      "apps/gateway/test/saas-operator.int.test.ts"
     ],
-    "note": "The operator defines plans (seat, volume, storage and endpoint limits, metered prices) and assigns them with the billing command; each workspace keeps a copy as its entitlements, independent of roles and permissions. Studio shows usage against them. Feature entitlements (features switched on per plan) are not built."
+    "note": "The operator defines plans (seat, volume, storage and endpoint limits, metered prices, trial days, a Stripe price) with the billing command and assigns them there, in the platform console or through the operator API; each workspace keeps a copy as its entitlements, independent of roles and permissions. New workspaces start on the server's default plan (free unless HAMNIVO_DEFAULT_PLAN says otherwise), as a trial when the plan has trial days; a trial falls back to the free plan when it ends. Studio shows usage against the limits. Feature entitlements (features switched on per plan) are not built."
   },
   "A16": {
-    "status": "partial",
+    "status": "implemented-live-unverified",
     "evidence": [
       "apps/gateway/src/billing/operations.ts",
       "apps/gateway/src/billing/billing.service.ts",
@@ -2213,9 +2353,20 @@
       "packages/adapters/src/billing/index.ts",
       "apps/gateway/test/billing.int.test.ts",
       "apps/console/e2e/reports.spec.ts",
-      "docs/self-hosting.md"
+      "docs/self-hosting.md",
+      "packages/adapters/src/billing/port.ts",
+      "packages/adapters/src/billing/stripe.ts",
+      "packages/adapters/test/billing/stripe.test.ts",
+      "apps/gateway/src/billing/subscriptions.service.ts",
+      "apps/gateway/src/billing/lifecycle.ts",
+      "apps/gateway/src/billing/notices.ts",
+      "apps/gateway/test/saas-billing.int.test.ts",
+      "apps/gateway/test/saas-operator.int.test.ts",
+      "integrations/whmcs/modules/servers/hamnivo/hamnivo.php",
+      "docs/guide/saas/stripe.md",
+      "docs/guide/saas/whmcs.md"
     ],
-    "note": "Invoices drafted per calendar month from the usage ledger (plan price and metered usage beyond what it includes, only for workspaces that had the plan before the month ended), then issued, paid or voided, with payment failures and retry dates, audited in the workspace; overdue invoices make the workspace past due in Studio. Collection is manual or through the InvoicePaymentPort, which has no payment provider adapter yet (interface only). Grace periods and suspending or restoring access are not built."
+    "note": "Invoices drafted per calendar month from the usage ledger (plan price and metered usage), issued, paid or voided, with payment failures and retry dates, audited in the workspace. Billing providers behind a port: free (default), Stripe (Checkout for subscriptions, the Customer Portal, provider invoices, and signed webhooks applied once each and in any order: subscription changes, paid invoices with a receipt email, failed payments with a grace period after which the workspace falls back to the free plan) and WHMCS (a provisioning module that creates, suspends, unsuspends, terminates and re-plans workspaces through the operator API). Workspaces billed by Stripe or WHMCS get no invoice from this server. Tested against a fake Stripe Billing server and with the WHMCS module driving the gateway; not yet against live Stripe or a WHMCS installation."
   },
   "O04": {
     "status": "partial",
@@ -2321,9 +2472,12 @@
     "evidence": [
       "apps/console/src/pages/reports/BillingTab.tsx",
       "apps/gateway/src/billing/billing.service.ts",
-      "apps/console/e2e/reports.spec.ts"
+      "apps/console/e2e/reports.spec.ts",
+      "apps/console/src/pages/settings/BillingPage.tsx",
+      "apps/gateway/src/billing/subscriptions.service.ts",
+      "apps/gateway/test/saas-billing.int.test.ts"
     ],
-    "note": "Plan, usage against each limit for the current billing month, the AI budget and the invoice history. Plans are changed by the operator, not from Studio, and there is no usage forecast."
+    "note": "Plan and billing in Studio settings shows the plan, its trial or grace period, usage against each limit for the current billing month and the invoices; Reports keeps the AI budget and the invoice details. With Stripe, Upgrade opens Checkout and Manage the Customer Portal; with WHMCS, Manage opens the provider's client area. There is no usage forecast."
   },
   "HNV-23-05": {
     "status": "implemented",
@@ -2341,9 +2495,12 @@
     "evidence": [
       "apps/console/src/pages/reports/BillingTab.tsx",
       "apps/gateway/src/billing/operations.ts",
-      "apps/console/e2e/reports.spec.ts"
+      "apps/console/e2e/reports.spec.ts",
+      "apps/console/src/pages/settings/BillingPage.tsx",
+      "apps/gateway/src/billing/lifecycle.ts",
+      "apps/gateway/test/saas-billing.int.test.ts"
     ],
-    "note": "Invoice status, overdue and failed payments, due dates and the past-due notice are shown. Updating a payment method and plan changes with effective dates need a payment provider, which is not connected yet."
+    "note": "Invoice status, overdue and failed payments, due dates and the past-due notice are shown. With Stripe, a failed payment shows the grace period's end and emails the owners; the payment method and plan are changed in the Customer Portal, and the workspace follows Stripe's events. Plan changes with a chosen effective date are not offered."
   },
   "W02": {
     "status": "implemented",
@@ -2400,17 +2557,20 @@
   "W19": {
     "status": "implemented",
     "evidence": [
+      "apps/console/e2e/chat-settings.spec.ts",
+      "apps/console/src/pages/BrandChatSettings.tsx",
+      "apps/console/src/pages/visitors/VisitorsPage.tsx",
+      "apps/gateway/src/visitors/invites.ts",
       "apps/gateway/src/widget/settings.service.ts",
       "apps/gateway/test/customer-surface.int.test.ts",
+      "apps/gateway/test/visitors.int.test.ts",
       "apps/widget/e2e/surface.spec.ts",
-      "apps/console/src/pages/BrandChatSettings.tsx",
-      "apps/console/e2e/chat-settings.spec.ts",
       "packages/contracts/src/customer-surface.ts",
       "packages/widget-loader/src/loader.ts",
       "packages/widget-loader/src/proactive.ts",
       "packages/widget-loader/test/proactive.test.ts"
     ],
-    "note": "Prompts on a page, after time on a page, or for returning visitors, set per brand in Studio under their own permission (widget.proactive) and off by default. At most three a day, a quiet time after a dismissal, one per page view, never over an open chat, and optionally only during business hours. The page passes only the prompt's id; the chat shows the brand's own words (tested, mutation-checked)."
+    "note": "Prompts on a page, after time on a page, or for returning visitors, set per brand in Studio under their own permission (widget.proactive) and off by default. At most three a day, a quiet time after a dismissal, one per page view, never over an open chat, and optionally only during business hours. The page passes only the prompt's id; the chat shows the brand's own words (tested, mutation-checked). Staff who may reply can also invite a visitor from Live visitors: the invitation shows in the same bubble within seconds, waits three minutes and opens the chat with their words."
   },
   "W22": {
     "status": "partial",
@@ -2551,9 +2711,19 @@
       "packages/domain/test/actions/schema.test.ts",
       "apps/gateway/test/tools.int.test.ts",
       "apps/console/src/pages/ToolsPage.tsx",
-      "apps/console/e2e/tools.spec.ts"
+      "apps/console/e2e/tools.spec.ts",
+      "packages/db/src/schema/ai-power.ts",
+      "apps/gateway/src/actions/http/definition.ts",
+      "apps/gateway/src/actions/http/request.ts",
+      "apps/gateway/src/actions/http/controller.ts",
+      "apps/gateway/test/http-tools.test.ts",
+      "apps/gateway/test/http-tools.int.test.ts",
+      "apps/console/src/components/tools/HttpEndpointDialog.tsx",
+      "apps/console/src/components/tools/HttpImportDialog.tsx",
+      "apps/console/test/http-tools.test.tsx",
+      "docs/guide/ai/custom-tools.md"
     ],
-    "note": "Tools per brand with an input schema and, for MCP tools, an output schema (both reduced to a portable subset; a result that does not match is refused), a risk class (read, write, money, irreversible), who approves, a required permission, a time limit, an output size limit, an approval expiry and an egress allowlist. Every policy change bumps the revision approvals are bound to and needs tools.manage and a fresh sign-in; money and irreversible tools can never run without approval (tested)."
+    "note": "Tools per brand with an input schema and, for MCP tools, an output schema (both reduced to a portable subset; a result that does not match is refused), a risk class (read, write, money, irreversible), who approves, a required permission, a time limit, an output size limit, an approval expiry and an egress allowlist. Every policy change bumps the revision approvals are bound to and needs tools.manage and a fresh sign-in; money and irreversible tools can never run without approval (tested). A tool can also be a custom HTTP request to a service of the customer’s own: the chosen operations of an OpenAPI 3 description (JSON or YAML, pasted, uploaded or read from an address; references inside the file only, a work limit against files made to be slow to read) or one request written by hand, with its arguments going to the path, the query, a header or a JSON body. Each starts in review with the safest policy, and what the description says about it is shown quoted and never sent to the AI. A call goes through the same gateway, approvals and budgets, only to the service’s host (the tool’s own list and the workspace’s), with the credential read from the secret broker after the arguments make a request that may be sent; a value that would change the shape of the request is refused. A change carries the action’s idempotency key, a refusal by the service is a failure, and an error or silence after sending is never sent again (all tested against a made-up service in the gateway; the screens are unit-tested, with no browser test). Only JSON bodies are supported: forms, files, cookies and sign-ins other than a token or a secret in a header are not."
   },
   "G08": {
     "status": "implemented",
@@ -2606,9 +2776,14 @@
       "apps/gateway/src/actions/publish-checks.ts",
       "apps/gateway/test/tools.int.test.ts",
       "apps/console/src/components/Simulations.tsx",
-      "apps/console/e2e/tools.spec.ts"
+      "apps/console/e2e/tools.spec.ts",
+      "apps/gateway/src/runtime/playground.service.ts",
+      "apps/gateway/test/playground.int.test.ts",
+      "apps/console/src/components/agent/AgentPlayground.tsx",
+      "apps/console/test/agent-playground.test.tsx",
+      "docs/guide/ai/test-your-ai.md"
     ],
-    "note": "Suites of frozen cases (customer messages and what each tool answers) replay against the draft and the published version with nothing sent; Studio shows what changed, and publishing waits until required suites pass on the exact draft (tested in the gateway and in a browser). Replays use the deterministic mock model, so they show what Hamnivo’s rules do with the draft (tools offered, approvals, budgets, guards), not what the configured model would say. Replaying with the tenant’s own model is not built."
+    "note": "Suites of frozen cases (customer messages and what each tool answers) replay against the draft and the published version with nothing sent; Studio shows what changed, and publishing waits until required suites pass on the exact draft (tested in the gateway and in a browser). Replays use the deterministic mock model, so they show what Hamnivo’s rules do with the draft (tools offered, approvals, budgets, guards), not what the configured model would say. Replaying with the tenant’s own model is not built. Apart from replays, “Test your AI” lets a person try the draft or the live version in a scratch conversation with the agent’s own model connection, its knowledge and its tools’ rules: tools are judged by the live rules and never run, nothing is stored or sent to Chatwoot, every reply goes through the honesty and claim guards, and each turn spends tokens against the plan and budget (tested against a made-up model server in the gateway; the Studio panel is unit-tested, with no browser test). It does not run the brand’s Jev checks."
   },
   "G13": {
     "status": "implemented",
@@ -2664,9 +2839,28 @@
       "packages/adapters/README.md",
       "packages/adapters/test/mcp.test.ts",
       "apps/gateway/src/actions/tools.service.ts",
-      "apps/gateway/test/tools.int.test.ts"
+      "apps/gateway/test/tools.int.test.ts",
+      "packages/adapters/src/mcp/oauth.ts",
+      "packages/adapters/src/mcp/presets.ts",
+      "packages/adapters/test/mcp-oauth.test.ts",
+      "packages/adapters/test/mcp-catalog.test.ts",
+      "apps/gateway/src/actions/mcp-oauth.service.ts",
+      "apps/gateway/src/actions/mcp-catalog.service.ts",
+      "apps/gateway/test/mcp-power.int.test.ts",
+      "apps/console/src/components/tools/McpServerDialogs.tsx",
+      "apps/gateway/src/mcp-server/mcp-server.service.ts",
+      "apps/gateway/test/mcp-server.int.test.ts",
+      "docs/guide/ai/connect-mcp-services.md",
+      "docs/guide/ai/hamnivo-for-claude-and-chatgpt.md",
+      "apps/gateway/src/actions/http/openapi.ts",
+      "apps/gateway/src/actions/http/service.ts",
+      "apps/gateway/test/http-tools.test.ts",
+      "apps/gateway/test/http-tools.int.test.ts",
+      "apps/console/src/components/tools/HttpToolSources.tsx",
+      "apps/console/test/http-tools.test.tsx",
+      "docs/guide/ai/custom-tools.md"
     ],
-    "note": "Remote MCP servers over Streamable HTTP only, on MCP 2025-11-25, 2025-06-18 or 2025-03-26 (others are refused), with an optional bearer token kept in the secret broker, all through the egress guard; documented in the adapters README. Every new or changed tool waits in review before it can be granted or called, and gets Hamnivo’s own description and its own host allowlist (tested). No test talks to a third-party server."
+    "note": "Remote MCP servers over Streamable HTTP only, on MCP 2025-11-25, 2025-06-18 or 2025-03-26 (others are refused), all through the egress guard; documented in the adapters README. A server is signed in to with a pasted token or with OAuth as the MCP authorization spec describes (discovery, PKCE, a client Hamnivo registers or a client ID a person enters, the resource indicator, renewal before the access ends), using the SDK’s own client helpers; tokens, refresh tokens and client registrations are kept in the secret broker and only the last characters of a pasted token are ever shown. A server can be renamed, moved (its tools go back to review and a credential never follows to another site), given a new token, turned off or removed. What a server lists besides tools (resources and prompts) is shown quoted in Studio; agents with the built-in “Read a resource” tool read only the resources a person allowed, in pieces, and what they propose after reading waits for a person. A catalog of thirteen remote servers that vendors run themselves comes with the vendor page that names each address and the day it was read. Every new or changed tool waits in review before it can be granted or called, and gets Hamnivo’s own description and its own host allowlist (tested). Hamnivo also runs an MCP server of its own at /mcp (read-only tools, an API key that holds mcp.read, a rate limit, every call in the audit log). Custom HTTP tools turn the operations of an OpenAPI 3 description, or one request written by hand, into tools of the same kind: see G07. Tests use made-up MCP and authorization servers on the loopback interface and none talks to a third-party server; the catalog’s addresses are not called."
   },
   "HNV-11-03": {
     "status": "implemented",
@@ -2757,5 +2951,102 @@
       "apps/gateway/test/checks.live.test.ts"
     ],
     "note": "Evidence: before the model sees retrieved passages, the passage relevance check asks Jev three questions per passage, one request each with only the question and that passage: is it about the question, does it answer it, does it carry instructions for the assistant. Code decides, first match wins: instructions drop it, off-topic drops it, an answer keeps it, no answer drops it; an unsure passage is kept. Live drops them and records which (document ids and reasons, no text); shadow, every brand's start, records only; a passage Jev could not judge is kept. Verified live on 2026-10-02 with jev-1.13.0: a passage carrying instructions and an off-topic one were left out and the returns policy kept (247 ms for three passages in parallel). No thresholds were evaluated yet: brands set them per language. Skill ranking is not built."
+  },
+  "A01": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/onboarding/OnboardingPage.tsx",
+      "apps/console/src/pages/onboarding/BrandStep.tsx",
+      "apps/console/src/pages/onboarding/EngineStep.tsx",
+      "apps/console/src/pages/onboarding/AiKeyStep.tsx",
+      "apps/console/src/pages/onboarding/TestChatStep.tsx",
+      "apps/console/src/pages/onboarding/InstallStep.tsx",
+      "apps/console/src/pages/onboarding/TeamStep.tsx",
+      "apps/console/src/lib/onboarding.ts",
+      "apps/console/src/lib/install.ts",
+      "apps/gateway/src/setup/onboarding.service.ts",
+      "apps/console/test/setup-screens.test.tsx",
+      "apps/console/test/setup.test.ts",
+      "apps/gateway/test/setup.int.test.ts",
+      "docs/guide/setup/getting-started.md"
+    ],
+    "note": "A guided setup opens after a workspace is created and from Home: workspace, brand and website, the chat engine (connected by itself), an AI key with a test, a test chat, install with a guide per website platform, and the team. Every step can be skipped, and what was done or skipped is kept at the gateway, so the owner resumes where they stopped. Home’s checklist now puts the brand first, adds the AI key, and does not count an agent that answers with the offline practice model. Knowledge, a handoff team and publishing the agent are not steps of the guide yet (Home’s list covers publishing), and Studio cannot check that the install code is on the website. Screens are tested as rendered HTML and the logic in unit tests; there is no browser journey for it."
+  },
+  "A05": {
+    "status": "implemented",
+    "evidence": [
+      "packages/domain/src/business-hours.ts",
+      "packages/domain/test/business-hours.test.ts",
+      "apps/console/src/pages/settings/HoursPage.tsx",
+      "apps/console/src/pages/settings/HoursSummary.tsx",
+      "apps/console/src/lib/hours.ts",
+      "apps/console/test/setup.test.ts",
+      "apps/console/test/setup-screens.test.tsx",
+      "apps/gateway/src/widget/copy.ts",
+      "docs/guide/setup/business-hours.md"
+    ],
+    "note": "Owners set each brand’s hours in Studio: a time zone, a week of opening spans (several on one day, such as a lunch break), quick starts, and whole days closed such as public holidays. The times are checked before saving and the hours can be removed, after which the chat never claims a person is available. Clock changes are handled by the domain rules. The page is tested as rendered HTML and its logic in unit tests; there is no browser journey for it."
+  },
+  "HNV-01-01": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/TenantsPage.tsx",
+      "apps/console/src/pages/onboarding/OnboardingPage.tsx"
+    ],
+    "note": "A new workspace opens the guided setup. It has seven skippable steps, not three, and shows no region or data location."
+  },
+  "HNV-01-02": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/onboarding/BrandStep.tsx",
+      "apps/console/src/pages/onboarding/InstallStep.tsx"
+    ],
+    "note": "Brand name and website, then the install step. Website is the only channel, so there is no choice of channel."
+  },
+  "HNV-01-03": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/onboarding/InstallStep.tsx",
+      "apps/console/src/lib/install.ts",
+      "apps/console/test/setup-screens.test.tsx"
+    ],
+    "note": "The install code with a copy confirmation, the allowed websites, readable steps and a guide for the website platform. There is no connection check: Studio cannot see the website, and the step says so and how to check by hand."
+  },
+  "HNV-01-05": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/onboarding/OnboardingPage.tsx",
+      "apps/console/src/pages/onboarding/Rail.tsx",
+      "apps/console/src/lib/onboarding.ts",
+      "apps/gateway/test/setup.int.test.ts",
+      "apps/console/test/setup-screens.test.tsx"
+    ],
+    "note": "The step list shows what is done, skipped or still to do; leaving keeps all of it; Home links back in and the guide opens at the first step still open. Any step can be skipped."
+  },
+  "HNV-04-01": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/settings/AppearanceDialog.tsx",
+      "apps/console/src/pages/settings/WidgetPreview.tsx",
+      "apps/console/src/lib/setup.ts",
+      "apps/console/test/setup-screens.test.tsx"
+    ],
+    "note": "A live picture of the chat (any of the four languages, team online or away), a contrast check with a darker suggestion to apply, reset to the saved look. Changes save straight to the chat (there is no draft), and there is no mobile viewport or launcher placement here."
+  },
+  "HNV-04-02": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/settings/AppearanceDialog.tsx",
+      "apps/console/src/pages/settings/HoursPage.tsx"
+    ],
+    "note": "The greeting and the offline message in four languages (English first), and the business hours on their own page. No journey preview and no identity label settings."
+  },
+  "HNV-04-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/settings/AppearanceDialog.tsx",
+      "apps/console/test/setup-screens.test.tsx"
+    ],
+    "note": "An invalid colour, address or text is explained next to its field and in a linked error summary, and what was typed is kept. The gateway checks again and its reasons are shown the same way."
   }
 }

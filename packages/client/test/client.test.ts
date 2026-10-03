@@ -322,6 +322,61 @@ describe('outbox', () => {
   });
 });
 
+describe('visitor link', () => {
+  it('tells the gateway which browser the chat runs in and returns what to show the visitor', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => HttpResponse.json(session(), { status: 201 })),
+      http.post(`${API}/v1/widget/visitors/link`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({
+          tracking: true,
+          notice: 'To help you, this website notes which pages you view.',
+          invite: { id: 'abc', message: 'Need a hand?' },
+        });
+      }),
+    );
+    const c = client();
+    await c.connect();
+    const linked = await c.linkVisitor('k'.repeat(22), 'en');
+    expect(linked).toEqual({
+      tracking: true,
+      notice: 'To help you, this website notes which pages you view.',
+      invite: { id: 'abc', message: 'Need a hand?' },
+    });
+    await c.linkVisitor('k'.repeat(22));
+    expect(bodies).toEqual([
+      { visitorKey: 'k'.repeat(22), locale: 'en' },
+      { visitorKey: 'k'.repeat(22) },
+    ]);
+  });
+});
+
+describe('typing', () => {
+  it('tells the gateway whether the visitor is typing, with the session', async () => {
+    const calls: { path: string; auth: string | null; body: unknown }[] = [];
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => HttpResponse.json(session(), { status: 201 })),
+      http.post(`${API}/v1/widget/conversations/:id/typing`, async ({ request, params }) => {
+        calls.push({
+          path: String(params.id),
+          auth: request.headers.get('authorization'),
+          body: await request.json(),
+        });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const c = client();
+    await c.connect();
+    expect(await c.reportTyping('conv_1', true)).toBeUndefined();
+    await c.reportTyping('conv_1', false);
+    expect(calls).toEqual([
+      { path: 'conv_1', auth: expect.stringMatching(/^Bearer access-/), body: { typing: true } },
+      { path: 'conv_1', auth: expect.stringMatching(/^Bearer access-/), body: { typing: false } },
+    ]);
+  });
+});
+
 describe('event stream', () => {
   const sse = (frames: string[], keepOpen = false) =>
     new HttpResponse(
@@ -370,6 +425,71 @@ describe('event stream', () => {
     expect(received).toEqual([1, 2, 3, 4]);
     expect(cursors.slice(0, 4)).toEqual(['0', '2', '3', null]);
     expect(resyncs).toBe(1);
+    stream.close();
+  });
+
+  it('hands live-only events on as they come, without moving the cursor or asking again for history', async () => {
+    const cursors: (string | null)[] = [];
+    let connection = 0;
+    const typing = (on: boolean) =>
+      `event: typing\ndata: ${JSON.stringify({
+        sequence: null,
+        type: 'typing',
+        data: { displayName: 'Amina', typing: on },
+      })}\n\n`;
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => HttpResponse.json(session(), { status: 201 })),
+      http.get(`${API}/v1/widget/conversations/:id/events`, ({ request }) => {
+        cursors.push(request.headers.get('last-event-id'));
+        connection += 1;
+        // "Typing" comes first, before any real event: the stream must still start "from now on".
+        if (connection === 1) return sse([typing(true), event(1), typing(false), event(2)]);
+        return sse([`event: control\ndata: {"control":"heartbeat","at":"now"}\n\n`], true);
+      }),
+    );
+    const c = client();
+    await c.connect();
+    const received: number[] = [];
+    const live: boolean[] = [];
+    const stream = new EventStream(
+      c,
+      'conv_1',
+      {
+        onEvent: (e) => received.push(e.sequence),
+        onTransient: (e) => live.push((e.data as { typing: boolean }).typing),
+      },
+      { backoffMs: () => 5 },
+    );
+    await expect.poll(() => connection).toBeGreaterThanOrEqual(2);
+    expect(received).toEqual([1, 2]);
+    expect(live).toEqual([true, false]);
+    expect(stream.lastSequence).toBe(2);
+    // The second connection resumes after the last real event, not after "typing".
+    expect(cursors).toEqual([null, '2']);
+    stream.close();
+  });
+
+  it('ignores a live-only event when nobody asked for them', async () => {
+    let connection = 0;
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => HttpResponse.json(session(), { status: 201 })),
+      http.get(`${API}/v1/widget/conversations/:id/events`, () => {
+        connection += 1;
+        return sse(
+          [
+            `event: typing\ndata: ${JSON.stringify({ sequence: null, type: 'typing' })}\n\n`,
+            event(1),
+          ],
+          true,
+        );
+      }),
+    );
+    const c = client();
+    await c.connect();
+    const received: number[] = [];
+    const stream = new EventStream(c, 'conv_1', { onEvent: (e) => received.push(e.sequence) });
+    await expect.poll(() => received).toEqual([1]);
+    expect(connection).toBe(1);
     stream.close();
   });
 

@@ -2,6 +2,7 @@ import type { ReplyLanguage } from '@hamnivo/contracts';
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { ACTION_COPY } from './actions/copy.js';
+import { APPEARANCE_COPY } from './appearance-copy.js';
 import { SHOP_COPY } from './commerce/copy.js';
 import { SURFACE_COPY } from './surface-copy.js';
 
@@ -25,7 +26,10 @@ export const resources = {
       retry: 'Retry',
       language: 'Language',
       startError: 'The chat could not start. Please try again.',
+      chatOffline: 'This chat is offline right now. Please try again later.',
       typing: 'The assistant is writing…',
+      personTyping: '{{name}} is typing…',
+      aPersonTyping: 'A person from the team is typing…',
       draftChecking: 'Checking this answer…',
       sources: 'Sources',
       languageQuestion: 'Which language should replies use?',
@@ -34,6 +38,7 @@ export const resources = {
       shop: SHOP_COPY.en,
       surface: SURFACE_COPY.en,
       actions: ACTION_COPY.en,
+      appearance: APPEARANCE_COPY.en,
       memory: {
         open: 'Memory',
         title: 'What we remember',
@@ -138,7 +143,10 @@ export const resources = {
       retry: 'إعادة المحاولة',
       language: 'اللغة',
       startError: 'تعذّر بدء المحادثة. حاول مرة أخرى.',
+      chatOffline: 'هذه المحادثة غير متاحة الآن. حاول مرة أخرى لاحقًا.',
       typing: 'المساعد يكتب…',
+      personTyping: '{{name}} يكتب…',
+      aPersonTyping: 'أحد أفراد الفريق يكتب…',
       draftChecking: 'جارٍ التحقق من هذه الإجابة…',
       sources: 'المصادر',
       languageQuestion: 'بأي لغة تريد أن تصلك الردود؟',
@@ -147,6 +155,7 @@ export const resources = {
       shop: SHOP_COPY.ar,
       surface: SURFACE_COPY.ar,
       actions: ACTION_COPY.ar,
+      appearance: APPEARANCE_COPY.ar,
       memory: {
         open: 'الذاكرة',
         title: 'ما نتذكره',
@@ -249,7 +258,10 @@ export const resources = {
       retry: 'फिर कोशिश करें',
       language: 'भाषा',
       startError: 'चैट शुरू नहीं हो सकी। कृपया फिर कोशिश करें।',
+      chatOffline: 'यह चैट अभी ऑफ़लाइन है। कृपया बाद में फिर कोशिश करें।',
       typing: 'सहायक लिख रहा है…',
+      personTyping: '{{name}} लिख रहे हैं…',
+      aPersonTyping: 'टीम के एक सदस्य लिख रहे हैं…',
       draftChecking: 'इस जवाब की जाँच हो रही है…',
       sources: 'स्रोत',
       languageQuestion: 'जवाब किस भाषा में चाहिए?',
@@ -258,6 +270,7 @@ export const resources = {
       shop: SHOP_COPY.hi,
       surface: SURFACE_COPY.hi,
       actions: ACTION_COPY.hi,
+      appearance: APPEARANCE_COPY.hi,
       memory: {
         open: 'मेमोरी',
         title: 'हम क्या याद रखते हैं',
@@ -362,7 +375,10 @@ export const resources = {
       retry: 'دوبارہ کوشش کریں',
       language: 'زبان',
       startError: 'چیٹ شروع نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔',
+      chatOffline: 'یہ چیٹ ابھی آف لائن ہے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔',
       typing: 'اسسٹنٹ لکھ رہا ہے…',
+      personTyping: '{{name}} لکھ رہے ہیں…',
+      aPersonTyping: 'ٹیم کا ایک فرد لکھ رہا ہے…',
       draftChecking: 'اس جواب کی جانچ ہو رہی ہے…',
       sources: 'ذرائع',
       languageQuestion: 'جوابات کس زبان میں چاہییں؟',
@@ -371,6 +387,7 @@ export const resources = {
       shop: SHOP_COPY.ur,
       surface: SURFACE_COPY.ur,
       actions: ACTION_COPY.ur,
+      appearance: APPEARANCE_COPY.ur,
       memory: {
         open: 'میموری',
         title: 'ہم کیا یاد رکھتے ہیں',

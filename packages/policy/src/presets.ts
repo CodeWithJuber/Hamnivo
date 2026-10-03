@@ -38,6 +38,7 @@ export const ROLE_PRESETS = [
       'analytics.*',
       'api_keys.*',
       'webhooks.*',
+      'mcp.*',
       'integrations.*',
       'secrets.*',
       'extensions.*',

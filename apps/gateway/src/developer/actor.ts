@@ -22,6 +22,7 @@ import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { PrincipalService } from '../identity/principal.service.js';
 import { enforce, tenantIdFromHeader } from '../identity/staff.guard.js';
+import { assertWritable } from '../identity/tenants.readonly.js';
 import { CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { ApiKeysService } from './api-keys.service.js';
 import { bearerApiKey } from './keys.js';
@@ -165,6 +166,7 @@ export class ActorGuard implements CanActivate {
     const principal = await this.principals.principal(session, tenantId);
     // Not a member (or no such tenant): indistinguishable on purpose.
     if (!principal) throw new AppError('NOT_FOUND');
+    assertWritable(principal, request);
     request.hamnivo = { session, principal };
     return {
       kind: 'staff',

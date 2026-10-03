@@ -8,7 +8,7 @@ import { loadConfig } from './config.js';
  *
  *   billing plans
  *   billing plan:set <plan.json | ->       (- reads the plan from standard input)
- *   billing plan:assign <tenant id or slug> <plan key>
+ *   billing plan:assign <tenant id or slug> <plan key> [--trial]   (--trial: the plan's trial)
  *   billing invoices:generate <YYYY-MM>
  *   billing invoice:issue <invoice id or number>
  *   billing invoice:paid <invoice id or number> [payment reference]
@@ -73,8 +73,12 @@ try {
       break;
     }
     case 'plan:assign': {
-      if (!args[0] || !args[1]) throw new BillingOperationError('plan:assign <tenant> <plan>');
-      print(await operations.assignPlan(args[0], args[1]));
+      if (!args[0] || !args[1]) {
+        throw new BillingOperationError('plan:assign <tenant> <plan> [--trial]');
+      }
+      print(
+        await operations.assignPlan(args[0], args[1], { startTrial: args.includes('--trial') }),
+      );
       break;
     }
     case 'invoices:generate': {

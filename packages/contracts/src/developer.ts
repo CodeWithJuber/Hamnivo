@@ -14,7 +14,7 @@ import { WebhookEventType } from './webhook-events.js';
 
 /** What an API key can be given (mirrors API_KEY_PERMISSIONS in @hamnivo/policy). */
 export const ApiKeyPermission = z
-  .enum(['analytics.read', 'billing.read', 'webhooks.read'])
+  .enum(['analytics.read', 'billing.read', 'webhooks.read', 'mcp.read'])
   .meta({ id: 'ApiKeyPermission' });
 export type ApiKeyPermission = z.infer<typeof ApiKeyPermission>;
 

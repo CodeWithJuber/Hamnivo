@@ -37,6 +37,12 @@ const securitySchemes = {
     description:
       't={timestamp},v1=HMAC-SHA256(signing secret, "{timestamp}.{raw body}"), checked with the Stripe SDK',
   },
+  operatorKey: {
+    type: 'http',
+    scheme: 'bearer',
+    description:
+      'Operator API key (hvop_…) for a billing system such as WHMCS; it acts on the whole server',
+  },
 } as const;
 
 const securityFor: Record<RouteDef['auth'], Record<string, string[]>[] | undefined> = {
@@ -47,6 +53,7 @@ const securityFor: Record<RouteDef['auth'], Record<string, string[]>[] | undefin
   staff_or_api_key: [{ staffSession: [] }, { apiKey: [] }],
   integration_signature: [{ chatwootSignature: [] }],
   provider_signature: [{ stripeSignature: [] }],
+  operator_key: [{ operatorKey: [] }],
 };
 
 /** Builds the OpenAPI 3.1 document from route definitions (contract-first; no running server). */

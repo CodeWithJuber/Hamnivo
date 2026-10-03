@@ -47,6 +47,10 @@ const GLOBAL_TABLES: Record<string, string> = {
     'Plans are defined by the platform operator for every workspace; a workspace keeps a copy of its plan’s limits in tenant_entitlements',
   invoices:
     'Invoices are the platform operator’s billing records; a workspace reads its own through app.tenant_invoices() and cannot change them',
+  platform_settings:
+    'Settings for the whole server, such as whether anyone may sign up; changed in the platform console',
+  operator_api_keys:
+    'Keys a billing system such as WHMCS uses to call the operator API; they act on the platform, not inside one workspace',
 };
 
 /** Tables the application role may only insert into. */
@@ -62,6 +66,7 @@ const APPEND_ONLY = new Set([
   'customer_notifications',
   'action_approvals',
   'handoff_packets',
+  'billing_events',
 ]);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
@@ -86,6 +91,9 @@ const NEVER_DELETED = new Set([
   'tool_definitions',
   'mcp_servers',
   'action_settings',
+  'billing_accounts',
+  'http_tool_sources',
+  'http_tool_endpoints',
 ]);
 
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
@@ -246,6 +254,10 @@ describe('two-tenant isolation', () => {
     'publications',
     'conversation_feedback',
     'brand_widget_settings',
+    'brand_appearance',
+    'test_conversations',
+    'model_connection_tests',
+    'onboarding_progress',
     'widget_uploads',
     'conversation_read_state',
     'customer_notification_preferences',
@@ -284,6 +296,12 @@ describe('two-tenant isolation', () => {
     'staff_drafts',
     'conversation_links',
     'conversation_reviews',
+    'staff_inbox_preferences',
+    'staff_conversation_reads',
+    'brand_visitor_settings',
+    'visitors',
+    'visitor_sessions',
+    'visitor_page_views',
     'sso_domains',
     'sso_connections',
     'team_routing',
@@ -325,6 +343,17 @@ describe('two-tenant isolation', () => {
     'handoff_packets',
     'simulation_suites',
     'simulation_runs',
+    'billing_accounts',
+    'billing_events',
+    'chatwoot_provisioning',
+    'workspace_email_settings',
+    'mcp_server_oauth',
+    'mcp_oauth_attempts',
+    'mcp_catalog_items',
+    'http_tool_sources',
+    'http_tool_endpoints',
+    'knowledge_web_sources',
+    'knowledge_web_pages',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -421,6 +450,10 @@ describe('two-tenant isolation', () => {
       'publications',
       'conversation_feedback',
       'brand_widget_settings',
+      'brand_appearance',
+      'test_conversations',
+      'model_connection_tests',
+      'onboarding_progress',
       'widget_uploads',
       'conversation_read_state',
       'customer_notification_preferences',
@@ -459,6 +492,12 @@ describe('two-tenant isolation', () => {
       'staff_drafts',
       'conversation_links',
       'conversation_reviews',
+      'staff_inbox_preferences',
+      'staff_conversation_reads',
+      'brand_visitor_settings',
+      'visitors',
+      'visitor_sessions',
+      'visitor_page_views',
       'sso_domains',
       'sso_connections',
       'team_routing',
@@ -500,6 +539,17 @@ describe('two-tenant isolation', () => {
       'handoff_packets',
       'simulation_suites',
       'simulation_runs',
+      'billing_accounts',
+      'billing_events',
+      'chatwoot_provisioning',
+      'workspace_email_settings',
+      'mcp_server_oauth',
+      'mcp_oauth_attempts',
+      'mcp_catalog_items',
+      'http_tool_sources',
+      'http_tool_endpoints',
+      'knowledge_web_sources',
+      'knowledge_web_pages',
       'audit_heads',
       'audit_events',
     ]);

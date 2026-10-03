@@ -105,10 +105,14 @@ describe('the row of pages above a page', () => {
     const settings = navigation(await shell('/security', owner), 'Settings pages');
     expect(settings?.map((link) => link.href)).toEqual([
       '/brands',
+      '/hours',
       '/team',
+      '/support-teams',
       '/security',
       '/developer',
+      '/customer-identity',
       '/migration',
+      '/settings/billing',
     ]);
     expect(current(settings)).toEqual(['/security']);
   });

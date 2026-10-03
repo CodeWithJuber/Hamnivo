@@ -1,18 +1,42 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { aiPowerAr } from './ai-power/ar';
+import { aiPowerEn } from './ai-power/en';
+import { aiPowerHi } from './ai-power/hi';
+import { aiPowerUr } from './ai-power/ur';
 import { ar } from './ar';
+import { billingAr } from './billing/ar';
+import { billingEn } from './billing/en';
+import { billingHi } from './billing/hi';
+import { billingUr } from './billing/ur';
 import { en } from './en';
 import { hi } from './hi';
+import { inboxAlertsAr } from './inbox-alerts/ar';
+import { inboxAlertsEn } from './inbox-alerts/en';
+import { inboxAlertsHi } from './inbox-alerts/hi';
+import { inboxAlertsUr } from './inbox-alerts/ur';
 import { migrationAr } from './migration/ar';
 import { migrationEn } from './migration/en';
 import { migrationHi } from './migration/hi';
 import { migrationUr } from './migration/ur';
+import { setupAr } from './setup/ar';
+import { setupEn } from './setup/en';
+import { setupHi } from './setup/hi';
+import { setupUr } from './setup/ur';
 import { ur } from './ur';
 
 declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'translation';
-    resources: { translation: typeof en & { migration: typeof migrationEn } };
+    resources: {
+      translation: typeof en & {
+        migration: typeof migrationEn;
+        billing: typeof billingEn;
+        setup: typeof setupEn;
+        inboxAlerts: typeof inboxAlertsEn;
+        aiPower: typeof aiPowerEn;
+      };
+    };
   }
 }
 
@@ -55,10 +79,46 @@ export function initialLocale(): Locale {
 export async function initI18n(locale: Locale) {
   await i18next.use(initReactI18next).init({
     resources: {
-      en: { translation: { ...en, migration: migrationEn } },
-      ar: { translation: { ...ar, migration: migrationAr } },
-      hi: { translation: { ...hi, migration: migrationHi } },
-      ur: { translation: { ...ur, migration: migrationUr } },
+      en: {
+        translation: {
+          ...en,
+          migration: migrationEn,
+          billing: billingEn,
+          setup: setupEn,
+          inboxAlerts: inboxAlertsEn,
+          aiPower: aiPowerEn,
+        },
+      },
+      ar: {
+        translation: {
+          ...ar,
+          migration: migrationAr,
+          billing: billingAr,
+          setup: setupAr,
+          inboxAlerts: inboxAlertsAr,
+          aiPower: aiPowerAr,
+        },
+      },
+      hi: {
+        translation: {
+          ...hi,
+          migration: migrationHi,
+          billing: billingHi,
+          setup: setupHi,
+          inboxAlerts: inboxAlertsHi,
+          aiPower: aiPowerHi,
+        },
+      },
+      ur: {
+        translation: {
+          ...ur,
+          migration: migrationUr,
+          billing: billingUr,
+          setup: setupUr,
+          inboxAlerts: inboxAlertsUr,
+          aiPower: aiPowerUr,
+        },
+      },
     },
     lng: locale,
     fallbackLng: 'en',

@@ -6,13 +6,7 @@ import type {
   TransferRequest,
 } from '@hamnivo/contracts';
 import { appendAudit, fromPublicId, schema, type TenantTx, toPublicId } from '@hamnivo/db';
-import {
-  authorize,
-  type Grant,
-  type Permission,
-  type ResourceScope,
-  type StaffPrincipal,
-} from '@hamnivo/policy';
+import { type Permission, type ResourceScope, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
 import canonicalize from 'canonicalize';
 import { and, eq, isNull, or } from 'drizzle-orm';
@@ -27,13 +21,14 @@ import {
 } from '../authority/ownership.service.js';
 import { AppError } from '../common/app-error.js';
 import { ownedByOther } from '../conversations/staff-conversations.service.js';
-import { scopeFromRow } from '../identity/principal.service.js';
 import { enforce } from '../identity/staff.guard.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
 import { CLOCK, type Clock } from '../tokens.js';
 import { type ConversationAccess, InboxAccess } from './access.js';
+import { AvailabilityService } from './availability.service.js';
+import { eligibleStaffAt } from './eligible.js';
 import { InboxService } from './inbox.service.js';
 import { InboxMessagesService } from './messages.service.js';
 import { InboxSignals } from './signals.service.js';
@@ -56,67 +51,16 @@ export class AssignmentService {
     private readonly signals: InboxSignals,
     private readonly outbound: OutboundMessagesService,
     private readonly messages: InboxMessagesService,
+    private readonly availability: AvailabilityService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   /** Active staff whose grants let them reply in a conversation at `resource`. */
-  async eligibleStaff(
+  eligibleStaff(
     tx: TenantTx,
     resource: ResourceScope,
   ): Promise<{ staffMemberId: string; displayName: string }[]> {
-    const rows = await tx
-      .select({
-        staffMemberId: schema.staffMembers.id,
-        displayName: schema.staffMembers.displayName,
-        grantId: schema.grants.id,
-        scopeType: schema.grants.scopeType,
-        scopeId: schema.grants.scopeId,
-        expiresAt: schema.grants.expiresAt,
-        permissions: schema.roleDefinitions.permissions,
-      })
-      .from(schema.staffMembers)
-      .innerJoin(
-        schema.grants,
-        and(
-          eq(schema.grants.staffMemberId, schema.staffMembers.id),
-          isNull(schema.grants.revokedAt),
-        ),
-      )
-      .innerJoin(schema.roleDefinitions, eq(schema.roleDefinitions.id, schema.grants.roleId))
-      .where(eq(schema.staffMembers.status, 'active'));
-    const byStaff = new Map<string, { displayName: string; grants: Grant[] }>();
-    for (const row of rows) {
-      const entry = byStaff.get(row.staffMemberId) ?? { displayName: row.displayName, grants: [] };
-      entry.grants.push({
-        id: row.grantId,
-        permissions: row.permissions,
-        scope: scopeFromRow(row.scopeType, row.scopeId),
-        expiresAt: row.expiresAt,
-        revokedAt: null,
-      });
-      byStaff.set(row.staffMemberId, entry);
-    }
-    const now = this.clock();
-    return [...byStaff.entries()]
-      .filter(
-        ([staffMemberId, entry]) =>
-          authorize(
-            {
-              kind: 'staff',
-              tenantId: '',
-              staffMemberId,
-              status: 'active',
-              mfa: true,
-              authenticatedAt: now,
-              grants: entry.grants,
-            },
-            'conversations.reply',
-            resource,
-            { now },
-          ).allowed,
-      )
-      .map(([staffMemberId, entry]) => ({ staffMemberId, displayName: entry.displayName }))
-      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+    return eligibleStaffAt(tx, resource, this.clock());
   }
 
   private async primaryBot(tx: TenantTx, control: ControlRow) {
@@ -140,6 +84,11 @@ export class AssignmentService {
     return this.access.tx(principal, async (tx) => {
       const found = await this.access.authorized(tx, principal, publicId, 'conversations.read');
       const staff = await this.eligibleStaff(tx, found.resource);
+      const statuses = await this.availability.statuses(
+        tx,
+        principal.tenantId,
+        staff.map((s) => s.staffMemberId),
+      );
       const teams = await tx
         .select({ id: schema.teams.id, name: schema.teams.name })
         .from(schema.teams)
@@ -166,6 +115,7 @@ export class AssignmentService {
           current:
             found.control.ownerMode === 'HUMAN_ACTIVE' &&
             found.control.ownerStaffId === s.staffMemberId,
+          status: statuses.get(s.staffMemberId) ?? 'offline',
         })),
         teams: teams.map((t) => ({ id: toPublicId('team', t.id), name: t.name })),
         ai: { available: Boolean(bot) && answering.answering, displayName: bot?.name ?? null },

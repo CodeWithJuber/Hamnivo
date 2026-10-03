@@ -175,3 +175,13 @@ tls_failure() { # tls_failure CODE
     *) return 1 ;;
   esac
 }
+
+# Whether the SQL on standard input drops, renames or retypes data, or empties a table: what starting
+# the previous version cannot undo. Comments and privilege changes are left out first, because they
+# undo nothing: "REVOKE DELETE, TRUNCATE ON t" takes rights away and empties no table.
+destructive_sql() {
+  local statements
+  statements="$(sed -e 's/--.*$//' | tr '\n' ' ' | tr ';' '\n' |
+    grep -viE '^[[:space:]]*(grant|revoke)[[:space:]]' || true)"
+  grep -qiE 'drop[[:space:]]+(table|column|schema)|rename[[:space:]]+(to|column)|set[[:space:]]+data[[:space:]]+type|alter[[:space:]]+column[^;]*[[:space:]]type[[:space:]]|set[[:space:]]+not[[:space:]]+null|(^|[^[:alnum:]_])truncate([^[:alnum:]_]|$)' <<<"$statements"
+}

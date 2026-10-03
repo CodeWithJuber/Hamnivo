@@ -72,7 +72,10 @@ const uuidList = (ids: string[]) =>
  * joined with `b` (brands) and `s` (conversation_inbox_state), plus the channel expression.
  */
 function conditions(scope: AnalyticsScope, filters: Filters, channel: SQL): SQL {
-  const parts: SQL[] = [];
+  // Chats an owner opened from Studio to try the widget are not part of the business.
+  const parts: SQL[] = [
+    sql`not exists (select 1 from test_conversations tc where tc.tenant_id = m.tenant_id and tc.conversation_id = m.id)`,
+  ];
   if (!scope.all) {
     const any: SQL[] = [];
     if (scope.workspaceIds.length)

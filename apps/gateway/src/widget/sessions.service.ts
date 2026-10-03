@@ -20,11 +20,12 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { decodeProtectedHeader, importJWK, type JWK, jwtVerify } from 'jose';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
+import { assertWidgetOnline, widgetLoads } from '../identity/tenants.readonly.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { filesScannable } from './attachments.service.js';
 import { launcherConfig, widgetConfig } from './copy.js';
-import { LOCAL_ANCESTORS, originAllowed, sessionOrigin } from './origins.js';
+import { frameAncestors, originAllowed, sessionOrigin } from './origins.js';
 import { SessionSignals } from './session-signals.service.js';
 import { brandSurface } from './settings.service.js';
 import {
@@ -60,8 +61,11 @@ export class WidgetSessionsService {
     private readonly signals: SessionSignals,
   ) {}
 
-  private checkOrigin(allowed: string[], hostOrigin: string | undefined) {
-    if (originAllowed(allowed, hostOrigin)) return;
+  /** `test`: a test chat opened from Studio, whose page is Studio itself (and never anyone else's). */
+  private checkOrigin(allowed: string[], hostOrigin: string | undefined, test = false) {
+    if (originAllowed(allowed, hostOrigin, test ? this.config.PUBLIC_CONSOLE_ORIGIN : undefined)) {
+      return;
+    }
     throw new AppError('ORIGIN_NOT_ALLOWED', {
       detail: 'Add this website to the brand’s allowed websites to use the chat here.',
     });
@@ -69,16 +73,20 @@ export class WidgetSessionsService {
 
   /**
    * Websites that may show this widget in a frame, matching the session origin check. The TLS
-   * proxy sends it as CSP frame-ancestors on the widget page.
+   * proxy sends it as CSP frame-ancestors on the widget page. A test chat (`test`) may also be
+   * framed by Studio.
    */
-  async framePolicy(widgetId: string): Promise<WidgetFramePolicy> {
+  async framePolicy(widgetId: string, test = false): Promise<WidgetFramePolicy> {
     const widget = await resolveWidget(this.db, widgetId);
-    if (widget?.brandStatus !== 'active' || widget.tenantStatus !== 'active') {
+    if (widget?.brandStatus !== 'active' || !widgetLoads(widget.tenantStatus)) {
       throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
     }
     return {
       widgetId,
-      frameAncestors: widget.allowedOrigins.length > 0 ? widget.allowedOrigins : LOCAL_ANCESTORS,
+      frameAncestors: frameAncestors(
+        widget.allowedOrigins,
+        test ? { studioOrigin: this.config.PUBLIC_CONSOLE_ORIGIN } : null,
+      ),
     };
   }
 
@@ -92,7 +100,7 @@ export class WidgetSessionsService {
     locale: string | undefined,
   ): Promise<LauncherConfig> {
     const widget = await resolveWidget(this.db, widgetId);
-    if (widget?.brandStatus !== 'active' || widget.tenantStatus !== 'active') {
+    if (widget?.brandStatus !== 'active' || !widgetLoads(widget.tenantStatus)) {
       throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
     }
     if (origin !== undefined) this.checkOrigin(widget.allowedOrigins, origin);
@@ -111,12 +119,14 @@ export class WidgetSessionsService {
     locale?: string;
     resumeToken?: string;
     hostOrigin?: string;
+    test?: boolean;
   }): Promise<WidgetSession> {
     const widget = await resolveWidget(this.db, input.widgetId);
-    if (widget?.brandStatus !== 'active' || widget.tenantStatus !== 'active') {
+    if (widget?.brandStatus !== 'active') {
       throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
     }
-    this.checkOrigin(widget.allowedOrigins, input.hostOrigin);
+    assertWidgetOnline(widget.tenantStatus);
+    this.checkOrigin(widget.allowedOrigins, input.hostOrigin, input.test === true);
     if (input.resumeToken) {
       try {
         return await this.refresh(input.resumeToken, input.widgetId);
@@ -226,6 +236,9 @@ export class WidgetSessionsService {
     if (!tenantId) throw expired();
     const now = this.clock();
     const outcome = await withTenant(this.db, { tenantId, actorId: 'widget' }, async (tx) => {
+      const [tenant] = await tx.select({ status: schema.tenants.status }).from(schema.tenants);
+      // The session outlives a suspension; the chat is offline until the workspace is back.
+      assertWidgetOnline(tenant?.status ?? 'closing');
       const [session] = await tx
         .select()
         .from(schema.widgetSessions)
@@ -253,8 +266,15 @@ export class WidgetSessionsService {
       if (brand?.status !== 'active' || (widgetId && brand.widgetPublicId !== widgetId)) {
         return { error: true as const };
       }
-      // A website removed from the brand's list can no longer keep its chats going.
-      if (!originAllowed(brand.allowedOrigins, sessionOrigin(session.hostOrigin))) {
+      // A website removed from the brand's list can no longer keep its chats going. A test chat
+      // from Studio never was on the list: it began as a test, which is the only way in.
+      if (
+        !originAllowed(
+          brand.allowedOrigins,
+          sessionOrigin(session.hostOrigin),
+          this.config.PUBLIC_CONSOLE_ORIGIN,
+        )
+      ) {
         return { error: true as const };
       }
       const next = newRefreshSecret();

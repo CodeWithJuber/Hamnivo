@@ -90,6 +90,12 @@ export const CreateWidgetSessionRequest = z
      * allowed websites. The browser enforces embedding itself with CSP frame-ancestors.
      */
     hostOrigin: z.url().max(300).optional(),
+    /**
+     * A test chat opened from Studio (the owner trying their own widget). Only then may the page
+     * be Studio itself; the conversations it starts are marked as tests, so reports and counts
+     * leave them out.
+     */
+    test: z.boolean().optional(),
   })
   .meta({ id: 'CreateWidgetSessionRequest' });
 

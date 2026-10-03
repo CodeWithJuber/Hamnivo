@@ -544,10 +544,18 @@ Hamnivo's operator, not the workspaces, defines plans, assigns them and issues i
 billing command. Each step is recorded in the workspace's audit log under the name in
 `HAMNIVO_OPERATOR`. A workspace without a plan has no limits.
 
+New workspaces start on the built-in **free** plan, which has limits (100 conversations and 200 AI
+replies a month, 2 seats, among others). If you host Hamnivo only for yourself, set
+`HAMNIVO_DEFAULT_PLAN=unlimited` in `.env` before creating workspaces: they then get no plan and
+nothing is limited. Workspaces created before keep the plan they have; `plan:assign` changes it.
+To sell Hamnivo to other businesses (sign-up, trials, Stripe or WHMCS), see
+[docs/guide/saas](guide/saas/run-as-saas.md).
+
 A plan is a JSON file. Prices are in minor units (cents), written as strings. `limits` can hold
 `conversations`, `aiReplies` and `aiTokens` (per calendar month, UTC) and `knowledgeStorageBytes`,
 `seats` and `webhookEndpoints` (at any time); a limit left out is unlimited. `metered` prices usage
-beyond what the plan includes.
+beyond what the plan includes. `trialDays` (optional) lets a workspace try the plan first, and
+`stripePriceId` (optional) is the Stripe price that sells it.
 
 ```json
 {"key":"starter","name":"Starter","currency":"USD","priceMinor":"4900",
@@ -562,6 +570,7 @@ b=(./deploy/production/hamnivo.sh compose exec -T -e HAMNIVO_OPERATOR=you@exampl
 "${b[@]}" plan:set - < starter.json         # create or change a plan
 "${b[@]}" plans                             # list them
 "${b[@]}" plan:assign acme starter          # a workspace, by slug or tnt_… id
+"${b[@]}" plan:assign acme starter --trial  # the same, starting the plan's trial days
 "${b[@]}" invoices:generate 2026-09         # drafts for a finished month
 "${b[@]}" invoice:issue HV-202609-0E4F2A1B  # the workspace sees it from now on
 "${b[@]}" invoice:paid HV-202609-0E4F2A1B bank-transfer-0042
@@ -572,9 +581,10 @@ b=(./deploy/production/hamnivo.sh compose exec -T -e HAMNIVO_OPERATOR=you@exampl
 At a limit, Hamnivo refuses what would go past it with `402 PLAN_LIMIT_REACHED` and the numbers
 (a new conversation is refused without telling the customer about the plan). When the AI replies,
 tokens or a workspace's own AI budget run out, new conversations go to people instead. Studio shows
-usage against the limits under **Reports → Billing**. Invoices are drafted from the plan price and
-the metered usage of the month. They are collected by hand (`invoice:paid`), until a payment
-provider is connected behind the billing port. In development, run the same commands with
+usage against the limits under **Reports → Billing** and **Settings → Plan and billing**. Invoices
+are drafted from the plan price and the metered usage of the month and collected by hand
+(`invoice:paid`). Workspaces that pay through Stripe or WHMCS are billed there and get no invoice
+from Hamnivo. In development, run the same commands with
 `pnpm --filter @hamnivo/gateway billing <command>` after building the gateway.
 
 ### Backups

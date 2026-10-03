@@ -11,7 +11,13 @@ import { ActionApprovals } from './approvals.service.js';
 import { ActionExecutor } from './executor.service.js';
 import { ToolGateway } from './gateway.service.js';
 import { HandoffPackets } from './handoff.service.js';
+import { HttpToolsController } from './http/controller.js';
+import { HttpToolsService } from './http/service.js';
 import { InboxActions } from './inbox-actions.service.js';
+import { McpController } from './mcp.controller.js';
+import { McpCatalogService } from './mcp-catalog.service.js';
+import { McpCredentials } from './mcp-credentials.service.js';
+import { McpOAuthService } from './mcp-oauth.service.js';
 import { SimulationsController } from './simulation.controller.js';
 import { SimulationService } from './simulation.service.js';
 import { ToolsService } from './tools.service.js';
@@ -26,6 +32,7 @@ const shared = [
   // A reply that may rest on a tool's answer never enters or leaves the answer cache (K06).
   ActionsCacheRules,
   OperationReconcilers,
+  McpCredentials,
   ToolAdapters,
   ActionExecutor,
   ActionApprovals,
@@ -35,11 +42,21 @@ const shared = [
 
 export const ACTIONS_API_CONTROLLERS = [
   ToolsController,
+  McpController,
+  HttpToolsController,
   InboxActionsController,
   WidgetActionsController,
   SimulationsController,
 ];
 
-export const ACTIONS_API_PROVIDERS = [...shared, ToolsService, InboxActions, SimulationService];
+export const ACTIONS_API_PROVIDERS = [
+  ...shared,
+  ToolsService,
+  McpOAuthService,
+  McpCatalogService,
+  HttpToolsService,
+  InboxActions,
+  SimulationService,
+];
 
 export const ACTIONS_WORKER_PROVIDERS = [...shared, InboxAccess, ActionsWorker];

@@ -3,6 +3,7 @@
  * chosen address. No browser: what a screen shows on its first render (its data comes from the
  * query cache, which a test fills first) is read back with the small helpers below.
  */
+import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -31,6 +32,8 @@ const PATHS = [
   '/overview',
   '/inbox',
   '/inbox/$conversationId',
+  '/visitors',
+  '/saved-replies',
   '/agents',
   '/agents/$agentId',
   '/knowledge',
@@ -47,10 +50,14 @@ const PATHS = [
   '/finance',
   '/reports',
   '/brands',
+  '/hours',
   '/team',
+  '/support-teams',
   '/security',
   '/developer',
+  '/customer-identity',
   '/migration',
+  '/onboarding',
   '/stop-ai',
   '/account',
   '/tenants',
@@ -94,10 +101,13 @@ export async function renderStudio({
   });
   seed?.(client);
   const root = createRootRoute();
+  // Pages ask for their search by route id (`/_studio/hours`), so the paths sit under a layout
+  // route of that name, as they do in the app.
+  const studio = createRoute({ getParentRoute: () => root, id: '_studio' });
   const router = createRouter({
-    routeTree: root.addChildren(
-      PATHS.map((path) => createRoute({ getParentRoute: () => root, path })),
-    ),
+    routeTree: root.addChildren([
+      studio.addChildren(PATHS.map((path) => createRoute({ getParentRoute: () => studio, path }))),
+    ]),
     history: createMemoryHistory({ initialEntries: [at] }),
     // The root has no component of its own, so the screen takes its place.
     defaultComponent: () => <>{screen}</>,
@@ -106,7 +116,9 @@ export async function renderStudio({
   return renderToString(
     <QueryClientProvider client={client}>
       <TenantProvider me={memberWith(permissions)} tenant={tenant}>
-        <RouterProvider router={router} />
+        <AnnouncerProvider>
+          <RouterProvider router={router} />
+        </AnnouncerProvider>
       </TenantProvider>
     </QueryClientProvider>,
   );
