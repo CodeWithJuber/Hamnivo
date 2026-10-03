@@ -4,11 +4,14 @@
 # A deploy takes the newest commit of the deploy branch (HAMNIVO_DEPLOY_BRANCH, default main) from
 # the git remote. It checks that commit (Biome, type checks, unit tests) and builds its images from
 # a clean copy of its files, while the running version stays as it is. Then it starts the new
-# version; if that does not stay healthy, the version that ran before is started again. See
-# docs/self-hosting.md, "Automatic deployment from GitHub".
+# version; if that does not stay healthy, the version that ran before is started again. Before it
+# builds, it checks that HTTPS works on this server (without a certificate, nothing is built); after
+# the switch, it restarts the edge once if a name has none. See docs/self-hosting.md, "Automatic
+# deployment from GitHub", and `hamnivo.sh doctor` for what is wrong with a server.
 #
 #   hamnivo.sh deploy [--latest | REF] [--force]   REF: a commit, tag or branch. --force deploys
-#                                                  even a live, failed or stopped commit
+#                                                  even a live, failed or stopped commit, and
+#                                                  skips the HTTPS check before the build
 #   hamnivo.sh rollback [COMMIT]                   default: the version that ran before
 #   hamnivo.sh deploys [N]                         the last N deploys (default 20)
 #   hamnivo.sh autodeploy enable [--mode webhook|poll] [--github-token-file FILE] [--no-systemd]
@@ -23,6 +26,8 @@
 #   history.tsv         one line per deploy; logs/ holds each deploy's full log
 #   failed/<commit>     "<attempts> <step>" of commits that failed. Automatic deploys retry a
 #                       commit that stopped before the switch once, after 30 minutes; no other.
+#                       A stop because HTTPS did not work (step "https") is no failure of the
+#                       commit: it is tried again every 30 minutes, until HTTPS works.
 #   held/<commit>       commits that wait for a deploy by hand, and why
 #   build/<tag>         the clean copy of a version that a deploy checks and builds (temporary)
 #   env.before          the settings as they were, while a switch runs
@@ -43,6 +48,10 @@ github_host_key='github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 deploy_force=0
+# Why the switch to a version, or its start, failed, in words: for the log, the history and GitHub.
+fail_reason=''
+# Whether the edge was restarted already in this deploy (see probe_https).
+edge_restarted=0
 
 now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 short() { printf '%s' "${1:0:12}"; }
@@ -56,22 +65,32 @@ record() { # record COMMIT RESULT TRIGGER SECONDS DETAIL
     >>"$state_dir/history.tsv"
 }
 
-# Notes that COMMIT failed at STEP, counting the attempts.
+# Notes that COMMIT failed at STEP, counting the attempts. A stop at "https" counts none: broken
+# HTTPS says nothing about the commit, so it stays at one attempt and is tried again, every time.
 fail_state() { # fail_state COMMIT STEP
   local attempts=0
   mkdir -p "$state_dir/failed"
   if [[ -f "$state_dir/failed/$1" ]]; then read -r attempts _ <"$state_dir/failed/$1" || true; fi
   [[ "$attempts" =~ ^[0-9]+$ ]] || attempts=0
+  [[ "$2" == https ]] && attempts=0
   printf '%s %s\n' "$((attempts + 1))" "$2" >"$state_dir/failed/$1"
 }
 
+# The step at which COMMIT failed (the second word of its failed/ file), or nothing.
+failed_step() { # failed_step COMMIT
+  local step=''
+  read -r _ step <"$state_dir/failed/$1" || true
+  printf '%s' "$step"
+}
+
 # Whether an automatic run may try COMMIT again: only when it stopped before the switch (a network
-# or a registry may have failed), only once, and only after 30 minutes.
+# or a registry may have failed), only once, and only after 30 minutes. A stop for broken HTTPS may
+# be tried again every 30 minutes, until HTTPS works.
 may_retry() { # may_retry COMMIT
   local file="$state_dir/failed/$1" attempts='' step=''
   read -r attempts step <"$file" || true
   [[ "$attempts" =~ ^[0-9]+$ ]] || return 1
-  case "$step" in export | setup | checks-and-build | backup) ;; *) return 1 ;; esac
+  case "$step" in export | setup | checks-and-build | backup | https) ;; *) return 1 ;; esac
   ((attempts < 2)) && [[ -n "$(find "$file" -mmin +30)" ]]
 }
 
@@ -154,39 +173,112 @@ prune_build_cache() { # prune_build_cache [GB]
 }
 
 check_disk() {
-  local dir free need
+  local free need
   need="$(setting HAMNIVO_DEPLOY_MIN_FREE_GB 8)"
-  dir="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)"
-  free="$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print int($4 / 1048576) }')"
+  free="$(docker_free_gb)"
   ((${free:-0} >= need)) && return 0
   log "Only ${free:-0} GB free for Docker; shrinking the build cache"
   prune_build_cache 2
-  free="$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print int($4 / 1048576) }')"
+  free="$(docker_free_gb)"
   ((${free:-0} >= need)) || {
     log "Not enough disk space: ${free:-0} GB free, $need GB needed (HAMNIVO_DEPLOY_MIN_FREE_GB)."
     return 1
   }
 }
 
-# Checks the stack from outside, through the edge: API health, Studio and the chat loader.
-probe() {
-  local port url host ca=()
-  port="$(get HAMNIVO_HTTPS_PORT)"
-  if [[ "$(get HAMNIVO_TLS)" == internal ]] &&
-    "${compose[@]}" exec -T edge cat /data/caddy/pki/authorities/local/root.crt >"$work/ca.crt" 2>/dev/null; then
-    ca=(--cacert "$work/ca.crt")
+# --- HTTPS ---------------------------------------------------------------------------------------
+# What proves that the stack answers over HTTPS, through the edge: the API's health, Studio and the
+# chat loader.
+probe_urls() {
+  printf '%s\n' "$(get HAMNIVO_API_ORIGIN)/health/ready" "$(get HAMNIVO_APP_ORIGIN)/" \
+    "$(get HAMNIVO_CHAT_ORIGIN)/loader.js"
+}
+
+# One request to URL, tried again RETRIES times. Returns curl's exit code (see tls_failure).
+probe_get() { # probe_get URL RETRIES
+  curl_edge "$1" -fsS -o /dev/null --max-time 10 --retry "$2" --retry-delay 3 --retry-all-errors
+}
+
+# The reason in words when the TLS handshake with HOST failed (curl's exit code CODE): Caddy sends
+# the alert "internal error" for a name it has no certificate for.
+tls_reason() { # tls_reason CODE HOST
+  if [[ "$1" == 35 ]]; then
+    printf 'no HTTPS certificate for %s (run hamnivo.sh doctor)' "$2"
+  else
+    printf 'the HTTPS certificate for %s is not valid (run hamnivo.sh doctor)' "$2"
   fi
-  for url in "$(get HAMNIVO_API_ORIGIN)/health/ready" "$(get HAMNIVO_APP_ORIGIN)/" \
-    "$(get HAMNIVO_CHAT_ORIGIN)/loader.js"; do
-    host="${url#https://}"
-    host="${host%%/*}"
-    host="${host%%:*}"
-    if ! curl -fsS -o /dev/null --max-time 10 --retry 10 --retry-delay 3 --retry-all-errors \
-      --resolve "$host:$port:127.0.0.1" "${ca[@]}" "$url"; then
-      log "Not reachable over HTTPS: $url"
-      return 1
+}
+
+# Checks the stack from outside, through the edge. On failure, probe_reason says why, in words, for
+# the log, the history and GitHub; probe_tls is 1 when the TLS handshake failed (no certificate),
+# and 0 for anything else (a refused connection, an HTTP error).
+probe_reason=''
+probe_tls=0
+probe() {
+  local url code
+  probe_reason=''
+  probe_tls=0
+  edge_ca "$work/ca.crt"
+  while IFS= read -r url; do
+    code=0
+    probe_get "$url" 10 || code=$?
+    if ((code == 0)); then continue; fi
+    log "Not reachable over HTTPS: $url (curl exit $code)"
+    if tls_failure "$code"; then
+      probe_tls=1
+      probe_reason="$(tls_reason "$code" "$(host_of "$url")")"
+    else
+      probe_reason="$url does not answer over HTTPS"
     fi
-  done
+    return 1
+  done < <(probe_urls)
+}
+
+# probe, and when the TLS handshake fails (Caddy may still be asking for a certificate, or may have
+# lost it), restarts the edge once in this deploy and probes again before giving up.
+probe_https() {
+  if probe; then return 0; fi
+  if ((probe_tls == 0 || edge_restarted == 1)); then return 1; fi
+  edge_restarted=1
+  log 'The TLS handshake failed: restarting the edge once, so that Caddy asks for its certificates again'
+  "${compose[@]}" restart edge >&2 || true
+  HAMNIVO_FAIL_UNHEALTHY=1 HAMNIVO_WAIT_SECONDS="$(setting HAMNIVO_DEPLOY_HEALTH_SECONDS 600)" \
+    wait_healthy edge || true
+  probe
+}
+
+# Before building: whether the running version answers over HTTPS. When every name that fails fails
+# on the TLS handshake, HTTPS was broken before this deploy: a new version could not fix that, and
+# the check after its switch would roll it back. Any other failure does not stop a deploy, because
+# the new version may be the fix. Returns 1 for broken HTTPS and says why in baseline_reason.
+baseline_reason=''
+check_baseline() {
+  local url code host='' tls_code='' other=0
+  baseline_reason=''
+  edge_ca "$work/ca.crt"
+  while IFS= read -r url; do
+    code=0
+    probe_get "$url" 2 || code=$?
+    if ((code == 0)); then continue; fi
+    log "The running version does not answer over HTTPS at $url (curl exit $code)"
+    if ! tls_failure "$code"; then
+      other=1
+    elif [[ -z "$host" ]]; then
+      host="$(host_of "$url")"
+      tls_code="$code"
+    fi
+  done < <(probe_urls)
+  if ((other == 1)); then
+    log 'It fails for more than certificates, so this deploy goes on: the new version may be the fix.'
+    return 0
+  fi
+  [[ -n "$host" ]] || return 0
+  if [[ "$tls_code" == 35 ]]; then
+    baseline_reason="HTTPS is not working on this server: no certificate for $host. Fix it first (hamnivo.sh doctor)"
+  else
+    baseline_reason="HTTPS is not working on this server: the certificate for $host is not valid. Fix it first (hamnivo.sh doctor)"
+  fi
+  return 1
 }
 
 # Whether the API container runs the images built from COMMIT (images built before the revision
@@ -253,15 +345,27 @@ check_guards() { # check_guards FROM TO
 }
 
 # --- phases --------------------------------------------------------------------------------------
-# Starts COMMIT with the images TAG, using that version's own hamnivo.sh, then checks it.
+# Starts COMMIT with the images TAG, using that version's own hamnivo.sh, then checks it. When it
+# fails, fail_reason says why.
 start_version() { # start_version COMMIT TAG
-  git_ checkout --quiet --detach "$1" || return 1
+  fail_reason=''
+  git_ checkout --quiet --detach "$1" || {
+    fail_reason="could not check out $(short "$1")"
+    return 1
+  }
   set_kv HAMNIVO_IMAGE_TAG "$2"
   HAMNIVO_FAIL_UNHEALTHY=1 HAMNIVO_WAIT_SECONDS="$(setting HAMNIVO_DEPLOY_HEALTH_SECONDS 600)" \
-    "${hamnivo[@]}" up --no-build --quiet || return 1
-  probe || return 1
+    "${hamnivo[@]}" up --no-build --quiet || {
+    fail_reason='the services did not become healthy'
+    return 1
+  }
+  probe_https || {
+    fail_reason="$probe_reason"
+    return 1
+  }
   runs_commit "$1" || {
     log "The API does not run $(short "$1")."
+    fail_reason="the API does not run $(short "$1")"
     return 1
   }
 }
@@ -284,11 +388,15 @@ soak() {
     if [[ "$state" != "${restarts[i]} healthy" && "$state" != "${restarts[i]} running" ]]; then
       "${compose[@]}" logs --tail 80 "$service" >&2 || true
       log "$service did not stay healthy (restarts and state: $state)."
+      fail_reason="$service did not stay healthy"
       return 1
     fi
     i=$((i + 1))
   done
-  probe
+  probe_https || {
+    fail_reason="$probe_reason"
+    return 1
+  }
 }
 
 # Backs up first (a separate rotation of 5) when the new version changes the database, its
@@ -369,7 +477,7 @@ check_units() {
 # healthy. Its output goes to the deploy's log file too.
 deploy_version() { # deploy_version COMMIT RUNNING_COMMIT RUNNING_TAG TRIGGER
   local target="$1" prev="$2" prev_tag="$3" trigger="$4" tag step guard=0 started=$SECONDS
-  local build_dir env_next
+  local build_dir env_next switch_reason detail
   tag="$(short "$target")"
   log "Deploying $tag: $(git_ log -1 --format=%s "$target" | cut -c1-72)"
   log "Running now: $(short "$prev") (images: $prev_tag); trigger: $trigger"
@@ -407,7 +515,22 @@ deploy_version() { # deploy_version COMMIT RUNNING_COMMIT RUNNING_TAG TRIGGER
   fi
   ((guard == 0)) || log "Deploying although $guard_reason (asked for by hand)."
 
-  # 1. Check and build the new version from a clean copy of its files and of the settings, then
+  # 1. HTTPS must work already. When browsers cannot reach this server over HTTPS either (Caddy
+  #    has no certificate), a new version cannot be switched in: its check would fail and the
+  #    deploy would roll back after a build for nothing. This is a stop before the switch that
+  #    never counts against the commit (see fail_state): automatic runs try it again, every 30
+  #    minutes, once HTTPS works. Other failures of the running version do not stop a deploy: the
+  #    new version may be the fix. --force skips this check.
+  if ((deploy_force == 0)) && ! check_baseline; then
+    log "Stopped: $baseline_reason. $(short "$prev") keeps running."
+    log "(hamnivo.sh deploy --force $tag deploys without this check.)"
+    fail_state "$target" https
+    record "$target" failed "$trigger" "$((SECONDS - started))" "stopped before building: $baseline_reason"
+    github_status failure "$baseline_reason"
+    return 1
+  fi
+
+  # 2. Check and build the new version from a clean copy of its files and of the settings, then
   #    back up with the running version's own script. Nothing that runs changes yet.
   build_dir="$state_dir/build/$tag"
   env_next="$build_dir/deploy/production/.env.next"
@@ -431,10 +554,11 @@ deploy_version() { # deploy_version COMMIT RUNNING_COMMIT RUNNING_TAG TRIGGER
     return 1
   fi
 
-  # 2. Switch: the checkout moves, new settings are added, migrations run and the new version
-  #    starts. It must answer over HTTPS and stay healthy.
+  # 3. Switch: the checkout moves, new settings are added, migrations run and the new version
+  #    starts. It must answer over HTTPS and stay healthy. When it does not, fail_reason says why.
   cp "$env_file" "$state_dir/env.before"
   chmod 600 "$state_dir/env.before"
+  fail_reason=''
   if git_ checkout --quiet --detach "$target" && "${hamnivo[@]}" setup --quiet &&
     start_version "$target" "$tag" && soak; then
     write_state previous "$prev" "$prev_tag"
@@ -450,18 +574,22 @@ deploy_version() { # deploy_version COMMIT RUNNING_COMMIT RUNNING_TAG TRIGGER
     return 0
   fi
 
-  # 3. Roll back: the settings, the files and the images of the version that ran before.
-  log "$tag is not healthy; starting $(short "$prev") again"
+  # 4. Roll back: the settings, the files and the images of the version that ran before.
+  switch_reason="$fail_reason"
+  log "$tag is not healthy${switch_reason:+ ($switch_reason)}; starting $(short "$prev") again"
   fail_state "$target" start
   restore_env
   if start_version "$prev" "$prev_tag"; then
-    record "$target" rolled-back "$trigger" "$((SECONDS - started))" "$(short "$prev") runs again"
-    github_status failure "Not healthy; rolled back to $(short "$prev")"
+    record "$target" rolled-back "$trigger" "$((SECONDS - started))" "${switch_reason:+$switch_reason; }$(short "$prev") runs again"
+    github_status failure "${switch_reason:-Not healthy}; rolled back to $(short "$prev")"
     log "Rolled back: $(short "$prev") runs again."
     return 1
   fi
-  record "$target" broken "$trigger" "$((SECONDS - started))" 'neither version is healthy'
-  github_status error 'Not healthy, and the previous version did not start either'
+  detail='neither version is healthy'
+  if [[ -n "$switch_reason" ]]; then detail+="; the new one: $switch_reason"; fi
+  if [[ -n "$fail_reason" ]]; then detail+="; the previous one: $fail_reason"; fi
+  record "$target" broken "$trigger" "$((SECONDS - started))" "$detail"
+  github_status error "Not healthy, and the previous version did not start either${fail_reason:+: $fail_reason}"
   log "Neither $tag nor $(short "$prev") is healthy. See this log and hamnivo.sh status."
   log "If the database changed, the backup made before this deploy is in $here/backups/before-deploy."
   return 2
@@ -509,7 +637,7 @@ cmd_deploy() {
   fi
   unset HAMNIVO_IMAGE_TAG
 
-  local branch target running prompt=0
+  local branch target running prompt=0 https_stop=0
   branch="$(get HAMNIVO_DEPLOY_BRANCH)"
   branch="${branch:-main}"
   # A person at a terminal may type git credentials; automatic runs never wait for anyone.
@@ -529,12 +657,22 @@ cmd_deploy() {
     # Held versions wait for a person; they were announced when they were held.
     [[ -f "$state_dir/held/$target" ]] && return 0
     if [[ -f "$state_dir/failed/$target" ]]; then
+      [[ "$(failed_step "$target")" == https ]] && https_stop=1
       if ! may_retry "$target"; then
-        [[ "$trigger" == timer ]] ||
-          log "$(short "$target") failed before and is not retried automatically (hamnivo.sh deploy --force $(short "$target"))."
+        if [[ "$trigger" != timer ]]; then
+          if ((https_stop == 1)); then
+            log "$(short "$target") waits until HTTPS works on this server; it is tried again every 30 minutes (hamnivo.sh doctor)."
+          else
+            log "$(short "$target") failed before and is not retried automatically (hamnivo.sh deploy --force $(short "$target"))."
+          fi
+        fi
         return 0
       fi
-      log "Trying $(short "$target") once more: it stopped before the switch 30 minutes ago."
+      if ((https_stop == 1)); then
+        log "Trying $(short "$target") again: HTTPS did not work on this server 30 minutes ago."
+      else
+        log "Trying $(short "$target") once more: it stopped before the switch 30 minutes ago."
+      fi
     fi
   fi
 
@@ -588,9 +726,9 @@ cmd_rollback() {
     github_status success 'Rolled back by hand'
     log "$(short "$target") runs again. Automatic deploys resume with the next new commit."
   else
-    record "$target" failed manual-rollback "$((SECONDS - started))" 'not healthy'
-    github_status failure 'Rollback did not come up healthy'
-    fail "$(short "$target") did not come up healthy; see hamnivo.sh status."
+    record "$target" failed manual-rollback "$((SECONDS - started))" "${fail_reason:-not healthy}"
+    github_status failure "Rollback did not come up healthy${fail_reason:+: $fail_reason}"
+    fail "$(short "$target") did not come up healthy${fail_reason:+ ($fail_reason)}; see hamnivo.sh status."
   fi
 }
 
@@ -843,6 +981,7 @@ autodeploy_status() {
   fi
   printf '\n'
   cmd_deploys 5
+  printf '\nDeploys fail or roll back? Check the whole server: %s/hamnivo.sh doctor\n' "$here"
 }
 
 cmd_autodeploy() {

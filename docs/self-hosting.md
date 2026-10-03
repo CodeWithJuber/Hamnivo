@@ -463,6 +463,7 @@ API reference is at `https://api.example.com/docs`; set `API_DOCS=false` to hide
 | Task | Command |
 |---|---|
 | See services and health | `./deploy/production/hamnivo.sh status` |
+| Check the whole server, and see how to fix what is wrong (HTTPS certificates, ports, disk, memory, deploys) | `./deploy/production/hamnivo.sh doctor` |
 | Follow logs | `./deploy/production/hamnivo.sh logs [service…]` |
 | Back up now | `./deploy/production/hamnivo.sh backup` |
 | Restore a backup | `./deploy/production/hamnivo.sh restore deploy/production/backups/<time>` |
@@ -596,15 +597,22 @@ restore drill in its checks.
 This deploys the newest commit of `main` (the branch in `HAMNIVO_DEPLOY_BRANCH`), the way automatic
 deploys do (A10):
 
-1. **Checks** a clean copy of the new version: Biome, type checks and unit tests. A failure stops
-   here and touches nothing that runs.
+1. **Checks** that HTTPS works on this server now, then a clean copy of the new version: Biome, type
+   checks and unit tests. A failure stops here and touches nothing that runs. If the version that
+   runs has no HTTPS certificate (browsers show an SSL error), it stops before building, because a
+   new version could not be switched in either: it says which name has no certificate and points
+   to `hamnivo.sh doctor` (A9). Other failures of the running version do not stop it, because the
+   new version may be the fix. `hamnivo.sh deploy --force` skips that first check.
 2. **Builds** its images, tagged with the commit.
 3. **Backs up** first when the new version changes the database or its containers, into
    `backups/before-deploy/`.
 4. **Switches:** the checkout moves to the new version, `.env` gets its new settings, database
    migrations run, and the new version starts. It must answer over HTTPS, then stay healthy for 45
-   seconds.
-5. **Rolls back** if it does not: the settings and the version that ran before come back.
+   seconds. If a name has no certificate at that point, the web server restarts once and is
+   checked again.
+5. **Rolls back** if it does not: the settings and the version that ran before come back. The log,
+   `hamnivo.sh deploys` and GitHub say why, for example "no HTTPS certificate for
+   api.example.com (run hamnivo.sh doctor)".
 
 While the API restarts, requests wait a few seconds for it, and open chats reconnect by
 themselves. `hamnivo.sh deploys` lists every deploy; `hamnivo.sh rollback` goes back to the
@@ -641,6 +649,28 @@ up and deploys.
   - Check that ports 80 and 443 are open.
   - Read `hamnivo.sh logs edge`.
   - Let's Encrypt limits failed attempts, so fix DNS first, then run `hamnivo.sh up`.
+  - A browser error such as `ERR_SSL_PROTOCOL_ERROR` has its own entry below.
+- **The browser shows an SSL error, or every deploy rolls back:** the web server (Caddy) has no
+  certificate for a name. Browsers say `SSL_ERROR_INTERNAL_ERROR_ALERT` or
+  `ERR_SSL_PROTOCOL_ERROR`, plain `http://` still redirects, and `hamnivo.sh deploys` says "no HTTPS
+  certificate for api.example.com" or "HTTPS is not working on this server".
+  1. Run `hamnivo.sh doctor` on the server. It tries every public name over HTTPS, shows the last
+     lines Caddy logged about certificates, and prints a fix and its exact command under each ✗.
+  2. Fix it in this order:
+     1. Restart the web server, so that Caddy asks for the certificates again:
+        `hamnivo.sh compose restart edge`.
+     2. If Caddy's log mentions a rate limit (`rateLimited`), wait. Let's Encrypt allows only a few
+        attempts per name; the log names the time it allows the next one, which is between an hour
+        and a week away. Then restart the web server again.
+     3. Check DNS and the ports. Every name must resolve to this server
+        (`dig +short app.example.com`), and ports 80 and 443 must be open to the internet, because
+        Let's Encrypt calls them (A2).
+  3. Never free disk space with `docker volume prune` or `docker system prune --volumes`. Docker
+     counts the volumes of a stack that is down as unused, so they delete the databases and the
+     certificates, and Caddy then asks Let's Encrypt for new certificates and may hit the limit.
+     `docker builder prune -af` frees the build cache and nothing else.
+  4. Once HTTPS works, automatic deploys carry on by themselves: one that stopped for this reason is
+     tried again every 30 minutes, without a new commit.
 - **The first start is slow:** Chatwoot prepares its database (2 to 3 minutes), and ClamAV
   downloads its virus signatures (a few minutes). Uploads wait for ClamAV and are scanned when it
   is ready.
@@ -669,13 +699,21 @@ up and deploys.
   - The 5-minute check deploys even when a webhook is lost.
   - A commit that failed is not retried, except once after 30 minutes when it stopped before the
     switch (for example, a download failed during the build). Push a fix, or run
-    `hamnivo.sh deploy --force <commit>`.
+    `hamnivo.sh deploy --force <commit>`. A commit that stopped because HTTPS does not work on the
+    server is not a failed commit: it is tried again every 30 minutes until HTTPS works.
+  - `hamnivo.sh doctor` shows the git access, how many commits the checkout is behind, and the last
+    three deploys with their reasons, together with everything else that can go wrong.
   - `hamnivo.sh deploys` lists versions that wait for a deploy by hand (A10).
 - **A deploy stopped or rolled back:** its full log is in `deploy/production/state/logs/`, and
   `hamnivo.sh deploys` names the step.
   - "local changes on the server": files tracked by git were edited on the server. Commit such
     changes to the repository instead.
-  - "not enough disk space": free space for Docker, or lower `HAMNIVO_DEPLOY_BUILD_CACHE_GB`.
+  - "HTTPS is not working on this server: no certificate for NAME": the deploy stopped before
+    building, because HTTPS was already broken. Fix it first (the entry above, `hamnivo.sh doctor`).
+  - "no HTTPS certificate for NAME" after "rolled back": the new version started, but Caddy had no
+    certificate for that name, even after one restart of the web server. Same entry.
+  - "not enough disk space": free space for Docker, or lower `HAMNIVO_DEPLOY_BUILD_CACHE_GB`. Remove
+    the build cache with `docker builder prune -af`, never with `docker volume prune`.
   - "stopped at guards": a migration that already ran was edited or removed, or a new one is dated
     before the newest applied one. Add or regenerate the migration in a new commit.
 - **After restoring a backup on a new server:** run `hamnivo.sh autodeploy enable` there too. The
@@ -701,6 +739,14 @@ healthy for a short while; otherwise the one before starts again. Specific to au
 - A commit that failed is not tried again automatically; the next commit is. One exception: a
   deploy that stopped before the switch (for example, a download failed during the build) is tried
   once more after 30 minutes.
+- Before building, a deploy checks that HTTPS answers on this server (the API, Studio and the chat
+  loader). If no certificate is served for a name, it stops with "HTTPS is not working on this
+  server" instead of building a version that would be rolled back. That stop never counts as a
+  failed commit: it is tried again every 30 minutes, so a fix of the certificates (A9) is enough,
+  without a new commit. Other failures of the running version do not stop a deploy, because the new
+  version may be the fix.
+- After the switch, a name without a certificate restarts the web server once and is checked again,
+  before the deploy is rolled back.
 - Some versions wait for you, because starting the previous version could not undo them:
   - a migration that drops, renames or changes the type of data;
   - a new version of other software in `compose.yml` (Chatwoot, PostgreSQL, Valkey). Chatwoot,
@@ -748,12 +794,14 @@ Run `autodeploy enable` as the user who owns the checkout, without `sudo`: deplo
 | Task | Command |
 |---|---|
 | Mode, git access and recent deploys | `hamnivo.sh autodeploy status` |
+| Check the whole server when deploys fail or roll back: HTTPS certificates, ports, disk, memory, systemd units, git, the last three deploys | `hamnivo.sh doctor` |
 | Deploy history | `hamnivo.sh deploys` |
 | Follow a deploy | `journalctl -u hamnivo-deploy -f` |
 | One deploy's full log | `ls deploy/production/state/logs/` |
 | Pause automatic deploys | `hamnivo.sh autodeploy pause` (and `resume`) |
 | Go back to the version before | `hamnivo.sh rollback` |
 | Deploy a given commit or tag | `hamnivo.sh deploy <commit>` |
+| Deploy even though the commit failed before, or HTTPS is broken | `hamnivo.sh deploy --force <commit>` |
 | Turn it off | `hamnivo.sh autodeploy disable` |
 
 After a `rollback`, the version you left is not redeployed automatically; the next new commit is.

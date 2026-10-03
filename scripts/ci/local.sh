@@ -233,6 +233,7 @@ step "Lint and format (Biome)" pnpm lint
 step "Typecheck" pnpm typecheck
 step "Unit tests" unit_tests
 step "Shell scripts (shellcheck)" shell_scripts
+step "Deploy scripts: doctor and HTTPS rules (stand-ins, no Docker)" bash scripts/ci/deploy-https-test.sh
 step "Feature status matrix is current" pnpm exec tsx scripts/feature-status/generate.ts --check
 step "Licence inventory is current and reviewed" pnpm exec tsx scripts/licenses/inventory.ts --check
 

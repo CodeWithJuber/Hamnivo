@@ -5,6 +5,8 @@
 #                           create or complete deploy/production/.env (secrets are generated)
 #   hamnivo.sh up           build the images, start everything, connect Chatwoot, print the addresses
 #   hamnivo.sh status       services and their health
+#   hamnivo.sh doctor       check this server (services, HTTPS for every name, ports, disk, memory,
+#                           certificates, deploys) and say how to fix what is wrong; only reads
 #   hamnivo.sh logs [service...]
 #   hamnivo.sh mail [ADDRESS]   the latest emails, while SMTP_URL is not set (they go to the API log)
 #   hamnivo.sh backup [--to DIR] [--keep N] [--no-secrets]
@@ -581,6 +583,7 @@ main() {
     build) cmd_build "$@" ;;
     update) exec bash "$here/deploy.sh" deploy --latest --trigger manual "$@" ;;
     deploy | rollback | deploys | autodeploy) exec bash "$here/deploy.sh" "$command" "$@" ;;
+    doctor) exec bash "$here/doctor.sh" "$@" ;;
     down) need_env; "${compose[@]}" down ;;
     compose) need_env; "${compose[@]}" "$@" ;;
     help | -h | --help) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0" ;;

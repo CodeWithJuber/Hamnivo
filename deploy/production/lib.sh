@@ -86,30 +86,92 @@ take_lock() {
 
 container_of() { "${compose[@]}" ps -q "$1" 2>/dev/null | head -1; }
 
+# "<state> <restarts>" of a service's container: its health, else its status ("missing" when there
+# is no container), and how often Docker restarted it.
+service_state() { # service_state SERVICE
+  local id state='' restarts=0
+  id="$(container_of "$1")"
+  if [[ -n "$id" ]]; then
+    state="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || true)"
+    restarts="$(docker inspect -f '{{.RestartCount}}' "$id" 2>/dev/null || echo 0)"
+  fi
+  printf '%s %s' "${state:-missing}" "$restarts"
+}
+
 # Waits until each service is healthy (or running, when it has no health check). A container that
 # stops or keeps restarting fails at once. Deploys also fail at once on "unhealthy"
 # (HAMNIVO_FAIL_UNHEALTHY=1), so that a broken version is rolled back quickly; a first start on a
 # slow server may pass through "unhealthy" and recover, so it keeps waiting.
 wait_healthy() {
-  local service deadline=$((SECONDS + ${HAMNIVO_WAIT_SECONDS:-900})) id state restarts
+  local service deadline=$((SECONDS + ${HAMNIVO_WAIT_SECONDS:-900})) state restarts
   for service in "$@"; do
     log "Waiting for $service"
     while :; do
-      id="$(container_of "$service")"
-      state=''
-      restarts=0
-      if [[ -n "$id" ]]; then
-        state="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || true)"
-        restarts="$(docker inspect -f '{{.RestartCount}}' "$id" 2>/dev/null || echo 0)"
-      fi
+      read -r state restarts <<<"$(service_state "$service")"
       [[ "$state" == healthy || "$state" == running ]] && break
       if [[ "$state" == exited || "$state" == dead ]] || ((restarts >= 3)) ||
         [[ "$state" == unhealthy && -n "${HAMNIVO_FAIL_UNHEALTHY:-}" ]] || ((SECONDS > deadline)); then
         "${compose[@]}" logs --tail 80 "$service" >&2 || true
-        log "$service did not become healthy (state: ${state:-missing}, restarts: $restarts)."
+        log "$service did not become healthy (state: $state, restarts: $restarts)."
         return 1
       fi
       sleep 3
     done
   done
+}
+
+# Free disk space where Docker keeps its data, in whole GB.
+docker_free_gb() {
+  local dir
+  dir="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)"
+  df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print int($4 / 1048576) }'
+}
+
+# --- HTTPS, as a browser reaches the edge --------------------------------------------------------
+# deploy.sh checks it before every build and after every switch; doctor.sh checks it for every
+# public name. Both ask this machine's own edge: the name resolves to 127.0.0.1 here.
+ca_args=()
+
+https_port() { setting HAMNIVO_HTTPS_PORT 443; }
+
+host_of() { # host_of URL: the name in https://NAME[:PORT]/...
+  local host="${1#https://}"
+  host="${host%%/*}"
+  printf '%s' "${host%%:*}"
+}
+
+# The names the edge serves: Studio, the API, the chat widget, Chatwoot and the website.
+public_hosts() {
+  local host sites=()
+  IFS=' ' read -r -a sites <<<"$(get HAMNIVO_SITE_HOSTS)"
+  for host in "$(get HAMNIVO_APP_HOST)" "$(get HAMNIVO_API_HOST)" "$(get HAMNIVO_CHAT_HOST)" \
+    "$(get HAMNIVO_SUPPORT_HOST)" "${sites[@]}"; do
+    if [[ -n "$host" ]]; then printf '%s\n' "$host"; fi
+  done
+}
+
+# With HAMNIVO_TLS=internal the certificates come from Caddy's own CA, which is trusted for these
+# requests only: sets ca_args to (--cacert FILE), or to nothing (Let's Encrypt).
+edge_ca() { # edge_ca FILE
+  ca_args=()
+  if [[ "$(get HAMNIVO_TLS)" == internal ]] &&
+    "${compose[@]}" exec -T edge cat /data/caddy/pki/authorities/local/root.crt >"$1" 2>/dev/null; then
+    ca_args=(--cacert "$1")
+  fi
+}
+
+# curl through the edge on this machine: URL is https://NAME[:PORT]/..., and NAME goes to 127.0.0.1.
+curl_edge() { # curl_edge URL CURL_OPTIONS...
+  local url="$1"
+  shift
+  curl --resolve "$(host_of "$url"):$(https_port):127.0.0.1" "${ca_args[@]}" "$@" "$url"
+}
+
+# Whether curl's exit code says that the TLS handshake or the certificate failed, not the connection
+# or HTTP. Caddy answers a name it has no certificate for with the alert "internal error" (35).
+tls_failure() { # tls_failure CODE
+  case "$1" in
+    35 | 51 | 53 | 54 | 58 | 59 | 60 | 66 | 77 | 80 | 82 | 83 | 90 | 91) return 0 ;;
+    *) return 1 ;;
+  esac
 }
