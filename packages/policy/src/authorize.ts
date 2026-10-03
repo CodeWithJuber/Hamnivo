@@ -38,6 +38,11 @@ export interface StaffPrincipal extends PrincipalBase {
   mfa: boolean;
   /** When the user last authenticated (used for step-up freshness). */
   authenticatedAt: Date;
+  /**
+   * The request only reads (GET). Step-up guards changes, so it does not apply, except for
+   * permissions whose read is the sensitive act (`stepUpReads`: exports).
+   */
+  reading?: boolean;
 }
 
 export interface ServiceAccountPrincipal extends PrincipalBase {
@@ -148,7 +153,8 @@ export function authorize(
   }
 
   if ('mfa' in spec && spec.mfa && !principal.mfa) return deny('mfa_required');
-  if ('stepUp' in spec && spec.stepUp) {
+  const readExempt = principal.reading === true && !('stepUpReads' in spec && spec.stepUpReads);
+  if ('stepUp' in spec && spec.stepUp && !readExempt) {
     const maxAge = options.stepUpMaxAgeMs ?? DEFAULT_STEP_UP_MAX_AGE_MS;
     if (now.getTime() - principal.authenticatedAt.getTime() > maxAge)
       return deny('step_up_required');

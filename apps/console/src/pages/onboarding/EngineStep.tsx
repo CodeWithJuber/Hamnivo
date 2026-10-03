@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConnectionBadge } from '../../components/Badges';
 import { stepOf } from '../../components/ProvisioningProgress';
-import { ActionError } from '../../components/States';
+import { ActionError, ErrorPanel } from '../../components/States';
 import { api, newIdempotencyKey } from '../../lib/api';
 import { keys, useAuthorityConnections, useStudioMutation } from '../../lib/queries';
 import { isCancelled } from '../../lib/reauth';
@@ -129,6 +129,13 @@ export function EngineStep({
           <Spinner aria-hidden="true" role="presentation" />
           {t('setup.onboarding.engine.checking')}
         </p>
+      ) : connections.isError && !connection ? (
+        // Without the list it cannot tell whether the brand has an engine: say why, never spin.
+        <ErrorPanel
+          error={connections.error}
+          onRetry={() => void connections.refetch()}
+          retrying={connections.isFetching}
+        />
       ) : ready ? (
         <div className="flex flex-col gap-3" data-testid="engine-ready">
           <div className="flex flex-wrap items-center gap-2">

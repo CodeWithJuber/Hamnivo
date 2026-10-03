@@ -735,6 +735,34 @@ describe('migration permissions', () => {
   });
 });
 
+describe('step-up on reads', () => {
+  const admin = grant({
+    permissions: ['integrations.manage', 'audit.export', 'conversations.export'],
+    scope: { type: 'tenant' },
+  });
+  const old = { authenticatedAt: minutesAgo(60) };
+
+  it('lets an old session read what a step-up permission covers, but not change it', () => {
+    expect(authorize(staff([admin], old), 'integrations.manage', {}, { now })).toMatchObject({
+      allowed: false,
+      reason: 'step_up_required',
+    });
+    expect(
+      authorize(staff([admin], { ...old, reading: true }), 'integrations.manage', {}, { now })
+        .allowed,
+    ).toBe(true);
+  });
+
+  it('still asks for a recent sign-in to read an export', () => {
+    for (const permission of ['audit.export', 'conversations.export'] as const) {
+      expect(permissionSpec(permission)).toMatchObject({ stepUp: true, stepUpReads: true });
+      expect(
+        authorize(staff([admin], { ...old, reading: true }), permission, {}, { now }),
+      ).toMatchObject({ allowed: false, reason: 'step_up_required' });
+    }
+  });
+});
+
 describe('developer platform permissions', () => {
   it('lets API keys carry only permissions without step-up or MFA', () => {
     expect(API_KEY_PERMISSIONS.length).toBeGreaterThan(0);

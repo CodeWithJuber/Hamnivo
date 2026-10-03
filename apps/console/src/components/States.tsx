@@ -7,6 +7,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isApiError } from '../lib/api';
 import { describeError } from '../lib/errors';
+import { reauth } from '../lib/reauth';
 
 /** Permission-denied state: says what is missing and who can help (HNV-02-06, HNV-24-02). */
 export function Forbidden({
@@ -54,12 +55,16 @@ export function ErrorPanel({
   const { t } = useTranslation();
   if (isApiError(error, 'SCOPE_DENIED')) return <Forbidden compact />;
   const text = describeError(t, error);
+  // Too long since the last sign-in: the button opens the sign-in dialog, then loads again.
+  const stale = isApiError(error, 'REAUTH_REQUIRED');
   return (
     <RecoverableError
       title={text.title}
       description={text.detail ? `${text.description} ${text.detail}` : text.description}
-      retryLabel={t('app.retry')}
-      onRetry={onRetry}
+      retryLabel={stale ? t('errors.reauth.action') : t('app.retry')}
+      onRetry={
+        stale ? () => void reauth.request('step-up').then(onRetry, () => undefined) : onRetry
+      }
       retrying={retrying ?? false}
       referenceLabel={t('app.reference')}
       {...(text.reference ? { reference: text.reference } : {})}

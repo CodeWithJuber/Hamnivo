@@ -294,6 +294,22 @@ describe('the chat engine step', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 
+  it('asks for a fresh sign-in instead of spinning when the list needs one', async () => {
+    const gateway = fakeGateway({
+      'GET /v1/admin/authority/connections': {
+        problem: { status: 401, code: 'REAUTH_REQUIRED' },
+      },
+    });
+    await mountStudio({
+      permissions: owner,
+      screen: <EngineStep brand={brand} onDone={() => undefined} />,
+    });
+    expect(await screen.findByText('Sign in again to continue')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign in again' })).toBeTruthy();
+    expect(screen.queryByTestId('engine-working')).toBeNull();
+    expect(gateway.writes()).toEqual([]);
+  });
+
   it('says so when the connection is turned off, and does not set up another', async () => {
     const gateway = fakeGateway({});
     await mountStudio({

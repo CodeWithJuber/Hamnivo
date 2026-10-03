@@ -103,6 +103,11 @@ export const en = {
       description:
         'Your plan doesn’t include more of this. Free some up, or ask the workspace owner about a larger plan.',
     },
+    reauth: {
+      title: 'Sign in again to continue',
+      description: 'For your safety, this needs a recent sign-in.',
+      action: 'Sign in again',
+    },
     unknown: { title: 'Something went wrong', description: 'Try again.' },
     page: {
       title: 'This page couldn’t load',

@@ -20,6 +20,7 @@ type ErrorKey =
   | 'idempotency'
   | 'conflict'
   | 'mfa'
+  | 'reauth'
   | 'tooLarge'
   | 'rejected'
   | 'disabled'
@@ -50,6 +51,8 @@ function keyOf(error: ApiError): ErrorKey {
       return 'conflict';
     case 'MFA_REQUIRED':
       return 'mfa';
+    case 'REAUTH_REQUIRED':
+      return 'reauth';
     case 'UPLOAD_TOO_LARGE':
       return 'tooLarge';
     case 'UPLOAD_REJECTED':
