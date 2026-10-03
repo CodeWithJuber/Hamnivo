@@ -45,6 +45,12 @@ Design principles, carried into code and tests:
 - **Evidence before automation** — an action is complete only with an authoritative receipt; unknown stays unknown.
 - **Recovery before release** — drafts survive failures, sends are idempotent, takeovers fence stale AI output.
 
+## Start here
+
+**New to Hamnivo?** Start with the **[documentation site](https://your-domain.com/docs)** — it's written for non-technical business owners and covers everything you need to get running.
+
+For an overview, see [`docs/using-hamnivo.md`](docs/using-hamnivo.md): it explains which app to use and what each one does.
+
 ## Quick start
 
 Requirements: Node ≥ 22.12 (24 LTS recommended), pnpm 10, Docker and openssl. Everything runs on

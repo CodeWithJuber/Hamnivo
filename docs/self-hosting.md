@@ -228,8 +228,8 @@ Open Studio, the staff console, at `https://app.example.com` (your domain in pla
            data-api="https://api.example.com" async></script>
    ```
 
-Staff can answer customers in Chatwoot at `https://support.example.com`. The super admin email and
-password are in `.env` (`CHATWOOT_ADMIN_EMAIL` and `CHATWOOT_ADMIN_PASSWORD`).
+Staff answer customers in Hamnivo Studio's **Inbox**. Go to `https://app.example.com` and click
+**Inbox** to see waiting chats.
 
 ### Decisions with Jev
 
