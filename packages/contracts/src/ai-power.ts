@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RunStep } from './agents.js';
 import { Timestamp } from './common.js';
 import { typeId } from './ids.js';
 import { KnowledgeVisibility } from './knowledge.js';
@@ -260,6 +261,101 @@ const webSourceParams = z.object({
   webSourceId: z.string().meta({ description: 'Website source ID (wsrc_…)' }),
 });
 
+// ── Test your AI ─────────────────────────────────────────────────────────────────────────
+
+const agentParams = z.object({ agentId: z.string().meta({ description: 'Agent ID (agt_…)' }) });
+
+export const PlaygroundVersion = z.enum(['draft', 'published']).meta({
+  id: 'PlaygroundVersion',
+  description: 'Which version of the agent to try: the saved draft, or the one that is live.',
+});
+
+export const PlaygroundMessage = z
+  .object({
+    role: z.enum(['user', 'assistant']),
+    text: z.string().trim().min(1).max(2000),
+  })
+  .meta({ id: 'PlaygroundMessage' });
+
+/**
+ * One turn of a scratch conversation. The conversation is kept by the person testing, not by
+ * Hamnivo: it is sent whole each time, nothing of it is stored, and no customer, no earlier
+ * conversation and no memory is in it.
+ */
+export const PlaygroundRequest = z
+  .object({
+    version: PlaygroundVersion.default('draft'),
+    messages: z
+      .array(PlaygroundMessage)
+      .min(1)
+      .max(20)
+      .refine((messages) => messages.at(-1)?.role === 'user', {
+        message: 'The last message must be the one being tested.',
+      }),
+  })
+  .meta({ id: 'PlaygroundRequest' });
+
+/** A passage of the knowledge base the reply cites. */
+export const PlaygroundSource = z
+  .object({
+    documentId: typeId('document'),
+    title: z.string(),
+    heading: z.string().nullable(),
+    url: z.string().nullable(),
+    excerpt: z.string(),
+  })
+  .meta({ id: 'PlaygroundSource' });
+
+/** A tool the AI asked for: what the live rules would do with it. Nothing is ever run. */
+export const PlaygroundAction = z
+  .object({
+    tool: z.string(),
+    title: z.string(),
+    /**
+     * `would_run`: it would run at once in a live chat. `needs_approval`: someone would be asked
+     * first. `denied`: the rules refuse it. `invalid`: the AI sent arguments the tool does not take.
+     */
+    decision: z.enum(['would_run', 'needs_approval', 'denied', 'invalid']),
+    reason: z.string().nullable(),
+    arguments: z.record(z.string(), z.unknown()).nullable(),
+  })
+  .meta({ id: 'PlaygroundAction' });
+
+export const PlaygroundResult = z
+  .object({
+    outcome: z.enum(['replied', 'handoff', 'blocked', 'error']),
+    /** What the AI would say to the customer (citation numbers already checked). */
+    reply: z.string().nullable(),
+    /** Why a live chat would go to a person, with the live reasons. */
+    handoffReason: z.string().nullable(),
+    /** What went wrong when the outcome is `error`, in the words runs record. */
+    errorKind: z.string().nullable(),
+    version: z.object({ number: z.int().positive(), state: PlaygroundVersion }),
+    /** The model that answered: the agent's own choice or one of its fallbacks. */
+    model: z.object({ provider: z.string(), modelId: z.string() }).nullable(),
+    inputTokens: z.int().nullable(),
+    outputTokens: z.int().nullable(),
+    latencyMs: z.int(),
+    sources: z.array(PlaygroundSource),
+    actions: z.array(PlaygroundAction),
+    /** What happened, in order, as a live run records it. */
+    steps: z.array(RunStep),
+  })
+  .meta({ id: 'PlaygroundResult' });
+export type PlaygroundSource = z.infer<typeof PlaygroundSource>;
+export type PlaygroundAction = z.infer<typeof PlaygroundAction>;
+export type PlaygroundStep = z.infer<typeof RunStep>;
+export type PlaygroundResult = z.infer<typeof PlaygroundResult>;
+
+/** The memory customer behind a conversation, so Studio can show what is remembered. */
+export const ConversationMemoryCustomer = z
+  .object({
+    /** The customer whose memory the conversation's customer is, or none (an unknown visitor). */
+    customerId: typeId('customer').nullable(),
+  })
+  .meta({ id: 'ConversationMemoryCustomer' });
+export type ConversationMemoryCustomer = z.infer<typeof ConversationMemoryCustomer>;
+
 // ── Hamnivo's own MCP server ─────────────────────────────────────────────────────────────
 
 /** A JSON-RPC 2.0 message of the Model Context Protocol (Streamable HTTP, no sessions). */
@@ -421,6 +517,35 @@ export const aiPowerRoutes = {
       status: 200,
       description: 'Pages',
       schema: z.object({ items: z.array(KnowledgeWebPage) }),
+    },
+  },
+  runAgentPlayground: {
+    method: 'post',
+    path: '/v1/admin/agents/{agentId}/playground',
+    operationId: 'runAgentPlayground',
+    summary:
+      'Try an agent in a scratch conversation with its own model connection: nothing is stored, nothing reaches a customer or Chatwoot, and no tool is run (agents.manage)',
+    tags: ['Agents'],
+    auth: 'staff_session',
+    params: agentParams,
+    body: PlaygroundRequest,
+    success: { status: 200, description: 'What the AI would do', schema: PlaygroundResult },
+  },
+  getConversationMemoryCustomer: {
+    method: 'get',
+    path: '/v1/admin/memory/conversations/{conversationId}',
+    operationId: 'getConversationMemoryCustomer',
+    summary:
+      'The memory customer of a conversation, for the inbox panel (conversations.read and memory.read)',
+    tags: ['Memory'],
+    auth: 'staff_session',
+    params: z.object({
+      conversationId: z.string().meta({ description: 'Conversation ID (conv_…)' }),
+    }),
+    success: {
+      status: 200,
+      description: 'Memory customer',
+      schema: ConversationMemoryCustomer,
     },
   },
 } as const satisfies Record<string, RouteDef>;

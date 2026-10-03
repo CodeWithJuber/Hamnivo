@@ -848,9 +848,12 @@
       "apps/widget/e2e/memory.spec.ts",
       "apps/gateway/test/memory.int.test.ts",
       "apps/console/src/pages/CustomerMemoryPage.tsx",
-      "apps/console/e2e/memory.spec.ts"
+      "apps/console/e2e/memory.spec.ts",
+      "apps/console/src/components/memory/CustomerMemoryCard.tsx",
+      "apps/console/test/customer-memory-card.test.tsx",
+      "apps/gateway/test/conversation-memory.int.test.ts"
     ],
-    "note": "Customers agree or decline, see what is remembered with its source and expiry, correct, confirm, delete, forget everything and turn memory off in the widget; staff do the same in Studio within their grants (tested in the API and in browsers, including right to left). Retention is fixed per memory type; letting brands or customers configure it is pending."
+    "note": "Customers agree or decline, see what is remembered with its source and expiry, correct, confirm, delete, forget everything and turn memory off in the widget; staff do the same in Studio within their grants (tested in the API and in browsers, including right to left). Retention is fixed per memory type; letting brands or customers configure it is pending. Staff also see, correct and delete a customer’s memory beside the conversation in the inbox (unit-tested, no browser test)."
   },
   "L05": {
     "status": "in-progress",
@@ -919,9 +922,11 @@
       "apps/console/e2e/memory.spec.ts",
       "apps/console/src/pages/MemoryPage.tsx",
       "apps/widget/src/components/MemoryPanel.tsx",
-      "apps/widget/e2e/memory.spec.ts"
+      "apps/widget/e2e/memory.spec.ts",
+      "apps/console/src/components/memory/CustomerMemoryCard.tsx",
+      "apps/console/test/customer-memory-card.test.tsx"
     ],
-    "note": "Studio lists customers with memory and shows each memory with purpose, source message, who recorded it, scope, expiry and history; customers see theirs in the widget (tested, including right to left)."
+    "note": "Studio lists customers with memory and shows each memory with purpose, source message, who recorded it, scope, expiry and history; customers see theirs in the widget (tested, including right to left). The inbox panel lists each memory with its source and the day it was observed."
   },
   "HNV-15-03": {
     "status": "implemented",
@@ -1024,9 +1029,13 @@
       "apps/console/e2e/inbox.spec.ts",
       "apps/console/src/pages/inbox/ContextPanel.tsx",
       "apps/gateway/src/inbox/inbox.service.ts",
-      "apps/gateway/test/inbox-workspace.int.test.ts"
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "apps/console/src/components/memory/CustomerMemoryCard.tsx",
+      "apps/console/test/customer-memory-card.test.tsx",
+      "apps/gateway/test/conversation-memory.int.test.ts",
+      "docs/guide/ai/see-what-the-ai-remembers.md"
     ],
-    "note": "Verified or anonymous identity and what that means, a verified email apart from an address nobody verified, language, brand, Chatwoot contact attributes (Hamnivo's internal ones left out) and the other conversations the person can see. A third column on wide screens, a sheet otherwise."
+    "note": "Verified or anonymous identity and what that means, a verified email apart from an address nobody verified, language, brand, Chatwoot contact attributes (Hamnivo's internal ones left out) and the other conversations the person can see. A third column on wide screens, a sheet otherwise. Beside the customer, the panel shows what the AI remembers about them, each memory with its source, for people who may read memory in the brand; people with the right grants correct or delete a memory there (tested in the gateway and in unit tests; no browser test)."
   },
   "H07": {
     "status": "implemented",
@@ -2625,9 +2634,14 @@
       "apps/gateway/src/actions/publish-checks.ts",
       "apps/gateway/test/tools.int.test.ts",
       "apps/console/src/components/Simulations.tsx",
-      "apps/console/e2e/tools.spec.ts"
+      "apps/console/e2e/tools.spec.ts",
+      "apps/gateway/src/runtime/playground.service.ts",
+      "apps/gateway/test/playground.int.test.ts",
+      "apps/console/src/components/agent/AgentPlayground.tsx",
+      "apps/console/test/agent-playground.test.tsx",
+      "docs/guide/ai/test-your-ai.md"
     ],
-    "note": "Suites of frozen cases (customer messages and what each tool answers) replay against the draft and the published version with nothing sent; Studio shows what changed, and publishing waits until required suites pass on the exact draft (tested in the gateway and in a browser). Replays use the deterministic mock model, so they show what Hamnivo’s rules do with the draft (tools offered, approvals, budgets, guards), not what the configured model would say. Replaying with the tenant’s own model is not built."
+    "note": "Suites of frozen cases (customer messages and what each tool answers) replay against the draft and the published version with nothing sent; Studio shows what changed, and publishing waits until required suites pass on the exact draft (tested in the gateway and in a browser). Replays use the deterministic mock model, so they show what Hamnivo’s rules do with the draft (tools offered, approvals, budgets, guards), not what the configured model would say. Replaying with the tenant’s own model is not built. Apart from replays, “Test your AI” lets a person try the draft or the live version in a scratch conversation with the agent’s own model connection, its knowledge and its tools’ rules: tools are judged by the live rules and never run, nothing is stored or sent to Chatwoot, every reply goes through the honesty and claim guards, and each turn spends tokens against the plan and budget (tested against a made-up model server in the gateway; the Studio panel is unit-tested, with no browser test). It does not run the brand’s Jev checks."
   },
   "G13": {
     "status": "implemented",

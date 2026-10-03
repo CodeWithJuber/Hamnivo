@@ -96,6 +96,10 @@ import { KillSwitchesService } from './runtime/kill-switches.service.js';
 import { ModelConnectionsController } from './runtime/model-connections.controller.js';
 import { ModelConnectionsService } from './runtime/model-connections.service.js';
 import { LANGUAGE_MODEL, ModelFactory } from './runtime/models.js';
+import {
+  PLAYGROUND_API_CONTROLLERS,
+  PLAYGROUND_API_PROVIDERS,
+} from './runtime/playground.module.js';
 import { RunsController } from './runtime/runs.controller.js';
 import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
@@ -166,6 +170,7 @@ export class ApiModule {
         ...ACTIONS_API_CONTROLLERS,
         ...MCP_SERVER_API_CONTROLLERS,
         ...KNOWLEDGE_WEB_API_CONTROLLERS,
+        ...PLAYGROUND_API_CONTROLLERS,
       ],
       providers: [
         {
@@ -250,6 +255,7 @@ export class ApiModule {
         ...ACTIONS_API_PROVIDERS,
         ...MCP_SERVER_API_PROVIDERS,
         ...KNOWLEDGE_WEB_API_PROVIDERS,
+        ...PLAYGROUND_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

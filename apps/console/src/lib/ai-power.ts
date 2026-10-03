@@ -1,13 +1,14 @@
 /**
- * AI power tools (D10, G04, G17): signing in to MCP servers, what they list besides tools, and the
- * catalog of services whose vendors run an MCP server: API shapes and queries. Everything a service
- * says about itself is untrusted text; the pages show it quoted.
+ * AI power tools (D10, G04, G17, G11, H06): signing in to MCP servers, what they list besides tools,
+ * the catalog of services whose vendors run an MCP server, websites as knowledge, the memory card
+ * beside a conversation and the answer of "Test your AI": API shapes and queries. Everything a
+ * service says about itself is untrusted text; the pages show it quoted.
  */
 import type * as C from '@hamnivo/contracts';
 import type { i18n as I18n, TFunction } from 'i18next';
-import { useStudioQuery } from './queries';
+import { keys, useStudioQuery } from './queries';
 import { useTenant } from './tenant';
-import type { Items } from './types';
+import type { Items, MemoryCustomerDetail } from './types';
 
 export type McpPreset = C.McpPreset;
 export type McpCatalog = C.McpCatalog;
@@ -17,6 +18,11 @@ export type McpOAuthStart = C.McpOAuthStart;
 export type KnowledgeWebSource = C.KnowledgeWebSource;
 export type KnowledgeWebPage = C.KnowledgeWebPage;
 export type WebSyncSummary = C.WebSyncSummary;
+export type PlaygroundResult = C.PlaygroundResult;
+export type PlaygroundAction = C.PlaygroundAction;
+export type PlaygroundSource = C.PlaygroundSource;
+export type PlaygroundStep = C.PlaygroundStep;
+export type ConversationMemoryCustomer = C.ConversationMemoryCustomer;
 
 export const aiPowerKeys = {
   presets: ['mcp-presets'] as const,
@@ -25,6 +31,9 @@ export const aiPowerKeys = {
   /** Under the knowledge key: a website is a knowledge source whose documents are its pages. */
   webSources: ['knowledge', 'web-sources'] as const,
   webPages: (webSourceId: string) => ['knowledge', 'web-sources', webSourceId, 'pages'] as const,
+  /** Under the memory key, so what a memory change reloads includes the inbox card. */
+  conversationMemory: (conversationId: string) =>
+    ['memory', 'conversations', conversationId] as const,
 };
 
 /** Remote MCP servers that vendors run themselves, each with the vendor page that names it. */
@@ -69,6 +78,33 @@ export function useWebPages(webSourceId: string | undefined, enabled: boolean) {
     aiPowerKeys.webPages(webSourceId ?? ''),
     `/v1/admin/knowledge/web-sources/${webSourceId}/pages`,
     { enabled: enabled && can('knowledge.read') && Boolean(webSourceId) },
+  );
+}
+
+/** Which customer's memory a conversation belongs to (none for a visitor nobody knows). */
+export function useConversationMemoryCustomer(conversationId: string) {
+  const { can } = useTenant();
+  return useStudioQuery<ConversationMemoryCustomer>(
+    aiPowerKeys.conversationMemory(conversationId),
+    `/v1/admin/memory/conversations/${conversationId}`,
+    { enabled: can('memory.read') },
+  );
+}
+
+/**
+ * One customer's memory once the customer is known. It shares its key with the memory page's
+ * query, so a correction made on either reloads both.
+ */
+export function useMemoryOf(customerId: string | null) {
+  const { can } = useTenant();
+  return useStudioQuery<MemoryCustomerDetail>(
+    keys.memoryCustomer(customerId ?? ''),
+    `/v1/admin/memory/customers/${customerId}`,
+    {
+      enabled: can('memory.read') && customerId !== null,
+      refetchInterval: (data) =>
+        data?.deletions.some((deletion) => deletion.status === 'pending') ? 2000 : false,
+    },
   );
 }
 

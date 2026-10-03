@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { AgentTools } from '../components/AgentTools';
 import { AgentVersions } from '../components/AgentVersions';
 import { ConfirmDialog } from '../components/AppDialog';
+import { AgentPlayground } from '../components/agent/AgentPlayground';
 import { VisibilityBadge } from '../components/Badges';
 import {
   CheckboxField,
@@ -873,6 +874,12 @@ function Editor({ detail }: { detail: AgentDetail }) {
         </aside>
       </div>
 
+      <AgentPlayground
+        agentId={agent.id}
+        draftVersion={draftVersion}
+        publishedVersion={published}
+        unsaved={dirty}
+      />
       <Simulations agentId={agent.id} draftVersion={draftVersion} />
 
       <ConfirmDialog

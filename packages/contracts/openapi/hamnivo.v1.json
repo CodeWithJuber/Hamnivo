@@ -19393,6 +19393,130 @@
         }
       }
     },
+    "/v1/admin/agents/{agentId}/playground": {
+      "post": {
+        "operationId": "runAgentPlayground",
+        "summary": "Try an agent in a scratch conversation with its own model connection: nothing is stored, nothing reaches a customer or Chatwoot, and no tool is run (agents.manage)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "description": "Agent ID (agt_…)"
+            },
+            "required": true,
+            "description": "Agent ID (agt_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaygroundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What the AI would do",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaygroundResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/conversations/{conversationId}": {
+      "get": {
+        "operationId": "getConversationMemoryCustomer",
+        "summary": "The memory customer of a conversation, for the inbox panel (conversations.read and memory.read)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Memory customer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationMemoryCustomer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/inbox/conversations/{conversationId}/actions": {
       "get": {
         "operationId": "listConversationActions",
@@ -25377,6 +25501,55 @@
             "$ref": "#/components/schemas/WebSyncSchedule"
           }
         }
+      },
+      "PlaygroundRequest": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "default": "draft",
+            "$ref": "#/components/schemas/PlaygroundVersion"
+          },
+          "messages": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaygroundMessage"
+            }
+          }
+        },
+        "required": [
+          "messages"
+        ]
+      },
+      "PlaygroundVersion": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "published"
+        ],
+        "description": "Which version of the agent to try: the saved draft, or the one that is live."
+      },
+      "PlaygroundMessage": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "role",
+          "text"
+        ]
       },
       "DecideActionRequest": {
         "type": "object",
@@ -48509,6 +48682,246 @@
           "status",
           "lastFetchedAt",
           "error"
+        ],
+        "additionalProperties": false
+      },
+      "PlaygroundResult": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "replied",
+              "handoff",
+              "blocked",
+              "error"
+            ]
+          },
+          "reply": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "handoffReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errorKind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "state": {
+                "$ref": "#/components/schemas/PlaygroundVersion"
+              }
+            },
+            "required": [
+              "number",
+              "state"
+            ],
+            "additionalProperties": false
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "modelId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latencyMs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaygroundSource"
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaygroundAction"
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunStep"
+            }
+          }
+        },
+        "required": [
+          "outcome",
+          "reply",
+          "handoffReason",
+          "errorKind",
+          "version",
+          "model",
+          "inputTokens",
+          "outputTokens",
+          "latencyMs",
+          "sources",
+          "actions",
+          "steps"
+        ],
+        "additionalProperties": false
+      },
+      "PlaygroundSource": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "document identifier (TypeID with prefix \"doc\")",
+            "example": "doc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "title": {
+            "type": "string"
+          },
+          "heading": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "excerpt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "documentId",
+          "title",
+          "heading",
+          "url",
+          "excerpt"
+        ],
+        "additionalProperties": false
+      },
+      "PlaygroundAction": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "would_run",
+              "needs_approval",
+              "denied",
+              "invalid"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "tool",
+          "title",
+          "decision",
+          "reason",
+          "arguments"
+        ],
+        "additionalProperties": false
+      },
+      "ConversationMemoryCustomer": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "customer identifier (TypeID with prefix \"cus\")",
+                "example": "cus_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "customerId"
         ],
         "additionalProperties": false
       },
