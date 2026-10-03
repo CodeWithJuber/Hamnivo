@@ -12,6 +12,7 @@ you give it.
 | `analytics.read` | Read reports (`/v1/admin/analytics/overview`) and the CSV export. Aggregates only, never message content. |
 | `billing.read` | Read the plan, usage against its limits, and invoices. |
 | `webhooks.read` | Read webhook endpoints, the delivery log and the event log. Never a signing secret. |
+| `mcp.read` | Let an AI assistant such as Claude read conversations (as customers see them), knowledge, customer memory and open hand-offs through Hamnivo's MCP server at `/mcp`. Read only. See [Let an AI assistant read your support data](../guide/ai/hamnivo-for-claude-and-chatgpt.md). |
 
 A key never gets more than the person who creates it holds. Actions that need a person stay with
 people: managing keys, webhooks, budgets, members and anything else that needs two-step

@@ -64,6 +64,10 @@ import { KnowledgeService } from './knowledge/knowledge.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
 import type { Scanner } from './knowledge/scanner.js';
 import { LanguageController } from './language/language.controller.js';
+import {
+  MCP_SERVER_API_CONTROLLERS,
+  MCP_SERVER_API_PROVIDERS,
+} from './mcp-server/mcp-server.module.js';
 import { AdminMemoryController } from './memory/admin-memory.controller.js';
 import { AdminMemoryService } from './memory/admin-memory.service.js';
 import { MemoryCache } from './memory/cache.js';
@@ -156,6 +160,7 @@ export class ApiModule {
         ...DEVELOPER_API_CONTROLLERS,
         ...WIDGET_SURFACE_API_CONTROLLERS,
         ...ACTIONS_API_CONTROLLERS,
+        ...MCP_SERVER_API_CONTROLLERS,
       ],
       providers: [
         {
@@ -238,6 +243,7 @@ export class ApiModule {
         ...developerApiProviders(overrides),
         ...widgetSurfaceApiProviders(config, overrides.scanner),
         ...ACTIONS_API_PROVIDERS,
+        ...MCP_SERVER_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

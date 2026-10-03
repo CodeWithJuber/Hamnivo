@@ -169,6 +169,8 @@ const EnvSchema = z.object({
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(600),
   /** Requests per minute for one API key (each key has its own budget). */
   API_KEY_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(120),
+  /** Tool calls per minute for one API key on the MCP server, on top of the budget above. */
+  MCP_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(30),
 
   /**
    * Outbound requests made for tenants (webhooks) reach public HTTPS hosts only. Origins listed

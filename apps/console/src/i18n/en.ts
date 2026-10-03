@@ -2293,6 +2293,7 @@ export const en = {
     api_keys: 'API keys',
     webhooks: 'Webhooks',
     network: 'Allowed hosts',
+    mcp: 'AI assistants (MCP)',
     integrations: 'Integrations',
     secrets: 'Credentials',
     extensions: 'Extensions',
@@ -2376,6 +2377,9 @@ export const en = {
       manage: 'Configure outgoing webhooks',
     },
     network: { manage: 'Choose which outside hosts Hamnivo may call' },
+    mcp: {
+      read: 'Let AI assistants such as Claude read conversations, knowledge and customer memory through Hamnivo’s MCP server',
+    },
     integrations: { manage: 'Connect channels and third-party services' },
     secrets: { manage: 'Store and rotate credentials' },
     extensions: { manage: 'Install and remove extensions' },

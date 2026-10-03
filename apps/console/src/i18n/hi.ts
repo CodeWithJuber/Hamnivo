@@ -2277,6 +2277,7 @@ export const hi: Translation = {
     api_keys: 'API कुंजियां',
     webhooks: 'वेबहुक',
     network: 'अनुमत होस्ट',
+    mcp: 'एआई सहायक (MCP)',
     integrations: 'इंटीग्रेशन',
     secrets: 'क्रेडेंशियल',
     extensions: 'एक्सटेंशन',
@@ -2361,6 +2362,9 @@ export const hi: Translation = {
       manage: 'बाहर जाने वाले वेबहुक सेट करें',
     },
     network: { manage: 'चुनें कि Hamnivo किन बाहरी होस्ट से जुड़ सकता है' },
+    mcp: {
+      read: 'Claude जैसे एआई सहायकों को Hamnivo के MCP सर्वर से बातचीत, जानकारी और ग्राहक की स्मृति पढ़ने दें',
+    },
     integrations: { manage: 'चैनल और थर्ड-पार्टी सेवाएं जोड़ें' },
     secrets: { manage: 'क्रेडेंशियल सहेजें और बदलें' },
     extensions: { manage: 'एक्सटेंशन इंस्टॉल करें और हटाएं' },

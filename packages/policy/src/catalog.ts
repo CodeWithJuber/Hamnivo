@@ -182,6 +182,11 @@ export const PERMISSIONS = {
     scopes: TENANT,
     stepUp: true,
   },
+  'mcp.read': {
+    description:
+      'Let AI assistants such as Claude read conversations, knowledge and customer memory through Hamnivo’s MCP server',
+    scopes: BRAND,
+  },
   'integrations.manage': {
     description: 'Connect channels and third-party services',
     scopes: WORKSPACE,
@@ -239,6 +244,7 @@ export const API_KEY_PERMISSIONS = [
   'analytics.read',
   'billing.read',
   'webhooks.read',
+  'mcp.read',
 ] as const satisfies readonly Permission[];
 export type ApiKeyPermission = (typeof API_KEY_PERMISSIONS)[number];
 

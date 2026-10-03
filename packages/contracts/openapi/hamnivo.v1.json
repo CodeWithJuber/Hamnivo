@@ -18655,6 +18655,53 @@
         }
       }
     },
+    "/mcp": {
+      "post": {
+        "operationId": "postMcp",
+        "summary": "Hamnivo’s own MCP server (Streamable HTTP, JSON-RPC): read-only tools for AI assistants such as Claude, called with an API key that holds mcp.read",
+        "tags": [
+          "MCP"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpMessage"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The JSON-RPC answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/mcp-presets": {
       "get": {
         "operationId": "listMcpPresets",
@@ -23916,7 +23963,8 @@
         "enum": [
           "analytics.read",
           "billing.read",
-          "webhooks.read"
+          "webhooks.read",
+          "mcp.read"
         ]
       },
       "RotateApiKeyRequest": {
@@ -24853,6 +24901,14 @@
           "name",
           "messages"
         ]
+      },
+      "McpMessage": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "A JSON-RPC 2.0 request, notification or response."
       },
       "StartMcpOAuthRequest": {
         "type": "object",

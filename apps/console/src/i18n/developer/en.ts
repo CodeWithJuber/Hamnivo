@@ -38,6 +38,12 @@ export const developerEn = {
         hint: 'Endpoints, the delivery log and event types. No signing secrets.',
       },
     },
+    mcp: {
+      read: {
+        name: 'Read through MCP',
+        hint: 'Lets an AI assistant such as Claude search conversations, read what customers saw, and look up knowledge, customer memory and open hand-offs. Read only.',
+      },
+    },
   },
   keys: {
     title: 'API keys',

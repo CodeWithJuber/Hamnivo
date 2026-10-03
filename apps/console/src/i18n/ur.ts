@@ -2317,6 +2317,7 @@ export const ur: Translation = {
     api_keys: 'API کلیدیں',
     webhooks: 'ویب ہکس',
     network: 'اجازت یافتہ ہوسٹس',
+    mcp: 'اے آئی معاون (MCP)',
     integrations: 'انٹیگریشنز',
     secrets: 'اسناد',
     extensions: 'ایکسٹینشنز',
@@ -2401,6 +2402,9 @@ export const ur: Translation = {
       manage: 'باہر جانے والے ویب ہکس سیٹ کریں',
     },
     network: { manage: 'منتخب کریں کہ Hamnivo کن بیرونی ہوسٹس سے رابطہ کر سکتا ہے' },
+    mcp: {
+      read: 'Claude جیسے اے آئی معاونین کو Hamnivo کے MCP سرور سے گفتگو، معلومات اور گاہک کی یادداشت پڑھنے دیں',
+    },
     integrations: { manage: 'چینلز اور تیسرے فریق کی سروسز جوڑیں' },
     secrets: { manage: 'اسناد محفوظ کریں اور بدلیں' },
     extensions: { manage: 'ایکسٹینشنز انسٹال کریں اور ہٹائیں' },

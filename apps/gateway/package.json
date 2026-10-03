@@ -33,6 +33,7 @@
     "@hamnivo/domain": "workspace:*",
     "@hamnivo/migration-sdk": "workspace:*",
     "@hamnivo/policy": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.0",
     "@nestjs/common": "12.1.0",
     "@nestjs/core": "12.1.0",
     "@nestjs/platform-fastify": "12.1.0",

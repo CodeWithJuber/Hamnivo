@@ -139,7 +139,25 @@ export const UpdateMcpResourceRequest = z
   .object({ aiReadable: z.boolean() })
   .meta({ id: 'UpdateMcpResourceRequest' });
 
+// ── Hamnivo's own MCP server ─────────────────────────────────────────────────────────────
+
+/** A JSON-RPC 2.0 message of the Model Context Protocol (Streamable HTTP, no sessions). */
+export const McpMessage = z
+  .record(z.string(), z.unknown())
+  .meta({ id: 'McpMessage', description: 'A JSON-RPC 2.0 request, notification or response.' });
+
 export const aiPowerRoutes = {
+  mcpServer: {
+    method: 'post',
+    path: '/mcp',
+    operationId: 'postMcp',
+    summary:
+      'Hamnivo’s own MCP server (Streamable HTTP, JSON-RPC): read-only tools for AI assistants such as Claude, called with an API key that holds mcp.read',
+    tags: ['MCP'],
+    auth: 'api_key',
+    body: McpMessage,
+    success: { status: 200, description: 'The JSON-RPC answer', schema: McpMessage },
+  },
   listMcpPresets: {
     method: 'get',
     path: '/v1/admin/mcp-presets',
