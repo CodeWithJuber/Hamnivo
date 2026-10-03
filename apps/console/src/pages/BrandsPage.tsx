@@ -5,10 +5,12 @@ import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { ReasonedAction } from '@hamnivo/ui/components/reasoned-action';
 import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import { StatusBadge } from '@hamnivo/ui/components/status-badge';
-import { useRouterState } from '@tanstack/react-router';
+import { Link, useRouterState } from '@tanstack/react-router';
 import {
   GlobeIcon,
   MessageSquareTextIcon,
+  MessagesSquareIcon,
+  PaletteIcon,
   PencilIcon,
   PlugZapIcon,
   PlusIcon,
@@ -37,6 +39,9 @@ import { useTenant } from '../lib/tenant';
 import type { AuthorityConnection, Brand } from '../lib/types';
 import { ChatSettingsDialog, ProactiveDialog } from './BrandChatSettings';
 import { connectionFor } from './OverviewPage';
+import { AppearanceDialog } from './settings/AppearanceDialog';
+import { HoursSummary } from './settings/HoursSummary';
+import { TestChatDialog } from './settings/TestChat';
 
 const ORIGIN = /^https?:\/\/[^/?#\s]+$/;
 
@@ -393,7 +398,12 @@ function BrandCard({
   const [editing, setEditing] = useState(false);
   const [chatSettings, setChatSettings] = useState(false);
   const [proactive, setProactive] = useState(false);
+  const [look, setLook] = useState(false);
+  const [testing, setTesting] = useState(false);
   const snippet = installSnippet(brand.widgetId);
+  // The test chat needs the chat engine. Someone who cannot see its status is let try: the
+  // gateway answers if it is not connected.
+  const engineMissing = connectionsState === 'ready' && !connection;
   const codeRef = useRef<HTMLElement>(null);
   const titleId = `brand-${brand.id}-title`;
   return (
@@ -432,6 +442,30 @@ function BrandCard({
               {t('chatSettings.open')}
             </Button>
           ) : null}
+          {can('widget.configure') ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setLook(true)}
+              aria-label={t('setup.appearance.openLabel', { name: brand.name })}
+              data-testid="appearance"
+            >
+              <PaletteIcon aria-hidden="true" />
+              {t('setup.appearance.open')}
+            </Button>
+          ) : null}
+          <ReasonedAction reason={engineMissing ? t('setup.testChat.needsEngine') : null}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setTesting(true)}
+              aria-label={t('setup.testChat.openLabel', { name: brand.name })}
+              data-testid="test-chat"
+            >
+              <MessagesSquareIcon aria-hidden="true" />
+              {t('setup.testChat.open')}
+            </Button>
+          </ReasonedAction>
           {can('widget.proactive') ? (
             <Button
               variant="secondary"
@@ -461,6 +495,8 @@ function BrandCard({
       <EditBrandDialog brand={brand} open={editing} onOpenChange={setEditing} />
       <ChatSettingsDialog brand={brand} open={chatSettings} onOpenChange={setChatSettings} />
       <ProactiveDialog brand={brand} open={proactive} onOpenChange={setProactive} />
+      <AppearanceDialog brand={brand} open={look} onOpenChange={setLook} />
+      <TestChatDialog brand={brand} open={testing} onOpenChange={setTesting} />
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
@@ -480,6 +516,20 @@ function BrandCard({
                 ))}
               </ul>
             )}
+          </div>
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold text-text">{t('setup.hours.title')}</h3>
+            <HoursSummary hours={brand.businessHours} />
+            {can('widget.configure') ? (
+              <Link
+                to="/hours"
+                search={{ brand: brand.id }}
+                className="text-sm text-link underline underline-offset-4 hover:no-underline"
+                data-testid="edit-hours"
+              >
+                {t('setup.hours.edit')}
+              </Link>
+            ) : null}
           </div>
           <div className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold text-text">{t('brands.chat.title')}</h3>

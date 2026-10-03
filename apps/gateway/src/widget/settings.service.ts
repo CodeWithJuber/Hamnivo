@@ -1,6 +1,7 @@
 import {
   ProactiveSettings,
   type ProactiveSettingsView,
+  type WidgetAppearance,
   WidgetSettings,
   type WidgetSettingsView,
 } from '@hamnivo/contracts';
@@ -21,10 +22,13 @@ import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { enforce } from '../identity/staff.guard.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
+import { parseAppearance } from './appearance.js';
 
 export interface BrandSurface {
   settings: WidgetSettings;
   proactive: ProactiveSettings;
+  /** How the chat looks and what it says (W03); the defaults when left out. */
+  appearance?: WidgetAppearance;
   settingsUpdatedAt: Date | null;
   proactiveUpdatedAt: Date | null;
 }
@@ -35,15 +39,20 @@ function parsed<T>(schemaOf: z.ZodType<T>, value: unknown): T {
   return result.success ? result.data : schemaOf.parse({});
 }
 
-/** A brand's widget settings and proactive prompts (defaults when it has none). */
+/** A brand's widget settings, proactive prompts and appearance (defaults when it has none). */
 export async function brandSurface(tx: TenantTx, brandId: string): Promise<BrandSurface> {
   const [row] = await tx
     .select()
     .from(schema.brandWidgetSettings)
     .where(eq(schema.brandWidgetSettings.brandId, brandId));
+  const [look] = await tx
+    .select({ appearance: schema.brandAppearance.appearance })
+    .from(schema.brandAppearance)
+    .where(eq(schema.brandAppearance.brandId, brandId));
   return {
     settings: parsed(WidgetSettings, row?.settings),
     proactive: parsed(ProactiveSettings, row?.proactive),
+    appearance: parseAppearance(look?.appearance),
     settingsUpdatedAt: row?.settingsUpdatedAt ?? null,
     proactiveUpdatedAt: row?.proactiveUpdatedAt ?? null,
   };

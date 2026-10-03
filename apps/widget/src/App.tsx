@@ -1,4 +1,4 @@
-import { HamnivoClient } from '@hamnivo/client';
+import { defaultStorage, HamnivoClient, prefixedStorage } from '@hamnivo/client';
 import type { WidgetLayoutMode } from '@hamnivo/contracts';
 import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
 import { useEffect, useMemo, useState } from 'react';
@@ -8,6 +8,7 @@ import type { HostBridge } from './bridge.js';
 import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
 import { applyLocale, type Locale } from './i18n.js';
+import { applyTheme } from './theme.js';
 import { CHAT_OFFLINE, useChat } from './useChat.js';
 import { useDisplay } from './useDisplay.js';
 import { useMemory } from './useMemory.js';
@@ -20,6 +21,8 @@ export interface WidgetParams {
   locale: Locale;
   /** How the loader placed the chat on the page (W02); null when the brand's choice applies. */
   mode: WidgetLayoutMode | null;
+  /** Studio's test chat: its own session, and the conversations it starts are marked as tests. */
+  test?: boolean;
 }
 
 export function App({ params, bridge }: { params: WidgetParams; bridge: HostBridge }) {
@@ -32,6 +35,8 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
         widgetId: params.widgetId,
         locale: params.locale,
         ...(params.hostOrigin ? { hostOrigin: params.hostOrigin } : {}),
+        // A test chat keeps its own session, never a real visitor's.
+        ...(params.test ? { test: true, storage: prefixedStorage(defaultStorage(), 'test:') } : {}),
       }),
     [params],
   );
@@ -46,6 +51,15 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const actions = useActions(client, chat.state.conversation?.id ?? null, bridge);
   useEffect(() => onEvent(actions.onEvent), [onEvent, actions.onEvent]);
   const display = useDisplay(params.widgetId);
+  // The brand's colour and corners (W03); Hamnivo's own look stays as it is.
+  const accent = chat.state.session?.config.brand.accent;
+  const onAccent = chat.state.session?.config.brand.onAccent;
+  const radius = chat.state.session?.config.brand.radius;
+  useEffect(() => {
+    if (accent !== undefined && onAccent !== undefined && radius !== undefined) {
+      applyTheme(document.documentElement, { accent, onAccent, radius });
+    }
+  }, [accent, onAccent, radius]);
   // Embedded, the chat is on screen only while the loader shows it; on its own page, always.
   const [open, setOpen] = useState(
     !params.hostOrigin || params.mode === 'inline' || params.mode === 'fullpage',

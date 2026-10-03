@@ -1,6 +1,8 @@
 import type { Provider } from '@nestjs/common';
 import type { AppConfig } from '../config.js';
 import { type Scanner, type ScanVerdict, scannerFromUrl } from '../knowledge/scanner.js';
+import { WidgetAppearanceController } from './appearance.controller.js';
+import { WidgetAppearanceService } from './appearance.service.js';
 import { ATTACHMENT_SCANNER, WidgetAttachmentsService } from './attachments.service.js';
 
 export { filesScannable } from './attachments.service.js';
@@ -36,6 +38,7 @@ export const WIDGET_SURFACE_API_CONTROLLERS = [
   WidgetSurfaceController,
   NotificationsController,
   WidgetSettingsController,
+  WidgetAppearanceController,
 ];
 
 export function widgetSurfaceApiProviders(config: AppConfig, scanner?: Scanner): Provider[] {
@@ -43,6 +46,7 @@ export function widgetSurfaceApiProviders(config: AppConfig, scanner?: Scanner):
     { provide: ATTACHMENT_SCANNER, useValue: scanner ?? attachmentScanner(config) },
     SessionSignals,
     WidgetSettingsService,
+    WidgetAppearanceService,
     WidgetAttachmentsService,
     WidgetMessagesService,
     WidgetHelpService,

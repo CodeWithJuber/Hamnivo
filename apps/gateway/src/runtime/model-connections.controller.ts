@@ -1,4 +1,9 @@
-import { agentRoutes, CreateModelConnectionRequest } from '@hamnivo/contracts';
+import {
+  agentRoutes,
+  CreateModelConnectionRequest,
+  ReplaceModelKeyRequest,
+  TestModelConnectionRequest,
+} from '@hamnivo/contracts';
 import type { StaffPrincipal } from '@hamnivo/policy';
 import { Body, Controller, Get, HttpCode, Param, Post, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -43,6 +48,45 @@ export class ModelConnectionsController {
     reply.status(result.status);
     if (result.replayed) reply.header('idempotent-replayed', 'true');
     return result.body;
+  }
+
+  /** Which keys the server holds, whether Jev is set up, and the last test of each connection. */
+  @Get('status')
+  @StaffRoute({ tenant: true, permission: 'integrations.manage', tenantWide: true })
+  status(@CurrentPrincipal() principal: StaffPrincipal) {
+    return this.connections.status(principal);
+  }
+
+  /** One real call of a few tokens; the answer says in plain words whether the key works. */
+  @Post(':connectionId/test')
+  @HttpCode(200)
+  @StaffRoute({ tenant: true, permission: 'integrations.manage', tenantWide: true })
+  test(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('connectionId') connectionId: string,
+    @Body() body: unknown,
+  ) {
+    return this.connections.test(
+      principal,
+      connectionId,
+      parseInput(TestModelConnectionRequest, body),
+    );
+  }
+
+  /** Replaces the key in place; agents that use the connection carry on with the new one. */
+  @Post(':connectionId/rotate')
+  @HttpCode(200)
+  @StaffRoute({ tenant: true, permission: 'integrations.manage', tenantWide: true })
+  rotate(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('connectionId') connectionId: string,
+    @Body() body: unknown,
+  ) {
+    return this.connections.rotate(
+      principal,
+      connectionId,
+      parseInput(ReplaceModelKeyRequest, body),
+    );
   }
 
   @Post(':connectionId/disable')

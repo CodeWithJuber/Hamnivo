@@ -63,7 +63,7 @@ the fake Chatwoot, which calls the gateway's webhook endpoints. It covers:
 | Area | Where |
 |---|---|
 | Agents: drafts, immutable published versions, rollback (G01, A07) | `src/runtime/agents.*` |
-| Model credentials: tenant connections or platform keys, revealed just in time | `src/runtime/models.ts`, `model-connections.*` |
+| Model credentials: tenant connections or platform keys, revealed just in time; replaced in place and tested with one call | `src/runtime/models.ts`, `model-connections.*` |
 | Kill switches for the tenant, a brand or an agent (X08) | `src/runtime/kill-switches.*` |
 | Run telemetry: version, model, tokens, time, outcome, hashes only (G12, X11) | `src/runtime/runs.*` |
 | Prompt: Hamnivo's rules first, business instructions after, customer view only | `src/runtime/prompt.ts` |
@@ -426,6 +426,37 @@ a reply, drop a passage or hand the conversation to people.
   stays unread for `CUSTOMER_REPLY_EMAIL_DELAY_SECONDS` (default 300), at most one every 30
   minutes, never with the reply's text. Every email carries a signed one-click unsubscribe link
   (`/v1/notifications/unsubscribe`, RFC 8058) that asks before changing anything.
+
+## Setting up from Studio (A01, A05, A06, G02, W03)
+
+What a business owner needs to set Hamnivo up without help. `src/runtime/model-connections.*`,
+`src/widget/appearance*`, `src/setup/*`; the tables are in `packages/db/src/schema/setup.ts`.
+
+- **AI keys.** `POST /v1/admin/model-connections/{id}/test` makes one real call of a few tokens with
+  the connection's key (integrations.manage), through the egress guard, with a 10 second limit, and
+  answers `ok`, `wrong_key`, `no_credit`, `model_not_found`, `network`, `blocked`, `rate_limited`,
+  `unavailable` or `unknown`, with a plain message. Neither the key nor the provider's own text is
+  in the answer or the audit entry. The last test of each connection is kept
+  (`model_connection_tests`) and shown by `GET /v1/admin/model-connections/status`, which also says
+  (yes or no, never a value) which provider keys the server holds, whether Jev is set up and what
+  searches the knowledge. `POST …/{id}/rotate` puts a new key in an existing connection: the old
+  key is revoked and agents that use the connection carry on. All of these need
+  `integrations.manage`, which asks for a recent sign-in.
+- **How a brand's chat looks.** `GET/PUT /v1/admin/brands/{id}/appearance` (widget.configure): the
+  main colour, logo address, corner radius, greeting, offline text, rating on or off and privacy
+  address. The colour is checked with the brand package's `validateTheme`: the text on it must be
+  readable and it must show on a white page, else the answer is a 422 saying why. Each save
+  publishes a new configuration version. The widget configuration carries the colour, the colour
+  of text on it (`onAccent`), the radius, the logo and the privacy address, and `{when}` in the
+  offline text becomes the time people are back, in the customer's language and the brand's time
+  zone.
+- **Test chat.** `POST /v1/widget/sessions` takes `test: true`. Studio's own page
+  (`PUBLIC_CONSOLE_ORIGIN`) is allowed to frame the chat and to open a session for a brand for that
+  and nothing else; any other website still needs the brand's allowed list. The conversations such
+  a session starts are recorded in `test_conversations`: analytics and the inbox counts leave them
+  out (the inbox list still shows them), and they use the plan like any other chat.
+- **Guided setup.** `GET/PUT /v1/admin/onboarding` (brands.manage): which of the seven steps are
+  done or skipped, the brand being set up and whether the guide was finished.
 
 ## Widget framing
 

@@ -27,6 +27,7 @@
     "@fastify/helmet": "13.1.1",
     "@fastify/rate-limit": "11.2.0",
     "@hamnivo/adapters": "workspace:*",
+    "@hamnivo/brand": "workspace:*",
     "@hamnivo/chatwoot": "workspace:*",
     "@hamnivo/contracts": "workspace:*",
     "@hamnivo/db": "workspace:*",

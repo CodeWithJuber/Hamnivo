@@ -52,7 +52,17 @@ describe('the menu', () => {
       ],
       sales: ['/orders', '/finance'],
       reports: ['/reports'],
-      settings: ['/brands', '/team', '/security', '/developer', '/migration', '/settings/billing'],
+      settings: [
+        '/brands',
+        '/hours',
+        '/team',
+        '/support-teams',
+        '/security',
+        '/developer',
+        '/customer-identity',
+        '/migration',
+        '/settings/billing',
+      ],
     });
   });
 
@@ -78,23 +88,27 @@ describe('the menu', () => {
       '/finance': 'commerce.read',
       '/reports': ['analytics.read', 'billing.read'],
       '/brands': 'brands.manage',
+      '/hours': 'brands.manage',
       '/team': 'members.read',
+      '/support-teams': 'members.read',
       '/security': ['security.manage', 'support.grant'],
       '/developer': ['api_keys.read', 'webhooks.read', 'network.manage'],
+      '/customer-identity': 'widget.identity_keys',
       '/migration': 'migration.review',
       '/settings/billing': ['billing.read', 'settings.manage'],
     });
   });
 
-  it('gives every Studio page a place, except the two that live elsewhere', () => {
+  it('gives every Studio page a place, except the three that live elsewhere', () => {
     const folder = fileURLToPath(new URL('../src/routes/_studio', import.meta.url));
     const pages = new Set(
       readdirSync(folder, { withFileTypes: true }).map(
         (entry) => `/${entry.name.replace(/\.tsx$/, '').replaceAll('.', '/')}`,
       ),
     );
-    // Stop AI is a button in the header; Account security is in the account menu.
-    const elsewhere = ['/stop-ai', '/account'];
+    // Stop AI is a button in the header; Account security is in the account menu; the guided
+    // setup is opened from Home and after a workspace is created.
+    const elsewhere = ['/stop-ai', '/account', '/onboarding'];
     const placed = NAV_GROUPS.flatMap((group) => group.routes.map((route) => route.to));
     expect([...pages].filter((page) => !elsewhere.includes(page)).sort()).toEqual(
       [...placed].sort(),
@@ -181,7 +195,17 @@ describe('who sees which entry', () => {
       ],
       sales: ['/orders', '/finance'],
       reports: ['/reports'],
-      settings: ['/brands', '/team', '/security', '/developer', '/migration', '/settings/billing'],
+      settings: [
+        '/brands',
+        '/hours',
+        '/team',
+        '/support-teams',
+        '/security',
+        '/developer',
+        '/customer-identity',
+        '/migration',
+        '/settings/billing',
+      ],
     };
     const home = { home: ['/overview'] };
     expect(pagesOf('owner')).toEqual(everything);
@@ -189,21 +213,21 @@ describe('who sees which entry', () => {
     expect(pagesOf('supervisor')).toEqual({
       ...everything,
       ai: everything.ai.filter((page) => page !== '/models'),
-      settings: ['/team'],
+      settings: ['/team', '/support-teams'],
     });
     expect(pagesOf('agent')).toEqual({
       ...home,
       inbox: ['/inbox'],
       ai: ['/knowledge', '/tools', '/caching'],
       sales: ['/orders', '/finance'],
-      settings: ['/team'],
+      settings: ['/team', '/support-teams'],
     });
     expect(pagesOf('finance')).toEqual({
       ...home,
       ai: ['/runs'],
       sales: ['/orders', '/finance'],
       reports: ['/reports'],
-      settings: ['/team'],
+      settings: ['/team', '/support-teams'],
     });
     expect(pagesOf('knowledge_editor')).toEqual({
       ...home,
@@ -213,7 +237,7 @@ describe('who sees which entry', () => {
     expect(pagesOf('developer')).toEqual({
       ...home,
       ai: ['/agents', '/models'],
-      settings: ['/team', '/developer'],
+      settings: ['/team', '/support-teams', '/developer'],
     });
     expect(pagesOf('analyst')).toEqual({
       ...home,

@@ -107,9 +107,12 @@ function useMenu(pathname: string): { entries: MenuEntry[]; section: MenuSection
     '/finance': t('commerce.nav.finance'),
     '/reports': t('reports.nav'),
     '/brands': t('nav.brands'),
+    '/hours': t('setup.hours.nav'),
     '/team': t('nav.team'),
+    '/support-teams': t('setup.teams.nav'),
     '/security': t('nav.security'),
     '/developer': t('developer.nav'),
+    '/customer-identity': t('setup.identity.nav'),
     '/migration': t('migration.nav'),
     '/settings/billing': t('billing.nav'),
   } satisfies Record<NavPath, string>;

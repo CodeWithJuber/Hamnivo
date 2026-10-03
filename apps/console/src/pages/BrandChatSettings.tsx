@@ -21,8 +21,8 @@ import type { Brand } from '../lib/types';
 
 type Settings = C.WidgetSettings;
 type Proactive = C.ProactiveSettings;
-type Lang = 'en' | 'ar' | 'hi' | 'ur';
-const LANGS: Lang[] = ['en', 'ar', 'hi', 'ur'];
+export type Lang = 'en' | 'ar' | 'hi' | 'ur';
+export const LANGS: Lang[] = ['en', 'ar', 'hi', 'ur'];
 const TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'] as const;
 const TYPE_KEYS = {
   'image/png': 'png',
@@ -34,15 +34,15 @@ const TYPE_KEYS = {
 const MODES = ['bubble', 'panel', 'inline', 'fullpage'] as const;
 const KINDS = ['page_path', 'time_on_page', 'returning_visitor'] as const;
 
-type Texts = Record<Lang, string>;
-const texts = (value?: Partial<Record<Lang, string>>): Texts => ({
+export type Texts = Record<Lang, string>;
+export const texts = (value?: Partial<Record<Lang, string>>): Texts => ({
   en: value?.en ?? '',
   ar: value?.ar ?? '',
   hi: value?.hi ?? '',
   ur: value?.ur ?? '',
 });
 /** English plus the languages filled in; an empty one falls back to English in the chat. */
-const localized = (value: Texts) =>
+export const localized = (value: Texts) =>
   Object.fromEntries(
     LANGS.flatMap((lang) => (value[lang].trim() ? [[lang, value[lang].trim()]] : [])),
   ) as C.LocalizedText;
@@ -58,7 +58,7 @@ const settingsPath = (brand: Brand) => `/v1/admin/brands/${brand.id}/widget-sett
 const proactivePath = (brand: Brand) => `/v1/admin/brands/${brand.id}/proactive`;
 
 /** One text per language, English first and required. */
-function LocalizedFields({
+export function LocalizedFields({
   id,
   legend,
   hint,

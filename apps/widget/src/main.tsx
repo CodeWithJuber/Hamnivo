@@ -16,6 +16,8 @@ const params = {
   hostOrigin: query.get('host'),
   locale,
   mode: mode.success ? mode.data : null,
+  // Studio's test chat: the owner trying their own widget (A01).
+  test: query.get('test') === '1',
 };
 applyLocale(locale);
 await initI18n(locale);

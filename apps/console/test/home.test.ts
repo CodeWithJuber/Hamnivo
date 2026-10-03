@@ -52,31 +52,41 @@ const nothingYet: SetupFacts = {
   members: [{ id: 'staff_me' }],
   invitations: [],
   selfId: 'staff_me',
+  models: { connections: [], serverKey: false },
 };
 const allDone: SetupFacts = {
   connections: [{ status: 'active' }],
   brands: [{ status: 'active', allowedOrigins: ['https://shop.example.com'] }],
-  agents: [{ status: 'active', publishedVersion: 1 }],
+  agents: [{ status: 'active', publishedVersion: 1, usesMock: false }],
   members: [{ id: 'staff_me' }, { id: 'staff_other' }],
   invitations: [],
   selfId: 'staff_me',
+  models: { connections: [{ status: 'active' }], serverKey: false },
 };
 const owner = role('owner');
 const done = (facts: SetupFacts, can = owner) =>
   Object.fromEntries(setupSteps(facts, can).map((step) => [step.id, step.done]));
 
 describe('setup steps', () => {
-  it('lists the four steps in order for a new workspace, each with its page', () => {
+  it('lists the five steps in order for a new workspace, each with its page', () => {
+    // The brand and its website come first: the chat engine is connected for a brand.
     expect(setupSteps(nothingYet, owner)).toEqual([
-      { id: 'engine', to: '/brands', done: false },
       { id: 'brand', to: '/brands', done: false },
+      { id: 'engine', to: '/brands', done: false },
+      { id: 'aikey', to: '/models', done: false },
       { id: 'agent', to: '/agents', done: false },
       { id: 'team', to: '/team', done: false },
     ]);
   });
 
   it('marks every step done when there is nothing left', () => {
-    expect(done(allDone)).toEqual({ engine: true, brand: true, agent: true, team: true });
+    expect(done(allDone)).toEqual({
+      brand: true,
+      engine: true,
+      aikey: true,
+      agent: true,
+      team: true,
+    });
   });
 
   it('counts a connection as made once it is active, or active but needing attention', () => {
@@ -96,12 +106,64 @@ describe('setup steps', () => {
     expect(brand('disabled', ['https://shop.example.com'])).toBe(false);
   });
 
-  it('counts an agent once a version is published', () => {
-    const agent = (status: 'active' | 'archived', publishedVersion: number | null) =>
-      done({ ...nothingYet, agents: [{ status, publishedVersion }] }).agent;
-    expect(agent('active', 2)).toBe(true);
-    expect(agent('active', null)).toBe(false);
-    expect(agent('archived', 2)).toBe(false);
+  describe('the AI key', () => {
+    const key = (models: SetupFacts['models']) =>
+      setupSteps({ ...nothingYet, models }, owner).find((step) => step.id === 'aikey')?.done;
+
+    it('counts a key of the workspace’s own that is on, or one the server holds', () => {
+      expect(key({ connections: [{ status: 'active' }], serverKey: false })).toBe(true);
+      expect(key({ connections: [], serverKey: true })).toBe(true);
+      expect(key({ connections: [{ status: 'disabled' }], serverKey: false })).toBe(false);
+      expect(key({ connections: [], serverKey: false })).toBe(false);
+    });
+
+    it('leaves the step out when the lists cannot say, instead of guessing', () => {
+      expect(key({ connections: undefined, serverKey: undefined })).toBeUndefined();
+      expect(key({ connections: [], serverKey: undefined })).toBeUndefined();
+      // One answer is enough when it is yes.
+      expect(key({ connections: undefined, serverKey: true })).toBe(true);
+      expect(key({ connections: [{ status: 'active' }], serverKey: undefined })).toBe(true);
+    });
+
+    it('is not asked of a workspace that never loaded the facts', () => {
+      const { models: _unused, ...without } = nothingYet;
+      expect(setupSteps(without, owner).map((step) => step.id)).not.toContain('aikey');
+    });
+  });
+
+  describe('an AI agent', () => {
+    const agent = (agents: SetupFacts['agents']) =>
+      setupSteps({ ...nothingYet, agents }, owner).find((step) => step.id === 'agent')?.done;
+
+    it('counts once a version is published with a real model', () => {
+      expect(agent([{ status: 'active', publishedVersion: 2, usesMock: false }])).toBe(true);
+      expect(agent([{ status: 'active', publishedVersion: null, usesMock: false }])).toBe(false);
+      expect(agent([{ status: 'archived', publishedVersion: 2, usesMock: false }])).toBe(false);
+      expect(agent([])).toBe(false);
+    });
+
+    it('does not count an agent that answers with the offline practice model', () => {
+      expect(agent([{ status: 'active', publishedVersion: 2, usesMock: true }])).toBe(false);
+      // One real agent among practice ones is enough.
+      expect(
+        agent([
+          { status: 'active', publishedVersion: 1, usesMock: true },
+          { status: 'active', publishedVersion: 3, usesMock: false },
+        ]),
+      ).toBe(true);
+    });
+
+    it('leaves the step out when a published agent’s model is not known', () => {
+      expect(agent([{ status: 'active', publishedVersion: 2 }])).toBeUndefined();
+      expect(
+        agent([
+          { status: 'active', publishedVersion: 1, usesMock: true },
+          { status: 'active', publishedVersion: 2 },
+        ]),
+      ).toBeUndefined();
+      // An unpublished agent has no model to be unsure about.
+      expect(agent([{ status: 'active', publishedVersion: null }])).toBe(false);
+    });
   });
 
   it('counts a teammate who joined, or an invitation sent, but not the person themselves', () => {
@@ -135,19 +197,19 @@ describe('setup steps', () => {
       setupSteps({ ...nothingYet, connections: undefined, agents: undefined }, owner).map(
         (step) => step.id,
       ),
-    ).toEqual(['brand', 'team']);
+    ).toEqual(['brand', 'aikey', 'team']);
   });
 
   it('shows a step only to someone who can do it', () => {
     const ids = (can: (permission: string) => boolean) =>
       setupSteps(nothingYet, can).map((step) => step.id);
     expect(ids(holding('brands.manage'))).toEqual(['brand']);
-    expect(ids(holding('integrations.manage'))).toEqual(['engine']);
+    expect(ids(holding('integrations.manage'))).toEqual(['engine', 'aikey']);
     expect(ids(holding('agents.publish'))).toEqual(['agent']);
     expect(ids(holding('members.invite'))).toEqual(['team']);
     expect(ids(holding())).toEqual([]);
     // A supervisor reads agents and the team but publishes and invites nothing.
     expect(ids(role('supervisor'))).toEqual([]);
-    expect(ids(role('admin'))).toEqual(['engine', 'brand', 'agent', 'team']);
+    expect(ids(role('admin'))).toEqual(['brand', 'engine', 'aikey', 'agent', 'team']);
   });
 });

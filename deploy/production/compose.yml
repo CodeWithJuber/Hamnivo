@@ -245,6 +245,8 @@ services:
       HAMNIVO_API_ORIGIN: ${HAMNIVO_API_ORIGIN:?run hamnivo.sh setup}
       # Studio may load Cloudflare Turnstile's check on sign-up when its site key is set.
       HAMNIVO_CAPTCHA_ORIGIN: ${TURNSTILE_SITE_KEY:+https://challenges.cloudflare.com}
+      # The chat's own address: Studio frames it for Test chat (Content-Security-Policy frame-src).
+      HAMNIVO_CHAT_ORIGIN: ${HAMNIVO_CHAT_ORIGIN:?run hamnivo.sh setup}
       # "webhook" turns on the route to deploy-hook (hamnivo.sh autodeploy enable).
       HAMNIVO_AUTODEPLOY: ${HAMNIVO_AUTODEPLOY:-off}
       # Proxies whose visitor addresses are believed: Cloudflare's ranges when HAMNIVO_CLOUDFLARE

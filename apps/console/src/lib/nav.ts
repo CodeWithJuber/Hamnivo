@@ -11,7 +11,7 @@
  * The menu is filtered by role; the gateway still checks every request (HNV-03-05).
  */
 
-/** Every page that has a place in the menu. `/stop-ai` and `/account` live elsewhere. */
+/** Every page that has a place in the menu. `/stop-ai`, `/account` and `/onboarding` live elsewhere. */
 export type NavPath =
   | '/overview'
   | '/inbox'
@@ -28,11 +28,14 @@ export type NavPath =
   | '/finance'
   | '/reports'
   | '/brands'
+  | '/hours'
   | '/team'
+  | '/support-teams'
   | '/security'
   | '/developer'
   | '/migration'
-  | '/settings/billing';
+  | '/settings/billing'
+  | '/customer-identity';
 
 export type NavGroupId = 'home' | 'inbox' | 'ai' | 'sales' | 'reports' | 'settings';
 
@@ -82,9 +85,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     id: 'settings',
     routes: [
       { to: '/brands', permission: 'brands.manage' },
+      { to: '/hours', permission: 'brands.manage' },
       { to: '/team', permission: 'members.read' },
+      { to: '/support-teams', permission: 'members.read' },
       { to: '/security', anyOf: ['security.manage', 'support.grant'] },
       { to: '/developer', anyOf: ['api_keys.read', 'webhooks.read', 'network.manage'] },
+      { to: '/customer-identity', permission: 'widget.identity_keys' },
       { to: '/migration', permission: 'migration.review' },
       { to: '/settings/billing', anyOf: ['billing.read', 'settings.manage'] },
     ],

@@ -22,5 +22,6 @@ export * from './operators.js';
 export * from './platform.js';
 export * from './runtime.js';
 export * from './saas.js';
+export * from './setup.js';
 export * from './sso.js';
 export * from './tenancy.js';
