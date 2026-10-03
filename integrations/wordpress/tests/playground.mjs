@@ -75,11 +75,24 @@ function blueprintFile(text) {
 }
 
 /**
- * Runs a PHP script inside a new WordPress that has the plugin active. Resolves with the exit
- * status and what the script printed.
+ * Runs a PHP script inside a new WordPress, on the PHP version asked for, with folders mounted and
+ * constants defined. Resolves with the exit status and what the script printed. Other tests use it
+ * too, for code that needs PHP and no WordPress (the WHMCS addon).
+ *
+ * @param {{ php: string, wp?: string, script: string, mounts: string[], defines?: Record<string, string>, steps?: object[], timeoutMs?: number }} options
+ *   mounts are `host:inside` pairs. steps are Blueprint steps to run first.
  */
-export function runPhp({ plugin, php, script, wp = 'latest', timeoutMs = 600_000 }) {
+export function runScript({
+  php,
+  wp = 'latest',
+  script,
+  mounts,
+  defines = {},
+  steps = [],
+  timeoutMs = 600_000,
+}) {
   const [program, ...before] = command();
+  const blueprint = JSON.stringify({ preferredVersions: { php, wp }, steps });
   const result = spawnSync(
     program,
     [
@@ -87,14 +100,30 @@ export function runPhp({ plugin, php, script, wp = 'latest', timeoutMs = 600_000
       'php',
       `--php=${php}`,
       `--wp=${wp}`,
-      `--blueprint=${blueprintFile(blueprint({ php, wp }))}`,
-      ...mounts(plugin),
+      `--blueprint=${blueprintFile(blueprint)}`,
+      ...mounts.map((mount) => `--mount=${mount}`),
+      ...Object.entries(defines).flatMap(([name, value]) => ['--define', name, value]),
       '--',
-      `/tests/${script}`,
+      script,
     ],
     { cwd: root, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 },
   );
   return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+}
+
+/**
+ * Runs a PHP script inside a new WordPress that has the plugin active. Resolves with the exit
+ * status and what the script printed.
+ */
+export function runPhp({ plugin, php, script, wp = 'latest', timeoutMs = 600_000 }) {
+  return runScript({
+    php,
+    wp,
+    script: `/tests/${script}`,
+    mounts: mounts(plugin).map((mount) => mount.replace(/^--mount=/, '')),
+    steps: [{ step: 'activatePlugin', pluginPath: 'hamnivo-chat/hamnivo-chat.php' }],
+    timeoutMs,
+  });
 }
 
 /**

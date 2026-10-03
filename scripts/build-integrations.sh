@@ -115,11 +115,15 @@ build_whmcs() {
   rm -rf "$stage/whmcs"
   mkdir -p "$dest"
   cp -R "$src"/. "$dest"/
+  rm -rf "$dest/tests"
   bundle_sdk "$dest/lib/hamnivo-php"
   make_zip "$stage/whmcs" hamnivo-whmcs-addon.zip
   check_zip hamnivo-whmcs-addon.zip \
     modules/addons/hamnivo/hamnivo.php modules/addons/hamnivo/hooks.php \
-    modules/addons/hamnivo/lib/hamnivo-php/autoload.php
+    modules/addons/hamnivo/README.md modules/addons/hamnivo/LICENSE \
+    modules/addons/hamnivo/assets/identity.js modules/addons/hamnivo/lib/Settings.php \
+    modules/addons/hamnivo/lib/hamnivo-php/autoload.php \
+    modules/addons/hamnivo/lib/hamnivo-php/Internal/IdentityAssertion.php
 }
 
 build_gtm() {
