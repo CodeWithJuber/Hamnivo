@@ -34,7 +34,7 @@
     "test": "tsdown && vitest run"
   },
   "peerDependencies": {
-    "@hamnivo/client": ">=0.1.0",
+    "@hamnivo/client": "workspace:>=0.1.0",
     "react": ">=18.2.0"
   },
   "peerDependenciesMeta": {

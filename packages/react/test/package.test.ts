@@ -31,6 +31,9 @@ describe('the published package', () => {
     expect(pack.dependencies).toBeUndefined();
     expect(pack.peerDependencies.react).toMatch(/^>=18/);
     expect(pack.peerDependenciesMeta['@hamnivo/client']).toEqual({ optional: true });
+    // Linked from the workspace, never fetched: the client is not on npm yet, and the gateway
+    // image's `pnpm deploy` resolves every workspace package. Publishing writes ">=0.1.0".
+    expect(pack.peerDependencies['@hamnivo/client']).toBe('workspace:>=0.1.0');
     expect(existsSync(join(root, 'LICENSE'))).toBe(true);
     expect(read('LICENSE')).toBe(readFileSync(join(root, '../../LICENSE'), 'utf8'));
   });
