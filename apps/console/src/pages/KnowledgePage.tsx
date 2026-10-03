@@ -16,6 +16,7 @@ import {
   BookOpenIcon,
   ExternalLinkIcon,
   FileTextIcon,
+  GlobeIcon,
   PlusIcon,
   SearchIcon,
   Settings2Icon,
@@ -33,8 +34,11 @@ import {
 } from '../components/Badges';
 import { ChoiceField, SelectField, TextField } from '../components/Fields';
 import { SourceDialog, UploadDialog } from '../components/KnowledgeDialogs';
+import { WebSourceLine, WebSourcePanel } from '../components/knowledge/WebSourcePanel';
+import { WebsiteDialog } from '../components/knowledge/WebsiteDialog';
 import { PageHeader, Section } from '../components/PageHeader';
 import { ActionError, QueryState } from '../components/States';
+import { type KnowledgeWebSource, useWebSources } from '../lib/ai-power';
 import { api } from '../lib/api';
 import { formatBytes, formatDateTime, formatNumber, formatScore } from '../lib/format';
 import { useBrandRefs, useNames } from '../lib/names';
@@ -380,10 +384,13 @@ function SearchPreview({ defaultBrandId }: { defaultBrandId: string | undefined 
 
 function SourceList({
   sources,
+  websites,
   selected,
   onEdit,
 }: {
   sources: KnowledgeSource[];
+  /** The websites behind some of the sources, by source id. */
+  websites: Map<string, KnowledgeWebSource>;
   selected: string | undefined;
   onEdit: (source: KnowledgeSource) => void;
 }) {
@@ -394,6 +401,7 @@ function SourceList({
     <ul className="flex flex-col gap-2" data-testid="sources">
       {sources.map((source) => {
         const active = source.id === selected;
+        const website = websites.get(source.id);
         return (
           <li
             key={source.id}
@@ -413,6 +421,7 @@ function SourceList({
             <span className="text-xs text-text-secondary">
               <bdi>{names.brand(source.brandId) ?? source.brandId}</bdi>
             </span>
+            {website ? <WebSourceLine web={website} /> : null}
             <div className="flex flex-wrap items-center gap-2">
               <VisibilityBadge visibility={source.visibility} />
               {source.status !== 'active' ? <SourceStatusBadge status={source.status} /> : null}
@@ -449,11 +458,15 @@ export function KnowledgePage() {
   const navigate = useNavigate();
   const search = useSearch({ from: '/_studio/knowledge' });
   const sources = useSources();
+  const webSources = useWebSources();
+  const websites = new Map((webSources.data?.items ?? []).map((web) => [web.sourceId, web]));
   const [sourceDialog, setSourceDialog] = useState<{ source?: KnowledgeSource } | null>(null);
+  const [websiteDialog, setWebsiteDialog] = useState<{ web?: KnowledgeWebSource } | null>(null);
   const [uploading, setUploading] = useState(false);
   const selectedSource =
     sources.data?.items.find((s) => s.id === search.source) ?? sources.data?.items[0];
   const documents = useDocuments(selectedSource?.id);
+  const selectedWebsite = selectedSource ? websites.get(selectedSource.id) : undefined;
   const selectedDocument = documents.data?.items.find((d) => d.id === search.document);
   const showingDetail = Boolean(selectedDocument);
   const settling = (documents.data?.items ?? []).some(settlingState);
@@ -468,10 +481,16 @@ export function KnowledgePage() {
     });
 
   const addSource = can('knowledge.manage') ? (
-    <Button onClick={() => setSourceDialog({})}>
-      <PlusIcon aria-hidden="true" />
-      {t('knowledge.sources.add')}
-    </Button>
+    <div className="flex flex-wrap gap-2">
+      <Button variant="secondary" onClick={() => setWebsiteDialog({})}>
+        <GlobeIcon aria-hidden="true" />
+        {t('aiPower.web.add')}
+      </Button>
+      <Button onClick={() => setSourceDialog({})}>
+        <PlusIcon aria-hidden="true" />
+        {t('knowledge.sources.add')}
+      </Button>
+    </div>
   ) : null;
 
   return (
@@ -507,6 +526,7 @@ export function KnowledgePage() {
               </h2>
               <SourceList
                 sources={data.items}
+                websites={websites}
                 selected={selectedSource?.id}
                 onEdit={(source) => setSourceDialog({ source })}
               />
@@ -538,6 +558,12 @@ export function KnowledgePage() {
                   </Button>
                 ) : null}
               </div>
+              {selectedWebsite ? (
+                <WebSourcePanel
+                  web={selectedWebsite}
+                  onSettings={() => setWebsiteDialog({ web: selectedWebsite })}
+                />
+              ) : null}
               {settling ? (
                 <p className="text-xs text-text-secondary" role="status">
                   {t('knowledge.documents.polling')}
@@ -673,6 +699,19 @@ export function KnowledgePage() {
         onSaved={(saved) => {
           if (!sourceDialog?.source)
             void navigate({ to: '/knowledge', search: { source: saved.id } });
+        }}
+      />
+      <WebsiteDialog
+        open={websiteDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) setWebsiteDialog(null);
+        }}
+        web={websiteDialog?.web}
+        defaultBrandId={selectedSource?.brandId}
+        onSaved={(saved) => {
+          if (!websiteDialog?.web) {
+            void navigate({ to: '/knowledge', search: { source: saved.sourceId } });
+          }
         }}
       />
       {selectedSource ? (

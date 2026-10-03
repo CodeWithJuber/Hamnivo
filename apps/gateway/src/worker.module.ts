@@ -26,6 +26,7 @@ import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
 import { type Scanner, scannerFromUrl } from './knowledge/scanner.js';
+import { KNOWLEDGE_WEB_WORKER_PROVIDERS } from './knowledge/web/web.module.js';
 import { MemoryCache } from './memory/cache.js';
 import { ConversationHistory } from './memory/conversation-history.js';
 import { MemoryDeletionService } from './memory/deletion.service.js';
@@ -124,6 +125,7 @@ export class WorkerModule {
         ...COMMERCE_WORKER_PROVIDERS,
         ...WIDGET_SURFACE_WORKER_PROVIDERS,
         ...ACTIONS_WORKER_PROVIDERS,
+        ...KNOWLEDGE_WEB_WORKER_PROVIDERS,
         {
           provide: OUTBOX_HANDLERS,
           inject: [

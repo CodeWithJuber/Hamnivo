@@ -42,7 +42,8 @@ const heading: FormatCallback = (element, walk, builder, options) => {
   builder.closeBlock({ trailingLineBreaks: 2 });
 };
 
-function htmlText(html: string): string {
+/** The text of an HTML page as ingestion reads it (headings kept as Markdown headings). */
+export function htmlText(html: string): string {
   return convert(html, {
     wordwrap: false,
     formatters: { heading },

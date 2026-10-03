@@ -63,6 +63,10 @@ import { KnowledgeController } from './knowledge/knowledge.controller.js';
 import { KnowledgeService } from './knowledge/knowledge.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
 import type { Scanner } from './knowledge/scanner.js';
+import {
+  KNOWLEDGE_WEB_API_CONTROLLERS,
+  KNOWLEDGE_WEB_API_PROVIDERS,
+} from './knowledge/web/web.module.js';
 import { LanguageController } from './language/language.controller.js';
 import {
   MCP_SERVER_API_CONTROLLERS,
@@ -161,6 +165,7 @@ export class ApiModule {
         ...WIDGET_SURFACE_API_CONTROLLERS,
         ...ACTIONS_API_CONTROLLERS,
         ...MCP_SERVER_API_CONTROLLERS,
+        ...KNOWLEDGE_WEB_API_CONTROLLERS,
       ],
       providers: [
         {
@@ -244,6 +249,7 @@ export class ApiModule {
         ...widgetSurfaceApiProviders(config, overrides.scanner),
         ...ACTIONS_API_PROVIDERS,
         ...MCP_SERVER_API_PROVIDERS,
+        ...KNOWLEDGE_WEB_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

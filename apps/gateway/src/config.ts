@@ -100,6 +100,11 @@ const EnvSchema = z.object({
   EMBEDDING_MODEL: z.string().min(1).default('hamnivo-embed'),
   /** ClamAV daemon for uploads (tcp://host:3310). Without it only the EICAR test file is caught. */
   CLAMAV_URL: z.url().optional(),
+  /**
+   * Websites kept as knowledge are read one request at a time, at least this long apart (the
+   * site's robots.txt may ask for longer). Raise it for a small server; `0` only for tests.
+   */
+  KNOWLEDGE_WEB_DELAY_MS: z.coerce.number().int().min(0).max(10_000).default(1000),
 
   /** Messages per minute written into one conversation while importing (Chatwoot allows 200). */
   MIGRATION_MESSAGES_PER_MINUTE: z.coerce.number().int().min(1).max(200).default(180),

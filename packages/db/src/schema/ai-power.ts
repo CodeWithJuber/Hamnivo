@@ -378,7 +378,7 @@ export const knowledgeWebPages = pgTable(
     depth: integer('depth').notNull().default(0),
     etag: text('etag'),
     lastModified: text('last_modified'),
-    /** SHA-256 of the page's HTML, so an unchanged page adds no new version. */
+    /** SHA-256 of the page's text (the file for a PDF), so an unchanged page adds no new version. */
     contentHash: bytea('content_hash'),
     lastFetchedAt: tstz('last_fetched_at'),
     lastStatus: integer('last_status'),

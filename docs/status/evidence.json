@@ -502,13 +502,19 @@
     "note": "Saved drafts are not live; publishing freezes a version with its configuration hash (a database trigger rejects changes), one version is live at a time, and publishing an earlier version is the rollback (tested). Studio screens pending."
   },
   "G04": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/knowledge/knowledge.service.ts",
       "apps/gateway/test/knowledge.int.test.ts",
-      "packages/db/src/schema/knowledge.ts"
+      "packages/db/src/schema/knowledge.ts",
+      "apps/gateway/src/knowledge/web/crawler.ts",
+      "apps/gateway/src/knowledge/web/sync.service.ts",
+      "apps/gateway/src/knowledge/web/sources.service.ts",
+      "apps/gateway/test/web-knowledge.test.ts",
+      "apps/gateway/test/web-knowledge.int.test.ts",
+      "docs/guide/ai/teach-your-ai-your-website.md"
     ],
-    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). URL crawling and Studio screens pending."
+    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). A website can be a source: its pages become documents, found through its sitemap and the links between them within one site and the folder of the address, with robots.txt followed, limits on pages and link depth, read on a schedule or on request. A changed page becomes a new version, and a page that is gone or now off limits is retired; a site that is down loses nothing (tested against a made-up site over real HTTP). The website panel in Studio is rendered in unit tests; there is no browser test of it."
   },
   "G05": {
     "status": "in-progress",
@@ -543,9 +549,12 @@
       "apps/gateway/src/knowledge/scanner.ts",
       "apps/gateway/src/knowledge/text.ts",
       "apps/gateway/test/knowledge.int.test.ts",
-      "apps/gateway/test/knowledge.test.ts"
+      "apps/gateway/test/knowledge.test.ts",
+      "apps/gateway/src/knowledge/web/crawler.ts",
+      "apps/gateway/src/knowledge/versions.ts",
+      "apps/gateway/test/web-knowledge.int.test.ts"
     ],
-    "note": "Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Parsing runs in-process (no sandbox) and URL sources are pending."
+    "note": "Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Pages of a website enter the same pipeline: the crawler (one request at a time, every request through the egress guard, size and unpacking limits) hands over each page as an upload, in its own character set converted to UTF-8; a page whose text is built by JavaScript is left out (tested). Parsing runs in-process (no sandbox)."
   },
   "X09": {
     "status": "implemented",
@@ -751,13 +760,23 @@
   },
   "HNV-14-01": {
     "status": "in-progress",
-    "evidence": ["apps/console/src/pages/KnowledgePage.tsx", "apps/console/e2e/journeys.spec.ts"],
-    "note": "The knowledge library lists sources with their status (tested)."
+    "evidence": [
+      "apps/console/src/pages/KnowledgePage.tsx",
+      "apps/console/e2e/journeys.spec.ts",
+      "apps/console/src/components/knowledge/WebSourcePanel.tsx",
+      "apps/console/test/web-sources.test.tsx"
+    ],
+    "note": "The knowledge library lists sources with their status (tested); a website says so under its name with how its reading stands (unit-tested)."
   },
   "HNV-14-02": {
     "status": "in-progress",
-    "evidence": ["apps/console/src/pages/KnowledgePage.tsx", "apps/console/e2e/journeys.spec.ts"],
-    "note": "An uploaded file shows its progress until it is ready to search (tested); cancelling an import comes later."
+    "evidence": [
+      "apps/console/src/pages/KnowledgePage.tsx",
+      "apps/console/e2e/journeys.spec.ts",
+      "apps/console/src/components/knowledge/WebSourcePanel.tsx",
+      "apps/console/test/web-sources.test.tsx"
+    ],
+    "note": "An uploaded file shows its progress until it is ready to search (tested); a website shows that it is waiting or being read, how its last read went and each page’s state (unit-tested, no browser test); cancelling an import comes later."
   },
   "HNV-14-04": {
     "status": "in-progress",

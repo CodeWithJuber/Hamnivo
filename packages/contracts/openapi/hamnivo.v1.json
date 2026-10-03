@@ -19076,6 +19076,323 @@
         }
       }
     },
+    "/v1/admin/knowledge/web-sources": {
+      "get": {
+        "operationId": "listWebSources",
+        "summary": "Websites kept as knowledge, with how their last read went (knowledge.read)",
+        "tags": [
+          "Knowledge"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Websites",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/KnowledgeWebSource"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWebSource",
+        "summary": "Add a website as knowledge: Hamnivo reads its pages (sitemap, same site, robots.txt respected) and keeps them up to date (knowledge.manage)",
+        "tags": [
+          "Knowledge"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Retry-safe key bound to the request body hash; reuse with a different body returns 409",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Website added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeWebSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/knowledge/web-sources/{webSourceId}": {
+      "patch": {
+        "operationId": "updateWebSource",
+        "summary": "Change what a website source reads and how often (knowledge.manage)",
+        "tags": [
+          "Knowledge"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "webSourceId",
+            "schema": {
+              "type": "string",
+              "description": "Website source ID (wsrc_…)"
+            },
+            "required": true,
+            "description": "Website source ID (wsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Website",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeWebSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/knowledge/web-sources/{webSourceId}/sync": {
+      "post": {
+        "operationId": "syncWebSource",
+        "summary": "Read the website again now (knowledge.manage)",
+        "tags": [
+          "Knowledge"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "webSourceId",
+            "schema": {
+              "type": "string",
+              "description": "Website source ID (wsrc_…)"
+            },
+            "required": true,
+            "description": "Website source ID (wsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeWebSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/knowledge/web-sources/{webSourceId}/pages": {
+      "get": {
+        "operationId": "listWebPages",
+        "summary": "The pages of a website source and what the last read said about each (knowledge.read)",
+        "tags": [
+          "Knowledge"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "webSourceId",
+            "schema": {
+              "type": "string",
+              "description": "Website source ID (wsrc_…)"
+            },
+            "required": true,
+            "description": "Website source ID (wsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/KnowledgeWebPage"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/inbox/conversations/{conversationId}/actions": {
       "get": {
         "operationId": "listConversationActions",
@@ -24970,6 +25287,96 @@
         "required": [
           "aiReadable"
         ]
+      },
+      "CreateWebSourceRequest": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "mode": {
+            "default": "site",
+            "$ref": "#/components/schemas/WebSyncMode"
+          },
+          "maxPages": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "maxDepth": {
+            "default": 2,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "schedule": {
+            "default": "weekly",
+            "$ref": "#/components/schemas/WebSyncSchedule"
+          },
+          "visibility": {
+            "default": "public",
+            "type": "string",
+            "enum": [
+              "public",
+              "internal"
+            ]
+          }
+        },
+        "required": [
+          "brandId",
+          "url"
+        ]
+      },
+      "WebSyncMode": {
+        "type": "string",
+        "enum": [
+          "page",
+          "site"
+        ],
+        "description": "`page`: just the address given. `site`: its sitemap and the links between its pages, within the limits."
+      },
+      "WebSyncSchedule": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "daily",
+          "weekly"
+        ],
+        "description": "How often the website is read again; `manual` only when someone asks."
+      },
+      "UpdateWebSourceRequest": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/WebSyncMode"
+          },
+          "maxPages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/WebSyncSchedule"
+          }
+        }
       },
       "DecideActionRequest": {
         "type": "object",
@@ -47744,6 +48151,364 @@
           "title",
           "description",
           "arguments"
+        ],
+        "additionalProperties": false
+      },
+      "KnowledgeWebSource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "webSource identifier (TypeID with prefix \"wsrc\")",
+            "example": "wsrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "source identifier (TypeID with prefix \"ksrc\")",
+            "example": "ksrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused",
+              "retired"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/WebSyncMode"
+          },
+          "maxPages": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/WebSyncSchedule"
+          },
+          "state": {
+            "$ref": "#/components/schemas/WebSyncState"
+          },
+          "nextRunAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastRunAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastResult": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebSyncResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastRun": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebSyncSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pageCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "sourceId",
+          "brandId",
+          "name",
+          "visibility",
+          "status",
+          "url",
+          "mode",
+          "maxPages",
+          "maxDepth",
+          "schedule",
+          "state",
+          "nextRunAt",
+          "lastRunAt",
+          "lastResult",
+          "lastRun",
+          "pageCount",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "WebSyncState": {
+        "type": "string",
+        "enum": [
+          "idle",
+          "queued",
+          "running"
+        ]
+      },
+      "WebSyncResult": {
+        "type": "string",
+        "enum": [
+          "succeeded",
+          "partial",
+          "failed"
+        ]
+      },
+      "WebSyncSummary": {
+        "type": "object",
+        "properties": {
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "pages": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "added": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "updated": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "unchanged": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "retired": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "skipped": {
+            "type": "object",
+            "properties": {
+              "robots": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "offsite": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "noindex": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "type": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "duplicate": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "empty": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "robots",
+              "offsite",
+              "noindex",
+              "type",
+              "duplicate",
+              "empty"
+            ],
+            "additionalProperties": false
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "robots": {
+            "type": "string",
+            "enum": [
+              "read",
+              "missing",
+              "unreadable"
+            ]
+          },
+          "sitemaps": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "startedAt",
+          "finishedAt",
+          "pages",
+          "added",
+          "updated",
+          "unchanged",
+          "retired",
+          "skipped",
+          "problems",
+          "truncated",
+          "robots",
+          "sitemaps"
+        ],
+        "additionalProperties": false
+      },
+      "KnowledgeWebPage": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "documentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "document identifier (TypeID with prefix \"doc\")",
+                "example": "doc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "failed",
+              "gone"
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastFetchedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "url",
+          "documentId",
+          "state",
+          "status",
+          "lastFetchedAt",
+          "error"
         ],
         "additionalProperties": false
       },

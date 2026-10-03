@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Timestamp } from './common.js';
 import { typeId } from './ids.js';
+import { KnowledgeVisibility } from './knowledge.js';
 import type { RouteDef } from './routes.js';
 import { McpServer } from './tools.js';
 
@@ -139,6 +140,126 @@ export const UpdateMcpResourceRequest = z
   .object({ aiReadable: z.boolean() })
   .meta({ id: 'UpdateMcpResourceRequest' });
 
+// ── Websites as knowledge ────────────────────────────────────────────────────────────────
+
+export const WebSyncMode = z.enum(['page', 'site']).meta({
+  id: 'WebSyncMode',
+  description:
+    '`page`: just the address given. `site`: its sitemap and the links between its pages, within the limits.',
+});
+export const WebSyncSchedule = z.enum(['manual', 'daily', 'weekly']).meta({
+  id: 'WebSyncSchedule',
+  description: 'How often the website is read again; `manual` only when someone asks.',
+});
+export const WebSyncState = z.enum(['idle', 'queued', 'running']).meta({ id: 'WebSyncState' });
+export const WebSyncResult = z
+  .enum(['succeeded', 'partial', 'failed'])
+  .meta({ id: 'WebSyncResult' });
+export type WebSyncMode = z.infer<typeof WebSyncMode>;
+export type WebSyncSchedule = z.infer<typeof WebSyncSchedule>;
+export type WebSyncState = z.infer<typeof WebSyncState>;
+export type WebSyncResult = z.infer<typeof WebSyncResult>;
+
+/** What the last read of a website did: counts and short reasons, never page content. */
+export const WebSyncSummary = z
+  .object({
+    startedAt: Timestamp,
+    finishedAt: Timestamp,
+    /** Pages read and kept. */
+    pages: z.int(),
+    added: z.int(),
+    updated: z.int(),
+    unchanged: z.int(),
+    /** Pages that were there before and are not any more (their documents are retired). */
+    retired: z.int(),
+    /** Left out, by reason. */
+    skipped: z.object({
+      robots: z.int(),
+      offsite: z.int(),
+      noindex: z.int(),
+      type: z.int(),
+      duplicate: z.int(),
+      empty: z.int(),
+    }),
+    /** Why the pages that failed did, for the first few. */
+    problems: z.array(z.object({ url: z.string(), reason: z.string() })),
+    /** The page limit or the time limit stopped the read before it was through. */
+    truncated: z.boolean(),
+    /** What the site's robots.txt said: read, not there, or could not be read. */
+    robots: z.enum(['read', 'missing', 'unreadable']),
+    sitemaps: z.int(),
+  })
+  .meta({ id: 'WebSyncSummary' });
+export type WebSyncSummary = z.infer<typeof WebSyncSummary>;
+
+/** A website kept as a knowledge source: where it starts, how far it goes, when it is read again. */
+export const KnowledgeWebSource = z
+  .object({
+    id: typeId('webSource'),
+    sourceId: typeId('source'),
+    brandId: typeId('brand'),
+    name: z.string(),
+    visibility: KnowledgeVisibility,
+    status: z.enum(['active', 'paused', 'retired']),
+    url: z.string(),
+    mode: WebSyncMode,
+    maxPages: z.int(),
+    maxDepth: z.int(),
+    schedule: WebSyncSchedule,
+    state: WebSyncState,
+    nextRunAt: Timestamp.nullable(),
+    lastRunAt: Timestamp.nullable(),
+    lastResult: WebSyncResult.nullable(),
+    lastRun: WebSyncSummary.nullable(),
+    /** Pages that are currently documents of the source. */
+    pageCount: z.int(),
+    createdAt: Timestamp,
+  })
+  .meta({ id: 'KnowledgeWebSource' });
+export type KnowledgeWebSource = z.infer<typeof KnowledgeWebSource>;
+
+/** Add a website: a knowledge source whose documents are its pages. */
+export const CreateWebSourceRequest = z
+  .object({
+    brandId: typeId('brand'),
+    url: z.url({ protocol: /^https?$/ }).max(500),
+    /** Defaults to the website's host name. */
+    name: z.string().trim().min(1).max(120).optional(),
+    mode: WebSyncMode.default('site'),
+    maxPages: z.int().min(1).max(500).default(50),
+    maxDepth: z.int().min(0).max(5).default(2),
+    schedule: WebSyncSchedule.default('weekly'),
+    visibility: KnowledgeVisibility.default('public'),
+  })
+  .meta({ id: 'CreateWebSourceRequest' });
+
+export const UpdateWebSourceRequest = z
+  .object({
+    mode: WebSyncMode.optional(),
+    maxPages: z.int().min(1).max(500).optional(),
+    maxDepth: z.int().min(0).max(5).optional(),
+    schedule: WebSyncSchedule.optional(),
+  })
+  .meta({ id: 'UpdateWebSourceRequest' });
+
+export const KnowledgeWebPage = z
+  .object({
+    url: z.string(),
+    documentId: typeId('document').nullable(),
+    /** `ok`: read at the last sync. `failed`: could not be read. `gone`: not there any more. */
+    state: z.enum(['ok', 'failed', 'gone']),
+    /** The HTTP status of the last request, when there was one. */
+    status: z.int().nullable(),
+    lastFetchedAt: Timestamp.nullable(),
+    error: z.string().nullable(),
+  })
+  .meta({ id: 'KnowledgeWebPage' });
+export type KnowledgeWebPage = z.infer<typeof KnowledgeWebPage>;
+
+const webSourceParams = z.object({
+  webSourceId: z.string().meta({ description: 'Website source ID (wsrc_…)' }),
+});
+
 // ── Hamnivo's own MCP server ─────────────────────────────────────────────────────────────
 
 /** A JSON-RPC 2.0 message of the Model Context Protocol (Streamable HTTP, no sessions). */
@@ -240,5 +361,66 @@ export const aiPowerRoutes = {
     }),
     body: UpdateMcpResourceRequest,
     success: { status: 200, description: 'Resource', schema: McpCatalogResource },
+  },
+  listWebSources: {
+    method: 'get',
+    path: '/v1/admin/knowledge/web-sources',
+    operationId: 'listWebSources',
+    summary: 'Websites kept as knowledge, with how their last read went (knowledge.read)',
+    tags: ['Knowledge'],
+    auth: 'staff_session',
+    success: {
+      status: 200,
+      description: 'Websites',
+      schema: z.object({ items: z.array(KnowledgeWebSource) }),
+    },
+  },
+  createWebSource: {
+    method: 'post',
+    path: '/v1/admin/knowledge/web-sources',
+    operationId: 'createWebSource',
+    summary:
+      'Add a website as knowledge: Hamnivo reads its pages (sitemap, same site, robots.txt respected) and keeps them up to date (knowledge.manage)',
+    tags: ['Knowledge'],
+    auth: 'staff_session',
+    body: CreateWebSourceRequest,
+    idempotent: true,
+    success: { status: 201, description: 'Website added', schema: KnowledgeWebSource },
+  },
+  updateWebSource: {
+    method: 'patch',
+    path: '/v1/admin/knowledge/web-sources/{webSourceId}',
+    operationId: 'updateWebSource',
+    summary: 'Change what a website source reads and how often (knowledge.manage)',
+    tags: ['Knowledge'],
+    auth: 'staff_session',
+    params: webSourceParams,
+    body: UpdateWebSourceRequest,
+    success: { status: 200, description: 'Website', schema: KnowledgeWebSource },
+  },
+  syncWebSource: {
+    method: 'post',
+    path: '/v1/admin/knowledge/web-sources/{webSourceId}/sync',
+    operationId: 'syncWebSource',
+    summary: 'Read the website again now (knowledge.manage)',
+    tags: ['Knowledge'],
+    auth: 'staff_session',
+    params: webSourceParams,
+    success: { status: 202, description: 'Queued', schema: KnowledgeWebSource },
+  },
+  listWebPages: {
+    method: 'get',
+    path: '/v1/admin/knowledge/web-sources/{webSourceId}/pages',
+    operationId: 'listWebPages',
+    summary:
+      'The pages of a website source and what the last read said about each (knowledge.read)',
+    tags: ['Knowledge'],
+    auth: 'staff_session',
+    params: webSourceParams,
+    success: {
+      status: 200,
+      description: 'Pages',
+      schema: z.object({ items: z.array(KnowledgeWebPage) }),
+    },
   },
 } as const satisfies Record<string, RouteDef>;
