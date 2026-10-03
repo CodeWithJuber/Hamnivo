@@ -1,143 +1,69 @@
 ---
-title: Frequently Asked Questions
-description: Common questions about Hamnivo
+title: Frequently asked questions
+description: Short, honest answers to common questions about Hamnivo
 ---
 
 ## Do I need to open Chatwoot?
 
-No. Chatwoot is the engine that stores conversations, but you never need to open it. Studio handles everything.
+No. Chatwoot is the engine that stores conversations underneath Hamnivo. You and your team work in
+Hamnivo Studio, including saved replies and tags (**Inbox** → **Saved replies and tags**).
 
-If you ever want to customize Chatwoot's fields or saved replies, you can. Studio tells you how. But it's optional.
+## Who can see my conversations?
 
-## Is my data private?
+- **Self-hosted:** everything stays on your own server.
+- **On a Hamnivo service run by someone else:** on that operator's server.
+- **AI features:** when the AI answers, the conversation is sent to the AI company whose key you
+  added. When the message guard or other checks are on, customer messages are also sent to
+  TypeSafe (Jev), with personal details such as emails and phone numbers removed first.
 
-Yes. Conversations are stored on your own server or in your account. Nobody at Hamnivo can read them.
+## What does the AI cost?
 
-If you're self-hosting, all data stays in your data center.
+You pay the AI company for what your key uses. Hamnivo's built-in practice model is free, but it
+only gives sample answers. Your plan and your workspace's AI budget limit how many AI replies are
+sent; when they run out, your team answers instead.
 
-If you're using SaaS, Hamnivo follows your regional data protection laws (GDPR, etc.).
+## Which AI companies can I use?
 
-## How much does AI cost?
+Anthropic, OpenAI, Google Gemini, and any service that works like OpenAI's (including models you
+run yourself). Keys are stored encrypted, and **Test** checks a key before customers depend on it.
+See [AI keys](/docs/setup/ai-keys/).
 
-It depends on which AI model you use:
+## Can I bring my old conversations?
 
-- **Mock model** (built in): Free. It's not real AI, but lets you test the workflow.
-- **Real models** (Anthropic, OpenAI, Gemini, etc.): You pay the model provider. Hamnivo charges no extra fee.
+Yes: **Settings** → **Import history**. It walks you through checking a sample before anything is
+imported.
 
-You control your budget. Set a monthly limit or turn off AI anytime.
+## Can I change how the chat looks?
 
-Go to **Settings** → **AI** to see your costs and limits.
+Yes: your colour, logo, corners, greeting and offline message, with a live preview. Go to
+**Settings** → **Brands and install** and press **Look and wording** on your brand.
 
-## Can I use my own AI model?
+## What happens if the AI can't answer?
 
-Yes. You can connect:
-- Anthropic Claude
-- OpenAI (GPT-4, etc.)
-- Google Gemini
-- Any OpenAI-compatible API
+The chat goes to your team with a note saying why, and the customer is told a person will reply.
+This also happens if the AI company is down or the customer asks for a person. Nothing is lost.
 
-You bring your own API key. Hamnivo doesn't store it — we only use it to call your model.
+## Can the chat speak my customers' language?
 
-## How do I move from another platform?
+The chat comes in English, Arabic, Hindi and Urdu, including right-to-left layout. The AI replies
+in the customer's language, including Hinglish and Roman Urdu.
 
-1. Export your conversations from your old platform (as JSON or CSV)
-2. In Studio, go to **Settings** → **Import**
-3. Upload the file
-4. Hamnivo imports them and shows them in Inbox
+## What if nobody is online?
 
-Your conversation history stays with you.
+Set your [business hours](/docs/setup/business-hours/). Outside them, customers see your offline
+message and when you'll be back. Inside them, the chat says a person is available only when someone
+who can answer is online.
 
-## Can I use Hamnivo for sales, not just support?
+## Will I notice new chats?
 
-Yes. Teams use Hamnivo for:
-- Customer support (answering questions)
-- Sales (handling inquiries, quotes)
-- Feedback (collecting opinions)
-- Scheduling (booking calls or appointments)
-
-You control what the chat shows. Customize the title, color, and message.
-
-## What happens if the API model goes down?
-
-If your AI model provider (OpenAI, etc.) has an outage:
-
-1. The AI stops answering
-2. Customers see "A person will help you soon"
-3. Your team still answers manually
-4. When the provider comes back, AI resumes
-
-No conversations are lost.
-
-## Can I customize the chat color and text?
-
-Yes. On your brand, click **Edit** and change:
-- Chat title
-- Welcome message
-- Brand color
-- Logo (optional)
-
-The changes appear immediately on your website.
-
-## How many people can be on my team?
-
-Unlimited. Invite as many people as you need. Each person gets a role (admin, agent, editor, etc.).
-
-## Can I ban a customer?
-
-Yes. In Inbox, open the customer's chat, click the menu, and select **Block**. They can't send new messages.
-
-To unblock, click the menu again.
-
-## How do I set a response time goal?
-
-Go to **Settings** → **Reports**. Set targets like "Respond within 2 hours". Hamnivo tracks how often you hit them.
-
-## Can the chat translate languages?
-
-The chat itself shows in your customer's browser language. Conversation content is not automatically translated.
-
-If you need translation:
-1. Add knowledge in multiple languages
-2. Train your AI agent on translated knowledge
-3. The AI can answer in the customer's language
-
-## What if I'm on vacation?
-
-Set an away message:
-1. Go to **Settings** → **Team**
-2. Click your name and set "Away until..."
-3. Chats say "The team is away. We'll reply Monday."
-
-Your team gets the chats while you're away.
-
-## Can I undo a sent message?
-
-No. Messages can't be unsent. But you can:
-1. Send a follow-up message to correct it
-2. Ask your team to help fix the situation
-
-Plan your replies before sending.
-
-## Does Hamnivo work offline?
-
-No. The chat needs an internet connection. If your customer's connection drops:
-1. Their chat pauses
-2. When they reconnect, the chat resumes
-3. No messages are lost
-
-## Can I export my conversations?
-
-Yes. Go to **Reports**, click **Export**, and download your conversations as CSV or JSON. They stay in Studio too.
+Yes: sounds, desktop notifications, and unread counts in the browser tab. See
+[Sounds and notifications](/docs/inbox/sounds-and-notifications/).
 
 ## Is there a mobile app?
 
-Not yet. You can:
-- Use Studio on your phone's web browser
-- Keep your browser tab open in another app
-- Get notified when new chats arrive (if available in your plan)
+Not yet. Studio works in your phone's browser.
 
-## How do I get support?
+## How do I get help?
 
-Email the Hamnivo team or use the support chat in Studio.
-
-If you're running Hamnivo yourself, see **[Self-hosting made simple](self-hosting)**.
+If you run Hamnivo yourself, start with [Self-hosting made simple](/docs/self-hosting/) and the
+`hamnivo.sh doctor` command. Otherwise, ask the person or company that runs your Hamnivo.
