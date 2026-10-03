@@ -26,15 +26,18 @@ export const en = {
   },
   nav: {
     label: 'Studio',
-    overview: 'Overview',
+    home: 'Home',
     inbox: 'Inbox',
+    ai: 'AI assistant',
+    sales: 'Sales',
+    settings: 'Settings',
+    sections: '{{name}} pages',
     brands: 'Brands and install',
     agents: 'AI agents',
     models: 'Model connections',
     knowledge: 'Knowledge',
     memory: 'Customer memory',
-    stopAi: 'Stop AI',
-    runs: 'Runs',
+    runs: 'Activity',
     team: 'Team and access',
     security: 'Security',
     platform: 'Platform console',
@@ -270,6 +273,37 @@ export const en = {
   overview: {
     title: 'Overview',
     greeting: 'Welcome back, {{name}}.',
+    chats: {
+      title: 'Your chats',
+      description: 'Customers waiting for a person, and chats assigned to you.',
+      loading: 'Loading your chats',
+      waiting: 'Waiting for a person',
+      mine: 'Assigned to you',
+      caughtUp: 'Nothing is waiting for you right now.',
+      open: 'Open inbox',
+    },
+    setup: {
+      title: 'Get set up',
+      description: 'These steps are left before customers can chat with your AI assistant.',
+      steps: {
+        engine: {
+          title: 'Connect the chat engine',
+          description: 'Connect a brand so that its chats reach your team.',
+        },
+        brand: {
+          title: 'Add a brand and install the chat',
+          description: 'Name it, allow your website and paste the install code there.',
+        },
+        agent: {
+          title: 'Publish an AI agent',
+          description: 'Your assistant answers customers only after you publish it.',
+        },
+        team: {
+          title: 'Invite a teammate',
+          description: 'Add the people who will answer chats with you.',
+        },
+      },
+    },
     brands: {
       title: 'Brands',
       description: 'Chat connection and AI status for each brand.',
@@ -352,6 +386,8 @@ export const en = {
       account: 'Chatwoot account {{id}}',
       connect: 'Connect Chatwoot',
       connectTitle: 'Connect {{name}} to Chatwoot',
+      engineNote:
+        'Hamnivo uses Chatwoot as its chat engine. You and your team work in Hamnivo Studio; you don’t need to open Chatwoot.',
       connectIntro: 'Hamnivo sets up a Chatwoot account for this brand with:',
       connectItem1: 'an integration user and an inbox for the website chat,',
       connectItem2: 'an AI bot that answers in that inbox,',

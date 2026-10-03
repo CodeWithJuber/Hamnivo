@@ -69,6 +69,9 @@ To run Hamnivo in production on your own server, with HTTPS and backups:
 The steps, from DNS records to backups and updates, are in Part A of
 [`docs/self-hosting.md`](docs/self-hosting.md).
 
+Not sure which app to open? [`docs/using-hamnivo.md`](docs/using-hamnivo.md), "Which app do I
+use?", explains it: your team works in Hamnivo Studio, and Chatwoot is only the engine underneath.
+
 Further guides live in [`docs/`](docs/). The product blueprint and the UI/UX design kit that this
 implementation follows are in [`docs/blueprint/`](docs/blueprint/) and [`docs/design/`](docs/design/).
 

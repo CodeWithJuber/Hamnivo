@@ -27,15 +27,18 @@ export const hi: Translation = {
   },
   nav: {
     label: 'Studio',
-    overview: 'सारांश',
+    home: 'होम',
     inbox: 'इनबॉक्स',
+    ai: 'AI असिस्टेंट',
+    sales: 'बिक्री',
+    settings: 'सेटिंग',
+    sections: '{{name}} के पेज',
     brands: 'ब्रांड और इंस्टॉल',
     agents: 'AI एजेंट',
     models: 'मॉडल कनेक्शन',
     knowledge: 'जानकारी',
     memory: 'ग्राहक मेमोरी',
-    stopAi: 'AI रोकें',
-    runs: 'रन',
+    runs: 'गतिविधि',
     team: 'टीम और एक्सेस',
     security: 'सुरक्षा',
     platform: 'प्लेटफ़ॉर्म कंसोल',
@@ -268,6 +271,37 @@ export const hi: Translation = {
   overview: {
     title: 'सारांश',
     greeting: 'फिर से स्वागत है, {{name}}।',
+    chats: {
+      title: 'आपकी चैट',
+      description: 'किसी व्यक्ति का इंतज़ार कर रहे ग्राहक, और आपको सौंपी गई चैट।',
+      loading: 'आपकी चैट लोड हो रही हैं',
+      waiting: 'किसी व्यक्ति का इंतज़ार',
+      mine: 'आपको सौंपी गई',
+      caughtUp: 'अभी आपके लिए कुछ भी इंतज़ार नहीं कर रहा।',
+      open: 'इनबॉक्स खोलें',
+    },
+    setup: {
+      title: 'शुरुआती सेटअप',
+      description: 'ग्राहक आपके AI असिस्टेंट से चैट कर सकें, इससे पहले ये कदम बाकी हैं।',
+      steps: {
+        engine: {
+          title: 'चैट इंजन जोड़ें',
+          description: 'एक ब्रांड को जोड़ें, ताकि उसकी चैट आपकी टीम तक पहुँचें।',
+        },
+        brand: {
+          title: 'ब्रांड जोड़ें और चैट इंस्टॉल करें',
+          description: 'उसे नाम दें, अपनी वेबसाइट को अनुमति दें और उसमें इंस्टॉल कोड जोड़ें।',
+        },
+        agent: {
+          title: 'AI एजेंट प्रकाशित करें',
+          description: 'आपका असिस्टेंट ग्राहकों को तभी जवाब देता है जब आप उसे प्रकाशित करते हैं।',
+        },
+        team: {
+          title: 'किसी साथी को आमंत्रित करें',
+          description: 'उन लोगों को जोड़ें जो आपके साथ चैट का जवाब देंगे।',
+        },
+      },
+    },
     brands: {
       title: 'ब्रांड',
       description: 'हर ब्रांड के लिए चैट कनेक्शन और AI की स्थिति।',
@@ -348,6 +382,8 @@ export const hi: Translation = {
       account: 'Chatwoot खाता {{id}}',
       connect: 'Chatwoot जोड़ें',
       connectTitle: '{{name}} को Chatwoot से जोड़ें',
+      engineNote:
+        'Hamnivo, Chatwoot को अपने चैट इंजन की तरह इस्तेमाल करता है। आप और आपकी टीम Hamnivo Studio में काम करते हैं; आपको Chatwoot खोलने की ज़रूरत नहीं है।',
       connectIntro: 'Hamnivo इस ब्रांड के लिए एक Chatwoot खाता सेट अप करता है, जिसमें होंगे:',
       connectItem1: 'एक इंटीग्रेशन यूज़र और वेबसाइट चैट के लिए एक इनबॉक्स,',
       connectItem2: 'एक AI बॉट जो उस इनबॉक्स में जवाब देता है,',

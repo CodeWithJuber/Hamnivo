@@ -8,10 +8,13 @@ import { AgentBadge, ConnectionBadge, OutcomeBadge } from '../components/Badges'
 import { PageHeader, Section } from '../components/PageHeader';
 import { QueryState } from '../components/States';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../lib/format';
+import { isStaffOnly } from '../lib/home';
 import { killSwitchScope, useBrandRefs, useNames } from '../lib/names';
 import { useAgents, useAuthorityConnections, useKillSwitches, useRuns } from '../lib/queries';
 import { useTenant } from '../lib/tenant';
 import type { Agent, AuthorityConnection } from '../lib/types';
+import { GetSetUp } from './home/GetSetUp';
+import { YourChats } from './home/YourChats';
 
 /** Chat connection of a brand: an authority connection with a live inbox for it. */
 export function connectionFor(
@@ -248,10 +251,15 @@ function RunsSection() {
   );
 }
 
-/** Workspace overview (board 03: HNV-03-01 healthy, 03-02 empty, 03-03 loading, 03-04 partial). */
+/**
+ * Home, the workspace overview (board 03: HNV-03-01 healthy, 03-02 empty, 03-03 loading, 03-04
+ * partial). Staff who do not run the workspace start with their chats; people who do start with
+ * what is left to set up. What is below is the same for everyone.
+ */
 export function OverviewPage() {
   const { t } = useTranslation();
   const { me, can } = useTenant();
+  const staffOnly = isStaffOnly(can);
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -263,6 +271,8 @@ export function OverviewPage() {
           </>
         }
       />
+      {staffOnly && can('conversations.read') ? <YourChats /> : null}
+      {staffOnly ? null : <GetSetUp />}
       {can('agents.read') ? <StopsSection /> : null}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <BrandsSection />

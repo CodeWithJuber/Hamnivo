@@ -21,12 +21,32 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
     signs Studio out instead of continuing.
 - **Workspace choice.** Lists the person's workspaces and creates new ones. The choice is
   remembered in this browser. With only one workspace, Studio opens it.
-- **Overview.** Brands with their Chatwoot connection, each brand's AI assistant (live version or
+- **Menu** (`src/lib/nav.ts`). Six entries: Home, Inbox, AI assistant, Sales, Reports and Settings.
+  Each is a group of pages that already existed, with the permission each page always had.
+  - An entry shows when the person can see at least one of its pages, and opens the first one they
+    can see. It is active on every page of its group, nested ones such as `/agents/:id` included.
+  - When a person can see two or more pages of an entry, they are a row of links above the page
+    (`SectionTabs`): the current one has `aria-current="page"`, and on a narrow screen the row
+    scrolls sideways.
+  - Stop AI is a red button in the header, not an entry. Account security and the Platform
+    console are in the account menu.
+  - The groups are listed in `docs/using-hamnivo.md`, with what each role sees.
+- **Home** (`/overview`). It starts with a block for the person's role, then is the same for
+  everyone: brands with their Chatwoot connection, each brand's AI assistant (live version or
   "draft only"), active AI stops, and the latest runs.
+  - Someone who can neither manage brands nor see the team gets **Your chats**: how many
+    customers wait for a person and how many chats are assigned to them (the inbox's own counts),
+    and an "Open inbox" button.
+  - Everyone else gets **Get set up**: the steps still open (connect the chat engine, add a brand
+    and install the chat, publish an AI agent, invite a teammate), each linking to its page. A
+    step is shown only when the person can do it and the lists they can read say whether it is
+    done; nothing detects the install code on a website, so "install" counts once a brand has an
+    allowed website. The list is gone once every step is done.
 - **Brands and install.**
   - Create a brand with its allowed websites, and edit its name and websites later. Studio warns
     that a website taken off the list ends the chats open there.
-  - Connect it to Chatwoot.
+  - Connect it to Chatwoot. The dialog says that Chatwoot is only the chat engine: people work in
+    Studio and do not need to open it.
   - Copy the loader snippet with the brand's widget ID.
 - **AI agents.**
   - List and create agents.
@@ -52,11 +72,12 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
     size and type are checked before anything is sent.
   - Mark as reviewed, retire, and upload a new version.
   - A search preview shows the passages an answer would use, with their scores.
-- **Stop AI.** A "Stop AI" button is always in the header for people who may publish agents. It
-  stops AI replies for the whole workspace, one brand or one agent, with a reason. The stops page
-  lists active and earlier stops, and lets the AI answer again.
-- **Runs.** A table of outcome, version, model, tokens, time taken and start time, with filters.
-  A side sheet shows one run's steps. No message text is shown.
+- **Stop AI.** A red "Stop AI" button is always in the header for people who can see AI agents. It
+  opens the Stop AI page, where people who may publish agents stop AI replies for the whole
+  workspace, one brand or one agent, with a reason. The page lists active and earlier stops, and
+  lets the AI answer again.
+- **Runs**, called Activity in the menu. A table of outcome, version, model, tokens, time taken and
+  start time, with filters. A side sheet shows one run's steps. No message text is shown.
 - **Decision rules** (board 12). Routing mode (shadow by default), the inbox's teams with their
   topics, languages and translation languages for the brand (adding a team here creates an inbox
   team in the brand's workspace), the rubric editor (provider and pinned Jev version, time limit,
@@ -167,6 +188,11 @@ pnpm --filter @hamnivo/console typecheck
 
 `routeTree.gen.ts` is generated from `src/routes` on install, typecheck and build. It is not in
 git.
+
+`pnpm --filter @hamnivo/console test` runs the unit and component tests in `test/`: text coverage
+in every language, who sees which menu entry and setup step, and the menu, the header and Home
+rendered to HTML in Node (`test/render.tsx` fills the query cache first, so nothing is fetched).
+The browser journeys are in `e2e/`.
 
 ## Settings
 

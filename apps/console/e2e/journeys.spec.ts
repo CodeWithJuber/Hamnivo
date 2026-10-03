@@ -104,8 +104,11 @@ test('HNV-02-01 HNV-03-02 HNV-17-02 HNV-17-03 HNV-17-05 · sign up, create a wor
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toBe((await snippet.textContent())?.trim());
 
-  // The overview now shows the brand connected, with its assistant still a draft.
-  await page.getByRole('link', { name: 'Overview' }).first().click();
+  // Home now shows the brand connected, with its assistant still a draft.
+  await page
+    .getByRole('navigation', { name: 'Studio', exact: true })
+    .getByRole('link', { name: 'Home', exact: true })
+    .click();
   const row = page.getByTestId('overview-brands').locator('[data-brand="Noor Books"]');
   await expect(row).toContainText('Connected');
   await expect(row).toContainText('Draft only');
@@ -394,7 +397,16 @@ test('HNV-13-06 · stop AI replies for one brand, see it everywhere, then let th
   await page.goto('/overview');
   await expect(page.getByText('The AI isn’t stopped anywhere.')).toBeVisible();
 
+  // The danger button in the header is on every page and leads to the Stop AI page, where the
+  // stop is made. Stop AI is not an entry in the menu.
+  await expect(
+    page.getByRole('navigation', { name: 'Studio', exact: true }).getByRole('link', {
+      name: 'Stop AI',
+    }),
+  ).toHaveCount(0);
   await page.getByTestId('stop-ai-button').click();
+  await expect(page).toHaveURL(/\/stop-ai/);
+  await page.getByTestId('stop-ai-open').click();
   const dialog = page.getByTestId('stop-ai-dialog');
   await dialog.getByRole('radio', { name: 'One brand' }).click();
   await dialog.getByLabel('Brand', { exact: true }).selectOption({ label: 'Noor Books' });
@@ -402,6 +414,11 @@ test('HNV-13-06 · stop AI replies for one brand, see it everywhere, then let th
   await dialog.getByRole('button', { name: 'Stop AI replies' }).click();
   await expect(dialog).toBeHidden();
 
+  // The stop shows on every page: back on Home, the banner and the header say so.
+  await page
+    .getByRole('navigation', { name: 'Studio', exact: true })
+    .getByRole('link', { name: 'Home', exact: true })
+    .click();
   const banner = page.getByTestId('kill-switch-banner');
   await expect(banner).toContainText('AI replies are stopped');
   await expect(banner).toContainText('Brand: Noor Books');

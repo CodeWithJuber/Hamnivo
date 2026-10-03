@@ -84,7 +84,10 @@ test('a new owner signs up in Studio, sets up a brand, connects Chatwoot and sav
   ).toBeVisible({ timeout: 60_000 });
 
   // Saving the agent's draft is a PUT to the API origin.
-  await page.getByRole('link', { name: 'Overview' }).first().click();
+  await page
+    .getByRole('navigation', { name: 'Studio', exact: true })
+    .getByRole('link', { name: 'Home', exact: true })
+    .click();
   await page
     .getByTestId('overview-brands')
     .locator('[data-brand="Studio Books"]')

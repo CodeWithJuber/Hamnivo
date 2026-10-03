@@ -97,7 +97,11 @@ export function StopAiPage() {
         description={t('stopAi.description')}
         actions={
           canAct ? (
-            <Button variant="destructive-solid" onClick={() => setStopping(true)}>
+            <Button
+              variant="destructive-solid"
+              onClick={() => setStopping(true)}
+              data-testid="stop-ai-open"
+            >
               <OctagonPauseIcon aria-hidden="true" />
               {t('stopAi.submit')}
             </Button>
