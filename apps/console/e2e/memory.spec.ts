@@ -256,7 +256,11 @@ test('HNV-15-06 · without permission to see customer memory, Studio says so and
   const page = await context.newPage();
   await page.goto('/memory');
   await expect(page.getByTestId('forbidden')).toContainText('You can’t see customer memory');
-  await expect(page.getByRole('navigation', { name: 'Studio' })).not.toContainText(
+  // The AI assistant pages this person can open do not include customer memory.
+  const pages = page.getByRole('navigation', { name: 'AI assistant pages' });
+  await expect(pages).toBeVisible();
+  await expect(pages).not.toContainText('Customer memory');
+  await expect(page.getByRole('navigation', { name: 'Studio', exact: true })).not.toContainText(
     'Customer memory',
   );
   expect(await audit(page, 'memory forbidden')).toEqual([]);

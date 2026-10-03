@@ -349,7 +349,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
 | HNV-03-01 | Overview | Healthy workspace | planned |  |
-| HNV-03-02 | Overview | No conversations yet | in-progress | `apps/console/src/pages/OverviewPage.tsx`, `apps/console/e2e/journeys.spec.ts` — A new workspace’s overview says what to do first and links to creating a brand (tested); the test widget comes later. |
+| HNV-03-02 | Overview | No conversations yet | in-progress | `apps/console/src/pages/OverviewPage.tsx`, `apps/console/src/pages/home/GetSetUp.tsx`, `apps/console/src/lib/home.ts`, `apps/console/test/home.test.ts`, `apps/console/test/home-blocks.test.tsx`, `apps/console/e2e/journeys.spec.ts`, `apps/console/e2e/menu.spec.ts` — A new workspace’s overview says what to do first: a Get set up list with the steps still open (connect the chat engine, add a brand and install the chat, publish an AI agent, invite a teammate), each linking to its page and gone once all are done; people who do not run the workspace see their chats instead (tested). The test widget comes later. |
 | HNV-03-03 | Overview | Loading | planned |  |
 | HNV-03-04 | Overview | Partial service degradation | planned |  |
 | HNV-03-05 | Command palette | Search and keyboard navigation | planned |  |
