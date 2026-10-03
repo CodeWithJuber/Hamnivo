@@ -163,6 +163,136 @@ export const inboxAlertsEn = {
       saved: 'Saved. It applies from each visitor’s next page view.',
     },
   },
+  library: {
+    link: 'Saved replies and tags',
+    title: 'Saved replies and tags',
+    description:
+      'Ready-made answers and labels your team shares. A change applies to everyone who answers customers for this brand.',
+    back: 'Back to inbox',
+    brand: 'Brand',
+    loading: 'Loading saved replies and tags',
+    noBrands: 'There is no brand yet. Saved replies and tags belong to a brand’s chat.',
+    notSetUp: {
+      title: 'Chat is not set up for {{name}} yet',
+      description:
+        'Connect the brand to chat first. Its saved replies and tags can be set up here afterwards.',
+      action: 'Open Brands and install',
+    },
+    forbidden: {
+      title: 'Saved replies and tags are not available to you',
+      description: 'Your role does not include managing the inbox. Ask an administrator for help.',
+    },
+    hint: {
+      add: 'Add tags',
+      ask: 'Ask someone who manages the inbox to add them.',
+    },
+    replies: {
+      title: 'Saved replies',
+      description:
+        'Your team picks these with the Saved replies button next to the reply box. Details such as the customer’s name are filled in from the chat.',
+      add: 'Add a saved reply',
+      search: 'Search saved replies',
+      noMatch: 'No saved reply matches your search.',
+      table: 'Saved replies of this brand',
+      columns: { code: 'Short code', text: 'Text', actions: 'Actions' },
+      edit: 'Edit',
+      editFor: 'Edit saved reply {{code}}',
+      delete: 'Delete',
+      deleteFor: 'Delete saved reply {{code}}',
+      empty: {
+        title: 'No saved replies yet',
+        description:
+          'Add the answers your team writes again and again, such as opening hours or how returns work.',
+      },
+      added: 'Saved reply {{code}} added.',
+      saved: 'Saved reply {{code}} saved.',
+      deleted: 'Saved reply {{code}} deleted.',
+      dialog: {
+        addTitle: 'Add a saved reply',
+        editTitle: 'Edit saved reply {{code}}',
+        description: 'Everyone who answers customers for this brand can use it straight away.',
+        code: 'Short code',
+        codeHint:
+          'A short name your team can search for, such as refund-policy. Letters, numbers, - and _ only, no spaces.',
+        codeRequired: 'Enter a short code.',
+        codeInvalid: 'Use letters, numbers, - and _ only (no spaces), up to 40 characters.',
+        codeTaken: 'Another saved reply already uses this short code.',
+        text: 'Text',
+        textHint: 'Up to {{number}} characters.',
+        textRequired: 'Enter the text of the reply.',
+        details: 'Add a detail from the chat',
+        detailsHint:
+          'It is filled in when someone uses the reply. If it is not known, the person is asked to fill it in by hand.',
+        detail: {
+          firstName: 'Customer’s first name',
+          name: 'Customer’s full name',
+          agent: 'Your name',
+          brand: 'Brand name',
+        },
+        save: 'Save',
+        add: 'Add saved reply',
+      },
+      confirm: {
+        title: 'Delete saved reply {{code}}?',
+        body: 'It disappears for everyone on your team. Messages that were already sent do not change.',
+        action: 'Delete saved reply',
+      },
+    },
+    tags: {
+      title: 'Tags',
+      description:
+        'Labels your team puts on chats to sort and find them. Staff add them in a chat’s details panel.',
+      add: 'Add a tag',
+      table: 'Tags of this brand',
+      columns: { name: 'Name', description: 'Description', actions: 'Actions' },
+      edit: 'Edit',
+      editFor: 'Edit tag {{name}}',
+      delete: 'Delete',
+      deleteFor: 'Delete tag {{name}}',
+      empty: {
+        title: 'No tags yet',
+        description: 'Add tags such as vip or refund, so your team can sort chats.',
+      },
+      added: 'Tag {{name}} added.',
+      saved: 'Tag {{name}} saved.',
+      deleted: 'Tag {{name}} deleted.',
+      dialog: {
+        addTitle: 'Add a tag',
+        editTitle: 'Edit tag {{name}}',
+        description: 'Your team can put it on chats straight away.',
+        name: 'Name',
+        nameHint:
+          'At least 2 letters or numbers, with - and _ allowed after the first one, such as vip or order-problem. It is kept in lower case.',
+        nameRequired: 'Enter a name for the tag.',
+        nameInvalid:
+          'Use 2 to 50 letters or numbers, with - and _ allowed after the first one and no spaces. The chat service does not accept letters with vowel signs (such as in Hindi): write the name in English letters instead.',
+        nameTaken: 'A tag with this name already exists.',
+        renameNote: 'Renaming changes this tag on every chat that has it.',
+        descriptionLabel: 'Description',
+        descriptionHint: 'Optional. Up to {{number}} characters.',
+        color: 'Colour',
+        colorChosen: 'Chosen colour: {{name}}',
+        save: 'Save',
+        add: 'Add tag',
+      },
+      colors: {
+        blue: 'Blue',
+        green: 'Green',
+        teal: 'Teal',
+        orange: 'Orange',
+        red: 'Red',
+        pink: 'Pink',
+        purple: 'Purple',
+        grey: 'Grey',
+        custom: 'Custom ({{hex}})',
+      },
+      confirm: {
+        title: 'Delete tag {{name}}?',
+        body: 'It is removed from the list your team picks from, and from every chat that has it.',
+        action: 'Delete tag',
+      },
+    },
+  },
 } as const;
 
 type Strings<T> = { [K in keyof T]: T[K] extends string ? string : Strings<T[K]> };

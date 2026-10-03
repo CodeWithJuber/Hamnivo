@@ -92,9 +92,10 @@ describe('the menu', () => {
         (entry) => `/${entry.name.replace(/\.tsx$/, '')}`,
       ),
     );
-    // Stop AI is a button in the header; Account security is in the account menu; Live visitors is
-    // a button above the list of chats in the inbox (its page would push the inbox down a row).
-    const elsewhere = ['/stop-ai', '/account', '/visitors'];
+    // Stop AI is a button in the header; Account security is in the account menu; Live visitors
+    // and Saved replies and tags are buttons above the list of chats in the inbox (a row of tabs
+    // for them would push the inbox down).
+    const elsewhere = ['/stop-ai', '/account', '/visitors', '/saved-replies'];
     const placed = NAV_GROUPS.flatMap((group) => group.routes.map((route) => route.to));
     expect([...pages].filter((page) => !elsewhere.includes(page)).sort()).toEqual(
       [...placed].sort(),

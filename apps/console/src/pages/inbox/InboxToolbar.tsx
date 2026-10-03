@@ -3,7 +3,7 @@ import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { NativeSelect, NativeSelectOption } from '@hamnivo/ui/components/native-select';
 import { cn } from '@hamnivo/ui/lib/utils';
 import { Link } from '@tanstack/react-router';
-import { BellIcon, BellRingIcon, CircleIcon, UsersIcon } from 'lucide-react';
+import { BellIcon, BellRingIcon, CircleIcon, MessageSquareTextIcon, UsersIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,6 +14,7 @@ import {
   useChooseAvailability,
   useDesktopPermission,
 } from '../../lib/inbox-alerts';
+import { useTenant } from '../../lib/tenant';
 import { AlertSettingsDialog } from './AlertSettings';
 
 /** Online, away or offline: a dot (filled, filled, hollow) and always the word. */
@@ -94,6 +95,7 @@ export function InboxToolbar() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const settings = useAlertSettings();
+  const { can } = useTenant();
   const silent = settings.sounds.muted;
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
@@ -105,6 +107,14 @@ export function InboxToolbar() {
             {t('inboxAlerts.live.link')}
           </Link>
         </Button>
+        {can('inbox.manage') ? (
+          <Button asChild variant="secondary" size="sm">
+            <Link to="/saved-replies" search={{}} data-testid="saved-replies-link">
+              <MessageSquareTextIcon aria-hidden="true" />
+              {t('inboxAlerts.library.link')}
+            </Link>
+          </Button>
+        ) : null}
         <Button
           variant="secondary"
           size="sm"

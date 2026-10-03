@@ -1234,7 +1234,7 @@ export const ar: Translation = {
       remove: 'إزالة الوسم {{name}}',
       added: 'أُضيف الوسم {{name}}.',
       removed: 'أُزيل الوسم {{name}}.',
-      noneDefined: 'لم تُعدّ وسوم لهذه العلامة التجارية بعد. يضيفها المسؤول في Chatwoot.',
+      noneDefined: 'لم تُعدّ وسوم لهذه العلامة التجارية بعد.',
     },
     fields: {
       title: 'الحقول المخصصة',

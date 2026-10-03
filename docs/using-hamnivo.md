@@ -15,8 +15,9 @@ Chatwoot is the engine underneath. Nobody has to open it day to day.
 | **Chat widget and website** | Your customers | Whenever they need help | The chat on your website. Customers never see Studio or Chatwoot. |
 
 You and your team work in Studio. Studio has no link to Chatwoot, and staff never need its
-address. An administrator may open Chatwoot for the few things Studio does not do yet: defining
-tags and custom fields, and editing or deleting saved replies.
+address. An administrator may open Chatwoot for the one thing Studio does not do yet: defining
+custom fields. Saved replies and tags are set up in Studio, from the inbox (see
+[Saved replies and tags](guide/inbox/saved-replies.md)).
 
 ## The menu in Studio
 
@@ -33,12 +34,15 @@ as a row of links above the page, so each one is a click away.
 | **Reports** | Reports |
 | **Settings** | Brands and install, Team and access, Security, Developer, Import history |
 
-Two things are not in the menu:
+Some pages are not in the menu:
 
 - **Stop AI** is a red button in the header, on every page, for people who can stop the AI
   (permission to publish agents). It opens the Stop AI page.
 - **Account security** and the **Platform console** (operators only) are in the account area at
   the bottom of the menu, which is a sheet on a phone.
+- [**Live visitors**](guide/inbox/live-visitors.md) (everyone who can read chats) and
+  [**Saved replies and tags**](guide/inbox/saved-replies.md) (people who manage the inbox) are
+  buttons above the list of chats in the inbox. A row of links for them would push the inbox down.
 
 ## What each role sees
 

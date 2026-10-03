@@ -30,6 +30,7 @@ import {
   useReviews,
   useTags,
 } from '../../lib/inbox';
+import { NoTagsHint } from '../library/LibraryHints';
 import { ConversationStatusBadge, IdentityBadge, languageName } from './parts';
 import { VisitorDetails } from './VisitorDetails';
 
@@ -262,7 +263,7 @@ function Tags({ detail }: { detail: InboxDetail }) {
         </form>
       ) : null}
       {editable && tags.data.options.length === 0 ? (
-        <p className="text-xs text-text-secondary">{t('inbox.tags.noneDefined')}</p>
+        <NoTagsHint brandId={detail.brand?.id} />
       ) : null}
       <ActionError error={change.error} />
     </div>

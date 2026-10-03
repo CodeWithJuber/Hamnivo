@@ -290,18 +290,23 @@
     "evidence": [
       "apps/console/e2e/inbox.spec.ts",
       "apps/console/src/pages/inbox/ConversationPane.tsx",
+      "apps/console/src/pages/inbox/Typing.tsx",
       "apps/gateway/src/authority/ownership.service.ts",
       "apps/gateway/src/authority/processor.service.ts",
       "apps/gateway/src/conversations/staff-conversations.service.ts",
       "apps/gateway/src/inbox/assignment.service.ts",
+      "apps/gateway/src/inbox/customer-typing.service.ts",
       "apps/gateway/src/inbox/live.service.ts",
       "apps/gateway/src/inbox/signals.service.ts",
+      "apps/gateway/src/inbox/typing.service.ts",
+      "apps/gateway/test/inbox-alerts.int.test.ts",
       "apps/gateway/test/inbox-workspace.int.test.ts",
       "apps/gateway/test/inbox.int.test.ts",
       "apps/gateway/test/reconciler.int.test.ts",
-      "apps/gateway/test/slice.int.test.ts"
+      "apps/gateway/test/slice.int.test.ts",
+      "apps/widget/src/useTyping.ts"
     ],
-    "note": "Atomic claim and takeover through the ownership epoch; an AI reply still being written when staff take over is fenced, and takeovers made inside Chatwoot are adopted (all tested). A reply from an out-of-date view (expected epoch) or over a colleague is refused and nothing is sent. Taking a conversation from a colleague needs conversations.assign; others ask for a transfer. Studio shows who else is viewing or typing, and ownership changes, live over the staff stream."
+    "note": "Atomic claim and takeover through the ownership epoch; an AI reply still being written when staff take over is fenced, and takeovers made inside Chatwoot are adopted (all tested). A reply from an out-of-date view (expected epoch) or over a colleague is refused and nothing is sent. Taking a conversation from a colleague needs conversations.assign; others ask for a transfer. Studio shows who else is viewing or typing, and ownership changes, live over the staff stream. Typing also goes between staff and the customer, as short-lived signals that are never stored, and each person’s online, away or offline status shows in the inbox."
   },
   "R05": {
     "status": "in-progress",
@@ -948,13 +953,16 @@
     "status": "implemented",
     "evidence": [
       "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/lib/inbox-alerts.ts",
       "apps/console/src/pages/inbox/InboxPage.tsx",
       "apps/gateway/src/inbox/access.ts",
+      "apps/gateway/src/inbox/alerts.service.ts",
       "apps/gateway/src/inbox/inbox.controller.ts",
       "apps/gateway/src/inbox/inbox.service.ts",
+      "apps/gateway/test/inbox-alerts.int.test.ts",
       "apps/gateway/test/inbox.int.test.ts"
     ],
-    "note": "Queues for mine, waiting for a person, AI answering, my teams and all, with counts, keyset paging and filters by status (open or pending, snoozed, resolved), brand, channel, customer language and tag. Lists, counts, search and the staff stream all apply the same grant filter (workspace, brand, inbox or team): a conversation outside a person's grants is not found. Tested through the API and in the browser."
+    "note": "Queues for mine, waiting for a person, AI answering, my teams and all, with counts, keyset paging and filters by status (open or pending, snoozed, resolved), brand, channel, customer language and tag. Lists, counts, search and the staff stream all apply the same grant filter (workspace, brand, inbox or team): a conversation outside a person's grants is not found. Tested through the API and in the browser. Each person sees which chats have news for them: unread is kept by the server per person, not per browser, and shows in the list, the page title and the tab icon, with sounds and desktop alerts that are theirs to set (tested)."
   },
   "H02": {
     "status": "in-progress",
@@ -984,30 +992,41 @@
     "status": "implemented",
     "evidence": [
       "apps/console/src/pages/inbox/ContextPanel.tsx",
+      "apps/console/src/pages/library/TagsSection.tsx",
       "apps/gateway/src/inbox/annotations.service.ts",
+      "apps/gateway/src/inbox/library.service.ts",
       "apps/gateway/src/inbox/projection.ts",
-      "apps/gateway/test/inbox-workspace.int.test.ts"
+      "apps/gateway/test/inbox-library.int.test.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "packages/chatwoot/test/contract/suite.ts"
     ],
-    "note": "Only tags defined for the brand (Chatwoot labels) are accepted, and custom fields are checked against their definitions (text, number, list, date, link, checkbox); Chatwoot's other attributes are kept. Tags are copied into Hamnivo for queue filters. New tags and fields are still defined in Chatwoot."
+    "note": "Only tags defined for the brand (Chatwoot labels) are accepted, and custom fields are checked against their definitions (text, number, list, date, link, checkbox); Chatwoot's other attributes are kept. Tags are copied into Hamnivo for queue filters. People who manage the inbox add, rename, recolour and delete tags in Studio (Saved replies and tags, inbox.manage on the brand): a rename or a delete reaches the conversations in Chatwoot and in Hamnivo’s copy, open inboxes are told, and each change is audited. Tag names follow Chatwoot’s own rule (two characters or more, letters and numbers, no vowel signs). The Chatwoot calls are covered by the fake and by contract cases whose run against a real Chatwoot is left to CI. New custom fields are still defined in Chatwoot."
   },
   "H05": {
     "status": "implemented",
     "evidence": [
       "apps/console/src/pages/inbox/Composer.tsx",
+      "apps/console/src/pages/library/RepliesSection.tsx",
       "apps/gateway/src/inbox/annotations.service.ts",
-      "apps/gateway/test/inbox-workspace.int.test.ts"
+      "apps/gateway/src/inbox/library.service.ts",
+      "apps/gateway/test/inbox-library.int.test.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "packages/chatwoot/test/contract/suite.ts"
     ],
-    "note": "Chatwoot canned responses, searched as the staff member, with variables filled from verified facts only (an address nobody verified is never filled in) and missing variables listed. Adding one needs inbox.manage. Editing and deleting saved replies is still done in Chatwoot."
+    "note": "Chatwoot canned responses, searched as the staff member, with variables filled from verified facts only (an address nobody verified is never filled in) and missing variables listed. People who manage the inbox add, edit and delete saved replies in Studio (Saved replies and tags): each short code is used once, a detail such as the customer’s first name is added with a button, the composer sees every change at once, and each change is audited without the text of the reply. The contract cases against a real Chatwoot are left to CI."
   },
   "H06": {
     "status": "implemented",
     "evidence": [
       "apps/console/e2e/inbox.spec.ts",
       "apps/console/src/pages/inbox/ContextPanel.tsx",
+      "apps/console/src/pages/inbox/VisitorDetails.tsx",
       "apps/gateway/src/inbox/inbox.service.ts",
-      "apps/gateway/test/inbox-workspace.int.test.ts"
+      "apps/gateway/src/visitors/tracker.service.ts",
+      "apps/gateway/test/inbox-workspace.int.test.ts",
+      "apps/gateway/test/visitors.int.test.ts"
     ],
-    "note": "Verified or anonymous identity and what that means, a verified email apart from an address nobody verified, language, brand, Chatwoot contact attributes (Hamnivo's internal ones left out) and the other conversations the person can see. A third column on wide screens, a sheet otherwise."
+    "note": "Verified or anonymous identity and what that means, a verified email apart from an address nobody verified, language, brand, Chatwoot contact attributes (Hamnivo's internal ones left out) and the other conversations the person can see. A third column on wide screens, a sheet otherwise. A Website visit card shows the customer’s current page, the pages seen, device, country and number of visits. Browsers that send Do Not Track are left out, no IP address is stored, page addresses lose their query string unless the brand chooses otherwise, and everything is deleted 30 days after the visitor was last seen (tested)."
   },
   "H07": {
     "status": "implemented",
@@ -2400,17 +2419,20 @@
   "W19": {
     "status": "implemented",
     "evidence": [
+      "apps/console/e2e/chat-settings.spec.ts",
+      "apps/console/src/pages/BrandChatSettings.tsx",
+      "apps/console/src/pages/visitors/VisitorsPage.tsx",
+      "apps/gateway/src/visitors/invites.ts",
       "apps/gateway/src/widget/settings.service.ts",
       "apps/gateway/test/customer-surface.int.test.ts",
+      "apps/gateway/test/visitors.int.test.ts",
       "apps/widget/e2e/surface.spec.ts",
-      "apps/console/src/pages/BrandChatSettings.tsx",
-      "apps/console/e2e/chat-settings.spec.ts",
       "packages/contracts/src/customer-surface.ts",
       "packages/widget-loader/src/loader.ts",
       "packages/widget-loader/src/proactive.ts",
       "packages/widget-loader/test/proactive.test.ts"
     ],
-    "note": "Prompts on a page, after time on a page, or for returning visitors, set per brand in Studio under their own permission (widget.proactive) and off by default. At most three a day, a quiet time after a dismissal, one per page view, never over an open chat, and optionally only during business hours. The page passes only the prompt's id; the chat shows the brand's own words (tested, mutation-checked)."
+    "note": "Prompts on a page, after time on a page, or for returning visitors, set per brand in Studio under their own permission (widget.proactive) and off by default. At most three a day, a quiet time after a dismissal, one per page view, never over an open chat, and optionally only during business hours. The page passes only the prompt's id; the chat shows the brand's own words (tested, mutation-checked). Staff who may reply can also invite a visitor from Live visitors: the invitation shows in the same bubble within seconds, waits three minutes and opens the chat with their words."
   },
   "W22": {
     "status": "partial",
