@@ -86,6 +86,8 @@ const NEVER_DELETED = new Set([
   'tool_definitions',
   'mcp_servers',
   'action_settings',
+  'http_tool_sources',
+  'http_tool_endpoints',
 ]);
 
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
@@ -325,6 +327,13 @@ describe('two-tenant isolation', () => {
     'handoff_packets',
     'simulation_suites',
     'simulation_runs',
+    'mcp_server_oauth',
+    'mcp_oauth_attempts',
+    'mcp_catalog_items',
+    'http_tool_sources',
+    'http_tool_endpoints',
+    'knowledge_web_sources',
+    'knowledge_web_pages',
     'audit_heads',
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
@@ -500,6 +509,13 @@ describe('two-tenant isolation', () => {
       'handoff_packets',
       'simulation_suites',
       'simulation_runs',
+      'mcp_server_oauth',
+      'mcp_oauth_attempts',
+      'mcp_catalog_items',
+      'http_tool_sources',
+      'http_tool_endpoints',
+      'knowledge_web_sources',
+      'knowledge_web_pages',
       'audit_heads',
       'audit_events',
     ]);

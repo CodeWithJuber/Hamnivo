@@ -32,11 +32,18 @@ import { brands, tenantId, workspaces } from './tenancy.js';
 export const RISK_CLASSES = ['read', 'write', 'money', 'irreversible'] as const;
 export const ACTION_APPROVERS = ['customer', 'staff'] as const;
 export const TOOL_STATUSES = ['enabled', 'disabled', 'review'] as const;
-export const BUILTIN_TOOLS = ['order_status', 'demo_update_address', 'demo_issue_credit'] as const;
+export const BUILTIN_TOOLS = [
+  'order_status',
+  'demo_update_address',
+  'demo_issue_credit',
+  'read_resource',
+] as const;
 
 /**
- * A remote MCP server (Streamable HTTP only). Its bearer token lives in `secrets`; its host is on
- * the egress allowlist of the tools it offers. What it says about itself is untrusted.
+ * A remote MCP server (Streamable HTTP only). Its bearer token lives in `secrets` (a pasted token,
+ * or the access token of its OAuth sign-in, see `mcp_server_oauth`); its host is on the egress
+ * allowlist of the tools it offers. What it says about itself is untrusted. The application never
+ * deletes a server: `deleted` hides it, turns its tools off and revokes its credentials.
  */
 export const mcpServers = pgTable(
   'mcp_servers',
@@ -47,7 +54,7 @@ export const mcpServers = pgTable(
     brandId: uuid('brand_id').notNull(),
     label: text('label').notNull(),
     url: text('url').notNull(),
-    status: text('status', { enum: ['active', 'disabled'] })
+    status: text('status', { enum: ['active', 'disabled', 'deleted'] })
       .notNull()
       .default('active'),
     tokenSecretId: uuid('token_secret_id'),
@@ -105,9 +112,9 @@ export const toolDefinitions = pgTable(
     name: text('name').notNull(),
     title: text('title').notNull(),
     description: text('description').notNull(),
-    /** What the MCP server said (untrusted, never sent to the model as is). */
+    /** What the MCP server or the imported API description said (untrusted, never sent as is). */
     remoteDescription: text('remote_description'),
-    source: text('source', { enum: ['builtin', 'mcp'] }).notNull(),
+    source: text('source', { enum: ['builtin', 'mcp', 'http'] }).notNull(),
     builtin: text('builtin', { enum: BUILTIN_TOOLS }),
     mcpServerId: uuid('mcp_server_id'),
     /** The tool's name on the MCP server. */
@@ -176,7 +183,8 @@ export const toolDefinitions = pgTable(
     check(
       'tool_definitions_source_ck',
       sql`(${t.source} = 'builtin' and ${t.builtin} is not null and ${t.mcpServerId} is null)
-        or (${t.source} = 'mcp' and ${t.mcpServerId} is not null and ${t.remoteName} is not null)`,
+        or (${t.source} = 'mcp' and ${t.mcpServerId} is not null and ${t.remoteName} is not null)
+        or (${t.source} = 'http' and ${t.builtin} is null and ${t.mcpServerId} is null)`,
     ),
     // Money and irreversible actions: staff approve, never autopilot (also checked in code).
     check(

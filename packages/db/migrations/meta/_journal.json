@@ -288,6 +288,20 @@
       "when": 1790998464033,
       "tag": "20261003033424_safety_marks",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791039983954,
+      "tag": "20261003150623_ai_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791040011817,
+      "tag": "20261003150651_ai_power_security",
+      "breakpoints": true
     }
   ]
 }

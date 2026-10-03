@@ -5,6 +5,7 @@ import type { Db } from '../client.js';
 import { newId, toPublicId } from '../ids.js';
 import * as s from '../schema/index.js';
 import { type TenantTx, withTenant } from '../tenant.js';
+import { seedAiPower } from './ai-power-fixtures.js';
 
 export interface SeededTenant {
   tenantId: string;
@@ -1335,6 +1336,14 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       agentId: ids.agentId,
       agentVersionId: ids.agentVersionId,
       runId: ids.runId,
+    });
+    await seedAiPower(tx, tenantId, suffix, {
+      workspaceId: ids.workspaceId,
+      brandId: ids.brandId,
+      secretId: ids.secretId,
+      staffMemberId: ids.staffMemberId,
+      knowledgeSourceId: ids.knowledgeSourceId,
+      documentId: ids.documentId,
     });
     // Last: the plan's limits it sets would hold any row seeded after it.
     await seedDeveloperPlatform(tx, tenantId, {
