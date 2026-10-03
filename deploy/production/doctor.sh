@@ -159,9 +159,10 @@ tls_help() { # tls_help FIRST_HOST
 }
 
 check_https() {
-  local port suffix='' host url code http what first_tls=''
+  local port suffix='' host url code http what first_tls='' public
   port="$(https_port)"
-  [[ "$port" == 443 ]] || suffix=":$port"
+  public="$(public_https_port)"
+  [[ "$public" == 443 ]] || suffix=":$public"
   edge_ca "$tmp/ca.crt"
   while IFS= read -r host; do
     url="https://$host$suffix$(page_of "$host")"
@@ -189,6 +190,25 @@ check_https() {
     fi
   done < <(public_hosts)
   if [[ -n "$first_tls" ]]; then tls_help "$first_tls"; fi
+}
+
+# The addresses that browsers are given (Studio, the API, the chat) must carry the port browsers
+# use. Behind another web server on 443 the edge listens on another port, and addresses with that
+# port reach nothing from outside: Studio then cannot reach the API.
+check_addresses() {
+  local public suffix='' want have
+  public="$(public_https_port)"
+  [[ "$public" == 443 ]] || suffix=":$public"
+  want="https://$(get HAMNIVO_APP_HOST)$suffix"
+  have="$(get HAMNIVO_APP_ORIGIN)"
+  if [[ "$have" != "$want" ]]; then
+    problem "Addresses: Studio's address is $have, but browsers use $want" 'write the addresses again and rebuild, so that Studio, the API and the chat use them.' "$hv setup --quiet && $hv up"
+  elif [[ "$public" != 443 ]]; then
+    pass "Addresses: browsers use port $public ($have)"
+    note "Behind a web server that answers on 443 and passes requests on to port $(https_port), run: $hv setup --public-port 443, then $hv up"
+  else
+    pass "Addresses: $have"
+  fi
 }
 
 # --- ports ---------------------------------------------------------------------------------------
@@ -396,6 +416,7 @@ main() {
     check_docker
     check_services
     check_https
+    check_addresses
     check_ports
     check_disk
     check_memory

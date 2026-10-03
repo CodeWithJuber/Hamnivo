@@ -20,8 +20,10 @@
 #   hamnivo.sh compose ...  any docker compose command with this stack's files and settings
 #
 # Setup options: --tls internal (Caddy's own CA instead of Let's Encrypt, for tests and private
-# networks), --https-port N and --http-port N (other ports than 443 and 80), --cloudflare on|off
-# (the names are proxied by Cloudflare: believe the visitor addresses it reports), --quiet.
+# networks), --https-port N and --http-port N (other ports than 443 and 80), --public-port N (the
+# HTTPS port browsers use, when a web server in front of this one answers on it and passes the
+# requests on to --https-port; usually 443), --cloudflare on|off (the names are proxied by
+# Cloudflare: believe the visitor addresses it reports), --quiet.
 # Environment: HAMNIVO_ENV_FILE (default deploy/production/.env), HAMNIVO_PROJECT (compose
 # project name), HAMNIVO_BUILD_CA (CA file for builds behind a TLS-inspecting proxy),
 # HAMNIVO_BUILD_NETWORK (docker build --network), HAMNIVO_BUILD_CONCURRENCY (packages built at
@@ -34,7 +36,7 @@ source "$here/lib.sh"
 
 # --- setup ---------------------------------------------------------------------------------------
 cmd_setup() {
-  local domain='' tls='' https_port='' http_port='' cloudflare='' quiet=0
+  local domain='' tls='' https_port='' http_port='' public_port='' cloudflare='' quiet=0
   while (($#)); do
     case "$1" in
       --quiet) quiet=1; shift ;;
@@ -44,6 +46,7 @@ cmd_setup() {
       --tls) tls="${2:?--tls needs a value}"; shift 2 ;;
       --https-port) https_port="${2:?--https-port needs a value}"; shift 2 ;;
       --http-port) http_port="${2:?--http-port needs a value}"; shift 2 ;;
+      --public-port) public_port="${2:?--public-port needs a value}"; shift 2 ;;
       *) fail "Unknown setup option: $1" ;;
     esac
   done
@@ -53,6 +56,10 @@ cmd_setup() {
 
   [[ -n "$https_port" ]] && set_kv HAMNIVO_HTTPS_PORT "$https_port"
   [[ -n "$http_port" ]] && set_kv HAMNIVO_HTTP_PORT "$http_port"
+  if [[ -n "$public_port" ]]; then
+    [[ "$public_port" =~ ^[0-9]+$ ]] || fail "Not a port: $public_port"
+    set_kv HAMNIVO_PUBLIC_HTTPS_PORT "$public_port"
+  fi
   ensure HAMNIVO_HTTPS_PORT 443
   ensure HAMNIVO_HTTP_PORT 80
   [[ -n "$tls" ]] && set_kv HAMNIVO_TLS "$tls"
@@ -73,18 +80,24 @@ cmd_setup() {
   has HAMNIVO_DOMAIN || fail 'Pass --domain example.com (the domain whose names point at this server).'
   domain="$(get HAMNIVO_DOMAIN)"
 
-  local port suffix='' site
-  port="$(get HAMNIVO_HTTPS_PORT)"
+  # The addresses carry the port browsers use: the edge's own HTTPS port, unless a web server in
+  # front of this one answers on another (HAMNIVO_PUBLIC_HTTPS_PORT, usually 443).
+  local port suffix='' site old_api
+  port="$(get HAMNIVO_PUBLIC_HTTPS_PORT)"
+  [[ -n "$port" ]] || port="$(get HAMNIVO_HTTPS_PORT)"
   [[ "$port" == 443 ]] || suffix=":$port"
   site="$(get HAMNIVO_SITE_HOSTS)"
   site="${site%% *}"
+  old_api="$(get HAMNIVO_API_ORIGIN)"
   set_kv HAMNIVO_APP_ORIGIN "https://$(get HAMNIVO_APP_HOST)$suffix"
   set_kv HAMNIVO_API_ORIGIN "https://$(get HAMNIVO_API_HOST)$suffix"
   set_kv HAMNIVO_CHAT_ORIGIN "https://$(get HAMNIVO_CHAT_HOST)$suffix"
   set_kv HAMNIVO_SUPPORT_ORIGIN "https://$(get HAMNIVO_SUPPORT_HOST)$suffix"
   set_kv HAMNIVO_SITE_ORIGIN "https://$site$suffix"
-  # Chatwoot calls the gateway's webhooks at its public HTTPS name.
-  if ((renamed == 1)) || ! has CHATWOOT_WEBHOOK_BASE_URL; then
+  # Chatwoot calls the gateway's webhooks at its public HTTPS name, and follows the API's address
+  # unless it was set to another one.
+  if ((renamed == 1)) || ! has CHATWOOT_WEBHOOK_BASE_URL ||
+    [[ "$(get CHATWOOT_WEBHOOK_BASE_URL)" == "$old_api" ]]; then
     set_kv CHATWOOT_WEBHOOK_BASE_URL "$(get HAMNIVO_API_ORIGIN)"
   fi
 
@@ -134,6 +147,11 @@ Point these DNS names at this server (A and AAAA records), then run: $0 up
   $(get HAMNIVO_SITE_HOSTS)    website
 Ports $(get HAMNIVO_HTTP_PORT) and $(get HAMNIVO_HTTPS_PORT) (TCP, and UDP for HTTP/3) must be open.
 EOF
+  local public
+  public="$(get HAMNIVO_PUBLIC_HTTPS_PORT)"
+  if [[ -n "$public" && "$public" != "$(get HAMNIVO_HTTPS_PORT)" ]]; then
+    printf '%s\n' "Browsers use port $public: the web server in front of this one must pass it on to port $(get HAMNIVO_HTTPS_PORT)." >&2
+  fi
   if [[ -z "$(get SMTP_URL)" ]]; then
     printf '%s\n' "Email: set SMTP_URL in $env_file to send sign-in emails (until then, read them with: $0 mail)." >&2
   fi

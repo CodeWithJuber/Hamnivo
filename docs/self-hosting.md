@@ -168,6 +168,11 @@ Then edit `deploy/production/.env` for:
   addresses that Cloudflare reports, but only on connections from Cloudflare's own address ranges,
   which `up` keeps current. Rate limits and the audit log then see each visitor's address.
   `--cloudflare off` undoes it.
+- **Behind another web server on ports 80 and 443** (a hosting panel or a load balancer that passes
+  the Hamnivo names on to this server): give the edge other ports, and tell `setup` which port
+  browsers use: `setup --https-port 8443 --http-port 8080 --public-port 443`. The addresses then
+  have no port, and the edge listens on 8443 and 8080. Without `--public-port`, Studio, the API and
+  the chat are given addresses with `:8443`, which browsers cannot reach through that web server.
 - **Chatwoot's email:** copy `deploy/production/chatwoot.env.example` to `chatwoot.env` in the
   same folder and fill it in.
 
@@ -728,6 +733,9 @@ up and deploys.
      `docker builder prune -af` frees the build cache and nothing else.
   4. Once HTTPS works, automatic deploys carry on by themselves: one that stopped for this reason is
      tried again every 30 minutes, without a new commit.
+- **Studio says "We couldn't reach Hamnivo" behind another web server:** the addresses carry the
+  edge's own port (`hamnivo.sh doctor` shows them under "Addresses"). Run `setup --public-port 443`,
+  then `hamnivo.sh up`, which builds Studio again with the new addresses.
 - **The first start is slow:** Chatwoot prepares its database (2 to 3 minutes), and ClamAV
   downloads its virus signatures (a few minutes). Uploads wait for ClamAV and are scanned when it
   is ready.

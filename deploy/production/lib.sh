@@ -129,10 +129,14 @@ docker_free_gb() {
 
 # --- HTTPS, as a browser reaches the edge --------------------------------------------------------
 # deploy.sh checks it before every build and after every switch; doctor.sh checks it for every
-# public name. Both ask this machine's own edge: the name resolves to 127.0.0.1 here.
+# public name. Both ask this machine's own edge, at the port it listens on, whatever port the
+# public address names (behind another web server, browsers use 443 and the edge another port).
 ca_args=()
 
 https_port() { setting HAMNIVO_HTTPS_PORT 443; }
+# The HTTPS port in the public addresses: the edge's own, unless a web server in front answers on
+# another one (hamnivo.sh setup --public-port).
+public_https_port() { setting HAMNIVO_PUBLIC_HTTPS_PORT "$(https_port)"; }
 
 host_of() { # host_of URL: the name in https://NAME[:PORT]/...
   local host="${1#https://}"
@@ -160,11 +164,12 @@ edge_ca() { # edge_ca FILE
   fi
 }
 
-# curl through the edge on this machine: URL is https://NAME[:PORT]/..., and NAME goes to 127.0.0.1.
+# curl through the edge on this machine: URL is https://NAME[:PORT]/..., and the connection goes to
+# 127.0.0.1 at the edge's port, with NAME as the name the edge sees.
 curl_edge() { # curl_edge URL CURL_OPTIONS...
   local url="$1"
   shift
-  curl --resolve "$(host_of "$url"):$(https_port):127.0.0.1" "${ca_args[@]}" "$@" "$url"
+  curl --connect-to "$(host_of "$url")::127.0.0.1:$(https_port)" "${ca_args[@]}" "$@" "$url"
 }
 
 # Whether curl's exit code says that the TLS handshake or the certificate failed, not the connection
