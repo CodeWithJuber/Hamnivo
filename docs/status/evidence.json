@@ -197,9 +197,11 @@
     "evidence": [
       "apps/gateway/src/authority/registry.ts",
       "apps/gateway/src/secrets/secret-broker.service.ts",
-      "apps/gateway/test/secrets.int.test.ts"
+      "apps/gateway/test/secrets.int.test.ts",
+      "apps/gateway/test/http-tools.int.test.ts",
+      "apps/gateway/test/mcp-power.int.test.ts"
     ],
-    "note": "Secret broker reveals credentials only to server code inside the owning tenant; scoped short-lived credentials for tools and agents pending."
+    "note": "Secret broker reveals credentials only to server code inside the owning tenant; scoped short-lived credentials for tools and agents pending. MCP tokens, OAuth sign-ins (access and refresh tokens, client registrations) and the credentials of custom HTTP tools live in it and are never returned, logged or put in the audit log (tested); a credential replaced or removed is revoked."
   },
   "O01": {
     "status": "in-progress",
@@ -536,13 +538,19 @@
     "note": "Saved drafts are not live; publishing freezes a version with its configuration hash (a database trigger rejects changes), one version is live at a time, and publishing an earlier version is the rollback (tested). Studio screens pending."
   },
   "G04": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/knowledge/knowledge.service.ts",
       "apps/gateway/test/knowledge.int.test.ts",
-      "packages/db/src/schema/knowledge.ts"
+      "packages/db/src/schema/knowledge.ts",
+      "apps/gateway/src/knowledge/web/crawler.ts",
+      "apps/gateway/src/knowledge/web/sync.service.ts",
+      "apps/gateway/src/knowledge/web/sources.service.ts",
+      "apps/gateway/test/web-knowledge.test.ts",
+      "apps/gateway/test/web-knowledge.int.test.ts",
+      "docs/guide/ai/teach-your-ai-your-website.md"
     ],
-    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). URL crawling and Studio screens pending."
+    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). A website can be a source: its pages become documents, found through its sitemap and the links between them within one site and the folder of the address, with robots.txt followed, limits on pages and link depth, read on a schedule or on request. A changed page becomes a new version, and a page that is gone or now off limits is retired; a site that is down loses nothing (tested against a made-up site over real HTTP). The website panel in Studio is rendered in unit tests; there is no browser test of it."
   },
   "G05": {
     "status": "in-progress",
@@ -577,9 +585,12 @@
       "apps/gateway/src/knowledge/scanner.ts",
       "apps/gateway/src/knowledge/text.ts",
       "apps/gateway/test/knowledge.int.test.ts",
-      "apps/gateway/test/knowledge.test.ts"
+      "apps/gateway/test/knowledge.test.ts",
+      "apps/gateway/src/knowledge/web/crawler.ts",
+      "apps/gateway/src/knowledge/versions.ts",
+      "apps/gateway/test/web-knowledge.int.test.ts"
     ],
-    "note": "Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Parsing runs in-process (no sandbox) and URL sources are pending."
+    "note": "Quarantined uploads, fail-closed scanning (ClamAV INSTREAM or the EICAR check), type sniffing, bounded parsing of text, Markdown, HTML, PDF and DOCX, sanitization, heading-aware chunking, embedding and indexing with progress states; the upload is cleared afterwards (tested). While the scanner is unreachable, uploads wait with backoff and are refused only after the last attempt (tested). Pages of a website enter the same pipeline: the crawler (one request at a time, every request through the egress guard, size and unpacking limits) hands over each page as an upload, in its own character set converted to UTF-8; a page whose text is built by JavaScript is left out (tested). Parsing runs in-process (no sandbox)."
   },
   "X09": {
     "status": "implemented",
@@ -590,9 +601,10 @@
       "packages/domain/src/actions/output.ts",
       "apps/gateway/test/tools.int.test.ts",
       "apps/gateway/src/checks/reply-checks.service.ts",
-      "apps/gateway/test/checks.int.test.ts"
+      "apps/gateway/test/checks.int.test.ts",
+      "apps/gateway/test/http-tools.int.test.ts"
     ],
-    "note": "Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool results reach the model fenced as untrusted data from a named tool, size-limited and checked, and a write proposed after reading another system’s data needs approval (tested). With the passage relevance check live, Jev also leaves out passages that carry instructions for the assistant (tested; verified live on one planted passage). Measuring injection resistance with an adversarial suite is X12."
+    "note": "Retrieved passages are fenced in the prompt as data with an explicit instruction to ignore instructions inside them, and staff messages are labelled; tool results reach the model fenced as untrusted data from a named tool, size-limited and checked, and a write proposed after reading another system’s data needs approval (tested). With the passage relevance check live, Jev also leaves out passages that carry instructions for the assistant (tested; verified live on one planted passage). Measuring injection resistance with an adversarial suite is X12. The answer of a custom HTTP tool is handled the same way (tested): fenced as data, size-limited, and a change proposed after reading it waits for a person."
   },
   "W08": {
     "status": "in-progress",
@@ -787,13 +799,23 @@
   },
   "HNV-14-01": {
     "status": "in-progress",
-    "evidence": ["apps/console/src/pages/KnowledgePage.tsx", "apps/console/e2e/journeys.spec.ts"],
-    "note": "The knowledge library lists sources with their status (tested)."
+    "evidence": [
+      "apps/console/src/pages/KnowledgePage.tsx",
+      "apps/console/e2e/journeys.spec.ts",
+      "apps/console/src/components/knowledge/WebSourcePanel.tsx",
+      "apps/console/test/web-sources.test.tsx"
+    ],
+    "note": "The knowledge library lists sources with their status (tested); a website says so under its name with how its reading stands (unit-tested)."
   },
   "HNV-14-02": {
     "status": "in-progress",
-    "evidence": ["apps/console/src/pages/KnowledgePage.tsx", "apps/console/e2e/journeys.spec.ts"],
-    "note": "An uploaded file shows its progress until it is ready to search (tested); cancelling an import comes later."
+    "evidence": [
+      "apps/console/src/pages/KnowledgePage.tsx",
+      "apps/console/e2e/journeys.spec.ts",
+      "apps/console/src/components/knowledge/WebSourcePanel.tsx",
+      "apps/console/test/web-sources.test.tsx"
+    ],
+    "note": "An uploaded file shows its progress until it is ready to search (tested); a website shows that it is waiting or being read, how its last read went and each page’s state (unit-tested, no browser test); cancelling an import comes later."
   },
   "HNV-14-04": {
     "status": "in-progress",
@@ -865,9 +887,12 @@
       "apps/widget/e2e/memory.spec.ts",
       "apps/gateway/test/memory.int.test.ts",
       "apps/console/src/pages/CustomerMemoryPage.tsx",
-      "apps/console/e2e/memory.spec.ts"
+      "apps/console/e2e/memory.spec.ts",
+      "apps/console/src/components/memory/CustomerMemoryCard.tsx",
+      "apps/console/test/customer-memory-card.test.tsx",
+      "apps/gateway/test/conversation-memory.int.test.ts"
     ],
-    "note": "Customers agree or decline, see what is remembered with its source and expiry, correct, confirm, delete, forget everything and turn memory off in the widget; staff do the same in Studio within their grants (tested in the API and in browsers, including right to left). Retention is fixed per memory type; letting brands or customers configure it is pending."
+    "note": "Customers agree or decline, see what is remembered with its source and expiry, correct, confirm, delete, forget everything and turn memory off in the widget; staff do the same in Studio within their grants (tested in the API and in browsers, including right to left). Retention is fixed per memory type; letting brands or customers configure it is pending. Staff also see, correct and delete a customer’s memory beside the conversation in the inbox (unit-tested, no browser test)."
   },
   "L05": {
     "status": "in-progress",
@@ -936,9 +961,11 @@
       "apps/console/e2e/memory.spec.ts",
       "apps/console/src/pages/MemoryPage.tsx",
       "apps/widget/src/components/MemoryPanel.tsx",
-      "apps/widget/e2e/memory.spec.ts"
+      "apps/widget/e2e/memory.spec.ts",
+      "apps/console/src/components/memory/CustomerMemoryCard.tsx",
+      "apps/console/test/customer-memory-card.test.tsx"
     ],
-    "note": "Studio lists customers with memory and shows each memory with purpose, source message, who recorded it, scope, expiry and history; customers see theirs in the widget (tested, including right to left)."
+    "note": "Studio lists customers with memory and shows each memory with purpose, source message, who recorded it, scope, expiry and history; customers see theirs in the widget (tested, including right to left). The inbox panel lists each memory with its source and the day it was observed."
   },
   "HNV-15-03": {
     "status": "implemented",
@@ -1056,9 +1083,13 @@
       "apps/gateway/src/inbox/inbox.service.ts",
       "apps/gateway/src/visitors/tracker.service.ts",
       "apps/gateway/test/inbox-workspace.int.test.ts",
-      "apps/gateway/test/visitors.int.test.ts"
+      "apps/gateway/test/visitors.int.test.ts",
+      "apps/console/src/components/memory/CustomerMemoryCard.tsx",
+      "apps/console/test/customer-memory-card.test.tsx",
+      "apps/gateway/test/conversation-memory.int.test.ts",
+      "docs/guide/ai/see-what-the-ai-remembers.md"
     ],
-    "note": "Verified or anonymous identity and what that means, a verified email apart from an address nobody verified, language, brand, Chatwoot contact attributes (Hamnivo's internal ones left out) and the other conversations the person can see. A third column on wide screens, a sheet otherwise. A Website visit card shows the customer’s current page, the pages seen, device, country and number of visits. Browsers that send Do Not Track are left out, no IP address is stored, page addresses lose their query string unless the brand chooses otherwise, and everything is deleted 30 days after the visitor was last seen (tested)."
+    "note": "Verified or anonymous identity and what that means, a verified email apart from an address nobody verified, language, brand, Chatwoot contact attributes (Hamnivo's internal ones left out) and the other conversations the person can see. A third column on wide screens, a sheet otherwise. A Website visit card shows the customer’s current page, the pages seen, device, country and number of visits. Browsers that send Do Not Track are left out, no IP address is stored, page addresses lose their query string unless the brand chooses otherwise, and everything is deleted 30 days after the visitor was last seen (tested). Beside the customer, the panel shows what the AI remembers about them, each memory with its source, for people who may read memory in the brand; people with the right grants correct or delete a memory there (tested in the gateway and in unit tests; no browser test)."
   },
   "H07": {
     "status": "implemented",
@@ -2232,9 +2263,13 @@
       "apps/gateway/src/migration/source-guard.ts",
       "apps/gateway/src/runtime/models.ts",
       "apps/gateway/test/egress.test.ts",
-      "apps/gateway/test/egress.int.test.ts"
+      "apps/gateway/test/egress.int.test.ts",
+      "apps/gateway/src/actions/http/network.ts",
+      "apps/gateway/test/http-tools.int.test.ts",
+      "apps/gateway/src/knowledge/web/sync.service.ts",
+      "apps/gateway/test/web-knowledge.int.test.ts"
     ],
-    "note": "Every request the server makes at an address a tenant can name goes through one guard (@hamnivo/adapters/net): webhooks, tool calls to remote MCP servers, identity providers’ discovery documents, migration sources and a tenant’s own model servers. HTTPS only, no credentials in the address, public addresses only: private, loopback, link-local and special-use addresses (one list, the union of what the earlier guards refused) are refused at connect time, on the address actually connected to, so DNS rebinding fails; redirects are never followed; responses have size and time limits. Each workspace can restrict the rest to listed hosts (with wildcards), which MCP servers and model servers follow too; webhook endpoints the list would refuse are shown. Only the server administrator can trust extra origins, and each caller keeps its own setting (EGRESS_TRUSTED_ORIGINS for webhooks and model servers, SSO_TRUSTED_IDP_ORIGINS, and for development TOOLS_EGRESS_ALLOW_PRIVATE and MIGRATION_SOURCE_ALLOW_PRIVATE). One exception: Better Auth’s SSO plugin fetches an identity provider’s token, key and user-info endpoints itself with the global fetch and has no option to replace it. Those addresses are checked with the guard when a connection is saved, and the plugin refuses redirects and private addresses on its own, but its single lookup is not pinned to the connection, so DNS rebinding is not stopped for those three calls."
+    "note": "Every request the server makes at an address a tenant can name goes through one guard (@hamnivo/adapters/net): webhooks, tool calls to remote MCP servers and to custom HTTP tools (and the OpenAPI description they are read from), the websites read for knowledge, identity providers’ discovery documents, migration sources and a tenant’s own model servers. HTTPS only, no credentials in the address, public addresses only: private, loopback, link-local and special-use addresses (one list, the union of what the earlier guards refused) are refused at connect time, on the address actually connected to, so DNS rebinding fails; redirects are never followed; responses have size and time limits. Each workspace can restrict the rest to listed hosts (with wildcards), which MCP servers and model servers follow too; webhook endpoints the list would refuse are shown. Only the server administrator can trust extra origins, and each caller keeps its own setting (EGRESS_TRUSTED_ORIGINS for webhooks and model servers, SSO_TRUSTED_IDP_ORIGINS, and for development TOOLS_EGRESS_ALLOW_PRIVATE and MIGRATION_SOURCE_ALLOW_PRIVATE). One exception: Better Auth’s SSO plugin fetches an identity provider’s token, key and user-info endpoints itself with the global fetch and has no option to replace it. Those addresses are checked with the guard when a connection is saved, and the plugin refuses redirects and private addresses on its own, but its single lookup is not pinned to the connection, so DNS rebinding is not stopped for those three calls."
   },
   "A08": {
     "status": "partial",
@@ -2638,9 +2673,19 @@
       "packages/domain/test/actions/schema.test.ts",
       "apps/gateway/test/tools.int.test.ts",
       "apps/console/src/pages/ToolsPage.tsx",
-      "apps/console/e2e/tools.spec.ts"
+      "apps/console/e2e/tools.spec.ts",
+      "packages/db/src/schema/ai-power.ts",
+      "apps/gateway/src/actions/http/definition.ts",
+      "apps/gateway/src/actions/http/request.ts",
+      "apps/gateway/src/actions/http/controller.ts",
+      "apps/gateway/test/http-tools.test.ts",
+      "apps/gateway/test/http-tools.int.test.ts",
+      "apps/console/src/components/tools/HttpEndpointDialog.tsx",
+      "apps/console/src/components/tools/HttpImportDialog.tsx",
+      "apps/console/test/http-tools.test.tsx",
+      "docs/guide/ai/custom-tools.md"
     ],
-    "note": "Tools per brand with an input schema and, for MCP tools, an output schema (both reduced to a portable subset; a result that does not match is refused), a risk class (read, write, money, irreversible), who approves, a required permission, a time limit, an output size limit, an approval expiry and an egress allowlist. Every policy change bumps the revision approvals are bound to and needs tools.manage and a fresh sign-in; money and irreversible tools can never run without approval (tested)."
+    "note": "Tools per brand with an input schema and, for MCP tools, an output schema (both reduced to a portable subset; a result that does not match is refused), a risk class (read, write, money, irreversible), who approves, a required permission, a time limit, an output size limit, an approval expiry and an egress allowlist. Every policy change bumps the revision approvals are bound to and needs tools.manage and a fresh sign-in; money and irreversible tools can never run without approval (tested). A tool can also be a custom HTTP request to a service of the customer’s own: the chosen operations of an OpenAPI 3 description (JSON or YAML, pasted, uploaded or read from an address; references inside the file only, a work limit against files made to be slow to read) or one request written by hand, with its arguments going to the path, the query, a header or a JSON body. Each starts in review with the safest policy, and what the description says about it is shown quoted and never sent to the AI. A call goes through the same gateway, approvals and budgets, only to the service’s host (the tool’s own list and the workspace’s), with the credential read from the secret broker after the arguments make a request that may be sent; a value that would change the shape of the request is refused. A change carries the action’s idempotency key, a refusal by the service is a failure, and an error or silence after sending is never sent again (all tested against a made-up service in the gateway; the screens are unit-tested, with no browser test). Only JSON bodies are supported: forms, files, cookies and sign-ins other than a token or a secret in a header are not."
   },
   "G08": {
     "status": "implemented",
@@ -2693,9 +2738,14 @@
       "apps/gateway/src/actions/publish-checks.ts",
       "apps/gateway/test/tools.int.test.ts",
       "apps/console/src/components/Simulations.tsx",
-      "apps/console/e2e/tools.spec.ts"
+      "apps/console/e2e/tools.spec.ts",
+      "apps/gateway/src/runtime/playground.service.ts",
+      "apps/gateway/test/playground.int.test.ts",
+      "apps/console/src/components/agent/AgentPlayground.tsx",
+      "apps/console/test/agent-playground.test.tsx",
+      "docs/guide/ai/test-your-ai.md"
     ],
-    "note": "Suites of frozen cases (customer messages and what each tool answers) replay against the draft and the published version with nothing sent; Studio shows what changed, and publishing waits until required suites pass on the exact draft (tested in the gateway and in a browser). Replays use the deterministic mock model, so they show what Hamnivo’s rules do with the draft (tools offered, approvals, budgets, guards), not what the configured model would say. Replaying with the tenant’s own model is not built."
+    "note": "Suites of frozen cases (customer messages and what each tool answers) replay against the draft and the published version with nothing sent; Studio shows what changed, and publishing waits until required suites pass on the exact draft (tested in the gateway and in a browser). Replays use the deterministic mock model, so they show what Hamnivo’s rules do with the draft (tools offered, approvals, budgets, guards), not what the configured model would say. Replaying with the tenant’s own model is not built. Apart from replays, “Test your AI” lets a person try the draft or the live version in a scratch conversation with the agent’s own model connection, its knowledge and its tools’ rules: tools are judged by the live rules and never run, nothing is stored or sent to Chatwoot, every reply goes through the honesty and claim guards, and each turn spends tokens against the plan and budget (tested against a made-up model server in the gateway; the Studio panel is unit-tested, with no browser test). It does not run the brand’s Jev checks."
   },
   "G13": {
     "status": "implemented",
@@ -2751,9 +2801,28 @@
       "packages/adapters/README.md",
       "packages/adapters/test/mcp.test.ts",
       "apps/gateway/src/actions/tools.service.ts",
-      "apps/gateway/test/tools.int.test.ts"
+      "apps/gateway/test/tools.int.test.ts",
+      "packages/adapters/src/mcp/oauth.ts",
+      "packages/adapters/src/mcp/presets.ts",
+      "packages/adapters/test/mcp-oauth.test.ts",
+      "packages/adapters/test/mcp-catalog.test.ts",
+      "apps/gateway/src/actions/mcp-oauth.service.ts",
+      "apps/gateway/src/actions/mcp-catalog.service.ts",
+      "apps/gateway/test/mcp-power.int.test.ts",
+      "apps/console/src/components/tools/McpServerDialogs.tsx",
+      "apps/gateway/src/mcp-server/mcp-server.service.ts",
+      "apps/gateway/test/mcp-server.int.test.ts",
+      "docs/guide/ai/connect-mcp-services.md",
+      "docs/guide/ai/hamnivo-for-claude-and-chatgpt.md",
+      "apps/gateway/src/actions/http/openapi.ts",
+      "apps/gateway/src/actions/http/service.ts",
+      "apps/gateway/test/http-tools.test.ts",
+      "apps/gateway/test/http-tools.int.test.ts",
+      "apps/console/src/components/tools/HttpToolSources.tsx",
+      "apps/console/test/http-tools.test.tsx",
+      "docs/guide/ai/custom-tools.md"
     ],
-    "note": "Remote MCP servers over Streamable HTTP only, on MCP 2025-11-25, 2025-06-18 or 2025-03-26 (others are refused), with an optional bearer token kept in the secret broker, all through the egress guard; documented in the adapters README. Every new or changed tool waits in review before it can be granted or called, and gets Hamnivo’s own description and its own host allowlist (tested). No test talks to a third-party server."
+    "note": "Remote MCP servers over Streamable HTTP only, on MCP 2025-11-25, 2025-06-18 or 2025-03-26 (others are refused), all through the egress guard; documented in the adapters README. A server is signed in to with a pasted token or with OAuth as the MCP authorization spec describes (discovery, PKCE, a client Hamnivo registers or a client ID a person enters, the resource indicator, renewal before the access ends), using the SDK’s own client helpers; tokens, refresh tokens and client registrations are kept in the secret broker and only the last characters of a pasted token are ever shown. A server can be renamed, moved (its tools go back to review and a credential never follows to another site), given a new token, turned off or removed. What a server lists besides tools (resources and prompts) is shown quoted in Studio; agents with the built-in “Read a resource” tool read only the resources a person allowed, in pieces, and what they propose after reading waits for a person. A catalog of thirteen remote servers that vendors run themselves comes with the vendor page that names each address and the day it was read. Every new or changed tool waits in review before it can be granted or called, and gets Hamnivo’s own description and its own host allowlist (tested). Hamnivo also runs an MCP server of its own at /mcp (read-only tools, an API key that holds mcp.read, a rate limit, every call in the audit log). Custom HTTP tools turn the operations of an OpenAPI 3 description, or one request written by hand, into tools of the same kind: see G07. Tests use made-up MCP and authorization servers on the loopback interface and none talks to a third-party server; the catalog’s addresses are not called."
   },
   "HNV-11-03": {
     "status": "implemented",

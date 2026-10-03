@@ -6,7 +6,7 @@ import { checkUrl, EgressError, type EgressPolicy, refusalOf } from './policy.js
 
 export interface EgressRequest {
   url: string;
-  method?: 'GET' | 'HEAD' | 'POST' | 'PUT';
+  method?: 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   headers?: Record<string, string>;
   body?: string | Buffer;
   /** Deadline for the whole exchange, reading the response included. */

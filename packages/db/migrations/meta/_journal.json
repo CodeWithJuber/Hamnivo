@@ -330,6 +330,20 @@
       "when": 1791048781352,
       "tag": "20261003173301_visitors_security",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791053457218,
+      "tag": "20261003185057_ai_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1791053458924,
+      "tag": "20261003185058_ai_power_security",
+      "breakpoints": true
     }
   ]
 }

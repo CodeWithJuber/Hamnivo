@@ -273,7 +273,7 @@ export class ActionExecutor implements OnModuleInit {
         kind: `tool.${tool.name}`,
         businessKey: `action:${action.id}`,
         requestHash: action.argumentsHash,
-        provider: tool.source === 'mcp' ? 'mcp' : 'demo',
+        provider: tool.source === 'builtin' ? 'demo' : tool.source,
         resourceType: 'action',
         resourceId: action.id,
         conversationId: action.conversationId,

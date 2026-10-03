@@ -98,6 +98,7 @@ describe('database roles', () => {
         'app.claim_outbox(integer,integer)',
         'app.claim_reconcile_cursors(integer,integer)',
         'app.claim_webhook_deliveries(integer,integer)',
+        'app.due_web_syncs(integer,timestamp with time zone)',
         'app.ensure_audit_partitions(integer)',
         'app.ensure_reconcile_cursors()',
         'app.expired_actions(integer,timestamp with time zone)',

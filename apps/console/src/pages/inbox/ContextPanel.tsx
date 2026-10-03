@@ -13,6 +13,7 @@ import {
   TextareaField,
   TextField,
 } from '../../components/Fields';
+import { CustomerMemoryCard } from '../../components/memory/CustomerMemoryCard';
 import { ActionError, ErrorPanel, ListSkeleton } from '../../components/States';
 import { api, isApiError } from '../../lib/api';
 import { formatDateTime } from '../../lib/format';
@@ -643,6 +644,7 @@ export function ContextPanel({ detail }: { detail: InboxDetail }) {
       <Block id={`ctx-customer-${detail.id}`} title={t('inbox.customer.title')}>
         <Customer detail={detail} />
       </Block>
+      <CustomerMemoryCard conversationId={detail.id} />
       <Block id={`ctx-actions-${detail.id}`} title={t('tools.inbox.title')}>
         <ConversationActions conversationId={detail.id} />
       </Block>

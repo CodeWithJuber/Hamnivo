@@ -109,8 +109,16 @@ describe('the menu', () => {
     // Stop AI is a button in the header; Account security is in the account menu; the guided
     // setup is opened from Home and after a workspace is created; Live visitors and Saved replies
     // and tags are buttons above the list of chats in the inbox (a row of tabs for them would push
-    // the inbox down).
-    const elsewhere = ['/stop-ai', '/account', '/onboarding', '/visitors', '/saved-replies'];
+    // the inbox down); the page a service's sign-in sends the browser back to (OAuth for MCP
+    // servers) is reached from there.
+    const elsewhere = [
+      '/stop-ai',
+      '/account',
+      '/onboarding',
+      '/visitors',
+      '/saved-replies',
+      '/connect/mcp',
+    ];
     const placed = NAV_GROUPS.flatMap((group) => group.routes.map((route) => route.to));
     expect([...pages].filter((page) => !elsewhere.includes(page)).sort()).toEqual(
       [...placed].sort(),

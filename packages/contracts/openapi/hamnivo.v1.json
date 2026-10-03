@@ -19521,6 +19521,54 @@
             }
           }
         }
+      },
+      "delete": {
+        "operationId": "deleteMcpServer",
+        "summary": "Remove an MCP server: its tools are turned off, its credentials are revoked and it leaves the list; connecting the same address again starts fresh (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/admin/mcp-servers/{serverId}/sync": {
@@ -20256,6 +20304,1325 @@
                     "items"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "operationId": "postMcp",
+        "summary": "Hamnivo’s own MCP server (Streamable HTTP, JSON-RPC): read-only tools for AI assistants such as Claude, called with an API key that holds mcp.read",
+        "tags": [
+          "MCP"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpMessage"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The JSON-RPC answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-presets": {
+      "get": {
+        "operationId": "listMcpPresets",
+        "summary": "Remote MCP servers that vendors run themselves, with the vendor page that names each address (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Services",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/McpPreset"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers/{serverId}/oauth/start": {
+      "post": {
+        "operationId": "startMcpOAuth",
+        "summary": "Begin signing in to an MCP server with OAuth: returns the address to send the browser to (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartMcpOAuthRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Where to sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpOAuthStart"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-oauth/complete": {
+      "post": {
+        "operationId": "completeMcpOAuth",
+        "summary": "Finish a sign-in with what the browser came back with; only the person who started it can (tools.manage)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteMcpOAuthRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers/{serverId}/oauth/disconnect": {
+      "post": {
+        "operationId": "disconnectMcpOAuth",
+        "summary": "Sign out of an MCP server: its tokens are revoked and dropped (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers/{serverId}/catalog": {
+      "get": {
+        "operationId": "getMcpCatalog",
+        "summary": "The resources and prompts a server listed at its last sync (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpCatalog"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers/{serverId}/resources/{itemId}": {
+      "patch": {
+        "operationId": "updateMcpResource",
+        "summary": "Let agents with the \"Read a resource\" tool read this resource, or stop them (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "schema": {
+              "type": "string",
+              "description": "Resource ID (mci_…)"
+            },
+            "required": true,
+            "description": "Resource ID (mci_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMcpResourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpCatalogResource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/knowledge/web-sources": {
+      "get": {
+        "operationId": "listWebSources",
+        "summary": "Websites kept as knowledge, with how their last read went (knowledge.read)",
+        "tags": [
+          "Knowledge"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Websites",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/KnowledgeWebSource"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWebSource",
+        "summary": "Add a website as knowledge: Hamnivo reads its pages (sitemap, same site, robots.txt respected) and keeps them up to date (knowledge.manage)",
+        "tags": [
+          "Knowledge"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Retry-safe key bound to the request body hash; reuse with a different body returns 409",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Website added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeWebSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/knowledge/web-sources/{webSourceId}": {
+      "patch": {
+        "operationId": "updateWebSource",
+        "summary": "Change what a website source reads and how often (knowledge.manage)",
+        "tags": [
+          "Knowledge"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "webSourceId",
+            "schema": {
+              "type": "string",
+              "description": "Website source ID (wsrc_…)"
+            },
+            "required": true,
+            "description": "Website source ID (wsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Website",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeWebSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/knowledge/web-sources/{webSourceId}/sync": {
+      "post": {
+        "operationId": "syncWebSource",
+        "summary": "Read the website again now (knowledge.manage)",
+        "tags": [
+          "Knowledge"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "webSourceId",
+            "schema": {
+              "type": "string",
+              "description": "Website source ID (wsrc_…)"
+            },
+            "required": true,
+            "description": "Website source ID (wsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeWebSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/knowledge/web-sources/{webSourceId}/pages": {
+      "get": {
+        "operationId": "listWebPages",
+        "summary": "The pages of a website source and what the last read said about each (knowledge.read)",
+        "tags": [
+          "Knowledge"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "webSourceId",
+            "schema": {
+              "type": "string",
+              "description": "Website source ID (wsrc_…)"
+            },
+            "required": true,
+            "description": "Website source ID (wsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/KnowledgeWebPage"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/agents/{agentId}/playground": {
+      "post": {
+        "operationId": "runAgentPlayground",
+        "summary": "Try an agent in a scratch conversation with its own model connection: nothing is stored, nothing reaches a customer or Chatwoot, and no tool is run (agents.manage)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "description": "Agent ID (agt_…)"
+            },
+            "required": true,
+            "description": "Agent ID (agt_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaygroundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What the AI would do",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaygroundResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/memory/conversations/{conversationId}": {
+      "get": {
+        "operationId": "getConversationMemoryCustomer",
+        "summary": "The memory customer of a conversation, for the inbox panel (conversations.read and memory.read)",
+        "tags": [
+          "Memory"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Memory customer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationMemoryCustomer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/http-tools/sources": {
+      "get": {
+        "operationId": "listHttpToolSources",
+        "summary": "Services whose requests are custom HTTP tools, with their tools (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "brandId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Services",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HttpToolSource"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createHttpToolSource",
+        "summary": "Add a service with custom HTTP tools, from chosen operations of an OpenAPI description or one request written by hand; the tools start in review and its credential goes to the secret broker (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Retry-safe key bound to the request body hash; reuse with a different body returns 409",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHttpSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Service added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpToolSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/http-tools/preview": {
+      "post": {
+        "operationId": "previewHttpSpec",
+        "summary": "Read an OpenAPI 3 description (pasted, or fetched from an address through the egress guard) and list the tools it could become; nothing is saved (tools.manage)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewHttpSpecRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpSpecPreview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/http-tools/sources/{sourceId}": {
+      "patch": {
+        "operationId": "updateHttpToolSource",
+        "summary": "Rename a service, change its address, replace its credential or turn it off (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "description": "Custom tool source ID (hsrc_…)"
+            },
+            "required": true,
+            "description": "Custom tool source ID (hsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHttpSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpToolSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteHttpToolSource",
+        "summary": "Remove a service: its tools are turned off, pending requests are cancelled and its credential is revoked; what its tools did stays on record (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "description": "Custom tool source ID (hsrc_…)"
+            },
+            "required": true,
+            "description": "Custom tool source ID (hsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/http-tools/sources/{sourceId}/endpoints": {
+      "post": {
+        "operationId": "addHttpToolEndpoints",
+        "summary": "Add more tools to a service: operations of an OpenAPI description, or one request written by hand; they start in review (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "description": "Custom tool source ID (hsrc_…)"
+            },
+            "required": true,
+            "description": "Custom tool source ID (hsrc_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Retry-safe key bound to the request body hash; reuse with a different body returns 409",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddHttpEndpointsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Service with the new tools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpToolSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/http-tools/sources/{sourceId}/endpoints/{toolId}": {
+      "put": {
+        "operationId": "updateHttpToolEndpoint",
+        "summary": "Replace a request written by hand; the tool goes back to review and requests waiting on it are cancelled (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sourceId",
+            "schema": {
+              "type": "string",
+              "description": "Custom tool source ID (hsrc_…)"
+            },
+            "required": true,
+            "description": "Custom tool source ID (hsrc_…)"
+          },
+          {
+            "in": "path",
+            "name": "toolId",
+            "schema": {
+              "type": "string",
+              "description": "Tool ID (tool_…)"
+            },
+            "required": true,
+            "description": "Tool ID (tool_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHttpEndpointRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpToolSource"
                 }
               }
             }
@@ -27002,7 +28369,8 @@
         "enum": [
           "analytics.read",
           "billing.read",
-          "webhooks.read"
+          "webhooks.read",
+          "mcp.read"
         ]
       },
       "RotateApiKeyRequest": {
@@ -27602,7 +28970,8 @@
         "enum": [
           "order_status",
           "demo_update_address",
-          "demo_issue_credit"
+          "demo_issue_credit",
+          "read_resource"
         ]
       },
       "RiskClass": {
@@ -27765,6 +29134,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 80
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
           },
           "status": {
             "type": "string",
@@ -27932,6 +29306,547 @@
           "id",
           "name",
           "messages"
+        ]
+      },
+      "McpMessage": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "A JSON-RPC 2.0 request, notification or response."
+      },
+      "StartMcpOAuthRequest": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "clientSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "CompleteMcpOAuthRequest": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 200
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "error": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "errorDescription": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "iss": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "UpdateMcpResourceRequest": {
+        "type": "object",
+        "properties": {
+          "aiReadable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "aiReadable"
+        ]
+      },
+      "CreateWebSourceRequest": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "mode": {
+            "default": "site",
+            "$ref": "#/components/schemas/WebSyncMode"
+          },
+          "maxPages": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "maxDepth": {
+            "default": 2,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "schedule": {
+            "default": "weekly",
+            "$ref": "#/components/schemas/WebSyncSchedule"
+          },
+          "visibility": {
+            "default": "public",
+            "type": "string",
+            "enum": [
+              "public",
+              "internal"
+            ]
+          }
+        },
+        "required": [
+          "brandId",
+          "url"
+        ]
+      },
+      "WebSyncMode": {
+        "type": "string",
+        "enum": [
+          "page",
+          "site"
+        ],
+        "description": "`page`: just the address given. `site`: its sitemap and the links between its pages, within the limits."
+      },
+      "WebSyncSchedule": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "daily",
+          "weekly"
+        ],
+        "description": "How often the website is read again; `manual` only when someone asks."
+      },
+      "UpdateWebSourceRequest": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/WebSyncMode"
+          },
+          "maxPages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/WebSyncSchedule"
+          }
+        }
+      },
+      "PlaygroundRequest": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "default": "draft",
+            "$ref": "#/components/schemas/PlaygroundVersion"
+          },
+          "messages": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaygroundMessage"
+            }
+          }
+        },
+        "required": [
+          "messages"
+        ]
+      },
+      "PlaygroundVersion": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "published"
+        ],
+        "description": "Which version of the agent to try: the saved draft, or the one that is live."
+      },
+      "PlaygroundMessage": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "role",
+          "text"
+        ]
+      },
+      "CreateHttpSourceRequest": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "baseUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "auth": {
+            "default": {
+              "kind": "none"
+            },
+            "$ref": "#/components/schemas/HttpToolAuthInput"
+          },
+          "openapi": {
+            "$ref": "#/components/schemas/HttpOpenApiImport"
+          },
+          "endpoint": {
+            "$ref": "#/components/schemas/HttpEndpointInput"
+          }
+        },
+        "required": [
+          "brandId",
+          "name",
+          "baseUrl"
+        ]
+      },
+      "HttpToolAuthInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "none"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "bearer"
+              },
+              "token": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 4000
+              }
+            },
+            "required": [
+              "kind",
+              "token"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "header"
+              },
+              "header": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            },
+            "required": [
+              "kind",
+              "header",
+              "value"
+            ]
+          }
+        ],
+        "type": "object"
+      },
+      "HttpOpenApiImport": {
+        "type": "object",
+        "properties": {
+          "spec": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 900000
+          },
+          "specUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "specHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "operations": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 400
+            }
+          }
+        },
+        "required": [
+          "operations"
+        ]
+      },
+      "HttpEndpointInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpToolMethod"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\/[A-Za-z0-9\\-._~!$&'()*+,;=:@%/{}]*$"
+          },
+          "arguments": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpToolArgumentInput"
+            }
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "method",
+          "path"
+        ]
+      },
+      "HttpToolMethod": {
+        "type": "string",
+        "enum": [
+          "GET",
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE"
+        ],
+        "description": "The request method of a custom HTTP tool."
+      },
+      "HttpToolArgumentInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+          },
+          "in": {
+            "$ref": "#/components/schemas/HttpToolArgumentIn"
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "type": {
+            "default": "string",
+            "$ref": "#/components/schemas/HttpToolArgumentType"
+          },
+          "required": {
+            "default": false,
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "name",
+          "in"
+        ]
+      },
+      "HttpToolArgumentIn": {
+        "type": "string",
+        "enum": [
+          "path",
+          "query",
+          "header",
+          "body"
+        ],
+        "description": "Where an argument goes in the request: the address path, the query string, a header, or a field of the JSON body."
+      },
+      "HttpToolArgumentType": {
+        "type": "string",
+        "enum": [
+          "string",
+          "integer",
+          "number",
+          "boolean"
+        ]
+      },
+      "PreviewHttpSpecRequest": {
+        "type": "object",
+        "properties": {
+          "spec": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 900000
+          },
+          "specUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "httpSource identifier (TypeID with prefix \"hsrc\")",
+            "example": "hsrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          }
+        }
+      },
+      "UpdateHttpSourceRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "baseUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "auth": {
+            "$ref": "#/components/schemas/HttpToolAuthInput"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          }
+        }
+      },
+      "AddHttpEndpointsRequest": {
+        "type": "object",
+        "properties": {
+          "openapi": {
+            "$ref": "#/components/schemas/HttpOpenApiImport"
+          },
+          "endpoint": {
+            "$ref": "#/components/schemas/HttpEndpointInput"
+          }
+        }
+      },
+      "UpdateHttpEndpointRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpToolMethod"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^\\/[A-Za-z0-9\\-._~!$&'()*+,;=:@%/{}]*$"
+          },
+          "arguments": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpToolArgumentInput"
+            }
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "method",
+          "path",
+          "expectedRevision"
         ]
       },
       "DecideActionRequest": {
@@ -50563,7 +52478,8 @@
             "type": "string",
             "enum": [
               "builtin",
-              "mcp"
+              "mcp",
+              "http"
             ]
           },
           "builtin": {
@@ -50849,6 +52765,66 @@
               }
             ]
           },
+          "auth": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "token",
+                  "oauth"
+                ]
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "connected",
+                      "needs_reconnect"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "authorizationHost": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expiresAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "scope": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "status",
+              "authorizationHost",
+              "expiresAt",
+              "scope"
+            ],
+            "additionalProperties": false
+          },
           "protocolVersion": {
             "type": [
               "string",
@@ -50904,6 +52880,7 @@
           "url",
           "status",
           "credential",
+          "auth",
           "protocolVersion",
           "serverName",
           "toolCount",
@@ -51692,6 +53669,1222 @@
           "startedAt",
           "finishedAt",
           "createdBy"
+        ],
+        "additionalProperties": false
+      },
+      "McpPreset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "vendor": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "docsUrl": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "support",
+              "commerce",
+              "work",
+              "engineering"
+            ]
+          },
+          "auth": {
+            "$ref": "#/components/schemas/McpPresetAuth"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verifiedOn": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "vendor",
+          "url",
+          "docsUrl",
+          "category",
+          "auth",
+          "summary",
+          "note",
+          "verifiedOn"
+        ],
+        "additionalProperties": false
+      },
+      "McpPresetAuth": {
+        "type": "string",
+        "enum": [
+          "oauth",
+          "oauth_or_token",
+          "token"
+        ],
+        "description": "`oauth`: a browser sign-in. `token`: a pasted token. `oauth_or_token`: either."
+      },
+      "McpOAuthStart": {
+        "type": "object",
+        "properties": {
+          "authorizationUrl": {
+            "type": "string"
+          },
+          "authorizationHost": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "authorizationUrl",
+          "authorizationHost",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "McpCatalog": {
+        "type": "object",
+        "properties": {
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpCatalogResource"
+            }
+          },
+          "prompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpCatalogPrompt"
+            }
+          },
+          "syncedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "resources",
+          "prompts",
+          "syncedAt"
+        ],
+        "additionalProperties": false
+      },
+      "McpCatalogResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "mcpItem identifier (TypeID with prefix \"mci\")",
+            "example": "mci_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "uri": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mimeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sizeBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "aiReadable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "uri",
+          "name",
+          "title",
+          "description",
+          "mimeType",
+          "sizeBytes",
+          "aiReadable"
+        ],
+        "additionalProperties": false
+      },
+      "McpCatalogPrompt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "mcpItem identifier (TypeID with prefix \"mci\")",
+            "example": "mci_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "required": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "required"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "title",
+          "description",
+          "arguments"
+        ],
+        "additionalProperties": false
+      },
+      "KnowledgeWebSource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "webSource identifier (TypeID with prefix \"wsrc\")",
+            "example": "wsrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "source identifier (TypeID with prefix \"ksrc\")",
+            "example": "ksrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused",
+              "retired"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/WebSyncMode"
+          },
+          "maxPages": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/WebSyncSchedule"
+          },
+          "state": {
+            "$ref": "#/components/schemas/WebSyncState"
+          },
+          "nextRunAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastRunAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastResult": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebSyncResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastRun": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebSyncSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pageCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "sourceId",
+          "brandId",
+          "name",
+          "visibility",
+          "status",
+          "url",
+          "mode",
+          "maxPages",
+          "maxDepth",
+          "schedule",
+          "state",
+          "nextRunAt",
+          "lastRunAt",
+          "lastResult",
+          "lastRun",
+          "pageCount",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "WebSyncState": {
+        "type": "string",
+        "enum": [
+          "idle",
+          "queued",
+          "running"
+        ]
+      },
+      "WebSyncResult": {
+        "type": "string",
+        "enum": [
+          "succeeded",
+          "partial",
+          "failed"
+        ]
+      },
+      "WebSyncSummary": {
+        "type": "object",
+        "properties": {
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "pages": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "added": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "updated": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "unchanged": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "retired": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "skipped": {
+            "type": "object",
+            "properties": {
+              "robots": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "offsite": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "noindex": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "type": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "duplicate": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "empty": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "robots",
+              "offsite",
+              "noindex",
+              "type",
+              "duplicate",
+              "empty"
+            ],
+            "additionalProperties": false
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "robots": {
+            "type": "string",
+            "enum": [
+              "read",
+              "missing",
+              "unreadable"
+            ]
+          },
+          "sitemaps": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "startedAt",
+          "finishedAt",
+          "pages",
+          "added",
+          "updated",
+          "unchanged",
+          "retired",
+          "skipped",
+          "problems",
+          "truncated",
+          "robots",
+          "sitemaps"
+        ],
+        "additionalProperties": false
+      },
+      "KnowledgeWebPage": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "documentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "document identifier (TypeID with prefix \"doc\")",
+                "example": "doc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "failed",
+              "gone"
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastFetchedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "url",
+          "documentId",
+          "state",
+          "status",
+          "lastFetchedAt",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "PlaygroundResult": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "replied",
+              "handoff",
+              "blocked",
+              "error"
+            ]
+          },
+          "reply": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "handoffReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errorKind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "state": {
+                "$ref": "#/components/schemas/PlaygroundVersion"
+              }
+            },
+            "required": [
+              "number",
+              "state"
+            ],
+            "additionalProperties": false
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "modelId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latencyMs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaygroundSource"
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaygroundAction"
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunStep"
+            }
+          }
+        },
+        "required": [
+          "outcome",
+          "reply",
+          "handoffReason",
+          "errorKind",
+          "version",
+          "model",
+          "inputTokens",
+          "outputTokens",
+          "latencyMs",
+          "sources",
+          "actions",
+          "steps"
+        ],
+        "additionalProperties": false
+      },
+      "PlaygroundSource": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "document identifier (TypeID with prefix \"doc\")",
+            "example": "doc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "title": {
+            "type": "string"
+          },
+          "heading": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "excerpt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "documentId",
+          "title",
+          "heading",
+          "url",
+          "excerpt"
+        ],
+        "additionalProperties": false
+      },
+      "PlaygroundAction": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "would_run",
+              "needs_approval",
+              "denied",
+              "invalid"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "tool",
+          "title",
+          "decision",
+          "reason",
+          "arguments"
+        ],
+        "additionalProperties": false
+      },
+      "ConversationMemoryCustomer": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "customer identifier (TypeID with prefix \"cus\")",
+                "example": "cus_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "customerId"
+        ],
+        "additionalProperties": false
+      },
+      "HttpToolSource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "httpSource identifier (TypeID with prefix \"hsrc\")",
+            "example": "hsrc_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "openapi",
+              "manual"
+            ]
+          },
+          "baseUrl": {
+            "type": "string"
+          },
+          "auth": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "$ref": "#/components/schemas/HttpToolAuthKind"
+              },
+              "header": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "masked": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "header",
+              "masked"
+            ],
+            "additionalProperties": false
+          },
+          "specTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "specVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpToolEndpoint"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "name",
+          "kind",
+          "baseUrl",
+          "auth",
+          "specTitle",
+          "specVersion",
+          "status",
+          "endpoints",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "HttpToolAuthKind": {
+        "type": "string",
+        "enum": [
+          "none",
+          "bearer",
+          "header"
+        ],
+        "description": "`bearer`: a token sent as `Authorization: Bearer …`. `header`: a secret value sent in a header of your choice."
+      },
+      "HttpToolEndpoint": {
+        "type": "object",
+        "properties": {
+          "toolId": {
+            "type": "string",
+            "description": "tool identifier (TypeID with prefix \"tool\")",
+            "example": "tool_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "toolName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpToolMethod"
+          },
+          "path": {
+            "type": "string"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ToolStatus"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpToolArgument"
+            }
+          }
+        },
+        "required": [
+          "toolId",
+          "toolName",
+          "title",
+          "description",
+          "method",
+          "path",
+          "risk",
+          "status",
+          "revision",
+          "editable",
+          "arguments"
+        ],
+        "additionalProperties": false
+      },
+      "HttpToolArgument": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "in": {
+            "$ref": "#/components/schemas/HttpToolArgumentIn"
+          },
+          "key": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "in",
+          "key",
+          "required",
+          "type",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "HttpSpecPreview": {
+        "type": "object",
+        "properties": {
+          "openapi": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hash": {
+            "type": "string"
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "auth": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "$ref": "#/components/schemas/HttpToolAuthKind"
+              },
+              "header": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "unsupported": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "header",
+              "unsupported"
+            ],
+            "additionalProperties": false
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpOperationPreview"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "openapi",
+          "title",
+          "version",
+          "hash",
+          "servers",
+          "auth",
+          "operations",
+          "skipped"
+        ],
+        "additionalProperties": false
+      },
+      "HttpOperationPreview": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/components/schemas/HttpToolMethod"
+          },
+          "path": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "toolName": {
+            "type": "string"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskClass"
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HttpOperationArgument"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "imported": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "method",
+          "path",
+          "title",
+          "summary",
+          "toolName",
+          "risk",
+          "arguments",
+          "notes",
+          "imported"
+        ],
+        "additionalProperties": false
+      },
+      "HttpOperationArgument": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "in": {
+            "$ref": "#/components/schemas/HttpToolArgumentIn"
+          },
+          "type": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "in",
+          "type",
+          "required"
         ],
         "additionalProperties": false
       },

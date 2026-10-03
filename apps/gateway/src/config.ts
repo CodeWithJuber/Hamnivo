@@ -100,6 +100,11 @@ const EnvSchema = z.object({
   EMBEDDING_MODEL: z.string().min(1).default('hamnivo-embed'),
   /** ClamAV daemon for uploads (tcp://host:3310). Without it only the EICAR test file is caught. */
   CLAMAV_URL: z.url().optional(),
+  /**
+   * Websites kept as knowledge are read one request at a time, at least this long apart (the
+   * site's robots.txt may ask for longer). Raise it for a small server; `0` only for tests.
+   */
+  KNOWLEDGE_WEB_DELAY_MS: z.coerce.number().int().min(0).max(10_000).default(1000),
 
   /** Messages per minute written into one conversation while importing (Chatwoot allows 200). */
   MIGRATION_MESSAGES_PER_MINUTE: z.coerce.number().int().min(1).max(200).default(180),
@@ -169,6 +174,8 @@ const EnvSchema = z.object({
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(600),
   /** Requests per minute for one API key (each key has its own budget). */
   API_KEY_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(120),
+  /** Tool calls per minute for one API key on the MCP server, on top of the budget above. */
+  MCP_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(30),
 
   /**
    * Outbound requests made for tenants (webhooks) reach public HTTPS hosts only. Origins listed

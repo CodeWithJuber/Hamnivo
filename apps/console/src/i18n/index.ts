@@ -1,5 +1,9 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { aiPowerAr } from './ai-power/ar';
+import { aiPowerEn } from './ai-power/en';
+import { aiPowerHi } from './ai-power/hi';
+import { aiPowerUr } from './ai-power/ur';
 import { ar } from './ar';
 import { billingAr } from './billing/ar';
 import { billingEn } from './billing/en';
@@ -30,6 +34,7 @@ declare module 'i18next' {
         billing: typeof billingEn;
         setup: typeof setupEn;
         inboxAlerts: typeof inboxAlertsEn;
+        aiPower: typeof aiPowerEn;
       };
     };
   }
@@ -81,6 +86,7 @@ export async function initI18n(locale: Locale) {
           billing: billingEn,
           setup: setupEn,
           inboxAlerts: inboxAlertsEn,
+          aiPower: aiPowerEn,
         },
       },
       ar: {
@@ -90,6 +96,7 @@ export async function initI18n(locale: Locale) {
           billing: billingAr,
           setup: setupAr,
           inboxAlerts: inboxAlertsAr,
+          aiPower: aiPowerAr,
         },
       },
       hi: {
@@ -99,6 +106,7 @@ export async function initI18n(locale: Locale) {
           billing: billingHi,
           setup: setupHi,
           inboxAlerts: inboxAlertsHi,
+          aiPower: aiPowerHi,
         },
       },
       ur: {
@@ -108,6 +116,7 @@ export async function initI18n(locale: Locale) {
           billing: billingUr,
           setup: setupUr,
           inboxAlerts: inboxAlertsUr,
+          aiPower: aiPowerUr,
         },
       },
     },
