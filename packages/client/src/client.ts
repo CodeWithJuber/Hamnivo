@@ -315,6 +315,18 @@ export class HamnivoClient {
     );
   }
 
+  /**
+   * Tells staff the visitor is typing. Send it every few seconds while they type, and `false` when
+   * they stop or send. It is best effort: a failure changes nothing the visitor needs.
+   */
+  reportTyping(conversationId: string, typing: boolean): Promise<void> {
+    return this.request(
+      'POST',
+      `/v1/widget/conversations/${encodeURIComponent(conversationId)}/typing`,
+      { typing },
+    );
+  }
+
   /** The visitor saw the conversation up to this sequence (W05, W06). */
   markRead(conversationId: string, upToSequence: number): Promise<void> {
     return this.request(

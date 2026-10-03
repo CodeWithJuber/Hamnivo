@@ -20,6 +20,7 @@ import type {
 import { withReauth } from '../../lib/reauth';
 import { useTenant } from '../../lib/tenant';
 import { dayLabel, languageName, timeOfDay } from './parts';
+import { CustomerTypingLine } from './Typing';
 
 const AVATAR: Record<InboxMessage['sender']['kind'], ParticipantKind> = {
   customer: 'customer',
@@ -437,6 +438,7 @@ export function Timeline({
           </ol>
         )}
       </div>
+      <CustomerTypingLine detail={detail} />
     </section>
   );
 }

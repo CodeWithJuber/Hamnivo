@@ -37,12 +37,13 @@ import {
   STATUSES,
   useInboxList,
   useInboxSearch,
-  useInboxStream,
   useOnline,
 } from '../../lib/inbox';
+import { useInboxStream } from '../../lib/inbox-live';
 import { useBrandRefs } from '../../lib/names';
 import { useTenant } from '../../lib/tenant';
 import { BulkBar } from './BulkBar';
+import { DesktopAlertsPrompt, InboxToolbar } from './InboxToolbar';
 import { ChannelIcon, ConversationStatusBadge, languageName, OwnerBadge, shortTime } from './parts';
 
 /** The row to put focus back on after leaving a conversation (Esc or Back on a phone). */
@@ -69,6 +70,20 @@ function RowPreview({ conversation }: { conversation: InboxConversation }) {
   );
 }
 
+/** How many customer messages in a chat are unread: a number for the eye, a sentence for a screen reader. */
+export function UnreadBadge({ count }: { count: number }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-strong px-1.5 text-xs font-semibold text-on-brand-strong"
+      data-testid="unread-badge"
+    >
+      <span aria-hidden="true">{count > 99 ? '99+' : formatNumber(count)}</span>
+      <span className="sr-only">{t('inboxAlerts.unread.row', { count })}</span>
+    </span>
+  );
+}
+
 function QueueRow({
   conversation,
   selected,
@@ -88,6 +103,7 @@ function QueueRow({
 }) {
   const { t } = useTranslation();
   const language = languageName(conversation.customer.language);
+  const unread = conversation.unreadCount > 0;
   return (
     <li
       className={cn(
@@ -123,15 +139,18 @@ function QueueRow({
         <ParticipantAvatar kind="customer" name={conversation.customer.displayName} />
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-baseline justify-between gap-2">
-            <span className="truncate font-medium text-text">
+            <span
+              className={cn('truncate text-text', unread ? 'font-semibold' : 'font-medium')}
+              data-unread={unread ? 'true' : undefined}
+            >
               <bdi>{conversation.customer.displayName}</bdi>
             </span>
-            <time
-              dateTime={conversation.lastActivityAt}
-              className="shrink-0 text-xs text-text-secondary"
-            >
-              {shortTime(conversation.lastActivityAt)}
-            </time>
+            <span className="flex shrink-0 items-center gap-2">
+              {unread ? <UnreadBadge count={conversation.unreadCount} /> : null}
+              <time dateTime={conversation.lastActivityAt} className="text-xs text-text-secondary">
+                {shortTime(conversation.lastActivityAt)}
+              </time>
+            </span>
           </span>
           <RowPreview conversation={conversation} />
           <span className="flex flex-wrap items-center gap-1.5">
@@ -629,6 +648,8 @@ function QueuePane({ open, selectedId }: { open: boolean; selectedId: string | u
             </Button>
           </form>
         </search>
+        <InboxToolbar />
+        <DesktopAlertsPrompt />
         {search.q ? null : <QueueNav counts={counts} />}
         <div id="inbox-filters-panel">
           {filtersOpen ? <FilterPanel rows={rows} onClose={() => setFiltersOpen(false)} /> : null}

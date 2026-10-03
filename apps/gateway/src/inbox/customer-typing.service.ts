@@ -51,6 +51,8 @@ export class CustomerTypingService {
     // Never "forbidden": that would confirm a conversation of someone else exists.
     if (!own) throw new AppError('NOT_FOUND', { detail: 'Conversation not found.' });
     const changed = await this.typing.setCustomerTyping(claims.tenantId, conversationId, typing);
-    if (changed) await this.signals.changed(claims.tenantId, [conversationId], 'typing');
+    // Stopping tells staff once. While the customer keeps typing, each report is told again, so
+    // a Studio that missed the "stopped" signal can drop the line after a few seconds.
+    if (changed || typing) await this.signals.changed(claims.tenantId, [conversationId], 'typing');
   }
 }

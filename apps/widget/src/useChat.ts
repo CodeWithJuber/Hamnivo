@@ -269,6 +269,11 @@ export function useChat(client: HamnivoClient) {
         conversation.id,
         {
           onEvent: apply,
+          // Live-only events (a person typing) go to the parts that follow them, nowhere else.
+          onTransient: (event) => {
+            const data = (event.data ?? {}) as Record<string, unknown>;
+            for (const listener of listeners.current) listener({ type: event.type, data });
+          },
           onStatus: (connection) =>
             setState((s) => ({
               ...s,

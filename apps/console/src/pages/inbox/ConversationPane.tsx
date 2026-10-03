@@ -62,10 +62,12 @@ import {
   useDrafts,
   useMessages,
 } from '../../lib/inbox';
+import { useMarkReadWhileOpen } from '../../lib/inbox-alerts';
 import { useTenant } from '../../lib/tenant';
 import { Composer } from './Composer';
 import { ContextPanel } from './ContextPanel';
 import { returnToQueue } from './InboxPage';
+import { StaffStatus } from './InboxToolbar';
 import {
   ChannelIcon,
   ConversationStatusBadge,
@@ -323,8 +325,9 @@ function AssignMenu({ detail }: { detail: InboxDetail }) {
                     >
                       <UserRoundIcon aria-hidden="true" />
                       <bdi>{s.displayName}</bdi>
+                      <StaffStatus status={s.status} className="ms-auto" />
                       {s.current ? (
-                        <span className="ms-auto text-xs text-text-secondary">
+                        <span className="text-xs text-text-secondary">
                           {t('inbox.assign.current')}
                         </span>
                       ) : null}
@@ -724,6 +727,7 @@ export function ConversationPane() {
   const detail = useConversation(conversationId);
   const messages = useMessages(conversationId);
   const drafts = useDrafts(conversationId);
+  useMarkReadWhileOpen(conversationId, detail.data?.unreadCount ?? 0);
   const [detailsWide, setDetailsWide] = useState(detailsPreference);
   const [sheetOpen, setSheetOpen] = useState(false);
   const sheetOpener = useOpener(sheetOpen);

@@ -12,6 +12,7 @@ import { useChat } from './useChat.js';
 import { useDisplay } from './useDisplay.js';
 import { useMemory } from './useMemory.js';
 import { useReplyLanguage } from './useReplyLanguage.js';
+import { useStaffTyping } from './useTyping.js';
 
 export interface WidgetParams {
   apiBase: string;
@@ -45,6 +46,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const memory = useMemory(client, chat.state.session?.principal.id ?? null);
   const actions = useActions(client, chat.state.conversation?.id ?? null, bridge);
   useEffect(() => onEvent(actions.onEvent), [onEvent, actions.onEvent]);
+  const staffTyping = useStaffTyping(onEvent);
   const display = useDisplay(params.widgetId);
   // Embedded, the chat is on screen only while the loader shows it; on its own page, always.
   const [open, setOpen] = useState(
@@ -162,6 +164,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           visible={open && pageShown}
           display={display}
           prompt={prompt}
+          staffTyping={staffTyping}
           onLocale={(next) => {
             setLocale(next);
             void saveLocale(next);

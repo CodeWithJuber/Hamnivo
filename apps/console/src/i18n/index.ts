@@ -3,6 +3,10 @@ import { initReactI18next } from 'react-i18next';
 import { ar } from './ar';
 import { en } from './en';
 import { hi } from './hi';
+import { inboxAlertsAr } from './inbox-alerts/ar';
+import { inboxAlertsEn } from './inbox-alerts/en';
+import { inboxAlertsHi } from './inbox-alerts/hi';
+import { inboxAlertsUr } from './inbox-alerts/ur';
 import { migrationAr } from './migration/ar';
 import { migrationEn } from './migration/en';
 import { migrationHi } from './migration/hi';
@@ -12,7 +16,9 @@ import { ur } from './ur';
 declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'translation';
-    resources: { translation: typeof en & { migration: typeof migrationEn } };
+    resources: {
+      translation: typeof en & { migration: typeof migrationEn; inboxAlerts: typeof inboxAlertsEn };
+    };
   }
 }
 
@@ -55,10 +61,10 @@ export function initialLocale(): Locale {
 export async function initI18n(locale: Locale) {
   await i18next.use(initReactI18next).init({
     resources: {
-      en: { translation: { ...en, migration: migrationEn } },
-      ar: { translation: { ...ar, migration: migrationAr } },
-      hi: { translation: { ...hi, migration: migrationHi } },
-      ur: { translation: { ...ur, migration: migrationUr } },
+      en: { translation: { ...en, migration: migrationEn, inboxAlerts: inboxAlertsEn } },
+      ar: { translation: { ...ar, migration: migrationAr, inboxAlerts: inboxAlertsAr } },
+      hi: { translation: { ...hi, migration: migrationHi, inboxAlerts: inboxAlertsHi } },
+      ur: { translation: { ...ur, migration: migrationUr, inboxAlerts: inboxAlertsUr } },
     },
     lng: locale,
     fallbackLng: 'en',
