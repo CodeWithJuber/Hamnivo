@@ -155,15 +155,14 @@ describe('Stop AI', () => {
     expect(menu?.length).toBe(6);
   });
 
+  it('is shown only to people who can stop the AI', async () => {
+    expect((await stopAi('/overview', ['agents.read', 'agents.publish'])).button).toBeDefined();
+    // Seeing the AI's settings is not enough: the page would be read-only for them.
+    expect((await stopAi('/overview', ['agents.read'])).button).toBeUndefined();
+  });
+
   it('is marked as the current page on the Stop AI page', async () => {
     const { button } = await stopAi('/stop-ai', owner);
     expect(button?.attrs['aria-current']).toBe('page');
-  });
-
-  it('shows to those who saw the Stop AI entry before: whoever can read agents', async () => {
-    expect((await stopAi('/overview', presetPermissions('knowledge_editor'))).button).toBeDefined();
-    expect((await stopAi('/overview', presetPermissions('supervisor'))).button).toBeDefined();
-    expect((await stopAi('/overview', presetPermissions('agent'))).button).toBeUndefined();
-    expect((await stopAi('/overview', ['conversations.read'])).button).toBeUndefined();
   });
 });

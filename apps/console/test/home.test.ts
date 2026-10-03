@@ -13,7 +13,7 @@ describe('who gets "Your chats" and who gets "Get set up"', () => {
     expect(isStaffOnly(holding('conversations.read'))).toBe(true);
     expect(isStaffOnly(holding())).toBe(true);
     expect(isStaffOnly(holding('brands.manage'))).toBe(false);
-    expect(isStaffOnly(holding('members.read'))).toBe(false);
+    expect(isStaffOnly(holding('members.read'))).toBe(true);
     expect(isStaffOnly(holding('brands.manage', 'members.read'))).toBe(false);
   });
 
@@ -22,8 +22,8 @@ describe('who gets "Your chats" and who gets "Get set up"', () => {
     expect(isStaffOnly(role('admin'))).toBe(false);
     expect(isStaffOnly(role('analyst'))).toBe(true);
     expect(isStaffOnly(role('knowledge_editor'))).toBe(true);
-    // The Support agent role can see the team (read only), so by this rule it is not staff-only.
-    expect(isStaffOnly(role('agent'))).toBe(false);
+    // Support agents can see the team (read only) and are staff all the same.
+    expect(isStaffOnly(role('agent'))).toBe(true);
   });
 });
 

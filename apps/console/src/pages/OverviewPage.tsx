@@ -272,7 +272,7 @@ export function OverviewPage() {
         }
       />
       {staffOnly && can('conversations.read') ? <YourChats /> : null}
-      {staffOnly ? null : <GetSetUp />}
+      <GetSetUp />
       {can('agents.read') ? <StopsSection /> : null}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <BrandsSection />

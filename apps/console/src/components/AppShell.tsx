@@ -371,7 +371,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </StatusBadge>
               </Link>
             ) : null}
-            {can('agents.read') ? (
+            {/* Only for people who can stop the AI: a red button that leads nowhere they can act is noise. */}
+            {can('agents.publish') ? (
               <Button asChild variant="destructive-solid" size="sm">
                 <Link
                   to="/stop-ai"

@@ -34,10 +34,10 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
 - **Home** (`/overview`). It starts with a block for the person's role, then is the same for
   everyone: brands with their Chatwoot connection, each brand's AI assistant (live version or
   "draft only"), active AI stops, and the latest runs.
-  - Someone who can neither manage brands nor see the team gets **Your chats**: how many
+  - Someone who does not manage brands (support agents, supervisors) gets **Your chats**: how many
     customers wait for a person and how many chats are assigned to them (the inbox's own counts),
     and an "Open inbox" button.
-  - Everyone else gets **Get set up**: the steps still open (connect the chat engine, add a brand
+  - Anyone who can do a setup step gets **Get set up**: the steps still open (connect the chat engine, add a brand
     and install the chat, publish an AI agent, invite a teammate), each linking to its page. A
     step is shown only when the person can do it and the lists they can read say whether it is
     done; nothing detects the install code on a website, so "install" counts once a brand has an
@@ -72,8 +72,8 @@ Query) that talks to the gateway's existing APIs with the signed-in person's coo
     size and type are checked before anything is sent.
   - Mark as reviewed, retire, and upload a new version.
   - A search preview shows the passages an answer would use, with their scores.
-- **Stop AI.** A red "Stop AI" button is always in the header for people who can see AI agents. It
-  opens the Stop AI page, where people who may publish agents stop AI replies for the whole
+- **Stop AI.** A red "Stop AI" button is always in the header for people who may publish agents. It
+  opens the Stop AI page, where they stop AI replies for the whole
   workspace, one brand or one agent, with a reason. The page lists active and earlier stops, and
   lets the AI answer again.
 - **Runs**, called Activity in the menu. A table of outcome, version, model, tokens, time taken and

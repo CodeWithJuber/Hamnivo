@@ -7,12 +7,11 @@ import type { Can } from './nav';
 import type { Agent, AuthorityConnection, Brand, Invitation, Member } from './types';
 
 /**
- * Someone who neither manages brands nor sees the team is staff, not an administrator: Home
- * leads with their chats instead of with setup. Built-in roles that can see the team (Support
- * agent and Supervisor among them) therefore count as administrators here.
+ * Someone who does not manage brands is staff, not an administrator: Home leads with their chats.
+ * Support agents and supervisors can see the team, and they are staff all the same.
  */
 export function isStaffOnly(can: Can): boolean {
-  return !can('brands.manage') && !can('members.read');
+  return !can('brands.manage');
 }
 
 /** What it takes to do each setup step; someone with none of these has no step to be shown. */

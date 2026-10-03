@@ -35,8 +35,8 @@ as a row of links above the page, so each one is a click away.
 
 Two things are not in the menu:
 
-- **Stop AI** is a red button in the header, on every page, for people who can see AI agents. It
-  opens the Stop AI page. Stopping or resuming the AI needs permission to publish agents.
+- **Stop AI** is a red button in the header, on every page, for people who can stop the AI
+  (permission to publish agents). It opens the Stop AI page.
 - **Account security** and the **Platform console** (operators only) are in the account area at
   the bottom of the menu, which is a sheet on a phone.
 
@@ -65,9 +65,10 @@ page you may not open shows a notice, never its data.
 
 Home starts with a block that depends on what you do:
 
-- If you can neither manage brands nor see the team, it shows **Your chats**: how many customers
-  are waiting for a person and how many chats are assigned to you, with an **Open inbox** button.
-- If you can, it shows **Get set up**, with the steps that are still open: connect the chat
+- If you do not manage brands (support agents and supervisors, for example), it shows **Your
+  chats**: how many customers are waiting for a person and how many chats are assigned to you,
+  with an **Open inbox** button.
+- If you can do any setup step, it shows **Get set up**, with the steps that are still open: connect the chat
   engine, add a brand and install the chat, publish an AI agent, invite a teammate. Each step links
   to its page, and a step shows only if you can do it. The list disappears when every step is done.
   Studio cannot tell whether the install code is on your website, so "install the chat" counts as
