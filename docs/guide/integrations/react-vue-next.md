@@ -415,12 +415,12 @@ Both packages export `loadHamnivo(options)`, which adds the loader script once a
 - The two packages are in [`packages/react`](../../../packages/react) and
   [`packages/vue`](../../../packages/vue). Each carries an identical copy of the file that loads and
   follows the chat (`src/embed.ts`), and a test fails if they differ.
-- **Tests.** `pnpm --filter @hamnivo/react test` and `pnpm --filter @hamnivo/vue test` build the
-  package, then run the tests in a real React and a real Vue, against a stand-in for the loader: the
-  loading, the hiding, the identity flow with its sign-out ordering, the hooks, and, for React, the
-  hooks on the client against a stand-in for the Hamnivo API. They also check the published files:
-  the `"use client"` line, the imports, the exports. The Next.js and React snippets in this guide
-  are type-checked with the package.
+- **Tests.** `pnpm exec turbo run typecheck test --filter=@hamnivo/react --filter=@hamnivo/vue
+  --concurrency=1` builds each package and what it needs, then runs the tests in a real React and a
+  real Vue, against a stand-in for the loader: the loading, the hiding, the identity flow with its
+  sign-out ordering, the hooks, and, for React, the hooks on the client against a stand-in for the
+  Hamnivo API. They also check the published files: the `"use client"` line, the imports, the
+  exports. The Next.js and React snippets in this guide are type-checked with the package.
 - **Release.** Push a tag named `react-v` or `vue-v` followed by the version in the package's
   `package.json`, for example `react-v0.1.0`. [`release-packages.yml`](../../../.github/workflows/release-packages.yml)
   checks the tag against the package, runs its checks, and publishes it to npm with the `NPM_TOKEN`

@@ -75,9 +75,12 @@ assertion in a route handler with [`@hamnivo/server`](../server-sdk). The guide 
 ## Develop
 
 ```bash
-pnpm --filter @hamnivo/react test       # builds, then runs the tests in a real React
-pnpm --filter @hamnivo/react typecheck  # the package, the tests and the snippets of the guide
+# turbo builds @hamnivo/client and @hamnivo/server first, which the tests and the snippets use
+pnpm exec turbo run typecheck test --filter=@hamnivo/react --concurrency=1
 ```
+
+The tests run in a real React, and the type check covers the package, the tests and the snippets of
+the guide.
 
 `src/embed.ts` has no framework in it and is an identical copy of the one in
 [`@hamnivo/vue`](../vue): a test fails if they differ. A tag named `react-v<version>` publishes the
