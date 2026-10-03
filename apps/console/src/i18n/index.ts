@@ -21,7 +21,11 @@ declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'translation';
     resources: {
-      translation: typeof en & { migration: typeof migrationEn; billing: typeof billingEn; setup: typeof setupEn };
+      translation: typeof en & {
+        migration: typeof migrationEn;
+        billing: typeof billingEn;
+        setup: typeof setupEn;
+      };
     };
   }
 }
