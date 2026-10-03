@@ -85,15 +85,16 @@ describe('the menu', () => {
     });
   });
 
-  it('gives every Studio page a place, except the two that live elsewhere', () => {
+  it('gives every Studio page a place, except those that live elsewhere', () => {
     const folder = fileURLToPath(new URL('../src/routes/_studio', import.meta.url));
     const pages = new Set(
       readdirSync(folder, { withFileTypes: true }).map(
         (entry) => `/${entry.name.replace(/\.tsx$/, '')}`,
       ),
     );
-    // Stop AI is a button in the header; Account security is in the account menu.
-    const elsewhere = ['/stop-ai', '/account'];
+    // Stop AI is a button in the header; Account security is in the account menu; the page a
+    // service's sign-in sends the browser back to (OAuth for MCP servers) is reached from there.
+    const elsewhere = ['/stop-ai', '/account', '/connect.mcp'];
     const placed = NAV_GROUPS.flatMap((group) => group.routes.map((route) => route.to));
     expect([...pages].filter((page) => !elsewhere.includes(page)).sort()).toEqual(
       [...placed].sort(),

@@ -1,4 +1,9 @@
-import { callMcpTool, McpCallError } from '@hamnivo/adapters/mcp';
+import {
+  callMcpTool,
+  McpCallError,
+  type McpEndpoint,
+  readMcpResource,
+} from '@hamnivo/adapters/mcp';
 import { checkUrl, EgressError, type EgressPolicy, hostAllowed } from '@hamnivo/adapters/net';
 import { DemoActionsStore, DemoToolError } from '@hamnivo/adapters/tools';
 import { AgentConfig } from '@hamnivo/contracts';
@@ -7,6 +12,7 @@ import {
   type ContainedOutput,
   containToolOutput,
   type PortableSchema,
+  plainText,
   sanitizeToolSchema,
 } from '@hamnivo/domain/actions';
 import { Inject, Injectable } from '@nestjs/common';
@@ -14,27 +20,21 @@ import { and, desc, eq } from 'drizzle-orm';
 import { moneyText } from '../commerce/common.js';
 import type { AppConfig } from '../config.js';
 import { EgressService } from '../developer/egress.service.js';
-import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CONFIG } from '../tokens.js';
+import { McpCredentials, McpTokenUnavailable } from './mcp-credentials.service.js';
+import { mcpTrustedOrigins } from './mcp-origins.js';
 
 export type ToolRow = typeof schema.toolDefinitions.$inferSelect;
 
+export { mcpTrustedOrigins } from './mcp-origins.js';
+
 /**
- * The origins an MCP server may be reached at over plain HTTP and on a private address: none, but
- * for development and tests (TOOLS_EGRESS_ALLOW_PRIVATE, refused in production), which trust the
- * server's own origin. Every other server must be on public HTTPS, like any request made for a
- * tenant (`@hamnivo/adapters/net`).
+ * Whether what a tool returns came from outside Hamnivo (X09): from an MCP server, from a custom
+ * HTTP tool's service, or from the resources of one. Once a run has read such data, the changes it
+ * proposes wait for a person.
  */
-export function mcpTrustedOrigins(
-  config: Pick<AppConfig, 'TOOLS_EGRESS_ALLOW_PRIVATE'>,
-  serverUrl: string,
-): string[] {
-  if (!config.TOOLS_EGRESS_ALLOW_PRIVATE) return [];
-  try {
-    return [new URL(serverUrl).origin];
-  } catch {
-    return [];
-  }
+export function returnsUntrustedData(tool: Pick<ToolRow, 'source' | 'builtin'>): boolean {
+  return tool.source !== 'builtin' || tool.builtin === 'read_resource';
 }
 
 /**
@@ -169,6 +169,13 @@ const PAYMENT_WORDS: Record<string, string> = {
   unknown: 'payment status being checked',
 };
 
+/** Resources listed at once, and how much of one is read at once (the tool output is capped anyway). */
+const RESOURCE_LIST_LIMIT = 30;
+const RESOURCE_CHUNK_CHARS = 3500;
+/** The most of one resource that agents read, however many pieces it takes. */
+const RESOURCE_READ_LIMIT = 100_000;
+const RESOURCE_RESPONSE_BYTES = 1_048_576;
+
 const text = (value: unknown) => (typeof value === 'string' ? value : String(value ?? ''));
 
 /**
@@ -181,8 +188,8 @@ export class ToolAdapters {
   constructor(
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CONFIG) private readonly config: AppConfig,
-    private readonly secrets: SecretBroker,
     private readonly egress: EgressService,
+    private readonly credentials: McpCredentials,
   ) {}
 
   /** Demo tools are offered outside production, or where demos are switched on. */
@@ -292,6 +299,38 @@ export class ToolAdapters {
           },
         };
       }
+      case 'read_resource': {
+        const wanted = typeof args.resource === 'string' ? args.resource : '';
+        if (!wanted) {
+          return {
+            ok: true,
+            proposal: {
+              summary: 'List the resources that may be read',
+              effects: [],
+              changes: [],
+              resource: null,
+              amount: null,
+            },
+          };
+        }
+        const found = await this.readable(tx, scope, wanted);
+        if (!found) {
+          return {
+            ok: false,
+            summary: 'That resource is not available. List the resources first.',
+          };
+        }
+        return {
+          ok: true,
+          proposal: {
+            summary: `Read ${plainText(found.item.title ?? found.item.name, 120)} from ${found.server.label}`,
+            effects: [],
+            changes: [],
+            resource: null,
+            amount: null,
+          },
+        };
+      }
       default:
         return { ok: false, summary: 'This tool is not available.' };
     }
@@ -303,6 +342,7 @@ export class ToolAdapters {
     return prepared.ok ? (prepared.proposal.resource?.revision ?? null) : 'missing';
   }
 
+  /** Where a tool's server is and what it may be asked, but not yet the token to send. */
   private async mcpEndpoint(tool: ToolRow, scope: ToolScope) {
     return withTenant(this.db, { tenantId: scope.tenantId, actorId: 'ai' }, async (tx) => {
       const [server] = await tx
@@ -323,19 +363,62 @@ export class ToolAdapters {
         if (error instanceof EgressError) throw new ToolCallFailure('egress', error.message, false);
         throw error;
       }
-      const token = server.tokenSecretId
-        ? await this.secrets.reveal(tx, scope.tenantId, server.tokenSecretId)
-        : null;
       return {
-        url: server.url,
-        token,
-        allowedHosts: tool.egressHosts,
-        trustedOrigins,
-        ...(workspace.resolve ? { resolve: workspace.resolve } : {}),
-        timeoutMs: tool.timeoutMs,
-        maxResponseBytes: Math.max(tool.maxOutputBytes * 4, 65_536),
+        serverId: server.id,
+        endpoint: {
+          url: server.url,
+          allowedHosts: tool.egressHosts,
+          trustedOrigins,
+          ...(workspace.resolve ? { resolve: workspace.resolve } : {}),
+          timeoutMs: tool.timeoutMs,
+          maxResponseBytes: Math.max(tool.maxOutputBytes * 4, 65_536),
+        } satisfies McpEndpoint,
       };
     });
+  }
+
+  /** A sign-in that cannot give a token is a call that did not leave: nothing was sent. */
+  private tokenFailure(error: unknown): unknown {
+    if (error instanceof McpTokenUnavailable) {
+      return new ToolCallFailure(
+        error.kind === 'reconnect' ? 'auth' : 'network',
+        error.message,
+        false,
+      );
+    }
+    return error;
+  }
+
+  /**
+   * One request to an MCP server with the server's token. A token the server refuses (it ended, or
+   * was revoked) is renewed once and the request is sent again: a refused request did nothing, so
+   * sending it again cannot do a change twice.
+   */
+  private async signedIn<T>(
+    tenantId: string,
+    serverId: string,
+    endpoint: McpEndpoint,
+    send: (endpoint: McpEndpoint) => Promise<T>,
+  ): Promise<T> {
+    let token: string | null;
+    try {
+      token = await this.credentials.bearer(tenantId, serverId);
+    } catch (error) {
+      throw this.tokenFailure(error);
+    }
+    try {
+      return await send({ ...endpoint, token });
+    } catch (error) {
+      if (!(error instanceof McpCallError) || error.kind !== 'auth' || token === null) throw error;
+      let renewed: string | null;
+      try {
+        renewed = await this.credentials.bearer(tenantId, serverId, { rejected: token });
+      } catch (inner) {
+        throw this.tokenFailure(inner);
+      }
+      if (renewed === null || renewed === token) throw error;
+      return await send({ ...endpoint, token: renewed });
+    }
   }
 
   /** Runs the tool once. Throws ToolCallFailure when there is no answer. */
@@ -346,12 +429,14 @@ export class ToolAdapters {
     options: { idempotencyKey: string; signal: AbortSignal },
   ): Promise<ToolOutcome> {
     if (tool.source === 'mcp') {
-      const endpoint = await this.mcpEndpoint(tool, scope);
+      const { serverId, endpoint } = await this.mcpEndpoint(tool, scope);
       try {
-        const result = await callMcpTool(endpoint, tool.remoteName as string, args, {
-          idempotencyKey: options.idempotencyKey,
-          signal: options.signal,
-        });
+        const result = await this.signedIn(scope.tenantId, serverId, endpoint, (signed) =>
+          callMcpTool(signed, tool.remoteName as string, args, {
+            idempotencyKey: options.idempotencyKey,
+            signal: options.signal,
+          }),
+        );
         if (result.isError) {
           return {
             status: 'failed',
@@ -366,6 +451,7 @@ export class ToolAdapters {
           summary: `${tool.title}: completed.`,
         };
       } catch (error) {
+        if (error instanceof ToolCallFailure) throw error;
         if (error instanceof McpCallError) {
           throw new ToolCallFailure(error.kind, error.message, error.mayHaveApplied);
         }
@@ -406,6 +492,8 @@ export class ToolAdapters {
             summary: `A store credit of ${moneyText(BigInt(credit.amountMinor), credit.currency)} was issued for order ${reference}.`,
           };
         }
+        case 'read_resource':
+          return await this.readResource(args, scope, options.signal);
         default:
           return {
             status: 'failed',
@@ -419,6 +507,153 @@ export class ToolAdapters {
       }
       if (error instanceof ToolCallFailure) throw error;
       throw new ToolCallFailure('unexpected', 'The tool failed.', true);
+    }
+  }
+
+  /** A resource of one of the brand's active servers that a person allowed agents to read. */
+  private async readable(tx: TenantTx, scope: ToolScope, publicId: string) {
+    let itemId: string;
+    try {
+      itemId = fromPublicId('mcpItem', publicId);
+    } catch {
+      return null;
+    }
+    const [row] = await tx
+      .select({ item: schema.mcpCatalogItems, server: schema.mcpServers })
+      .from(schema.mcpCatalogItems)
+      .innerJoin(schema.mcpServers, eq(schema.mcpServers.id, schema.mcpCatalogItems.mcpServerId))
+      .where(
+        and(
+          eq(schema.mcpCatalogItems.id, itemId),
+          eq(schema.mcpCatalogItems.kind, 'resource'),
+          eq(schema.mcpCatalogItems.aiReadable, true),
+          eq(schema.mcpServers.brandId, scope.brandId),
+          eq(schema.mcpServers.status, 'active'),
+        ),
+      );
+    return row ?? null;
+  }
+
+  /**
+   * Without a resource: the resources agents may read, from the last sync of the brand's servers.
+   * With one: its text, in pieces (`offset` continues a long one). The words in either came from
+   * another system and are returned as data like any tool output.
+   */
+  private async readResource(
+    args: Args,
+    scope: ToolScope,
+    signal: AbortSignal,
+  ): Promise<ToolOutcome> {
+    const wanted = typeof args.resource === 'string' ? args.resource : '';
+    const prepared = await withTenant(
+      this.db,
+      { tenantId: scope.tenantId, actorId: 'ai' },
+      async (tx) => {
+        if (!wanted) {
+          const rows = await tx
+            .select({ item: schema.mcpCatalogItems, label: schema.mcpServers.label })
+            .from(schema.mcpCatalogItems)
+            .innerJoin(
+              schema.mcpServers,
+              eq(schema.mcpServers.id, schema.mcpCatalogItems.mcpServerId),
+            )
+            .where(
+              and(
+                eq(schema.mcpCatalogItems.kind, 'resource'),
+                eq(schema.mcpCatalogItems.aiReadable, true),
+                eq(schema.mcpServers.brandId, scope.brandId),
+                eq(schema.mcpServers.status, 'active'),
+              ),
+            )
+            .orderBy(schema.mcpServers.label, schema.mcpCatalogItems.name)
+            .limit(RESOURCE_LIST_LIMIT);
+          return { kind: 'list' as const, rows };
+        }
+        const found = await this.readable(tx, scope, wanted);
+        if (!found) return { kind: 'missing' as const };
+        const trustedOrigins = mcpTrustedOrigins(this.config, found.server.url);
+        const workspace = await this.egress.policyIn(tx, trustedOrigins);
+        try {
+          checkUrl(found.server.url, workspace);
+        } catch (error) {
+          if (error instanceof EgressError) {
+            throw new ToolCallFailure('egress', error.message, false);
+          }
+          throw error;
+        }
+        return {
+          kind: 'read' as const,
+          found,
+          endpoint: {
+            url: found.server.url,
+            allowedHosts: [new URL(found.server.url).hostname],
+            trustedOrigins,
+            ...(workspace.resolve ? { resolve: workspace.resolve } : {}),
+            timeoutMs: 10_000,
+            maxResponseBytes: RESOURCE_RESPONSE_BYTES,
+          } satisfies McpEndpoint,
+        };
+      },
+    );
+    if (prepared.kind === 'list') {
+      const resources = prepared.rows.map(({ item, label }) => ({
+        id: toPublicId('mcpItem', item.id),
+        service: label,
+        name: plainText(item.title ?? item.name, 120),
+        about: item.description ? plainText(item.description, 160) : null,
+        type: item.mimeType,
+      }));
+      return {
+        status: 'succeeded',
+        output: { resources },
+        reference: null,
+        summary: resources.length
+          ? `${resources.length} resource${resources.length === 1 ? '' : 's'} can be read.`
+          : 'No resources are available to read.',
+      };
+    }
+    if (prepared.kind === 'missing') {
+      return {
+        status: 'failed',
+        reason: 'not_found',
+        summary: 'That resource is not available. List the resources first.',
+      };
+    }
+    const offset = Math.max(0, Math.floor(Number(args.offset ?? 0)) || 0);
+    const { found, endpoint } = prepared;
+    try {
+      const content = await this.signedIn(scope.tenantId, found.server.id, endpoint, (signed) =>
+        readMcpResource(signed, found.item.key, {
+          signal,
+          maxChars: Math.min(offset + RESOURCE_CHUNK_CHARS, RESOURCE_READ_LIMIT),
+        }),
+      );
+      const piece = content.text.slice(offset, offset + RESOURCE_CHUNK_CHARS);
+      const more = content.text.length > offset + RESOURCE_CHUNK_CHARS || content.truncated;
+      const name = plainText(found.item.title ?? found.item.name, 120);
+      return {
+        status: 'succeeded',
+        output: {
+          name,
+          type: content.mimeType ?? found.item.mimeType,
+          offset,
+          text: piece,
+          nextOffset: more && piece.length > 0 ? offset + piece.length : null,
+          ...(content.binaryBytes > 0 && content.text === ''
+            ? {
+                note: `This is a file of ${content.binaryBytes} bytes that cannot be read as text.`,
+              }
+            : {}),
+        },
+        reference: null,
+        summary: `Read ${name}${more ? ' (the first part; more follows)' : ''}.`,
+      };
+    } catch (error) {
+      if (error instanceof ToolCallFailure) throw error;
+      if (error instanceof McpCallError) {
+        throw new ToolCallFailure(error.kind, error.message, error.mayHaveApplied);
+      }
+      throw new ToolCallFailure('unexpected', 'The tool failed.', false);
     }
   }
 
@@ -470,6 +705,7 @@ export class ToolAdapters {
     idempotencyKey: string,
   ): Promise<ToolOutcome | null> {
     if (tool.source !== 'builtin' || tool.builtin === 'order_status') return null;
+    if (tool.builtin === 'read_resource') return null;
     const applied = this.demo(scope).lookup(idempotencyKey);
     const reference = text(args.orderReference);
     if (!applied) {

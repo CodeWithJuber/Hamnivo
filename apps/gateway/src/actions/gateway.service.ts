@@ -38,6 +38,7 @@ import { RunsService } from '../runtime/runs.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import {
   containOutput,
+  returnsUntrustedData,
   ToolAdapters,
   ToolCallFailure,
   type ToolRow,
@@ -554,7 +555,9 @@ export class ToolGateway {
         summary =
           error instanceof ToolCallFailure && error.kind === 'timeout'
             ? `${tool.title}: the tool did not answer in time.`
-            : `${tool.title}: the tool could not be reached.`;
+            : error instanceof ToolCallFailure && error.kind === 'auth'
+              ? `${tool.title}: the connection to the service needs to be renewed by the team.`
+              : `${tool.title}: the tool could not be reached.`;
       }
       await this.tx(ctx.tenantId, async (tx) => {
         await tx
@@ -585,7 +588,7 @@ export class ToolGateway {
       summary = executed.summary;
       output = executed.output;
     }
-    if (tool.source === 'mcp') run.untrusted = true;
+    if (returnsUntrustedData(tool)) run.untrusted = true;
     run.called.push({ actionId, tool: tool.name, risk: tool.risk, state });
     const contained = output === undefined ? null : containOutput(tool, output);
     const status: ToolResultStatus =

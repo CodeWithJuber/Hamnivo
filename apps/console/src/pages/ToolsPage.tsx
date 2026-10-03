@@ -12,11 +12,16 @@ import { StatusBadge } from '@hamnivo/ui/components/status-badge';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import {
+  BookOpenIcon,
   CircleOffIcon,
   HourglassIcon,
+  LogInIcon,
+  LogOutIcon,
   OctagonPauseIcon,
+  PencilIcon,
   PlusIcon,
   RefreshCwIcon,
+  Trash2Icon,
   UserCheckIcon,
   WrenchIcon,
   XIcon,
@@ -35,6 +40,14 @@ import {
 } from '../components/Fields';
 import { PageHeader, Section } from '../components/PageHeader';
 import { ActionError, QueryState } from '../components/States';
+import { McpCatalogSheet } from '../components/tools/McpCatalogSheet';
+import {
+  EditServerDialog,
+  RemoveServerDialog,
+  SignInDialog,
+  SignOutDialog,
+  startMcpSignIn,
+} from '../components/tools/McpServerDialogs';
 import { directionOf, isLocale } from '../i18n';
 import {
   type AiAction,
@@ -53,6 +66,7 @@ import {
   useMcpServers,
   useTools,
 } from '../lib/actions';
+import { presetText, useMcpPresets } from '../lib/ai-power';
 import { api, isApiError, newIdempotencyKey } from '../lib/api';
 import { returnFocus, useOpener } from '../lib/focus';
 import { formatDateTime } from '../lib/format';
@@ -417,9 +431,15 @@ function ToolDetail({
             </dd>
             <dt className="text-text-secondary">{t('tools.drawer.credential')}</dt>
             <dd>
-              <bdi dir="ltr" className="font-mono text-xs">
-                {server?.credential?.masked ?? t('tools.drawer.noCredential')}
-              </bdi>
+              {server?.auth.kind === 'oauth' ? (
+                <bdi>
+                  {t('aiPower.mcp.auth.oauth', { host: server.auth.authorizationHost ?? '' })}
+                </bdi>
+              ) : (
+                <bdi dir="ltr" className="font-mono text-xs">
+                  {server?.credential?.masked ?? t('tools.drawer.noCredential')}
+                </bdi>
+              )}
             </dd>
             <dt className="text-text-secondary">{t('tools.drawer.hosts')}</dt>
             <dd className="min-w-0 break-all">
@@ -775,22 +795,40 @@ function ConnectServerDialog({
   onOpenChange: (open: boolean) => void;
   brandId: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const announce = useAnnouncer();
   const [label, setLabel] = useState('');
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
+  const [presetId, setPresetId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
+  const presets = useMcpPresets();
+  const preset = presets.data?.items.find((item) => item.id === presetId);
 
   useEffect(() => {
     if (!open) return;
     setLabel('');
     setUrl('');
     setToken('');
+    setPresetId('');
     setErrors({});
     setIdempotencyKey(newIdempotencyKey());
   }, [open]);
+
+  const choosePreset = (id: string) => {
+    setPresetId(id);
+    const chosenPreset = presets.data?.items.find((item) => item.id === id);
+    if (!chosenPreset) return;
+    setLabel(chosenPreset.name);
+    setUrl(chosenPreset.url);
+    setErrors({});
+  };
+
+  const signInNow = useStudioMutation(
+    (serverId: string, tenant) => startMcpSignIn(serverId, {}, tenant),
+    [],
+  );
 
   const connect = useStudioMutation(
     (body: { label: string; url: string; token?: string }, tenant) =>
@@ -824,6 +862,11 @@ function ConnectServerDialog({
       });
       announce(t('tools.servers.connected', { name: server.label }));
       onOpenChange(false);
+      // A service that signs in with the browser: go there now. If that does not work, the
+      // server's card has the Sign in button.
+      if (preset?.auth === 'oauth' && !token.trim()) {
+        await signInNow.mutateAsync(server.id).catch(() => undefined);
+      }
     } catch (error) {
       if (isApiError(error, 'VALIDATION_FAILED')) {
         const fields: Record<string, string> = {};
@@ -844,6 +887,47 @@ function ConnectServerDialog({
       testId="connect-server-dialog"
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+        {presets.data && presets.data.items.length > 0 ? (
+          <>
+            <SelectField
+              id="server-preset"
+              label={t('aiPower.mcp.preset.label')}
+              hint={t('aiPower.mcp.preset.hint')}
+              value={presetId}
+              placeholder={t('aiPower.mcp.preset.other')}
+              onChange={(event) => choosePreset(event.target.value)}
+              options={presets.data.items.map((item) => ({ value: item.id, label: item.name }))}
+            />
+            {preset ? (
+              <div
+                className="flex flex-col gap-1 rounded-lg border border-border bg-surface-sunken p-3 text-sm"
+                data-testid="preset-details"
+              >
+                <p className="text-text">
+                  <bdi>{presetText(t, i18n, 'summaries', preset)}</bdi>
+                </p>
+                <p className="text-text-secondary">{t(`aiPower.mcp.preset.auth.${preset.auth}`)}</p>
+                {preset.note ? (
+                  <p className="text-xs text-text-secondary">
+                    <bdi>{presetText(t, i18n, 'notes', preset)}</bdi>
+                  </p>
+                ) : null}
+                <p className="text-xs text-text-secondary">
+                  <a
+                    href={preset.docsUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-link underline"
+                  >
+                    {t('aiPower.mcp.preset.docs')}
+                  </a>
+                  {' · '}
+                  {t('aiPower.mcp.preset.verified', { date: preset.verifiedOn })}
+                </p>
+              </div>
+            ) : null}
+          </>
+        ) : null}
         <TextField
           id="server-label"
           label={t('tools.servers.label')}
@@ -914,6 +998,9 @@ function ServerRow({ server }: { server: McpServer }) {
       }),
     [toolKeys.servers],
   );
+  const [dialog, setDialog] = useState<'edit' | 'remove' | 'signIn' | 'signOut' | 'catalog' | null>(
+    null,
+  );
   const host = (() => {
     try {
       return new URL(server.url).host;
@@ -921,6 +1008,15 @@ function ServerRow({ server }: { server: McpServer }) {
       return server.url;
     }
   })();
+  const needsSignIn = server.auth.kind === 'oauth' && server.auth.status === 'needs_reconnect';
+  const authText =
+    server.auth.kind === 'oauth'
+      ? needsSignIn
+        ? t('aiPower.mcp.auth.needsReconnect')
+        : t('aiPower.mcp.auth.oauth', { host: server.auth.authorizationHost ?? '' })
+      : server.auth.kind === 'token'
+        ? t('aiPower.mcp.auth.token', { masked: server.credential?.masked ?? '' })
+        : t('aiPower.mcp.auth.none');
   return (
     <li
       className="flex flex-col gap-2 rounded-lg border border-border p-3"
@@ -951,7 +1047,15 @@ function ServerRow({ server }: { server: McpServer }) {
         {server.lastSyncedAt
           ? t('tools.servers.checked', { time: formatDateTime(server.lastSyncedAt) })
           : t('tools.servers.never')}
-        {server.credential ? ` · ${t('tools.drawer.credential')}: ${server.credential.masked}` : ''}
+      </p>
+      <p
+        className={`text-xs ${needsSignIn ? 'font-medium text-danger' : 'text-text-secondary'}`}
+        data-testid="server-auth"
+      >
+        <bdi>{authText}</bdi>
+        {server.auth.kind === 'oauth' && !needsSignIn && server.auth.expiresAt
+          ? ` · ${t('aiPower.mcp.auth.expires', { time: formatDateTime(server.auth.expiresAt) })}`
+          : ''}
       </p>
       {server.lastError ? (
         <p className="text-sm text-danger" role="alert">
@@ -971,8 +1075,8 @@ function ServerRow({ server }: { server: McpServer }) {
         </p>
       ) : null}
       <ActionError error={isCancelled(sync.error) ? null : (sync.error ?? toggle.error)} />
-      {can('tools.manage') ? (
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
+        {can('tools.manage') ? (
           <Button
             variant="secondary"
             size="sm"
@@ -998,20 +1102,104 @@ function ServerRow({ server }: { server: McpServer }) {
             <RefreshCwIcon aria-hidden="true" />
             {t('tools.servers.sync')}
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            busy={toggle.isPending}
-            onClick={() =>
-              void toggle
-                .mutateAsync(server.status === 'active' ? 'disabled' : 'active')
-                .catch(() => undefined)
-            }
-          >
-            {server.status === 'active' ? t('tools.servers.turnOff') : t('tools.servers.turnOn')}
-          </Button>
-        </div>
-      ) : null}
+        ) : null}
+        {can('tools.manage') ? (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              busy={toggle.isPending}
+              onClick={() =>
+                void toggle
+                  .mutateAsync(server.status === 'active' ? 'disabled' : 'active')
+                  .catch(() => undefined)
+              }
+            >
+              {server.status === 'active' ? t('tools.servers.turnOff') : t('tools.servers.turnOn')}
+            </Button>
+            {server.auth.kind === 'oauth' && !needsSignIn ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDialog('signOut')}
+                aria-label={t('aiPower.mcp.actions.signOutLabel', { name: server.label })}
+              >
+                <LogOutIcon aria-hidden="true" />
+                {t('aiPower.mcp.actions.signOut')}
+              </Button>
+            ) : null}
+            {server.status === 'active' && (server.auth.kind !== 'oauth' || needsSignIn) ? (
+              <Button
+                variant={needsSignIn ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setDialog('signIn')}
+                aria-label={t('aiPower.mcp.actions.signInLabel', { name: server.label })}
+                data-testid="sign-in"
+              >
+                <LogInIcon aria-hidden="true" />
+                {needsSignIn
+                  ? t('aiPower.mcp.actions.signInAgain')
+                  : t('aiPower.mcp.actions.signIn')}
+              </Button>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDialog('edit')}
+              aria-label={t('aiPower.mcp.actions.editLabel', { name: server.label })}
+              data-testid="edit-server"
+            >
+              <PencilIcon aria-hidden="true" />
+              {t('aiPower.mcp.actions.edit')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDialog('remove')}
+              aria-label={t('aiPower.mcp.actions.removeLabel', { name: server.label })}
+              data-testid="remove-server"
+            >
+              <Trash2Icon aria-hidden="true" />
+              {t('aiPower.mcp.actions.remove')}
+            </Button>
+          </>
+        ) : null}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setDialog('catalog')}
+          aria-label={t('aiPower.mcp.actions.catalogLabel', { name: server.label })}
+          data-testid="open-catalog"
+        >
+          <BookOpenIcon aria-hidden="true" />
+          {t('aiPower.mcp.actions.catalog')}
+        </Button>
+      </div>
+      <SignInDialog
+        server={server}
+        open={dialog === 'signIn'}
+        onOpenChange={(o) => setDialog(o ? 'signIn' : null)}
+      />
+      <SignOutDialog
+        server={server}
+        open={dialog === 'signOut'}
+        onOpenChange={(o) => setDialog(o ? 'signOut' : null)}
+      />
+      <EditServerDialog
+        server={server}
+        open={dialog === 'edit'}
+        onOpenChange={(o) => setDialog(o ? 'edit' : null)}
+      />
+      <RemoveServerDialog
+        server={server}
+        open={dialog === 'remove'}
+        onOpenChange={(o) => setDialog(o ? 'remove' : null)}
+      />
+      <McpCatalogSheet
+        server={server}
+        open={dialog === 'catalog'}
+        onOpenChange={(o) => setDialog(o ? 'catalog' : null)}
+      />
     </li>
   );
 }

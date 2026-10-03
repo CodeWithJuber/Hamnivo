@@ -7,6 +7,7 @@ export type ApprovalRow = typeof schema.actionApprovals.$inferSelect;
 export type ReceiptRow = typeof schema.operationReceipts.$inferSelect;
 type ToolRow = typeof schema.toolDefinitions.$inferSelect;
 type ServerRow = typeof schema.mcpServers.$inferSelect;
+export type ServerOauthRow = typeof schema.mcpServerOauth.$inferSelect;
 
 /** Why an action did not run, in words safe for customers and staff. */
 export const REASON_TEXT: Record<string, string> = {
@@ -69,14 +70,32 @@ export function serverView(
   row: ServerRow,
   counts: { tools: number; review: number },
   masked: string | null,
+  oauth: ServerOauthRow | null = null,
 ): McpServer {
   return {
     id: toPublicId('mcpServer', row.id),
     brandId: toPublicId('brand', row.brandId),
     label: row.label,
     url: row.url,
-    status: row.status,
-    credential: masked ? { masked } : null,
+    // A removed server is not listed; only the two states a person can see are in the contract.
+    status: row.status === 'disabled' ? 'disabled' : 'active',
+    // The access token of a sign-in is not a token somebody pasted: only the latter is shown.
+    credential: masked && !oauth ? { masked } : null,
+    auth: oauth
+      ? {
+          kind: 'oauth',
+          status: oauth.status,
+          authorizationHost: hostOf(oauth.authorizationServer),
+          expiresAt: iso(oauth.accessExpiresAt),
+          scope: oauth.scope,
+        }
+      : {
+          kind: masked ? 'token' : 'none',
+          status: null,
+          authorizationHost: null,
+          expiresAt: null,
+          scope: null,
+        },
     protocolVersion: row.protocolVersion,
     serverName: row.serverName,
     toolCount: counts.tools,
@@ -85,6 +104,14 @@ export function serverView(
     lastError: row.lastError,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
 }
 
 export function actionView(

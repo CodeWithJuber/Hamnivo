@@ -23,7 +23,7 @@ export type McpPresetAuth = 'oauth' | 'oauth_or_token' | 'token';
 export type McpPresetCategory = 'support' | 'commerce' | 'work' | 'engineering';
 
 export interface McpPreset {
-  /** Stable key; Studio looks its translated summary up by it. */
+  /** Stable key; Studio looks the translated summary and note up by it. */
   id: string;
   /** The product's name as its vendor writes it. */
   name: string;
@@ -34,9 +34,9 @@ export interface McpPreset {
   docsUrl: string;
   category: McpPresetCategory;
   auth: McpPresetAuth;
-  /** What it is for, in one plain English sentence (Studio shows its own translations). */
+  /** What it is for, in one plain English sentence (Studio shows its own translation when it has one). */
   summary: string;
-  /** A hint for the one thing people trip over, when there is one. */
+  /** A hint for the one thing people trip over, when there is one (translated the same way). */
   note?: string;
   /** The day the vendor's page was read. */
   verifiedOn: string;

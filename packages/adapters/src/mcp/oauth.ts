@@ -428,7 +428,8 @@ export async function finishMcpOAuth(
 export async function refreshMcpOAuth(
   input: Pick<Base, 'policy' | 'timeoutMs' | 'now'> & {
     client: McpOAuthClient;
-    tokens: OAuthTokens;
+    /** What was saved from the sign-in: only the refresh token is used. */
+    tokens: { refresh_token?: string | undefined };
     discovery: McpOAuthDiscovery;
     /** The resource indicator the sign-in was made for. */
     resource: string;

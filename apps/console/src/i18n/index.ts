@@ -1,5 +1,9 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { aiPowerAr } from './ai-power/ar';
+import { aiPowerEn } from './ai-power/en';
+import { aiPowerHi } from './ai-power/hi';
+import { aiPowerUr } from './ai-power/ur';
 import { ar } from './ar';
 import { en } from './en';
 import { hi } from './hi';
@@ -12,7 +16,9 @@ import { ur } from './ur';
 declare module 'i18next' {
   interface CustomTypeOptions {
     defaultNS: 'translation';
-    resources: { translation: typeof en & { migration: typeof migrationEn } };
+    resources: {
+      translation: typeof en & { migration: typeof migrationEn; aiPower: typeof aiPowerEn };
+    };
   }
 }
 
@@ -55,10 +61,10 @@ export function initialLocale(): Locale {
 export async function initI18n(locale: Locale) {
   await i18next.use(initReactI18next).init({
     resources: {
-      en: { translation: { ...en, migration: migrationEn } },
-      ar: { translation: { ...ar, migration: migrationAr } },
-      hi: { translation: { ...hi, migration: migrationHi } },
-      ur: { translation: { ...ur, migration: migrationUr } },
+      en: { translation: { ...en, migration: migrationEn, aiPower: aiPowerEn } },
+      ar: { translation: { ...ar, migration: migrationAr, aiPower: aiPowerAr } },
+      hi: { translation: { ...hi, migration: migrationHi, aiPower: aiPowerHi } },
+      ur: { translation: { ...ur, migration: migrationUr, aiPower: aiPowerUr } },
     },
     lng: locale,
     fallbackLng: 'en',

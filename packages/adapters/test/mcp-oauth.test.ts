@@ -326,13 +326,12 @@ describe('keeping the sign-in alive', () => {
 
   it('cannot renew a sign-in that has no refresh token', async () => {
     const server = await serve();
-    const { start, tokens } = await signIn(server);
-    const { refresh_token: _dropped, ...withoutRefresh } = tokens.raw;
+    const { start } = await signIn(server);
     await expect(
       refreshMcpOAuth({
         ...base(server),
         client: start.client,
-        tokens: withoutRefresh,
+        tokens: {},
         discovery: start.discovery,
         resource: start.resource,
       }),

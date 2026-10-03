@@ -17855,6 +17855,54 @@
             }
           }
         }
+      },
+      "delete": {
+        "operationId": "deleteMcpServer",
+        "summary": "Remove an MCP server: its tools are turned off, its credentials are revoked and it leaves the list; connecting the same address again starts fresh (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/admin/mcp-servers/{serverId}/sync": {
@@ -18590,6 +18638,380 @@
                     "items"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-presets": {
+      "get": {
+        "operationId": "listMcpPresets",
+        "summary": "Remote MCP servers that vendors run themselves, with the vendor page that names each address (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Services",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/McpPreset"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers/{serverId}/oauth/start": {
+      "post": {
+        "operationId": "startMcpOAuth",
+        "summary": "Begin signing in to an MCP server with OAuth: returns the address to send the browser to (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartMcpOAuthRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Where to sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpOAuthStart"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-oauth/complete": {
+      "post": {
+        "operationId": "completeMcpOAuth",
+        "summary": "Finish a sign-in with what the browser came back with; only the person who started it can (tools.manage)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteMcpOAuthRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers/{serverId}/oauth/disconnect": {
+      "post": {
+        "operationId": "disconnectMcpOAuth",
+        "summary": "Sign out of an MCP server: its tokens are revoked and dropped (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers/{serverId}/catalog": {
+      "get": {
+        "operationId": "getMcpCatalog",
+        "summary": "The resources and prompts a server listed at its last sync (tools.read)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpCatalog"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/mcp-servers/{serverId}/resources/{itemId}": {
+      "patch": {
+        "operationId": "updateMcpResource",
+        "summary": "Let agents with the \"Read a resource\" tool read this resource, or stop them (tools.manage, fresh sign-in)",
+        "tags": [
+          "Tools"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "serverId",
+            "schema": {
+              "type": "string",
+              "description": "MCP server ID (mcp_…)"
+            },
+            "required": true,
+            "description": "MCP server ID (mcp_…)"
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "schema": {
+              "type": "string",
+              "description": "Resource ID (mci_…)"
+            },
+            "required": true,
+            "description": "Resource ID (mci_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMcpResourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpCatalogResource"
                 }
               }
             }
@@ -24094,7 +24516,8 @@
         "enum": [
           "order_status",
           "demo_update_address",
-          "demo_issue_credit"
+          "demo_issue_credit",
+          "read_resource"
         ]
       },
       "RiskClass": {
@@ -24257,6 +24680,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 80
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 500,
+            "format": "uri"
           },
           "status": {
             "type": "string",
@@ -24424,6 +24852,67 @@
           "id",
           "name",
           "messages"
+        ]
+      },
+      "StartMcpOAuthRequest": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "clientSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "CompleteMcpOAuthRequest": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 200
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "error": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "errorDescription": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "iss": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "UpdateMcpResourceRequest": {
+        "type": "object",
+        "properties": {
+          "aiReadable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "aiReadable"
         ]
       },
       "DecideActionRequest": {
@@ -45764,7 +46253,8 @@
             "type": "string",
             "enum": [
               "builtin",
-              "mcp"
+              "mcp",
+              "http"
             ]
           },
           "builtin": {
@@ -46050,6 +46540,66 @@
               }
             ]
           },
+          "auth": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "token",
+                  "oauth"
+                ]
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "connected",
+                      "needs_reconnect"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "authorizationHost": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expiresAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "scope": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "status",
+              "authorizationHost",
+              "expiresAt",
+              "scope"
+            ],
+            "additionalProperties": false
+          },
           "protocolVersion": {
             "type": [
               "string",
@@ -46105,6 +46655,7 @@
           "url",
           "status",
           "credential",
+          "auth",
           "protocolVersion",
           "serverName",
           "toolCount",
@@ -46893,6 +47444,250 @@
           "startedAt",
           "finishedAt",
           "createdBy"
+        ],
+        "additionalProperties": false
+      },
+      "McpPreset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "vendor": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "docsUrl": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "support",
+              "commerce",
+              "work",
+              "engineering"
+            ]
+          },
+          "auth": {
+            "$ref": "#/components/schemas/McpPresetAuth"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verifiedOn": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "vendor",
+          "url",
+          "docsUrl",
+          "category",
+          "auth",
+          "summary",
+          "note",
+          "verifiedOn"
+        ],
+        "additionalProperties": false
+      },
+      "McpPresetAuth": {
+        "type": "string",
+        "enum": [
+          "oauth",
+          "oauth_or_token",
+          "token"
+        ],
+        "description": "`oauth`: a browser sign-in. `token`: a pasted token. `oauth_or_token`: either."
+      },
+      "McpOAuthStart": {
+        "type": "object",
+        "properties": {
+          "authorizationUrl": {
+            "type": "string"
+          },
+          "authorizationHost": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "authorizationUrl",
+          "authorizationHost",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "McpCatalog": {
+        "type": "object",
+        "properties": {
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpCatalogResource"
+            }
+          },
+          "prompts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpCatalogPrompt"
+            }
+          },
+          "syncedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "resources",
+          "prompts",
+          "syncedAt"
+        ],
+        "additionalProperties": false
+      },
+      "McpCatalogResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "mcpItem identifier (TypeID with prefix \"mci\")",
+            "example": "mci_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "uri": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mimeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sizeBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "aiReadable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "uri",
+          "name",
+          "title",
+          "description",
+          "mimeType",
+          "sizeBytes",
+          "aiReadable"
+        ],
+        "additionalProperties": false
+      },
+      "McpCatalogPrompt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "mcpItem identifier (TypeID with prefix \"mci\")",
+            "example": "mci_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "required": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "required"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "title",
+          "description",
+          "arguments"
         ],
         "additionalProperties": false
       },

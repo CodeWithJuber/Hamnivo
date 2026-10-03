@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
-import { listMcpTools, type McpToolInfo } from '@hamnivo/adapters/mcp';
+import {
+  listMcpCatalog,
+  McpCallError,
+  type McpCatalog as McpListed,
+  type McpToolInfo,
+} from '@hamnivo/adapters/mcp';
 import { checkDestination, checkUrl, EgressError } from '@hamnivo/adapters/net';
 import type {
   Action,
@@ -39,7 +44,7 @@ import {
   type StaffPrincipal,
 } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, inArray, lt, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { JournalService } from '../authority/journal.service.js';
 import { Effects } from '../commerce/effects.js';
@@ -55,7 +60,11 @@ import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { mcpTrustedOrigins, ToolAdapters, type ToolRow } from './adapters.js';
 import { ActionApprovals } from './approvals.service.js';
 import { BUILTIN_KEYS, BUILTIN_TOOLS } from './builtins.js';
-import { serverView, toolView } from './views.js';
+import { storeCatalog } from './mcp-catalog.service.js';
+import { McpCredentials, McpTokenUnavailable } from './mcp-credentials.service.js';
+import { dropSignIn } from './mcp-oauth.service.js';
+import { serverViews } from './server-views.js';
+import { toolView } from './views.js';
 
 type CreateTool = z.output<typeof CreateToolRequest>;
 type UpdateTool = z.output<typeof UpdateToolRequest>;
@@ -125,6 +134,7 @@ export class ToolsService {
     private readonly approvals: ActionApprovals,
     private readonly access: InboxAccess,
     private readonly egress: EgressService,
+    private readonly credentials: McpCredentials,
   ) {}
 
   private tx<T>(principal: StaffPrincipal, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -226,15 +236,21 @@ export class ToolsService {
 
   async list(principal: StaffPrincipal, brandPublicId?: string): Promise<ToolDefinition[]> {
     return this.tx(principal, async (tx) => {
-      const rows = await tx
-        .select()
+      // The tools of a removed server are kept for the record of what they did, and not listed.
+      const found = await tx
+        .select({ tool: schema.toolDefinitions })
         .from(schema.toolDefinitions)
+        .leftJoin(schema.mcpServers, eq(schema.mcpServers.id, schema.toolDefinitions.mcpServerId))
         .where(
-          brandPublicId
-            ? eq(schema.toolDefinitions.brandId, fromPublicId('brand', brandPublicId))
-            : undefined,
+          and(
+            or(isNull(schema.mcpServers.id), ne(schema.mcpServers.status, 'deleted')),
+            brandPublicId
+              ? eq(schema.toolDefinitions.brandId, fromPublicId('brand', brandPublicId))
+              : undefined,
+          ),
         )
         .orderBy(schema.toolDefinitions.name);
+      const rows = found.map((r) => r.tool);
       const visible = rows.filter(
         (row) =>
           this.decide(principal, 'tools.read', {
@@ -464,51 +480,21 @@ export class ToolsService {
 
   // ── MCP servers ─────────────────────────────────────────────────────────────────────
 
-  private async serverViews(tx: TenantTx, rows: ServerRow[]): Promise<McpServer[]> {
-    if (rows.length === 0) return [];
-    const ids = rows.map((r) => r.id);
-    const tools = await tx
-      .select({
-        server: schema.toolDefinitions.mcpServerId,
-        status: schema.toolDefinitions.status,
-        n: count(),
-      })
-      .from(schema.toolDefinitions)
-      .where(inArray(schema.toolDefinitions.mcpServerId, ids))
-      .groupBy(schema.toolDefinitions.mcpServerId, schema.toolDefinitions.status);
-    const secretIds = rows.flatMap((r) => (r.tokenSecretId ? [r.tokenSecretId] : []));
-    const hints = secretIds.length
-      ? await tx
-          .select({ id: schema.secrets.id, hint: schema.secrets.hint })
-          .from(schema.secrets)
-          .where(inArray(schema.secrets.id, secretIds))
-      : [];
-    return rows.map((row) => {
-      const mine = tools.filter((t) => t.server === row.id);
-      const hint = hints.find((h) => h.id === row.tokenSecretId)?.hint;
-      return serverView(
-        row,
-        {
-          tools: mine.reduce((sum, t) => sum + Number(t.n), 0),
-          review: mine.filter((t) => t.status === 'review').reduce((s, t) => s + Number(t.n), 0),
-        },
-        row.tokenSecretId ? `••••${hint ?? ''}` : null,
-      );
-    });
-  }
-
   async listServers(principal: StaffPrincipal, brandPublicId?: string): Promise<McpServer[]> {
     return this.tx(principal, async (tx) => {
       const rows = await tx
         .select()
         .from(schema.mcpServers)
         .where(
-          brandPublicId
-            ? eq(schema.mcpServers.brandId, fromPublicId('brand', brandPublicId))
-            : undefined,
+          and(
+            ne(schema.mcpServers.status, 'deleted'),
+            brandPublicId
+              ? eq(schema.mcpServers.brandId, fromPublicId('brand', brandPublicId))
+              : undefined,
+          ),
         )
         .orderBy(schema.mcpServers.createdAt);
-      return this.serverViews(
+      return serverViews(
         tx,
         rows.filter(
           (row) =>
@@ -582,6 +568,51 @@ export class ToolsService {
             value: input.token,
           })
         : null;
+      const [removed] = await tx
+        .select()
+        .from(schema.mcpServers)
+        .where(
+          and(
+            eq(schema.mcpServers.brandId, brand.id),
+            eq(schema.mcpServers.url, input.url),
+            eq(schema.mcpServers.status, 'deleted'),
+          ),
+        )
+        .for('update');
+      if (removed) {
+        // The same address again: the record of what it did stays, and everything else is new.
+        const now = this.clock();
+        const [revived] = await tx
+          .update(schema.mcpServers)
+          .set({
+            label: input.label,
+            status: 'active',
+            tokenSecretId,
+            protocolVersion: null,
+            serverName: null,
+            lastSyncedAt: null,
+            lastError: null,
+            createdBy: principal.staffMemberId,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .where(eq(schema.mcpServers.id, removed.id))
+          .returning();
+        if (!revived) throw new Error('server update returned nothing');
+        await this.audit(
+          tx,
+          principal,
+          'mcp_server.created',
+          { type: 'mcp_server', id: toPublicId('mcpServer', revived.id) },
+          {
+            brand: input.brandId,
+            host: new URL(input.url).hostname,
+            token: tokenSecretId !== null,
+            again: true,
+          },
+        );
+        return (await serverViews(tx, [revived]))[0] as McpServer;
+      }
       try {
         const [row] = await tx
           .insert(schema.mcpServers)
@@ -610,7 +641,7 @@ export class ToolsService {
             token: tokenSecretId !== null,
           },
         );
-        return (await this.serverViews(tx, [row]))[0] as McpServer;
+        return (await serverViews(tx, [row]))[0] as McpServer;
       } catch (error) {
         if (isUniqueViolation(error)) {
           throw new AppError('VERSION_CONFLICT', { detail: 'This server is already connected.' });
@@ -626,7 +657,9 @@ export class ToolsService {
       .from(schema.mcpServers)
       .where(eq(schema.mcpServers.id, fromPublicId('mcpServer', publicId)))
       .for('update');
-    if (!row) throw new AppError('NOT_FOUND', { detail: 'Server not found.' });
+    if (!row || row.status === 'deleted') {
+      throw new AppError('NOT_FOUND', { detail: 'Server not found.' });
+    }
     enforce(
       this.decide(principal, 'tools.manage', {
         workspaceId: row.workspaceId,
@@ -636,21 +669,64 @@ export class ToolsService {
     return row;
   }
 
+  /** Supersedes what still waits on these tools, and tells the conversations it was in. */
+  private async supersedePending(
+    tx: TenantTx,
+    effects: Effects,
+    tenantId: string,
+    toolIds: string[],
+    now: Date,
+  ) {
+    if (toolIds.length === 0) return 0;
+    const pending = await tx
+      .update(schema.actions)
+      .set({ state: 'superseded', reason: 'tool_changed', updatedAt: now })
+      .where(
+        and(
+          inArray(schema.actions.toolId, toolIds),
+          inArray(schema.actions.state, ['awaiting_approval', 'approved']),
+        ),
+      )
+      .returning();
+    for (const action of pending) {
+      effects.add(
+        tenantId,
+        action.conversationId,
+        await this.journal.append(tx, tenantId, action.conversationId, [
+          {
+            lane: action.approver === 'customer' ? 'customer' : 'staff',
+            type: 'approval.updated',
+            data: { approvalId: toPublicId('action', action.id), status: 'superseded' },
+          },
+        ]),
+      );
+    }
+    return pending.length;
+  }
+
   async updateServer(
     principal: StaffPrincipal,
     publicId: string,
     input: z.output<typeof UpdateMcpServerRequest>,
   ): Promise<McpServer> {
-    return this.tx(principal, async (tx) => {
+    const effects = new Effects();
+    const view = await this.tx(principal, async (tx) => {
       const row = await this.loadServer(tx, principal, publicId);
+      const now = this.clock();
+      let url = row.url;
+      let moved = false;
+      if (input.url !== undefined && input.url !== row.url) {
+        this.checkServerUrl(input.url);
+        await this.checkWorkspace(tx, input.url);
+        url = input.url;
+        moved = true;
+      }
       let tokenSecretId = row.tokenSecretId;
+      let signedOut = false;
       if (input.token !== undefined) {
-        if (row.tokenSecretId) {
-          await tx
-            .update(schema.secrets)
-            .set({ revokedAt: this.clock() })
-            .where(eq(schema.secrets.id, row.tokenSecretId));
-        }
+        // A token that is given or removed replaces whatever the server was signed in with.
+        signedOut = (await dropSignIn(tx, this.secrets, row.id)) !== null;
+        if (row.tokenSecretId) await this.secrets.revokeIn(tx, row.tokenSecretId);
         tokenSecretId = input.token
           ? await this.secrets.storeIn(tx, principal.tenantId, {
               kind: 'mcp_token',
@@ -658,30 +734,184 @@ export class ToolsService {
               value: input.token,
             })
           : null;
+      } else if (moved) {
+        // A credential is never sent to another site, and a sign-in was made for the old address.
+        const sameSite = new URL(url).origin === new URL(row.url).origin;
+        signedOut = (await dropSignIn(tx, this.secrets, row.id)) !== null;
+        if (row.tokenSecretId && (signedOut || !sameSite)) {
+          await this.secrets.revokeIn(tx, row.tokenSecretId);
+          tokenSecretId = null;
+        }
       }
-      const [updated] = await tx
+      let superseded = 0;
+      if (moved) {
+        // What the new address offers has to be looked at again: its tools go back to review.
+        const tools = await tx
+          .select()
+          .from(schema.toolDefinitions)
+          .where(eq(schema.toolDefinitions.mcpServerId, row.id))
+          .for('update');
+        const oldHost = new URL(row.url).hostname;
+        const newHost = new URL(url).hostname;
+        for (const tool of tools) {
+          await tx
+            .update(schema.toolDefinitions)
+            .set({
+              ...(tool.status === 'enabled' ? { status: 'review' as const } : {}),
+              ...(oldHost !== newHost
+                ? {
+                    egressHosts: sql`case when ${newHost} = any(${schema.toolDefinitions.egressHosts})
+                      then array_remove(${schema.toolDefinitions.egressHosts}, ${oldHost})
+                      else array_append(array_remove(${schema.toolDefinitions.egressHosts}, ${oldHost}), ${newHost}) end`,
+                  }
+                : {}),
+              revision: tool.revision + 1,
+              updatedBy: principal.staffMemberId,
+              updatedAt: now,
+            })
+            .where(eq(schema.toolDefinitions.id, tool.id));
+        }
+        superseded = await this.supersedePending(
+          tx,
+          effects,
+          principal.tenantId,
+          tools.map((t) => t.id),
+          now,
+        );
+        await tx
+          .delete(schema.mcpCatalogItems)
+          .where(eq(schema.mcpCatalogItems.mcpServerId, row.id));
+      }
+      try {
+        const [updated] = await tx
+          .update(schema.mcpServers)
+          .set({
+            ...(input.label !== undefined ? { label: input.label } : {}),
+            ...(input.status !== undefined ? { status: input.status } : {}),
+            ...(moved
+              ? {
+                  url,
+                  protocolVersion: null,
+                  serverName: null,
+                  lastSyncedAt: null,
+                  lastError: null,
+                }
+              : {}),
+            ...(input.token !== undefined || (moved && signedOut) ? { lastError: null } : {}),
+            tokenSecretId,
+            updatedAt: now,
+          })
+          .where(eq(schema.mcpServers.id, row.id))
+          .returning();
+        await this.audit(
+          tx,
+          principal,
+          'mcp_server.updated',
+          { type: 'mcp_server', id: publicId },
+          {
+            ...(input.label !== undefined ? { label: true } : {}),
+            ...(input.status !== undefined ? { status: input.status } : {}),
+            ...(input.token !== undefined ? { token: input.token ? 'replaced' : 'removed' } : {}),
+            ...(moved
+              ? {
+                  url: { from: new URL(row.url).hostname, to: new URL(url).hostname },
+                  superseded,
+                }
+              : {}),
+            ...(signedOut ? { signIn: 'ended' } : {}),
+          },
+        );
+        return (await serverViews(tx, [updated ?? row]))[0] as McpServer;
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new AppError('VERSION_CONFLICT', {
+            detail: 'Another server of this brand already has this address.',
+          });
+        }
+        throw error;
+      }
+    });
+    await effects.flush(this.journal);
+    return view;
+  }
+
+  /**
+   * Removes a server: its tools are turned off and no longer listed, pending requests with them
+   * are superseded, its credentials are revoked and what it listed is forgotten. The record of
+   * what its tools did stays, so a tool keeps its name; a server connected later gets a numbered
+   * name for a tool of the same name. Connecting the same address again starts the server over.
+   */
+  async deleteServer(principal: StaffPrincipal, publicId: string): Promise<void> {
+    const effects = new Effects();
+    await this.tx(principal, async (tx) => {
+      const row = await this.loadServer(tx, principal, publicId);
+      const now = this.clock();
+      const tools = await tx
+        .select()
+        .from(schema.toolDefinitions)
+        .where(eq(schema.toolDefinitions.mcpServerId, row.id))
+        .for('update');
+      for (const tool of tools) {
+        await tx
+          .update(schema.toolDefinitions)
+          .set({
+            status: 'disabled',
+            revision: tool.revision + 1,
+            updatedBy: principal.staffMemberId,
+            updatedAt: now,
+          })
+          .where(eq(schema.toolDefinitions.id, tool.id));
+      }
+      const superseded = await this.supersedePending(
+        tx,
+        effects,
+        principal.tenantId,
+        tools.map((t) => t.id),
+        now,
+      );
+      await dropSignIn(tx, this.secrets, row.id);
+      if (row.tokenSecretId) await this.secrets.revokeIn(tx, row.tokenSecretId);
+      await tx.delete(schema.mcpCatalogItems).where(eq(schema.mcpCatalogItems.mcpServerId, row.id));
+      await tx
         .update(schema.mcpServers)
-        .set({
-          ...(input.label !== undefined ? { label: input.label } : {}),
-          ...(input.status !== undefined ? { status: input.status } : {}),
-          tokenSecretId,
-          updatedAt: this.clock(),
-        })
-        .where(eq(schema.mcpServers.id, row.id))
-        .returning();
+        .set({ status: 'deleted', tokenSecretId: null, lastError: null, updatedAt: now })
+        .where(eq(schema.mcpServers.id, row.id));
       await this.audit(
         tx,
         principal,
-        'mcp_server.updated',
+        'mcp_server.deleted',
         { type: 'mcp_server', id: publicId },
-        {
-          ...(input.label !== undefined ? { label: true } : {}),
-          ...(input.status !== undefined ? { status: input.status } : {}),
-          ...(input.token !== undefined ? { token: input.token ? 'replaced' : 'removed' } : {}),
-        },
+        { host: new URL(row.url).hostname, tools: tools.length, superseded },
       );
-      return (await this.serverViews(tx, [updated ?? row]))[0] as McpServer;
     });
+    await effects.flush(this.journal);
+  }
+
+  /**
+   * Lists a server with its token. A token the server refuses is renewed once (an OAuth sign-in
+   * has a refresh token) and the listing is asked for again.
+   */
+  private async listSignedIn(
+    tenantId: string,
+    row: ServerRow,
+    policy: Awaited<ReturnType<EgressService['policyIn']>>,
+  ): Promise<McpListed> {
+    const endpoint = (token: string | null) => ({
+      url: row.url,
+      token,
+      trustedOrigins: policy.trustedOrigins ?? [],
+      ...(policy.resolve ? { resolve: policy.resolve } : {}),
+      timeoutMs: 10_000,
+    });
+    const token = await this.credentials.bearer(tenantId, row.id);
+    try {
+      return await listMcpCatalog(endpoint(token));
+    } catch (error) {
+      if (!(error instanceof McpCallError) || error.kind !== 'auth' || token === null) throw error;
+      const renewed = await this.credentials.bearer(tenantId, row.id, { rejected: token });
+      if (renewed === null || renewed === token) throw error;
+      return await listMcpCatalog(endpoint(renewed));
+    }
   }
 
   /**
@@ -692,24 +922,15 @@ export class ToolsService {
   async syncServer(principal: StaffPrincipal, publicId: string): Promise<McpSyncResult> {
     const loaded = await this.tx(principal, async (tx) => {
       const row = await this.loadServer(tx, principal, publicId);
-      const token = row.tokenSecretId
-        ? await this.secrets.reveal(tx, principal.tenantId, row.tokenSecretId)
-        : null;
       // The workspace's allowed hosts apply to MCP servers like to every request made for it.
       const policy = await this.egress.policyIn(tx, mcpTrustedOrigins(this.config, row.url));
-      return { row, token, policy };
+      return { row, policy };
     });
     const { row, policy } = loaded;
-    let listing: Awaited<ReturnType<typeof listMcpTools>>;
+    let listing: McpListed;
     try {
       checkUrl(row.url, policy);
-      listing = await listMcpTools({
-        url: row.url,
-        token: loaded.token,
-        trustedOrigins: policy.trustedOrigins ?? [],
-        ...(policy.resolve ? { resolve: policy.resolve } : {}),
-        timeoutMs: 10_000,
-      });
+      listing = await this.listSignedIn(principal.tenantId, row, policy);
     } catch (error) {
       const kind =
         error instanceof EgressError
@@ -717,9 +938,16 @@ export class ToolsService {
           : error instanceof Error && 'kind' in error
             ? String((error as { kind: string }).kind)
             : null;
-      const message = kind
-        ? `The server could not be listed (${kind}).`
-        : 'The server could not be listed.';
+      const message =
+        error instanceof McpTokenUnavailable
+          ? error.kind === 'reconnect'
+            ? 'The saved sign-in no longer works. Sign in again.'
+            : 'The sign-in service did not answer. Try again in a moment.'
+          : kind === 'auth'
+            ? 'The server did not accept the sign-in or token. Sign in again, or enter a new token.'
+            : kind
+              ? `The server could not be listed (${kind}).`
+              : 'The server could not be listed.';
       await this.tx(principal, (tx) =>
         tx
           .update(schema.mcpServers)
@@ -736,6 +964,23 @@ export class ToolsService {
         .where(eq(schema.toolDefinitions.mcpServerId, row.id))
         .for('update');
       const now = this.clock();
+      // A tool of a removed server keeps its name for the record, so a new tool of the same name
+      // takes a numbered one instead of being turned away.
+      const named = await tx
+        .select({ name: schema.toolDefinitions.name, server: schema.mcpServers.status })
+        .from(schema.toolDefinitions)
+        .leftJoin(schema.mcpServers, eq(schema.mcpServers.id, schema.toolDefinitions.mcpServerId))
+        .where(eq(schema.toolDefinitions.brandId, row.brandId));
+      const taken = new Set(named.map((n) => n.name));
+      const setAside = new Set(named.filter((n) => n.server === 'deleted').map((n) => n.name));
+      const nameFor = (remoteName: string) => {
+        const wanted = toolNameOf(remoteName);
+        if (!setAside.has(wanted)) return wanted;
+        for (let n = 2; ; n += 1) {
+          const next = `${wanted.slice(0, 58)}_${n}`;
+          if (!taken.has(next)) return next;
+        }
+      };
       const added: string[] = [];
       const changed: string[] = [];
       const removed: string[] = [];
@@ -768,13 +1013,15 @@ export class ToolsService {
         if (!current) {
           const defaults = defaultsFor(info);
           const title = plainText(info.title ?? remoteName, 120) || remoteName;
+          const name = nameFor(remoteName);
+          taken.add(name);
           const [inserted] = await tx
             .insert(schema.toolDefinitions)
             .values({
               tenantId: principal.tenantId,
               workspaceId: row.workspaceId,
               brandId: row.brandId,
-              name: toolNameOf(remoteName),
+              name,
               title,
               description: `${title} (from ${row.label}). Written by Hamnivo until a person reviews it.`,
               remoteDescription,
@@ -851,6 +1098,7 @@ export class ToolsService {
         })
         .where(eq(schema.mcpServers.id, row.id))
         .returning();
+      const offered = await storeCatalog(tx, principal.tenantId, row.id, listing, now);
       await this.audit(
         tx,
         principal,
@@ -861,10 +1109,12 @@ export class ToolsService {
           changed,
           removed,
           skipped: skipped.length,
+          resources: offered.resources,
+          prompts: offered.prompts,
         },
       );
       return {
-        server: (await this.serverViews(tx, [updated ?? row]))[0] as McpServer,
+        server: (await serverViews(tx, [updated ?? row]))[0] as McpServer,
         added,
         changed,
         removed,

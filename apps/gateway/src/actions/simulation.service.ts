@@ -52,7 +52,7 @@ import { configHash } from '../runtime/agents.service.js';
 import { checkHonesty } from '../runtime/honesty.js';
 import { systemPrompt } from '../runtime/prompt.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
-import { containOutput, type ToolRow } from './adapters.js';
+import { containOutput, returnsUntrustedData, type ToolRow } from './adapters.js';
 import { REASON_TEXT } from './views.js';
 
 type SuiteRow = typeof schema.simulationSuites.$inferSelect;
@@ -555,7 +555,7 @@ export class SimulationService {
     }
     state.autopilot += 1;
     const fake = definition.tools[tool.name];
-    if (tool.source === 'mcp') state.untrusted = true;
+    if (returnsUntrustedData(tool)) state.untrusted = true;
     if (!fake || fake.error === 'failed' || fake.error === 'timeout') {
       state.actions.push({
         tool: tool.name,
