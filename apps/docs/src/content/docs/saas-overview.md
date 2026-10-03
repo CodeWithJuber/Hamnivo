@@ -1,90 +1,53 @@
 ---
 title: Running Hamnivo as SaaS
-description: Overview for operators running Hamnivo as a service for multiple businesses
+description: What changes when one Hamnivo server serves many businesses, and which guide covers each part
 ---
 
-This page is for people running Hamnivo as a SaaS platform — offering it to many customers.
+This page is for people who run one Hamnivo server for many businesses. Each business signs up in
+Studio and gets its own workspace. You decide who may sign up, which plan they start on and how
+they pay.
 
-## What is SaaS mode?
+## What each business gets
 
-In SaaS, you host one Hamnivo instance. Many customers sign up, each with their own:
-- Workspace (company)
-- Brands (websites)
-- Conversations
-- Team
+- Its own **workspace**: people, brands (websites), chats, knowledge, AI settings and plan.
+- Its data kept apart by the database itself. Every workspace table has row-level security, so
+  one workspace cannot read another's. There is nothing for you to set up.
 
-Everyone uses the same software, the same domain. You control who can sign up, billing, and support.
+## What you decide
 
-## For operators
+- **Who may sign up:** anyone (the default) or only invited people, with an optional Cloudflare
+  Turnstile check against robots.
+- **Plans:** new workspaces start on the **free** plan: 100 conversations, 200 AI replies and
+  500,000 AI tokens a month, 25 MB of knowledge, 2 seats and 1 webhook endpoint. You can change
+  it, add plans with their own limits and price, and offer a trial.
+- **Payments:** none, Stripe (customers pay by card in Studio), or WHMCS (you sell workspaces from
+  your billing system).
+- **The platform console** (`/platform` in Studio): open a workspace to see its plan and usage,
+  change its plan, or suspend and reactivate it. Every change is recorded in the audit logs.
 
-If you're running Hamnivo for others, see the detailed guides:
+## The guides
 
-- **[Setup and configuration](/docs/guide/saas/)** — How to prepare the server, set billing, and invite customers
-- **[Managing workspaces](/docs/guide/saas/workspaces)** — Create accounts, reset passwords, see usage
-- **[Billing and plans](/docs/guide/saas/billing)** — Set pricing, track usage, handle invoices
-- **[Support and access](/docs/guide/saas/support)** — Help customers, access their workspace if needed
-- **[Monitoring and updates](/docs/guide/saas/monitoring)** — Health checks, logs, deploying new versions
+- [Run Hamnivo as a service](/docs/saas/run-as-saas/): sign-up, plans, trials, the platform
+  console and emails.
+- [Take payments with Stripe](/docs/saas/stripe/)
+- [Sell workspaces with WHMCS](/docs/saas/whmcs/)
+- [What a suspended customer sees](/docs/saas/suspended/)
 
-## Architecture
+## Your addresses
 
 ```
-Your domain (example.com)
-├── app.example.com → Studio (all customers log in here)
-├── api.example.com → API (data and AI)
-├── chat.example.com → Chat widget (customers' websites)
-├── support.example.com → Chatwoot (conversations stored here)
-└── example.com → Public website (sign-up page)
+example.com          the public website, and these docs at /docs/
+app.example.com      Studio: everyone signs in here; the platform console is at /platform
+api.example.com      the API
+chat.example.com     the chat on your customers' websites
+support.example.com  Chatwoot, where the conversations are kept
 ```
 
-Each customer gets a **workspace**. Conversations stay isolated by workspace. The database is shared but row-level security ensures customers only see their own data.
+`hamnivo.sh setup --domain example.com` gives these names. Change them in
+`deploy/production/.env` if you want others.
 
-## Isolating customers
+## Growing
 
-**Row-level security** (RLS) in PostgreSQL ensures that:
-- Customer A cannot see Customer B's conversations
-- Customer A cannot read Customer B's knowledge
-- One customer's AI settings don't affect another's
-
-This is built in. You don't configure it — it just works.
-
-## Billing options
-
-You can use:
-- **Per-user pricing**: Charge by number of team members
-- **Per-conversation pricing**: Charge by volume of chats
-- **Per-feature pricing**: Charge by features they use (AI, reports, etc.)
-- **Flat plan pricing**: Starter, Professional, Enterprise tiers
-
-Hamnivo supports all of these. Set it up in the Platform console.
-
-## Data residency
-
-Customers care about where their data lives:
-- **EU**: Run on a European server; their GDPR obligations are met
-- **US**: Run on a US server
-- **Private**: Some customers want to run their own Hamnivo instance (see [Self-hosting](/docs/self-hosting))
-
-Plan your hosting region accordingly.
-
-## Scaling
-
-One Hamnivo instance can handle:
-- Hundreds of workspaces
-- Thousands of concurrent chats
-- Millions of conversation history
-
-Scale by:
-1. Adding memory to the server (more PostgreSQL connections)
-2. Adding CPU (more API workers)
-3. Load-balancing across multiple servers (advanced)
-
-Start on one server and watch `hamnivo.sh doctor` and your usage as customers join; move to a bigger server when memory or disk runs low.
-
-## Next steps
-
-- Set up the Platform console (`app.example.com/platform`)
-- Invite your first customer
-- Monitor usage in the dashboard
-- See the SaaS guides for detailed workflows
-
-Questions? See the detailed SaaS documentation in `/docs/guide/saas/`.
+Everything runs on one server (see [Self-hosting](/docs/self-hosting/)). As customers join, watch
+`hamnivo.sh doctor` and the usage in the platform console, and move to a bigger server when memory
+or disk runs low.

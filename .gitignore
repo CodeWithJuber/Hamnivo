@@ -27,9 +27,10 @@ deploy/production/chatwoot.env
 deploy/production/backups/
 deploy/production/state/
 
-# Copied from docs/guide by apps/docs/scripts/sync-guides.mjs
+# Copied by apps/docs/scripts/sync-guides.mjs from docs/guide and packages/brand
 apps/docs/src/content/docs/setup/*.md
 apps/docs/src/content/docs/inbox/*.md
 apps/docs/src/content/docs/ai/*.md
 apps/docs/src/content/docs/integrations/*.md
 apps/docs/src/content/docs/saas/*.md
+apps/docs/public/favicon.svg
