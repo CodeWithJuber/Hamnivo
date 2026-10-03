@@ -104,7 +104,7 @@ ARG HAMNIVO_BUILD_CONCURRENCY=2
 RUN --mount=type=cache,id=hamnivo-turbo,target=/turbo-cache,sharing=locked \
     pnpm exec turbo run build --concurrency="$HAMNIVO_BUILD_CONCURRENCY" \
       --filter=@hamnivo/widget^... --filter=@hamnivo/site^... --filter=@hamnivo/console^... \
-      --filter=@hamnivo/widget-loader
+      --filter=@hamnivo/docs^... --filter=@hamnivo/widget-loader
 RUN VITE_HAMNIVO_API="$HAMNIVO_API_ORIGIN" pnpm --filter @hamnivo/widget build
 # Studio calls the API on its own origin and shows install code for the chat origin.
 RUN VITE_HAMNIVO_API="$HAMNIVO_API_ORIGIN" VITE_HAMNIVO_WIDGET_ORIGIN="$HAMNIVO_CHAT_ORIGIN" \
@@ -114,11 +114,13 @@ RUN PUBLIC_SITE_URL="$HAMNIVO_SITE_URL" \
     PUBLIC_HAMNIVO_WIDGET_ORIGIN="${HAMNIVO_DEMO_WIDGET_ID:+$HAMNIVO_CHAT_ORIGIN}" \
     PUBLIC_HAMNIVO_API="${HAMNIVO_DEMO_WIDGET_ID:+$HAMNIVO_API_ORIGIN}" \
     pnpm --filter @hamnivo/site build
-RUN mkdir -p /out/chat /out/site /out/studio \
+RUN pnpm --filter @hamnivo/docs build
+RUN mkdir -p /out/chat /out/site /out/studio /out/docs \
  && cp -R apps/widget/dist/. /out/chat/ \
  && cp packages/widget-loader/dist/loader.js /out/chat/loader.js \
  && cp -R apps/site/dist/. /out/site/ \
- && cp -R apps/console/dist/. /out/studio/
+ && cp -R apps/console/dist/. /out/studio/ \
+ && cp -R apps/docs/dist/. /out/docs/
 
 # ---- Deploy webhook receiver (hamnivo.sh autodeploy) --------------------------------------------
 # adnanh/webhook from Debian. It checks GitHub's signature and drops a file for the host's deploy
@@ -138,6 +140,7 @@ FROM caddy:${CADDY_VERSION}-alpine AS edge
 COPY --from=web-build /out/chat /srv/chat
 COPY --from=web-build /out/site /srv/site
 COPY --from=web-build /out/studio /srv/studio
+COPY --from=web-build /out/docs /srv/docs
 COPY deploy/production/Caddyfile /etc/caddy/Caddyfile
 ARG HAMNIVO_RELEASE=unknown
 LABEL org.opencontainers.image.title="Hamnivo edge" \
