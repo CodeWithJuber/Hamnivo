@@ -81,7 +81,7 @@ function hamnivo_config()
             'trust_emails' => [
                 'FriendlyName' => 'Share email addresses',
                 'Type' => 'yesno',
-                'Description' => 'Tick only if WHMCS makes clients confirm their email address (General Settings, Security). Hamnivo then keeps the address. Otherwise the chat gets the name only.',
+                'Description' => 'Tick only if WHMCS makes clients confirm their email address, for example with a link they click when they sign up. Hamnivo then keeps the address. Otherwise the chat gets the name only.',
             ],
             'share_products' => [
                 'FriendlyName' => 'Share product names',

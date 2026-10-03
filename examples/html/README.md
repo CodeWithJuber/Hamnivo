@@ -1,7 +1,11 @@
 # Hamnivo Chat on a static page
 
 The smallest way to add Hamnivo Chat to a website is one script tag. `index.html` has it, with
-placeholders.
+placeholders. If you are not a developer, read the
+[guide for any website](../../docs/guide/integrations/html.md) instead. It starts from the install
+code that Hamnivo Studio gives you, and has a table of what to check when the chat does not show.
+The guides for WordPress, Shopify, WHMCS and Google Tag Manager are listed in
+[`docs/guide/integrations`](../../docs/guide/integrations).
 
 ## Use it
 
