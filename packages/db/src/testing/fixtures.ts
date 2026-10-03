@@ -548,6 +548,58 @@ async function seedDeveloperPlatform(
   });
 }
 
+/** One staff member's inbox settings and read marker, and one visitor with a visit and a page view. */
+async function seedVisitors(
+  tx: TenantTx,
+  tenantId: string,
+  ref: { brandId: string; staffMemberId: string; principalId: string; conversationId: string },
+) {
+  await tx.insert(s.staffInboxPreferences).values({ tenantId, staffMemberId: ref.staffMemberId });
+  await tx.insert(s.staffConversationReads).values({
+    tenantId,
+    staffMemberId: ref.staffMemberId,
+    conversationId: ref.conversationId,
+    readSeq: 1,
+  });
+  await tx.insert(s.brandVisitorSettings).values({ tenantId, brandId: ref.brandId });
+  const visitorId = newId();
+  const sessionId = newId();
+  await tx.insert(s.visitors).values({
+    id: visitorId,
+    tenantId,
+    brandId: ref.brandId,
+    keyHash: bytes(),
+    principalId: ref.principalId,
+    visitCount: 2,
+  });
+  await tx.insert(s.visitorSessions).values({
+    id: sessionId,
+    tenantId,
+    brandId: ref.brandId,
+    visitorId,
+    country: 'AE',
+    browser: 'Chrome',
+    browserVersion: '141',
+    os: 'Android',
+    osVersion: '14',
+    deviceType: 'mobile',
+    language: 'en',
+    referrer: 'https://search.example/results',
+    entryUrl: 'https://shop.example/pricing',
+    currentUrl: 'https://shop.example/pricing',
+    currentTitle: 'Pricing',
+    pageCount: 1,
+  });
+  await tx.insert(s.visitorPageViews).values({
+    tenantId,
+    brandId: ref.brandId,
+    visitorId,
+    sessionId,
+    url: 'https://shop.example/pricing',
+    title: 'Pricing',
+  });
+}
+
 /**
  * Creates a tenant with at least one row in every tenant-owned table, through the application
  * role and row-level security (as production code would). Used by the RLS test suite, which
@@ -1192,6 +1244,7 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       rating: 4,
       note: 'Clear and kind.',
     });
+    await seedVisitors(tx, tenantId, ids);
     // Decisions, language and cache: the inbox team above routes for the brand.
     await tx.insert(s.teamRouting).values({
       tenantId,

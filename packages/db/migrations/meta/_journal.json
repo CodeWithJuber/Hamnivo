@@ -288,6 +288,20 @@
       "when": 1790998464033,
       "tag": "20261003033424_safety_marks",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791040029874,
+      "tag": "20261003150709_visitors",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791040052140,
+      "tag": "20261003150732_visitors_security",
+      "breakpoints": true
     }
   ]
 }
