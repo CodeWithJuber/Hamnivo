@@ -17,6 +17,8 @@
 #      switch restarts the edge once, then goes on or rolls back with the reason
 #   D  the migration guard: SQL that loses data (drops, renames, retypes or empties) holds a version
 #      for a person; comments and privilege changes such as REVOKE ... TRUNCATE do not
+#   E  behind another web server: setup --public-port gives the addresses the port browsers use, the
+#      webhook address follows them, and doctor names addresses that still carry another port
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -124,7 +126,7 @@ esac
 exit 0
 EOF
 
-# curl: for requests through the edge (--resolve HOST:PORT:IP), the rules in $FAKE_DIR/curl.rules say
+# curl: for requests through the edge (--connect-to HOST::IP:PORT), the rules in $FAKE_DIR/curl.rules say
 # how each name answers: "HOST EXIT[,EXIT...] [HTTP]". The nth request for a name exits with the nth
 # code, and the last code repeats. 0 answers HTTP (200 unless given), 35 is a failed TLS handshake,
 # 22 an HTTP error, 7 a refused connection. A request to GitHub's deployment API is only logged.
@@ -134,7 +136,7 @@ host='' format='' body='' url="${*: -1}"
 args=("$@")
 for ((i = 0; i < ${#args[@]}; i++)); do
   case "${args[i]}" in
-    --resolve) host="${args[i + 1]%%:*}" ;;
+    --connect-to | --resolve) host="${args[i + 1]%%:*}" ;;
     -w) format="${args[i + 1]}" ;;
     -d) body="${args[i + 1]}" ;;
   esac
@@ -248,7 +250,8 @@ check 'services' matches '^✓ Services: all 10 are healthy'
 check 'HTTPS for the app name' has '✓ HTTPS app.example.test: answers 200'
 check 'HTTPS for the website names' has '✓ HTTPS www.example.test: answers 200'
 check 'HTTPS for the API uses its health page' grep -q 'health/ready' "$FAKE_DIR/curl.log"
-check 'curl is told where the name is' grep -q -- '--resolve api.example.test:443:127.0.0.1' "$FAKE_DIR/curl.log"
+check 'curl is told where the edge is' grep -q -- '--connect-to api.example.test::127.0.0.1:443' "$FAKE_DIR/curl.log"
+check 'the addresses carry the port browsers use' has '✓ Addresses: https://app.example.test'
 check 'ports' has '✓ Port 443: listening'
 check 'disk' matches '^✓ Disk: [0-9]+ GB free for Docker .*build cache 5.2GB'
 check 'memory' has '✓ Memory: 7.6 GB of 15.3 GB free'
@@ -499,6 +502,34 @@ check 'DROP COLUMN: hold' destructive 'ALTER TABLE t DROP COLUMN n;'
 check 'SET NOT NULL: hold' destructive 'ALTER TABLE "t" ALTER COLUMN "n" SET NOT NULL;'
 check 'SET DATA TYPE: hold' destructive 'ALTER TABLE "t" ALTER COLUMN "n" SET DATA TYPE integer;'
 check 'RENAME TO: hold' destructive 'ALTER TABLE t RENAME TO u;'
+
+# --- E: the port browsers use --------------------------------------------------------------------
+say 'E  behind another web server: the addresses carry the port browsers use'
+public_env="$work/public.env"
+setup_public() { HAMNIVO_ENV_FILE="$public_env" "${hv[@]}" setup --quiet "$@" >/dev/null 2>&1; }
+public_value() { grep "^$1=" "$public_env" | tail -n 1 | cut -d= -f2-; }
+doctor_public() { status=0; HAMNIVO_ENV_FILE="$public_env" "${hv[@]}" doctor >"$out" 2>&1 || status=$?; }
+setup_public --domain example.test --tls ops@example.test --https-port 8443 --http-port 8080
+check 'without --public-port, the addresses name the edge port' \
+  test "$(public_value HAMNIVO_APP_ORIGIN)" = https://app.example.test:8443
+doctor_public
+check 'doctor says how to drop the port behind a web server on 443' has 'setup --public-port 443'
+setup_public --public-port 443
+check '--public-port 443 drops the port from the addresses' \
+  test "$(public_value HAMNIVO_APP_ORIGIN) $(public_value HAMNIVO_API_ORIGIN)" = \
+  'https://app.example.test https://api.example.test'
+check 'the chat address too' test "$(public_value HAMNIVO_CHAT_ORIGIN)" = https://chat.example.test
+check 'the edge keeps its own port' test "$(public_value HAMNIVO_HTTPS_PORT)" = 8443
+check 'the webhook address follows the API address' \
+  test "$(public_value CHATWOOT_WEBHOOK_BASE_URL)" = https://api.example.test
+sed -i 's#^HAMNIVO_APP_ORIGIN=.*#HAMNIVO_APP_ORIGIN=https://app.example.test:8443#' "$public_env"
+doctor_public
+check 'doctor finds an address that still carries the old port' \
+  has "Addresses: Studio's address is https://app.example.test:8443, but browsers use https://app.example.test"
+sed -i 's#^CHATWOOT_WEBHOOK_BASE_URL=.*#CHATWOOT_WEBHOOK_BASE_URL=http://api:3000#' "$public_env"
+setup_public --public-port 8443
+check 'a webhook address set by hand stays' test "$(public_value CHATWOOT_WEBHOOK_BASE_URL)" = http://api:3000
+check 'and the addresses follow the port' test "$(public_value HAMNIVO_APP_ORIGIN)" = https://app.example.test:8443
 
 if ((failures > 0)); then
   printf '\n%d check(s) failed\n' "$failures"
