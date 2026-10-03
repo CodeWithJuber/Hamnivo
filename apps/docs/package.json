@@ -1,0 +1,24 @@
+{
+  "name": "@hamnivo/docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hamnivo user-friendly documentation site built with Astro Starlight",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --port 5191",
+    "build": "astro check && astro build",
+    "preview": "astro preview --port 5191",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.5",
+    "@hamnivo/brand": "workspace:*",
+    "astro": "7.3.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

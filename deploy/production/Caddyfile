@@ -136,6 +136,23 @@
 	import tls
 	import headers
 	encode zstd gzip
+
+	# Documentation (at /docs)
+	@docs path /docs /docs/*
+	handle @docs {
+		root * /srv/docs
+		@docsAssets path /docs/_astro/*
+		header @docsAssets Cache-Control "public, max-age=31536000, immutable"
+		# Deep links to docs pages
+		@deepLink {
+			not path /docs/_astro/*
+			not file
+		}
+		rewrite @deepLink /docs/index.html
+		file_server
+	}
+
+	# Website
 	root * /srv/site
 	@assets path /_astro/*
 	header @assets Cache-Control "public, max-age=31536000, immutable"

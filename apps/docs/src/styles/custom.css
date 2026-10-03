@@ -1,0 +1,169 @@
+/* Custom styles for Hamnivo docs using brand tokens */
+
+:root {
+  /* Primary colors from Hamnivo brand */
+  --sl-color-accent-low: #f0f4ff;
+  --sl-color-accent: #4f46e5;
+  --sl-color-accent-high: #1e1b4b;
+
+  /* Text colors */
+  --sl-color-text: #1f2937;
+  --sl-color-text-accent: #4f46e5;
+
+  /* Backgrounds */
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #f9fafb;
+  --sl-color-bg-sidebar: #f9fafb;
+
+  /* Borders */
+  --sl-color-border: #e5e7eb;
+
+  /* Code highlighting */
+  --sl-color-code-bg: #f3f4f6;
+  --sl-color-code-text: #1f2937;
+  --sl-color-code-punctuation: #6366f1;
+}
+
+:root[data-theme="dark"] {
+  --sl-color-accent-low: #1e1b4b;
+  --sl-color-accent: #818cf8;
+  --sl-color-accent-high: #f0f4ff;
+
+  --sl-color-text: #f3f4f6;
+  --sl-color-text-accent: #818cf8;
+
+  --sl-color-bg: #111827;
+  --sl-color-bg-nav: #1f2937;
+  --sl-color-bg-sidebar: #1f2937;
+
+  --sl-color-border: #374151;
+
+  --sl-color-code-bg: #1f2937;
+  --sl-color-code-text: #f3f4f6;
+  --sl-color-code-punctuation: #818cf8;
+}
+
+/* Typography */
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.6;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+h2 {
+  font-size: 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+h3 {
+  font-size: 1.25rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Links */
+a {
+  color: var(--sl-color-accent);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--sl-color-accent-high);
+  text-decoration: underline;
+}
+
+/* Code blocks */
+code {
+  background-color: var(--sl-color-code-bg);
+  color: var(--sl-color-code-text);
+  padding: 0.2em 0.4em;
+  border-radius: 0.25rem;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.9em;
+}
+
+pre {
+  background-color: var(--sl-color-code-bg);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+th {
+  background-color: var(--sl-color-accent-low);
+  color: var(--sl-color-accent);
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--sl-color-border);
+}
+
+tr:hover {
+  background-color: var(--sl-color-accent-low);
+}
+
+/* Blockquotes */
+blockquote {
+  border-left: 4px solid var(--sl-color-accent);
+  padding-left: 1rem;
+  margin-left: 0;
+  color: var(--sl-color-text-accent);
+  font-style: italic;
+}
+
+/* Lists */
+ul,
+ol {
+  margin: 1rem 0;
+  padding-left: 2rem;
+}
+
+li {
+  margin-bottom: 0.5rem;
+}
+
+/* Search styling */
+.astro-starlight input[type="search"] {
+  background-color: var(--sl-color-bg);
+  border: 1px solid var(--sl-color-border);
+  color: var(--sl-color-text);
+}
+
+.astro-starlight input[type="search"]::placeholder {
+  color: var(--sl-color-text);
+  opacity: 0.6;
+}
