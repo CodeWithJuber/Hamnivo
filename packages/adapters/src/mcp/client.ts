@@ -1,5 +1,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {
   EgressError,
   type EgressPolicy,
@@ -15,6 +18,8 @@ import {
  * What a server says about its tools (names, descriptions, schemas) is untrusted data: callers
  * reduce schemas to the portable subset and never show descriptions to a model as instructions.
  * MCP is an adapter for tools, not a source of authority: Hamnivo decides who may call what.
+ * Besides tools it lists a server's resources and prompts (also untrusted text) and reads one
+ * resource's text; signing in with OAuth is in `./oauth`, which ends in the same bearer token.
  */
 
 /**
@@ -64,6 +69,39 @@ export interface McpListing {
   tools: McpToolInfo[];
 }
 
+/** A resource a server offers: all of it is untrusted text from the server. */
+export interface McpResourceInfo {
+  uri: string;
+  name: string;
+  title: string | null;
+  description: string | null;
+  mimeType: string | null;
+  size: number | null;
+}
+
+export interface McpPromptInfo {
+  name: string;
+  title: string | null;
+  description: string | null;
+  arguments: { name: string; description: string | null; required: boolean }[];
+}
+
+export interface McpCatalog extends McpListing {
+  /** `null`: the server offers them but could not list them this time. */
+  resources: McpResourceInfo[] | null;
+  prompts: McpPromptInfo[] | null;
+}
+
+export interface McpResourceContent {
+  uri: string;
+  mimeType: string | null;
+  /** The text contents, joined; empty for a resource that is only binary. */
+  text: string;
+  truncated: boolean;
+  /** Bytes of binary contents that were left out. */
+  binaryBytes: number;
+}
+
 export interface McpCallResult {
   /** The server says the tool ran and failed. */
   isError: boolean;
@@ -71,7 +109,11 @@ export interface McpCallResult {
   text: string | null;
 }
 
-export type McpFailureKind = 'egress' | 'timeout' | 'network' | 'refused' | 'protocol';
+/**
+ * `auth`: the server answered 401, so the token is missing, expired or revoked. Nothing was done,
+ * and signing in again (or refreshing the token) is the way out.
+ */
+export type McpFailureKind = 'egress' | 'timeout' | 'network' | 'refused' | 'protocol' | 'auth';
 
 /**
  * A failed MCP request. `mayHaveApplied` answers the question that matters after a write: a
@@ -90,6 +132,8 @@ export class McpCallError extends Error {
 }
 
 const MAX_TOOLS = 200;
+const MAX_RESOURCES = 200;
+const MAX_PROMPTS = 100;
 const MAX_PAGES = 10;
 
 function hostOf(url: string): string {
@@ -167,6 +211,10 @@ function classify(error: unknown, sent: boolean): McpCallError {
       error.problem === 'response_too_large' && sent,
     );
   }
+  // A 401 is answered before anything runs: the token is the problem, and nothing was done.
+  if (error instanceof StreamableHTTPError && error.code === 401) {
+    return new McpCallError('auth', 'The service did not accept the saved sign-in.', false);
+  }
   const message = error instanceof Error ? error.message : String(error);
   const name = error instanceof Error ? error.name : '';
   if (name === 'AbortError' || name === 'TimeoutError' || /timed? ?out|aborted/i.test(message)) {
@@ -188,29 +236,47 @@ function withDeadline(timeoutMs: number, outer?: AbortSignal): AbortSignal {
   return outer ? AbortSignal.any([outer, deadline]) : deadline;
 }
 
-/** Lists the server's tools (bounded), with what it says about itself. */
-export async function listMcpTools(
-  endpoint: McpEndpoint,
-  outer?: AbortSignal,
-): Promise<McpListing> {
-  const signal = withDeadline(endpoint.timeoutMs, outer);
-  let connected: Connection | null = null;
-  try {
-    connected = await connect(endpoint, signal);
-    const { client } = connected;
-    const tools: McpToolInfo[] = [];
-    let cursor: string | undefined;
-    for (let page = 0; page < MAX_PAGES && tools.length < MAX_TOOLS; page += 1) {
-      const result = await client.listTools(cursor ? { cursor } : {}, {
-        signal,
-        timeout: endpoint.timeoutMs,
-      });
-      for (const tool of result.tools) {
-        if (tools.length >= MAX_TOOLS) break;
-        tools.push({
+/** One page of a list a server offers, as the SDK returns it. */
+interface Page<T> {
+  items: T[];
+  nextCursor: string | undefined;
+}
+
+/** Reads a cursor-paged list up to the bounds: pages, and items in all. */
+async function collect<T>(
+  max: number,
+  fetchPage: (cursor: string | undefined) => Promise<Page<T>>,
+): Promise<T[]> {
+  const items: T[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < MAX_PAGES && items.length < max; page += 1) {
+    const result = await fetchPage(cursor);
+    for (const item of result.items) {
+      if (items.length >= max) break;
+      items.push(item);
+    }
+    cursor = result.nextCursor;
+    if (!cursor) break;
+  }
+  return items;
+}
+
+const text = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+
+function collectTools(
+  client: Client,
+  signal: AbortSignal,
+  timeoutMs: number,
+): Promise<McpToolInfo[]> {
+  return collect(MAX_TOOLS, async (cursor) => {
+    const result = await client.listTools(cursor ? { cursor } : {}, { signal, timeout: timeoutMs });
+    return {
+      nextCursor: result.nextCursor,
+      items: result.tools.map(
+        (tool): McpToolInfo => ({
           name: String(tool.name),
-          title: typeof tool.title === 'string' ? tool.title : null,
-          description: typeof tool.description === 'string' ? tool.description : null,
+          title: text(tool.title),
+          description: text(tool.description),
           inputSchema: tool.inputSchema,
           outputSchema: tool.outputSchema ?? null,
           annotations: tool.annotations
@@ -226,16 +292,178 @@ export async function listMcpTools(
                   : {}),
               }
             : null,
-        });
-      }
-      cursor = result.nextCursor;
-      if (!cursor) break;
-    }
+        }),
+      ),
+    };
+  });
+}
+
+function collectResources(
+  client: Client,
+  signal: AbortSignal,
+  timeoutMs: number,
+): Promise<McpResourceInfo[]> {
+  return collect(MAX_RESOURCES, async (cursor) => {
+    const result = await client.listResources(cursor ? { cursor } : {}, {
+      signal,
+      timeout: timeoutMs,
+    });
+    return {
+      nextCursor: result.nextCursor,
+      items: result.resources.map(
+        (resource): McpResourceInfo => ({
+          uri: String(resource.uri),
+          name: String(resource.name),
+          title: text(resource.title),
+          description: text(resource.description),
+          mimeType: text(resource.mimeType),
+          size: typeof resource.size === 'number' ? resource.size : null,
+        }),
+      ),
+    };
+  });
+}
+
+function collectPrompts(
+  client: Client,
+  signal: AbortSignal,
+  timeoutMs: number,
+): Promise<McpPromptInfo[]> {
+  return collect(MAX_PROMPTS, async (cursor) => {
+    const result = await client.listPrompts(cursor ? { cursor } : {}, {
+      signal,
+      timeout: timeoutMs,
+    });
+    return {
+      nextCursor: result.nextCursor,
+      items: result.prompts.map(
+        (prompt): McpPromptInfo => ({
+          name: String(prompt.name),
+          title: text(prompt.title),
+          description: text(prompt.description),
+          arguments: (prompt.arguments ?? []).slice(0, 20).map((argument) => ({
+            name: String(argument.name),
+            description: text(argument.description),
+            required: argument.required === true,
+          })),
+        }),
+      ),
+    };
+  });
+}
+
+/** Lists the server's tools (bounded), with what it says about itself. */
+export async function listMcpTools(
+  endpoint: McpEndpoint,
+  outer?: AbortSignal,
+): Promise<McpListing> {
+  const signal = withDeadline(endpoint.timeoutMs, outer);
+  let connected: Connection | null = null;
+  try {
+    connected = await connect(endpoint, signal);
+    const { client } = connected;
+    const tools = await collectTools(client, signal, endpoint.timeoutMs);
     const version = client.getServerVersion();
     return {
       protocolVersion: connected.protocolVersion,
       serverName: version?.name ? String(version.name).slice(0, 120) : null,
       tools,
+    };
+  } catch (error) {
+    throw classify(error, false);
+  } finally {
+    await disconnect(connected);
+  }
+}
+
+/**
+ * Lists everything a server offers on one connection: tools, and the resources and prompts when
+ * it has them. A list that the server could not give (it failed, or answered something unusable)
+ * is `null`, not empty: a caller keeping a copy must not take "unknown" for "nothing".
+ */
+export async function listMcpCatalog(
+  endpoint: McpEndpoint,
+  outer?: AbortSignal,
+): Promise<McpCatalog> {
+  const signal = withDeadline(endpoint.timeoutMs, outer);
+  let connected: Connection | null = null;
+  try {
+    connected = await connect(endpoint, signal);
+    const { client } = connected;
+    const capabilities = client.getServerCapabilities() ?? {};
+    const tools = await collectTools(client, signal, endpoint.timeoutMs);
+    const optional = async <T>(offered: boolean, read: () => Promise<T[]>): Promise<T[] | null> => {
+      if (!offered) return [];
+      try {
+        return await read();
+      } catch (error) {
+        // A server that is out of reach, too slow or no longer accepting the sign-in fails the
+        // whole listing; one that only cannot list this kind (or answers badly) loses this part.
+        const failure = classify(error, false);
+        if (failure.kind === 'egress' || failure.kind === 'timeout' || failure.kind === 'auth') {
+          throw error;
+        }
+        return null;
+      }
+    };
+    const resources = await optional(Boolean(capabilities.resources), () =>
+      collectResources(client, signal, endpoint.timeoutMs),
+    );
+    const prompts = await optional(Boolean(capabilities.prompts), () =>
+      collectPrompts(client, signal, endpoint.timeoutMs),
+    );
+    const version = client.getServerVersion();
+    return {
+      protocolVersion: connected.protocolVersion,
+      serverName: version?.name ? String(version.name).slice(0, 120) : null,
+      tools,
+      resources,
+      prompts,
+    };
+  } catch (error) {
+    throw classify(error, false);
+  } finally {
+    await disconnect(connected);
+  }
+}
+
+/**
+ * Reads one resource as text. Binary contents are not passed on (only their size), and the text
+ * is cut at `maxChars`. The URI is the caller's to vet: a server's resource URIs mean what that
+ * server says, so only URIs a person has accepted should ever get here.
+ */
+export async function readMcpResource(
+  endpoint: McpEndpoint,
+  uri: string,
+  options: { signal?: AbortSignal; maxChars?: number } = {},
+): Promise<McpResourceContent> {
+  const signal = withDeadline(endpoint.timeoutMs, options.signal);
+  const maxChars = options.maxChars ?? 20_000;
+  let connected: Connection | null = null;
+  try {
+    connected = await connect(endpoint, signal);
+    const result = await connected.client.readResource(
+      { uri },
+      { signal, timeout: endpoint.timeoutMs },
+    );
+    const parts: string[] = [];
+    let binaryBytes = 0;
+    let mimeType: string | null = null;
+    for (const content of result.contents) {
+      mimeType ??= text(content.mimeType);
+      if ('text' in content && typeof content.text === 'string') parts.push(content.text);
+      else if ('blob' in content && typeof content.blob === 'string') {
+        // Base64: three bytes for every four characters.
+        binaryBytes += Math.floor((content.blob.length * 3) / 4);
+      }
+    }
+    const joined = parts.join('\n\n');
+    return {
+      uri,
+      mimeType,
+      text: joined.length > maxChars ? joined.slice(0, maxChars) : joined,
+      truncated: joined.length > maxChars,
+      binaryBytes,
     };
   } catch (error) {
     throw classify(error, false);
@@ -270,7 +498,7 @@ export async function callMcpTool(
       { signal, timeout: endpoint.timeoutMs },
     );
     const content = Array.isArray(result.content) ? result.content : [];
-    const text = content
+    const joined = content
       .map((part) =>
         part && typeof part === 'object' && (part as { type?: unknown }).type === 'text'
           ? String((part as { text?: unknown }).text ?? '')
@@ -281,7 +509,7 @@ export async function callMcpTool(
     return {
       isError: result.isError === true,
       structured: result.structuredContent ?? null,
-      text: text || null,
+      text: joined || null,
     };
   } catch (error) {
     throw classify(error, sent);

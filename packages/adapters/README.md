@@ -312,16 +312,39 @@ tools exist, who may call them and who approves.
 |---|---|
 | Transport | Streamable HTTP to a remote server, over HTTPS. No local (stdio) servers and no fallback to the older HTTP with SSE transport. |
 | Protocol revisions | `2025-11-25`, `2025-06-18` and `2025-03-26` (`MCP_SUPPORTED_PROTOCOLS`). The client offers the newest; a server that answers with another revision is refused before any tool is listed or called. |
-| Authentication | None, or a bearer token per server (`Authorization: Bearer …`). The gateway keeps the token in its secret broker and reveals it only for the request. OAuth is not supported yet. |
-| Requests used | `initialize`, `tools/list` (at most 200 tools over 10 pages) and `tools/call`. Resources, prompts, sampling and elicitation are not used. |
+| Authentication | None, a bearer token per server (`Authorization: Bearer …`), or an OAuth sign-in as the MCP authorization spec describes it (below). The gateway keeps every token in its secret broker and reveals it only for the request. |
+| Requests used | `initialize`, `tools/list` (at most 200 tools over 10 pages), `tools/call`, `resources/list` (200), `resources/read` and `prompts/list` (100), the last three only for a server that says it offers them. Sampling and elicitation are not used. |
 | Network | Every request goes through the egress guard below. |
 
 | Export | What it does |
 |---|---|
 | `listMcpTools(endpoint, signal?)` | The server's tools with their names, descriptions, schemas and annotations, all as untrusted data, plus the revision the server chose. |
 | `callMcpTool(endpoint, name, args, { idempotencyKey, signal })` | One call. The idempotency key goes in `_meta['hamnivo/idempotency-key']`, for servers that honour it. Returns `isError`, structured content and text. |
-| `McpCallError` | `kind` (`egress`, `timeout`, `network`, `refused`, `protocol`) and `mayHaveApplied`. A refusal did nothing; a timeout or lost connection after sending may have, so the gateway records the outcome as unknown and checks it rather than sending again. |
-| `startFakeMcpServer()` (`@hamnivo/adapters/mcp/testing`) | A real Streamable HTTP server on 127.0.0.1 with scripted tools, faults before or after a change, a chosen protocol revision, and a record of calls and tokens. |
+| `listMcpCatalog(endpoint, signal?)` | Tools, resources and prompts on one connection. A list the server offers but could not give is `null`, not empty, so a caller that keeps a copy never takes "unknown" for "nothing". |
+| `readMcpResource(endpoint, uri, { maxChars })` | One resource as text, cut at `maxChars`; binary contents are not passed on, only their size. The caller vets the URI. |
+| `McpCallError` | `kind` (`egress`, `timeout`, `network`, `refused`, `protocol`, `auth`) and `mayHaveApplied`. A refusal did nothing, and so did a 401 (`auth`: the token is missing, expired or revoked); a timeout or lost connection after sending may have, so the gateway records the outcome as unknown and checks it rather than sending again. |
+| `MCP_PRESETS` | Remote servers that vendors run themselves, for Studio's "Connect a service" list. Each entry names the vendor page its address came from and the day it was read; the comment on the file lists what was left out and why. |
+| `startFakeMcpServer(tools, { resources, prompts, oauth })` (`@hamnivo/adapters/mcp/testing`) | A real Streamable HTTP server on 127.0.0.1 with scripted tools, faults before or after a change, a chosen protocol revision, resources and prompts, a record of calls and tokens, and optionally a stand-in authorization server (metadata, registration, PKCE, tokens, refresh, revocation) on the same address. |
+
+### OAuth sign-in (`@hamnivo/adapters/mcp`, `oauth.ts`)
+
+The protocol steps are the SDK's own client auth helpers (`@modelcontextprotocol/sdk/client/auth`),
+driven with the state Hamnivo stores. The server answers 401 and points at its protected resource
+metadata (RFC 9728); that names an authorization server (RFC 8414 or OpenID discovery); Hamnivo
+registers itself there (RFC 7591), or uses a client a person entered for services that do not
+register clients; the person signs in with an authorization code and PKCE (S256), and every request
+names the server as the resource (RFC 8707). The authorization server must name itself as discovery
+found it, or the sign-in is refused. Every request goes through the egress guard under the
+workspace's policy; redirects are followed only within one origin, and each hop is checked again.
+
+| Export | What it does |
+|---|---|
+| `probeMcpAuth` | Asks the server to initialize without a token: does it want a sign-in, and where is its metadata. |
+| `startMcpOAuth` | Discovers, registers (or takes the entered client) and returns the address for the person's browser, the PKCE verifier and the registration. |
+| `finishMcpOAuth` | Exchanges the code the person came back with, with the verifier. |
+| `refreshMcpOAuth` | Renews the access token. A refused refresh token is `reconnect_required`; a service having trouble is `unavailable` and leaves the sign-in as it is. (It calls the SDK's refresh step, not the orchestrator, which would start a new sign-in after any failure.) |
+| `revokeMcpOAuthToken` | Tells the authorization server to forget a token (RFC 7009), when it has an endpoint for that. Best effort. |
+| `McpOAuthError` | `kind` (`egress`, `unsupported`, `registration_unsupported`, `reconnect_required`, `invalid`, `unavailable`) with words that are safe to show, never a response body. |
 
 Tool calls reach the network only through the egress guard (X05, `@hamnivo/adapters/net`, described
 in the next section): a request goes out only over HTTPS to public addresses, to the server's own
@@ -357,6 +380,12 @@ What a server says about its tools is never trusted. The gateway:
 - `test/mcp.test.ts`: listing as data, the bearer token, the idempotency key, a lost answer after
   the change, a failed tool, refused servers, cancellation, each supported revision and the
   refusal of another.
+- `test/mcp-oauth.test.ts`: the whole sign-in against a stand-in authorization server: the
+  challenge, discovery, registration, PKCE and the resource indicator, a wrong verifier, a wrong
+  issuer, a client entered by hand, refresh with and without a replaced refresh token, a refused
+  refresh and a service having trouble, a private address, revocation.
+- `test/mcp-catalog.test.ts`: resources, prompts and reading, hostile descriptions kept as data,
+  a list that fails, and the catalog of services.
 - `test/net/*.test.ts`: the egress guard itself (next section). `test/mcp.test.ts` also checks a
   name that turns private between the check and the connection, redirects and answers over the size
   limit.
