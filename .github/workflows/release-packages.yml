@@ -1,0 +1,120 @@
+# Publishes @hamnivo/react or @hamnivo/vue to npm. It runs only when a tag is pushed, never on a
+# branch:
+#
+#   react-v0.1.0   publishes @hamnivo/react 0.1.0, from packages/react
+#   vue-v0.1.0     publishes @hamnivo/vue 0.1.0, from packages/vue
+#
+# The version in the tag must be the version in that package's package.json, so bump the version
+# first, merge it, then tag that commit. A version with a dash in it (0.2.0-beta.1) is published
+# under the npm tag "next", and never becomes "latest".
+#
+# It needs one secret that the owner of the repository adds under Settings, Secrets and variables,
+# Actions: NPM_TOKEN, an npm access token that may publish the @hamnivo packages (an automation
+# token, or a granular token with read and write on them). The token is never printed.
+#
+# It runs on the same runners as ci.yml: set HAMNIVO_CI_RUNNER to use others. There is no npm
+# provenance statement, because npm gives one only to builds on GitHub's own runners.
+name: Release packages
+
+on:
+  push:
+    tags:
+      - 'react-v*'
+      - 'vue-v*'
+
+# Two pushes of the same tag do not publish at the same time, and a running publish is never cut.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ${{ fromJSON(vars.HAMNIVO_CI_RUNNER || '["self-hosted", "linux", "x64", "hamnivo"]') }}
+    timeout-minutes: 45
+    env:
+      TURBO_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # The tag is read from the environment, never put into the script text.
+      - name: Work out which package the tag is for
+        id: package
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          name="${TAG%%-v*}"
+          version="${TAG#*-v}"
+          case "$name" in
+            react | vue) ;;
+            *)
+              echo "::error::The tag '$TAG' is not react-v<version> or vue-v<version>."
+              exit 1
+              ;;
+          esac
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$version', in the tag '$TAG', is not a version like 1.2.3 or 1.2.3-beta.1."
+            exit 1
+          fi
+          actual="$(node -p "require('./packages/$name/package.json').version")"
+          if [ "$actual" != "$version" ]; then
+            echo "::error::The tag says $version, but packages/$name/package.json says $actual. Change one of them."
+            exit 1
+          fi
+          if [ "$(node -p "require('./packages/$name/package.json').private === true")" = "true" ]; then
+            echo "::error::packages/$name is marked private, so it cannot be published."
+            exit 1
+          fi
+          echo "filter=@hamnivo/$name" >> "$GITHUB_OUTPUT"
+          echo "dir=packages/$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
+            echo "npm_tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check the npm token is there
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::The NPM_TOKEN secret is not set. Add it under Settings, Secrets and variables, Actions, then run this tag's workflow again."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Only the package that is released, and what it needs. Its test script builds it first.
+      - name: Lint, type-check and test the package
+        env:
+          DIR: ${{ steps.package.outputs.dir }}
+          FILTER: ${{ steps.package.outputs.filter }}
+        run: |
+          pnpm exec biome check "$DIR"
+          pnpm exec turbo run typecheck test --filter="$FILTER" --concurrency=1
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          FILTER: ${{ steps.package.outputs.filter }}
+          VERSION: ${{ steps.package.outputs.version }}
+          NPM_TAG: ${{ steps.package.outputs.npm_tag }}
+        run: |
+          if npm view "$FILTER@$VERSION" version > /dev/null 2>&1; then
+            echo "$FILTER@$VERSION is already on npm. Nothing to publish."
+            exit 0
+          fi
+          pnpm --filter "$FILTER" publish --access public --tag "$NPM_TAG" --no-git-checks

@@ -63,7 +63,17 @@ declare global {
 (() => {
   const script = document.currentScript as HTMLScriptElement | null;
   if (!script || window.Hamnivo?.loaded) return;
-  const data = script.dataset;
+  // The settings are the script's data-* attributes. Where a platform cannot set them (Google Tag
+  // Manager's injectScript can only pass an address), the same names work in the query of the
+  // script's own address: loader.js?widgetId=wid_…&api=https://api.example.com. Attributes win.
+  const query = (() => {
+    try {
+      return Object.fromEntries(new URL(script.src, location.href).searchParams);
+    } catch {
+      return {};
+    }
+  })();
+  const data: DOMStringMap = { ...query, ...script.dataset };
   const widgetId = data.widgetId;
   if (!widgetId) {
     console.error('Hamnivo: add data-widget-id to the loader script');

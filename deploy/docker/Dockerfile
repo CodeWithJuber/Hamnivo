@@ -108,6 +108,7 @@ RUN --mount=type=cache,id=hamnivo-turbo,target=/turbo-cache,sharing=locked \
 RUN VITE_HAMNIVO_API="$HAMNIVO_API_ORIGIN" pnpm --filter @hamnivo/widget build
 # Studio calls the API on its own origin and shows install code for the chat origin.
 RUN VITE_HAMNIVO_API="$HAMNIVO_API_ORIGIN" VITE_HAMNIVO_WIDGET_ORIGIN="$HAMNIVO_CHAT_ORIGIN" \
+    VITE_HAMNIVO_DOCS_URL="${HAMNIVO_SITE_URL%/}/docs" \
     pnpm --filter @hamnivo/console build
 RUN PUBLIC_SITE_URL="$HAMNIVO_SITE_URL" \
     PUBLIC_HAMNIVO_WIDGET_ID="$HAMNIVO_DEMO_WIDGET_ID" \

@@ -1,7 +1,18 @@
 {
   "name": "@hamnivo/example-wordpress",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Example: a single-file WordPress plugin that adds the Hamnivo chat loader from its settings",
-  "license": "MIT"
+  "description": "Example: try the Hamnivo Chat WordPress plugin on your computer, and the browser and file checks that keep the plugin honest",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "jsdom": "30.1.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
 }

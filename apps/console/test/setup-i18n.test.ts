@@ -32,11 +32,13 @@ const SAME_EVERYWHERE = new Set([
   'install.platforms.wordpress',
   'install.platforms.woocommerce',
   'install.platforms.shopify',
+  'install.platforms.whmcs',
   'install.platforms.wix',
   'install.platforms.squarespace',
   'install.platforms.webflow',
   'install.platforms.google-tag-manager',
   'install.platforms.react',
+  'install.platforms.vue',
   'install.platforms.nextjs',
 ]);
 

@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_HAMNIVO_GATEWAY_ORIGIN?: string;
   /** Origin that serves the widget and loader.js, for the install snippet. */
   readonly VITE_HAMNIVO_WIDGET_ORIGIN?: string;
+  /** The docs site, such as https://example.com/docs (the guides Studio links to). */
+  readonly VITE_HAMNIVO_DOCS_URL?: string;
 }
 
 interface ImportMeta {

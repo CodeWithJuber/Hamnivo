@@ -1,0 +1,5 @@
+# The Shopify CLI keeps its cache and local settings here.
+.shopify/
+node_modules/
+.env
+.env.*

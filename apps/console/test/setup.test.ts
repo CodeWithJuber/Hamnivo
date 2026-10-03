@@ -527,7 +527,12 @@ describe('where the chat may go', () => {
   it('knows a platform by its name, and links its guide by file name', () => {
     expect(isPlatform('shopify')).toBe(true);
     expect(isPlatform('myspace')).toBe(false);
-    expect(guideSlug('google-tag-manager')).toBe('google-tag-manager');
+    // Some platforms share a guide: the WordPress plugin covers WooCommerce, site builders take the
+    // plain HTML snippet, and one guide covers React, Vue and Next.js.
+    expect(guideSlug('google-tag-manager')).toBe('gtm');
+    expect(guideSlug('woocommerce')).toBe('wordpress');
+    expect(guideSlug('wix')).toBe('html');
+    expect(guideSlug('nextjs')).toBe('react-vue-next');
   });
 
   // The guides are written in docs/guide/integrations. Where that folder is there, every platform

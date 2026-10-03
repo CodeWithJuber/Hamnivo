@@ -1051,11 +1051,13 @@ describe('the guided setup', () => {
         'wordpress',
         'woocommerce',
         'shopify',
+        'whmcs',
         'wix',
         'squarespace',
         'webflow',
         'google-tag-manager',
         'react',
+        'vue',
         'nextjs',
       ]);
       const guide = anchors(html).find((link) => link.attrs['data-testid'] === 'install-guide');

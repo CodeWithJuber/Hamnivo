@@ -1,0 +1,785 @@
+{
+  "generatedBy": "integrations/php-sdk/tests/fixtures/generate.ts, with @hamnivo/server",
+  "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+  "otherSecret": "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD",
+  "now": 1789459200,
+  "signatures": [
+    {
+      "name": "an event, secret whsec_MfKQ9…",
+      "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+    },
+    {
+      "name": "an event, secret whsec_C2FVs…",
+      "secret": "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "signature": "v1,ygr0LF1KXmoEuPpOGtcHXlOJiB3WJfhqT6E4qqmQaqo="
+    },
+    {
+      "name": "an event, secret MfKQ9r8GKYq…",
+      "secret": "MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+    },
+    {
+      "name": "an empty object, secret whsec_MfKQ9…",
+      "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{}",
+      "signature": "v1,3W07Wh6F4jTLHlBXsKlwsQSIEdUx9V8qopIfkveoHGc="
+    },
+    {
+      "name": "an empty object, secret whsec_C2FVs…",
+      "secret": "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{}",
+      "signature": "v1,mpg3HkF7FqsRLYDku9qRplUdZHk3dDZNYH4MXUh/RDc="
+    },
+    {
+      "name": "an empty object, secret MfKQ9r8GKYq…",
+      "secret": "MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{}",
+      "signature": "v1,3W07Wh6F4jTLHlBXsKlwsQSIEdUx9V8qopIfkveoHGc="
+    },
+    {
+      "name": "text with a line break and spaces, secret whsec_MfKQ9…",
+      "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\n  \"id\": \"evt_1\",\n  \"type\": \"x\"\n}\n",
+      "signature": "v1,dZBx17TZQjnqm7980l+m495kYZEivqSxjgGY6lPcVNQ="
+    },
+    {
+      "name": "text with a line break and spaces, secret whsec_C2FVs…",
+      "secret": "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\n  \"id\": \"evt_1\",\n  \"type\": \"x\"\n}\n",
+      "signature": "v1,KFQTnfn/+DfKmuah0+LIC4o6+PrM2QVYAMoXoQhfdi0="
+    },
+    {
+      "name": "text with a line break and spaces, secret MfKQ9r8GKYq…",
+      "secret": "MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\n  \"id\": \"evt_1\",\n  \"type\": \"x\"\n}\n",
+      "signature": "v1,dZBx17TZQjnqm7980l+m495kYZEivqSxjgGY6lPcVNQ="
+    },
+    {
+      "name": "Urdu and emoji, secret whsec_MfKQ9…",
+      "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\"id\":\"evt_2\",\"type\":\"message.created\",\"data\":{\"text\":\"السلام عليكم 🙂\"}}",
+      "signature": "v1,/RN0SLlJD+hCIb8zourtLzhbWhRQddPEaRLC+QDhpJU="
+    },
+    {
+      "name": "Urdu and emoji, secret whsec_C2FVs…",
+      "secret": "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\"id\":\"evt_2\",\"type\":\"message.created\",\"data\":{\"text\":\"السلام عليكم 🙂\"}}",
+      "signature": "v1,odSyFDeFcy50nmgtsUslhUmSNNkqLKl9d++IUQmQRyI="
+    },
+    {
+      "name": "Urdu and emoji, secret MfKQ9r8GKYq…",
+      "secret": "MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\"id\":\"evt_2\",\"type\":\"message.created\",\"data\":{\"text\":\"السلام عليكم 🙂\"}}",
+      "signature": "v1,/RN0SLlJD+hCIb8zourtLzhbWhRQddPEaRLC+QDhpJU="
+    },
+    {
+      "name": "a long body, secret whsec_MfKQ9…",
+      "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\"id\":\"evt_3\",\"data\":{\"text\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}}",
+      "signature": "v1,7ZrTrRvEGUbKIxs1yVdo07pi7QRwETZVc40xC8sCbLA="
+    },
+    {
+      "name": "a long body, secret whsec_C2FVs…",
+      "secret": "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\"id\":\"evt_3\",\"data\":{\"text\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}}",
+      "signature": "v1,be0bNJE6VEwYLj9Pp3c47IX2iOygrZXPd0bs7WL66gI="
+    },
+    {
+      "name": "a long body, secret MfKQ9r8GKYq…",
+      "secret": "MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+      "timestamp": 1789459200,
+      "body": "{\"id\":\"evt_3\",\"data\":{\"text\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}}",
+      "signature": "v1,7ZrTrRvEGUbKIxs1yVdo07pi7QRwETZVc40xC8sCbLA="
+    },
+    {
+      "name": "Standard Webhooks vector 1",
+      "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "msg_p5jXN8AQM9LWM0D4loKWxJek",
+      "timestamp": 1614265330,
+      "body": "{\"test\": 2432232314}",
+      "signature": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+    },
+    {
+      "name": "Standard Webhooks vector 2",
+      "secret": "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD",
+      "id": "msg_27UH4WbU6Z5A5EzD8u03UvzRbpk",
+      "timestamp": 1649367553,
+      "body": "{\"email\":\"test@example.com\",\"username\":\"test_user\"}",
+      "signature": "v1,tZ1I4/hDygAJgO5TYxiSd6Sd0kDW6hPenDe+bTa3Kkw="
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "a valid request",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {
+          "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "type": "conversation.created",
+          "timestamp": "2026-09-15T07:59:58.000Z",
+          "schemaVersion": "1.0",
+          "tenantId": "tnt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "data": {
+            "conversationId": "conv_01k6a3p0a1b2c3d4e5f6g7h8j9",
+            "note": "عائشة 🙂 \"quoted\""
+          }
+        }
+      }
+    },
+    {
+      "name": "the secret without its whsec_ prefix",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {
+          "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "type": "conversation.created",
+          "timestamp": "2026-09-15T07:59:58.000Z",
+          "schemaVersion": "1.0",
+          "tenantId": "tnt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "data": {
+            "conversationId": "conv_01k6a3p0a1b2c3d4e5f6g7h8j9",
+            "note": "عائشة 🙂 \"quoted\""
+          }
+        }
+      }
+    },
+    {
+      "name": "two signatures during a rotation, the first for another secret",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,ygr0LF1KXmoEuPpOGtcHXlOJiB3WJfhqT6E4qqmQaqo= v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {
+          "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "type": "conversation.created",
+          "timestamp": "2026-09-15T07:59:58.000Z",
+          "schemaVersion": "1.0",
+          "tenantId": "tnt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "data": {
+            "conversationId": "conv_01k6a3p0a1b2c3d4e5f6g7h8j9",
+            "note": "عائشة 🙂 \"quoted\""
+          }
+        }
+      }
+    },
+    {
+      "name": "a signature of a version this SDK does not know, then a good one",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v2,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {
+          "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "type": "conversation.created",
+          "timestamp": "2026-09-15T07:59:58.000Z",
+          "schemaVersion": "1.0",
+          "tenantId": "tnt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "data": {
+            "conversationId": "conv_01k6a3p0a1b2c3d4e5f6g7h8j9",
+            "note": "عائشة 🙂 \"quoted\""
+          }
+        }
+      }
+    },
+    {
+      "name": "the previous secret, with both secrets given",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,ygr0LF1KXmoEuPpOGtcHXlOJiB3WJfhqT6E4qqmQaqo="
+      },
+      "options": {
+        "secret": [
+          "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+          "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD"
+        ],
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {
+          "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "type": "conversation.created",
+          "timestamp": "2026-09-15T07:59:58.000Z",
+          "schemaVersion": "1.0",
+          "tenantId": "tnt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "data": {
+            "conversationId": "conv_01k6a3p0a1b2c3d4e5f6g7h8j9",
+            "note": "عائشة 🙂 \"quoted\""
+          }
+        }
+      }
+    },
+    {
+      "name": "a signature for another secret",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,ygr0LF1KXmoEuPpOGtcHXlOJiB3WJfhqT6E4qqmQaqo="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_signature"
+      }
+    },
+    {
+      "name": "a body that was changed",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}} ",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_signature"
+      }
+    },
+    {
+      "name": "another event id",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_other",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_signature"
+      }
+    },
+    {
+      "name": "a timestamp that was changed",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459201",
+        "webhook-signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_signature"
+      }
+    },
+    {
+      "name": "no signature value",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,"
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_signature"
+      }
+    },
+    {
+      "name": "a signature cut short",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,FC/QDRVZw"
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_signature"
+      }
+    },
+    {
+      "name": "a signature that is not base64",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,!!!!"
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_signature"
+      }
+    },
+    {
+      "name": "a timestamp 301 seconds old",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789458899",
+        "webhook-signature": "v1,zCDuW38ydyIqld+t5OdJuGOgot9tvNOu4fJ20M0Efx0="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "timestamp_out_of_range"
+      }
+    },
+    {
+      "name": "a timestamp 301 seconds ahead",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459501",
+        "webhook-signature": "v1,vOW+U7GSMTSkyMIRIpqPAfR4lJe6K9d1R8CHdLtCUMM="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "timestamp_out_of_range"
+      }
+    },
+    {
+      "name": "a timestamp exactly 300 seconds old",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789458900",
+        "webhook-signature": "v1,bYQfUVJl2FsRVmDsb4L4QWMwYw9VddDD87oiuFvPVKM="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {
+          "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "type": "conversation.created",
+          "timestamp": "2026-09-15T07:59:58.000Z",
+          "schemaVersion": "1.0",
+          "tenantId": "tnt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "data": {
+            "conversationId": "conv_01k6a3p0a1b2c3d4e5f6g7h8j9",
+            "note": "عائشة 🙂 \"quoted\""
+          }
+        }
+      }
+    },
+    {
+      "name": "an old timestamp with a longer tolerance",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789458899",
+        "webhook-signature": "v1,zCDuW38ydyIqld+t5OdJuGOgot9tvNOu4fJ20M0Efx0="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200,
+        "toleranceSeconds": 600
+      },
+      "expect": {
+        "event": {
+          "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "type": "conversation.created",
+          "timestamp": "2026-09-15T07:59:58.000Z",
+          "schemaVersion": "1.0",
+          "tenantId": "tnt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "data": {
+            "conversationId": "conv_01k6a3p0a1b2c3d4e5f6g7h8j9",
+            "note": "عائشة 🙂 \"quoted\""
+          }
+        }
+      }
+    },
+    {
+      "name": "a timestamp that is not a number",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "NaN",
+        "webhook-signature": "v1,x"
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_timestamp"
+      }
+    },
+    {
+      "name": "a timestamp of 13 digits",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200000",
+        "webhook-signature": "v1,x"
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_timestamp"
+      }
+    },
+    {
+      "name": "no webhook-id",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "missing_header"
+      }
+    },
+    {
+      "name": "no webhook-timestamp",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "missing_header"
+      }
+    },
+    {
+      "name": "no webhook-signature",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200"
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "missing_header"
+      }
+    },
+    {
+      "name": "an empty webhook-id",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "webhook-id": "",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "missing_header"
+      }
+    },
+    {
+      "name": "header names in capitals",
+      "body": "{\"id\":\"evt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"type\":\"conversation.created\",\"timestamp\":\"2026-09-15T07:59:58.000Z\",\"schemaVersion\":\"1.0\",\"tenantId\":\"tnt_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"data\":{\"conversationId\":\"conv_01k6a3p0a1b2c3d4e5f6g7h8j9\",\"note\":\"عائشة 🙂 \\\"quoted\\\"\"}}",
+      "headers": {
+        "Webhook-Id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "Webhook-Timestamp": "1789459200",
+        "Webhook-Signature": "v1,FC/QDRVZwj7bYEIlAicynfBdSAafc6F6qiQm0ZVo7Uk="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {
+          "id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "type": "conversation.created",
+          "timestamp": "2026-09-15T07:59:58.000Z",
+          "schemaVersion": "1.0",
+          "tenantId": "tnt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+          "data": {
+            "conversationId": "conv_01k6a3p0a1b2c3d4e5f6g7h8j9",
+            "note": "عائشة 🙂 \"quoted\""
+          }
+        }
+      }
+    },
+    {
+      "name": "a valid request with an empty object",
+      "body": "{}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,3W07Wh6F4jTLHlBXsKlwsQSIEdUx9V8qopIfkveoHGc="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {}
+      }
+    },
+    {
+      "name": "a valid request with text with a line break and spaces",
+      "body": "{\n  \"id\": \"evt_1\",\n  \"type\": \"x\"\n}\n",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,dZBx17TZQjnqm7980l+m495kYZEivqSxjgGY6lPcVNQ="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {
+          "id": "evt_1",
+          "type": "x"
+        }
+      }
+    },
+    {
+      "name": "a valid request with Urdu and emoji",
+      "body": "{\"id\":\"evt_2\",\"type\":\"message.created\",\"data\":{\"text\":\"السلام عليكم 🙂\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,/RN0SLlJD+hCIb8zourtLzhbWhRQddPEaRLC+QDhpJU="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {
+          "id": "evt_2",
+          "type": "message.created",
+          "data": {
+            "text": "السلام عليكم 🙂"
+          }
+        }
+      }
+    },
+    {
+      "name": "a valid request with a long body",
+      "body": "{\"id\":\"evt_3\",\"data\":{\"text\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}}",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,7ZrTrRvEGUbKIxs1yVdo07pi7QRwETZVc40xC8sCbLA="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "event": {
+          "id": "evt_3",
+          "data": {
+            "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        }
+      }
+    },
+    {
+      "name": "a signed body that is \"not json\"",
+      "body": "not json",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,TUmWE2M5n8jIlOHuJafH56UxL4bMnNJtVC6OFo7OUa4="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_payload"
+      }
+    },
+    {
+      "name": "a signed body that is \"[]\"",
+      "body": "[]",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,8GZNuVQS1lSuXSDGfqOyb8Yy4Cpqjek99o0FyLFR66c="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_payload"
+      }
+    },
+    {
+      "name": "a signed body that is \"[1,2]\"",
+      "body": "[1,2]",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,EquM8EO4lrmLW9LN5fwCQP47Qv9neoL03Sl9tDcqJ2o="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_payload"
+      }
+    },
+    {
+      "name": "a signed body that is \"\\\"text\\\"\"",
+      "body": "\"text\"",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,s4uiH0XTwd2t4Rga3la4nZ+4Cen5nChK8x0gwD/Hi9Q="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_payload"
+      }
+    },
+    {
+      "name": "a signed body that is \"123\"",
+      "body": "123",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,sn/UAg/kpB5i3Rl0Ie0UPfgOLdWzwcCE92sMTUsu4m4="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_payload"
+      }
+    },
+    {
+      "name": "a signed body that is \"null\"",
+      "body": "null",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,255XAvrCslkXoGXBTzVS4ATEZTPNvJdWTSZTtrzmksc="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_payload"
+      }
+    },
+    {
+      "name": "a signed body that is \"\"",
+      "body": "",
+      "headers": {
+        "webhook-id": "evt_01k6a3p0a1b2c3d4e5f6g7h8j9",
+        "webhook-timestamp": "1789459200",
+        "webhook-signature": "v1,u3CjxWB5sGTT9zxAUv9UDkeAoFLkfvZSUa6nQtT8Vv0="
+      },
+      "options": {
+        "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+        "now": 1789459200
+      },
+      "expect": {
+        "error": "invalid_payload"
+      }
+    }
+  ]
+}

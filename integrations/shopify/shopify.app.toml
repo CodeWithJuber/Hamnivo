@@ -1,0 +1,23 @@
+# Hamnivo Chat for Shopify: an extension-only app. It has no server of its own, so there is nothing
+# to host. Learn more: https://shopify.dev/docs/apps/build/cli-for-apps/app-configuration
+#
+# client_id stays empty in this repository, because it belongs to the app in your Shopify Partner
+# account. Run `shopify app config link` once: it asks you to sign in, lets you create the app or
+# pick yours, and writes the client ID here.
+client_id = ""
+name = "Hamnivo Chat"
+application_url = "https://shopify.dev/apps/default-app-home"
+embedded = true
+
+[build]
+include_config_on_deploy = true
+
+[access_scopes]
+# The chat reads nothing from the store.
+scopes = ""
+
+[auth]
+redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+
+[webhooks]
+api_version = "2026-07"

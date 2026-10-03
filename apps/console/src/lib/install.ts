@@ -7,14 +7,18 @@
 export const PLATFORMS = [
   { id: 'html', slug: 'html' },
   { id: 'wordpress', slug: 'wordpress' },
-  { id: 'woocommerce', slug: 'woocommerce' },
+  // The WordPress plugin covers WooCommerce shops and their signed-in customers.
+  { id: 'woocommerce', slug: 'wordpress' },
   { id: 'shopify', slug: 'shopify' },
-  { id: 'wix', slug: 'wix' },
-  { id: 'squarespace', slug: 'squarespace' },
-  { id: 'webflow', slug: 'webflow' },
-  { id: 'google-tag-manager', slug: 'google-tag-manager' },
-  { id: 'react', slug: 'react' },
-  { id: 'nextjs', slug: 'nextjs' },
+  { id: 'whmcs', slug: 'whmcs' },
+  // Site builders take the plain HTML snippet; the HTML guide says where each one keeps it.
+  { id: 'wix', slug: 'html' },
+  { id: 'squarespace', slug: 'html' },
+  { id: 'webflow', slug: 'html' },
+  { id: 'google-tag-manager', slug: 'gtm' },
+  { id: 'react', slug: 'react-vue-next' },
+  { id: 'vue', slug: 'react-vue-next' },
+  { id: 'nextjs', slug: 'react-vue-next' },
 ] as const;
 
 export type PlatformId = (typeof PLATFORMS)[number]['id'];

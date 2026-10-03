@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "paths": {
+      "@hamnivo/react": ["./src/index.ts"],
+      "@hamnivo/react/client": ["./src/client.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}

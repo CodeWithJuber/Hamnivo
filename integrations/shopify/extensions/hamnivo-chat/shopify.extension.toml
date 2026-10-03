@@ -1,0 +1,7 @@
+# The theme app extension of Hamnivo Chat: one app embed block, blocks/hamnivo-chat.liquid.
+# Learn more: https://shopify.dev/docs/apps/build/online-store/theme-app-extensions/configuration
+#
+# The first `shopify app deploy` adds a `uid` line below. Keep it and commit it.
+name = "Hamnivo Chat"
+type = "theme"
+handle = "hamnivo-chat"
