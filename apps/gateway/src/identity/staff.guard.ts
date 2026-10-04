@@ -6,6 +6,7 @@ import {
   type DenyReason,
   explain,
   type PlatformPermission,
+  type StaffPrincipal,
 } from '@hamnivo/policy';
 import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -33,6 +34,19 @@ export function enforce(
     default:
       throw new AppError('SCOPE_DENIED', { detail });
   }
+}
+
+/**
+ * The principal a request acts as. A request that only reads (GET, HEAD) needs no recent sign-in:
+ * step-up guards changes (and exports, whose permissions ask for it on reads too). Both guards
+ * hand the services this same principal, so a route and the service behind it decide alike.
+ */
+export function principalForRequest(
+  member: StaffPrincipal,
+  request: FastifyRequest,
+): StaffPrincipal {
+  const reading = request.method === 'GET' || request.method === 'HEAD';
+  return reading ? { ...member, reading: true } : member;
 }
 
 export function tenantIdFromHeader(request: FastifyRequest): string {
@@ -106,10 +120,7 @@ export class StaffGuard implements CanActivate {
     // Not a member (or no such tenant): indistinguishable on purpose.
     if (!member) throw new AppError('NOT_FOUND');
     assertWritable(member, request);
-    // A request that only reads needs no recent sign-in: step-up guards changes (and exports,
-    // whose permissions ask for it on reads too). The services check the same principal.
-    const reading = request.method === 'GET' || request.method === 'HEAD';
-    const principal = reading ? { ...member, reading: true } : member;
+    const principal = principalForRequest(member, request);
     request.hamnivo.principal = principal;
 
     if (options.permission) {

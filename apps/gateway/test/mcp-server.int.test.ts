@@ -586,7 +586,9 @@ describe('audit and limits', () => {
     try {
       await ask(client, 'search_conversations', { query: 'private zebra words' });
       await ask(client, 'get_transcript', { conversationId: c1.conversationId });
-      await ask(client, 'get_transcript', { conversationId: c3.conversationId.replace(/.$/, '0') });
+      // An id no conversation has: the last character always changes (an id ending in 0 kept it).
+      const unknown = c3.conversationId.replace(/.$/, (last) => (last === '0' ? '1' : '0'));
+      await ask(client, 'get_transcript', { conversationId: unknown });
       await ask(client, 'search_conversations', { query: 'x' });
     } finally {
       await client.close();
