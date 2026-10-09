@@ -1,4 +1,4 @@
-/** Studio: a brand's chat settings and proactive prompts (W02, W09, W17, W19, W23, W25). */
+/** Studio: a brand's chat settings (W02, W09, W17, W23, W25). */
 export const chatSettingsEn = {
   open: 'Chat settings',
   openLabel: 'Chat settings for {{name}}',
@@ -60,51 +60,5 @@ export const chatSettingsEn = {
   emails: {
     label: 'Offer signed-in customers emails about their conversations',
     hint: 'A copy when a conversation closes, and a note when a reply waits. Customers choose, and every email has a link to stop them.',
-  },
-  proactive: {
-    open: 'Proactive prompts',
-    openLabel: 'Proactive prompts for {{name}}',
-    title: 'Proactive prompts for {{name}}',
-    description:
-      'Short messages near the chat button that invite visitors to ask. They never cover an open chat.',
-    saved: 'Proactive prompts saved for {{name}}.',
-    save: 'Save prompts',
-    loading: 'Loading the proactive prompts',
-    enabled: 'Show proactive prompts',
-    enabledHint: 'Off until you turn it on.',
-    maxPerDay: 'Prompts one visitor sees in a day',
-    maxPerDayHint: 'From 1 to 3.',
-    dismissHours: 'After a visitor closes one, wait (hours)',
-    dismissHoursHint: 'From 1 to 168 (a week).',
-    onlyWhenAvailable: 'Only while people are working',
-    onlyWhenAvailableHint:
-      'Uses the brand’s business hours. While no hours are set, no prompt shows.',
-    prompts: 'Prompts',
-    promptsHint: 'Up to 5. On each page, the first one that applies is shown.',
-    prompt: 'Prompt {{number}}',
-    id: 'Name',
-    idHint: 'Lower-case letters, digits and dashes, such as pricing-help.',
-    kind: 'When it shows',
-    kinds: {
-      page_path: 'On a page',
-      time_on_page: 'After some time on a page',
-      returning_visitor: 'When a visitor comes back',
-    },
-    path: 'Page',
-    pathHint: 'A path such as /pricing. It covers the pages below it too.',
-    pathOptionalHint: 'Optional. Only on this page and the pages below it.',
-    seconds: 'Seconds on the page first',
-    secondsHint: 'At least 10 after some time on a page.',
-    visits: 'From which visit',
-    visitsHint: 'Visits on different days, from 2 to 20.',
-    message: 'Message',
-    messageHint: 'Up to 160 characters. English is required; an empty language shows the English.',
-    add: 'Add a prompt',
-    remove: 'Remove prompt {{number}}',
-    idInvalid: 'Use lower-case letters, digits and dashes for prompt {{number}}.',
-    idDuplicate: 'Prompt {{number}} needs a name of its own.',
-    pathInvalid: 'Start the page of prompt {{number}} with / and leave out ? and #.',
-    pathRequired: 'Enter the page for prompt {{number}}.',
-    messageRequired: 'Write the message of prompt {{number}} in English.',
   },
 };
