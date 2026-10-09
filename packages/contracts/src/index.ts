@@ -4,6 +4,8 @@ export * from './agent-routes.js';
 export * from './agents.js';
 export * from './ai-power.js';
 export * from './analytics.js';
+export * from './automation-routes.js';
+export * from './automations.js';
 export * from './billing.js';
 export * from './billing-routes.js';
 export * from './brands.js';

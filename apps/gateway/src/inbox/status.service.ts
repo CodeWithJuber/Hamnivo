@@ -7,6 +7,7 @@ import type { z } from 'zod';
 import { type JournalEntry, JournalService } from '../authority/journal.service.js';
 import { authorityUnavailable } from '../authority/outbound.service.js';
 import { OwnershipService } from '../authority/ownership.service.js';
+import { queueAutomationEvent } from '../automations/events.js';
 import { AppError } from '../common/app-error.js';
 import { ownedByOther } from '../conversations/staff-conversations.service.js';
 import { enforce } from '../identity/staff.guard.js';
@@ -137,6 +138,11 @@ export class StatusService {
           },
         });
         if (from !== 'resolved' && input.status === 'resolved') {
+          await queueAutomationEvent(tx, principal.tenantId, control.brandId, {
+            conversationId: control.id,
+            event: 'chat_closed',
+            ref: `staff:${principal.staffMemberId}`,
+          });
           return this.journal.append(tx, principal.tenantId, control.id, [
             { lane: 'customer', type: 'conversation.resolved', data: { canReopen: true } },
           ]);

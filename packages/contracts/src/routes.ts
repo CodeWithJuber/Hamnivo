@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { adminRoutes, identityRoutes } from './admin-routes.js';
 import { agentRoutes } from './agent-routes.js';
 import { aiPowerRoutes } from './ai-power.js';
+import { automationRoutes } from './automation-routes.js';
 import { analyticsRoutes, billingRoutes } from './billing-routes.js';
 import { cacheRoutes } from './cache-routes.js';
 import { checkRoutes } from './check-routes.js';
@@ -433,6 +434,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...customerSurfaceWidgetRoutes,
   ...notificationRoutes,
   ...customerSurfaceAdminRoutes,
+  ...automationRoutes,
   ...toolAdminRoutes,
   ...aiPowerRoutes,
   ...actionInboxRoutes,

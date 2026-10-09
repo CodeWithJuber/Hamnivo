@@ -18,6 +18,7 @@ import {
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import { decodeProtectedHeader, importJWK, type JWK, jwtVerify } from 'jose';
+import { asksAnyoneOnline } from '../automations/definitions.js';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { assertWidgetOnline, widgetLoads } from '../identity/tenants.readonly.js';
@@ -101,6 +102,7 @@ export class WidgetSessionsService {
     widgetId: string,
     origin: string | undefined,
     locale: string | undefined,
+    country: string | null = null,
   ): Promise<LauncherConfig> {
     const widget = await resolveWidget(this.db, widgetId);
     if (widget?.brandStatus !== 'active' || !widgetLoads(widget.tenantStatus)) {
@@ -113,7 +115,18 @@ export class WidgetSessionsService {
         .from(schema.brands)
         .where(eq(schema.brands.id, widget.brandId));
       if (!brand) throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
-      return launcherConfig(brand, await brandSurface(tx, brand.id), locale, this.clock());
+      const surface = await brandSurface(tx, brand.id);
+      // Who is online costs a lookup, so it is asked only when a website rule needs it.
+      const staffOnline = asksAnyoneOnline(surface.prompts)
+        ? await this.availability.anyOnline(tx, widget.tenantId, {
+            workspaceId: brand.workspaceId,
+            brandId: brand.id,
+          })
+        : undefined;
+      return launcherConfig(brand, surface, locale, this.clock(), {
+        country,
+        ...(staffOnline === undefined ? {} : { staffOnline }),
+      });
     });
   }
 

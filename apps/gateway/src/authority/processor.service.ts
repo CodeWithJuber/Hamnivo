@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
+import { queueAutomationEvent } from '../automations/events.js';
 import { confirmCardPublication } from '../commerce/card-publisher.service.js';
 import type { AppConfig } from '../config.js';
 import { projectInboxState } from '../inbox/projection.js';
@@ -437,6 +438,11 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
       entries.push(...resolved);
       // The customer asked for a transcript when a conversation closes (W25).
       await queueTranscript(tx, tenantId, control, resolved[0]?.seq ?? control.journalSeq);
+      await queueAutomationEvent(tx, tenantId, control.brandId, {
+        conversationId: control.id,
+        event: 'chat_closed',
+        ref: `authority:${state.version}`,
+      });
     } else if (wasResolved && state.status !== 'resolved') {
       entries.push(
         ...(await this.journal.append(tx, tenantId, control.id, [

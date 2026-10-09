@@ -6,11 +6,9 @@ import {
   LauncherConfig,
   MessageDeletion,
   NotificationPreferences,
-  ProactiveSettingsView,
   ReactionRequest,
   UnsubscribeQuery,
   UpdateNotificationPreferencesRequest,
-  UpdateProactiveSettingsRequest,
   UpdateWidgetSettingsRequest,
   WidgetSettingsView,
 } from './customer-surface.js';
@@ -43,7 +41,7 @@ export const customerSurfaceWidgetRoutes = {
     path: '/v1/widget/launcher',
     operationId: 'getLauncherConfig',
     summary:
-      'Layout, launcher colours and labels, and proactive prompts for the loader; readable from the brand’s allowed websites only',
+      'Layout, launcher colours and labels, and website prompts (automations) for the loader; readable from the brand’s allowed websites only',
     tags: ['Widget'],
     auth: 'public',
     query: z.object({
@@ -238,27 +236,6 @@ export const customerSurfaceAdminRoutes = {
     params: brandParams,
     body: UpdateWidgetSettingsRequest,
     success: { status: 200, description: 'Widget settings', schema: WidgetSettingsView },
-  },
-  getProactiveSettings: {
-    method: 'get',
-    path: '/v1/admin/brands/{brandId}/proactive',
-    operationId: 'getProactiveSettings',
-    summary: 'Proactive prompts on the brand’s website (widget.proactive)',
-    tags: ['Admin'],
-    auth: 'staff_session',
-    params: brandParams,
-    success: { status: 200, description: 'Proactive settings', schema: ProactiveSettingsView },
-  },
-  updateProactiveSettings: {
-    method: 'put',
-    path: '/v1/admin/brands/{brandId}/proactive',
-    operationId: 'updateProactiveSettings',
-    summary: 'Replace the proactive prompts; off until turned on (widget.proactive)',
-    tags: ['Admin'],
-    auth: 'staff_session',
-    params: brandParams,
-    body: UpdateProactiveSettingsRequest,
-    success: { status: 200, description: 'Proactive settings', schema: ProactiveSettingsView },
   },
   getWidgetForms: {
     method: 'get',
