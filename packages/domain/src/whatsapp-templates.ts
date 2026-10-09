@@ -69,9 +69,8 @@ export function parseWhatsappTemplate(raw: unknown): WhatsappTemplate | null {
   const part = (type: string) => components.find((c) => str(c.type)?.toUpperCase() === type);
   const header = part('HEADER');
   const headerFormat = (str(header?.format) ?? 'TEXT').toLowerCase();
-  const buttons = Array.isArray(part('BUTTONS')?.buttons)
-    ? (part('BUTTONS')?.buttons as unknown[]).map(obj)
-    : [];
+  const rawButtons = part('BUTTONS')?.buttons;
+  const buttons = Array.isArray(rawButtons) ? rawButtons.map(obj) : [];
   return {
     name,
     language,
@@ -115,11 +114,10 @@ export function templateVariables(template: WhatsappTemplate): TemplateVariables
   return {
     header: template.header?.format === 'text' ? variablesIn(template.header.text) : [],
     body: variablesIn(template.body),
-    buttons: template.buttons.flatMap((button, index) => {
-      if (button.type === 'copy_code')
-        return [{ index, type: 'copy_code' as const, label: button.text }];
+    buttons: template.buttons.flatMap((button, index): TemplateVariables['buttons'] => {
+      if (button.type === 'copy_code') return [{ index, type: 'copy_code', label: button.text }];
       if (button.type === 'url' && variablesIn(button.url).length > 0) {
-        return [{ index, type: 'url' as const, label: button.text }];
+        return [{ index, type: 'url', label: button.text }];
       }
       return [];
     }),
