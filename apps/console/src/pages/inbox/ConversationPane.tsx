@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@hamnivo/ui/components/dropdown-menu';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
+import { ReasonedAction } from '@hamnivo/ui/components/reasoned-action';
 import {
   Sheet,
   SheetClose,
@@ -19,19 +20,23 @@ import {
   SheetTitle,
 } from '@hamnivo/ui/components/sheet';
 import { Skeleton } from '@hamnivo/ui/components/skeleton';
+import { ToggleGroup, ToggleGroupItem } from '@hamnivo/ui/components/toggle-group';
 import { cn } from '@hamnivo/ui/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import {
   ArrowLeftIcon,
   BotIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
+  EllipsisIcon,
   HandIcon,
   InfoIcon,
   MoonIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
   RotateCcwIcon,
+  TicketIcon,
   UserRoundCheckIcon,
   UserRoundIcon,
   UsersRoundIcon,
@@ -40,7 +45,7 @@ import {
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppDialog, DialogFooter } from '../../components/AppDialog';
-import { TextareaField, TextField } from '../../components/Fields';
+import { SelectField, TextareaField, TextField } from '../../components/Fields';
 import { useDocumentTitle } from '../../components/PageHeader';
 import { ActionError, ErrorPanel } from '../../components/States';
 import { directionOf, isLocale } from '../../i18n';
@@ -53,9 +58,18 @@ import {
   chronological,
   type InboxDetail,
   type InboxSearch,
+  type InboxTicket,
+  inboxKeys,
+  makeTicket,
   newClientId,
+  PRIORITIES,
   sendPresence,
+  setPriority,
   setStatus,
+  statusOfTicketState,
+  TICKET_STATES,
+  type TicketPriority,
+  type TicketState,
   useAssignees,
   useConversation,
   useConversationChange,
@@ -74,6 +88,8 @@ import {
   IdentityBadge,
   languageName,
   OwnerBadge,
+  PriorityBadge,
+  TicketStateBadge,
   useMyStaffId,
 } from './parts';
 import { Timeline } from './Timeline';
@@ -519,6 +535,255 @@ function StatusActions({ detail }: { detail: InboxDetail }) {
   );
 }
 
+/** Puts a changed conversation in the cache at once, so the page shows it before it reloads. */
+function useRememberDetail(id: string) {
+  const { tenantId } = useTenant();
+  const client = useQueryClient();
+  return (detail: InboxDetail) =>
+    client.setQueryData([tenantId, ...inboxKeys.conversation(id)], detail);
+}
+
+/**
+ * A ticket's state and priority (H19), above the conversation. Open, Pending and Closed are the
+ * conversation's status underneath (Pending waits for the customer, Closed is resolved), so they
+ * are changed the way a status is, refused if someone else changed the owner meanwhile.
+ */
+function TicketBar({ detail, ticket }: { detail: InboxDetail; ticket: InboxTicket }) {
+  const { t } = useTranslation();
+  const announce = useAnnouncer();
+  const remember = useRememberDetail(detail.id);
+  const allowed = detail.permissions.status;
+  const state = useConversationChange(
+    detail.id,
+    (next: TicketState, tenantId) =>
+      setStatus(tenantId, detail.id, {
+        ...statusOfTicketState(next),
+        expectedEpoch: detail.ownershipEpoch,
+      }),
+    ['messages'],
+  );
+  const priority = useConversationChange(detail.id, (next: TicketPriority | null, tenantId) =>
+    setPriority(tenantId, detail.id, { priority: next, expectedEpoch: detail.ownershipEpoch }),
+  );
+  const reasonId = `ticket-${detail.id}-reason`;
+  const hintId = `ticket-${detail.id}-hint`;
+  const error = state.error ?? priority.error;
+  return (
+    <section
+      aria-labelledby="ticket-title"
+      className="flex flex-wrap items-end gap-x-4 gap-y-3 rounded-lg border border-border bg-surface-muted p-3"
+      data-testid="ticket-bar"
+      data-ticket-state={ticket.state}
+    >
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <h3 id="ticket-title" className="text-sm font-semibold text-text">
+          <TicketIcon className="me-1 inline size-4 align-text-bottom" aria-hidden="true" />
+          {t('inbox.tickets.reference', { reference: ticket.reference })}
+        </h3>
+        <p className="text-xs text-text-secondary">
+          {t(`inbox.tickets.source.${ticket.source}`)} ·{' '}
+          <time dateTime={ticket.openedAt}>{formatRelative(ticket.openedAt)}</time>
+        </p>
+      </div>
+      <div className="flex flex-col gap-1">
+        <span id="ticket-state-label" className="text-xs font-medium text-text">
+          {t('inbox.tickets.states.label')}
+        </span>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={ticket.state}
+          disabled={!allowed || state.isPending}
+          aria-labelledby="ticket-state-label"
+          aria-describedby={allowed ? hintId : reasonId}
+          onValueChange={(value) => {
+            const next = TICKET_STATES.find((s) => s === value);
+            if (!next || next === ticket.state) return;
+            state.mutate(next, {
+              onSuccess: (result) => {
+                remember(result);
+                announce(
+                  t('inbox.tickets.stateChanged', {
+                    reference: ticket.reference,
+                    state: t(`inbox.tickets.stateBadge.${next}`),
+                  }),
+                );
+              },
+            });
+          }}
+          data-testid="ticket-state"
+        >
+          {TICKET_STATES.map((value) => (
+            <ToggleGroupItem key={value} value={value} data-testid={`ticket-state-${value}`}>
+              {t(`inbox.tickets.states.${value}`)}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+      <div className="w-44">
+        <SelectField
+          id={`ticket-${detail.id}-priority`}
+          label={t('inbox.tickets.priority.label')}
+          value={detail.priority ?? ''}
+          disabled={!allowed || priority.isPending}
+          aria-describedby={allowed ? undefined : reasonId}
+          onChange={(event) => {
+            const next = PRIORITIES.find((value) => value === event.target.value) ?? null;
+            priority.mutate(next, {
+              onSuccess: (result) => {
+                remember(result);
+                announce(
+                  next
+                    ? t('inbox.tickets.priorityChanged', {
+                        priority: t(`inbox.tickets.priority.${next}`),
+                      })
+                    : t('inbox.tickets.priorityCleared'),
+                );
+              },
+            });
+          }}
+          options={[
+            { value: '', label: t('inbox.tickets.priority.none') },
+            ...PRIORITIES.map((value) => ({
+              value,
+              label: t(`inbox.tickets.priority.${value}`),
+            })),
+          ]}
+          data-testid="ticket-priority"
+        />
+      </div>
+      {allowed ? (
+        <p id={hintId} className="basis-full text-xs text-text-secondary">
+          {t(`inbox.tickets.stateHint.${ticket.state}`)}
+        </p>
+      ) : (
+        <p id={reasonId} className="basis-full text-xs text-danger" data-testid="ticket-reason">
+          {t('inbox.tickets.noPermission')}
+        </p>
+      )}
+      {error ? (
+        <div className="basis-full">
+          <ActionError error={error} />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** Makes the conversation a ticket, with a priority if one is chosen (H19). */
+function MakeTicketDialog({
+  open,
+  onOpenChange,
+  detail,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  detail: InboxDetail;
+}) {
+  const { t } = useTranslation();
+  const announce = useAnnouncer();
+  const remember = useRememberDetail(detail.id);
+  const [priority, setPriorityChoice] = useState<TicketPriority | ''>('');
+  const make = useConversationChange(detail.id, (vars: { priority?: TicketPriority }, tenantId) =>
+    makeTicket(tenantId, detail.id, { ...vars, expectedEpoch: detail.ownershipEpoch }),
+  );
+  const allowed = detail.permissions.status;
+  return (
+    <AppDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (make.isPending) return;
+        if (!next) make.reset();
+        onOpenChange(next);
+      }}
+      title={t('inbox.tickets.make.title')}
+      description={t('inbox.tickets.make.description')}
+      testId="make-ticket-dialog"
+    >
+      <form
+        className="flex flex-col gap-4"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!allowed) return;
+          make.mutate(priority ? { priority } : {}, {
+            onSuccess: (result) => {
+              remember(result);
+              announce(t('inbox.tickets.make.done', { reference: result.ticket?.reference ?? '' }));
+              setPriorityChoice('');
+              onOpenChange(false);
+            },
+          });
+        }}
+      >
+        <SelectField
+          id="make-ticket-priority"
+          label={t('inbox.tickets.make.priority')}
+          labelNote={t('app.optional')}
+          value={priority}
+          onChange={(event) =>
+            setPriorityChoice(PRIORITIES.find((value) => value === event.target.value) ?? '')
+          }
+          options={[
+            { value: '', label: t('inbox.tickets.priority.none') },
+            ...PRIORITIES.map((value) => ({
+              value,
+              label: t(`inbox.tickets.priority.${value}`),
+            })),
+          ]}
+        />
+        <ActionError error={make.error} />
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onOpenChange(false)}
+            disabled={make.isPending}
+          >
+            {t('app.cancel')}
+          </Button>
+          <ReasonedAction reason={allowed ? null : t('inbox.tickets.noPermission')}>
+            <Button type="submit" busy={make.isPending} data-testid="make-ticket-submit">
+              {t('inbox.tickets.make.submit')}
+            </Button>
+          </ReasonedAction>
+        </DialogFooter>
+      </form>
+    </AppDialog>
+  );
+}
+
+/** Less frequent actions on a conversation: for now, making it a ticket. */
+function MoreMenu({ detail }: { detail: InboxDetail }) {
+  const { t } = useTranslation();
+  const [making, setMaking] = useState(false);
+  if (detail.ticket) return null;
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="icon-sm"
+            variant="secondary"
+            aria-label={t('inbox.tickets.more')}
+            data-testid="more-menu"
+          >
+            <EllipsisIcon aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setMaking(true)} data-testid="make-ticket">
+            <TicketIcon aria-hidden="true" />
+            {t('inbox.tickets.make.item')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <MakeTicketDialog open={making} onOpenChange={setMaking} detail={detail} />
+    </>
+  );
+}
+
 /** What the person can do about ownership right now, in one sentence and one or two buttons. */
 function OwnershipBanner({ detail }: { detail: InboxDetail }) {
   const { t } = useTranslation();
@@ -667,7 +932,14 @@ function Header({
           </h2>
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-secondary">
             <IdentityBadge identity={detail.customer.identity} />
-            <ConversationStatusBadge status={detail.status} snoozedUntil={detail.snoozedUntil} />
+            {detail.ticket ? (
+              <TicketStateBadge state={detail.ticket.state} />
+            ) : (
+              <ConversationStatusBadge status={detail.status} snoozedUntil={detail.snoozedUntil} />
+            )}
+            {detail.priority && !detail.ticket ? (
+              <PriorityBadge priority={detail.priority} />
+            ) : null}
             <OwnerBadge conversation={detail} />
             <ChannelIcon channel={detail.channel} />
             {language ? <bdi>{language}</bdi> : null}
@@ -679,7 +951,9 @@ function Header({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <AssignMenu detail={detail} />
-        <StatusActions detail={detail} />
+        {/* A ticket's state control (below) does what these buttons do, in the ticket's words. */}
+        {detail.ticket ? null : <StatusActions detail={detail} />}
+        <MoreMenu detail={detail} />
         <Button
           size="sm"
           variant="ghost"
@@ -696,6 +970,7 @@ function Header({
           {detailsOpen ? t('inbox.details.hide') : t('inbox.details.show')}
         </Button>
       </div>
+      {detail.ticket ? <TicketBar detail={detail} ticket={detail.ticket} /> : null}
     </header>
   );
 }

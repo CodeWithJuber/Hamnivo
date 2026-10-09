@@ -1,3 +1,13 @@
+import { GATEWAY_ORIGIN, WIDGET_ORIGIN } from './config';
+
+/**
+ * The loader tag for a brand (packages/widget-loader). The widget ID is not a secret: it is in
+ * every page the chat is on.
+ */
+export function installSnippet(widgetId: string): string {
+  return `<script src="${WIDGET_ORIGIN}/loader.js" data-widget-id="${widgetId}" data-api="${GATEWAY_ORIGIN}" async></script>`;
+}
+
 /**
  * Where a business may be putting the chat. Each platform has its own written guide in
  * `docs/guide/integrations/<slug>.md`; the picker in the setup guide links to the one chosen.

@@ -1,10 +1,12 @@
 import { cachingUr } from './caching';
+import { chatWidgetUr } from './chat-widget/ur';
 import { checksUr } from './checks';
 import { commerceUr } from './commerce/ur';
 import { decisionsUr } from './decisions';
 import { developerUr } from './developer/ur';
 import type { Translation } from './en';
 import { reportsUr } from './reports/ur';
+import { ticketsUr } from './tickets/ur';
 import { toolsUr } from './tools';
 import { chatSettingsUr } from './widget/ur';
 
@@ -956,8 +958,10 @@ export const ur: Translation = {
       unassigned: 'کسی شخص کا انتظار',
       ai: 'AI جواب دے رہا ہے',
       team: 'میری ٹیمیں',
+      tickets: 'ٹکٹ',
       all: 'سب',
     },
+    tickets: ticketsUr,
     keys: {
       plain: 'کلیدیں: حرکت کے لیے ↑ ↓ یا J K، کھولنے کے لیے Enter، واپسی کے لیے Esc۔',
       withSelect:
@@ -1020,6 +1024,11 @@ export const ur: Translation = {
       team: {
         title: 'آپ کی ٹیموں میں کچھ نہیں',
         description: 'آپ کی ٹیموں کو دی گئی گفتگوئیں یہاں نظر آتی ہیں۔',
+      },
+      tickets: {
+        title: 'ابھی کوئی ٹکٹ نہیں',
+        description:
+          'جب جواب دینے کے لیے کوئی نہ ہو، تب رابطہ فارم سے چھوڑے گئے پیغامات ٹکٹ بن جاتے ہیں۔ وہ ہر گفتگو بھی، جسے آپ ٹکٹ بناتے ہیں۔',
       },
       all: {
         title: 'ابھی کوئی گفتگو نہیں',
@@ -1365,6 +1374,7 @@ export const ur: Translation = {
   developer: developerUr,
   reports: reportsUr,
   chatSettings: chatSettingsUr,
+  chatWidget: chatWidgetUr,
   memory: {
     title: 'کسٹمر میموری',
     description: 'طے کریں کہ ہم آپ کے کسٹمرز کے بارے میں کیا یاد رکھتے ہیں۔',

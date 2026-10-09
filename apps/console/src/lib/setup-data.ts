@@ -66,35 +66,109 @@ export const DEFAULT_WIDGET_TEXT: Readonly<
 };
 
 /**
- * Words drawn inside the live preview, in the customer's language: what the chat's own text box,
- * rating and privacy link say. An illustration; the real chat has the real words.
+ * What the chat's forms say until a brand writes its own words: the consent question (W27) and
+ * the thank-you after the contact form (W11). Studio shows them as the placeholder of the field
+ * and in the preview, so the owner sees what customers will read when the field is left empty.
  */
-export const PREVIEW_TEXT: Readonly<
-  Record<ChatLanguage, { placeholder: string; question: string; rating: string; privacy: string }>
+export const DEFAULT_FORM_TEXT: Readonly<
+  Record<'consent' | 'thanks', Readonly<Record<ChatLanguage, string>>>
 > = {
+  consent: {
+    en: 'We keep this chat and what you write in it, so our team can help you and follow up later. Please agree before you start.',
+    ar: 'نحتفظ بهذه المحادثة وبما تكتبه فيها، ليتمكن فريقنا من مساعدتك ومتابعة طلبك لاحقًا. يُرجى الموافقة قبل البدء.',
+    hi: 'हम यह बातचीत और इसमें आपका लिखा हुआ रखते हैं, ताकि हमारी टीम आपकी मदद कर सके और बाद में संपर्क कर सके। शुरू करने से पहले कृपया सहमति दें।',
+    ur: 'ہم یہ گفتگو اور اس میں آپ کا لکھا ہوا محفوظ رکھتے ہیں، تاکہ ہماری ٹیم آپ کی مدد کر سکے اور بعد میں رابطہ کر سکے۔ شروع کرنے سے پہلے براہ کرم اتفاق کریں۔',
+  },
+  thanks: {
+    en: 'Thank you, we have your message. Check your email to confirm your address, and we will answer you there.',
+    ar: 'شكرًا، وصلتنا رسالتك. افتح بريدك الإلكتروني لتأكيد عنوانك، وسنرد عليك هناك.',
+    hi: 'धन्यवाद, आपका संदेश हमें मिल गया है। अपना पता पक्का करने के लिए अपना ईमेल देखें, हम वहीं जवाब देंगे।',
+    ur: 'شکریہ، آپ کا پیغام ہمیں مل گیا ہے۔ اپنا پتہ تصدیق کرنے کے لیے اپنی ای میل دیکھیں، ہم وہیں جواب دیں گے۔',
+  },
+};
+
+/** The chat's own words drawn inside the live preview, in one language. */
+export interface PreviewWords {
+  placeholder: string;
+  question: string;
+  rating: string;
+  privacy: string;
+  /** Above the pre-chat form. */
+  prechatIntro: string;
+  /** Above the contact form while nobody can answer. */
+  offlineIntro: string;
+  startChat: string;
+  send: string;
+  agree: string;
+  /** After a field that may be left empty. */
+  optional: string;
+  /** In a list nobody has picked from yet. */
+  choose: string;
+  /** A sample ticket reference after the contact form is sent. */
+  reference: string;
+}
+
+/**
+ * Words drawn inside the live preview, in the customer's language: what the chat's own text box,
+ * rating, privacy link, forms and buttons say. An illustration; the real chat has the real words.
+ */
+export const PREVIEW_TEXT: Readonly<Record<ChatLanguage, PreviewWords>> = {
   en: {
     placeholder: 'Write a message…',
     question: 'Where is my order?',
     rating: 'How was this chat?',
     privacy: 'Privacy policy',
+    prechatIntro: 'Before we start, tell us a little about you.',
+    offlineIntro: 'Nobody can answer right now. Leave a message and we will email you back.',
+    startChat: 'Start chat',
+    send: 'Send message',
+    agree: 'I agree',
+    optional: 'optional',
+    choose: 'Choose…',
+    reference: 'Reference #1042',
   },
   ar: {
     placeholder: 'اكتب رسالة…',
     question: 'أين طلبي؟',
     rating: 'كيف كانت هذه المحادثة؟',
     privacy: 'سياسة الخصوصية',
+    prechatIntro: 'قبل أن نبدأ، أخبرنا قليلًا عنك.',
+    offlineIntro: 'لا أحد متاح للرد الآن. اترك رسالة وسنرد عليك عبر البريد الإلكتروني.',
+    startChat: 'ابدأ المحادثة',
+    send: 'أرسل الرسالة',
+    agree: 'أوافق',
+    optional: 'اختياري',
+    choose: 'اختر…',
+    reference: 'المرجع #1042',
   },
   hi: {
     placeholder: 'संदेश लिखें…',
     question: 'मेरा ऑर्डर कहाँ है?',
     rating: 'यह बातचीत कैसी रही?',
     privacy: 'गोपनीयता नीति',
+    prechatIntro: 'शुरू करने से पहले, हमें अपने बारे में थोड़ा बताएँ।',
+    offlineIntro: 'अभी कोई जवाब देने के लिए उपलब्ध नहीं है। संदेश छोड़ें, हम आपको ईमेल से जवाब देंगे।',
+    startChat: 'चैट शुरू करें',
+    send: 'संदेश भेजें',
+    agree: 'मैं सहमत हूँ',
+    optional: 'वैकल्पिक',
+    choose: 'चुनें…',
+    reference: 'संदर्भ #1042',
   },
   ur: {
     placeholder: 'پیغام لکھیں…',
     question: 'میرا آرڈر کہاں ہے؟',
     rating: 'یہ گفتگو کیسی رہی؟',
     privacy: 'پرائیویسی پالیسی',
+    prechatIntro: 'شروع کرنے سے پہلے، ہمیں اپنے بارے میں تھوڑا بتائیں۔',
+    offlineIntro:
+      'ابھی کوئی جواب دینے کے لیے موجود نہیں ہے۔ پیغام چھوڑیں، ہم آپ کو ای میل سے جواب دیں گے۔',
+    startChat: 'چیٹ شروع کریں',
+    send: 'پیغام بھیجیں',
+    agree: 'میں متفق ہوں',
+    optional: 'اختیاری',
+    choose: 'منتخب کریں…',
+    reference: 'حوالہ #1042',
   },
 };
 

@@ -26,13 +26,16 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SelectField } from '../../components/Fields';
+import { GuideLink } from '../../components/GuideLink';
 import { useDocumentTitle } from '../../components/PageHeader';
 import { Forbidden, ListSkeleton, QueryState } from '../../components/States';
+import { DOCS } from '../../lib/docs';
 import { formatNumber } from '../../lib/format';
 import {
   CHANNELS,
   type InboxConversation,
   type InboxSearch,
+  PRIORITIES,
   QUEUES,
   STATUSES,
   useInboxList,
@@ -44,7 +47,16 @@ import { useBrandRefs } from '../../lib/names';
 import { useTenant } from '../../lib/tenant';
 import { BulkBar } from './BulkBar';
 import { DesktopAlertsPrompt, InboxToolbar } from './InboxToolbar';
-import { ChannelIcon, ConversationStatusBadge, languageName, OwnerBadge, shortTime } from './parts';
+import {
+  ChannelIcon,
+  ConversationStatusBadge,
+  languageName,
+  OwnerBadge,
+  PriorityBadge,
+  shortTime,
+  TicketReference,
+  TicketStateBadge,
+} from './parts';
 
 /** The row to put focus back on after leaving a conversation (Esc or Back on a phone). */
 let returnFocusTo: string | null = null;
@@ -154,8 +166,17 @@ function QueueRow({
           </span>
           <RowPreview conversation={conversation} />
           <span className="flex flex-wrap items-center gap-1.5">
+            {conversation.ticket ? (
+              <>
+                <TicketReference reference={conversation.ticket.reference} />
+                <TicketStateBadge state={conversation.ticket.state} />
+              </>
+            ) : null}
+            {conversation.priority ? <PriorityBadge priority={conversation.priority} /> : null}
             <OwnerBadge conversation={conversation} />
-            {conversation.status === 'snoozed' || conversation.status === 'resolved' ? (
+            {/* A ticket's state already says whether it waits or is closed. */}
+            {!conversation.ticket &&
+            (conversation.status === 'snoozed' || conversation.status === 'resolved') ? (
               <ConversationStatusBadge
                 status={conversation.status}
                 snoozedUntil={conversation.snoozedUntil}
@@ -204,7 +225,8 @@ function QueueNav({ counts }: { counts: Record<(typeof QUEUES)[number], number> 
             <Link
               to="."
               search={(prev: InboxSearch) => {
-                const { queue: _old, ...rest } = prev;
+                // A ticket's state and priority belong to the tickets queue.
+                const { queue: _old, ticketState: _state, priority: _priority, ...rest } = prev;
                 return queue === 'all' ? rest : { ...rest, queue };
               }}
               aria-current={current === queue ? 'page' : undefined}
@@ -217,7 +239,7 @@ function QueueNav({ counts }: { counts: Record<(typeof QUEUES)[number], number> 
               )}
             >
               {t(`inbox.queues.${queue}`)}
-              {counts ? (
+              {counts && counts[queue] !== undefined ? (
                 <span
                   className={cn(
                     'rounded-full px-1.5 text-xs',
@@ -232,6 +254,73 @@ function QueueNav({ counts }: { counts: Record<(typeof QUEUES)[number], number> 
         ))}
       </ul>
     </nav>
+  );
+}
+
+/**
+ * The tickets queue's own filters: where the tickets stand (Open, Pending, Closed or all of them)
+ * and their priority. Both are in the address, so a view of tickets can be shared.
+ */
+function TicketFilters() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const search = useSearch({ from: '/_studio/inbox' });
+  const current = search.ticketState ?? 'all';
+  return (
+    <div className="flex flex-col gap-3" data-testid="ticket-filters">
+      <nav aria-label={t('inbox.tickets.states.label')}>
+        <ul className="flex flex-wrap gap-1">
+          {(['open', 'pending', 'closed', 'all'] as const).map((state) => (
+            <li key={state}>
+              <Link
+                to="."
+                search={(prev: InboxSearch) => {
+                  const { ticketState: _old, ...rest } = prev;
+                  return state === 'all' ? rest : { ...rest, ticketState: state };
+                }}
+                aria-current={current === state ? 'true' : undefined}
+                data-ticket-state={state}
+                className={cn(
+                  'inline-flex min-h-8 items-center rounded-full border px-3 text-sm whitespace-nowrap',
+                  current === state
+                    ? 'border-text bg-surface-muted font-medium text-text'
+                    : 'border-border bg-surface text-text-secondary hover:bg-surface-sunken',
+                )}
+              >
+                {t(`inbox.tickets.states.${state}`)}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="w-48">
+          <SelectField
+            id="inbox-priority"
+            label={t('inbox.tickets.priority.label')}
+            value={search.priority ?? ''}
+            onChange={(event) =>
+              void navigate({
+                to: '.',
+                search: (prev: InboxSearch) => {
+                  const { priority: _old, ...rest } = prev;
+                  const priority = PRIORITIES.find((value) => value === event.target.value);
+                  return priority ? { ...rest, priority } : rest;
+                },
+              })
+            }
+            options={[
+              { value: '', label: t('inbox.tickets.priority.any') },
+              ...PRIORITIES.map((value) => ({
+                value,
+                label: t(`inbox.tickets.priority.${value}`),
+              })),
+            ]}
+          />
+        </div>
+        <GuideLink href={DOCS.inbox.tickets}>{t('inbox.tickets.guide')}</GuideLink>
+      </div>
+    </div>
   );
 }
 
@@ -288,18 +377,21 @@ function FilterPanel({ rows, onClose }: { rows: InboxConversation[]; onClose: ()
         </Button>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-        <SelectField
-          id="inbox-status"
-          label={t('inbox.filters.status')}
-          value={search.status ?? 'active'}
-          onChange={(event) =>
-            set('status', event.target.value === 'active' ? '' : event.target.value)
-          }
-          options={STATUSES.map((value) => ({
-            value,
-            label: t(`inbox.filters.statuses.${value}`),
-          }))}
-        />
+        {/* In the tickets queue, a ticket's state (above the list) takes the status's place. */}
+        {search.queue === 'tickets' ? null : (
+          <SelectField
+            id="inbox-status"
+            label={t('inbox.filters.status')}
+            value={search.status ?? 'active'}
+            onChange={(event) =>
+              set('status', event.target.value === 'active' ? '' : event.target.value)
+            }
+            options={STATUSES.map((value) => ({
+              value,
+              label: t(`inbox.filters.statuses.${value}`),
+            }))}
+          />
+        )}
         <SelectField
           id="inbox-brand"
           label={t('inbox.filters.brand')}
@@ -337,9 +429,13 @@ function FilterPanel({ rows, onClose }: { rows: InboxConversation[]; onClose: ()
 }
 
 const FILTER_KEYS = ['status', 'brand', 'channel', 'language', 'tag'] as const;
+const TICKET_FILTER_KEYS = ['ticketState', 'priority'] as const;
 
+/** The filters in use; the tickets queue has no status filter (its tickets' state replaces it). */
 function activeFilters(search: InboxSearch) {
-  return FILTER_KEYS.filter((key) => Boolean(search[key]));
+  return FILTER_KEYS.filter(
+    (key) => Boolean(search[key]) && !(key === 'status' && search.queue === 'tickets'),
+  );
 }
 
 function SearchResults({ q }: { q: string }) {
@@ -493,6 +589,8 @@ function QueuePane({ open, selectedId }: { open: boolean; selectedId: string | u
   const rows = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data]);
   const counts = list.data?.pages[0]?.counts;
   const filters = activeFilters(search);
+  const tickets = search.queue === 'tickets';
+  const ticketFilters = tickets ? TICKET_FILTER_KEYS.filter((key) => Boolean(search[key])) : [];
   const tabStop = rows.some((r) => r.id === activeId) ? activeId : rows[0]?.id;
 
   // Coming back from a conversation (Esc, or Back on a phone): focus returns to its row, or to
@@ -593,6 +691,14 @@ function QueuePane({ open, selectedId }: { open: boolean; selectedId: string | u
         return next as InboxSearch;
       },
     });
+  const clearTicketFilters = () =>
+    void navigate({
+      to: '.',
+      search: (prev: InboxSearch) => {
+        const { ticketState: _state, priority: _priority, ...rest } = prev;
+        return rest;
+      },
+    });
 
   return (
     <section
@@ -651,6 +757,7 @@ function QueuePane({ open, selectedId }: { open: boolean; selectedId: string | u
         <InboxToolbar />
         <DesktopAlertsPrompt />
         {search.q ? null : <QueueNav counts={counts} />}
+        {tickets && !search.q ? <TicketFilters /> : null}
         <div id="inbox-filters-panel">
           {filtersOpen ? <FilterPanel rows={rows} onClose={() => setFiltersOpen(false)} /> : null}
         </div>
@@ -691,7 +798,18 @@ function QueuePane({ open, selectedId }: { open: boolean; selectedId: string | u
             isEmpty={(items) => items.length === 0}
             empty={
               <div className="p-4">
-                {filters.length > 0 ? (
+                {ticketFilters.length > 0 && filters.length === 0 ? (
+                  <EmptyState
+                    kind="no-matches"
+                    title={t('inbox.tickets.emptyFiltered.title')}
+                    description={t('inbox.tickets.emptyFiltered.description')}
+                    action={
+                      <Button variant="secondary" onClick={clearTicketFilters}>
+                        {t('inbox.tickets.emptyFiltered.action')}
+                      </Button>
+                    }
+                  />
+                ) : filters.length > 0 ? (
                   <EmptyState
                     kind="no-matches"
                     title={t('inbox.empty.filteredTitle')}

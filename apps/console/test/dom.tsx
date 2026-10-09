@@ -61,7 +61,10 @@ const tenant = {
 
 const PATHS = [
   '/overview',
+  '/inbox',
+  '/inbox/$conversationId',
   '/brands',
+  '/chat-widget',
   '/hours',
   '/team',
   '/support-teams',

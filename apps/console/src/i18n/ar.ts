@@ -1,10 +1,12 @@
 import { cachingAr } from './caching';
+import { chatWidgetAr } from './chat-widget/ar';
 import { checksAr } from './checks';
 import { commerceAr } from './commerce/ar';
 import { decisionsAr } from './decisions';
 import { developerAr } from './developer/ar';
 import type { Translation } from './en';
 import { reportsAr } from './reports/ar';
+import { ticketsAr } from './tickets/ar';
 import { toolsAr } from './tools';
 import { chatSettingsAr } from './widget/ar';
 
@@ -934,8 +936,10 @@ export const ar: Translation = {
       unassigned: 'بانتظار شخص',
       ai: 'يجيب الذكاء الاصطناعي',
       team: 'فرقي',
+      tickets: 'التذاكر',
       all: 'الكل',
     },
+    tickets: ticketsAr,
     keys: {
       plain: 'المفاتيح: ↑ ↓ أو J K للتنقل، و Enter للفتح، و Esc للرجوع.',
       withSelect: 'المفاتيح: ↑ ↓ أو J K للتنقل، و Enter للفتح، و X للتحديد، و Esc للرجوع.',
@@ -997,6 +1001,11 @@ export const ar: Translation = {
       team: {
         title: 'لا شيء في فرقك',
         description: 'تظهر هنا المحادثات المُسندة إلى فرقك.',
+      },
+      tickets: {
+        title: 'لا توجد تذاكر بعد',
+        description:
+          'تصبح الرسائل المتروكة عبر نموذج التواصل حين لا يتوفر من يرد تذاكر، وكذلك أي محادثة تحوّلها إلى تذكرة.',
       },
       all: {
         title: 'لا توجد محادثات بعد',
@@ -1339,6 +1348,7 @@ export const ar: Translation = {
   developer: developerAr,
   reports: reportsAr,
   chatSettings: chatSettingsAr,
+  chatWidget: chatWidgetAr,
   memory: {
     title: 'ذاكرة العملاء',
     description: 'أدِر ما نتذكره عن عملائك.',

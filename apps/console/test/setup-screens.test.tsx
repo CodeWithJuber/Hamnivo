@@ -311,13 +311,18 @@ const brands = (extra: ((client: QueryClient) => void)[], permissions: readonly 
   });
 
 describe('a brand’s card', () => {
-  it('has the look editor, the test chat and the business hours', async () => {
+  it('links to the chat widget, and has the test chat and the business hours', async () => {
     const html = await brands([
       put(keys.brands, { items: [{ ...brand, businessHours: hours }] }),
       put(keys.connections, { items: [connection] }),
     ]);
     const labels = [...html.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
-    expect(labels).toContain('Change the look and wording of Noor Books’s chat');
+    // The look, behaviour, forms, consent and link of the chat are one page now, not dialogs.
+    const widget = anchors(html).find((link) => link.attrs['data-testid'] === 'chat-widget-link');
+    expect(widget?.href).toBe('/chat-widget?brand=brd_1');
+    expect(widget?.attrs['aria-label']).toBe('Chat widget settings for Noor Books');
+    expect(html).not.toContain('data-testid="appearance"');
+    expect(html).not.toContain('data-testid="chat-settings"');
     expect(labels).toContain('Try the chat of Noor Books');
     const summary = html.match(/data-testid="hours-summary"[^>]*>([\s\S]*?)<\/div>\s*<a/);
     expect(textOf(summary?.[1] ?? '')).toContain('Mon to Fri 09:00 to 17:00');
@@ -363,7 +368,7 @@ describe('a brand’s card', () => {
       [put(keys.brands, { items: [brand] }), put(keys.connections, { items: [connection] })],
       ['brands.manage', 'integrations.manage'],
     );
-    expect(html).not.toContain('data-testid="appearance"');
+    expect(html).not.toContain('data-testid="chat-widget-link"');
     expect(html).not.toContain('data-testid="edit-hours"');
     expect(html).toContain('data-testid="test-chat"');
   });
