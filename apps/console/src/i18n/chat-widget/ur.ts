@@ -31,7 +31,6 @@ export const chatWidgetUr: ChatWidgetTranslation = {
   reset: 'تبدیلیاں واپس لیں',
   guideLook: 'شکل کیسے بدلیں',
   preview: {
-    title: 'پیش منظر',
     note: 'محفوظ کرنے سے پہلے، آپ کی تبدیلیوں کے ساتھ چیٹ کی ایک تصویر۔ اصل چیٹ آزمانے کے لیے، برانڈز اور انسٹال پر ٹیسٹ چیٹ استعمال کریں۔',
     language: 'زبان',
     screen: 'دکھائیں',

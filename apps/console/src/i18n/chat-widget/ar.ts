@@ -31,7 +31,6 @@ export const chatWidgetAr: ChatWidgetTranslation = {
   reset: 'تراجع عن التغييرات',
   guideLook: 'كيف تغيّر المظهر',
   preview: {
-    title: 'معاينة',
     note: 'صورة للمحادثة بتغييراتك قبل الحفظ. لتجربة المحادثة الحقيقية، استخدم «اختبار المحادثة» في صفحة العلامات التجارية والتثبيت.',
     language: 'اللغة',
     screen: 'اعرض',

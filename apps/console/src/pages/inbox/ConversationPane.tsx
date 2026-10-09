@@ -28,6 +28,7 @@ import {
   ArrowLeftIcon,
   BotIcon,
   CheckCircle2Icon,
+  CheckIcon,
   ChevronDownIcon,
   EllipsisIcon,
   HandIcon,
@@ -615,7 +616,14 @@ function TicketBar({ detail, ticket }: { detail: InboxDetail; ticket: InboxTicke
           data-testid="ticket-state"
         >
           {TICKET_STATES.map((value) => (
-            <ToggleGroupItem key={value} value={value} data-testid={`ticket-state-${value}`}>
+            <ToggleGroupItem
+              key={value}
+              value={value}
+              data-testid={`ticket-state-${value}`}
+              className="data-[state=on]:font-semibold"
+            >
+              {/* The chosen state is marked by a tick and bold text, not by colour alone. */}
+              {ticket.state === value ? <CheckIcon aria-hidden="true" /> : null}
               {t(`inbox.tickets.states.${value}`)}
             </ToggleGroupItem>
           ))}

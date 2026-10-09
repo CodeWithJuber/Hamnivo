@@ -103,13 +103,13 @@ export function LocalizedFields({
   placeholders?: Partial<Texts> | undefined;
   /**
    * Keeps the other languages behind a disclosure with this name (English stays in view), for
-   * lists where every item has words of its own. It starts open when any of them is written.
+   * lists where every item has words of its own. Its name says how many are written.
    */
   others?: (written: number) => string;
 }) {
   const { t } = useTranslation();
   const written = LANGS.filter((lang) => lang !== 'en' && value[lang].trim()).length;
-  const [open, setOpen] = useState(written > 0);
+  const [open, setOpen] = useState(false);
   const field = (lang: Lang) => {
     const common = {
       id: `${id}-${lang}`,

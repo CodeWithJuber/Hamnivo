@@ -35,7 +35,6 @@ export const chatWidgetEn = {
   reset: 'Undo changes',
   guideLook: 'How to change the look',
   preview: {
-    title: 'Preview',
     note: 'A picture of the chat with your changes, before you save. To try the real chat, use Test chat on Brands and install.',
     language: 'Language',
     screen: 'Show',

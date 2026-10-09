@@ -157,9 +157,8 @@ function OptionsEditor({
         {t('chatWidget.forms.fields.options')}
       </legend>
       <p className="text-sm text-text-secondary">
-        {department
-          ? t('chatWidget.forms.fields.departmentHint')
-          : t('chatWidget.forms.fields.optionsHint', { min: MIN_OPTIONS, max: MAX_OPTIONS })}
+        {department ? `${t('chatWidget.forms.fields.departmentHint')} ` : null}
+        {t('chatWidget.forms.fields.optionsHint', { min: MIN_OPTIONS, max: MAX_OPTIONS })}
       </p>
       {department && teams && !teams.some((team) => team.status === 'active') ? (
         <p className="text-sm text-warning" data-testid="no-teams">
@@ -207,16 +206,8 @@ function OptionsEditor({
                 error={errors[`${labelId}-en`]}
                 onChange={(label) => update({ label })}
               />
-              <ReasonedAction
-                reason={
-                  few
-                    ? t('chatWidget.forms.fields.optionsHint', {
-                        min: MIN_OPTIONS,
-                        max: MAX_OPTIONS,
-                      })
-                    : null
-                }
-              >
+              {/* A list keeps its fewest answers (the hint above says how many). */}
+              {few ? null : (
                 <Button
                   type="button"
                   variant="ghost"
@@ -233,7 +224,7 @@ function OptionsEditor({
                   <Trash2Icon aria-hidden="true" />
                   {t('chatWidget.forms.fields.removeOption', { number, name })}
                 </Button>
-              </ReasonedAction>
+              )}
             </li>
           );
         })}

@@ -31,7 +31,6 @@ export const chatWidgetHi: ChatWidgetTranslation = {
   reset: 'बदलाव वापस लें',
   guideLook: 'रूप कैसे बदलें',
   preview: {
-    title: 'पूर्वावलोकन',
     note: 'सेव करने से पहले, आपके बदलावों के साथ चैट की एक तस्वीर। असली चैट आज़माने के लिए, ब्रांड और इंस्टॉल पर टेस्ट चैट इस्तेमाल करें।',
     language: 'भाषा',
     screen: 'दिखाएँ',
