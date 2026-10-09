@@ -88,6 +88,8 @@ const screens = (): Record<string, string> => ({
   'stop-ai': '/stop-ai',
   runs: '/runs',
   'run-detail': `/runs?run=${runId}`,
+  // Blocked visitors (H20), linked from the inbox; nobody is blocked in this workspace.
+  blocked: '/blocked',
   account: '/account',
 });
 const SIGNED_OUT = { 'sign-in': '/sign-in', 'sign-up': '/sign-up', forgot: '/forgot-password' };
