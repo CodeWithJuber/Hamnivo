@@ -71,6 +71,13 @@ export const DELETED: MessagePart = {
 const byTime = (a: Message, b: Message) =>
   Date.parse(a.createdAt) - Date.parse(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0);
 
+/**
+ * A history page in reading order. The server lists newest first, and the authority keeps times
+ * to the second, so a question and its answer can share a time: reversing first keeps their
+ * order (the sort is stable), and the answer never shows above the question.
+ */
+export const inOrder = (items: Message[]) => [...items].reverse().sort(byTime);
+
 function merge(messages: Message[], incoming: Message): Message[] {
   const previous = messages.find((m) => m.id === incoming.id);
   const without = messages.filter((m) => m.id !== incoming.id);
@@ -309,7 +316,7 @@ export function useChat(client: HamnivoClient) {
       if (loadHistory) {
         const page = await client.history(conversation.id, { limit: PAGE });
         if (stale()) return;
-        messages = [...page.items].sort(byTime);
+        messages = inOrder(page.items);
         after = page.latestSequence;
         olderCursor = page.olderCursor;
       }
@@ -355,7 +362,7 @@ export function useChat(client: HamnivoClient) {
               if (!stale())
                 setState((s) => ({
                   ...s,
-                  messages: [...page.items].sort(byTime),
+                  messages: inOrder(page.items),
                   olderCursor: page.olderCursor,
                   latestSequence: page.latestSequence,
                 }));
@@ -626,7 +633,7 @@ export function useChat(client: HamnivoClient) {
         ...s,
         loadingOlder: false,
         olderCursor: page.olderCursor,
-        messages: page.items.reduce(merge, s.messages),
+        messages: [...page.items].reverse().reduce(merge, s.messages),
       }));
     } catch (error) {
       if (current === generation.current)

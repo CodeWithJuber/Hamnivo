@@ -933,12 +933,14 @@ export function Chat(props: {
     Date.now() - Date.parse(last.createdAt) < 60_000;
 
   // Announce replies from others once, not every render (UX flow spec §4).
+  // What is already there when the chat opens (its history) is not read out; only what comes after.
   const announced = useRef(new Set<string>());
   useEffect(() => {
+    const opening = announced.current.size === 0 && state.messages.length > 1;
     for (const m of state.messages) {
       if (m.sender.kind === 'customer' || announced.current.has(m.id)) continue;
       announced.current.add(m.id);
-      if (announced.current.size > 1 || state.messages.length === 1)
+      if (!opening)
         announce(
           `${m.sender.displayName}: ${spokenOf(m, (name) => t('surface.files.picture', { name }))}`,
         );
