@@ -4,10 +4,23 @@ import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { parseInput } from '../common/validation.js';
 import { CurrentPrincipal, StaffRoute } from '../identity/request-auth.js';
 import { StaffConversationsService } from './staff-conversations.service.js';
+import { WhatsappTemplatesService } from './whatsapp-templates.service.js';
 
 @Controller('v1/conversations')
 export class StaffConversationsController {
-  constructor(private readonly conversations: StaffConversationsService) {}
+  constructor(
+    private readonly conversations: StaffConversationsService,
+    private readonly templates: WhatsappTemplatesService,
+  ) {}
+
+  @Get(':conversationId/whatsapp-templates')
+  @StaffRoute({ tenant: true, permission: 'conversations.reply' })
+  whatsappTemplates(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('conversationId') id: string,
+  ) {
+    return this.templates.list(principal, id);
+  }
 
   @Get(':conversationId')
   @StaffRoute({ tenant: true, permission: 'conversations.read' })

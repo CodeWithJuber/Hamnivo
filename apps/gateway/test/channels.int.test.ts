@@ -499,6 +499,8 @@ describe('WhatsApp and Telegram (D14, W24)', () => {
   let tg: Json;
   let waInbox: number;
   let tgInbox: number;
+  /** Hana's WhatsApp chat, whose 24-hour window has closed. */
+  let quiet: { id: string; conversationId: number };
 
   const externalOf = async (channelId: string) =>
     withTenant(slice.app, { tenantId }, async (tx) => {
@@ -575,6 +577,7 @@ describe('WhatsApp and Telegram (D14, W24)', () => {
     const listed = await shop.owner.get('/v1/inbox/conversations?channel=whatsapp');
     expect(listed.body.items).toHaveLength(1);
     const chat = listed.body.items[0];
+    quiet = { id: chat.id, conversationId: asked.conversationId };
     expect(chat).toMatchObject({ channel: 'whatsapp', customer: { displayName: 'Hana' } });
     const closes = Date.parse(chat.replyWindowClosesAt);
     expect(closes - Date.now()).toBeGreaterThan(23.9 * 3_600_000);
@@ -607,6 +610,197 @@ describe('WhatsApp and Telegram (D14, W24)', () => {
     expect((await reply('Customer went quiet.', 'internal')).status).toBe(202);
     const after = await shop.owner.get('/v1/inbox/conversations?channel=whatsapp');
     expect(Date.parse(after.body.items[0].replyWindowClosesAt)).toBeLessThan(Date.now());
+    slice.fake.ageConversation(asked.conversationId, 25);
+  });
+
+  describe('template messages (D14)', () => {
+    /** Meta's shape, as Chatwoot keeps it after syncing. */
+    const orderUpdate = {
+      name: 'order_update',
+      language: 'en_US',
+      status: 'APPROVED',
+      category: 'UTILITY',
+      components: [
+        { type: 'BODY', text: 'Hi {{1}}, your order {{2}} is on its way.' },
+        { type: 'FOOTER', text: 'Shop' },
+        {
+          type: 'BUTTONS',
+          buttons: [
+            { type: 'QUICK_REPLY', text: 'Thanks' },
+            { type: 'URL', text: 'Track', url: 'https://shop.example/t/{{1}}' },
+          ],
+        },
+      ],
+    };
+    const others = [
+      { ...orderUpdate, name: 'pending_one', status: 'PENDING' },
+      { ...orderUpdate, name: 'login_code', category: 'AUTHENTICATION' },
+      {
+        ...orderUpdate,
+        name: 'with_photo',
+        components: [{ type: 'HEADER', format: 'IMAGE' }, ...orderUpdate.components],
+      },
+    ];
+    const values = { body: { '1': 'Hana', '2': '1042' }, buttons: { '1': '1042' } };
+    const send = (template: Json, clientMessageId: string = crypto.randomUUID()) =>
+      shop.owner.post(`/v1/conversations/${quiet.id}/messages`, { clientMessageId, template });
+    const templatesSent = () =>
+      slice.fake.outbound.filter(
+        (o) => o.conversationId === quiet.conversationId && o.template !== undefined,
+      );
+
+    it('lists the templates Meta approved for the number, and says the window is closed', async () => {
+      slice.fake.setWhatsappTemplates(
+        waInbox,
+        [orderUpdate, ...others],
+        new Date('2026-10-09T08:00:00Z'),
+      );
+      const listed = await shop.owner.get(`/v1/conversations/${quiet.id}/whatsapp-templates`);
+      expect(listed.status, JSON.stringify(listed.body)).toBe(200);
+      expect(listed.body).toMatchObject({
+        windowOpen: false,
+        windowClosesAt: expect.any(String),
+        lastSyncedAt: '2026-10-09T08:00:00.000Z',
+      });
+      expect(listed.body.items[0]).toEqual({
+        name: 'order_update',
+        language: 'en_US',
+        category: 'UTILITY',
+        header: null,
+        body: 'Hi {{1}}, your order {{2}} is on its way.',
+        footer: 'Shop',
+        buttons: [
+          { type: 'quick_reply', text: 'Thanks' },
+          { type: 'url', text: 'Track' },
+        ],
+        variables: {
+          header: [],
+          body: ['1', '2'],
+          buttons: [{ index: 1, type: 'url', label: 'Track' }],
+        },
+        unsupported: null,
+      });
+      expect(listed.body.items.slice(1).map((t: Json) => [t.name, t.unsupported])).toEqual([
+        ['pending_one', 'not_approved'],
+        ['login_code', 'authentication'],
+        ['with_photo', 'media_header'],
+      ]);
+      // Only WhatsApp has templates.
+      const telegram = await shop.owner.get('/v1/inbox/conversations?channel=telegram');
+      const other = telegram.body.items[0]?.id;
+      if (other) {
+        expect((await shop.owner.get(`/v1/conversations/${other}/whatsapp-templates`)).status).toBe(
+          422,
+        );
+      }
+    });
+
+    it('sends one after the 24 hours, with the values Chatwoot passes to Meta', async () => {
+      const sent = await send({ name: 'order_update', language: 'en_US', values });
+      expect(sent.status, JSON.stringify(sent.body)).toBe(202);
+      await slice.drain();
+      expect(templatesSent()).toEqual([
+        expect.objectContaining({
+          kind: 'channel_reply',
+          template: {
+            name: 'order_update',
+            language: 'en_US',
+            category: 'UTILITY',
+            processedParams: {
+              body: { '1': 'Hana', '2': '1042' },
+              buttons: [{ type: 'none' }, { type: 'url', parameter: '1042' }],
+            },
+          },
+        }),
+      ]);
+      // The transcript shows what the customer read.
+      const runtime = await slice.worker
+        .get(AuthorityRegistry)
+        .get(tenantId, fromPublicId('connection', shop.connection.id));
+      const messages = await runtime.authority.listMessages(String(quiet.conversationId), {
+        view: 'staff',
+      });
+      expect(messages.at(-1)).toMatchObject({
+        text: 'Hi Hana, your order 1042 is on its way.\n\nShop',
+        direction: 'outgoing',
+      });
+      const audit = await withTenant(slice.app, { tenantId }, (tx) =>
+        tx
+          .select({ action: schema.auditEvents.action, data: schema.auditEvents.data })
+          .from(schema.auditEvents)
+          .where(eq(schema.auditEvents.action, 'conversation.template_sent')),
+      );
+      expect(audit).toEqual([
+        expect.objectContaining({
+          data: expect.objectContaining({ template: 'order_update', language: 'en_US' }),
+        }),
+      ]);
+    });
+
+    it('refuses an unknown, unapproved or unsupported template, or a missing value', async () => {
+      const fields = async (template: Json) => {
+        const refused = await send(template);
+        expect(refused.status, JSON.stringify(refused.body)).toBe(422);
+        return refused.body.fields.map((f: Json) => f.path);
+      };
+      expect(await fields({ name: 'nope', language: 'en_US', values })).toEqual(['template.name']);
+      for (const name of ['pending_one', 'login_code', 'with_photo']) {
+        expect(await fields({ name, language: 'en_US', values })).toEqual(['template.name']);
+      }
+      expect(
+        await fields({
+          name: 'order_update',
+          language: 'en_US',
+          values: { body: { '1': 'Hana' } },
+        }),
+      ).toEqual(['template.values.body.2', 'template.values.buttons.1']);
+      expect(
+        await fields({
+          name: 'order_update',
+          language: 'en_US',
+          values: { ...values, body: { ...values.body, '3': 'extra' } },
+        }),
+      ).toEqual(['template.values.body.3']);
+      // Text and a template together, or a template as a note, are refused by shape.
+      const both = await shop.owner.post(`/v1/conversations/${quiet.id}/messages`, {
+        clientMessageId: crypto.randomUUID(),
+        text: 'Hi',
+        template: { name: 'order_update', language: 'en_US', values },
+      });
+      expect(both.status).toBe(422);
+      expect(both.body.code).toBe('VALIDATION_FAILED');
+      expect(templatesSent()).toHaveLength(1);
+    });
+
+    it('sends a retry once, and refuses the same id with other values', async () => {
+      const id = crypto.randomUUID();
+      const template = { name: 'order_update', language: 'en_US', values };
+      expect((await send(template, id)).status).toBe(202);
+      const again = await send(template, id);
+      expect(again.status).toBe(202);
+      expect(again.body.status).toBe('duplicate');
+      const changed = await send(
+        { ...template, values: { ...values, body: { '1': 'Hana', '2': '9999' } } },
+        id,
+      );
+      expect(changed.status).toBe(409);
+      expect(changed.body.code).toBe('IDEMPOTENCY_CONFLICT');
+      await slice.drain();
+      expect(templatesSent()).toHaveLength(2);
+    });
+
+    it('finds a template approved a moment ago', async () => {
+      slice.fake.setWhatsappTemplates(waInbox, [
+        orderUpdate,
+        {
+          ...orderUpdate,
+          name: 'back_in_stock',
+          components: [{ type: 'BODY', text: 'It is back!' }],
+        },
+      ]);
+      const sent = await send({ name: 'back_in_stock', language: 'en_US' });
+      expect(sent.status, JSON.stringify(sent.body)).toBe(202);
+    });
   });
 
   it('finds a reply whose answer was lost, after WhatsApp replaced its id, and sends it once', async () => {

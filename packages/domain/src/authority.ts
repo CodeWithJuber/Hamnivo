@@ -1,3 +1,4 @@
+import type { TemplateProcessedParams } from './whatsapp-templates.js';
 /**
  * The conversation authority port (ADR 0001). Chatwoot CE implements it today; nothing outside the
  * adapter sees Chatwoot types. References are opaque strings owned by the authority.
@@ -143,6 +144,16 @@ export interface AppendMessageInput {
   externalCreatedAt?: Date;
   /** Files that travel with the message; the authority owns them afterwards. */
   attachments?: OutgoingAttachment[];
+  /**
+   * A WhatsApp template message (D14), sent outside the 24-hour window; `text` is what the
+   * customer reads, rendered from it.
+   */
+  template?: {
+    name: string;
+    language: string;
+    category: string;
+    processedParams: TemplateProcessedParams;
+  };
 }
 
 export interface EnsureContactInput {

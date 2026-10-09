@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { createContext, type ReactNode, useContext } from 'react';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { initI18n } from '../src/i18n';
-import type { InboxConversation, InboxDetail } from '../src/lib/inbox';
+import type { InboxConversation, InboxDetail, WhatsappTemplate } from '../src/lib/inbox';
 import { ConversationPane } from '../src/pages/inbox/ConversationPane';
 import { InboxPage } from '../src/pages/inbox/InboxPage';
 import { type Answer, type Call, fakeGateway, mountStudio, SELF_ID } from './dom';
@@ -70,10 +70,15 @@ const detail = (patch: Partial<InboxDetail> = {}): InboxDetail => ({
   ...patch,
 });
 
-/** One conversation open on its own, with its drafts and a send route. */
-function pane(first: InboxDetail, send: (call: Call) => Answer = () => ({ status: 202 })) {
+/** One conversation open on its own, with its drafts, a send route and any other routes. */
+function pane(
+  first: InboxDetail,
+  send: (call: Call) => Answer = () => ({ status: 202 }),
+  more: Record<string, Answer | ((call: Call) => Answer)> = {},
+) {
   let current = first;
   const gateway = fakeGateway({
+    ...more,
     'GET /v1/inbox/conversations/conv_1': () => ({ json: current }),
     'GET /v1/inbox/conversations/conv_1/drafts': { json: { drafts: [], outgoing: [] } },
     [`POST ${MESSAGES}`]: (call) => {
@@ -97,6 +102,7 @@ function pane(first: InboxDetail, send: (call: Call) => Answer = () => ({ status
 const reply = () => screen.findByTestId('composer-public') as Promise<HTMLTextAreaElement>;
 const sendButton = () => screen.getByTestId('send-reply') as HTMLButtonElement;
 const assertive = () => document.querySelector('[data-slot="announcer-assertive"]')?.textContent;
+const polite = () => document.querySelector('[data-slot="announcer-polite"]')?.textContent;
 
 describe('the composer says where a reply goes', () => {
   it('by email, on Telegram, and nothing extra for web chat', async () => {
@@ -279,5 +285,246 @@ describe('Telegram in the inbox list', () => {
           .some((call) => call.query.channel === 'telegram'),
       ).toBe(true),
     );
+  });
+});
+
+const TEMPLATES = '/v1/conversations/conv_1/whatsapp-templates';
+const template = (patch: Partial<WhatsappTemplate> = {}): WhatsappTemplate => ({
+  name: 'order_ready',
+  language: 'en_US',
+  category: 'UTILITY',
+  header: 'Order {{order}}',
+  body: 'Hi {{customer_name}}, your order is ready at {{1}}.',
+  footer: 'Noor Books',
+  buttons: [{ type: 'copy_code', text: 'Copy code' }],
+  variables: {
+    header: ['order'],
+    body: ['customer_name', '1'],
+    buttons: [{ index: 0, type: 'copy_code', label: 'Copy code' }],
+  },
+  unsupported: null,
+  ...patch,
+});
+const TEMPLATE_LIST = {
+  items: [
+    template({
+      name: 'pending_one',
+      body: 'Your parcel left the shop.',
+      variables: { header: [], body: [], buttons: [] },
+      unsupported: 'not_approved',
+    }),
+    template(),
+    template({
+      name: 'login_code',
+      category: 'AUTHENTICATION',
+      body: '{{1}} is your code.',
+      unsupported: 'authentication',
+    }),
+    template({
+      name: 'welcome_ar',
+      language: 'ar',
+      category: 'MARKETING',
+      header: null,
+      body: 'مرحبًا {{1}}',
+      footer: null,
+      buttons: [],
+      variables: { header: [], body: ['1'], buttons: [] },
+    }),
+  ],
+  windowOpen: false,
+  windowClosesAt: inMs(-3_600_000),
+  lastSyncedAt: inMs(-5 * 60_000),
+};
+const ticket = {
+  number: 1042,
+  reference: '#1042',
+  state: 'open' as const,
+  source: 'staff' as const,
+  openedAt: NOW,
+};
+
+describe('WhatsApp templates in the composer (D14)', () => {
+  it('after 24 hours: pick a template, fill it in, check the preview and send it', async () => {
+    const { gateway, mount } = pane(
+      detail({ channel: 'whatsapp', replyWindowClosesAt: inMs(-3_600_000), ticket }),
+      undefined,
+      { [`GET ${TEMPLATES}`]: { json: TEMPLATE_LIST } },
+    );
+    await mount();
+    await reply();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Send a template' }));
+    const dialog = await screen.findByTestId('template-dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Send a WhatsApp template' })).toBeTruthy();
+    await within(dialog).findAllByTestId('template-option');
+
+    // Grouped by language, ones that can be sent first, each with its category and text.
+    const groups = within(dialog).getAllByRole('heading', { level: 3 });
+    expect(groups.map((h) => h.textContent)).toEqual(['American English', 'Arabic']);
+    const options = within(dialog).getAllByTestId('template-option');
+    expect(options.map((o) => o.querySelector('bdi')?.textContent)).toEqual([
+      'order_ready',
+      'pending_one',
+      'login_code',
+      'welcome_ar',
+    ]);
+    expect(options[0]?.textContent).toContain('Utility');
+    expect(options[0]?.textContent).toContain('your order is ready');
+    expect(within(dialog).getByTestId('templates-synced').textContent).toBe(
+      'Templates last updated 5 minutes ago. New templates appear here after Chatwoot syncs them from Meta.',
+    );
+
+    // One Meta has not approved, or a one-time code, says why and cannot be chosen.
+    const pending = options[1] as HTMLElement;
+    expect(pending.getAttribute('aria-disabled')).toBe('true');
+    expect(within(pending).getByTestId('template-reason').textContent).toBe(
+      'Waiting for Meta’s approval',
+    );
+    expect(within(options[2] as HTMLElement).getByTestId('template-reason').textContent).toBe(
+      'One-time codes are sent by your own systems',
+    );
+    await user.click(pending);
+    expect(within(dialog).queryByTestId('template-form')).toBeNull();
+
+    // Search narrows the list.
+    await user.type(within(dialog).getByRole('searchbox', { name: 'Search templates' }), 'ready');
+    expect(within(dialog).getAllByTestId('template-option')).toHaveLength(1);
+    await user.click(within(dialog).getByTestId('template-option'));
+
+    // Named values Studio knows are filled in; numbered ones are not.
+    const order = within(dialog).getByLabelText('Header {{order}}') as HTMLInputElement;
+    expect(order.value).toBe('1042');
+    const name = within(dialog).getByLabelText('Message {{customer_name}}') as HTMLInputElement;
+    expect(name.value).toBe('Hana');
+    expect(within(dialog).getAllByText('Filled in from this conversation.')).toHaveLength(2);
+    const where = within(dialog).getByLabelText('Message {{1}}') as HTMLInputElement;
+    expect(where.value).toBe('');
+    const code = within(dialog).getByLabelText('Button “Copy code”') as HTMLInputElement;
+    expect(code.maxLength).toBe(15);
+    expect(code.getAttribute('dir')).toBe('ltr');
+
+    // The preview shows what is still empty, and Send says what is missing.
+    expect(within(dialog).getByTestId('preview-header').textContent).toBe('Order 1042');
+    expect(within(dialog).getByTestId('preview-body').textContent).toBe(
+      'Hi Hana, your order is ready at {{1}}.',
+    );
+    expect(within(dialog).getByTestId('preview-unfilled').textContent).toBe('{{1}}');
+    expect(within(dialog).getByTestId('preview-footer').textContent).toBe('Noor Books');
+    const send = within(dialog).getByTestId('send-template');
+    expect(send.getAttribute('aria-disabled')).toBe('true');
+    expect(within(dialog).getByText('Fill in 2 more values to send.')).toBeTruthy();
+    await user.click(send);
+    expect(gateway.to('POST', MESSAGES)).toHaveLength(0);
+
+    await user.type(where, 'the Dubai Mall');
+    await user.type(code, 'SAVE10');
+    expect(within(dialog).getByTestId('preview-body').textContent).toBe(
+      'Hi Hana, your order is ready at the Dubai Mall.',
+    );
+    expect(within(dialog).queryByTestId('preview-unfilled')).toBeNull();
+    // The button stands on its own again (no reason next to it).
+    const ready = within(dialog).getByTestId('send-template');
+    expect(ready.getAttribute('aria-disabled')).toBeNull();
+    await user.click(ready);
+    await waitFor(() => expect(gateway.to('POST', MESSAGES)).toHaveLength(1));
+    const body = gateway.to('POST', MESSAGES)[0]?.body;
+    expect(body).toEqual({
+      clientMessageId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      template: {
+        name: 'order_ready',
+        language: 'en_US',
+        values: {
+          header: { order: '1042' },
+          body: { customer_name: 'Hana', '1': 'the Dubai Mall' },
+          buttons: { '0': 'SAVE10' },
+        },
+      },
+      visibility: 'public',
+      clearDraft: false,
+      expectedEpoch: 3,
+    });
+    await waitFor(() => expect(screen.queryByTestId('template-dialog')).toBeNull());
+    await waitFor(() => expect(polite()).toBe('Template sent.'));
+  });
+
+  it('shows the gateway’s reasons next to the values, and keeps the dialog open', async () => {
+    const { gateway, mount } = pane(
+      detail({ channel: 'whatsapp', replyWindowClosesAt: inMs(-3_600_000) }),
+      () => ({
+        problem: {
+          status: 422,
+          code: 'VALIDATION_FAILED',
+          fields: [{ path: 'template.values.body.1', message: 'This template has no such value.' }],
+        },
+      }),
+      { [`GET ${TEMPLATES}`]: { json: TEMPLATE_LIST } },
+    );
+    await mount();
+    await reply();
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('template-open'));
+    const dialog = await screen.findByTestId('template-dialog');
+    const options = await within(dialog).findAllByTestId('template-option');
+    await user.click(options[3] as HTMLElement);
+    const value = within(dialog).getByLabelText('Message {{1}}') as HTMLInputElement;
+    // Typed Arabic reads right to left on its own.
+    await user.type(value, 'هناء');
+    expect(value.getAttribute('dir')).toBe('auto');
+    await user.click(within(dialog).getByTestId('send-template'));
+    await waitFor(() => expect(value.getAttribute('aria-invalid')).toBe('true'));
+    expect(value.getAttribute('aria-describedby')).toContain('template-body-1-error');
+    expect(document.getElementById('template-body-1-error')?.textContent).toBe(
+      'This template has no such value.',
+    );
+    expect(document.activeElement).toBe(value);
+    expect(screen.getByTestId('template-dialog')).toBeTruthy();
+    expect(gateway.to('POST', MESSAGES)).toHaveLength(1);
+
+    // Back to the list keeps the dialog open.
+    await user.click(within(dialog).getByTestId('template-back'));
+    expect(await within(dialog).findAllByTestId('template-option')).toHaveLength(4);
+  });
+
+  it('while the window is open: a Template button next to Saved replies', async () => {
+    const { mount } = pane(
+      detail({ channel: 'whatsapp', replyWindowClosesAt: inMs(20 * 3_600_000) }),
+      undefined,
+      {
+        [`GET ${TEMPLATES}`]: {
+          json: { items: [], windowOpen: true, windowClosesAt: null, lastSyncedAt: null },
+        },
+      },
+    );
+    await mount();
+    await reply();
+    expect(screen.getByTestId('saved-replies')).toBeTruthy();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Template' }));
+    const empty = await screen.findByTestId('templates-empty');
+    expect(empty.textContent).toContain('No approved templates yet');
+    const guide = within(empty).getByRole('link', { name: /How template messages work/ });
+    expect(guide.getAttribute('href')).toMatch(/whatsapp.*#template-messages$/);
+    expect(screen.getByTestId('templates-synced').textContent).toBe(
+      'New templates appear here after Chatwoot syncs them from Meta.',
+    );
+  });
+
+  it('only on WhatsApp, and not for someone who may not reply', async () => {
+    const chat = pane(detail({ channel: 'chat' }));
+    const first = await chat.mount();
+    await reply();
+    expect(screen.queryByTestId('template-button')).toBeNull();
+    first.unmount();
+
+    pane(
+      detail({
+        channel: 'whatsapp',
+        replyWindowClosesAt: inMs(20 * 3_600_000),
+        permissions: { ...detail().permissions, reply: false },
+      }),
+    ).mount();
+    await screen.findByTestId('composer-internal');
+    expect(screen.queryByTestId('template-button')).toBeNull();
+    expect(screen.queryByTestId('template-open')).toBeNull();
   });
 });

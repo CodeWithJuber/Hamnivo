@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { parseWhatsappTemplate, templateVariables } from '@hamnivo/domain';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 
 /**
@@ -55,6 +56,9 @@ interface Inbox {
   members: Set<number>;
   /** Chatwoot can no longer sign in to the channel (`reauthorization_required`). */
   reauthorizationRequired?: boolean;
+  /** WhatsApp: the templates Chatwoot synced from Meta, in Meta's shape, and when. */
+  messageTemplates?: Json[];
+  templatesSyncedAt?: number | null;
 }
 interface Bot {
   id: number;
@@ -164,6 +168,8 @@ interface Message {
   attachments: Attachment[];
   /** Delivery state: agent messages become `read` when the customer's client reports seeing them. */
   status: 'sent' | 'delivered' | 'read' | 'failed';
+  /** WhatsApp: the `template_params` it was sent with (kept in `additional_attributes`). */
+  template?: Json;
 }
 interface AutomationRule {
   id: number;
@@ -227,6 +233,8 @@ export interface FakeOutbound {
   messageId: number;
   /** The subject of a reply sent from an email inbox. */
   subject?: string;
+  /** A WhatsApp template message: the `template_params` Chatwoot sent it with. */
+  template?: { name: string; language: string; category?: string; processedParams: Json };
 }
 
 /** A customer writing in on a channel inbox, as `receiveChannelMessage` takes it. */
@@ -290,6 +298,10 @@ export interface FakeChatwoot {
    * its IMAP poller does after failed sign-ins; saving new credentials clears it.
    */
   setReauthorizationRequired(inboxId: number, required: boolean): void;
+  /** Moves a conversation's messages back in time, as if they were written `hours` ago. */
+  ageConversation(conversationId: number, hours: number): void;
+  /** The WhatsApp templates Chatwoot synced from Meta for an inbox (Meta's shape). */
+  setWhatsappTemplates(inboxId: number, templates: Json[], syncedAt?: Date | null): void;
   /** Connects an integration (Slack, Dialogflow…) that would receive message events. */
   addIntegrationHook(accountId: number, appId: string, inboxId?: number | null): void;
   /** Resolves when every queued webhook has been delivered, dropped or failed. */
@@ -566,6 +578,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       created_at: Math.floor(m.createdAt),
       private: m.private,
       source_id: m.sourceId,
+      ...(m.template ? { additional_attributes: { template_params: m.template } } : {}),
       sender: senderOf(m, false),
       ...(m.attachments.length > 0
         ? { attachments: m.attachments.map((a) => attachmentJson(m, a)) }
@@ -871,6 +884,18 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         conversationId: conversation.displayId,
         messageId: message.id,
         ...(inbox.channel === 'Channel::Email' ? { subject: replySubject(conversation) } : {}),
+        ...(message.template
+          ? {
+              template: {
+                name: String(message.template.name),
+                language: String(message.template.language),
+                ...(message.template.category
+                  ? { category: String(message.template.category) }
+                  : {}),
+                processedParams: (message.template.processed_params ?? {}) as Json,
+              },
+            }
+          : {}),
       });
     } else if (reply && contact?.email) {
       outbound.push({
@@ -925,6 +950,17 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     ) {
       return;
     }
+    const refused =
+      inbox.channel === 'Channel::Whatsapp' ? whatsappRefusal(conversation, inbox, message) : null;
+    if (refused) {
+      // Like Chatwoot's send job: the message stays, marked failed, and the customer gets nothing.
+      message.status = 'failed';
+      message.contentAttributes = { ...message.contentAttributes, external_error: refused };
+      const sent = outbound.findIndex((o) => o.messageId === message.id);
+      if (sent >= 0) outbound.splice(sent, 1);
+      emit(conversation.accountId, 'message_updated', messageWebhook(message), conversation);
+      return;
+    }
     message.sourceId =
       inbox.channel === 'Channel::Whatsapp'
         ? `wamid.${token(16)}`
@@ -932,6 +968,47 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
           ? String(1000 + message.id)
           : `<${token(8)}@mail.hv-fake.invalid>`;
     emit(conversation.accountId, 'message_updated', messageWebhook(message), conversation);
+  }
+
+  /**
+   * Why WhatsApp would not deliver a message, or null. Free text needs the customer to have
+   * written in the last 24 hours (Chatwoot's `can_reply?`); a template must be one of the inbox's
+   * approved templates, with every variable filled (Meta refuses it otherwise).
+   */
+  function whatsappRefusal(
+    conversation: Conversation,
+    inbox: Inbox,
+    message: Message,
+  ): string | null {
+    if (!message.template) {
+      const lastIncoming = messagesOf(conversation)
+        .filter((m) => m.messageType === 0)
+        .reduce((latest, m) => Math.max(latest, m.createdAt), 0);
+      return s.clock() - lastIncoming < 24 * 3600 ? null : 'Message outside messaging window';
+    }
+    const params = message.template;
+    const found = (inbox.messageTemplates ?? [])
+      .map((t) => parseWhatsappTemplate(t))
+      .find(
+        (t) =>
+          t !== null &&
+          t.name === params.name &&
+          t.language.toLowerCase() === String(params.language ?? '').toLowerCase() &&
+          t.status === 'APPROVED',
+      );
+    if (!found) return 'Template not found or invalid template name';
+    const processed = (params.processed_params ?? {}) as Json;
+    const vars = templateVariables(found);
+    const filled = (part: Json | undefined, name: string) =>
+      typeof part?.[name] === 'string' && (part[name] as string).trim() !== '';
+    const buttons = Array.isArray(processed.buttons) ? (processed.buttons as Json[]) : [];
+    const complete =
+      vars.body.every((v) => filled(processed.body as Json | undefined, v)) &&
+      vars.header.every((v) => filled(processed.header as Json | undefined, v)) &&
+      vars.buttons.every((b) => filled(buttons[b.index], 'parameter'));
+    return complete
+      ? null
+      : '(#132000) Number of parameters does not match the expected number of params';
   }
 
   function removeConversation(conversation: Conversation) {
@@ -1389,6 +1466,24 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     }
     Object.assign(inbox, next);
     return inboxApi(inbox);
+  });
+
+  app.get('/api/v1/accounts/:account_id/inboxes/:id/message_templates', async (request) => {
+    const { accountId } = accountAccess(request, 'inboxes#message_templates');
+    const inbox = inboxOf(request, accountId);
+    if (inbox.channel !== 'Channel::Whatsapp') {
+      throw new HttpError(422, {
+        error: 'Message templates are only available for WhatsApp inboxes',
+      });
+    }
+    return {
+      payload: inbox.messageTemplates ?? [],
+      meta: {
+        last_sync_attempt_at: inbox.templatesSyncedAt
+          ? new Date(inbox.templatesSyncedAt * 1000).toISOString()
+          : null,
+      },
+    };
   });
 
   app.get('/api/v1/accounts/:account_id/inboxes/:id/agent_bot', async (request) => {
@@ -2211,6 +2306,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         createdAt: s.clock(),
         attachments,
         status: 'sent',
+        ...(typeof input.template_params === 'object' && input.template_params !== null
+          ? { template: input.template_params as Json }
+          : {}),
       };
       s.messages.set(message.id, message);
       recordOutbound(conversation, message);
@@ -2723,6 +2821,20 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         messages: own(s.messages.values()),
         inboxes: own(s.inboxes.values()),
       };
+    },
+    ageConversation(conversationId, hours) {
+      const conversation = [...s.conversations.values()].find(
+        (c) => c.displayId === conversationId,
+      );
+      if (!conversation) throw new Error(`No conversation ${conversationId}`);
+      for (const message of messagesOf(conversation)) message.createdAt -= hours * 3600;
+    },
+    setWhatsappTemplates(inboxId, templates, syncedAt) {
+      const inbox = s.inboxes.get(inboxId);
+      if (inbox?.channel !== 'Channel::Whatsapp') throw new Error(`No WhatsApp inbox ${inboxId}`);
+      inbox.messageTemplates = templates;
+      inbox.templatesSyncedAt =
+        syncedAt === null ? null : (syncedAt ?? new Date()).getTime() / 1000;
     },
     setReauthorizationRequired(inboxId, required) {
       const inbox = s.inboxes.get(inboxId);

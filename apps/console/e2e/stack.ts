@@ -4,6 +4,7 @@
  *   · widget and loader (what the install snippet points to) · Studio's static build
  *   · an OpenID Connect provider and a DNS server for single sign-on.
  *   · a webhook receiver (a trusted egress origin, so deliveries may reach it over local HTTP).
+ *   · a control port for the fake Chatwoot's test hooks (a customer writing on WhatsApp…).
  * Studio is served with the gateway behind its own origin: /v1 and /api/auth are passed on to the
  * gateway, the same-origin set-up the README describes, so the gateway's public origin is Studio's.
  * Studio is served as http://localhost (passkeys need a host name, never an IP address). Nothing
@@ -22,7 +23,7 @@ import {
 } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
 import { startFakeStripe } from '@hamnivo/adapters/commerce/testing';
-import { startFakeChatwoot } from '@hamnivo/chatwoot/fake';
+import { type FakeChatwoot, startFakeChatwoot } from '@hamnivo/chatwoot/fake';
 import {
   createTestDatabase,
   dropDatabase,
@@ -40,6 +41,7 @@ const ports = {
   idp: Number(process.env.E2E_STUDIO_IDP_PORT ?? 5188),
   dns: Number(process.env.E2E_STUDIO_DNS_PORT ?? 5189),
   hooks: Number(process.env.E2E_STUDIO_HOOKS_PORT ?? 5190),
+  fake: Number(process.env.E2E_STUDIO_FAKE_PORT ?? 5191),
 };
 const origin = (port: number) => `http://127.0.0.1:${port}`;
 const studioOrigin = `http://localhost:${ports.studio}`;
@@ -207,6 +209,58 @@ function hooksServer(): Promise<void> {
   );
 }
 
+/**
+ * The fake Chatwoot's test hooks, which only exist in this process, for the tests to call over
+ * HTTP: `POST /receive-channel-message {inboxId, from, name?, content}` (a customer writes on
+ * email, WhatsApp or Telegram; answers once the webhooks are delivered), `POST
+ * /whatsapp-templates {inboxId, templates, syncedAt?}` and `POST /age-conversation
+ * {conversationId, hours}`.
+ */
+function fakeControlServer(fake: FakeChatwoot): Promise<void> {
+  const hooks: Record<string, (body: Record<string, unknown>) => Promise<unknown>> = {
+    '/receive-channel-message': async ({ inboxId, from, name, content }) => {
+      const made = await fake.receiveChannelMessage(Number(inboxId), {
+        from: String(from),
+        content: String(content),
+        ...(typeof name === 'string' ? { name } : {}),
+      });
+      await fake.flush();
+      return made;
+    },
+    '/whatsapp-templates': async ({ inboxId, templates, syncedAt }) =>
+      fake.setWhatsappTemplates(
+        Number(inboxId),
+        templates as Parameters<FakeChatwoot['setWhatsappTemplates']>[1],
+        typeof syncedAt === 'string' ? new Date(syncedAt) : syncedAt === null ? null : undefined,
+      ),
+    '/age-conversation': async ({ conversationId, hours }) =>
+      fake.ageConversation(Number(conversationId), Number(hours)),
+  };
+  return listen(
+    createServer((request, response) => {
+      const hook = hooks[new URL(request.url ?? '/', 'http://x').pathname];
+      const chunks: Buffer[] = [];
+      request.on('data', (chunk: Buffer) => chunks.push(chunk));
+      request.on('end', () => {
+        if (!hook || request.method !== 'POST') {
+          response.writeHead(404).end();
+          return;
+        }
+        hook(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'))
+          .then((result) => {
+            response.writeHead(200, { 'content-type': 'application/json' });
+            response.end(JSON.stringify(result ?? {}));
+          })
+          .catch((error: Error) => {
+            response.writeHead(400, { 'content-type': 'text/plain' });
+            response.end(error.message);
+          });
+      });
+    }),
+    ports.fake,
+  );
+}
+
 async function waitFor(url: string, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -304,6 +358,7 @@ try {
   }
   await waitFor(`${origin(ports.api)}/health/ready`);
   await hooksServer();
+  await fakeControlServer(fake);
   await widgetServer();
   await studioServer();
 
@@ -322,7 +377,7 @@ try {
         hooksUrl: origin(ports.hooks),
         stripe: { url: stripe.url, apiKey: stripe.apiKey },
         // The fake Chatwoot's platform API, to add channel inboxes to a brand's account.
-        chatwoot: { url: fake.url, platformToken: fake.platformToken },
+        chatwoot: { url: fake.url, platformToken: fake.platformToken, control: origin(ports.fake) },
       },
       null,
       2,

@@ -8,10 +8,9 @@
  * callback URL and verify token with Copy, Meta set-up from the card, Connect Telegram with the
  * bot's @name on its card, and Arabic right to left on a phone.
  *
- * Not covered here: the composer's WhatsApp reply window. A customer's WhatsApp message can only
- * be made inside the stack's own process (the fake's receiveChannelMessage), not from this one, so
- * there is no WhatsApp conversation to open; the composer's states are covered by unit tests
- * (test/inbox-channels.test.tsx).
+ * Not covered here: the composer's WhatsApp reply window. Its states are covered by unit tests
+ * (test/inbox-channels.test.tsx); whatsapp-templates.spec.ts opens a WhatsApp conversation made
+ * through the stack's control port and sends a template after the 24 hours.
  */
 import { expect, type Page, type Request, test } from '@playwright/test';
 import { overflowAt } from './access';

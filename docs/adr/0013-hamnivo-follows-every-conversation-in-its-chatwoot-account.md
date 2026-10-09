@@ -85,8 +85,11 @@ with a control row counted. Owners moving from tawk.to expect one inbox for ever
 - The Chatwoot account is shared with what Chatwoot itself does on those inboxes. Studio
   connects email, WhatsApp Cloud and Telegram; other Chatwoot channels are adopted when added in
   Chatwoot.
-- WhatsApp template messages are not sent yet, so a conversation past its window waits for the
-  customer.
+- Past WhatsApp's 24-hour window, staff send approved templates (D14). Chatwoot keeps each
+  inbox's templates, synced from Meta; Hamnivo reads them live (cached for a minute), checks a
+  template is approved and complete, renders the text the customer reads and sends Chatwoot's
+  `template_params` through the message ledger, so a retry is sent once. Templates with a media
+  header and one-time-code templates are not sent from Hamnivo.
 - A conversation closed before Hamnivo first saw it is not adopted. It stays in Chatwoot's
   history.
 - Blocking (ADR 0012) covers channel senders too: their conversations are closed with a note,
