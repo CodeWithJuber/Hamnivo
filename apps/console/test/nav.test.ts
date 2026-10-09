@@ -55,6 +55,7 @@ describe('the menu', () => {
       settings: [
         '/brands',
         '/chat-widget',
+        '/automations',
         '/hours',
         '/team',
         '/support-teams',
@@ -91,6 +92,8 @@ describe('the menu', () => {
       '/brands': 'brands.manage',
       // The chat's look, behaviour, forms, consent and link: for whoever configures the widget.
       '/chat-widget': 'widget.configure',
+      // Website prompts and chat rules: seen by whoever may read automations, changed by managers.
+      '/automations': 'automations.read',
       '/hours': 'brands.manage',
       '/team': 'members.read',
       '/support-teams': 'members.read',
@@ -212,6 +215,7 @@ describe('who sees which entry', () => {
       settings: [
         '/brands',
         '/chat-widget',
+        '/automations',
         '/hours',
         '/team',
         '/support-teams',
@@ -228,7 +232,7 @@ describe('who sees which entry', () => {
     expect(pagesOf('supervisor')).toEqual({
       ...everything,
       ai: everything.ai.filter((page) => page !== '/models'),
-      settings: ['/team', '/support-teams'],
+      settings: ['/automations', '/team', '/support-teams'],
     });
     expect(pagesOf('agent')).toEqual({
       ...home,
