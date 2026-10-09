@@ -25,6 +25,7 @@ import { assertWidgetOnline, widgetLoads } from '../identity/tenants.readonly.js
 import { AvailabilityService } from '../inbox/availability.service.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
+import { isBlocked } from '../visitors/blocks.js';
 import { filesScannable } from './attachments.service.js';
 import { consentState } from './consent.js';
 import { launcherConfig, widgetConfig } from './copy.js';
@@ -262,6 +263,7 @@ export class WidgetSessionsService {
         consentRequired: consent.required,
         consentGiven: consent.given,
         direct: session.hostOrigin === DIRECT_ORIGIN,
+        chatAvailable: !(await isBlocked(tx, brand.id, principal.id, this.clock())),
       }),
       conversations: await principalConversations(tx, principal.id),
     };

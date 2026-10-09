@@ -5,6 +5,7 @@ import {
   purgeAutomationRuns,
   purgeExpired,
   purgeMigrationFiles,
+  purgeVisitorBlocks,
   purgeVisitors,
   purgeWebhookEvents,
   purgeWidgetUploads,
@@ -62,6 +63,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           visitors_removed: visitors.visitors,
           // What chat automations did is kept for 90 days (G21).
           automation_runs_removed: await purgeAutomationRuns(this.db),
+          // Lifted and expired blocks stay on record for 90 days (H20).
+          visitor_blocks_removed: await purgeVisitorBlocks(this.db),
         };
       }
       case 'reconcile-cursors':

@@ -193,3 +193,66 @@ export const visitorPageViews = pgTable(
     tenantIsolation(),
   ],
 );
+
+/**
+ * A visitor a brand blocked (H20): the customer behind a chat, the browser key they used and,
+ * for a customer the website signed in, that account. Never an IP address. Active while not
+ * lifted and not past `expires_at`. The customer, browser and chat are not foreign keys: a block
+ * outlives a purged visitor or a deleted chat, and never stands in the way of erasing a customer.
+ */
+export const visitorBlocks = pgTable(
+  'visitor_blocks',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    brandId: uuid('brand_id').notNull(),
+    principalId: uuid('principal_id'),
+    visitorId: uuid('visitor_id'),
+    /** A signed-in customer's account (`sub` from the brand's assertion). */
+    externalSubject: text('external_subject'),
+    /** What staff called the visitor when they blocked them. */
+    label: text('label').notNull(),
+    conversationId: uuid('conversation_id'),
+    reason: text('reason').notNull(),
+    createdBy: uuid('created_by').notNull(),
+    createdAt: createdAt(),
+    expiresAt: tstz('expires_at'),
+    liftedAt: tstz('lifted_at'),
+    liftedBy: uuid('lifted_by'),
+  },
+  (t) => [
+    unique('visitor_blocks_tenant_id_id_key').on(t.tenantId, t.id),
+    index('visitor_blocks_principal_idx')
+      .on(t.tenantId, t.brandId, t.principalId)
+      .where(sql`${t.liftedAt} is null and ${t.principalId} is not null`),
+    index('visitor_blocks_visitor_idx')
+      .on(t.tenantId, t.brandId, t.visitorId)
+      .where(sql`${t.liftedAt} is null and ${t.visitorId} is not null`),
+    index('visitor_blocks_subject_idx')
+      .on(t.tenantId, t.brandId, t.externalSubject)
+      .where(sql`${t.liftedAt} is null and ${t.externalSubject} is not null`),
+    index('visitor_blocks_recent_idx').on(t.tenantId, t.createdAt),
+    check(
+      'visitor_blocks_target_ck',
+      sql`${t.principalId} is not null or ${t.visitorId} is not null or ${t.externalSubject} is not null`,
+    ),
+    check('visitor_blocks_reason_ck', sql`char_length(${t.reason}) between 1 and 500`),
+    check('visitor_blocks_lifted_ck', sql`(${t.liftedAt} is null) = (${t.liftedBy} is null)`),
+    foreignKey({
+      name: 'visitor_blocks_brand_fk',
+      columns: [t.tenantId, t.brandId],
+      foreignColumns: [brands.tenantId, brands.id],
+    }),
+    foreignKey({
+      name: 'visitor_blocks_created_by_fk',
+      columns: [t.tenantId, t.createdBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    foreignKey({
+      name: 'visitor_blocks_lifted_by_fk',
+      columns: [t.tenantId, t.liftedBy],
+      foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    tenantIsolation(),
+  ],
+);

@@ -109,6 +109,14 @@ describe('catalog and presets', () => {
   });
 });
 
+describe('blocking visitors (H20)', () => {
+  it('lets administrators and supervisors block, and not agents', () => {
+    expect(presetPermissions('admin')).toContain('visitors.block');
+    expect(presetPermissions('supervisor')).toContain('visitors.block');
+    expect(presetPermissions('agent')).not.toContain('visitors.block');
+  });
+});
+
 describe('automation permissions (G21)', () => {
   it('administrators manage automations, supervisors read them, developers and agents neither', () => {
     expect(presetPermissions('admin')).toEqual(

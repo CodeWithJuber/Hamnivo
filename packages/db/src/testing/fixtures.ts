@@ -645,6 +645,18 @@ async function seedVisitors(
     .update(s.automations)
     .set({ publishedVersionId: versionId })
     .where(eq(s.automations.id, automationId));
+  // A visitor the brand blocked (H20).
+  await tx.insert(s.visitorBlocks).values({
+    tenantId,
+    brandId: ref.brandId,
+    principalId: ref.principalId,
+    visitorId,
+    label: 'Visitor 7F3A',
+    conversationId: ref.conversationId,
+    reason: 'Abusive messages',
+    createdBy: ref.staffMemberId,
+    expiresAt: new Date(Date.now() + 86_400_000),
+  });
   await tx.insert(s.automationRuns).values({
     tenantId,
     brandId: ref.brandId,

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { MinorUnits, Timestamp } from './common.js';
 import { typeId } from './ids.js';
+import { TicketSource } from './tickets.js';
 
 /**
  * Product analytics (O04, board 23). Aggregates only: no message content, no customer names. A
@@ -51,6 +52,34 @@ export const AnalyticsOverview = z
       firstResponseMedianSeconds: AnalyticsMetric,
       resolutionMedianSeconds: AnalyticsMetric,
       csatAverage: AnalyticsMetric,
+    }),
+    /**
+     * Chats that went wrong for the customer (O04): missed (they wrote and nobody, person or AI,
+     * answered within an hour), contact form messages left while nobody could answer, and closed
+     * chats the customer or staff opened again.
+     */
+    quality: z.object({
+      /** `sample`: chats where the customer wrote at least an hour ago, or got an answer. */
+      missed: AnalyticsMetric.extend({ rate: Held }),
+      offlineMessages: AnalyticsMetric,
+      /** `sample`: chats that were closed at least once. */
+      reopened: AnalyticsMetric.extend({ rate: Held }),
+    }),
+    /** Tickets (H19) opened in the range, and those open now. */
+    tickets: z.object({
+      created: AnalyticsMetric,
+      closed: AnalyticsMetric,
+      /** Open or pending right now, whenever they were opened. */
+      openNow: AnalyticsMetric,
+      closeMedianSeconds: AnalyticsMetric,
+      byPriority: z.array(
+        z.object({
+          priority: z.enum(['urgent', 'high', 'medium', 'low']).nullable(),
+          count: Held,
+          suppressed: z.boolean(),
+        }),
+      ),
+      bySource: z.array(z.object({ source: TicketSource, count: Held, suppressed: z.boolean() })),
     }),
     daily: z.array(
       z.object({

@@ -22,6 +22,7 @@ export const ROLE_PRESETS = [
     patterns: [
       'conversations.*',
       'inbox.*',
+      'visitors.*',
       'teams.*',
       'members.*',
       'roles.*',
@@ -56,6 +57,7 @@ export const ROLE_PRESETS = [
     patterns: [
       'conversations.*',
       'inbox.manage',
+      'visitors.block',
       'members.read',
       'grants.manage',
       'audit.read',

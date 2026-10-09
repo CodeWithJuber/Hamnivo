@@ -90,6 +90,11 @@ export const WidgetConfig = z
     consent: WidgetConsentConfig,
     /** This session was opened from the brand's direct chat link, not from its website (W28). */
     direct: z.boolean(),
+    /**
+     * False when this visitor cannot start or continue a chat (H20). The widget says only that
+     * chat is not available; help, past conversations and privacy choices stay open.
+     */
+    chatAvailable: z.boolean(),
   })
   .meta({ id: 'WidgetConfig' });
 export type WidgetConfig = z.infer<typeof WidgetConfig>;
