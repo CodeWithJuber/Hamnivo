@@ -1,3 +1,4 @@
+import { automationsHi } from './automations/hi';
 import { cachingHi } from './caching';
 import { chatWidgetHi } from './chat-widget/hi';
 import { checksHi } from './checks';
@@ -1354,6 +1355,7 @@ export const hi: Translation = {
   reports: reportsHi,
   chatSettings: chatSettingsHi,
   chatWidget: chatWidgetHi,
+  automations: automationsHi,
   memory: {
     title: 'ग्राहक मेमोरी',
     description: 'तय करें कि हम आपके ग्राहकों के बारे में क्या याद रखते हैं।',
@@ -2282,6 +2284,7 @@ export const hi: Translation = {
     brands: 'ब्रांड',
     widget: 'चैट विजेट',
     agents: 'AI एजेंट',
+    automations: 'ऑटोमेशन',
     knowledge: 'जानकारी',
     tools: 'टूल और कार्रवाइयां',
     decisions: 'फ़ैसले',
@@ -2328,12 +2331,15 @@ export const hi: Translation = {
     widget: {
       configure: 'चैट विजेट सेट करें',
       identity_keys: 'ग्राहक की पहचान सत्यापित करने वाली कुंजियां दर्ज करें',
-      proactive: 'चुनें कि चैट वेबसाइट के विज़िटर को बात करने के लिए कब बुलाए',
     },
     agents: {
       read: 'AI एजेंट और उनके वर्शन देखें',
       manage: 'AI एजेंट के ड्राफ़्ट बदलें',
       publish: 'AI एजेंट प्रकाशित करें या वापस लें',
+    },
+    automations: {
+      read: 'ऑटोमेशन और उन्होंने क्या किया, यह देखें',
+      manage: 'ऑटोमेशन बनाएँ, प्रकाशित करें और बंद करें, वेबसाइट संदेशों सहित',
     },
     knowledge: { read: 'जानकारी के स्रोत पढ़ें', manage: 'जानकारी जोड़ें, बदलें और हटाएं' },
     tools: {

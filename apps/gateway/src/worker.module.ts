@@ -13,6 +13,8 @@ import { ReconcilerService } from './authority/reconciler.service.js';
 import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
 import { AuthoritySyncService } from './authority/sync.service.js';
+import { AUTOMATION_TOPIC } from './automations/events.js';
+import { AutomationRunner } from './automations/runner.service.js';
 import { BillingNotices } from './billing/notices.js';
 import { cacheProviders } from './cache/cache.providers.js';
 import { CARD_TOPIC, CommerceCardsService } from './commerce/card-publisher.service.js';
@@ -24,6 +26,8 @@ import { RoutingService } from './decisions/routing.service.js';
 import { type DeveloperOverrides, developerWorkerProviders } from './developer/developer.module.js';
 import { WebhookDispatcher } from './developer/webhooks/dispatcher.service.js';
 import { WEBHOOK_SOURCE_TOPIC, WebhookFanout } from './developer/webhooks/fanout.service.js';
+import { InboxAccess } from './inbox/access.js';
+import { AvailabilityService } from './inbox/availability.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
@@ -124,6 +128,9 @@ export class WorkerModule {
         MemoryExtractionService,
         ...developerWorkerProviders(overrides),
         RepliesService,
+        InboxAccess,
+        AvailabilityService,
+        AutomationRunner,
         MigrationEngine,
         MigrationExporter,
         ...COMMERCE_WORKER_PROVIDERS,
@@ -151,6 +158,7 @@ export class WorkerModule {
             ActionsWorker,
             ChatwootProvisioning,
             BillingNotices,
+            AutomationRunner,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -170,6 +178,7 @@ export class WorkerModule {
             actions: ActionsWorker,
             provisioning: ChatwootProvisioning,
             notices: BillingNotices,
+            automations: AutomationRunner,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -204,6 +213,7 @@ export class WorkerModule {
               [TICKET_CONFIRM_TOPIC, (event) => ticketEmails.onConfirm(event)],
               [ACTION_EXECUTE_TOPIC, (event) => executor.onExecute(event)],
               [ACTION_RECONCILE_TOPIC, (event) => actions.onReconcile(event)],
+              [AUTOMATION_TOPIC, (event) => automations.onEvent(event)],
               ...saasOutboxHandlers(provisioning, notices),
             ]),
         },

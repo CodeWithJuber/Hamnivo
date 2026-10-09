@@ -358,6 +358,20 @@
       "when": 1791539620088,
       "tag": "20261009095340_tickets_forms_security",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791546002973,
+      "tag": "20261009114002_automations",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1791546014661,
+      "tag": "20261009114014_automations_data",
+      "breakpoints": true
     }
   ]
 }

@@ -14,9 +14,10 @@ import {
   dismissed,
   eligible,
   type Memory,
+  type Page,
   type ProactiveConfig,
+  type Rule,
   shown,
-  type Trigger,
   visit,
 } from './proactive.js';
 import { track } from './visitor.js';
@@ -309,19 +310,24 @@ declare global {
     prompt.append(message, close);
     document.body.appendChild(prompt);
   };
-  const showPrompt = (trigger: Trigger) => {
+  const page = (): Page => ({
+    path: location.pathname + location.search,
+    referrer: document.referrer,
+    width: window.innerWidth,
+  });
+  const showPrompt = (rule: Rule) => {
     // Once per page view, never over an open chat, and within today's limit.
     if (
       prompted ||
       open ||
       !config ||
-      !eligible(config.proactive, memory, Date.now(), location.pathname).includes(trigger)
+      !eligible(config.proactive, memory, Date.now(), page()).includes(rule)
     )
       return;
     prompted = true;
     memory = shown(memory);
     remember(memory);
-    bubble(trigger.message, () => send({ type: 'proactive', triggerId: trigger.id }));
+    bubble(rule.message, () => send({ type: 'proactive', triggerId: rule.id }));
   };
   /** Staff invited this visitor to chat: shown like a prompt, but not counted against the limits. */
   const showInvite = (message: string) => {
@@ -330,8 +336,8 @@ declare global {
   };
   const schedulePrompts = () => {
     if (!config || !launcherMode()) return;
-    for (const trigger of eligible(config.proactive, memory, Date.now(), location.pathname)) {
-      timers.push(window.setTimeout(() => showPrompt(trigger), trigger.seconds * 1000));
+    for (const rule of eligible(config.proactive, memory, Date.now(), page())) {
+      timers.push(window.setTimeout(() => showPrompt(rule), rule.seconds * 1000));
     }
   };
 

@@ -1,7 +1,6 @@
 import {
   UpdateConsentSettingsRequest,
   UpdateDirectLinkRequest,
-  UpdateProactiveSettingsRequest,
   UpdateWidgetFormsRequest,
   UpdateWidgetSettingsRequest,
 } from '@hamnivo/contracts';
@@ -11,7 +10,7 @@ import { parseInput } from '../common/validation.js';
 import { CurrentPrincipal, StaffRoute } from '../identity/request-auth.js';
 import { WidgetSettingsService } from './settings.service.js';
 
-/** Brand settings for the customer surface (W02, W09, W17, W19, W23, W25, W26, W27, W28). */
+/** Brand settings for the customer surface (W02, W09, W17, W23, W25, W26, W27, W28). */
 @Controller('v1/admin/brands')
 export class WidgetSettingsController {
   constructor(private readonly settings: WidgetSettingsService) {}
@@ -33,26 +32,6 @@ export class WidgetSettingsController {
       principal,
       brandId,
       parseInput(UpdateWidgetSettingsRequest, body),
-    );
-  }
-
-  @Get(':brandId/proactive')
-  @StaffRoute({ tenant: true, permission: 'widget.proactive' })
-  getProactive(@CurrentPrincipal() principal: StaffPrincipal, @Param('brandId') brandId: string) {
-    return this.settings.getProactive(principal, brandId);
-  }
-
-  @Put(':brandId/proactive')
-  @StaffRoute({ tenant: true, permission: 'widget.proactive' })
-  updateProactive(
-    @CurrentPrincipal() principal: StaffPrincipal,
-    @Param('brandId') brandId: string,
-    @Body() body: unknown,
-  ) {
-    return this.settings.updateProactive(
-      principal,
-      brandId,
-      parseInput(UpdateProactiveSettingsRequest, body),
     );
   }
 

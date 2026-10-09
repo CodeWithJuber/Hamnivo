@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { SupportedLocale, Timestamp } from './common.js';
 import { CustomerConversation } from './conversations.js';
-import { ProactiveTriggerKind, WidgetLayoutMode } from './customer-surface.js';
+import { WidgetLayoutMode } from './customer-surface.js';
 import { WidgetConsentConfig, WidgetFormsConfig } from './widget-forms.js';
 
 export const LauncherPosition = z.enum(['bottom-right', 'bottom-left']);
@@ -72,12 +72,14 @@ export const WidgetConfig = z
     messageDeletion: z.object({ windowSeconds: z.int().nonnegative() }),
     /** Whether verified customers are offered email notifications (W25). */
     notifications: z.object({ email: z.boolean() }),
-    /** Proactive prompts the loader may show (W19), so the chat can open with the same words. */
+    /**
+     * Website prompts the loader may show (G21 automations), by automation ID, so the chat can
+     * open with the same words.
+     */
     proactive: z.object({
       triggers: z.array(
         z.object({
           id: z.string(),
-          kind: ProactiveTriggerKind,
           message: z.record(SupportedLocale, z.string().max(160)),
         }),
       ),

@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const source = join(here, '../../../docs/guide');
 const target = join(here, '../src/content/docs');
-const areas = ['setup', 'inbox', 'ai', 'integrations', 'saas'];
+const areas = ['setup', 'inbox', 'automation', 'ai', 'integrations', 'saas'];
 const repository = 'https://github.com/CodeWithJuber/Hamnivo/blob/main';
 
 // Guides link to other guides and to files of the repository by relative path, as GitHub shows

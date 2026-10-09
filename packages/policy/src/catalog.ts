@@ -86,10 +86,6 @@ export const PERMISSIONS = {
   },
   'brands.manage': { description: 'Create brands and set allowed websites', scopes: WORKSPACE },
   'widget.configure': { description: 'Configure the chat widget', scopes: BRAND },
-  'widget.proactive': {
-    description: 'Choose when the chat invites website visitors to talk',
-    scopes: BRAND,
-  },
   'widget.identity_keys': {
     description: 'Register the keys that verify customer identity',
     scopes: BRAND,
@@ -98,6 +94,15 @@ export const PERMISSIONS = {
   },
   'agents.read': { description: 'View AI agents and their versions', scopes: ALL, reference: true },
   'agents.manage': { description: 'Edit AI agent drafts', scopes: BRAND },
+  'automations.read': {
+    description: 'View automations and what they did',
+    scopes: BRAND,
+    reference: true,
+  },
+  'automations.manage': {
+    description: 'Create, publish and turn off automations, including website prompts',
+    scopes: BRAND,
+  },
   'agents.publish': { description: 'Publish or roll back AI agents', scopes: BRAND, stepUp: true },
   'knowledge.read': { description: 'Read knowledge sources', scopes: ALL, reference: true },
   'knowledge.manage': { description: 'Add, edit and retire knowledge', scopes: BRAND },

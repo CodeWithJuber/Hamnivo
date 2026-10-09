@@ -32,7 +32,7 @@ as a row of links above the page, so each one is a click away.
 | **AI assistant** | AI agents, Knowledge, Customer memory, Tools and permissions, Safety checks, Decision rules, Activity, Answer caching, Model connections |
 | **Sales** | Orders, Finance exceptions |
 | **Reports** | Reports |
-| **Settings** | Brands and install, Chat widget, Business hours, Team and access, Support teams, Security, Developer, Customer sign-in, Import history |
+| **Settings** | Brands and install, Chat widget, Automations, Business hours, Team and access, Support teams, Security, Developer, Customer sign-in, Import history |
 
 Some pages are not in the menu:
 
@@ -51,9 +51,9 @@ entry is there, and a list names the pages you can open in it.
 
 | Role | Home | Inbox | AI assistant | Sales | Reports | Settings |
 |---|---|---|---|---|---|---|
-| Owner | ✓ | ✓ | all nine pages | both pages | ✓ | all ten pages |
-| Administrator | ✓ | ✓ | all nine pages | both pages | ✓ | all ten pages (Plan and billing shows only the email sender name) |
-| Supervisor | ✓ | ✓ | all but Model connections | both pages | ✓ | Team and access, Support teams |
+| Owner | ✓ | ✓ | all nine pages | both pages | ✓ | all eleven pages |
+| Administrator | ✓ | ✓ | all nine pages | both pages | ✓ | all eleven pages (Plan and billing shows only the email sender name) |
+| Supervisor | ✓ | ✓ | all but Model connections | both pages | ✓ | Automations (read only), Team and access, Support teams |
 | Support agent | ✓ | ✓ | Knowledge, Tools and permissions, Answer caching | both pages | | Team and access, Support teams (both read only) |
 | Finance | ✓ | | Activity | both pages | ✓ | Team and access, Support teams |
 | Knowledge editor | ✓ | ✓ | AI agents, Knowledge, Answer caching | | | |

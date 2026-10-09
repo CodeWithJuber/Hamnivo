@@ -8,13 +8,13 @@ import { StatusBadge } from '@hamnivo/ui/components/status-badge';
 import { Link, useRouterState } from '@tanstack/react-router';
 import {
   GlobeIcon,
-  MessageSquareTextIcon,
   MessagesSquareIcon,
   PencilIcon,
   PlugZapIcon,
   PlusIcon,
   SlidersHorizontalIcon,
   TriangleAlertIcon,
+  WorkflowIcon,
 } from 'lucide-react';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,7 +36,6 @@ import {
 } from '../lib/queries';
 import { useTenant } from '../lib/tenant';
 import type { AuthorityConnection, Brand } from '../lib/types';
-import { ProactiveDialog } from './BrandChatSettings';
 import { connectionFor } from './OverviewPage';
 import { HoursSummary } from './settings/HoursSummary';
 import { TestChatDialog } from './settings/TestChat';
@@ -389,7 +388,6 @@ function BrandCard({
   const { t } = useTranslation();
   const { can } = useTenant();
   const [editing, setEditing] = useState(false);
-  const [proactive, setProactive] = useState(false);
   const [testing, setTesting] = useState(false);
   const snippet = installSnippet(brand.widgetId);
   // The test chat needs the chat engine. Someone who cannot see its status is let try: the
@@ -446,16 +444,17 @@ function BrandCard({
               {t('setup.testChat.open')}
             </Button>
           </ReasonedAction>
-          {can('widget.proactive') ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setProactive(true)}
-              aria-label={t('chatSettings.proactive.openLabel', { name: brand.name })}
-              data-testid="proactive-settings"
-            >
-              <MessageSquareTextIcon aria-hidden="true" />
-              {t('chatSettings.proactive.open')}
+          {can('automations.read') ? (
+            <Button asChild variant="secondary" size="sm">
+              <Link
+                to="/automations"
+                search={{ brand: brand.id }}
+                aria-label={t('automations.openLabel', { name: brand.name })}
+                data-testid="automations-link"
+              >
+                <WorkflowIcon aria-hidden="true" />
+                {t('automations.open')}
+              </Link>
             </Button>
           ) : null}
           {can('brands.manage') ? (
@@ -473,7 +472,6 @@ function BrandCard({
         </div>
       </div>
       <EditBrandDialog brand={brand} open={editing} onOpenChange={setEditing} />
-      <ProactiveDialog brand={brand} open={proactive} onOpenChange={setProactive} />
       <TestChatDialog brand={brand} open={testing} onOpenChange={setTesting} />
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">

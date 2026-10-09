@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AutomationDefinition,
   allRoutes,
   HostToFrame,
-  ProactiveSettings,
+  PromptLimits,
   parsePart,
   partsToPlainText,
   ReactionRequest,
@@ -99,46 +100,66 @@ describe('widget settings (W02, W09, W17, W23, W25)', () => {
   });
 });
 
-describe('proactive prompts (W19)', () => {
-  const trigger = {
-    id: 'pricing-help',
-    kind: 'page_path',
-    path: '/pricing',
-    message: { en: 'Questions about plans? Ask us.' },
-  };
+describe('website prompt limits (W19, G21)', () => {
+  it('shows at most one prompt a day by default', () => {
+    expect(PromptLimits.parse({})).toEqual({ maxPerDay: 1, dismissHours: 24 });
+  });
 
-  it('is off by default, with at most one prompt a day', () => {
-    expect(ProactiveSettings.parse({})).toMatchObject({
-      enabled: false,
-      triggers: [],
-      maxPerDay: 1,
-      dismissHours: 24,
+  it('bounds the limits so no configuration can spam a visitor', () => {
+    const ok = (value: unknown) => PromptLimits.safeParse(value).success;
+    expect(ok({ maxPerDay: 3 })).toBe(true);
+    expect(ok({ maxPerDay: 4 })).toBe(false);
+    expect(ok({ dismissHours: 0 })).toBe(false);
+    expect(ok({ dismissHours: 169 })).toBe(false);
+  });
+});
+
+describe('automations (G21)', () => {
+  const prompt = {
+    event: { type: 'page_view', seconds: 30 },
+    conditions: [{ field: 'page_url', op: 'contains', value: '/pricing' }],
+    actions: [{ type: 'show_prompt', message: { en: 'Questions about plans? Ask us.' } }],
+  };
+  const ok = (value: unknown) => AutomationDefinition.safeParse(value).success;
+
+  it('fills in "all" and no conditions', () => {
+    expect(
+      AutomationDefinition.parse({
+        event: { type: 'chat_started' },
+        actions: [{ type: 'make_ticket' }],
+      }),
+    ).toEqual({
+      event: { type: 'chat_started', seconds: 0 },
+      match: 'all',
+      conditions: [],
+      actions: [{ type: 'make_ticket' }],
     });
   });
 
-  it('bounds the caps so no configuration can spam a visitor', () => {
-    const ok = (value: unknown) => ProactiveSettings.safeParse(value).success;
-    expect(ok({ enabled: true, triggers: [trigger], maxPerDay: 3 })).toBe(true);
-    expect(ok({ enabled: true, triggers: [trigger], maxPerDay: 4 })).toBe(false);
-    expect(ok({ enabled: true, triggers: [trigger], dismissHours: 0 })).toBe(false);
-    expect(
-      ok({ triggers: Array.from({ length: 6 }, (_, i) => ({ ...trigger, id: `t${i}` })) }),
-    ).toBe(false);
-    expect(ok({ triggers: [trigger, trigger] })).toBe(false);
+  it('types each condition by its field', () => {
+    expect(ok(prompt)).toBe(true);
+    const condition = (c: unknown) => ok({ ...prompt, conditions: [c] });
+    expect(condition({ field: 'visit_count', op: 'at_least', value: 3 })).toBe(true);
+    expect(condition({ field: 'visit_count', op: 'contains', value: 3 })).toBe(false);
+    expect(condition({ field: 'country', op: 'is', value: ['AE', 'SA'] })).toBe(true);
+    expect(condition({ field: 'country', op: 'is', value: [] })).toBe(false);
+    expect(condition({ field: 'hours_open', op: 'is', value: 'yes' })).toBe(false);
+    expect(condition({ field: 'page_url', op: 'contains', value: '' })).toBe(false);
+    expect(condition({ field: 'mood', op: 'is', value: ['happy'] })).toBe(false);
   });
 
-  it('checks each kind of trigger', () => {
-    const one = (value: Record<string, unknown>) =>
-      ProactiveSettings.safeParse({ triggers: [{ ...trigger, ...value }] }).success;
-    expect(one({ path: null })).toBe(false);
-    expect(one({ path: '/pricing?x=1' })).toBe(false);
-    expect(one({ path: 'https://evil.example/' })).toBe(false);
-    expect(one({ kind: 'time_on_page', path: null, seconds: 5 })).toBe(false);
-    expect(one({ kind: 'time_on_page', path: null, seconds: 30 })).toBe(true);
-    expect(one({ kind: 'returning_visitor', path: null })).toBe(false);
-    expect(one({ kind: 'returning_visitor', path: null, visits: 2 })).toBe(true);
-    expect(one({ message: { en: 'x'.repeat(161) } })).toBe(false);
-    expect(one({ message: { ar: 'مرحبا' } })).toBe(false);
+  it('bounds conditions, actions and words', () => {
+    expect(ok({ ...prompt, actions: [] })).toBe(false);
+    expect(ok({ ...prompt, actions: Array.from({ length: 6 }, () => prompt.actions[0]) })).toBe(
+      false,
+    );
+    expect(
+      ok({ ...prompt, conditions: Array.from({ length: 11 }, () => prompt.conditions[0]) }),
+    ).toBe(false);
+    expect(
+      ok({ ...prompt, actions: [{ type: 'show_prompt', message: { en: 'x'.repeat(161) } }] }),
+    ).toBe(false);
+    expect(ok({ ...prompt, event: { type: 'customer_waiting', seconds: 3601 } })).toBe(false);
   });
 });
 
@@ -161,7 +182,7 @@ describe('route registry', () => {
     );
     expect(customer.length).toBeGreaterThan(10);
     expect(customer.every((r) => r.auth === 'widget_session')).toBe(true);
-    expect(allRoutes.updateProactiveSettings?.auth).toBe('staff_session');
+    expect(allRoutes.publishAutomation?.auth).toBe('staff_session');
     expect(allRoutes.launcherConfig?.auth).toBe('public');
     expect(allRoutes.uploadAttachment?.rawBody?.contentType).toBe('application/octet-stream');
   });

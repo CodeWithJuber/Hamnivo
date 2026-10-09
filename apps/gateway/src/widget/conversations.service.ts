@@ -34,6 +34,7 @@ import { RECONCILE_MIN_SECONDS } from '../authority/reconcile-policy.js';
 import { AuthorityRegistry } from '../authority/registry.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage, publicationFacts } from '../authority/views.js';
+import { queueAutomationEvent } from '../automations/events.js';
 import { EntitlementsService } from '../billing/entitlements.service.js';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
@@ -415,6 +416,8 @@ export class WidgetConversationsService {
     claims: WidgetClaims,
     publicId: string,
     input: z.output<typeof SendMessageRequest>,
+    /** What the first message starts for the brand's automations: a chat, or a contact form message. */
+    start: 'chat_started' | 'offline_message' = 'chat_started',
   ): Promise<OutboundResult> {
     const conversationId = this.conversationId(publicId);
     const text = input.parts
@@ -475,7 +478,19 @@ export class WidgetConversationsService {
             aggregateId: conversationId,
             payload: { conversationId, trigger: 'new_conversation', ref: `new:${ledgerId}` },
           });
+          await queueAutomationEvent(tx, claims.tenantId, control.brandId, {
+            conversationId,
+            event: start,
+            ref: `message:${ledgerId}`,
+          });
         }
+        // Each message starts the clock again for the brand's "waiting for a reply" rules (G21).
+        await queueAutomationEvent(tx, claims.tenantId, control.brandId, {
+          conversationId,
+          event: 'customer_message',
+          ref: `message:${ledgerId}`,
+          ledgerId,
+        });
       },
     });
     const claimed = files as Awaited<ReturnType<WidgetAttachmentsService['reserve']>> | null;

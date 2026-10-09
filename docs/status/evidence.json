@@ -2568,20 +2568,19 @@
   "W19": {
     "status": "implemented",
     "evidence": [
-      "apps/console/e2e/chat-settings.spec.ts",
-      "apps/console/src/pages/BrandChatSettings.tsx",
+      "apps/console/src/pages/automations/AutomationsPage.tsx",
+      "apps/console/e2e/automations.spec.ts",
       "apps/console/src/pages/visitors/VisitorsPage.tsx",
       "apps/gateway/src/visitors/invites.ts",
-      "apps/gateway/src/widget/settings.service.ts",
+      "apps/gateway/src/widget/copy.ts",
       "apps/gateway/test/customer-surface.int.test.ts",
       "apps/gateway/test/visitors.int.test.ts",
       "apps/widget/e2e/surface.spec.ts",
-      "packages/contracts/src/customer-surface.ts",
       "packages/widget-loader/src/loader.ts",
       "packages/widget-loader/src/proactive.ts",
       "packages/widget-loader/test/proactive.test.ts"
     ],
-    "note": "Prompts on a page, after time on a page, or for returning visitors, set per brand in Studio under their own permission (widget.proactive) and off by default. At most three a day, a quiet time after a dismissal, one per page view, never over an open chat, and optionally only during business hours. The page passes only the prompt's id; the chat shows the brand's own words (tested, mutation-checked). Staff who may reply can also invite a visitor from Live visitors: the invitation shows in the same bubble within seconds, waits three minutes and opens the chat with their words."
+    "note": "Website prompts are website automations (G21): page address, referrer, visits, device, country, language, business hours and who is online, all or any, after seconds on the page. The gateway checks what it knows and the loader the rest; at most three a day, a quiet time after a dismissal, one per page view, never over an open chat. The page passes only the automation's id; the chat shows the brand's own words. Staff who may reply can also invite a visitor from Live visitors."
   },
   "W22": {
     "status": "partial",
@@ -3127,5 +3126,58 @@
       "docs/guide/inbox/tickets.md"
     ],
     "note": "A ticket is a conversation with a tenant-wide number (ADR 0010): Open, Pending (snoozed until the customer writes) or Closed (resolved), with Chatwoot's priority set as the staff member and taken over when changed in Chatwoot. From the contact form or by staff; a Tickets queue with state and priority filters; every change audited and fenced by the ownership epoch. The queue orders by activity, not priority. The Chatwoot contract cases run against the fake here; the real run is left to CI."
+  },
+  "G21": {
+    "status": "partial",
+    "evidence": [
+      "packages/domain/src/automations/index.ts",
+      "packages/domain/test/automations.test.ts",
+      "packages/contracts/src/automations.ts",
+      "packages/db/src/schema/automations.ts",
+      "packages/db/test/automations-migration.int.test.ts",
+      "apps/gateway/src/automations/automations.service.ts",
+      "apps/gateway/src/automations/runner.service.ts",
+      "apps/gateway/test/automations.int.test.ts",
+      "apps/console/src/pages/automations/AutomationEditorPage.tsx",
+      "apps/console/src/pages/automations/TryItPanel.tsx",
+      "apps/console/e2e/automations.spec.ts",
+      "docs/adr/0011-automations-run-on-the-outbox.md",
+      "docs/guide/automation/automations.md"
+    ],
+    "note": "A When / If / Then form rather than a canvas: one event, up to 10 conditions (all or any) and up to 5 actions, from templates, with a Try it panel that uses the same evaluator as the worker. Drafts, immutable published versions, restore, a 90-day run log. Chat rules run from the outbox once per conversation and event; messages never while the AI has the chat, at most five a day. Partial: no branches or loops, and no external tool steps."
+  },
+  "HNV-28-01": {
+    "status": "partial",
+    "evidence": [
+      "apps/console/src/pages/automations/AutomationEditorPage.tsx",
+      "apps/console/src/pages/automations/RuleRows.tsx",
+      "apps/console/e2e/automations.spec.ts"
+    ],
+    "note": "Typed event and conditions with readable summaries and a draft state; no branches."
+  },
+  "HNV-28-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/automations/TryItPanel.tsx",
+      "packages/domain/src/automations/index.ts",
+      "apps/console/test/automations.test.ts"
+    ],
+    "note": "Try it evaluates a sample visitor or chat with the worker's own evaluator and has no side effects."
+  },
+  "HNV-28-04": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/automations/runner.service.ts",
+      "apps/gateway/test/automations.int.test.ts"
+    ],
+    "note": "Loops cannot start: automation messages never trigger rules, and a rule acts once per conversation and event. No hooks or plugins."
+  },
+  "HNV-28-05": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/automations/automations.service.ts",
+      "apps/console/src/pages/automations/HistoryPanels.tsx"
+    ],
+    "note": "Publishing keeps an immutable version and checks the rule; restore copies a version into the draft. No staged rollout or diff view."
   }
 }

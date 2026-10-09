@@ -2,6 +2,7 @@ import {
   type Db,
   ensureAuditPartitions,
   ensureReconcileCursors,
+  purgeAutomationRuns,
   purgeExpired,
   purgeMigrationFiles,
   purgeVisitors,
@@ -59,6 +60,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           visitor_page_views_removed: visitors.pageViews,
           visitor_sessions_removed: visitors.sessions,
           visitors_removed: visitors.visitors,
+          // What chat automations did is kept for 90 days (G21).
+          automation_runs_removed: await purgeAutomationRuns(this.db),
         };
       }
       case 'reconcile-cursors':

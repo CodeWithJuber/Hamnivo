@@ -27,6 +27,10 @@ export const DOCS = {
     /** The page with only the chat on it, and its QR code. */
     directLink: guide('setup', 'direct-link'),
   },
+  /** Rules that act on their own: website prompts and chat automations. */
+  automation: {
+    automations: guide('automation', 'automations'),
+  },
   /** The guides for people working in the inbox. */
   inbox: {
     tickets: guide('inbox', 'tickets'),

@@ -108,6 +108,7 @@ function useMenu(pathname: string): { entries: MenuEntry[]; section: MenuSection
     '/reports': t('reports.nav'),
     '/brands': t('nav.brands'),
     '/chat-widget': t('chatWidget.nav'),
+    '/automations': t('automations.nav'),
     '/hours': t('setup.hours.nav'),
     '/team': t('nav.team'),
     '/support-teams': t('setup.teams.nav'),

@@ -28,6 +28,7 @@ type Locale = (typeof LOCALES)[number];
 let workspace: Workspace;
 let knowledge: { sourceId: string; documentId: string };
 let runId: string;
+let automationId: string;
 
 test.describe.configure({ mode: 'serial' });
 
@@ -49,6 +50,21 @@ test.beforeAll(async () => {
     '/v1/admin/runs?limit=1',
   );
   runId = runs.items[0]?.id ?? '';
+  const automation = await workspace.staff.call<{ id: string }>(
+    'POST',
+    `/v1/admin/brands/${workspace.brand.id}/automations`,
+    {
+      name: 'Welcome reply',
+      publish: true,
+      definition: {
+        event: { type: 'chat_started', seconds: 0 },
+        match: 'all',
+        conditions: [{ field: 'owner', op: 'is', value: ['waiting'] }],
+        actions: [{ type: 'send_message', message: { en: 'Someone will reply shortly.' } }],
+      },
+    },
+  );
+  automationId = automation.id;
 });
 
 const withLang = (path: string, locale: Locale) =>
@@ -63,6 +79,8 @@ const screens = (): Record<string, string> => ({
   'chat-widget-forms': `/chat-widget?brand=${workspace.brand.id}&tab=forms`,
   'chat-widget-privacy': `/chat-widget?brand=${workspace.brand.id}&tab=privacy`,
   'chat-widget-share': `/chat-widget?brand=${workspace.brand.id}&tab=share`,
+  automations: `/automations?brand=${workspace.brand.id}`,
+  'automation-editor': `/automations/${automationId}`,
   agents: '/agents',
   'agent-editor': `/agents/${workspace.agent?.id}`,
   models: '/models',

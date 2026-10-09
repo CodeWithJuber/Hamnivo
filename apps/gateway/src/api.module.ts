@@ -20,6 +20,8 @@ import { OutboundMessagesService } from './authority/outbound.service.js';
 import { OwnershipService } from './authority/ownership.service.js';
 import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
+import { AutomationsController } from './automations/automations.controller.js';
+import { AutomationsService } from './automations/automations.service.js';
 import { CacheController } from './cache/cache.controller.js';
 import { cacheAdminProviders, cacheProviders } from './cache/cache.providers.js';
 import { ChecksController } from './checks/checks.controller.js';
@@ -149,6 +151,7 @@ export class ApiModule {
       imports: [PlatformModule.forRoot(config, overrides, 'gateway')],
       controllers: [
         HealthController,
+        AutomationsController,
         IdentityController,
         AdminController,
         SecretsController,
@@ -246,6 +249,7 @@ export class ApiModule {
         AssignmentService,
         StatusService,
         TicketsService,
+        AutomationsService,
         AnnotationsService,
         AssistService,
         CollaborationService,

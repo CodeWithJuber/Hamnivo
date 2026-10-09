@@ -109,13 +109,16 @@ describe('catalog and presets', () => {
   });
 });
 
-describe('proactive prompt permission (W19)', () => {
-  it('is its own permission: administrators have it, developers and agents do not', () => {
-    expect(presetPermissions('admin')).toContain('widget.proactive');
+describe('automation permissions (G21)', () => {
+  it('administrators manage automations, supervisors read them, developers and agents neither', () => {
+    expect(presetPermissions('admin')).toEqual(
+      expect.arrayContaining(['automations.read', 'automations.manage']),
+    );
+    expect(presetPermissions('supervisor')).toContain('automations.read');
+    expect(presetPermissions('supervisor')).not.toContain('automations.manage');
     expect(presetPermissions('developer')).toContain('widget.configure');
-    expect(presetPermissions('developer')).not.toContain('widget.proactive');
-    expect(presetPermissions('agent')).not.toContain('widget.proactive');
-    expect(presetPermissions('supervisor')).not.toContain('widget.proactive');
+    expect(presetPermissions('developer')).not.toContain('automations.manage');
+    expect(presetPermissions('agent')).not.toContain('automations.read');
   });
 });
 

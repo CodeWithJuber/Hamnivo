@@ -8,6 +8,7 @@ import { type Db, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo
 import { Inject, Injectable } from '@nestjs/common';
 import { and, count, eq, gt } from 'drizzle-orm';
 import { uuidV5 } from '../authority/uuid.js';
+import { queueAutomationEvent } from '../automations/events.js';
 import { AppError } from '../common/app-error.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { makeTicket } from '../tickets/tickets.js';
@@ -126,18 +127,31 @@ export class OfflineMessagesService {
           });
         }
         ticket = { number, email, confirmationSent: !asked };
+        // Without a question there is no first message to announce it to the automations.
+        if (!accepted?.question) {
+          await queueAutomationEvent(tx, claims.tenantId, claims.brandId, {
+            conversationId,
+            event: 'offline_message',
+            ref: `offline:${input.clientRequestId}`,
+          });
+        }
       },
     });
     const made = ticket as { number: number; email: string; confirmationSent: boolean } | null;
     if (!made) throw new Error('contact form ticket was not recorded');
     const publicId = toPublicId('conversation', opened.conversationId);
     if (opened.accepted?.question) {
-      await this.conversations.send(claims, publicId, {
-        // Derived from the request, so a retry of the same form posts the message once.
-        clientMessageId: uuidV5(opened.conversationId, `offline:${input.clientRequestId}`),
-        parts: [{ type: 'text', text: opened.accepted.question, format: 'plain' }],
-        ...(input.context ? { context: input.context } : {}),
-      });
+      await this.conversations.send(
+        claims,
+        publicId,
+        {
+          // Derived from the request, so a retry of the same form posts the message once.
+          clientMessageId: uuidV5(opened.conversationId, `offline:${input.clientRequestId}`),
+          parts: [{ type: 'text', text: opened.accepted.question, format: 'plain' }],
+          ...(input.context ? { context: input.context } : {}),
+        },
+        'offline_message',
+      );
     }
     return {
       conversation: await this.conversations.get(claims, publicId),

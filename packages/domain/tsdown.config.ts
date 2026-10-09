@@ -7,6 +7,7 @@ export default defineConfig({
     'billing/index': 'src/billing/index.ts',
     'analytics/index': 'src/analytics/index.ts',
     'actions/index': 'src/actions/index.ts',
+    'automations/index': 'src/automations/index.ts',
   },
   format: 'esm',
   dts: true,

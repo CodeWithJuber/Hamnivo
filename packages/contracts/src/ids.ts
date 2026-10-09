@@ -80,6 +80,8 @@ export const ID_PREFIX = {
   simulation: 'sim',
   simulationRun: 'simr',
   visitor: 'vis',
+  automation: 'aut',
+  automationRun: 'arun',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;
