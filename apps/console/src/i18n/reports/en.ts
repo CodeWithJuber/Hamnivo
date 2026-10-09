@@ -124,12 +124,13 @@ export const reportsEn = {
       offline_form: 'Contact form',
       staff: 'Staff',
       automation: 'Automation',
+      email: 'Email',
     },
     emptyList: 'No tickets in this range.',
     empty: {
       title: 'No tickets in this date range',
       description:
-        'Tickets come from the contact form, from your team and from automations. Try a different date range.',
+        'Tickets come from the contact form, email, your team and automations. Try a different date range.',
     },
   },
   commerce: {

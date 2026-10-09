@@ -1,5 +1,21 @@
-import { addInboxMembers, listInboxes, setInboxAgentBot } from '@hamnivo/chatwoot';
-import type { ChannelInbox, UpdateChannelRequest } from '@hamnivo/contracts';
+import {
+  addInboxMembers,
+  ChatwootError,
+  type ChatwootInboxSummary,
+  createEmailInbox,
+  type EmailInboxSettings,
+  getEmailInbox,
+  listInboxes,
+  setInboxAgentBot,
+  updateEmailInbox,
+} from '@hamnivo/chatwoot';
+import type {
+  ChannelInbox,
+  ConnectEmailRequest,
+  EmailChannelSettings,
+  UpdateChannelRequest,
+  UpdateEmailRequest,
+} from '@hamnivo/contracts';
 import {
   appendAudit,
   type Db,
@@ -44,6 +60,120 @@ function view(row: InboxRow, conversationsThisWeek: number): ChannelInbox {
     pausedAt: row.pausedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/** Chatwoot's field names for a mailbox, as Studio's form names them. */
+const EMAIL_FIELDS: Record<string, string> = {
+  name: 'name',
+  email: 'address',
+  imap_address: 'imap.address',
+  imap_port: 'imap.port',
+  imap_login: 'imap.login',
+  imap_password: 'imap.password',
+  imap_enable_ssl: 'imap.ssl',
+  smtp_address: 'smtp.address',
+  smtp_port: 'smtp.port',
+  smtp_login: 'smtp.login',
+  smtp_password: 'smtp.password',
+};
+
+/**
+ * Chatwoot refused a mailbox (it signs in before it accepts one): its words, next to the field
+ * they are about. A sign-in that failed is put on the password, the field people get wrong.
+ */
+function emailRefused(error: unknown): AppError {
+  if (!(error instanceof ChatwootError) || error.status !== 422) {
+    return new AppError('AUTHORITY_UNAVAILABLE', {
+      detail: 'Chatwoot could not be reached to check this mailbox. Please try again.',
+      internal: error,
+    });
+  }
+  const body = (typeof error.body === 'object' && error.body ? error.body : {}) as Record<
+    string,
+    unknown
+  >;
+  const message =
+    typeof body.message === 'string' && body.message.trim()
+      ? body.message.trim()
+      : 'Chatwoot could not use these settings.';
+  const attributes = Array.isArray(body.attributes) ? body.attributes.map(String) : [];
+  let paths = attributes.map((name) => EMAIL_FIELDS[name]).filter((p): p is string => !!p);
+  if (paths.length === 0) {
+    paths = /smtp/i.test(message)
+      ? ['smtp.password']
+      : /imap|sign in|login|authenticat/i.test(message)
+        ? ['imap.password']
+        : [];
+  }
+  return new AppError('VALIDATION_FAILED', {
+    detail: `Chatwoot could not use this mailbox: ${message}`,
+    fields: paths.map((path) => ({ path, message })),
+  });
+}
+
+function emailSettings(input: ConnectEmailRequest | UpdateEmailRequest): EmailInboxSettings {
+  return {
+    name: input.name,
+    email: input.address,
+    imap: { ...input.imap },
+    smtp: { ...input.smtp },
+  };
+}
+
+/** What Chatwoot says about a channel's sign-in, as the card shows it. */
+function healthOf(inbox: ChatwootInboxSummary, now: Date): NonNullable<InboxRow['health']> {
+  return inbox.needsReauthorization
+    ? {
+        ok: false,
+        message: 'Chatwoot can no longer sign in to this channel. Enter the password again.',
+        checkedAt: now.toISOString(),
+      }
+    : { ok: true, checkedAt: now.toISOString() };
+}
+
+/** Records a channel inbox and starts following its conversations (the inbox cursor). */
+async function recordChannel(
+  tx: TenantTx,
+  input: {
+    tenantId: string;
+    connectionId: string;
+    brandId: string | null;
+    inbox: ChatwootInboxSummary;
+    now: Date;
+    aiAnswers?: boolean;
+    defaultTeamId?: string | null;
+  },
+): Promise<InboxRow> {
+  const { tenantId, connectionId, inbox, now } = input;
+  const [row] = await tx
+    .insert(schema.authorityInboxes)
+    .values({
+      tenantId,
+      connectionId,
+      brandId: input.brandId,
+      purpose: 'channel',
+      externalInboxId: inbox.id,
+      channelType: inbox.channelType,
+      name: inbox.name,
+      displayAddress: inbox.address,
+      aiAnswers: input.aiAnswers ?? false,
+      defaultTeamId: input.defaultTeamId ?? null,
+      health: healthOf(inbox, now),
+    })
+    .returning();
+  await tx
+    .insert(schema.reconcileCursors)
+    .values({
+      tenantId,
+      connectionId,
+      scope: 'inbox',
+      scopeRef: String(inbox.id),
+      intervalSeconds: CHANNEL_POLL_SECONDS,
+      nextPollAt: now,
+    })
+    .onConflictDoNothing();
+  if (!row) throw new Error('channel inbox was not recorded');
+  return row;
 }
 
 /**
@@ -275,6 +405,228 @@ export class ChannelInboxesService {
     });
   }
 
+  /**
+   * Connects the brand's mailbox: Chatwoot creates the email inbox (signing in to check it) and
+   * keeps the passwords; Hamnivo records the channel and follows it at once. Nothing is stored
+   * when Chatwoot refuses, and the request is never kept for replays (it holds passwords).
+   */
+  async connectEmail(
+    principal: StaffPrincipal,
+    brandPublicId: string,
+    input: ConnectEmailRequest,
+  ): Promise<ChannelInbox> {
+    const target = await this.tx(principal, async (tx) => {
+      const { brand, connectionId } = await this.brandConnection(tx, principal, brandPublicId);
+      if (!connectionId) {
+        throw new AppError('FEATURE_DISABLED', {
+          detail: 'Connect this brand to its chat engine first (Brands and install).',
+        });
+      }
+      const teamId = input.defaultTeamId ? await this.team(tx, input.defaultTeamId) : null;
+      return { brand, connectionId, teamId };
+    });
+    const runtime = await this.registry.get(principal.tenantId, target.connectionId);
+    let made: ChatwootInboxSummary;
+    try {
+      made = await createEmailInbox(
+        { baseUrl: runtime.baseUrl, token: runtime.integrationToken, accountId: runtime.accountId },
+        emailSettings(input),
+      );
+    } catch (error) {
+      throw emailRefused(error);
+    }
+    const { row, staffUserIds } = await this.tx(principal, async (tx) => {
+      const row = await recordChannel(tx, {
+        tenantId: principal.tenantId,
+        connectionId: target.connectionId,
+        brandId: target.brand.id,
+        inbox: made,
+        now: this.clock(),
+        aiAnswers: input.aiAnswers,
+        defaultTeamId: target.teamId,
+      });
+      await appendAudit(tx, {
+        actorType: 'staff',
+        actorId: toPublicId('staff', principal.staffMemberId),
+        action: 'channel.connected',
+        targetType: 'authority_inbox',
+        targetId: toPublicId('inbox', row.id),
+        outcome: 'success',
+        data: {
+          kind: 'email',
+          brandId: toPublicId('brand', target.brand.id),
+          address: made.address,
+          aiAnswers: input.aiAnswers,
+        },
+      });
+      return { row, staffUserIds: await this.linkedStaff(tx, target.connectionId) };
+    });
+    this.registry.invalidate(principal.tenantId, target.connectionId);
+    await this.addStaff(principal.tenantId, target.connectionId, [made.id], staffUserIds);
+    if (row.aiAnswers) await this.attachBot(principal.tenantId, row, true);
+    return this.tx(principal, async (tx) => {
+      const [one] = await this.viewsFor(tx, row);
+      return one as ChannelInbox;
+    });
+  }
+
+  /** An email channel the principal may manage, with the brand it answers for. */
+  private async emailChannel(tx: TenantTx, principal: StaffPrincipal, channelPublicId: string) {
+    const [row] = await tx
+      .select()
+      .from(schema.authorityInboxes)
+      .where(
+        and(
+          eq(schema.authorityInboxes.id, fromPublicId('inbox', channelPublicId)),
+          eq(schema.authorityInboxes.purpose, 'channel'),
+          eq(schema.authorityInboxes.channelType, 'Channel::Email'),
+          eq(schema.authorityInboxes.status, 'active'),
+        ),
+      );
+    if (!row?.brandId) throw new AppError('NOT_FOUND', { detail: 'Email channel not found.' });
+    const [brand] = await tx.select().from(schema.brands).where(eq(schema.brands.id, row.brandId));
+    if (!brand) throw new AppError('NOT_FOUND', { detail: 'Email channel not found.' });
+    this.decide(principal, { workspaceId: brand.workspaceId, brandId: brand.id });
+    return row;
+  }
+
+  async emailSettings(
+    principal: StaffPrincipal,
+    channelPublicId: string,
+  ): Promise<EmailChannelSettings> {
+    const row = await this.tx(principal, (tx) => this.emailChannel(tx, principal, channelPublicId));
+    const runtime = await this.registry.get(principal.tenantId, row.connectionId);
+    let found: EmailInboxSettings;
+    try {
+      found = await getEmailInbox({
+        baseUrl: runtime.baseUrl,
+        token: runtime.integrationToken,
+        accountId: runtime.accountId,
+        inboxId: row.externalInboxId,
+      });
+    } catch (error) {
+      throw new AppError('AUTHORITY_UNAVAILABLE', {
+        detail: 'Chatwoot could not be reached to read this mailbox. Please try again.',
+        internal: error,
+      });
+    }
+    return {
+      name: found.name || (row.name ?? 'Email'),
+      address: found.email || (row.displayAddress ?? ''),
+      imap: {
+        address: found.imap.address,
+        port: found.imap.port,
+        ssl: found.imap.ssl,
+        login: found.imap.login,
+      },
+      smtp: {
+        address: found.smtp.address,
+        port: found.smtp.port,
+        security: found.smtp.security,
+        login: found.smtp.login,
+      },
+    };
+  }
+
+  /** Changes a mailbox's settings in Chatwoot; a new password that works clears "Needs attention". */
+  async updateEmailSettings(
+    principal: StaffPrincipal,
+    channelPublicId: string,
+    input: UpdateEmailRequest,
+  ): Promise<ChannelInbox> {
+    const row = await this.tx(principal, (tx) => this.emailChannel(tx, principal, channelPublicId));
+    const runtime = await this.registry.get(principal.tenantId, row.connectionId);
+    try {
+      await updateEmailInbox(
+        {
+          baseUrl: runtime.baseUrl,
+          token: runtime.integrationToken,
+          accountId: runtime.accountId,
+          inboxId: row.externalInboxId,
+        },
+        emailSettings(input),
+      );
+    } catch (error) {
+      throw emailRefused(error);
+    }
+    const newPassword = Boolean(input.imap.password || input.smtp.password);
+    return this.tx(principal, async (tx) => {
+      const now = this.clock();
+      const [updated] = await tx
+        .update(schema.authorityInboxes)
+        .set({
+          name: input.name,
+          displayAddress: input.address,
+          ...(newPassword ? { health: { ok: true, checkedAt: now.toISOString() } } : {}),
+          updatedAt: now,
+        })
+        .where(eq(schema.authorityInboxes.id, row.id))
+        .returning();
+      await appendAudit(tx, {
+        actorType: 'staff',
+        actorId: toPublicId('staff', principal.staffMemberId),
+        action: 'channel.settings_changed',
+        targetType: 'authority_inbox',
+        targetId: toPublicId('inbox', row.id),
+        outcome: 'success',
+        // Which settings changed, never their values' secrets.
+        data: { address: input.address, passwordChanged: newPassword },
+      });
+      const [one] = await this.viewsFor(tx, updated as InboxRow);
+      return one as ChannelInbox;
+    });
+  }
+
+  private async team(tx: TenantTx, teamPublicId: string): Promise<string> {
+    const teamId = fromPublicId('team', teamPublicId);
+    const [team] = await tx
+      .select({ id: schema.teams.id })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, teamId));
+    if (!team) {
+      throw new AppError('VALIDATION_FAILED', {
+        detail: 'That team no longer exists.',
+        fields: [{ path: 'defaultTeamId', message: 'That team no longer exists.' }],
+      });
+    }
+    return teamId;
+  }
+
+  private async linkedStaff(tx: TenantTx, connectionId: string): Promise<number[]> {
+    const links = await tx
+      .select({ userId: schema.staffAuthorityLinks.externalUserId })
+      .from(schema.staffAuthorityLinks)
+      .where(
+        and(
+          eq(schema.staffAuthorityLinks.connectionId, connectionId),
+          eq(schema.staffAuthorityLinks.status, 'active'),
+        ),
+      );
+    return links.map((link) => link.userId);
+  }
+
+  /** Staff already linked join new channel inboxes, so they can answer there in Chatwoot too. */
+  private async addStaff(
+    tenantId: string,
+    connectionId: string,
+    inboxIds: number[],
+    userIds: number[],
+  ): Promise<void> {
+    if (userIds.length === 0) return;
+    const runtime = await this.registry.get(tenantId, connectionId);
+    for (const inboxId of inboxIds) {
+      await addInboxMembers({
+        baseUrl: runtime.baseUrl,
+        token: runtime.integrationToken,
+        accountId: runtime.accountId,
+        inboxId,
+        userIds,
+      }).catch((error: unknown) =>
+        this.logger.warn(`staff not added to channel inbox ${inboxId}: ${String(error)}`),
+      );
+    }
+  }
+
   private async viewsFor(tx: TenantTx, row: InboxRow) {
     return (await this.views(tx, row.connectionId, row.brandId ?? '')).filter(
       (v) => v.id === toPublicId('inbox', row.id),
@@ -334,35 +686,22 @@ export class ChannelInboxesService {
           const row = byExternal.get(inbox.id);
           if (row) {
             if (row.purpose !== 'channel') continue;
-            if (row.name !== inbox.name || row.displayAddress !== inbox.address) {
+            const health = healthOf(inbox, now);
+            const healthChanged = (row.health?.ok ?? true) !== health.ok;
+            if (row.name !== inbox.name || row.displayAddress !== inbox.address || healthChanged) {
               await tx
                 .update(schema.authorityInboxes)
-                .set({ name: inbox.name, displayAddress: inbox.address, updatedAt: now })
+                .set({
+                  name: inbox.name,
+                  displayAddress: inbox.address,
+                  ...(healthChanged ? { health } : {}),
+                  updatedAt: now,
+                })
                 .where(eq(schema.authorityInboxes.id, row.id));
             }
             continue;
           }
-          await tx.insert(schema.authorityInboxes).values({
-            tenantId,
-            connectionId,
-            brandId,
-            purpose: 'channel',
-            externalInboxId: inbox.id,
-            channelType: inbox.channelType,
-            name: inbox.name,
-            displayAddress: inbox.address,
-          });
-          await tx
-            .insert(schema.reconcileCursors)
-            .values({
-              tenantId,
-              connectionId,
-              scope: 'inbox',
-              scopeRef: String(inbox.id),
-              intervalSeconds: CHANNEL_POLL_SECONDS,
-              nextPollAt: now,
-            })
-            .onConflictDoNothing();
+          await recordChannel(tx, { tenantId, connectionId, brandId, inbox, now });
           added.push(inbox.id);
         }
         const present = new Set(found.map((inbox) => inbox.id));

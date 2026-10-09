@@ -20787,6 +20787,195 @@
         }
       }
     },
+    "/v1/admin/brands/{brandId}/channels/email": {
+      "post": {
+        "operationId": "connectEmail",
+        "summary": "Connects the brand's mailbox (IMAP and SMTP) through Chatwoot, which keeps the passwords (integrations.manage)",
+        "tags": [
+          "Channels"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectEmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelInbox"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/channels/{channelId}/email": {
+      "get": {
+        "operationId": "getEmailSettings",
+        "summary": "A mailbox's settings as Chatwoot has them, without passwords (integrations.manage)",
+        "tags": [
+          "Channels"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channelId",
+            "schema": {
+              "type": "string",
+              "description": "Channel ID (inb_…)"
+            },
+            "required": true,
+            "description": "Channel ID (inb_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailChannelSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateEmailSettings",
+        "summary": "Changes a mailbox's settings; passwords only when sent (integrations.manage)",
+        "tags": [
+          "Channels"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channelId",
+            "schema": {
+              "type": "string",
+              "description": "Channel ID (inb_…)"
+            },
+            "required": true,
+            "description": "Channel ID (inb_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelInbox"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/tools": {
       "get": {
         "operationId": "listTools",
@@ -31563,6 +31752,215 @@
             "type": "boolean"
           }
         }
+      },
+      "ConnectEmailRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 320,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "imap": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "login": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 320
+              },
+              "ssl": {
+                "type": "boolean"
+              },
+              "password": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "address",
+              "port",
+              "login",
+              "ssl",
+              "password"
+            ]
+          },
+          "smtp": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "login": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 320
+              },
+              "security": {
+                "type": "string",
+                "enum": [
+                  "starttls",
+                  "tls",
+                  "none"
+                ]
+              },
+              "password": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "address",
+              "port",
+              "login",
+              "security",
+              "password"
+            ]
+          },
+          "aiAnswers": {
+            "default": false,
+            "type": "boolean"
+          },
+          "defaultTeamId": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "team identifier (TypeID with prefix \"team\")",
+                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "address",
+          "imap",
+          "smtp"
+        ]
+      },
+      "UpdateEmailRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 320,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "imap": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "login": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 320
+              },
+              "ssl": {
+                "type": "boolean"
+              },
+              "password": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "address",
+              "port",
+              "login",
+              "ssl"
+            ]
+          },
+          "smtp": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "login": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 320
+              },
+              "security": {
+                "type": "string",
+                "enum": [
+                  "starttls",
+                  "tls",
+                  "none"
+                ]
+              },
+              "password": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "address",
+              "port",
+              "login",
+              "security"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "address",
+          "imap",
+          "smtp"
+        ]
       },
       "CreateToolRequest": {
         "type": "object",
@@ -44881,7 +45279,8 @@
             "enum": [
               "offline_form",
               "staff",
-              "automation"
+              "automation",
+              "email"
             ]
           },
           "openedAt": {
@@ -55179,7 +55578,8 @@
                       "enum": [
                         "offline_form",
                         "staff",
-                        "automation"
+                        "automation",
+                        "email"
                       ]
                     },
                     "count": {
@@ -56779,6 +57179,94 @@
           "lastEventAt",
           "pausedAt",
           "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "EmailChannelSettings": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 320,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "imap": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "login": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 320
+              },
+              "ssl": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "address",
+              "port",
+              "login",
+              "ssl"
+            ],
+            "additionalProperties": false
+          },
+          "smtp": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "login": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 320
+              },
+              "security": {
+                "type": "string",
+                "enum": [
+                  "starttls",
+                  "tls",
+                  "none"
+                ]
+              }
+            },
+            "required": [
+              "address",
+              "port",
+              "login",
+              "security"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "name",
+          "address",
+          "imap",
+          "smtp"
         ],
         "additionalProperties": false
       },

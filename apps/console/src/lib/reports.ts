@@ -20,7 +20,7 @@ type Tickets = AnalyticsOverview['tickets'];
 /** Ticket priorities, highest first (H19). */
 export const TICKET_PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 /** Where tickets come from, in the order the report lists them. */
-export const TICKET_SOURCES = ['offline_form', 'staff', 'automation'] as const;
+export const TICKET_SOURCES = ['offline_form', 'email', 'staff', 'automation'] as const;
 
 /** Tickets by priority, highest first, then those with none. */
 export function ticketsByPriority(tickets: Tickets): Tickets['byPriority'] {
@@ -29,7 +29,7 @@ export function ticketsByPriority(tickets: Tickets): Tickets['byPriority'] {
   return [...tickets.byPriority].sort((a, b) => rank(a.priority) - rank(b.priority));
 }
 
-/** Tickets by source: the contact form, staff, then automations. */
+/** Tickets by source: the contact form, email, staff, then automations. */
 export function ticketsBySource(tickets: Tickets): Tickets['bySource'] {
   const rank = (source: string) => {
     const at = (TICKET_SOURCES as readonly string[]).indexOf(source);

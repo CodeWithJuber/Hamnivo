@@ -129,7 +129,7 @@ test('Channels · empty at first; a new email inbox is found, gets the AI and a 
   const empty = page.getByTestId('channels-empty');
   await expect(empty).toContainText('No email, WhatsApp or Telegram channels yet.');
   await expect(empty).toContainText(
-    'Add one in Chatwoot (Settings → Inboxes), then check again here. Connecting them from Studio is coming next.',
+    'Connect your support email here. For WhatsApp or Telegram, add the channel in Chatwoot (Settings → Inboxes), then check again here.',
   );
   const violations = await audit(page, 'channels empty (en)');
 

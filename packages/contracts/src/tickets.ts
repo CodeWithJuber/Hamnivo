@@ -15,7 +15,7 @@ export const TicketPriority = z.enum(TICKET_PRIORITIES);
 export type TicketPriority = z.infer<typeof TicketPriority>;
 
 /** How the conversation became a ticket. */
-export const TicketSource = z.enum(['offline_form', 'staff', 'automation']);
+export const TicketSource = z.enum(['offline_form', 'staff', 'automation', 'email']);
 export type TicketSource = z.infer<typeof TicketSource>;
 
 /** A ticket's reference as people quote it. */

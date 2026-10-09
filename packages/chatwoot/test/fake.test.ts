@@ -6,10 +6,12 @@ import { ChatwootError, call, createChatwootClient } from '../src/client.js';
 import { type FakeChatwoot, startFakeChatwoot } from '../src/fake/index.js';
 import {
   addInboxMembers,
+  createEmailInbox,
   listInboxes,
   provisionAccount,
   provisionStaffUser,
   setInboxAgentBot,
+  updateEmailInbox,
 } from '../src/provisioning.js';
 import { parseChatwootEvent } from '../src/webhooks.js';
 import { type Receiver, startReceiver } from './contract/receiver.js';
@@ -470,19 +472,33 @@ describe('fake Chatwoot channel inboxes', () => {
 
     // The adapter lists them with the address customers write to, ordered by name.
     expect(await listInboxes(options)).toEqual([
-      { id: expect.any(Number), name: 'Hamnivo Chat', channelType: 'Channel::Api', address: null },
-      { id, name: 'Mail', channelType: 'Channel::Email', address: 'support@shop.example' },
+      {
+        id: expect.any(Number),
+        name: 'Hamnivo Chat',
+        channelType: 'Channel::Api',
+        address: null,
+        needsReauthorization: false,
+      },
+      {
+        id,
+        name: 'Mail',
+        channelType: 'Channel::Email',
+        address: 'support@shop.example',
+        needsReauthorization: false,
+      },
       {
         id: Number(telegram.id),
         name: 'Telegram',
         channelType: 'Channel::Telegram',
         address: `@hv_fake_${telegram.id}_bot`,
+        needsReauthorization: false,
       },
       {
         id: Number(whatsapp.id),
         name: 'WhatsApp',
         channelType: 'Channel::Whatsapp',
         address: '+15551234567',
+        needsReauthorization: false,
       },
     ]);
   });
@@ -512,6 +528,64 @@ describe('fake Chatwoot channel inboxes', () => {
     expect(
       await listInboxes({ ...options, token: account.bot.token }).catch((error) => error),
     ).toMatchObject({ status: 401 });
+  });
+
+  it('connects a mailbox, refuses a wrong password, and asks to sign in again until it is fixed', async () => {
+    const { fake, options } = await channelSetup();
+    const settings = {
+      name: 'Orders',
+      email: 'orders@shop.example',
+      imap: {
+        address: 'imap.shop.example',
+        port: 993,
+        ssl: true,
+        login: 'orders@shop.example',
+        password: 'wrong-password',
+      },
+      smtp: {
+        address: 'smtp.shop.example',
+        port: 587,
+        security: 'starttls' as const,
+        login: 'orders@shop.example',
+        password: 'smtp-secret',
+      },
+    };
+    expect(await createEmailInbox(options, settings).catch((e) => e)).toMatchObject({
+      status: 422,
+      body: { message: expect.stringContaining('IMAP') },
+    });
+    const made = await createEmailInbox(options, {
+      ...settings,
+      imap: { ...settings.imap, password: 'imap-secret' },
+    });
+    expect(made).toEqual({
+      id: expect.any(Number),
+      name: 'Orders',
+      channelType: 'Channel::Email',
+      address: 'orders@shop.example',
+      needsReauthorization: false,
+    });
+    fake.setReauthorizationRequired(made.id, true);
+    expect((await listInboxes(options)).find((i) => i.id === made.id)).toMatchObject({
+      needsReauthorization: true,
+    });
+    // A new port alone keeps the passwords and the request to sign in again.
+    const { password: _imap, ...imapWithoutPassword } = settings.imap;
+    const { password: _smtp, ...smtpWithoutPassword } = settings.smtp;
+    await updateEmailInbox(
+      { ...options, inboxId: made.id },
+      { ...settings, imap: { ...imapWithoutPassword, port: 143 }, smtp: smtpWithoutPassword },
+    );
+    expect((await listInboxes(options)).find((i) => i.id === made.id)).toMatchObject({
+      needsReauthorization: true,
+    });
+    await updateEmailInbox(
+      { ...options, inboxId: made.id },
+      { ...settings, imap: { ...settings.imap, password: 'imap-secret-2' } },
+    );
+    expect((await listInboxes(options)).find((i) => i.id === made.id)).toMatchObject({
+      needsReauthorization: false,
+    });
   });
 
   it('makes channel inboxes as an administrator would in Chatwoot, with members', async () => {
@@ -724,7 +798,7 @@ describe('fake Chatwoot channel inboxes', () => {
     expect(missing).toMatchObject({ status: 404 });
   });
 
-  it('sends public replies over the channel, with the email subject Hamnivo chose', async () => {
+  it('sends public replies over the channel, with the subject Chatwoot writes', async () => {
     const { fake, account, admin, authority, createInbox, email } = await channelSetup();
     const thread = await fake.receiveChannelMessage(Number(email.id), {
       from: 'omar@example.com',
@@ -748,11 +822,6 @@ describe('fake Chatwoot channel inboxes', () => {
       visibility: 'private',
       text: 'Note only',
     });
-    await authority.annotate(
-      ref,
-      { attributes: { hv_email_subject: '[T-17] Order 1042' } },
-      integration,
-    );
     const second = await reply('Tracking: 123', { kind: 'bot', botRef: String(account.bot.id) });
     expect(fake.outbound).toEqual([
       {
@@ -767,7 +836,7 @@ describe('fake Chatwoot channel inboxes', () => {
         accountId: account.accountId,
         conversationId: thread.conversationId,
         messageId: Number(second.message.ref),
-        subject: '[T-17] Order 1042',
+        subject: 'Re: Where is order 1042?',
       },
     ]);
 

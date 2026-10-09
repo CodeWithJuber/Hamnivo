@@ -325,3 +325,164 @@ describe('the AI on a channel (ADR 0013)', () => {
     ]);
   });
 });
+
+describe('connecting a mailbox (D13)', () => {
+  const mailbox = (password: string) => ({
+    name: 'Orders',
+    address: 'orders@chan.example',
+    imap: {
+      address: 'imap.chan.example',
+      port: 993,
+      ssl: true,
+      login: 'orders@chan.example',
+      password,
+    },
+    smtp: {
+      address: 'smtp.chan.example',
+      port: 587,
+      security: 'starttls',
+      login: 'orders@chan.example',
+      password: 'smtp-pass-1',
+    },
+  });
+  let orders: Json;
+
+  it('says which field Chatwoot refused, and records nothing', async () => {
+    const before = (await channels()).body.items.length;
+    const refused = await shop.owner.post(
+      `/v1/admin/brands/${shop.brand.id}/channels/email`,
+      mailbox('wrong-password'),
+    );
+    expect(refused.status, JSON.stringify(refused.body)).toBe(422);
+    expect(refused.body).toMatchObject({
+      code: 'VALIDATION_FAILED',
+      fields: [{ path: 'imap.password', message: expect.stringContaining('IMAP') }],
+    });
+    expect(JSON.stringify(refused.body)).not.toContain('wrong-password');
+    expect((await channels()).body.items).toHaveLength(before);
+  });
+
+  it('connects it through Chatwoot, which keeps the passwords', async () => {
+    const made = await shop.owner.post(`/v1/admin/brands/${shop.brand.id}/channels/email`, {
+      ...mailbox('imap-pass-1'),
+      aiAnswers: false,
+    });
+    expect(made.status, JSON.stringify(made.body)).toBe(201);
+    orders = made.body;
+    expect(orders).toMatchObject({
+      kind: 'email',
+      name: 'Orders',
+      address: 'orders@chan.example',
+      status: 'connected',
+      aiAnswers: false,
+      brandId: shop.brand.id,
+    });
+    expect((await channels()).body.items.map((c: Json) => c.id)).toContain(orders.id);
+    // Settings come back from Chatwoot without any password.
+    const settings = await shop.owner.get(`/v1/admin/channels/${orders.id}/email`);
+    expect(settings.status).toBe(200);
+    expect(settings.body).toEqual({
+      name: 'Orders',
+      address: 'orders@chan.example',
+      imap: { address: 'imap.chan.example', port: 993, ssl: true, login: 'orders@chan.example' },
+      smtp: {
+        address: 'smtp.chan.example',
+        port: 587,
+        security: 'starttls',
+        login: 'orders@chan.example',
+      },
+    });
+    // Hamnivo stored no password anywhere it writes for this channel.
+    const stored = await withTenant(slice.app, { tenantId }, async (tx) => ({
+      inboxes: await tx.select().from(schema.authorityInboxes),
+      audit: await tx
+        .select()
+        .from(schema.auditEvents)
+        .where(eq(schema.auditEvents.targetId, orders.id)),
+    }));
+    expect(stored.audit.map((a) => a.action)).toEqual(['channel.connected']);
+    expect(JSON.stringify(stored)).not.toMatch(/imap-pass-1|smtp-pass-1/);
+  });
+
+  it('makes every new email a ticket, and answers no address that never reads replies', async () => {
+    const inboxRef = await withTenant(slice.app, { tenantId }, async (tx) => {
+      const [row] = await tx
+        .select({ external: schema.authorityInboxes.externalInboxId })
+        .from(schema.authorityInboxes)
+        .where(eq(schema.authorityInboxes.id, fromPublicId('inbox', orders.id)));
+      return row?.external as number;
+    });
+    const turnOn = await shop.owner.put(`/v1/admin/channels/${orders.id}`, { aiAnswers: true });
+    expect(turnOn.status, JSON.stringify(turnOn.body)).toBe(200);
+    const email = await slice.fake.receiveChannelMessage(inboxRef, {
+      from: 'gita@customer.example',
+      subject: 'Wrong size',
+      content: 'I got a small instead of a medium.',
+    });
+    await slice.drain();
+    const control = await controlOf(email.conversationId);
+    const [state] = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .select()
+        .from(schema.conversationInboxState)
+        .where(eq(schema.conversationInboxState.conversationId, control?.id as string)),
+    );
+    expect(state).toMatchObject({ ticketSource: 'email', ticketNumber: expect.any(Number) });
+    // The AI answers here: a person is not needed for this one.
+    expect(control).toMatchObject({ ownerMode: 'AI_ACTIVE' });
+
+    const bounce = await slice.fake.receiveChannelMessage(inboxRef, {
+      from: 'mailer-daemon@mail.example',
+      subject: 'Undelivered Mail Returned to Sender',
+      content: 'Delivery failed.',
+    });
+    await slice.drain();
+    expect(await controlOf(bounce.conversationId)).toMatchObject({ ownerMode: 'WAITING_HUMAN' });
+    expect(
+      slice.fake.outbound.filter(
+        (o) => o.kind === 'channel_reply' && o.conversationId === bounce.conversationId,
+      ),
+    ).toEqual([]);
+    await shop.owner.put(`/v1/admin/channels/${orders.id}`, { aiAnswers: false });
+  });
+
+  it('shows "Needs attention" when Chatwoot cannot sign in, until a new password works', async () => {
+    const inboxRef = await withTenant(slice.app, { tenantId }, async (tx) => {
+      const [row] = await tx
+        .select({ external: schema.authorityInboxes.externalInboxId })
+        .from(schema.authorityInboxes)
+        .where(eq(schema.authorityInboxes.id, fromPublicId('inbox', orders.id)));
+      return row?.external as number;
+    });
+    slice.fake.setReauthorizationRequired(inboxRef, true);
+    const found = await shop.owner.post(`/v1/admin/brands/${shop.brand.id}/channels/find`, {});
+    expect(found.body.items.find((c: Json) => c.id === orders.id)).toMatchObject({
+      status: 'needs_attention',
+      problem: expect.stringContaining('sign in'),
+    });
+    const { password: _imap, ...imap } = mailbox('x').imap;
+    const { password: _smtp, ...smtp } = mailbox('x').smtp;
+    // A port change keeps the passwords, and the problem.
+    const moved = await shop.owner.put(`/v1/admin/channels/${orders.id}/email`, {
+      ...mailbox('x'),
+      imap: { ...imap, port: 143, ssl: false },
+      smtp,
+    });
+    expect(moved.status, JSON.stringify(moved.body)).toBe(200);
+    expect(moved.body.status).toBe('needs_attention');
+    const refused = await shop.owner.put(`/v1/admin/channels/${orders.id}/email`, {
+      ...mailbox('wrong-password'),
+      smtp,
+    });
+    expect(refused.status).toBe(422);
+    expect(refused.body.fields).toEqual([{ path: 'imap.password', message: expect.any(String) }]);
+    const fixed = await shop.owner.put(`/v1/admin/channels/${orders.id}/email`, {
+      ...mailbox('imap-pass-2'),
+      smtp,
+    });
+    expect(fixed.status, JSON.stringify(fixed.body)).toBe(200);
+    expect(fixed.body).toMatchObject({ status: 'connected', problem: null });
+    const again = await shop.owner.post(`/v1/admin/brands/${shop.brand.id}/channels/find`, {});
+    expect(again.body.items.find((c: Json) => c.id === orders.id).status).toBe('connected');
+  });
+});

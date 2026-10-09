@@ -136,6 +136,7 @@ describe('the Tickets report', () => {
       { source: 'automation' as const, count: null, suppressed: true },
       { source: 'offline_form' as const, count: 5, suppressed: false },
       { source: 'staff' as const, count: null, suppressed: true },
+      { source: 'email' as const, count: 2, suppressed: false },
     ],
   };
 
@@ -143,9 +144,10 @@ describe('the Tickets report', () => {
     expect(ticketsByPriority(tickets).map((row) => row.priority)).toEqual(['urgent', 'low', null]);
   });
 
-  it('lists the contact form, staff, then automations', () => {
+  it('lists the contact form, email, staff, then automations', () => {
     expect(ticketsBySource(tickets).map((row) => row.source)).toEqual([
       'offline_form',
+      'email',
       'staff',
       'automation',
     ]);

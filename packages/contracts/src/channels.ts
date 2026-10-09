@@ -97,3 +97,166 @@ export const channelRoutes = {
     success: { status: 200, description: 'The channel', schema: ChannelInbox },
   },
 } as const satisfies Record<string, RouteDef>;
+
+// ------------------------------------------------------------------ email (D13)
+
+const server = {
+  address: z.string().trim().min(1).max(255),
+  port: z.int().min(1).max(65_535),
+  login: z.string().trim().min(1).max(320),
+};
+const password = z.string().min(1).max(500);
+
+/** Incoming mail: Chatwoot reads the mailbox over IMAP. */
+export const ImapSettings = z.object({ ...server, ssl: z.boolean() });
+/** Outgoing mail: replies are sent from the same address over SMTP. */
+export const SmtpSettings = z.object({ ...server, security: z.enum(['starttls', 'tls', 'none']) });
+
+/** A mailbox's settings as Studio shows them back: never a password. */
+export const EmailChannelSettings = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    address: z.email().max(320),
+    imap: ImapSettings,
+    smtp: SmtpSettings,
+  })
+  .meta({ id: 'EmailChannelSettings' });
+export type EmailChannelSettings = z.infer<typeof EmailChannelSettings>;
+
+/**
+ * Connects the brand's own mailbox. The passwords go straight to Chatwoot, which keeps them;
+ * Hamnivo stores none. Chatwoot signs in to the mailbox before it accepts it.
+ */
+export const ConnectEmailRequest = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    address: z.email().max(320),
+    imap: ImapSettings.extend({ password }),
+    smtp: SmtpSettings.extend({ password }),
+    aiAnswers: z.boolean().default(false),
+    defaultTeamId: typeId('team').nullable().default(null),
+  })
+  .meta({ id: 'ConnectEmailRequest' });
+export type ConnectEmailRequest = z.infer<typeof ConnectEmailRequest>;
+
+/** Changes a mailbox's settings; a password is sent only to change it. */
+export const UpdateEmailRequest = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    address: z.email().max(320),
+    imap: ImapSettings.extend({ password: password.optional() }),
+    smtp: SmtpSettings.extend({ password: password.optional() }),
+  })
+  .meta({ id: 'UpdateEmailRequest' });
+export type UpdateEmailRequest = z.infer<typeof UpdateEmailRequest>;
+
+export interface EmailProvider {
+  id: string;
+  name: string;
+  /** Address domains that suggest this provider. */
+  domains: string[];
+  imap: { address: string; port: number; ssl: boolean } | null;
+  smtp: { address: string; port: number; security: 'starttls' | 'tls' | 'none' } | null;
+  /** Where to make the app password the provider asks for instead of the account password. */
+  appPasswordUrl: string | null;
+  /** False: the provider no longer accepts passwords over IMAP (Microsoft); connect it in Chatwoot. */
+  passwordsWork: boolean;
+}
+
+/** Common providers' mail servers, for "Find my settings". `custom` fills nothing. */
+export const EMAIL_PROVIDERS: readonly EmailProvider[] = [
+  {
+    id: 'gmail',
+    name: 'Gmail / Google Workspace',
+    domains: ['gmail.com', 'googlemail.com'],
+    imap: { address: 'imap.gmail.com', port: 993, ssl: true },
+    smtp: { address: 'smtp.gmail.com', port: 587, security: 'starttls' },
+    appPasswordUrl: 'https://myaccount.google.com/apppasswords',
+    passwordsWork: true,
+  },
+  {
+    id: 'zoho',
+    name: 'Zoho Mail',
+    domains: ['zoho.com', 'zohomail.com'],
+    imap: { address: 'imap.zoho.com', port: 993, ssl: true },
+    smtp: { address: 'smtp.zoho.com', port: 465, security: 'tls' },
+    appPasswordUrl: 'https://accounts.zoho.com/home#security/app_password',
+    passwordsWork: true,
+  },
+  {
+    id: 'yahoo',
+    name: 'Yahoo Mail',
+    domains: ['yahoo.com', 'ymail.com'],
+    imap: { address: 'imap.mail.yahoo.com', port: 993, ssl: true },
+    smtp: { address: 'smtp.mail.yahoo.com', port: 465, security: 'tls' },
+    appPasswordUrl: 'https://login.yahoo.com/account/security/app-passwords',
+    passwordsWork: true,
+  },
+  {
+    id: 'fastmail',
+    name: 'Fastmail',
+    domains: ['fastmail.com', 'fastmail.fm'],
+    imap: { address: 'imap.fastmail.com', port: 993, ssl: true },
+    smtp: { address: 'smtp.fastmail.com', port: 465, security: 'tls' },
+    appPasswordUrl: 'https://app.fastmail.com/settings/security/apps',
+    passwordsWork: true,
+  },
+  {
+    id: 'microsoft',
+    name: 'Outlook / Microsoft 365',
+    domains: ['outlook.com', 'hotmail.com', 'live.com', 'msn.com'],
+    imap: null,
+    smtp: null,
+    appPasswordUrl: null,
+    passwordsWork: false,
+  },
+  {
+    id: 'custom',
+    name: 'Another provider',
+    domains: [],
+    imap: null,
+    smtp: null,
+    appPasswordUrl: null,
+    passwordsWork: true,
+  },
+];
+
+const channelParams = z.object({
+  channelId: z.string().meta({ description: 'Channel ID (inb_…)' }),
+});
+
+export const emailChannelRoutes = {
+  connectEmail: {
+    method: 'post',
+    path: '/v1/admin/brands/{brandId}/channels/email',
+    operationId: 'connectEmail',
+    summary:
+      "Connects the brand's mailbox (IMAP and SMTP) through Chatwoot, which keeps the passwords (integrations.manage)",
+    tags: ['Channels'],
+    auth: 'staff_session',
+    params: brandParams,
+    body: ConnectEmailRequest,
+    success: { status: 201, description: 'The channel', schema: ChannelInbox },
+  },
+  getEmailSettings: {
+    method: 'get',
+    path: '/v1/admin/channels/{channelId}/email',
+    operationId: 'getEmailSettings',
+    summary: "A mailbox's settings as Chatwoot has them, without passwords (integrations.manage)",
+    tags: ['Channels'],
+    auth: 'staff_session',
+    params: channelParams,
+    success: { status: 200, description: 'Settings', schema: EmailChannelSettings },
+  },
+  updateEmailSettings: {
+    method: 'put',
+    path: '/v1/admin/channels/{channelId}/email',
+    operationId: 'updateEmailSettings',
+    summary: "Changes a mailbox's settings; passwords only when sent (integrations.manage)",
+    tags: ['Channels'],
+    auth: 'staff_session',
+    params: channelParams,
+    body: UpdateEmailRequest,
+    success: { status: 200, description: 'The channel', schema: ChannelInbox },
+  },
+} as const satisfies Record<string, RouteDef>;

@@ -11,6 +11,7 @@ import { queueAutomationEvent } from '../automations/events.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
+import { makeTicket } from '../tickets/tickets.js';
 import { CLOCK, type Clock } from '../tokens.js';
 import { reactionOf } from './extended-parts.js';
 import type { JournalEntry } from './journal.service.js';
@@ -33,6 +34,16 @@ export function channelKindOf(channelType: string): ChannelKind {
     default:
       return 'other';
   }
+}
+
+/**
+ * Senders that never read replies: delivery reports and newsletters. Their mail reaches people,
+ * but nothing automatic answers it (an auto-reply to an auto-reply never ends).
+ */
+export function automatedSender(address: string | null | undefined): boolean {
+  if (!address) return false;
+  const local = address.split('@')[0]?.toLowerCase() ?? '';
+  return /^(no-?reply|do-?not-?reply|mailer-daemon|postmaster|bounces?)([+._-].*)?$/.test(local);
 }
 
 /**
@@ -79,7 +90,7 @@ export class ChannelAdoption {
     if (!inbox?.brandId || inbox.pausedAt) return null;
     const brandId = inbox.brandId;
     const now = this.clock();
-    const principalId = await this.customer(tx, tenantId, inbox, brandId, state);
+    const { id: principalId, handle } = await this.customer(tx, tenantId, inbox, brandId, state);
     const [bot] =
       state.owner.kind === 'bot'
         ? await tx
@@ -131,12 +142,18 @@ export class ChannelAdoption {
       .update(schema.authorityInboxes)
       .set({ lastEventAt: now })
       .where(eq(schema.authorityInboxes.id, inbox.id));
+    // An email is a ticket from the start (ADR 0010): it has a number and waits for an answer.
+    if (channelKindOf(inbox.channelType) === 'email') {
+      await makeTicket(tx, tenantId, conversationId, 'email', now);
+    }
     if (inbox.defaultTeamId) await this.toTeam(tx, tenantId, conversationId, inbox.defaultTeamId);
     if (!bot) return [];
     // Chatwoot gave it to Hamnivo's bot. The AI keeps it only where the owner let it answer.
+    // Mail from an address that never reads replies goes to people as well.
+    const aiAllowed = inbox.aiAnswers && !automatedSender(handle);
     const decision = await this.agents.answering(tx, brandId);
-    if (inbox.aiAnswers && decision.answering) return [];
-    const reason = inbox.aiAnswers && !decision.answering ? decision.reason : 'channel_ai_off';
+    if (aiAllowed && decision.answering) return [];
+    const reason = aiAllowed && !decision.answering ? decision.reason : 'channel_ai_off';
     const result = await this.ownership.transition(
       tx,
       tenantId,
@@ -163,7 +180,7 @@ export class ChannelAdoption {
     inbox: InboxRow,
     brandId: string,
     state: AuthorityConversationState,
-  ): Promise<string> {
+  ): Promise<{ id: string; handle: string }> {
     const kind = channelKindOf(inbox.channelType);
     const contact = state.contact ?? null;
     const address = kind === 'email' ? contact?.email : kind === 'whatsapp' ? contact?.phone : null;
@@ -197,7 +214,7 @@ export class ChannelAdoption {
       })
       .returning({ id: schema.customerPrincipals.id });
     if (!principal) throw new Error('channel customer was not recorded');
-    return principal.id;
+    return { id: principal.id, handle };
   }
 
   /** The channel's team takes the conversation, and routing leaves it there (like a chosen team). */
@@ -225,6 +242,16 @@ export class ChannelAdoption {
     });
   }
 
+  /** Whether the conversation's customer writes from an address that never reads replies. */
+  private async automated(tx: TenantTx, control: ControlRow): Promise<boolean> {
+    if (!control.principalId) return false;
+    const [principal] = await tx
+      .select({ handle: schema.customerPrincipals.channelHandle })
+      .from(schema.customerPrincipals)
+      .where(eq(schema.customerPrincipals.id, control.principalId));
+    return automatedSender(principal?.handle);
+  }
+
   /**
    * A customer message that came in on a channel. The widget's messages pass through Hamnivo's
    * ledger on their way to Chatwoot; these arrive the other way, so the ledger records them here
@@ -247,7 +274,11 @@ export class ChannelAdoption {
       return;
     }
     const [inbox] = await tx
-      .select({ id: schema.authorityInboxes.id, purpose: schema.authorityInboxes.purpose })
+      .select({
+        id: schema.authorityInboxes.id,
+        purpose: schema.authorityInboxes.purpose,
+        channelType: schema.authorityInboxes.channelType,
+      })
       .from(schema.authorityInboxes)
       .where(eq(schema.authorityInboxes.id, control.inboxId));
     if (inbox?.purpose !== 'channel') return;
@@ -277,12 +308,16 @@ export class ChannelAdoption {
     // A reaction (W22) is not a question: nobody is asked to answer it.
     if (reactionOf(message)) return;
     const conversationId = control.id;
-    await enqueueOutbox(tx, tenantId, {
-      topic: 'conversation.customer_message',
-      aggregateType: 'conversation',
-      aggregateId: conversationId,
-      payload: { conversationId, ledgerId: ledger.id, epoch: control.ownershipEpoch },
-    });
+    const quiet =
+      channelKindOf(inbox.channelType) === 'email' && (await this.automated(tx, control));
+    if (!quiet) {
+      await enqueueOutbox(tx, tenantId, {
+        topic: 'conversation.customer_message',
+        aggregateType: 'conversation',
+        aggregateId: conversationId,
+        payload: { conversationId, ledgerId: ledger.id, epoch: control.ownershipEpoch },
+      });
+    }
     if (control.lastCustomerMessageAt === null) {
       await enqueueOutbox(tx, tenantId, {
         topic: 'conversation.route',
@@ -290,12 +325,15 @@ export class ChannelAdoption {
         aggregateId: conversationId,
         payload: { conversationId, trigger: 'new_conversation', ref: `new:${ledger.id}` },
       });
-      await queueAutomationEvent(tx, tenantId, control.brandId, {
-        conversationId,
-        event: 'chat_started',
-        ref: `message:${ledger.id}`,
-      });
+      if (!quiet) {
+        await queueAutomationEvent(tx, tenantId, control.brandId, {
+          conversationId,
+          event: 'chat_started',
+          ref: `message:${ledger.id}`,
+        });
+      }
     }
+    if (quiet) return;
     await queueAutomationEvent(tx, tenantId, control.brandId, {
       conversationId,
       event: 'customer_message',

@@ -39,6 +39,7 @@ export const ticketsHi: TicketsTranslation = {
     offline_form: 'संपर्क फ़ॉर्म से छोड़ा गया',
     staff: 'आपकी टीम ने टिकट बनाया',
     automation: 'एक ऑटोमेशन ने टिकट बनाया',
+    email: 'ईमेल से आया',
   },
   stateChanged: 'टिकट {{reference}} अब: {{state}}।',
   priorityChanged: 'प्राथमिकता {{priority}} कर दी गई।',

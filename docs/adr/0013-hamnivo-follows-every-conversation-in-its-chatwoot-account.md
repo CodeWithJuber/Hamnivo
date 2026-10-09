@@ -49,8 +49,17 @@ with a control row counted. Owners moving from tawk.to expect one inbox for ever
   Hamnivo missed. An adopted conversation's cursor starts at message 0, so the messages before the
   adoption are read once too.
 - **Credentials stay in Chatwoot.** Hamnivo stores no mailbox password or channel token.
-  Connecting channels from Studio passes them straight to Chatwoot, and redaction keeps them out
-  of logs (PR B, PR C).
+  Connecting a mailbox from Studio passes the passwords straight to Chatwoot, which checks the
+  sign-in before it accepts the inbox. The request is not kept for replays, its refusals are
+  reported by field without echoing values, and audit records only that a password changed.
+- **Email conversations are tickets.** Each adopted email conversation gets a ticket number
+  (source `email`). Chatwoot threads replies itself (`In-Reply-To` from the last email) and builds
+  the reply subject from the customer's own subject; its API cannot change that subject, so the
+  ticket number stays in Hamnivo rather than in the email.
+- **No automatic answer to automatic mail.** Senders such as `no-reply@` and `mailer-daemon@`
+  reach people, but the AI and automations never answer them.
+- **Health comes from Chatwoot.** Discovery reads each channel's `reauthorization_required`; a
+  channel Chatwoot can no longer sign in to shows "Needs attention" until a new password works.
 
 ## Consequences
 

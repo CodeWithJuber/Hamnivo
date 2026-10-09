@@ -3210,7 +3210,7 @@
     "note": "Required reason, four durations, Also close this chat; Blocked list with Unblock and a confirm step; axe in English and Arabic."
   },
   "D13": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "docs/adr/0013-hamnivo-follows-every-conversation-in-its-chatwoot-account.md",
       "apps/gateway/src/authority/adopt.ts",
@@ -3221,9 +3221,12 @@
       "packages/chatwoot/test/fake.test.ts",
       "apps/console/src/pages/channels/ChannelsPage.tsx",
       "apps/console/e2e/channels.spec.ts",
-      "docs/guide/setup/channels.md"
+      "docs/guide/setup/channels.md",
+      "apps/gateway/test/channel-senders.test.ts",
+      "docs/guide/setup/email-channel.md",
+      "packages/chatwoot/src/provisioning.ts"
     ],
-    "note": "Email conversations from a Chatwoot email inbox (IMAP/SMTP) are adopted (ADR 0013): found by discovery, for the account's brand, given to people unless the owner turns on \"AI answers here\", with the customer known by their unverified address; each incoming email enters the message ledger (hv1:x:) so routing, automations and the AI start as for web chat. Webhook replays and the reconciler adopt nothing twice, and a minute-by-minute inbox poll finds conversations whose webhooks were lost (tested end to end against the fake, 11 cases). Settings → Channels lists the channels with the AI switch, team and pause. Connecting a mailbox from Studio and ticket references in subjects come next."
+    "note": "Connect the brand's mailbox from Settings → Channels (IMAP and SMTP, provider presets with app-password links): Chatwoot creates the email inbox, checks the sign-in and keeps the passwords; Hamnivo stores none, never keeps the request for replays, and shows Chatwoot's refusal next to the field. Every email conversation Chatwoot creates is adopted (ADR 0013) and becomes a ticket (source email); replies thread through Chatwoot's In-Reply-To. AI answers only where the owner turned it on; no-reply and mailer-daemon senders reach people but get no automatic answer. A mailbox Chatwoot can no longer sign in to shows Needs attention until a new password works. Tested end to end against the fake (15 cases) and in Studio. The ticket number is not in the email subject: Chatwoot's API cannot change it."
   },
   "D14": {
     "status": "in-progress",
