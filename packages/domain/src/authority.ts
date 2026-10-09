@@ -237,11 +237,15 @@ export interface ConversationAuthority {
   ): Promise<{ bytes: Uint8Array; contentType: string | null }>;
 }
 
-/** Message keys Hamnivo writes: `hv1:m:` customer/staff messages, `hv1:p:` AI publications. */
+/**
+ * Message keys Hamnivo writes: `hv1:m:` customer/staff messages, `hv1:p:` AI publications,
+ * `hv1:a:` messages from automations (G21).
+ */
 export const MESSAGE_KEY_PREFIX = {
   message: 'hv1:m:',
   publication: 'hv1:p:',
   note: 'hv1:n:',
+  automation: 'hv1:a:',
   import: 'hv1:imp:',
 } as const;
 

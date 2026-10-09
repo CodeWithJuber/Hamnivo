@@ -8,7 +8,12 @@ import {
   toPublicId,
   withTenant,
 } from '@hamnivo/db';
-import { type ActorCredential, type AuthorityMessage, isOpen } from '@hamnivo/domain';
+import {
+  type ActorCredential,
+  type AuthorityMessage,
+  isOpen,
+  MESSAGE_KEY_PREFIX,
+} from '@hamnivo/domain';
 import {
   type AutomationFacts,
   type ChatOwner,
@@ -38,9 +43,17 @@ const INTEGRATION: ActorCredential = { kind: 'integration' };
 const DAY_MS = 24 * 3_600_000;
 const LOCALES: readonly Locale[] = ['en', 'ar', 'hi', 'ur'];
 
-/** Whether a message the customer can see came from the team or a bot, not from them. */
-const saidToCustomer = (message: AuthorityMessage) =>
-  !message.private && (message.direction === 'outgoing' || message.direction === 'template');
+/** Message keys of automations: what they say is not a reply from the team. */
+const AUTOMATION_KEY = MESSAGE_KEY_PREFIX.automation;
+
+/**
+ * Whether a message the customer can see answered them: from the team, the AI or a bot, but not
+ * from them and not from an automation (a welcome does not end a wait).
+ */
+const answered = (message: AuthorityMessage) =>
+  !message.private &&
+  (message.direction === 'outgoing' || message.direction === 'template') &&
+  !message.key?.startsWith(AUTOMATION_KEY);
 
 const OWNERS: Record<ControlRow['ownerMode'], ChatOwner> = {
   AI_ACTIVE: 'ai',
@@ -195,7 +208,7 @@ export class AutomationRunner {
       view: 'staff',
       after: String(afterMessage),
     });
-    return later.some(saidToCustomer);
+    return later.some(answered);
   }
 
   /** What is known about the conversation now: the visitor's latest visit, the chat and the team. */
@@ -306,7 +319,7 @@ export class AutomationRunner {
             dropped = 'no_bot';
             continue;
           }
-          const messageKey = `hv1:a:${key('message')}`;
+          const messageKey = `${AUTOMATION_KEY}${key('message')}`;
           if (!(await runtime.authority.findByKey(ref, messageKey))) {
             const text = action.message[localeOf(decided.language)] ?? action.message.en;
             await runtime.authority.appendMessage({

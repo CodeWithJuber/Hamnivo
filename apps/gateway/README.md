@@ -386,6 +386,26 @@ a reply, drop a passage or hand the conversation to people.
   customer's own means the entry is not cached). A store call must match the lookup's audience,
   or nothing is stored.
 
+## Automations (G21, ADR 0011)
+
+`src/automations/`.
+
+- **Editing.** `GET/POST /v1/admin/brands/{id}/automations`, `GET …/automations/options` (the
+  brand's tags and teams), `PUT …/automations/prompt-limits`, and `GET/PUT/DELETE
+  /v1/admin/automations/{id}`, `POST …/publish`, `PUT …/enabled`, `GET …/versions`, `POST
+  …/versions/{n}/restore`, `GET …/runs`. Reading needs `automations.read`, changing
+  `automations.manage`. A draft is saved with its revision (a stale one is `VERSION_CONFLICT`);
+  publishing checks it with `definitionProblems` from `@hamnivo/domain/automations` and the
+  brand's own tags and teams, and keeps an immutable version.
+- **Chat rules.** The first customer message, each customer message, a close and a contact form
+  message queue `automation.event` when the brand has a published chat rule. `AutomationRunner`
+  gathers the facts (latest visit, chat owner, tags, team, hours, who is online), evaluates, and
+  runs the actions through the usual paths. A rule acts once per conversation and event
+  (`automation_runs`). "Waiting" rules are delayed events that check Chatwoot for anything said
+  since the customer's message. Messages are never sent while the AI has the chat (read again
+  under the lock), and at most five a day reach a conversation. Runs are kept 90 days
+  (`purge-expired`).
+
 ## Customer surface (W02, W05–W07, W09, W17–W19, W22–W25)
 
 `src/widget/surface.*`, `attachments.service.ts`, `messages.service.ts`, `help.service.ts`,
@@ -393,11 +413,13 @@ a reply, drop a passage or hand the conversation to people.
 
 - **Brand settings.** `GET/PUT /v1/admin/brands/{id}/widget-settings` (widget.configure): layout,
   files, help suggestions and search, the deletion window and email offers.
-  `GET/PUT /v1/admin/brands/{id}/proactive` (widget.proactive, its own permission): prompts, off
-  by default, at most five, at most three a day, with a quiet time after a dismissal. Each change
+  Website prompts are automations (G21, below); the brand keeps only their limits. Each change
   is audited and publishes a new configuration version.
 - **Launcher.** `GET /v1/widget/launcher?widgetId=` gives the loader the layout, colours, labels
-  and prompts in one language. Only the brand's allowed websites get CORS permission to read it.
+  and the published website automations in one language. The gateway checks what it knows
+  (country from `CF-IPCountry`, never stored; language; hours; who is online) and hands the loader
+  only the page, referrer, visits and device conditions. The response is `private`, never a shared
+  cache. Only the brand's allowed websites get CORS permission to read it.
 - **Files.** `POST /v1/widget/conversations/{id}/uploads?name=` takes the file's own bytes
   (`application/octet-stream`, 10 MB at most). The type is read from the bytes; the brand's types,
   size and count apply; the scanner must pass it (ClamAV with `CLAMAV_URL`, the EICAR check in

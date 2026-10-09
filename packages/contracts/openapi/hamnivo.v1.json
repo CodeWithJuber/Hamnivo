@@ -18470,7 +18470,7 @@
     "/v1/widget/launcher": {
       "get": {
         "operationId": "getLauncherConfig",
-        "summary": "Layout, launcher colours and labels, and proactive prompts for the loader; readable from the brand’s allowed websites only",
+        "summary": "Layout, launcher colours and labels, and website prompts (automations) for the loader; readable from the brand’s allowed websites only",
         "tags": [
           "Widget"
         ],
@@ -19239,128 +19239,6 @@
         }
       }
     },
-    "/v1/admin/brands/{brandId}/proactive": {
-      "get": {
-        "operationId": "getProactiveSettings",
-        "summary": "Proactive prompts on the brand’s website (widget.proactive)",
-        "tags": [
-          "Admin"
-        ],
-        "security": [
-          {
-            "staffSession": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "brandId",
-            "schema": {
-              "type": "string",
-              "description": "Brand ID (brd_…)"
-            },
-            "required": true,
-            "description": "Brand ID (brd_…)"
-          },
-          {
-            "in": "header",
-            "name": "X-Hamnivo-Tenant",
-            "required": true,
-            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Proactive settings",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProactiveSettingsView"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error (RFC 9457 problem details)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "operationId": "updateProactiveSettings",
-        "summary": "Replace the proactive prompts; off until turned on (widget.proactive)",
-        "tags": [
-          "Admin"
-        ],
-        "security": [
-          {
-            "staffSession": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "brandId",
-            "schema": {
-              "type": "string",
-              "description": "Brand ID (brd_…)"
-            },
-            "required": true,
-            "description": "Brand ID (brd_…)"
-          },
-          {
-            "in": "header",
-            "name": "X-Hamnivo-Tenant",
-            "required": true,
-            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateProactiveSettingsRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Proactive settings",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProactiveSettingsView"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error (RFC 9457 problem details)",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/admin/brands/{brandId}/widget-forms": {
       "get": {
         "operationId": "getWidgetForms",
@@ -19710,6 +19588,757 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DirectLinkView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/automations": {
+      "get": {
+        "operationId": "listAutomations",
+        "summary": "The brand’s automations, with what each did this week (automations.read)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Automations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAutomation",
+        "summary": "Create an automation as a draft, or publish it at once (automations.manage)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAutomationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new automation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Automation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/automations/options": {
+      "get": {
+        "operationId": "getAutomationOptions",
+        "summary": "The tags and support teams an automation can use (automations.read)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationOptions"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/automations/prompt-limits": {
+      "put": {
+        "operationId": "updatePromptLimits",
+        "summary": "How many website prompts one visitor sees a day, and the quiet time after closing one (automations.manage)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePromptLimitsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Automations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/automations/{automationId}": {
+      "get": {
+        "operationId": "getAutomation",
+        "summary": "One automation, its draft and what runs (automations.read)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automationId",
+            "schema": {
+              "type": "string",
+              "description": "Automation ID (aut_…)"
+            },
+            "required": true,
+            "description": "Automation ID (aut_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Automation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Automation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveAutomation",
+        "summary": "Save the draft; what runs changes only when it is published (automations.manage)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automationId",
+            "schema": {
+              "type": "string",
+              "description": "Automation ID (aut_…)"
+            },
+            "required": true,
+            "description": "Automation ID (aut_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAutomationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Automation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Automation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAutomation",
+        "summary": "Delete an automation with its versions and run history (automations.manage)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automationId",
+            "schema": {
+              "type": "string",
+              "description": "Automation ID (aut_…)"
+            },
+            "required": true,
+            "description": "Automation ID (aut_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/automations/{automationId}/publish": {
+      "post": {
+        "operationId": "publishAutomation",
+        "summary": "Publish the draft as a new version, which runs from now on (automations.manage)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automationId",
+            "schema": {
+              "type": "string",
+              "description": "Automation ID (aut_…)"
+            },
+            "required": true,
+            "description": "Automation ID (aut_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishAutomationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Automation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Automation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/automations/{automationId}/enabled": {
+      "put": {
+        "operationId": "setAutomationEnabled",
+        "summary": "Turn an automation on or off (automations.manage)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automationId",
+            "schema": {
+              "type": "string",
+              "description": "Automation ID (aut_…)"
+            },
+            "required": true,
+            "description": "Automation ID (aut_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAutomationEnabledRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Automation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Automation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/automations/{automationId}/versions": {
+      "get": {
+        "operationId": "listAutomationVersions",
+        "summary": "Published versions, newest first (automations.read)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automationId",
+            "schema": {
+              "type": "string",
+              "description": "Automation ID (aut_…)"
+            },
+            "required": true,
+            "description": "Automation ID (aut_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationVersionList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/automations/{automationId}/versions/{version}/restore": {
+      "post": {
+        "operationId": "restoreAutomationVersion",
+        "summary": "Copy a published version into the draft, to publish again (automations.manage)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automationId",
+            "schema": {
+              "type": "string",
+              "description": "Automation ID (aut_…)"
+            },
+            "required": true,
+            "description": "Automation ID (aut_…)"
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "required": true
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishAutomationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Automation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Automation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/automations/{automationId}/runs": {
+      "get": {
+        "operationId": "listAutomationRuns",
+        "summary": "What a chat rule did, newest first (automations.read)",
+        "tags": [
+          "Automations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "automationId",
+            "schema": {
+              "type": "string",
+              "description": "Automation ID (aut_…)"
+            },
+            "required": true,
+            "description": "Automation ID (aut_…)"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRunList"
                 }
               }
             }
@@ -29562,123 +30191,6 @@
           }
         }
       },
-      "UpdateProactiveSettingsRequest": {
-        "$ref": "#/components/schemas/ProactiveSettings"
-      },
-      "ProactiveTrigger": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "page_path",
-              "time_on_page",
-              "returning_visitor"
-            ]
-          },
-          "path": {
-            "default": null,
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^\\/[^\\s?#]{0,200}$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "seconds": {
-            "default": 5,
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 600
-          },
-          "visits": {
-            "default": null,
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 2,
-                "maximum": 20
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "message": {
-            "type": "object",
-            "properties": {
-              "en": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
-              },
-              "ar": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
-              },
-              "hi": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
-              },
-              "ur": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
-              }
-            },
-            "required": [
-              "en"
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "message"
-        ]
-      },
-      "ProactiveSettings": {
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "default": false,
-            "type": "boolean"
-          },
-          "triggers": {
-            "default": [],
-            "maxItems": 5,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProactiveTrigger"
-            }
-          },
-          "maxPerDay": {
-            "default": 1,
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 3
-          },
-          "dismissHours": {
-            "default": 24,
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 168
-          },
-          "onlyWhenAvailable": {
-            "default": false,
-            "type": "boolean"
-          }
-        }
-      },
       "UpdateWidgetFormsRequest": {
         "$ref": "#/components/schemas/WidgetForms"
       },
@@ -30118,6 +30630,453 @@
             "type": "boolean"
           }
         }
+      },
+      "CreateAutomationRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "definition": {
+            "$ref": "#/components/schemas/AutomationDefinition"
+          },
+          "publish": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "definition"
+        ]
+      },
+      "AutomationDefinition": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/AutomationTrigger"
+          },
+          "match": {
+            "default": "all",
+            "type": "string",
+            "enum": [
+              "all",
+              "any"
+            ]
+          },
+          "conditions": {
+            "default": [],
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationCondition"
+            }
+          },
+          "actions": {
+            "minItems": 1,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationAction"
+            }
+          }
+        },
+        "required": [
+          "event",
+          "actions"
+        ]
+      },
+      "AutomationTrigger": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "page_view",
+              "chat_started",
+              "customer_waiting",
+              "chat_closed",
+              "offline_message"
+            ]
+          },
+          "seconds": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3600
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "AutomationCondition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "page_url",
+                  "referrer"
+                ]
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "contains",
+                  "starts_with",
+                  "is",
+                  "not_contains"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "const": "visit_count"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "at_least",
+                  "at_most"
+                ]
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "country",
+                  "device",
+                  "language",
+                  "owner",
+                  "tag",
+                  "team"
+                ]
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "is",
+                  "is_not"
+                ]
+              },
+              "value": {
+                "minItems": 1,
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "hours_open",
+                  "anyone_online",
+                  "signed_in"
+                ]
+              },
+              "op": {
+                "type": "string",
+                "const": "is"
+              },
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "value"
+            ]
+          }
+        ],
+        "type": "object"
+      },
+      "AutomationAction": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "show_prompt"
+              },
+              "message": {
+                "type": "object",
+                "properties": {
+                  "en": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "ar": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "hi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "ur": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  }
+                },
+                "required": [
+                  "en"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "message"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "send_message"
+              },
+              "message": {
+                "type": "object",
+                "properties": {
+                  "en": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "ar": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "hi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "ur": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "en"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "message"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "add_note"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "add_tag"
+              },
+              "tag": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              }
+            },
+            "required": [
+              "type",
+              "tag"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "set_priority"
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "priority"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "assign_team"
+              },
+              "teamId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "type",
+              "teamId"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "make_ticket"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        ],
+        "type": "object"
+      },
+      "UpdatePromptLimitsRequest": {
+        "type": "object",
+        "properties": {
+          "maxPerDay": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "dismissHours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 168
+          }
+        },
+        "required": [
+          "maxPerDay",
+          "dismissHours"
+        ]
+      },
+      "SaveAutomationRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "definition": {
+            "$ref": "#/components/schemas/AutomationDefinition"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "name",
+          "definition",
+          "revision"
+        ]
+      },
+      "PublishAutomationRequest": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "revision"
+        ]
+      },
+      "SetAutomationEnabledRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ]
       },
       "CreateToolRequest": {
         "type": "object",
@@ -31762,14 +32721,6 @@
                     "id": {
                       "type": "string"
                     },
-                    "kind": {
-                      "type": "string",
-                      "enum": [
-                        "page_path",
-                        "time_on_page",
-                        "returning_visitor"
-                      ]
-                    },
                     "message": {
                       "type": "object",
                       "propertyNames": {
@@ -31795,7 +32746,6 @@
                   },
                   "required": [
                     "id",
-                    "kind",
                     "message"
                   ],
                   "additionalProperties": false
@@ -53949,13 +54899,127 @@
                   ],
                   "additionalProperties": false
                 }
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "seconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "any": {
+                      "type": "boolean"
+                    },
+                    "when": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "prefixItems": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "page_url",
+                                  "referrer"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "contains",
+                                  "starts_with",
+                                  "is",
+                                  "not_contains"
+                                ]
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "items": false,
+                            "minItems": 3,
+                            "maxItems": 3
+                          },
+                          {
+                            "type": "array",
+                            "prefixItems": [
+                              {
+                                "type": "string",
+                                "const": "visit_count"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "at_least",
+                                  "at_most"
+                                ]
+                              },
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            ],
+                            "items": false,
+                            "minItems": 3,
+                            "maxItems": 3
+                          },
+                          {
+                            "type": "array",
+                            "prefixItems": [
+                              {
+                                "type": "string",
+                                "const": "device"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "is",
+                                  "is_not"
+                                ]
+                              },
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            ],
+                            "items": false,
+                            "minItems": 3,
+                            "maxItems": 3
+                          }
+                        ]
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "seconds",
+                    "any",
+                    "when",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "required": [
               "enabled",
               "maxPerDay",
               "dismissHours",
-              "triggers"
+              "triggers",
+              "rules"
             ],
             "additionalProperties": false
           }
@@ -54150,36 +55214,6 @@
         ],
         "additionalProperties": false
       },
-      "ProactiveSettingsView": {
-        "type": "object",
-        "properties": {
-          "brandId": {
-            "type": "string"
-          },
-          "settings": {
-            "$ref": "#/components/schemas/ProactiveSettingsOutput"
-          },
-          "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
-                "description": "RFC 3339 timestamp"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "brandId",
-          "settings",
-          "updatedAt"
-        ],
-        "additionalProperties": false
-      },
       "WidgetFormsView": {
         "type": "object",
         "properties": {
@@ -54307,6 +55341,367 @@
           "url",
           "configVersion",
           "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AutomationList": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Automation"
+            }
+          },
+          "promptLimits": {
+            "type": "object",
+            "properties": {
+              "maxPerDay": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "dismissHours": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 168
+              }
+            },
+            "required": [
+              "maxPerDay",
+              "dismissHours"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "brandId",
+          "items",
+          "promptLimits"
+        ],
+        "additionalProperties": false
+      },
+      "Automation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "brandId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "visitor",
+              "conversation"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/AutomationDefinitionOutput"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "published": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "publishedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  },
+                  "publishedBy": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "publishedByName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "definition": {
+                    "$ref": "#/components/schemas/AutomationDefinitionOutput"
+                  }
+                },
+                "required": [
+                  "version",
+                  "publishedAt",
+                  "publishedBy",
+                  "publishedByName",
+                  "definition"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unpublishedChanges": {
+            "type": "boolean"
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "runsThisWeek": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "lastRunAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "runsThisWeek",
+              "lastRunAt"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "name",
+          "kind",
+          "enabled",
+          "draft",
+          "revision",
+          "published",
+          "unpublishedChanges",
+          "stats",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AutomationOptions": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "tags",
+          "teams"
+        ],
+        "additionalProperties": false
+      },
+      "AutomationVersionList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationVersion"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "AutomationVersion": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "publishedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publishedByName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "definition": {
+            "$ref": "#/components/schemas/AutomationDefinitionOutput"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "version",
+          "publishedAt",
+          "publishedBy",
+          "publishedByName",
+          "definition",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "AutomationRunList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationRun"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "AutomationRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event": {
+            "type": "string",
+            "enum": [
+              "page_view",
+              "chat_started",
+              "customer_waiting",
+              "chat_closed",
+              "offline_message"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "done",
+              "skipped",
+              "failed"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ranAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "conversationId",
+          "event",
+          "outcome",
+          "reason",
+          "actions",
+          "ranAt"
         ],
         "additionalProperties": false
       },
@@ -58910,133 +60305,6 @@
         ],
         "additionalProperties": false
       },
-      "ProactiveSettingsOutput": {
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "default": false,
-            "type": "boolean"
-          },
-          "triggers": {
-            "default": [],
-            "maxItems": 5,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProactiveTriggerOutput"
-            }
-          },
-          "maxPerDay": {
-            "default": 1,
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 3
-          },
-          "dismissHours": {
-            "default": 24,
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 168
-          },
-          "onlyWhenAvailable": {
-            "default": false,
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "enabled",
-          "triggers",
-          "maxPerDay",
-          "dismissHours",
-          "onlyWhenAvailable"
-        ],
-        "additionalProperties": false
-      },
-      "ProactiveTriggerOutput": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "page_path",
-              "time_on_page",
-              "returning_visitor"
-            ]
-          },
-          "path": {
-            "default": null,
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^\\/[^\\s?#]{0,200}$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "seconds": {
-            "default": 5,
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 600
-          },
-          "visits": {
-            "default": null,
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 2,
-                "maximum": 20
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "message": {
-            "type": "object",
-            "properties": {
-              "en": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
-              },
-              "ar": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
-              },
-              "hi": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
-              },
-              "ur": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
-              }
-            },
-            "required": [
-              "en"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "path",
-          "seconds",
-          "visits",
-          "message"
-        ],
-        "additionalProperties": false
-      },
       "WidgetFormsOutput": {
         "type": "object",
         "properties": {
@@ -59496,6 +60764,384 @@
           "text"
         ],
         "additionalProperties": false
+      },
+      "AutomationDefinitionOutput": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/AutomationTriggerOutput"
+          },
+          "match": {
+            "default": "all",
+            "type": "string",
+            "enum": [
+              "all",
+              "any"
+            ]
+          },
+          "conditions": {
+            "default": [],
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationConditionOutput"
+            }
+          },
+          "actions": {
+            "minItems": 1,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationActionOutput"
+            }
+          }
+        },
+        "required": [
+          "event",
+          "match",
+          "conditions",
+          "actions"
+        ],
+        "additionalProperties": false
+      },
+      "AutomationTriggerOutput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "page_view",
+              "chat_started",
+              "customer_waiting",
+              "chat_closed",
+              "offline_message"
+            ]
+          },
+          "seconds": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3600
+          }
+        },
+        "required": [
+          "type",
+          "seconds"
+        ],
+        "additionalProperties": false
+      },
+      "AutomationConditionOutput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "page_url",
+                  "referrer"
+                ]
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "contains",
+                  "starts_with",
+                  "is",
+                  "not_contains"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "const": "visit_count"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "at_least",
+                  "at_most"
+                ]
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "country",
+                  "device",
+                  "language",
+                  "owner",
+                  "tag",
+                  "team"
+                ]
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "is",
+                  "is_not"
+                ]
+              },
+              "value": {
+                "minItems": 1,
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "hours_open",
+                  "anyone_online",
+                  "signed_in"
+                ]
+              },
+              "op": {
+                "type": "string",
+                "const": "is"
+              },
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "value"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "type": "object"
+      },
+      "AutomationActionOutput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "show_prompt"
+              },
+              "message": {
+                "type": "object",
+                "properties": {
+                  "en": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "ar": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "hi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "ur": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  }
+                },
+                "required": [
+                  "en"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "type",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "send_message"
+              },
+              "message": {
+                "type": "object",
+                "properties": {
+                  "en": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "ar": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "hi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "ur": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "en"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "type",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "add_note"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "add_tag"
+              },
+              "tag": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              }
+            },
+            "required": [
+              "type",
+              "tag"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "set_priority"
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "priority"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "assign_team"
+              },
+              "teamId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "type",
+              "teamId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "make_ticket"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "type": "object"
       },
       "SimulationCaseOutput": {
         "type": "object",

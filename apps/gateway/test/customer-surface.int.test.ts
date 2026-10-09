@@ -360,40 +360,44 @@ describe('widget settings and the launcher (W02, W19)', () => {
     });
   });
 
-  it('keeps proactive prompts behind their own permission, off until a brand turns them on', async () => {
+  it('shows website prompts from published automations, edited under their own permission', async () => {
     const developer = await join(slice, shop, 'Dev Eloper', 'developer');
     const path = `/v1/admin/brands/${shop.brand.id}`;
     expect((await developer.client.get(`${path}/widget-settings`)).status).toBe(200);
-    expect((await developer.client.get(`${path}/proactive`)).status).toBe(403);
-    expect(
-      (await developer.client.put(`${path}/proactive`, { enabled: true, triggers: [] })).status,
-    ).toBe(403);
+    expect((await developer.client.get(`${path}/automations`)).status).toBe(403);
+    // The old prompt settings are gone: prompts are automations now (G21).
+    expect((await shop.owner.get(`${path}/proactive`)).status).toBe(404);
 
-    const off = await shop.owner.get(`${path}/proactive`);
-    expect(off.body.settings).toMatchObject({ enabled: false, triggers: [], maxPerDay: 1 });
-    // No setting can show a visitor more than three prompts a day, or one at once.
-    const spam = await shop.owner.put(`${path}/proactive`, { enabled: true, maxPerDay: 10 });
-    expect(spam.status).toBe(422);
-    const eager = await shop.owner.put(`${path}/proactive`, {
-      enabled: true,
-      triggers: [{ id: 'now', kind: 'time_on_page', seconds: 2, message: { en: 'Hi!' } }],
+    // No setting can show a visitor more than three prompts a day.
+    const spam = await shop.owner.put(`${path}/automations/prompt-limits`, {
+      maxPerDay: 10,
+      dismissHours: 12,
     });
-    expect(eager.status).toBe(422);
-    const on = await shop.owner.put(`${path}/proactive`, {
-      enabled: true,
+    expect(spam.status).toBe(422);
+    const limits = await shop.owner.put(`${path}/automations/prompt-limits`, {
       maxPerDay: 2,
       dismissHours: 12,
-      triggers: [
+    });
+    expect(limits.status, JSON.stringify(limits.body)).toBe(200);
+    const prompt = (name: string, definition: Json) =>
+      shop.owner.post(`${path}/automations`, { name, definition, publish: true });
+    const pricing = await prompt('Pricing', {
+      event: { type: 'page_view', seconds: 5 },
+      conditions: [{ field: 'page_url', op: 'starts_with', value: '/pricing' }],
+      actions: [
         {
-          id: 'pricing',
-          kind: 'page_path',
-          path: '/pricing',
+          type: 'show_prompt',
           message: { en: 'Questions about plans? Ask us.', ur: 'پلانز کے بارے میں سوال؟' },
         },
-        { id: 'linger', kind: 'time_on_page', seconds: 30, message: { en: 'Need a hand?' } },
       ],
     });
-    expect(on.status, JSON.stringify(on.body)).toBe(200);
+    expect(pricing.status, JSON.stringify(pricing.body)).toBe(201);
+    const linger = await prompt('Linger', {
+      event: { type: 'page_view', seconds: 30 },
+      conditions: [],
+      actions: [{ type: 'show_prompt', message: { en: 'Need a hand?' } }],
+    });
+    expect(linger.status).toBe(201);
     const launcher = await fetch(
       `${slice.baseUrl}/v1/widget/launcher?widgetId=${shop.brand.widgetId}&locale=ur`,
     );
@@ -401,46 +405,52 @@ describe('widget settings and the launcher (W02, W19)', () => {
       enabled: true,
       maxPerDay: 2,
       dismissHours: 12,
-      triggers: [
+      triggers: [],
+      rules: [
         {
-          id: 'pricing',
-          kind: 'page_path',
-          path: '/pricing',
+          id: pricing.body.id,
           seconds: 5,
-          visits: null,
+          any: false,
+          when: [['page_url', 'starts_with', '/pricing']],
           message: 'پلانز کے بارے میں سوال؟',
         },
-        {
-          id: 'linger',
-          kind: 'time_on_page',
-          path: null,
-          seconds: 30,
-          visits: null,
-          message: 'Need a hand?',
-        },
+        { id: linger.body.id, seconds: 30, any: false, when: [], message: 'Need a hand?' },
       ],
     });
     const session = await new Visitor(slice.baseUrl, shop.brand.widgetId, shop.hostOrigin).open();
-    expect(session.config.proactive.triggers.map((t: Json) => t.id)).toEqual(['pricing', 'linger']);
+    expect(session.config.proactive.triggers.map((t: Json) => t.id)).toEqual([
+      pricing.body.id,
+      linger.body.id,
+    ]);
 
     // Only while people work: this brand has no hours, so nobody is known to be working.
-    const quiet = await shop.owner.put(`${path}/proactive`, {
-      ...on.body.settings,
-      onlyWhenAvailable: true,
+    const quiet = await shop.owner.put(`/v1/admin/automations/${linger.body.id}`, {
+      name: 'Linger',
+      definition: {
+        ...linger.body.draft,
+        conditions: [{ field: 'hours_open', op: 'is', value: true }],
+      },
+      revision: linger.body.revision,
     });
     expect(quiet.status).toBe(200);
+    const republished = await shop.owner.post(`/v1/admin/automations/${linger.body.id}/publish`, {
+      revision: quiet.body.revision,
+    });
+    expect(republished.status).toBe(200);
     const silent = await fetch(
       `${slice.baseUrl}/v1/widget/launcher?widgetId=${shop.brand.widgetId}`,
     );
-    expect((await silent.json()).proactive).toMatchObject({ enabled: false, triggers: [] });
+    expect((await silent.json()).proactive.rules.map((r: Json) => r.id)).toEqual([pricing.body.id]);
     const audit = await withTenant(slice.app, { tenantId }, (tx) =>
       tx
         .select({ data: schema.auditEvents.data })
         .from(schema.auditEvents)
-        .where(eq(schema.auditEvents.action, 'brand.proactive.updated')),
+        .where(eq(schema.auditEvents.action, 'automation.published')),
     );
-    expect(audit).toHaveLength(2);
-    expect((await shop.owner.put(`${path}/proactive`, { enabled: false })).status).toBe(200);
+    expect(audit).toHaveLength(3);
+    for (const id of [pricing.body.id, linger.body.id]) {
+      expect((await shop.owner.delete(`/v1/admin/automations/${id}`)).status).toBe(204);
+    }
   });
 });
 
