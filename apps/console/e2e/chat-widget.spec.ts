@@ -102,9 +102,10 @@ test('W27 · consent for visitors from the EU, EEA and UK, with the brand’s ow
   await ready(page);
   const nobody = page.getByRole('radio', { name: 'Nobody' });
   await tabTo(page, nobody);
-  // Arrow keys move between the choices.
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('ArrowDown');
+  // Arrow keys move between the choices and choose. The group chooses on focus while the key is
+  // down, so each press is held for as long as a person's would be.
+  await page.keyboard.press('ArrowDown', { delay: 50 });
+  await page.keyboard.press('ArrowDown', { delay: 50 });
   await expect(
     page.getByRole('radio', { name: 'Only visitors from the EU, EEA and UK' }),
   ).toBeChecked();

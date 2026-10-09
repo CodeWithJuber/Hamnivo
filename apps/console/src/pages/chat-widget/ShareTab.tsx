@@ -14,7 +14,6 @@ import { ActionError, QueryState } from '../../components/States';
 import { DOCS } from '../../lib/docs';
 import { installSnippet } from '../../lib/install';
 import type { BrandRef } from '../../lib/names';
-import { useBrands } from '../../lib/queries';
 import { isCancelled } from '../../lib/reauth';
 import { useTenant } from '../../lib/tenant';
 import {
@@ -230,17 +229,11 @@ function DirectLinkEditor({ brand, view }: { brand: BrandRef; view: DirectLinkVi
   );
 }
 
-/** The install code, for people who may read the brand (it carries the widget ID). */
-function InstallCode({ brandId }: { brandId: string }) {
+/** The install code, with the widget ID the direct link's settings carry. */
+function InstallCode({ widgetId, loading }: { widgetId: string | null; loading: boolean }) {
   const { t } = useTranslation();
-  const { can } = useTenant();
-  const brands = useBrands();
   const codeRef = useRef<HTMLElement>(null);
-  // The widget ID comes with the brand list, which only people who manage brands may read.
-  const brand = can('brands.manage')
-    ? brands.data?.items.find((item) => item.id === brandId)
-    : undefined;
-  const snippet = brand ? installSnippet(brand.widgetId) : null;
+  const snippet = widgetId ? installSnippet(widgetId) : null;
   return (
     <Section
       id="install"
@@ -272,7 +265,7 @@ function InstallCode({ brandId }: { brandId: string }) {
           </div>
           <p className="text-xs text-text-secondary">{t('brands.install.note')}</p>
         </>
-      ) : can('brands.manage') && brands.isPending ? null : (
+      ) : loading ? null : (
         <p className="text-sm text-text-secondary" data-testid="install-no-access">
           {t('chatWidget.share.install.noAccess')}
         </p>
@@ -296,7 +289,7 @@ export function ShareTab({ brand }: { brand: BrandRef }) {
           />
         )}
       </QueryState>
-      <InstallCode brandId={brand.id} />
+      <InstallCode widgetId={link.data?.widgetId ?? null} loading={link.isPending} />
     </div>
   );
 }

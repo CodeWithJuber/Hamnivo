@@ -109,8 +109,11 @@ function ConsentEditor({
 
   // Hamnivo's own words show greyed while nothing is written; once English is, it is the
   // fallback for the other languages, so their boxes are left empty.
-  const placeholders = draft.text.en.trim() ? {} : { ...DEFAULT_FORM_TEXT.consent };
-  const words = draft.text[lang].trim() || draft.text.en.trim() || DEFAULT_FORM_TEXT.consent[lang];
+  const ownWords = (l: ChatLanguage) => DEFAULT_FORM_TEXT.consent[l].replace('{brand}', brand.name);
+  const placeholders = draft.text.en.trim()
+    ? {}
+    : { en: ownWords('en'), ar: ownWords('ar'), hi: ownWords('hi'), ur: ownWords('ur') };
+  const words = draft.text[lang].trim() || draft.text.en.trim() || ownWords(lang);
   const privacyUrl = appearance?.privacyUrl ?? null;
 
   return (

@@ -6,12 +6,14 @@ customers until you press **Save look**.
 
 ## Open the editor
 
-1. Open **Settings** in the menu, then **Brands and install**.
-2. Find your brand and press **Look and wording**.
+1. Open **Settings** in the menu, then **Chat widget**.
+2. Choose your brand under **Brand**, then the **Look** tab.
+
+You can also press **Chat widget** on your brand's card in **Brands and install**.
 
 Only an owner or administrator can change the look. If you do not see the button, ask one of them.
 
-The window has the fields on the left and a picture of your chat on the right. Under the picture
+The page has the fields on the left and a picture of your chat on the right. Under the picture
 you can choose a **Language**, and whether it shows the chat while **the team is online** or
 **the team is away**. Use these to check every language your customers use, and the message
 customers read when nobody is online. Arabic and Urdu show right to left.
@@ -67,8 +69,8 @@ opens in a new tab. Leave it empty for no link.
 
 - **Save look** puts the new look on your chat. Customers see it the next time the chat loads.
 - **Reset** puts the fields back to what is saved.
-- If you close the window with changes that are not saved, Studio asks first: **Keep editing** or
-  **Discard changes**.
+- If you leave the page or switch tabs with changes that are not saved, Studio asks first:
+  **Keep editing** or **Discard changes**.
 
 ## Check it for real
 

@@ -55,7 +55,7 @@ See [Sounds and notifications](/docs/inbox/sounds-and-notifications/).
 
 ## Next steps
 
-- Change your chat's colour, logo and greeting: **Settings** → **Brands and install** → **Look and
-  wording**. See [How the chat looks](/docs/setup/widget-look/).
+- Change your chat's colour, logo and greeting: **Settings** → **Chat widget** →
+  **Look**. See [How the chat looks](/docs/setup/widget-look/).
 - Set your opening hours, so customers know when you're back: [Business hours](/docs/setup/business-hours/).
 - Answer faster with saved replies: [Saved replies and tags](/docs/inbox/saved-replies/).

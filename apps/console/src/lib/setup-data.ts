@@ -43,7 +43,10 @@ export type ChatLanguage = 'en' | 'ar' | 'hi' | 'ur';
 
 /** What the chat says until a brand writes its own words (the preview shows what customers read). */
 export const DEFAULT_WIDGET_TEXT: Readonly<
-  Record<'greeting' | 'away' | 'awayUnknown', Readonly<Record<ChatLanguage, string>>>
+  Record<
+    'greeting' | 'away' | 'awayUnknown' | 'consent' | 'offlineThanks',
+    Readonly<Record<ChatLanguage, string>>
+  >
 > = {
   greeting: {
     en: 'Assalamu alaikum! How can we help today?',
@@ -63,29 +66,29 @@ export const DEFAULT_WIDGET_TEXT: Readonly<
     hi: 'हमारी टीम अभी उपलब्ध नहीं है। आपके संदेश यहाँ सुरक्षित हैं, और कोई व्यक्ति उन्हें पढ़ेगा।',
     ur: 'ہماری ٹیم ابھی موجود نہیں ہے۔ آپ کے پیغامات یہاں محفوظ ہیں، اور کوئی شخص انہیں پڑھے گا۔',
   },
+  consent: {
+    en: '{brand} keeps this chat, and what you share in it, so the team can help you. You can ask for it to be deleted at any time.',
+    ar: 'تحتفظ {brand} بهذه المحادثة وبما تشاركه فيها حتى يتمكن الفريق من مساعدتك. يمكنك طلب حذفها في أي وقت.',
+    hi: '{brand} यह चैट और इसमें आपकी साझा की गई बातें रखता है, ताकि टीम आपकी मदद कर सके। आप कभी भी इसे हटाने के लिए कह सकते हैं।',
+    ur: '{brand} یہ چیٹ اور اس میں آپ کی بتائی گئی باتیں محفوظ رکھتا ہے تاکہ ٹیم آپ کی مدد کر سکے۔ آپ کسی بھی وقت اسے حذف کرنے کا کہہ سکتے ہیں۔',
+  },
+  offlineThanks: {
+    en: 'Thank you. Your message is with our team, and we answer messages in the order they arrive.',
+    ar: 'شكرًا لك. رسالتك لدى فريقنا، ونرد على الرسائل بحسب ترتيب وصولها.',
+    hi: 'धन्यवाद। आपका संदेश हमारी टीम के पास है, और हम संदेशों का जवाब उसी क्रम में देते हैं जिसमें वे आते हैं।',
+    ur: 'شکریہ۔ آپ کا پیغام ہماری ٹیم کے پاس ہے، اور ہم پیغامات کا جواب اسی ترتیب سے دیتے ہیں جس میں وہ آتے ہیں۔',
+  },
 };
 
 /**
  * What the chat's forms say until a brand writes its own words: the consent question (W27) and
- * the thank-you after the contact form (W11). Studio shows them as the placeholder of the field
- * and in the preview, so the owner sees what customers will read when the field is left empty.
+ * the thank-you after the contact form (W11). They are the gateway's own words (kept equal to the
+ * contracts' by test/setup.test.ts), so the placeholder and the preview show what customers will read. `{brand}` in the
+ * consent words is the brand's name.
  */
 export const DEFAULT_FORM_TEXT: Readonly<
   Record<'consent' | 'thanks', Readonly<Record<ChatLanguage, string>>>
-> = {
-  consent: {
-    en: 'We keep this chat and what you write in it, so our team can help you and follow up later. Please agree before you start.',
-    ar: 'نحتفظ بهذه المحادثة وبما تكتبه فيها، ليتمكن فريقنا من مساعدتك ومتابعة طلبك لاحقًا. يُرجى الموافقة قبل البدء.',
-    hi: 'हम यह बातचीत और इसमें आपका लिखा हुआ रखते हैं, ताकि हमारी टीम आपकी मदद कर सके और बाद में संपर्क कर सके। शुरू करने से पहले कृपया सहमति दें।',
-    ur: 'ہم یہ گفتگو اور اس میں آپ کا لکھا ہوا محفوظ رکھتے ہیں، تاکہ ہماری ٹیم آپ کی مدد کر سکے اور بعد میں رابطہ کر سکے۔ شروع کرنے سے پہلے براہ کرم اتفاق کریں۔',
-  },
-  thanks: {
-    en: 'Thank you, we have your message. Check your email to confirm your address, and we will answer you there.',
-    ar: 'شكرًا، وصلتنا رسالتك. افتح بريدك الإلكتروني لتأكيد عنوانك، وسنرد عليك هناك.',
-    hi: 'धन्यवाद, आपका संदेश हमें मिल गया है। अपना पता पक्का करने के लिए अपना ईमेल देखें, हम वहीं जवाब देंगे।',
-    ur: 'شکریہ، آپ کا پیغام ہمیں مل گیا ہے۔ اپنا پتہ تصدیق کرنے کے لیے اپنی ای میل دیکھیں، ہم وہیں جواب دیں گے۔',
-  },
-};
+> = { consent: DEFAULT_WIDGET_TEXT.consent, thanks: DEFAULT_WIDGET_TEXT.offlineThanks };
 
 /** The chat's own words drawn inside the live preview, in one language. */
 export interface PreviewWords {

@@ -69,6 +69,7 @@ const consentView = (consent = ConsentSettings.parse({}), noticeVersion = 0) => 
 });
 const linkView = (enabled: boolean, url: string | null = 'https://chat.example/c/wid_1') => ({
   brandId: 'brd_1',
+  widgetId: 'wid_1',
   enabled,
   url,
   configVersion: 4,
@@ -320,8 +321,12 @@ describe('the Privacy tab', () => {
     await page('/chat-widget?brand=brd_1&tab=privacy');
     expect(screen.getByTestId('consent-version').textContent).toContain('Nobody has agreed yet');
     // Hamnivo's own words show, greyed, until the brand writes some; the picture shows them too.
-    expect(byId<HTMLTextAreaElement>('consent-text-en').placeholder).toContain('We keep this chat');
-    expect(screen.getByTestId('preview-consent').textContent).toContain('We keep this chat');
+    expect(byId<HTMLTextAreaElement>('consent-text-en').placeholder).toContain(
+      'Noor Books keeps this chat',
+    );
+    expect(screen.getByTestId('preview-consent').textContent).toContain(
+      'Noor Books keeps this chat',
+    );
     expect(screen.getByTestId('consent-preview-notice')).toBeTruthy();
     // The privacy link is the one set on the Look tab, shown here to read, with a way there.
     expect(screen.getByTestId('consent-privacy-link').textContent).toContain(
@@ -374,7 +379,7 @@ describe('the Share tab', () => {
     expect(
       screen.getByText('The link works even on websites that are not in your allowed list.'),
     ).toBeTruthy();
-    // The install code is here too, for people who may read the brand.
+    // The install code is here too, with the widget ID the link's settings carry.
     expect(screen.getByTestId('install-snippet').textContent).toContain('data-widget-id="wid_1"');
 
     const user = userEvent.setup();
@@ -417,12 +422,11 @@ describe('the Share tab', () => {
     expect(screen.queryByTestId('direct-link-qr')).toBeNull();
   });
 
-  it('points a developer to someone who can copy the install code', async () => {
+  it('gives a developer the install code too, without the brand list', async () => {
     fakeGateway({});
     await page('/chat-widget?brand=brd_1&tab=share', developer);
     await settle();
-    expect(screen.getByTestId('install-no-access').textContent).toContain(
-      'Someone who manages brands can copy the install code',
-    );
+    expect(screen.getByTestId('install-snippet').textContent).toContain('data-widget-id="wid_1"');
+    expect(screen.queryByTestId('install-no-access')).toBeNull();
   });
 });
