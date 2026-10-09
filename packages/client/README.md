@@ -56,6 +56,28 @@ A refused file is a `HamnivoApiError` with `code: 'UPLOAD_REJECTED'` (or `UPLOAD
 `problem.reason` says why: `type_not_allowed`, `too_large`, `too_many`, `malware_detected` or
 `scan_unavailable`.
 
+### Forms, consent and tickets
+
+```ts
+// Consent before chatting (W27): the session then says it was given, and listeners hear of it.
+await client.giveConsent(session.config.consent.noticeVersion);
+// The pre-chat form's answers go with the start (W26); a list answer is the option's id.
+await client.startConversation({ prechat: { name: 'Amina', team: 'billing' }, firstMessage });
+// A message while nobody can answer (W11) becomes a ticket (H19). The request id is the
+// idempotency key: a retry with the same id and answers creates nothing twice.
+const { reference, email, confirmationSent } = await client.sendOfflineMessage(
+  { answers: { email: 'amina@example.com', question: 'Can I change my order?' } },
+  crypto.randomUUID(),
+);
+await client.reopen(conversation.id); // a closed conversation, with its history (W15)
+await client.feedback(conversation.id, { rating: 5, comment: 'Quick and kind' });
+```
+
+A chat opened from the brand's direct chat link (W28) passes `direct: true` instead of a
+`hostOrigin`. Starting a chat before agreeing, where the brand asks, is refused with
+`code: 'CONSENT_REQUIRED'`; answers the form does not accept are `VALIDATION_FAILED`, with
+`problem.fields` naming them.
+
 ## Guarantees
 
 - **Sessions.**
