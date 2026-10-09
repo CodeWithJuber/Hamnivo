@@ -41,6 +41,7 @@ export const ticketsEn = {
     offline_form: 'Left with the contact form',
     staff: 'Made a ticket by your team',
     automation: 'Made a ticket by an automation',
+    email: 'Came in by email',
   },
   stateChanged: 'Ticket {{reference}} is now: {{state}}.',
   priorityChanged: 'Priority set to {{priority}}.',

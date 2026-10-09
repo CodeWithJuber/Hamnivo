@@ -39,6 +39,7 @@ export const ticketsAr: TicketsTranslation = {
     offline_form: 'تُركت عبر نموذج التواصل',
     staff: 'حوّلها فريقك إلى تذكرة',
     automation: 'حوّلتها أتمتة إلى تذكرة',
+    email: 'وصلت عبر البريد الإلكتروني',
   },
   stateChanged: 'حالة التذكرة {{reference}} الآن: {{state}}.',
   priorityChanged: 'ضُبطت الأولوية على {{priority}}.',

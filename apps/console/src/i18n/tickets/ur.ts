@@ -39,6 +39,7 @@ export const ticketsUr: TicketsTranslation = {
     offline_form: 'رابطہ فارم سے چھوڑا گیا',
     staff: 'آپ کی ٹیم نے ٹکٹ بنایا',
     automation: 'ایک آٹومیشن نے ٹکٹ بنایا',
+    email: 'ای میل سے آیا',
   },
   stateChanged: 'ٹکٹ {{reference}} اب: {{state}}۔',
   priorityChanged: 'ترجیح {{priority}} کر دی گئی۔',

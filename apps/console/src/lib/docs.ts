@@ -28,6 +28,8 @@ export const DOCS = {
     directLink: guide('setup', 'direct-link'),
     /** Email, WhatsApp and Telegram in the same inbox (ADR 0013). */
     channels: guide('setup', 'channels'),
+    /** Connecting the brand's own mailbox over IMAP and SMTP (D13). */
+    emailChannel: guide('setup', 'email-channel'),
   },
   /** Rules that act on their own: website prompts and chat automations. */
   automation: {

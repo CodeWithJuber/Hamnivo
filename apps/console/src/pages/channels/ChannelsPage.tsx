@@ -6,11 +6,11 @@ import { StatusBadge, type StatusTone } from '@hamnivo/ui/components/status-badg
 import { Switch } from '@hamnivo/ui/components/switch';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
-  AlertCircleIcon,
-  CheckIcon,
   InboxIcon,
+  KeyRoundIcon,
   type LucideIcon,
   MailIcon,
+  MailPlusIcon,
   MessageCircleIcon,
   MessageSquareIcon,
   PauseIcon,
@@ -26,7 +26,7 @@ import { BrandPicker, useChosenBrand } from '../../components/BrandPicker';
 import { SelectField } from '../../components/Fields';
 import { GuideLink } from '../../components/GuideLink';
 import { PageHeader } from '../../components/PageHeader';
-import { ActionError, Forbidden, QueryState } from '../../components/States';
+import { Forbidden, QueryState } from '../../components/States';
 import { useTeams } from '../../lib/access';
 import { isApiError } from '../../lib/api';
 import {
@@ -48,6 +48,8 @@ import { isCancelled } from '../../lib/reauth';
 import { useTenant } from '../../lib/tenant';
 import type { Team } from '../../lib/types';
 import type { ChannelsSearch } from '../../routes/_studio/channels';
+import { ChannelProblem, SavedNote } from './ChannelNotes';
+import { ConnectEmailDialog, EmailSettingsDialog } from './EmailDialogs';
 
 const KIND_ICONS: Record<ChannelKind, LucideIcon> = {
   email: MailIcon,
@@ -87,54 +89,6 @@ function KindLine({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
     <p className="flex items-center gap-1.5 text-sm text-text-secondary" data-testid="channel-kind">
       <Icon className="size-4 shrink-0" aria-hidden="true" />
       <span>{label}</span>
-    </p>
-  );
-}
-
-/**
- * A failed change. When Chatwoot did not answer, the gateway says what was saved anyway (the
- * setting can be saved here while Chatwoot is not updated yet), so its words are shown.
- */
-function ChannelProblem({ error }: { error: unknown }) {
-  const { t } = useTranslation();
-  if (!error || isCancelled(error)) return null;
-  if (!isApiError(error, 'AUTHORITY_UNAVAILABLE')) return <ActionError error={error} />;
-  const detail = error.problem?.detail;
-  return (
-    <div
-      role="alert"
-      data-testid="action-error"
-      className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger-subtle p-3 text-sm"
-    >
-      <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden="true" />
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="font-semibold text-danger">{t('channels.chatwoot.title')}</p>
-        {detail ? (
-          <p className="text-text" data-testid="problem-detail">
-            <bdi dir="auto">{detail}</bdi>
-          </p>
-        ) : null}
-        <p className="text-text-secondary">{t('channels.chatwoot.description')}</p>
-        {error.requestId ? (
-          <p className="text-xs text-text-secondary">
-            {t('app.reference')}:{' '}
-            <bdi dir="ltr" className="font-mono">
-              {error.requestId}
-            </bdi>
-          </p>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-/** What a change did, next to the card (and read out by screen readers). */
-function SavedNote({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <p className="flex items-start gap-1.5 text-sm text-success" data-testid="channel-saved">
-      <CheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-      <span>{text}</span>
     </p>
   );
 }
@@ -185,11 +139,19 @@ function ChannelCard({
   const [note, setNote] = useState<string | null>(null);
   const [problem, setProblem] = useState<unknown>(null);
   const [pausing, setPausing] = useState(false);
+  /** Email settings: closed, open, or open to fix the sign-in (incoming password ready). */
+  const [settings, setSettings] = useState<'closed' | 'open' | 'fix'>('closed');
   const id = `channel-${channel.id}`;
   const titleId = `${id}-title`;
   const name = channel.name;
   const claimed = channel.brandId !== null;
   const paused = channel.status === 'paused';
+  const mailbox = channel.kind === 'email' && claimed;
+  const openSettings = (mode: 'open' | 'fix') => {
+    setNote(null);
+    setProblem(null);
+    setSettings(mode);
+  };
 
   /** Saves one change; says what it did, or keeps the problem next to the card. */
   const save = async (change: ChannelChange, done: string) => {
@@ -240,10 +202,27 @@ function ChannelCard({
         </div>
         <StatusChip status={channel.status} />
       </div>
-      {channel.status === 'needs_attention' && channel.problem ? (
-        <p className="text-sm text-text" data-testid="channel-problem">
-          <bdi dir="auto">{t('channels.problem', { problem: channel.problem })}</bdi>
-        </p>
+      {channel.status === 'needs_attention' && (channel.problem || mailbox) ? (
+        <div className="flex flex-col items-start gap-2">
+          {channel.problem ? (
+            <p className="text-sm text-text" data-testid="channel-problem">
+              <bdi dir="auto">{t('channels.problem', { problem: channel.problem })}</bdi>
+            </p>
+          ) : null}
+          {mailbox ? (
+            <Button
+              type="button"
+              size="sm"
+              id={`${id}-fix`}
+              aria-label={t('channels.email.fix.label', { name })}
+              data-testid="channel-fix-sign-in"
+              onClick={() => openSettings('fix')}
+            >
+              <KeyRoundIcon aria-hidden="true" />
+              {t('channels.email.fix.action')}
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-text-secondary">
         <span data-testid="channel-count">
@@ -307,31 +286,46 @@ function ChannelCard({
                 }}
               />
             </div>
-            {paused ? (
-              <Button
-                type="button"
-                variant="secondary"
-                id={`${id}-pause-toggle`}
-                aria-label={t('channels.resume.label', { name })}
-                data-testid="channel-resume"
-                onClick={() => quietly({ paused: false }, t('channels.resume.done', { name }))}
-              >
-                <PlayIcon aria-hidden="true" />
-                {t('channels.resume.action')}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="secondary"
-                id={`${id}-pause-toggle`}
-                aria-label={t('channels.pause.label', { name })}
-                data-testid="channel-pause"
-                onClick={() => setPausing(true)}
-              >
-                <PauseIcon aria-hidden="true" />
-                {t('channels.pause.action')}
-              </Button>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {mailbox ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  id={`${id}-email-settings`}
+                  aria-label={t('channels.email.settings.label', { name })}
+                  data-testid="channel-email-settings"
+                  onClick={() => openSettings('open')}
+                >
+                  <SettingsIcon aria-hidden="true" />
+                  {t('channels.email.settings.action')}
+                </Button>
+              ) : null}
+              {paused ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  id={`${id}-pause-toggle`}
+                  aria-label={t('channels.resume.label', { name })}
+                  data-testid="channel-resume"
+                  onClick={() => quietly({ paused: false }, t('channels.resume.done', { name }))}
+                >
+                  <PlayIcon aria-hidden="true" />
+                  {t('channels.resume.action')}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  id={`${id}-pause-toggle`}
+                  aria-label={t('channels.pause.label', { name })}
+                  data-testid="channel-pause"
+                  onClick={() => setPausing(true)}
+                >
+                  <PauseIcon aria-hidden="true" />
+                  {t('channels.pause.action')}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       ) : (
@@ -356,6 +350,24 @@ function ChannelCard({
 
       <SavedNote text={note} />
       <ChannelProblem error={problem} />
+
+      {mailbox ? (
+        <EmailSettingsDialog
+          channel={channel}
+          brandId={brand.id}
+          open={settings !== 'closed'}
+          onOpenChange={(open) => {
+            if (!open) setSettings('closed');
+          }}
+          fixSignIn={settings === 'fix'}
+          fallbackFocus={() => document.getElementById(`${id}-email-settings`)}
+          onSaved={() => {
+            const done = t('channels.email.settings.done');
+            setNote(done);
+            announce(done);
+          }}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={pausing}
@@ -399,6 +411,7 @@ function BrandChannels({ brand }: { brand: BrandRef }) {
   const find = useFindChannels(brand.id);
   const teams = useBrandTeams(brand.id);
   const [found, setFound] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
 
   const check = async () => {
     setFound(null);
@@ -424,11 +437,39 @@ function BrandChannels({ brand }: { brand: BrandRef }) {
       {find.isPending ? t('channels.check.busy') : t('channels.check.action')}
     </Button>
   );
+  const connectButton = (testId: string) => (
+    <Button
+      type="button"
+      id={testId}
+      data-testid={testId}
+      onClick={() => {
+        setFound(null);
+        setConnecting(true);
+      }}
+    >
+      <MailPlusIcon aria-hidden="true" />
+      {t('channels.email.connect.action')}
+    </Button>
+  );
   const checkResult = (
     <>
       <SavedNote text={found} />
       <ChannelProblem error={find.error} />
     </>
+  );
+  const connectDialog = (
+    <ConnectEmailDialog
+      brandId={brand.id}
+      teams={teams}
+      open={connecting}
+      onOpenChange={setConnecting}
+      fallbackFocus={() => document.getElementById('connect-email')}
+      onConnected={() => {
+        const text = t('channels.email.connect.done');
+        setFound(text);
+        announce(text);
+      }}
+    />
   );
 
   return (
@@ -439,7 +480,10 @@ function BrandChannels({ brand }: { brand: BrandRef }) {
           <div className="flex flex-col gap-4" data-testid="channels" data-brand={brand.id}>
             {items.length > 0 ? (
               <div className="flex flex-col items-start gap-2">
-                {checkButton('secondary')}
+                <div className="flex flex-wrap gap-2">
+                  {connectButton('connect-email')}
+                  {checkButton('secondary')}
+                </div>
                 {checkResult}
               </div>
             ) : null}
@@ -461,12 +505,16 @@ function BrandChannels({ brand }: { brand: BrandRef }) {
                 data-testid="channels-empty"
                 action={
                   <div className="flex flex-col items-center gap-2">
-                    {checkButton('default')}
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {connectButton('connect-email-empty')}
+                      {checkButton('secondary')}
+                    </div>
                     {checkResult}
                   </div>
                 }
               />
             ) : null}
+            {connectDialog}
           </div>
         );
       }}
