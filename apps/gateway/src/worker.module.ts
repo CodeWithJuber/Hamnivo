@@ -4,6 +4,9 @@ import { ACTIONS_WORKER_PROVIDERS } from './actions/actions.module.js';
 import { ACTION_EXECUTE_TOPIC, ActionExecutor } from './actions/executor.service.js';
 import { ACTION_RECONCILE_TOPIC } from './actions/inbox-actions.service.js';
 import { ActionsWorker } from './actions/worker.service.js';
+import { ChannelAdoption } from './authority/adopt.js';
+import { ChannelInboxesService } from './authority/channel-inboxes.service.js';
+import { ChannelPollService } from './authority/channel-poll.service.js';
 import { JournalService } from './authority/journal.service.js';
 import { OwnershipService } from './authority/ownership.service.js';
 import { InboxProcessor } from './authority/processor.service.js';
@@ -104,8 +107,11 @@ export class WorkerModule {
         StaffLinksService,
         AuthoritySyncService,
         PublicationsService,
+        ChannelAdoption,
         InboxProcessor,
         ReconcilerService,
+        ChannelInboxesService,
+        ChannelPollService,
         ...(overrides.model ? [{ provide: LANGUAGE_MODEL, useValue: overrides.model }] : []),
         ModelFactory,
         KillSwitchesService,
@@ -225,6 +231,7 @@ export class WorkerModule {
         MaintenanceService,
         InboxProcessor,
         ReconcilerService,
+        ChannelPollService,
         RepliesService,
         JournalService,
         MemoryExtractionService,

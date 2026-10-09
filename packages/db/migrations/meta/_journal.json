@@ -386,6 +386,20 @@
       "when": 1791550190945,
       "tag": "20261009124950_visitor_blocks_security",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791562106886,
+      "tag": "20261009160826_channels",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1791562124143,
+      "tag": "20261009160844_channels_security",
+      "breakpoints": true
     }
   ]
 }

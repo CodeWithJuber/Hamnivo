@@ -321,6 +321,8 @@ try {
         platformDatabaseUrl: database.platform,
         hooksUrl: origin(ports.hooks),
         stripe: { url: stripe.url, apiKey: stripe.apiKey },
+        // The fake Chatwoot's platform API, to add channel inboxes to a brand's account.
+        chatwoot: { url: fake.url, platformToken: fake.platformToken },
       },
       null,
       2,

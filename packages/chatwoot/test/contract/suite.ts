@@ -6,9 +6,11 @@ import { ChatwootError, call, createChatwootClient } from '../../src/client.js';
 import {
   ChatwootUserAdoptedError,
   createPlatformUser,
+  listInboxes,
   type ProvisionedAccount,
   provisionAccount,
   provisionStaffUser,
+  setInboxAgentBot,
 } from '../../src/provisioning.js';
 import { dedupeKey, parseChatwootEvent, verifyChatwootSignature } from '../../src/webhooks.js';
 import { type Receiver, startReceiver } from './receiver.js';
@@ -21,6 +23,11 @@ export interface ContractTarget {
   /** Base URL Chatwoot uses to reach the receiver on `port`. */
   webhookBase(port: number): string;
   close?(): Promise<void>;
+  /**
+   * The target is the fake. Cases that need servers outside Chatwoot (Meta's WhatsApp Cloud API,
+   * Telegram) run only here.
+   */
+  fake?: boolean;
 }
 
 const email = (kind: string) => `hv-${kind}-${randomUUID()}@hamnivo.invalid`;
@@ -211,6 +218,46 @@ export function authorityContract(
         attributes: { hv_conversation: 'cnv_contract' },
       });
       expect(s.version).toBeGreaterThan(1_700_000_000);
+    });
+
+    it('lists an inbox’s conversations in every status, latest activity first', async () => {
+      const listed = await authority.listInboxConversations(inboxRef());
+      expect(listed.find((c) => c.ref === state.conversationRef)).toMatchObject({
+        inboxRef: inboxRef(),
+        status: 'pending',
+        contact: { name: 'Ayesha', email: null, phone: null },
+      });
+      // Another customer's two conversations: the one written in last comes first.
+      const other = await authority.ensureContact({
+        inboxRef: inboxRef(),
+        identifier: `hv:brand_contract:${randomUUID()}`,
+        sourceId: randomUUID(),
+        name: 'Bilal',
+      });
+      const open = () =>
+        authority.openConversation({ inboxRef: inboxRef(), contactSourceId: other.sourceId });
+      const older = (await open()).conversationRef;
+      const newer = (await open()).conversationRef;
+      const order = async () =>
+        (await authority.listInboxConversations(inboxRef()))
+          .map((c) => c.ref)
+          .filter((ref) => ref === older || ref === newer);
+      expect(await order()).toEqual([newer, older]);
+      await authority.appendMessage({
+        conversationRef: older,
+        key: `hv1:m:${randomUUID()}`,
+        author: { kind: 'customer' },
+        visibility: 'public',
+        text: 'Still there?',
+      });
+      expect(await eventually(order, (refs) => refs[0] === older)).toEqual([older, newer]);
+      // Resolved conversations are listed too.
+      await authority.setStatus(older, 'resolved', { kind: 'integration' });
+      const all = await authority.listInboxConversations(inboxRef());
+      expect(all.find((c) => c.ref === older)).toMatchObject({
+        status: 'resolved',
+        contact: { name: 'Bilal' },
+      });
     });
 
     it('writes customer, AI and staff-lane messages with keys and true authors', async () => {
@@ -736,6 +783,99 @@ export function authorityContract(
         expect((await authority.getState(ref)).teamRef).toBe(team.ref);
         await authority.assignTeam(ref, null, asStaff());
         expect((await authority.getState(ref)).teamRef).toBeNull();
+      });
+    });
+
+    describe('channel inboxes', () => {
+      const options = () => ({
+        baseUrl: t.baseUrl,
+        token: account.integration.token,
+        accountId: account.accountId,
+      });
+      const createInbox = (name: string, channel: Record<string, unknown>) =>
+        call<Record<string, unknown>>(
+          'createInbox',
+          createChatwootClient({ baseUrl: t.baseUrl, token: account.integration.token }).POST(
+            '/api/v1/accounts/{account_id}/inboxes',
+            {
+              params: { path: { account_id: account.accountId } },
+              body: { name, channel } as never,
+            },
+          ) as never,
+        );
+      const inboxBot = async (inboxId: number) => {
+        const admin = createChatwootClient({
+          baseUrl: t.baseUrl,
+          token: account.integration.token,
+        });
+        const result = await call<{ agent_bot?: { id?: number } | null }>(
+          'getInboxAgentBot',
+          admin.GET('/api/v1/accounts/{account_id}/inboxes/{id}/agent_bot', {
+            params: { path: { account_id: account.accountId, id: inboxId } },
+          }) as never,
+        );
+        return result.agent_bot?.id ?? null;
+      };
+
+      it('adds an email inbox without IMAP or SMTP, lists it and attaches the bot', async () => {
+        const address = `hv-mail-${randomUUID().slice(0, 8)}@hamnivo.invalid`;
+        const inbox = await createInbox('Contract mail', {
+          type: 'email',
+          email: address,
+          imap_enabled: false,
+          smtp_enabled: false,
+        });
+        expect(inbox).toMatchObject({ channel_type: 'Channel::Email', email: address });
+        const inboxes = await listInboxes(options());
+        expect(inboxes).toContainEqual({
+          id: Number(inbox.id),
+          name: 'Contract mail',
+          channelType: 'Channel::Email',
+          address,
+        });
+        expect(inboxes).toContainEqual(
+          expect.objectContaining({ id: account.inbox.id, channelType: 'Channel::Api' }),
+        );
+        // An address is taken once.
+        expect(
+          await createInbox('Again', { type: 'email', email: address }).catch((e) => e),
+        ).toMatchObject({ status: 422, retryable: false });
+
+        const inboxId = Number(inbox.id);
+        await setInboxAgentBot({ ...options(), inboxId, botId: account.bot.id });
+        expect(await inboxBot(inboxId)).toBe(account.bot.id);
+        await setInboxAgentBot({ ...options(), inboxId, botId: null });
+        expect(await inboxBot(inboxId)).toBeNull();
+      });
+
+      it('adds WhatsApp Cloud and Telegram inboxes (the fake only: they need Meta and Telegram)', async (ctx) => {
+        if (!t.fake) ctx.skip();
+        const number = `+1555${String(Date.now()).slice(-7)}`;
+        const whatsapp = await createInbox('Contract WhatsApp', {
+          type: 'whatsapp',
+          phone_number: number,
+          provider: 'whatsapp_cloud',
+          provider_config: { api_key: 'k', phone_number_id: 'p', business_account_id: 'b' },
+        });
+        const telegram = await createInbox('Contract Telegram', {
+          type: 'telegram',
+          bot_token: `1:${randomUUID()}`,
+        });
+        const inboxes = await listInboxes(options());
+        expect(inboxes).toContainEqual(
+          expect.objectContaining({
+            id: whatsapp.id,
+            channelType: 'Channel::Whatsapp',
+            address: number,
+          }),
+        );
+        expect(inboxes).toContainEqual(
+          expect.objectContaining({
+            id: telegram.id,
+            channelType: 'Channel::Telegram',
+            address: `@${telegram.bot_name}`,
+          }),
+        );
       });
     });
 

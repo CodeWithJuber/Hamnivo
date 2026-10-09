@@ -104,6 +104,43 @@ describe('toConversation (real v4.18.0 payloads)', () => {
     const { priority: _priority, ...without } = api.getConversation as Record<string, unknown>;
     expect('priority' in toConversation(without)).toBe(false);
   });
+
+  it('reads who wrote in and an email subject, and leaves them unknown when absent', () => {
+    const api_ = toConversation(api.getConversation);
+    expect(api_.contact).toEqual({ name: 'Ayesha', email: null, phone: null });
+    expect(api_.subject).toBeNull();
+    const email = toConversation({
+      ...api.getConversation,
+      meta: {
+        sender: {
+          id: 5,
+          name: 'Omar',
+          email: 'omar@example.com',
+          phone_number: '+971501234567',
+          type: 'contact',
+        },
+        channel: 'Channel::Email',
+      },
+      additional_attributes: { source: 'email', mail_subject: 'Where is order 1042?' },
+    });
+    expect(email).toMatchObject({
+      contactRef: '5',
+      contact: { name: 'Omar', email: 'omar@example.com', phone: '+971501234567' },
+      subject: 'Where is order 1042?',
+    });
+    // Empty strings are no facts.
+    expect(
+      toConversation({ ...api.getConversation, meta: { sender: { id: 5, name: '', email: '' } } })
+        .contact,
+    ).toEqual({ name: null, email: null, phone: null });
+    const { additional_attributes: _attributes, ...bare } = api.getConversation as Record<
+      string,
+      unknown
+    >;
+    const thin = toConversation({ ...bare, meta: {} });
+    expect('contact' in thin).toBe(false);
+    expect('subject' in thin).toBe(false);
+  });
 });
 
 describe('attachments and read markers (v4.18.0 shapes)', () => {

@@ -138,6 +138,18 @@ export function toConversation(raw: unknown): AuthorityConversationState {
     staffLastSeenAt: timeOf(c.agent_last_seen_at),
     // Absent from some payloads: then nothing is known, and a stored priority is kept.
     ...('priority' in c ? { priority: priorityOf(c.priority) } : {}),
+    ...(meta.sender !== undefined
+      ? {
+          contact: {
+            name: str(sender.name) || null,
+            email: str(sender.email) || null,
+            phone: str(sender.phone_number) || null,
+          },
+        }
+      : {}),
+    ...(c.additional_attributes !== undefined
+      ? { subject: str(obj(c.additional_attributes).mail_subject) }
+      : {}),
   };
 }
 

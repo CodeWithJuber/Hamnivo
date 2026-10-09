@@ -177,7 +177,7 @@ export const AuthorityConnection = z
       z.object({
         id: typeId('inbox'),
         brandId: typeId('brand').nullable(),
-        purpose: z.enum(['live', 'import']),
+        purpose: z.enum(['live', 'import', 'channel']),
         externalInboxId: z.int().positive(),
       }),
     ),

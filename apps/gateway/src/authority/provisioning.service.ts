@@ -26,6 +26,7 @@ import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
+import { CHANNEL_DISCOVERY_REF, CHANNEL_DISCOVERY_SECONDS } from './channel-inboxes.service.js';
 
 /** Outbox topic of an automatic Chatwoot set-up (the first brand of a workspace). */
 export const PROVISION_TOPIC = 'chatwoot.provision';
@@ -495,6 +496,14 @@ export class ChatwootProvisioning {
         hmacSecretId: inbox.hmacSecretId,
         webhookSecretId: inbox.webhookSecretId,
         channelType: 'Channel::Api',
+      });
+      // Inboxes made in Chatwoot later (email, WhatsApp, Telegram) are found by this cursor (ADR 0013).
+      await tx.insert(schema.reconcileCursors).values({
+        tenantId,
+        connectionId,
+        scope: 'inbox',
+        scopeRef: CHANNEL_DISCOVERY_REF,
+        intervalSeconds: CHANNEL_DISCOVERY_SECONDS,
       });
       await tx.insert(schema.authorityBots).values({
         tenantId,

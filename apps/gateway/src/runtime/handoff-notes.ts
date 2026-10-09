@@ -9,7 +9,8 @@ export type AiHandoffReason =
   | 'ai_blocked'
   | 'ai_limit'
   | 'customer_request'
-  | 'ai_escalated';
+  | 'ai_escalated'
+  | 'channel_ai_off';
 
 /** Internal notes for staff (the staff lane), in the operator's language. */
 export const HANDOFF_NOTES: Record<AiHandoffReason, string> = {
@@ -23,6 +24,7 @@ export const HANDOFF_NOTES: Record<AiHandoffReason, string> = {
     "The workspace's AI replies for this billing period are used up (plan limit or budget). Please answer.",
   customer_request: 'The customer asked to talk to a person, so the AI stepped back.',
   ai_escalated: 'The escalation check passed this conversation to people. Please answer.',
+  channel_ai_off: 'The AI does not answer on this channel, so a person needs to answer.',
 };
 
 /**

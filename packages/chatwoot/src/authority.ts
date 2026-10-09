@@ -210,6 +210,33 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
     return toConversation(conversation);
   }
 
+  /**
+   * One page (25) of an inbox's conversations in every status, latest activity first, read by
+   * the integration user (Chatwoot lists only open ones unless asked for all).
+   */
+  async listInboxConversations(
+    inboxRef: string,
+    options: { page?: number } = {},
+  ): Promise<AuthorityConversationState[]> {
+    const result = await call<Json>(
+      'listConversations',
+      this.integration.GET('/api/v1/accounts/{account_id}/conversations', {
+        params: {
+          path: this.accountPath,
+          query: {
+            inbox_id: Number(inboxRef),
+            status: 'all',
+            assignee_type: 'all',
+            page: options.page ?? 1,
+          },
+        },
+      }) as never,
+    );
+    const data = (result.data ?? {}) as Json;
+    const payload = Array.isArray(data.payload) ? data.payload : [];
+    return payload.map((c) => toConversation(c));
+  }
+
   async listMessages(
     conversationRef: string,
     options:

@@ -12,6 +12,8 @@ type Json = Record<string, unknown>;
 type Status = 'open' | 'pending' | 'resolved' | 'snoozed';
 type Role = 'administrator' | 'agent';
 type Source = 'account' | 'inbox' | 'bot';
+/** Chatwoot's channel classes the fake knows: its own API channel and three channel inboxes. */
+type ChannelKind = 'Channel::Api' | 'Channel::Email' | 'Channel::Whatsapp' | 'Channel::Telegram';
 
 interface User {
   id: number;
@@ -30,6 +32,15 @@ interface Inbox {
   id: number;
   accountId: number;
   name: string;
+  channel: ChannelKind;
+  /** The email address, the WhatsApp number or the Telegram bot's name; null for API inboxes. */
+  address: string | null;
+  /**
+   * The channel's own settings as given (IMAP and SMTP settings, provider config, bot token).
+   * Credentials are kept here but never returned, like a password field.
+   */
+  channelConfig: Json;
+  /** Client API identifier; only API inboxes are reachable through the Client API. */
   identifier: string;
   hmacToken: string;
   secret: string;
@@ -67,6 +78,8 @@ interface Contact {
   phone: string | null;
   identifier: string | null;
   customAttributes: Json;
+  /** Facts a channel learnt about the contact (a Telegram user id, say). */
+  additionalAttributes?: Json;
 }
 interface ContactInbox {
   id: number;
@@ -99,6 +112,8 @@ interface Conversation {
   contactLastSeenAt: number | null;
   /** urgent, high, medium or low; absent or null when none is set. */
   priority?: string | null;
+  /** What the channel recorded on creation (an email's subject as `mail_subject`). */
+  additionalAttributes: Json;
 }
 interface Label {
   id: number;
@@ -199,12 +214,29 @@ export interface FakeRequest {
   url: string;
 }
 
-/** Something Chatwoot would send outside itself for a message (a reply email, a greeting). */
+/**
+ * Something Chatwoot would send outside itself for a message: a reply email, a greeting, or a
+ * reply over a channel inbox's own channel (an email over SMTP, a WhatsApp or Telegram message).
+ */
 export interface FakeOutbound {
-  kind: 'reply_email' | 'greeting';
+  kind: 'reply_email' | 'greeting' | 'channel_reply';
   accountId: number;
   conversationId: number;
   messageId: number;
+  /** The subject of a reply sent from an email inbox. */
+  subject?: string;
+}
+
+/** A customer writing in on a channel inbox, as `receiveChannelMessage` takes it. */
+export interface FakeChannelMessage {
+  /** Email address (email), phone number (WhatsApp) or user id (Telegram). */
+  from: string;
+  name?: string;
+  content: string;
+  /** An email's subject, kept on a new conversation. */
+  subject?: string;
+  /** Starts a new conversation even when the contact has one going in this inbox. */
+  newConversation?: boolean;
 }
 
 export interface FakeSnapshot {
@@ -223,12 +255,34 @@ export interface FakeChatwoot {
   requests: FakeRequest[];
   /**
    * Messages Chatwoot would send beyond its own UI: a reply email for an outgoing public message
-   * to a contact with an email (Chatwoot does so on API inboxes when email continuity is on), or
-   * a greeting on an inbox with greetings enabled.
+   * to a contact with an email (Chatwoot does so on API inboxes when email continuity is on), a
+   * reply over the channel for an outgoing public message on a channel inbox, or a greeting on an
+   * inbox with greetings enabled.
    */
   outbound: FakeOutbound[];
   /** Counts of the account's records (all accounts when none is given). */
   snapshot(accountId?: number): FakeSnapshot;
+  /**
+   * A customer writes in on a channel inbox (email, WhatsApp, Telegram), as Chatwoot's channel
+   * listeners would record it: the contact and its contact inbox (source id = `from`) are found or
+   * created, then the message goes into the contact's latest unresolved conversation in the inbox,
+   * or a new one when there is none (a resolved one is not reopened) or `newConversation` is set.
+   * Webhooks follow as for a contact message on an API inbox. `conversationId` is the display id.
+   * Throws for API inboxes.
+   */
+  receiveChannelMessage(
+    inboxId: number,
+    input: FakeChannelMessage,
+  ): Promise<{ conversationId: number; messageId: number; contactId: number }>;
+  /**
+   * Creates a channel inbox as an administrator would in Chatwoot's own settings (no token, no
+   * outside server). `address` is the email address, phone number or Telegram bot name; each has
+   * a default.
+   */
+  createChannelInbox(
+    accountId: number,
+    input: { type: 'email' | 'whatsapp' | 'telegram'; name?: string; address?: string },
+  ): { id: number };
   /** Connects an integration (Slack, Dialogflow…) that would receive message events. */
   addIntegrationHook(accountId: number, appId: string, inboxId?: number | null): void;
   /** Resolves when every queued webhook has been delivered, dropped or failed. */
@@ -426,7 +480,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     return { id: accountId, name: account?.name ?? '' };
   };
   const contactApi = (c: Contact) => ({
-    additional_attributes: {},
+    additional_attributes: c.additionalAttributes ?? {},
     custom_attributes: c.customAttributes,
     email: c.email,
     id: c.id,
@@ -517,7 +571,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     const contactInbox = s.contactInboxes.get(c.contactInboxId) as ContactInbox;
     const meta: Json = {
       sender: contactApi(contact),
-      channel: 'Channel::Api',
+      channel: (s.inboxes.get(c.inboxId) as Inbox).channel,
       hmac_verified: contactInbox.hmacVerified,
     };
     if (c.aiAssigneeId) {
@@ -552,7 +606,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       id: c.displayId,
       account_id: c.accountId,
       uuid: c.uuid,
-      additional_attributes: {},
+      additional_attributes: c.additionalAttributes,
       agent_last_seen_at: Math.floor(c.agentLastSeenAt ?? 0),
       assignee_last_seen_at: 0,
       can_reply: true,
@@ -580,9 +634,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     const meta = conversationMeta(c);
     if (!('team' in meta)) meta.team = null;
     return {
-      additional_attributes: {},
+      additional_attributes: c.additionalAttributes,
       can_reply: true,
-      channel: 'Channel::Api',
+      channel: (s.inboxes.get(c.inboxId) as Inbox).channel,
       contact_inbox: {
         id: contactInbox.id,
         contact_id: contactInbox.contactId,
@@ -775,13 +829,38 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
   // ---------------------------------------------------------------- state changes
 
   /**
-   * What Chatwoot would send outside itself for a new message: a reply email for an outgoing
-   * public message to a contact with an email (API inboxes with email continuity), and a greeting
-   * template on the first incoming message of an inbox with greetings on.
+   * The subject of a reply from an email inbox: Chatwoot answers in the thread (`Re:` and the
+   * subject the customer wrote). Hamnivo can set its own in the `hv_email_subject` conversation
+   * attribute (a ticket reference, say), which is used as it is.
+   */
+  function replySubject(conversation: Conversation): string {
+    const own = conversation.customAttributes.hv_email_subject;
+    if (typeof own === 'string' && own.trim()) return own;
+    const subject = conversation.additionalAttributes.mail_subject;
+    return typeof subject === 'string' && subject
+      ? `Re: ${subject}`
+      : `[#${conversation.displayId}] New messages on this conversation`;
+  }
+
+  /**
+   * What Chatwoot would send outside itself for a new message: for an outgoing public message, a
+   * reply over the channel on a channel inbox, or on an API inbox a reply email to a contact with
+   * an email (email continuity); and a greeting template on the first incoming message of an
+   * inbox with greetings on.
    */
   function recordOutbound(conversation: Conversation, message: Message) {
     const contact = s.contacts.get(conversation.contactId);
-    if (message.messageType === 1 && !message.private && contact?.email) {
+    const inbox = s.inboxes.get(conversation.inboxId);
+    const reply = message.messageType === 1 && !message.private;
+    if (reply && inbox && inbox.channel !== 'Channel::Api') {
+      outbound.push({
+        kind: 'channel_reply',
+        accountId: conversation.accountId,
+        conversationId: conversation.displayId,
+        messageId: message.id,
+        ...(inbox.channel === 'Channel::Email' ? { subject: replySubject(conversation) } : {}),
+      });
+    } else if (reply && contact?.email) {
       outbound.push({
         kind: 'reply_email',
         accountId: conversation.accountId,
@@ -789,7 +868,6 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         messageId: message.id,
       });
     }
-    const inbox = s.inboxes.get(conversation.inboxId);
     if (
       message.messageType === 0 &&
       inbox?.greetingEnabled &&
@@ -843,6 +921,55 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     c.status = status;
     if (status !== 'snoozed') c.snoozedUntil = null;
     if (status === 'open' && !c.waitingSince) c.waitingSince = s.clock();
+    return changed;
+  }
+
+  /**
+   * A new conversation, announced with conversation_created. Like Chatwoot, it starts pending and
+   * assigned to the inbox's agent bot when one is attached, and open otherwise.
+   */
+  function startConversation(
+    inbox: Inbox,
+    contactInbox: ContactInbox,
+    options: { status?: Status; customAttributes?: Json; additionalAttributes?: Json } = {},
+  ): Conversation {
+    const account = s.accounts.get(inbox.accountId) as Account;
+    account.conversationSeq += 1;
+    const now = s.clock();
+    const conversation: Conversation = {
+      id: s.nextId(),
+      displayId: account.conversationSeq,
+      accountId: inbox.accountId,
+      inboxId: inbox.id,
+      contactId: contactInbox.contactId,
+      contactInboxId: contactInbox.id,
+      uuid: randomUUID(),
+      status: options.status ?? (inbox.botId ? 'pending' : 'open'),
+      assigneeId: null,
+      aiAssigneeId: inbox.botId,
+      teamId: null,
+      labels: [],
+      customAttributes: options.customAttributes ?? {},
+      createdAt: now,
+      updatedAt: now,
+      waitingSince: now,
+      snoozedUntil: null,
+      agentLastSeenAt: null,
+      contactLastSeenAt: null,
+      additionalAttributes: options.additionalAttributes ?? {},
+    };
+    s.conversations.set(conversation.id, conversation);
+    emit(inbox.accountId, 'conversation_created', conversationWebhook(conversation), conversation);
+    return conversation;
+  }
+
+  /** An incoming message reopens a resolved or snoozed conversation (pending when a bot is on). */
+  function reopenForIncoming(conversation: Conversation): boolean {
+    if (conversation.status !== 'resolved' && conversation.status !== 'snoozed') return false;
+    const inbox = s.inboxes.get(conversation.inboxId) as Inbox;
+    const next: Status = conversation.status === 'resolved' && inbox.botId ? 'pending' : 'open';
+    const changed = setStatus(conversation, next);
+    if (next === 'pending') conversation.aiAssigneeId = inbox.botId;
     return changed;
   }
 
@@ -956,20 +1083,160 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
 
   // ---------------------------------------------------------------- Application API: setup
 
+  /** `channel.type` on create → Chatwoot's channel class. */
+  const CHANNEL_TYPES: Record<string, ChannelKind> = {
+    api: 'Channel::Api',
+    email: 'Channel::Email',
+    whatsapp: 'Channel::Whatsapp',
+    telegram: 'Channel::Telegram',
+  };
+  /** An email inbox's IMAP and SMTP settings with Chatwoot's defaults (passwords aside). */
+  const EMAIL_SETTINGS: Json = {
+    imap_enabled: false,
+    imap_address: '',
+    imap_port: 0,
+    imap_login: '',
+    imap_enable_ssl: true,
+    smtp_enabled: false,
+    smtp_address: '',
+    smtp_port: 0,
+    smtp_login: '',
+    smtp_domain: '',
+    smtp_enable_starttls_auto: true,
+    smtp_authentication: 'login',
+    smtp_openssl_verify_mode: 'none',
+  };
+  const WHATSAPP_CLOUD_KEYS = ['api_key', 'phone_number_id', 'business_account_id'];
+
+  /** Rails' record-invalid answer: the full message and the attribute it is about. */
+  const invalid = (message: string, attribute: string) =>
+    new HttpError(422, { message, attributes: [attribute] });
+
+  /** A value as the column's type stores it (Rails casts "true" and "993" from forms). */
+  function cast(value: unknown, like: unknown): unknown {
+    if (typeof like === 'boolean') return value === true || value === 'true';
+    if (typeof like === 'number') return Number(value) || 0;
+    return String(value);
+  }
+
+  /** Whether another channel of the same kind already has this address (Chatwoot keeps them unique). */
+  function addressTaken(inbox: Inbox, address: string): boolean {
+    return [...s.inboxes.values()].some(
+      (other) =>
+        other.id !== inbox.id && other.channel === inbox.channel && other.address === address,
+    );
+  }
+
+  /**
+   * Checks and stores the channel settings of a create or update, as Chatwoot's channel models do:
+   * the address is required and unique, and settings left out keep their values (so a password is
+   * changed only when one is given). Credentials are stored but never returned.
+   */
+  function applyChannel(inbox: Inbox, channel: Json) {
+    const given = (key: string) => channel[key] !== undefined && channel[key] !== null;
+    const config: Json = { ...inbox.channelConfig };
+    switch (inbox.channel) {
+      case 'Channel::Api': {
+        if (channel.webhook_url !== undefined) {
+          inbox.webhookUrl =
+            typeof channel.webhook_url === 'string' && channel.webhook_url
+              ? channel.webhook_url
+              : null;
+        }
+        if (given('hmac_mandatory')) inbox.hmacMandatory = channel.hmac_mandatory === true;
+        return;
+      }
+      case 'Channel::Email': {
+        const email = given('email') ? String(channel.email).trim().toLowerCase() : inbox.address;
+        if (!email) throw invalid('Email can’t be blank', 'email');
+        if (addressTaken(inbox, email)) throw invalid('Email has already been taken', 'email');
+        for (const [key, fallback] of Object.entries(EMAIL_SETTINGS)) {
+          if (given(key)) config[key] = cast(channel[key], fallback);
+          else if (!(key in config)) config[key] = fallback;
+        }
+        for (const key of ['imap_password', 'smtp_password']) {
+          if (typeof channel[key] === 'string' && channel[key]) config[key] = channel[key];
+        }
+        // Chatwoot logs in to the IMAP server before it keeps settings with IMAP on. The fake has
+        // no server to try: the password 'wrong-password' stands for one the server refuses.
+        if (config.imap_enabled === true && config.imap_password === 'wrong-password') {
+          throw new HttpError(422, { message: 'Error while connecting to the IMAP server' });
+        }
+        inbox.address = email;
+        break;
+      }
+      case 'Channel::Whatsapp': {
+        const phone = given('phone_number') ? String(channel.phone_number).trim() : inbox.address;
+        if (!phone) throw invalid('Phone number can’t be blank', 'phone_number');
+        if (addressTaken(inbox, phone)) {
+          throw invalid('Phone number has already been taken', 'phone_number');
+        }
+        if (given('provider')) config.provider = String(channel.provider);
+        // Only WhatsApp Cloud is faked; Chatwoot keeps the deprecated 360dialog for old inboxes.
+        if (config.provider !== 'whatsapp_cloud') {
+          throw invalid('Provider is not included in the list', 'provider');
+        }
+        const providerConfig: Json = { ...((config.provider_config as Json | undefined) ?? {}) };
+        const update = channel.provider_config;
+        if (typeof update === 'object' && update !== null) {
+          for (const [key, value] of Object.entries(update as Json)) {
+            if (typeof value === 'string' && value) providerConfig[key] = value;
+          }
+        }
+        // Chatwoot asks Meta whether the credentials work; the fake only checks they are there.
+        if (WHATSAPP_CLOUD_KEYS.some((key) => !providerConfig[key])) {
+          throw invalid('Provider config Invalid Credentials', 'provider_config');
+        }
+        config.provider_config = providerConfig;
+        inbox.address = phone;
+        break;
+      }
+      case 'Channel::Telegram': {
+        const botToken = given('bot_token') ? String(channel.bot_token).trim() : config.bot_token;
+        if (!botToken) throw invalid('Bot token can’t be blank', 'bot_token');
+        const reused = [...s.inboxes.values()].some(
+          (other) => other.id !== inbox.id && other.channelConfig.bot_token === botToken,
+        );
+        if (reused) throw invalid('Bot token has already been taken', 'bot_token');
+        config.bot_token = botToken;
+        // Chatwoot asks Telegram for the bot's name (getMe); the fake makes one up.
+        inbox.address ??= `hv_fake_${inbox.id}_bot`;
+        break;
+      }
+    }
+    inbox.channelConfig = config;
+  }
+
   app.post('/api/v1/accounts/:account_id/inboxes', async (request) => {
     const { accountId } = accountAccess(request, 'inboxes#create', true);
     const input = body(request);
     const channel = (input.channel ?? {}) as Json;
-    if (channel.type !== 'api') throw new HttpError(422, { message: 'Only API inboxes are faked' });
-    const inbox: Inbox = {
+    const kind = CHANNEL_TYPES[String(channel.type)];
+    if (!kind) {
+      throw new HttpError(422, {
+        message: 'Only API, email, WhatsApp and Telegram inboxes are faked',
+      });
+    }
+    const inbox = newInbox(accountId, String(input.name ?? 'Inbox'), kind, input);
+    applyChannel(inbox, channel);
+    s.inboxes.set(inbox.id, inbox);
+    return inboxApi(inbox);
+  });
+
+  /** An inbox with its general settings; the channel's own come from `applyChannel`. */
+  function newInbox(accountId: number, name: string, kind: ChannelKind, input: Json = {}): Inbox {
+    return {
       id: s.nextId(),
       accountId,
-      name: String(input.name ?? 'Inbox'),
+      name,
+      channel: kind,
+      address: null,
+      channelConfig: {},
       identifier: token(18),
       hmacToken: token(18),
       secret: token(18),
-      webhookUrl: typeof channel.webhook_url === 'string' ? channel.webhook_url : null,
-      hmacMandatory: channel.hmac_mandatory === true,
+      webhookUrl: null,
+      hmacMandatory: false,
       autoAssignment: input.enable_auto_assignment !== false,
       greetingEnabled: input.greeting_enabled === true,
       csatEnabled: input.csat_survey_enabled === true,
@@ -978,25 +1245,43 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       botId: null,
       members: new Set(),
     };
-    s.inboxes.set(inbox.id, inbox);
-    return inboxApi(inbox);
-  });
+  }
 
-  const inboxApi = (inbox: Inbox) => ({
-    id: inbox.id,
-    name: inbox.name,
-    channel_type: 'Channel::Api',
-    enable_auto_assignment: inbox.autoAssignment,
-    greeting_enabled: inbox.greetingEnabled,
-    csat_survey_enabled: inbox.csatEnabled,
-    working_hours_enabled: inbox.workingHoursEnabled,
-    lock_to_single_conversation: inbox.lockToSingleConversation,
-    hmac_mandatory: inbox.hmacMandatory,
-    hmac_token: inbox.hmacToken,
-    secret: inbox.secret,
-    webhook_url: inbox.webhookUrl,
-    inbox_identifier: inbox.identifier,
-  });
+  /**
+   * Chatwoot's inbox JSON: the common settings, then the channel's own fields. Only API inboxes
+   * have the Client API identifier, HMAC token, webhook URL and secret.
+   */
+  function inboxApi(inbox: Inbox): Json {
+    const json: Json = {
+      id: inbox.id,
+      name: inbox.name,
+      channel_type: inbox.channel,
+      enable_auto_assignment: inbox.autoAssignment,
+      greeting_enabled: inbox.greetingEnabled,
+      csat_survey_enabled: inbox.csatEnabled,
+      working_hours_enabled: inbox.workingHoursEnabled,
+      lock_to_single_conversation: inbox.lockToSingleConversation,
+    };
+    switch (inbox.channel) {
+      case 'Channel::Api':
+        return {
+          ...json,
+          hmac_mandatory: inbox.hmacMandatory,
+          hmac_token: inbox.hmacToken,
+          secret: inbox.secret,
+          webhook_url: inbox.webhookUrl,
+          inbox_identifier: inbox.identifier,
+        };
+      case 'Channel::Email': {
+        const settings = Object.keys(EMAIL_SETTINGS).map((key) => [key, inbox.channelConfig[key]]);
+        return { ...json, email: inbox.address, ...Object.fromEntries(settings) };
+      }
+      case 'Channel::Whatsapp':
+        return { ...json, phone_number: inbox.address, provider: inbox.channelConfig.provider };
+      case 'Channel::Telegram':
+        return { ...json, bot_name: inbox.address };
+    }
+  }
 
   function inboxOf(request: FastifyRequest, accountId: number): Inbox {
     const inbox = s.inboxes.get(Number((request.params as Json).id));
@@ -1004,9 +1289,45 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     return inbox;
   }
 
+  // Like Chatwoot: administrators see every inbox of the account, agents the inboxes they are
+  // members of; ordered by name.
+  app.get('/api/v1/accounts/:account_id/inboxes', async (request) => {
+    const { accountId, principal } = accountAccess(request, 'inboxes#index');
+    const administrator =
+      principal.kind === 'user' && principal.user.roles.get(accountId) === 'administrator';
+    const inboxes = [...s.inboxes.values()]
+      .filter((i) => i.accountId === accountId)
+      .filter(
+        (i) => administrator || (principal.kind === 'user' && i.members.has(principal.user.id)),
+      )
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : a.id - b.id));
+    return { payload: inboxes.map(inboxApi) };
+  });
+
   app.get('/api/v1/accounts/:account_id/inboxes/:id', async (request) => {
     const { accountId } = accountAccess(request, 'inboxes#show');
     return inboxApi(inboxOf(request, accountId));
+  });
+
+  app.patch('/api/v1/accounts/:account_id/inboxes/:id', async (request) => {
+    const { accountId } = accountAccess(request, 'inboxes#update', true);
+    const inbox = inboxOf(request, accountId);
+    const input = body(request);
+    // Changes go onto a copy first, so a refused update leaves the inbox as it was.
+    const next: Inbox = { ...inbox };
+    if (typeof input.name === 'string' && input.name.trim()) next.name = input.name;
+    const flag = (key: string) => (typeof input[key] === 'boolean' ? input[key] : undefined);
+    next.autoAssignment = flag('enable_auto_assignment') ?? next.autoAssignment;
+    next.greetingEnabled = flag('greeting_enabled') ?? next.greetingEnabled;
+    next.csatEnabled = flag('csat_survey_enabled') ?? next.csatEnabled;
+    next.workingHoursEnabled = flag('working_hours_enabled') ?? next.workingHoursEnabled;
+    next.lockToSingleConversation =
+      flag('lock_to_single_conversation') ?? next.lockToSingleConversation;
+    if (typeof input.channel === 'object' && input.channel !== null) {
+      applyChannel(next, input.channel as Json);
+    }
+    Object.assign(inbox, next);
+    return inboxApi(inbox);
   });
 
   app.get('/api/v1/accounts/:account_id/inboxes/:id/agent_bot', async (request) => {
@@ -1639,40 +1960,15 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       };
       s.contactInboxes.set(contactInbox.id, contactInbox);
     }
-    const account = s.accounts.get(accountId) as Account;
-    account.conversationSeq += 1;
-    const now = s.clock();
     const attributes = input.custom_attributes;
     const requested = String(input.status ?? '');
     const statuses: readonly string[] = ['open', 'pending', 'resolved', 'snoozed'];
-    const conversation: Conversation = {
-      id: s.nextId(),
-      displayId: account.conversationSeq,
-      accountId,
-      inboxId: inbox.id,
-      contactId: contact.id,
-      contactInboxId: contactInbox.id,
-      uuid: randomUUID(),
-      status: statuses.includes(requested)
-        ? (requested as Status)
-        : inbox.botId
-          ? 'pending'
-          : 'open',
-      assigneeId: null,
-      aiAssigneeId: inbox.botId,
-      teamId: null,
-      labels: [],
-      customAttributes:
-        typeof attributes === 'object' && attributes !== null ? (attributes as Json) : {},
-      createdAt: now,
-      updatedAt: now,
-      waitingSince: now,
-      snoozedUntil: null,
-      agentLastSeenAt: null,
-      contactLastSeenAt: null,
-    };
-    s.conversations.set(conversation.id, conversation);
-    emit(accountId, 'conversation_created', conversationWebhook(conversation), conversation);
+    const conversation = startConversation(inbox, contactInbox, {
+      ...(statuses.includes(requested) ? { status: requested as Status } : {}),
+      ...(typeof attributes === 'object' && attributes !== null
+        ? { customAttributes: attributes as Json }
+        : {}),
+    });
     return conversationApi(conversation);
   });
 
@@ -1699,11 +1995,22 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     const query = request.query as Json;
     const inboxId = query.inbox_id === undefined ? null : Number(query.inbox_id);
     const page = Math.max(1, Number(query.page ?? 1));
+    // Chatwoot lists open conversations unless a status (or `all`) is asked for.
+    const status = String(query.status ?? 'open');
     // Chatwoot sorts by last activity by default; created_at_asc pages oldest first.
     const oldestFirst = query.sort_by === 'created_at_asc';
+    // Chatwoot's `last_activity_at`: the latest message's time, or the creation time.
+    const latest = new Map<number, number>();
+    for (const m of s.messages.values()) {
+      latest.set(m.conversationId, Math.max(latest.get(m.conversationId) ?? 0, m.createdAt));
+    }
+    const lastActivity = (c: Conversation) => latest.get(c.id) ?? c.createdAt;
     const all = [...s.conversations.values()]
       .filter((c) => c.accountId === accountId && (inboxId === null || c.inboxId === inboxId))
-      .sort((a, b) => (oldestFirst ? a.id - b.id : b.id - a.id));
+      .filter((c) => status === 'all' || c.status === status)
+      .sort((a, b) =>
+        oldestFirst ? a.id - b.id : lastActivity(b) - lastActivity(a) || b.id - a.id,
+      );
     return {
       data: {
         meta: { mine_count: 0, unassigned_count: all.length, all_count: all.length },
@@ -1752,7 +2059,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       return {
         meta: {
           labels: conversation.labels,
-          additional_attributes: {},
+          additional_attributes: conversation.additionalAttributes,
           contact: contactApi(contact),
           agent_last_seen_at: conversation.agentLastSeenAt
             ? new Date(conversation.agentLastSeenAt * 1000).toISOString()
@@ -1846,17 +2153,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       };
       s.messages.set(message.id, message);
       recordOutbound(conversation, message);
-      // Incoming messages reopen resolved or snoozed conversations (pending again when a bot is active).
-      let statusChanged = false;
-      if (
-        messageType === 0 &&
-        (conversation.status === 'resolved' || conversation.status === 'snoozed')
-      ) {
-        const inbox = s.inboxes.get(conversation.inboxId) as Inbox;
-        const next: Status = conversation.status === 'resolved' && inbox.botId ? 'pending' : 'open';
-        statusChanged = setStatus(conversation, next);
-        if (next === 'pending') conversation.aiAssigneeId = inbox.botId;
-      }
+      const statusChanged = messageType === 0 && reopenForIncoming(conversation);
       emit(conversation.accountId, 'message_created', messageWebhook(message), conversation);
       touch(conversation, statusChanged ? ['status'] : [], statusChanged);
       return messageApi(message);
@@ -2038,7 +2335,10 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
 
   function inboxByIdentifier(request: FastifyRequest): Inbox {
     const identifier = String((request.params as Json).inbox_identifier);
-    const inbox = [...s.inboxes.values()].find((i) => i.identifier === identifier);
+    // Only API inboxes have a Client API identifier.
+    const inbox = [...s.inboxes.values()].find(
+      (i) => i.channel === 'Channel::Api' && i.identifier === identifier,
+    );
     if (!inbox) throw notFound();
     return inbox;
   }
@@ -2114,38 +2414,13 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         inbox,
         String((request.params as Json).contact_identifier),
       );
-      const account = s.accounts.get(inbox.accountId) as Account;
-      account.conversationSeq += 1;
-      const now = s.clock();
       const attributes = body(request).custom_attributes;
-      const conversation: Conversation = {
-        id: s.nextId(),
-        displayId: account.conversationSeq,
-        accountId: inbox.accountId,
-        inboxId: inbox.id,
-        contactId: contactInbox.contactId,
-        contactInboxId: contactInbox.id,
-        uuid: randomUUID(),
-        status: inbox.botId ? 'pending' : 'open',
-        assigneeId: null,
-        aiAssigneeId: inbox.botId,
-        teamId: null,
-        labels: [],
-        customAttributes:
-          typeof attributes === 'object' && attributes !== null ? (attributes as Json) : {},
-        createdAt: now,
-        updatedAt: now,
-        waitingSince: now,
-        snoozedUntil: null,
-        agentLastSeenAt: null,
-        contactLastSeenAt: null,
-      };
-      s.conversations.set(conversation.id, conversation);
-      emit(
-        inbox.accountId,
-        'conversation_created',
-        conversationWebhook(conversation),
-        conversation,
+      const conversation = startConversation(
+        inbox,
+        contactInbox,
+        typeof attributes === 'object' && attributes !== null
+          ? { customAttributes: attributes as Json }
+          : {},
       );
       const contact = s.contacts.get(conversation.contactId) as Contact;
       return {
@@ -2217,6 +2492,103 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     },
   );
 
+  // ---------------------------------------------------------------- channel listeners
+
+  /**
+   * What Chatwoot's IMAP fetcher, WhatsApp webhook and Telegram webhook do with a customer's
+   * message. The contact inbox's source id is `from`; a contact with that email address or phone
+   * number is reused across inboxes, as Chatwoot's contact builders do. A Telegram user is known
+   * by the contact inbox only (Chatwoot keeps the id in the contact's additional attributes).
+   *
+   * The message joins the contact's latest unresolved conversation in the inbox (a snoozed one
+   * opens again). A resolved one is never reopened: a new conversation starts, as Chatwoot does
+   * for WhatsApp and Telegram and for an email that is not a reply.
+   */
+  function receiveChannelMessage(inboxId: number, input: FakeChannelMessage) {
+    const inbox = s.inboxes.get(inboxId);
+    if (!inbox) throw new Error(`The fake has no inbox ${inboxId}`);
+    if (inbox.channel === 'Channel::Api') {
+      throw new Error(`Inbox ${inboxId} is an API inbox: its messages come through the API`);
+    }
+    const email = inbox.channel === 'Channel::Email' ? input.from.trim().toLowerCase() : null;
+    const from = email ?? input.from.trim();
+    const phone =
+      inbox.channel === 'Channel::Whatsapp' ? (from.startsWith('+') ? from : `+${from}`) : null;
+    let contactInbox = [...s.contactInboxes.values()].find(
+      (ci) => ci.inboxId === inbox.id && ci.sourceId === from,
+    );
+    if (!contactInbox) {
+      let contact = [...s.contacts.values()].find(
+        (c) =>
+          c.accountId === inbox.accountId &&
+          ((email && c.email === email) || (phone && c.phone === phone)),
+      );
+      if (!contact) {
+        contact = {
+          id: s.nextId(),
+          accountId: inbox.accountId,
+          name: input.name ?? (email ? (email.split('@')[0] ?? email) : from),
+          email,
+          phone,
+          identifier: null,
+          customAttributes: {},
+          ...(inbox.channel === 'Channel::Telegram'
+            ? {
+                additionalAttributes: {
+                  social_telegram_user_id: /^\d+$/.test(from) ? Number(from) : from,
+                },
+              }
+            : {}),
+        };
+        s.contacts.set(contact.id, contact);
+        emit(inbox.accountId, 'contact_created', contactWebhook(contact));
+      }
+      contactInbox = {
+        id: s.nextId(),
+        contactId: contact.id,
+        inboxId: inbox.id,
+        sourceId: from,
+        hmacVerified: false,
+      };
+      s.contactInboxes.set(contactInbox.id, contactInbox);
+    }
+    const contactId = contactInbox.contactId;
+    let conversation = input.newConversation
+      ? undefined
+      : [...s.conversations.values()]
+          .filter((c) => c.inboxId === inbox.id && c.contactId === contactId)
+          .filter((c) => c.status !== 'resolved')
+          .sort((a, b) => b.id - a.id)[0];
+    conversation ??= startConversation(
+      inbox,
+      contactInbox,
+      inbox.channel === 'Channel::Email'
+        ? { additionalAttributes: { source: 'email', mail_subject: input.subject ?? null } }
+        : {},
+    );
+    const message: Message = {
+      id: s.nextId(),
+      accountId: inbox.accountId,
+      conversationId: conversation.id,
+      content: input.content,
+      messageType: 0,
+      private: false,
+      sourceId: null,
+      contentAttributes: {},
+      senderType: 'Contact',
+      senderId: contactId,
+      createdAt: s.clock(),
+      attachments: [],
+      status: 'sent',
+    };
+    s.messages.set(message.id, message);
+    recordOutbound(conversation, message);
+    const statusChanged = reopenForIncoming(conversation);
+    emit(inbox.accountId, 'message_created', messageWebhook(message), conversation);
+    touch(conversation, statusChanged ? ['status'] : [], statusChanged);
+    return { conversationId: conversation.displayId, messageId: message.id, contactId };
+  }
+
   // ---------------------------------------------------------------- ActiveStorage
 
   // A file exists while the message that carries it does (deleting a message removes its files).
@@ -2287,6 +2659,36 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         messages: own(s.messages.values()),
         inboxes: own(s.inboxes.values()),
       };
+    },
+    createChannelInbox(accountId, input) {
+      if (!s.accounts.has(accountId)) throw new Error(`The fake has no account ${accountId}`);
+      const kind = CHANNEL_TYPES[input.type];
+      if (!kind || kind === 'Channel::Api') throw new Error(`Not a channel inbox: ${input.type}`);
+      const names = { email: 'Email', whatsapp: 'WhatsApp', telegram: 'Telegram' };
+      const inbox = newInbox(accountId, input.name ?? names[input.type], kind);
+      const address = input.address?.trim() || null;
+      const channel: Json =
+        input.type === 'email'
+          ? { email: address ?? `support-${inbox.id}@hv-fake.invalid` }
+          : input.type === 'whatsapp'
+            ? {
+                phone_number: address ?? `+1555${String(inbox.id).padStart(7, '0')}`,
+                provider: 'whatsapp_cloud',
+                provider_config: {
+                  api_key: token(),
+                  phone_number_id: `pn-${inbox.id}`,
+                  business_account_id: `ba-${inbox.id}`,
+                },
+              }
+            : { bot_token: `${inbox.id}:${token()}` };
+      // The bot's name comes from Telegram in Chatwoot; here it may be given.
+      if (input.type === 'telegram' && address) inbox.address = address.replace(/^@/, '');
+      applyChannel(inbox, channel);
+      s.inboxes.set(inbox.id, inbox);
+      return { id: inbox.id };
+    },
+    async receiveChannelMessage(inboxId, input) {
+      return receiveChannelMessage(inboxId, input);
     },
     addIntegrationHook(accountId, appId, inboxId = null) {
       const id = s.nextId();

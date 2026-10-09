@@ -7,6 +7,10 @@ import { blockingAr } from '../src/i18n/blocking/ar';
 import { blockingEn } from '../src/i18n/blocking/en';
 import { blockingHi } from '../src/i18n/blocking/hi';
 import { blockingUr } from '../src/i18n/blocking/ur';
+import { channelsAr } from '../src/i18n/channels/ar';
+import { channelsEn } from '../src/i18n/channels/en';
+import { channelsHi } from '../src/i18n/channels/hi';
+import { channelsUr } from '../src/i18n/channels/ur';
 import { chatWidgetAr } from '../src/i18n/chat-widget/ar';
 import { chatWidgetEn } from '../src/i18n/chat-widget/en';
 import { chatWidgetHi } from '../src/i18n/chat-widget/hi';
@@ -31,13 +35,20 @@ function flatten(tree: Tree, prefix = ''): Record<string, string> {
   return out;
 }
 
+/**
+ * Plural forms a language needs beyond English's `_one`/`_other` (Arabic: zero, two, few, many).
+ * They stand for the English `_other` text of the same key.
+ */
+const MORE_PLURALS = /_(zero|two|few|many)$/;
+const englishKey = (key: string) => key.replace(MORE_PLURALS, '_other');
+
 const placeholders = (text: string) =>
   [...text.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]).sort();
 
 /** Text that is the same in every language. */
 const SAME_EVERYWHERE = new Set<string>([]);
 
-// The Chat widget page, Automations, the inbox's tickets and blocking visitors work completely in
+// The Chat widget page, Channels, Automations, the inbox's tickets and blocking visitors work completely in
 // each launch language (U05).
 // TypeScript already requires every key; this also checks placeholders, empty text and text
 // copied from the English.
@@ -46,6 +57,7 @@ for (const [name, english, translations] of [
   ['tickets', ticketsEn, { ar: ticketsAr, hi: ticketsHi, ur: ticketsUr }],
   ['automations', automationsEn, { ar: automationsAr, hi: automationsHi, ur: automationsUr }],
   ['blocking', blockingEn, { ar: blockingAr, hi: blockingHi, ur: blockingUr }],
+  ['channels', channelsEn, { ar: channelsAr, hi: channelsHi, ur: channelsUr }],
 ] as const) {
   const source = flatten(english);
   describe(`the ${name} text in every language`, () => {
@@ -57,10 +69,15 @@ for (const [name, english, translations] of [
       const strings = flatten(tree);
 
       it(`${locale}: every key, the same placeholders, and no empty text`, () => {
-        expect(Object.keys(strings).sort()).toEqual(Object.keys(source).sort());
+        const own = Object.keys(strings).filter(
+          (key) => !(MORE_PLURALS.test(key) && englishKey(key) in source),
+        );
+        expect(own.sort()).toEqual(Object.keys(source).sort());
         for (const [key, text] of Object.entries(strings)) {
           expect(text.trim(), `${locale}.${key}`).not.toBe('');
-          expect(placeholders(text), `${locale}.${key}`).toEqual(placeholders(source[key] ?? ''));
+          expect(placeholders(text), `${locale}.${key}`).toEqual(
+            placeholders(source[englishKey(key)] ?? ''),
+          );
         }
       });
 

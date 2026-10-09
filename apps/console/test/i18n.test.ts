@@ -19,6 +19,13 @@ function flatten(tree: Tree, prefix = ''): Record<string, string> {
   return out;
 }
 
+/**
+ * Plural forms a language needs beyond English's `_one`/`_other` (Arabic: zero, two, few, many).
+ * They stand for the English `_other` text of the same key.
+ */
+const MORE_PLURALS = /_(zero|two|few|many)$/;
+const englishKey = (key: string) => key.replace(MORE_PLURALS, '_other');
+
 const placeholders = (text: string) =>
   [...text.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]).sort();
 
@@ -31,10 +38,15 @@ describe('Studio text in every language (U05)', () => {
   for (const [locale, tree] of Object.entries(translations)) {
     it(`${locale}: every key, the same placeholders and no empty text`, () => {
       const strings = flatten(tree);
-      expect(Object.keys(strings).sort()).toEqual(Object.keys(english).sort());
+      const own = Object.keys(strings).filter(
+        (key) => !(MORE_PLURALS.test(key) && englishKey(key) in english),
+      );
+      expect(own.sort()).toEqual(Object.keys(english).sort());
       for (const [key, text] of Object.entries(strings)) {
         expect(text.trim(), `${locale}.${key}`).not.toBe('');
-        expect(placeholders(text), `${locale}.${key}`).toEqual(placeholders(english[key] ?? ''));
+        expect(placeholders(text), `${locale}.${key}`).toEqual(
+          placeholders(english[englishKey(key)] ?? ''),
+        );
       }
     });
 

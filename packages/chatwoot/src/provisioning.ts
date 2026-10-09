@@ -392,3 +392,82 @@ export async function addInboxMembers(options: {
     }) as never,
   );
 }
+
+/** An inbox as Hamnivo shows it when choosing which Chatwoot channels to adopt. */
+export interface ChatwootInboxSummary {
+  id: number;
+  name: string;
+  /** Chatwoot's channel class, such as `Channel::Email` or `Channel::Whatsapp`. */
+  channelType: string;
+  /** The email address, phone number or `@bot_name` customers write to; null when none. */
+  address: string | null;
+}
+
+function inboxAddress(inbox: Json): string | null {
+  const value = (key: string) =>
+    typeof inbox[key] === 'string' && inbox[key] ? (inbox[key] as string) : null;
+  switch (inbox.channel_type) {
+    case 'Channel::Email':
+      return value('email');
+    case 'Channel::Telegram': {
+      const bot = value('bot_name');
+      return bot ? `@${bot}` : null;
+    }
+    default:
+      // WhatsApp, SMS and Twilio inboxes carry a phone number; others have none.
+      return value('phone_number');
+  }
+}
+
+/** Lists the account's inboxes (an administrator's token sees all of them). */
+export async function listInboxes(options: {
+  baseUrl: string;
+  /** An administrator's token (the integration user). */
+  token: string;
+  accountId: number;
+  fetch?: typeof fetch;
+}): Promise<ChatwootInboxSummary[]> {
+  const client = createChatwootClient({
+    baseUrl: options.baseUrl,
+    token: options.token,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+  const result = await call<Json>(
+    'listInboxes',
+    client.GET('/api/v1/accounts/{account_id}/inboxes', {
+      params: { path: { account_id: options.accountId } },
+    }) as never,
+  );
+  const payload = Array.isArray(result.payload) ? (result.payload as Json[]) : [];
+  return payload.map((inbox) => ({
+    id: Number(inbox.id),
+    name: String(inbox.name ?? ''),
+    channelType: String(inbox.channel_type ?? ''),
+    address: inboxAddress(inbox),
+  }));
+}
+
+/** Attaches an agent bot to an inbox, or detaches the inbox's bot when `botId` is null. */
+export async function setInboxAgentBot(options: {
+  baseUrl: string;
+  /** An administrator's token (the integration user). */
+  token: string;
+  accountId: number;
+  inboxId: number;
+  botId: number | null;
+  fetch?: typeof fetch;
+}): Promise<void> {
+  const client = createChatwootClient({
+    baseUrl: options.baseUrl,
+    token: options.token,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+  await call(
+    'setAgentBot',
+    client.POST('/api/v1/accounts/{account_id}/inboxes/{id}/set_agent_bot', {
+      params: { path: { account_id: options.accountId, id: options.inboxId } },
+      // Chatwoot removes the inbox's bot when agent_bot is null.
+      body: { agent_bot: options.botId } as never,
+    }) as never,
+  );
+}

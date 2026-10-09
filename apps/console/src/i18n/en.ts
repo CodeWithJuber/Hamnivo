@@ -1,6 +1,7 @@
 import { automationsEn } from './automations/en';
 import { blockingEn } from './blocking/en';
 import { cachingEn } from './caching';
+import { channelsEn } from './channels/en';
 import { chatWidgetEn } from './chat-widget/en';
 import { checksEn } from './checks';
 import { commerceEn } from './commerce/en';
@@ -1085,6 +1086,7 @@ export const en = {
       asked: 'The customer asked for a person.',
       askedSince: 'The customer asked for a person {{time}}.',
       released: 'This conversation was put back in the queue.',
+      channelAiOff: 'The AI does not answer on this channel, so a person needs to answer.',
       waiting: 'This conversation is waiting for a person.',
       takeOver: 'Take over',
       claim: 'Assign to me',
@@ -1364,6 +1366,7 @@ export const en = {
   reports: reportsEn,
   chatSettings: chatSettingsEn,
   chatWidget: chatWidgetEn,
+  channels: channelsEn,
   automations: automationsEn,
   memory: {
     title: 'Customer memory',

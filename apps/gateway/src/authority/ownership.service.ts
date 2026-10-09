@@ -39,7 +39,8 @@ export interface TransitionOptions {
     | 'ai_unavailable'
     | 'ai_blocked'
     | 'ai_limit'
-    | 'ai_escalated';
+    | 'ai_escalated'
+    | 'channel_ai_off';
   /** Audit actor (`stf_…`, `cus_…`, `authority`). */
   actor: { type: 'staff' | 'customer' | 'system'; id: string };
   /** The epoch the caller saw; a different current epoch fails with OWNERSHIP_CHANGED. */

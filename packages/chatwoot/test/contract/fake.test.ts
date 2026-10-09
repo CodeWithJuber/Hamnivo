@@ -9,5 +9,6 @@ authorityContract('fake Chatwoot', async () => {
     receiverHost: '127.0.0.1',
     webhookBase: (port) => `http://127.0.0.1:${port}`,
     close: () => fake.close(),
+    fake: true,
   };
 });

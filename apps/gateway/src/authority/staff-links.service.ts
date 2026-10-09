@@ -84,7 +84,8 @@ export class StaffLinksService {
       role: 'agent',
       adoptOwnAddress: true,
     });
-    for (const inbox of runtime.inboxes.filter((i) => i.purpose === 'live')) {
+    // Web chat and channel inboxes: an agent sees and answers only the inboxes they belong to.
+    for (const inbox of runtime.inboxes.filter((i) => i.purpose !== 'import')) {
       await addInboxMembers({
         baseUrl: runtime.baseUrl,
         token: runtime.integrationToken,

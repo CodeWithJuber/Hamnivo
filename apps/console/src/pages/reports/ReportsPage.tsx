@@ -42,6 +42,7 @@ const REASONS = [
   'ai_stopped',
   'no_agent',
   'assist_mode',
+  'channel_ai_off',
   'staff_takeover',
   'staff_reply',
   'staff_assign',

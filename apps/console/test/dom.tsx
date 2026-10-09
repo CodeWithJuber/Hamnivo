@@ -65,6 +65,7 @@ const PATHS = [
   '/inbox/$conversationId',
   '/brands',
   '/chat-widget',
+  '/channels',
   '/hours',
   '/team',
   '/support-teams',

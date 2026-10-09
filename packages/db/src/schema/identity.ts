@@ -408,14 +408,17 @@ export const supportGrants = pgTable(
   ],
 );
 
-/** A customer as seen by one brand: anonymous, or verified through a tenant-signed assertion. */
+/**
+ * A customer as seen by one brand: anonymous, verified through a tenant-signed assertion, or
+ * known only by the address they wrote from on a channel (email, WhatsApp, Telegram; ADR 0013).
+ */
 export const customerPrincipals = pgTable(
   'customer_principals',
   {
     id: id(),
     tenantId: tenantId(),
     brandId: uuid('brand_id').notNull(),
-    kind: text('kind', { enum: ['anonymous', 'verified'] }).notNull(),
+    kind: text('kind', { enum: ['anonymous', 'verified', 'channel'] }).notNull(),
     /** The tenant's user id from a verified assertion (`sub`). */
     externalSubject: text('external_subject'),
     displayName: text('display_name'),
@@ -423,6 +426,9 @@ export const customerPrincipals = pgTable(
     email: citext('email'),
     emailVerifiedAt: tstz('email_verified_at'),
     locale: text('locale'),
+    /** Channel customers: which channel, and the address there (self-reported, never verified). */
+    channelKind: text('channel_kind', { enum: ['email', 'whatsapp', 'telegram', 'other'] }),
+    channelHandle: citext('channel_handle'),
     createdAt: createdAt(),
     lastSeenAt: tstz('last_seen_at'),
   },
@@ -431,6 +437,13 @@ export const customerPrincipals = pgTable(
     uniqueIndex('customer_principals_subject_key')
       .on(t.tenantId, t.brandId, t.externalSubject)
       .where(sql`${t.externalSubject} is not null`),
+    uniqueIndex('customer_principals_channel_key')
+      .on(t.tenantId, t.brandId, t.channelKind, t.channelHandle)
+      .where(sql`${t.channelHandle} is not null`),
+    check(
+      'customer_principals_channel_ck',
+      sql`(${t.kind} = 'channel') = (${t.channelHandle} is not null and ${t.channelKind} is not null)`,
+    ),
     foreignKey({
       name: 'customer_principals_brand_fk',
       columns: [t.tenantId, t.brandId],

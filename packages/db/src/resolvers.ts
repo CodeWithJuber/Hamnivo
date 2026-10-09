@@ -360,6 +360,35 @@ export async function claimReconcileCursors(
   }));
 }
 
+export interface ClaimedInboxCursor {
+  tenantId: string;
+  connectionId: string;
+  /** Chatwoot inbox id of a channel inbox (ADR 0013). */
+  inboxRef: string;
+  intervalSeconds: number;
+}
+
+/** Leases due channel-inbox cursors across tenants: each poll lists the inbox's recent conversations. */
+export async function claimReconcileInboxCursors(
+  db: Db,
+  options: { limit: number; leaseSeconds: number },
+): Promise<ClaimedInboxCursor[]> {
+  const { rows } = await db.execute<{
+    tenant_id: string;
+    connection_id: string;
+    scope_ref: string;
+    interval_seconds: number;
+  }>(
+    sql`select * from app.claim_reconcile_inbox_cursors(${options.limit}::int, ${options.leaseSeconds}::int)`,
+  );
+  return rows.map((row) => ({
+    tenantId: row.tenant_id,
+    connectionId: row.connection_id,
+    inboxRef: row.scope_ref,
+    intervalSeconds: row.interval_seconds,
+  }));
+}
+
 /** Starts following open conversations that have no reconciler cursor yet; returns how many. */
 export async function ensureReconcileCursors(db: Db): Promise<number> {
   const { rows } = await db.execute<{ ensure_reconcile_cursors: number }>(

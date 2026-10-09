@@ -53,6 +53,16 @@ export interface AuthorityConversationState {
   staffLastSeenAt?: Date | null;
   /** The conversation's priority (H19); undefined where the authority does not report it. */
   priority?: ConversationPriority | null;
+  /** Who wrote in (email, WhatsApp, Telegram): undefined where the payload does not carry it. */
+  contact?: AuthorityContactFacts | null;
+  /** An email conversation's subject. */
+  subject?: string | null;
+}
+
+export interface AuthorityContactFacts {
+  name: string | null;
+  email: string | null;
+  phone: string | null;
 }
 
 /** Chatwoot's priorities, most urgent first (H19). */
@@ -157,7 +167,13 @@ export interface EnsuredContact {
 }
 
 export type AuthorityEvent =
-  | { type: 'message.created' | 'message.updated'; accountRef: string; message: AuthorityMessage }
+  | {
+      type: 'message.created' | 'message.updated';
+      accountRef: string;
+      message: AuthorityMessage;
+      /** The conversation as it stood, where the payload carries it (Chatwoot's webhooks do). */
+      conversation?: AuthorityConversationState;
+    }
   | {
       type: 'conversation.created' | 'conversation.updated' | 'conversation.status_changed';
       accountRef: string;
@@ -247,6 +263,8 @@ export const MESSAGE_KEY_PREFIX = {
   note: 'hv1:n:',
   automation: 'hv1:a:',
   import: 'hv1:imp:',
+  /** A customer message that came in on a channel (email, WhatsApp…), as the ledger records it. */
+  external: 'hv1:x:',
 } as const;
 
 export function isHamnivoKey(key: string | null | undefined): key is string {
