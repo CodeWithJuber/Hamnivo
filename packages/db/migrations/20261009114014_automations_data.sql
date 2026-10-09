@@ -4,11 +4,15 @@
 -- its prompt limits. Custom roles that could edit prompts (widget.proactive) can now read and
 -- manage automations instead.
 --
--- The owner is bound by forced row-level security like the application, so the two tables read
--- here are released for this transaction and forced again at the end.
+-- The owner is bound by forced row-level security like the application, so the tables read and
+-- written here are released for this transaction and forced again at the end.
 ALTER TABLE brand_widget_settings NO FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
 ALTER TABLE role_definitions NO FORCE ROW LEVEL SECURITY;
+--> statement-breakpoint
+ALTER TABLE automations NO FORCE ROW LEVEL SECURITY;
+--> statement-breakpoint
+ALTER TABLE automation_versions NO FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
 CREATE TEMPORARY TABLE hv_moved_prompts ON COMMIT DROP AS
 WITH prompts AS (
@@ -74,3 +78,37 @@ SET permissions = array_remove(permissions, 'widget.proactive')
 WHERE 'widget.proactive' = ANY (permissions);
 --> statement-breakpoint
 SELECT app.harden_tenant_tables();
+--> statement-breakpoint
+-- A published version is a record of what ran: the application adds versions and never changes
+-- or removes one (they go only with their automation).
+REVOKE UPDATE, DELETE ON automation_versions FROM hamnivo_app;
+--> statement-breakpoint
+GRANT SELECT (tenant_id, id, ran_at), DELETE ON automation_runs TO hamnivo_resolver;
+--> statement-breakpoint
+-- What chat automations did is kept for 90 days (the run log in Studio and the weekly counts),
+-- then removed in batches by the worker's maintenance schedule. Returns how many were removed.
+CREATE FUNCTION app.purge_automation_runs(p_batch integer DEFAULT 5000)
+  RETURNS bigint
+  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  SET search_path = pg_catalog, public
+  AS $$
+DECLARE
+  lim integer := least(greatest(p_batch, 1), 50000);
+  removed bigint;
+BEGIN
+  DELETE FROM public.automation_runs AS r
+  USING (
+    SELECT x.tenant_id, x.id FROM public.automation_runs AS x
+    WHERE x.ran_at < now() - interval '90 days' ORDER BY x.ran_at LIMIT lim
+  ) AS d
+  WHERE r.tenant_id = d.tenant_id AND r.id = d.id;
+  GET DIAGNOSTICS removed = ROW_COUNT;
+  RETURN removed;
+END
+$$;
+--> statement-breakpoint
+ALTER FUNCTION app.purge_automation_runs(integer) OWNER TO hamnivo_resolver;
+--> statement-breakpoint
+REVOKE ALL ON FUNCTION app.purge_automation_runs(integer) FROM PUBLIC;
+--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION app.purge_automation_runs(integer) TO hamnivo_app;

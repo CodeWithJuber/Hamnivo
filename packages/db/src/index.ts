@@ -1,6 +1,7 @@
 export * from './actions-resolvers.js';
 export * from './ai-power-resolvers.js';
 export * from './audit.js';
+export * from './automations.js';
 export * from './client.js';
 export * from './commerce-resolvers.js';
 export * from './developer-resolvers.js';

@@ -614,6 +614,48 @@ async function seedVisitors(
     confirmationSentAt: new Date(),
   });
   await tx.insert(s.tenantCounters).values({ tenantId, name: 'ticket', value: 1 });
+  // An automation, its published version and one run (G21).
+  const automationId = newId();
+  const versionId = newId();
+  const definition = {
+    event: { type: 'chat_started', seconds: 0 },
+    match: 'all',
+    conditions: [{ field: 'owner', op: 'is', value: ['waiting'] }],
+    actions: [{ type: 'send_message', message: { en: 'Thanks, someone will reply soon.' } }],
+  };
+  await tx.insert(s.automations).values({
+    id: automationId,
+    tenantId,
+    brandId: ref.brandId,
+    name: 'Welcome reply',
+    kind: 'conversation',
+    draft: definition,
+    createdBy: ref.staffMemberId,
+  });
+  await tx.insert(s.automationVersions).values({
+    id: versionId,
+    tenantId,
+    automationId,
+    version: 1,
+    name: 'Welcome reply',
+    definition,
+    publishedBy: ref.staffMemberId,
+  });
+  await tx
+    .update(s.automations)
+    .set({ publishedVersionId: versionId })
+    .where(eq(s.automations.id, automationId));
+  await tx.insert(s.automationRuns).values({
+    tenantId,
+    brandId: ref.brandId,
+    automationId,
+    versionId,
+    conversationId: ref.conversationId,
+    event: 'chat_started',
+    eventKey: 'chat_started',
+    outcome: 'done',
+    actions: ['send_message'],
+  });
 }
 
 /**
