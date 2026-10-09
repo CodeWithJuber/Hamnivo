@@ -32,8 +32,30 @@ that, only approved template messages may be sent. Hamnivo follows this:
 - a reply after the window is refused, and nothing is sent;
 - the AI and automations don't send messages after the window either.
 
-The customer can write again at any time, which opens a new 24-hour window. Sending template
-messages from Hamnivo comes later.
+The customer can write again at any time, which opens a new 24-hour window.
+
+## Template messages
+
+After the 24 hours, you can still send a **template message**: a message you wrote in advance and
+Meta approved, such as an order update.
+
+1. Create the template in Meta's **WhatsApp Manager** (**Message templates**) and wait for Meta
+   to approve it. Your chat engine fetches approved templates from Meta regularly; the picker
+   shows when it last did.
+2. In the conversation, choose **Send a template**. The button is also next to **Saved replies**
+   while the window is open.
+3. Pick the template, fill in every value it asks for (a name, an order number…), and check the
+   preview. **Send** works once every value is filled in.
+
+The customer reads exactly what the preview shows. If they answer, the 24-hour window opens again.
+
+Some templates can't be sent from Hamnivo:
+
+- templates Meta has not approved yet;
+- one-time-code (authentication) templates, which your own systems send;
+- templates with a photo, video or document at the top (for now).
+
+They are listed but can't be chosen.
 
 ## Good to know
 

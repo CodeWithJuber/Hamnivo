@@ -3248,16 +3248,20 @@
   "D14": {
     "status": "implemented",
     "evidence": [
-      "packages/contracts/src/channels.ts",
-      "packages/chatwoot/src/provisioning.ts",
       "apps/gateway/src/authority/channel-inboxes.service.ts",
       "apps/gateway/src/authority/channel-window.ts",
+      "apps/gateway/src/conversations/whatsapp-templates.service.ts",
       "apps/gateway/test/channels.int.test.ts",
-      "packages/chatwoot/test/fake.test.ts",
-      "docs/guide/setup/whatsapp.md",
+      "docs/adr/0013-hamnivo-follows-every-conversation-in-its-chatwoot-account.md",
       "docs/guide/setup/telegram.md",
-      "docs/adr/0013-hamnivo-follows-every-conversation-in-its-chatwoot-account.md"
+      "docs/guide/setup/whatsapp.md",
+      "packages/chatwoot/src/fake/server.ts",
+      "packages/chatwoot/src/provisioning.ts",
+      "packages/chatwoot/test/fake.test.ts",
+      "packages/contracts/src/channels.ts",
+      "packages/domain/src/whatsapp-templates.ts",
+      "packages/domain/test/whatsapp-templates.test.ts"
     ],
-    "note": "Connect a WhatsApp Business number (Meta Cloud API) or a Telegram bot from Settings → Channels: Chatwoot checks the token with Meta or Telegram and keeps it; Hamnivo stores none. For WhatsApp, Studio shows the callback URL on Chatwoot's public host and Chatwoot's verify token for Meta's webhook set-up. Their conversations are adopted like email (ADR 0013), with the AI off until the owner turns it on, and Telegram is its own channel in the inbox. Tested end to end against the fake; creating WhatsApp and Telegram inboxes against a real Chatwoot needs Meta and Telegram, so the contract suite runs those cases on the fake only. Template messages are not sent yet."
+    "note": "Connect a WhatsApp Business number (Meta Cloud API) or a Telegram bot from Settings → Channels: Chatwoot checks the token with Meta or Telegram and keeps it; Hamnivo stores none. For WhatsApp, Studio shows the callback URL on Chatwoot's public host and Chatwoot's verify token for Meta's webhook set-up. Their conversations are adopted like email (ADR 0013), with the AI off until the owner turns it on, and Telegram is its own channel in the inbox. Tested end to end against the fake; creating WhatsApp and Telegram inboxes against a real Chatwoot needs Meta and Telegram, so the contract suite runs those cases on the fake only. Past the 24-hour window, staff send Meta-approved templates from the composer: Chatwoot's synced list is read live, values are checked and the rendered text is what the customer reads; sent once through the message ledger. Templates with a media header and one-time-code templates are not sent from Hamnivo."
   }
 }
