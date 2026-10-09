@@ -161,7 +161,7 @@ function OptionsEditor({
           ? t('chatWidget.forms.fields.departmentHint')
           : t('chatWidget.forms.fields.optionsHint', { min: MIN_OPTIONS, max: MAX_OPTIONS })}
       </p>
-      {department && teams && teams.length === 0 ? (
+      {department && teams && !teams.some((team) => team.status === 'active') ? (
         <p className="text-sm text-warning" data-testid="no-teams">
           {t('chatWidget.forms.fields.noTeams')}{' '}
           <Link to="/support-teams" className="underline underline-offset-4 hover:no-underline">
@@ -192,7 +192,10 @@ function OptionsEditor({
                   placeholder={t('chatWidget.forms.fields.teamPlaceholder')}
                   error={errors[teamId]}
                   onChange={(event) => update({ teamId: event.target.value })}
-                  options={(teams ?? []).map((team) => ({ value: team.id, label: team.name }))}
+                  // Active teams, and the one already chosen even if it was archived since.
+                  options={(teams ?? [])
+                    .filter((team) => team.status === 'active' || team.id === option.teamId)
+                    .map((team) => ({ value: team.id, label: team.name }))}
                 />
               ) : null}
               <LocalizedFields
@@ -200,6 +203,7 @@ function OptionsEditor({
                 legend={t('chatWidget.forms.fields.option', { number })}
                 value={option.label}
                 maxLength={OPTION_LABEL_MAX}
+                others={(n) => t('chatWidget.forms.fields.otherLanguages', { n })}
                 error={errors[`${labelId}-en`]}
                 onChange={(label) => update({ label })}
               />
@@ -344,6 +348,7 @@ function FieldRow({
         hint={t('chatWidget.forms.fields.labelHint')}
         value={field.label}
         maxLength={LABEL_MAX}
+        others={(n) => t('chatWidget.forms.fields.otherLanguages', { n })}
         error={errors[`${labelId}-en`]}
         onChange={(label) => onChange({ ...field, label })}
       />
@@ -559,14 +564,25 @@ function FormsEditor({
     messages.set(id, messages.has(id) ? `${messages.get(id)} ${text}` : text);
   }
   for (const [id, text] of Object.entries(server)) if (!messages.has(id)) messages.set(id, text);
+  // By the fields, the messages follow the changes; the summary is what the last Save found, so
+  // it does not take focus away while a field is being put right.
   const errors: Record<string, string> = attempted ? Object.fromEntries(messages) : {};
-  const summary = Object.entries(errors).map(([fieldId, message]) => ({ fieldId, message }));
+  const [summary, setSummary] = useState<{ fieldId: string; message: string }[]>([]);
+  const listOf = (entries: Map<string, string> | Record<string, string>) =>
+    [...(entries instanceof Map ? entries : Object.entries(entries))].map(([fieldId, message]) => ({
+      fieldId,
+      message,
+    }));
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setAttempted(true);
     setServer({});
-    if (problems.length > 0) return;
+    if (problems.length > 0) {
+      setSummary(listOf(messages));
+      return;
+    }
+    setSummary([]);
     try {
       const result = await save.mutateAsync(bodyOf(draft));
       // What was saved is the new starting point at once, without waiting for a reload.
@@ -580,16 +596,16 @@ function FormsEditor({
           fields[id] = fields[id] ? `${fields[id]} ${field.message}` : field.message;
         }
         setServer(fields);
+        setSummary(listOf(fields));
       }
     }
   };
 
   const look = previewLookOf(appearance, brand.name, lang);
-  const shown: PreviewScreen = screen;
   const notice =
-    shown === 'prechat' && !draft.prechat.enabled
+    screen === 'prechat' && !draft.prechat.enabled
       ? t('chatWidget.preview.prechatOff')
-      : (shown === 'offline' || shown === 'thanks') && !draft.offline.enabled
+      : (screen === 'offline' || screen === 'thanks') && !draft.offline.enabled
         ? t('chatWidget.preview.offlineOff')
         : null;
 
@@ -711,6 +727,7 @@ function FormsEditor({
             onClick={() => {
               setDraft(saved);
               setServer({});
+              setSummary([]);
               setAttempted(false);
             }}
           >
@@ -727,7 +744,7 @@ function FormsEditor({
         id="forms-preview"
         lang={lang}
         onLangChange={setLang}
-        screen={shown}
+        screen={screen}
         onScreenChange={(value) => setScreen(value as PreviewScreen)}
         screens={(['prechat', 'offline', 'thanks'] as const).map((value) => ({
           value,
@@ -737,10 +754,10 @@ function FormsEditor({
       >
         <WidgetPreview
           look={look}
-          screen={shown}
+          screen={screen}
           content={{
             fields: previewFields(
-              shown === 'prechat' ? draft.prechat.fields : draft.offline.fields,
+              screen === 'prechat' ? draft.prechat.fields : draft.offline.fields,
               lang,
             ),
             thanks: texts(draft.offline.thanks, lang, DEFAULT_FORM_TEXT.thanks[lang]),

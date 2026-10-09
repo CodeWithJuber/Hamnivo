@@ -126,6 +126,7 @@ export const chatWidgetUr: ChatWidgetTranslation = {
       noTeamsLink: 'سپورٹ ٹیموں پر جائیں',
       addOption: 'جواب شامل کریں',
       removeOption: '{{name}} کا جواب {{number}} ہٹائیں',
+      otherLanguages: 'عربی، ہندی اور اردو (3 میں سے {{n}} لکھی گئیں)',
       optionsFull: 'ایک فہرست میں زیادہ سے زیادہ {{max}} جوابات ہو سکتے ہیں۔',
     },
     problems: {

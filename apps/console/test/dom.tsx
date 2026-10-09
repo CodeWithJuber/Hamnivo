@@ -140,6 +140,8 @@ export async function mountStudio({
 export interface Call {
   method: string;
   path: string;
+  /** The query string's values (`?queue=tickets` → { queue: 'tickets' }). */
+  query: Record<string, string>;
   /** The JSON body that was sent, or undefined for none. */
   body: Record<string, unknown> | undefined;
   headers: Record<string, string>;
@@ -168,6 +170,7 @@ export function fakeGateway(routes: Record<string, Answer | ((call: Call) => Ans
     const call: Call = {
       method: init?.method ?? 'GET',
       path: url.pathname,
+      query: Object.fromEntries(url.searchParams),
       body: init?.body ? JSON.parse(String(init.body)) : undefined,
       headers,
     };

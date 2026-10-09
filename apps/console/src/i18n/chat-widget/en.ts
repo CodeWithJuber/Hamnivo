@@ -131,6 +131,7 @@ export const chatWidgetEn = {
       noTeamsLink: 'Go to Support teams',
       addOption: 'Add an answer',
       removeOption: 'Remove answer {{number}} of {{name}}',
+      otherLanguages: 'Arabic, Hindi and Urdu ({{n}} of 3 written)',
       optionsFull: 'A list can have at most {{max}} answers.',
     },
     problems: {

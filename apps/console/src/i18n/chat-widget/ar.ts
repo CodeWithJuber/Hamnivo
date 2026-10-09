@@ -124,6 +124,7 @@ export const chatWidgetAr: ChatWidgetTranslation = {
       noTeamsLink: 'انتقل إلى فرق الدعم',
       addOption: 'أضف إجابة',
       removeOption: 'احذف الإجابة {{number}} من {{name}}',
+      otherLanguages: 'العربية والهندية والأردية (المكتوب: {{n}} من 3)',
       optionsFull: 'يمكن أن تضم القائمة {{max}} إجابات على الأكثر.',
     },
     problems: {

@@ -88,6 +88,7 @@ export function LocalizedFields({
   onChange,
   multiline = false,
   placeholders,
+  others,
 }: {
   id: string;
   legend: string;
@@ -100,40 +101,66 @@ export function LocalizedFields({
   multiline?: boolean;
   /** Greyed words shown in an empty box: what customers read when it stays empty. */
   placeholders?: Partial<Texts> | undefined;
+  /**
+   * Keeps the other languages behind a disclosure with this name (English stays in view), for
+   * lists where every item has words of its own. It starts open when any of them is written.
+   */
+  others?: (written: number) => string;
 }) {
   const { t } = useTranslation();
+  const written = LANGS.filter((lang) => lang !== 'en' && value[lang].trim()).length;
+  const [open, setOpen] = useState(written > 0);
+  const field = (lang: Lang) => {
+    const common = {
+      id: `${id}-${lang}`,
+      label: t(`chatSettings.languages.${lang}`),
+      lang,
+      dir: 'auto',
+      value: value[lang],
+      maxLength,
+      error: lang === 'en' ? error : undefined,
+      ...(placeholders?.[lang] ? { placeholder: placeholders[lang] } : {}),
+    };
+    return multiline ? (
+      <TextareaField
+        key={lang}
+        {...common}
+        rows={3}
+        onChange={(event) => onChange({ ...value, [lang]: event.target.value })}
+      />
+    ) : (
+      <TextField
+        key={lang}
+        {...common}
+        onChange={(event) => onChange({ ...value, [lang]: event.target.value })}
+      />
+    );
+  };
   return (
     <FieldSet className="gap-3 rounded-lg border border-border p-3">
       <FieldLegend variant="label" className="mb-0">
         {legend}
       </FieldLegend>
       {hint ? <FieldDescription className="mt-0">{hint}</FieldDescription> : null}
-      {LANGS.map((lang) => {
-        const common = {
-          id: `${id}-${lang}`,
-          label: t(`chatSettings.languages.${lang}`),
-          lang,
-          dir: 'auto',
-          value: value[lang],
-          maxLength,
-          error: lang === 'en' ? error : undefined,
-          ...(placeholders?.[lang] ? { placeholder: placeholders[lang] } : {}),
-        };
-        return multiline ? (
-          <TextareaField
-            key={lang}
-            {...common}
-            rows={3}
-            onChange={(event) => onChange({ ...value, [lang]: event.target.value })}
-          />
-        ) : (
-          <TextField
-            key={lang}
-            {...common}
-            onChange={(event) => onChange({ ...value, [lang]: event.target.value })}
-          />
-        );
-      })}
+      {others ? (
+        <>
+          {field('en')}
+          <details
+            open={open}
+            onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
+            className="rounded-md"
+          >
+            <summary className="cursor-pointer text-sm font-medium text-text">
+              {others(written)}
+            </summary>
+            <div className="mt-3 flex flex-col gap-3">
+              {LANGS.filter((lang) => lang !== 'en').map(field)}
+            </div>
+          </details>
+        </>
+      ) : (
+        LANGS.map(field)
+      )}
     </FieldSet>
   );
 }

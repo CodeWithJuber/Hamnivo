@@ -278,7 +278,7 @@ function TicketFilters() {
                   const { ticketState: _old, ...rest } = prev;
                   return state === 'all' ? rest : { ...rest, ticketState: state };
                 }}
-                aria-current={current === state ? 'true' : undefined}
+                aria-current={current === state ? 'page' : undefined}
                 data-ticket-state={state}
                 className={cn(
                   'inline-flex min-h-8 items-center rounded-full border px-3 text-sm whitespace-nowrap',

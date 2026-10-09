@@ -316,11 +316,12 @@ function fieldProblems(form: FormName, fields: readonly FieldDraft[]): FormProbl
     if (!isListKind(field.kind)) return;
     if (field.options.length < MIN_OPTIONS) out.push({ ...at, kind: 'fewOptions' });
     if (field.options.length > MAX_OPTIONS) out.push({ ...at, kind: 'manyOptions' });
+    // In the order the page shows them: an answer's team first, then its words.
     for (const option of field.options) {
-      if (!option.label.en.trim()) out.push({ ...at, kind: 'optionLabel', option: option.id });
       if (field.kind === 'department' && !option.teamId) {
         out.push({ ...at, kind: 'optionTeam', option: option.id });
       }
+      if (!option.label.en.trim()) out.push({ ...at, kind: 'optionLabel', option: option.id });
     }
   });
   if (fields.length > MAX_FIELDS) out.push({ form, kind: 'tooManyFields' });

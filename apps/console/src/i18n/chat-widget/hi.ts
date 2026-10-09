@@ -123,6 +123,7 @@ export const chatWidgetHi: ChatWidgetTranslation = {
       noTeamsLink: 'सपोर्ट टीमों पर जाएँ',
       addOption: 'जवाब जोड़ें',
       removeOption: '{{name}} का जवाब {{number}} हटाएँ',
+      otherLanguages: 'अरबी, हिंदी और उर्दू (3 में से {{n}} लिखी गईं)',
       optionsFull: 'एक सूची में ज़्यादा से ज़्यादा {{max}} जवाब हो सकते हैं।',
     },
     problems: {

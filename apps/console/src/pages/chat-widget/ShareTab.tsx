@@ -236,7 +236,10 @@ function InstallCode({ brandId }: { brandId: string }) {
   const { can } = useTenant();
   const brands = useBrands();
   const codeRef = useRef<HTMLElement>(null);
-  const brand = brands.data?.items.find((item) => item.id === brandId);
+  // The widget ID comes with the brand list, which only people who manage brands may read.
+  const brand = can('brands.manage')
+    ? brands.data?.items.find((item) => item.id === brandId)
+    : undefined;
   const snippet = brand ? installSnippet(brand.widgetId) : null;
   return (
     <Section
