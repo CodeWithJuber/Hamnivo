@@ -6,8 +6,9 @@ import { and, eq } from 'drizzle-orm';
 export const inboxChannel = (tenantId: string) => `hamnivo:inbox:${tenantId}`;
 
 /**
- * Keeps the queue projection (tags, snooze time, team) in step with a newer authority state. Tags
- * and snooze times come from Chatwoot as they are; a team is adopted only when it is one Hamnivo
+ * Keeps the queue projection (tags, snooze time, team, priority) in step with a newer authority
+ * state. Tags, snooze times and priorities come from Chatwoot as they are (a state that does not
+ * report a priority leaves the stored one alone); a team is adopted only when it is one Hamnivo
  * knows, because Hamnivo assigns teams and Chatwoot may still show the previous one.
  */
 export async function projectInboxState(
@@ -15,7 +16,7 @@ export async function projectInboxState(
   tenantId: string,
   conversationId: string,
   connectionId: string,
-  state: Pick<AuthorityConversationState, 'labels' | 'snoozedUntil' | 'teamRef'>,
+  state: Pick<AuthorityConversationState, 'labels' | 'snoozedUntil' | 'teamRef' | 'priority'>,
 ): Promise<void> {
   let teamId: string | undefined;
   if (state.teamRef !== null && Number.isInteger(Number(state.teamRef))) {
@@ -34,6 +35,7 @@ export async function projectInboxState(
     labels: state.labels,
     snoozedUntil: state.snoozedUntil ?? null,
     ...(teamId ? { teamId } : {}),
+    ...(state.priority !== undefined ? { priority: state.priority } : {}),
   };
   await tx
     .insert(schema.conversationInboxState)

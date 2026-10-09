@@ -1,4 +1,6 @@
 import {
+  type ChatFormField,
+  ConsentSettings,
   DEFAULT_WIDGET_TEXT,
   type HandoffResponse,
   type LauncherConfig,
@@ -6,6 +8,8 @@ import {
   ProactiveSettings,
   WidgetAppearance,
   type WidgetConfig,
+  type WidgetFormField,
+  WidgetForms,
   WidgetSettings,
 } from '@hamnivo/contracts';
 import type { schema } from '@hamnivo/db';
@@ -63,19 +67,35 @@ const PERSON_ONLINE: Record<Locale, string> = {
 const localeOf = (locale: string | null | undefined): Locale =>
   (['en', 'ar', 'hi', 'ur'] as const).find((l) => l === locale) ?? 'en';
 
-/** Whether people are working now and when they are back, from the brand's hours (W11). */
+/**
+ * Whether people are working now and when they are back, from the brand's hours (W11), and
+ * whether anyone on the team is online right now (their own status).
+ */
 export function availabilityOf(
   brand: typeof schema.brands.$inferSelect,
   now: Date,
+  staffOnline = false,
 ): WidgetConfig['availability'] {
   const hours = brand.businessHours;
   // Without hours there is no way to know: never claim a person is standing by.
-  if (!hours) return { humanAvailable: false, nextOpenAt: null, timezone: 'UTC' };
+  if (!hours) {
+    return {
+      humanAvailable: false,
+      nextOpenAt: null,
+      timezone: 'UTC',
+      staffOnline,
+      hoursSet: false,
+      open: false,
+    };
+  }
   const open = isOpen(hours, now);
   return {
     humanAvailable: open,
     nextOpenAt: open ? null : (nextOpening(hours, now)?.toISOString() ?? null),
     timezone: hours.timezone,
+    staffOnline,
+    hoursSet: true,
+    open,
   };
 }
 
@@ -86,14 +106,63 @@ export const DEFAULT_SURFACE: BrandSurface = {
   settings: WidgetSettings.parse({}),
   proactive: ProactiveSettings.parse({}),
   appearance: DEFAULT_APPEARANCE,
+  forms: WidgetForms.parse({}),
+  consent: ConsentSettings.parse({}),
+  consentVersion: 0,
+  directLink: false,
   settingsUpdatedAt: null,
   proactiveUpdatedAt: null,
+  formsUpdatedAt: null,
+  consentUpdatedAt: null,
+  directLinkUpdatedAt: null,
 };
+
+/** What the session adds to the brand's configuration: who is asking, and from where. */
+export interface ConfigContext {
+  /** Files are offered only where they can be scanned (ClamAV in production). */
+  filesScannable?: boolean;
+  /** Someone on the team is online right now. */
+  staffOnline?: boolean;
+  /** This visitor must agree before chatting (from the brand's mode and the request's country). */
+  consentRequired?: boolean;
+  /** This customer agreed to the current words already. */
+  consentGiven?: boolean;
+  /** The session was opened from the brand's direct chat link (W28). */
+  direct?: boolean;
+}
 
 const LOCALES: Locale[] = ['en', 'ar', 'hi', 'ur'];
 
 /** A brand's text in one language, falling back to its English. */
 const textIn = (text: LocalizedText, locale: Locale): string => text[locale] ?? text.en;
+
+/** The text in every language. */
+const everyLocale = (text: LocalizedText): Record<Locale, string> =>
+  Object.fromEntries(LOCALES.map((locale) => [locale, textIn(text, locale)])) as Record<
+    Locale,
+    string
+  >;
+
+/** A form field as the widget shows it. */
+const formField = (field: ChatFormField): WidgetFormField => ({
+  id: field.id,
+  kind: field.kind,
+  label: everyLocale(field.label),
+  required: field.required,
+  options: field.options.map((option) => ({ id: option.id, label: everyLocale(option.label) })),
+});
+
+/** The brand's consent words, or Hamnivo's own, with its name in them. */
+export function consentText(brandName: string, text: LocalizedText | null): Record<Locale, string> {
+  return Object.fromEntries(
+    LOCALES.map((locale) => [
+      locale,
+      text
+        ? textIn(text, locale)
+        : DEFAULT_WIDGET_TEXT.consent[locale].replace('{brand}', brandName),
+    ]),
+  ) as Record<Locale, string>;
+}
 
 /** "Monday 9:00 AM GMT+5": when people are back, in the customer's language and the brand's time zone. */
 function whenText(lang: Locale, timezone: string, back: Date): string {
@@ -130,8 +199,7 @@ export function widgetConfig(
   brand: typeof schema.brands.$inferSelect,
   now: Date = new Date(),
   surface: BrandSurface = DEFAULT_SURFACE,
-  /** Files are offered only where they can be scanned (ClamAV in production). */
-  options: { filesScannable?: boolean } = {},
+  options: ConfigContext = {},
 ): WidgetConfig {
   const { settings, proactive } = surface;
   const appearance = surface.appearance ?? DEFAULT_APPEARANCE;
@@ -149,7 +217,8 @@ export function widgetConfig(
       },
     ]),
   ) as WidgetConfig['copy'];
-  const availability = availabilityOf(brand, now);
+  const availability = availabilityOf(brand, now, options.staffOnline === true);
+  const { prechat, offline } = surface.forms;
   const prompting =
     proactive.enabled && (!proactive.onlyWhenAvailable || availability.humanAvailable);
   return {
@@ -199,6 +268,28 @@ export function widgetConfig(
           }))
         : [],
     },
+    forms: {
+      prechat: {
+        enabled: prechat.enabled,
+        skipVerified: prechat.skipVerified,
+        fields: prechat.fields.map(formField),
+      },
+      offline: {
+        enabled: offline.enabled,
+        when: offline.when,
+        fields: offline.fields.map(formField),
+        thanks: offline.thanks
+          ? everyLocale(offline.thanks)
+          : { ...DEFAULT_WIDGET_TEXT.offlineThanks },
+      },
+    },
+    consent: {
+      required: options.consentRequired === true,
+      given: options.consentGiven === true,
+      noticeVersion: surface.consentVersion,
+      text: consentText(brand.name, surface.consent.text),
+    },
+    direct: options.direct === true,
   };
 }
 

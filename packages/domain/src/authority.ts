@@ -51,6 +51,22 @@ export interface AuthorityConversationState {
   snoozedUntil?: Date | null;
   /** When staff last looked at the conversation, where the authority reports it. */
   staffLastSeenAt?: Date | null;
+  /** The conversation's priority (H19); undefined where the authority does not report it. */
+  priority?: ConversationPriority | null;
+}
+
+/** Chatwoot's priorities, most urgent first (H19). */
+export const CONVERSATION_PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
+export type ConversationPriority = (typeof CONVERSATION_PRIORITIES)[number];
+
+/** Changes to a contact after it exists (the integration user writes them). */
+export interface ContactUpdate {
+  name?: string | null;
+  /**
+   * Custom attributes, merged into the ones the contact has. Never an address the customer only
+   * typed: the authority merges contacts by email, so those go into an attribute instead.
+   */
+  attributes?: Record<string, unknown>;
 }
 
 export type AuthorityMessageDirection = 'incoming' | 'outgoing' | 'activity' | 'template';
@@ -165,6 +181,8 @@ export type AuthorityEvent =
 export interface ConversationAuthority {
   readonly capabilities: AuthorityCapabilities;
   ensureContact(input: EnsureContactInput): Promise<EnsuredContact>;
+  /** Renames a contact or adds attributes to it, such as answers to a pre-chat form (W26). */
+  updateContact(contactRef: string, update: ContactUpdate): Promise<void>;
   openConversation(input: {
     inboxRef: string;
     contactSourceId: string;

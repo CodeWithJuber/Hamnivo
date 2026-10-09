@@ -1,7 +1,12 @@
 import {
+  ConsentSettings,
+  type ConsentSettingsView,
+  type DirectLinkView,
   ProactiveSettings,
   type ProactiveSettingsView,
   type WidgetAppearance,
+  WidgetForms,
+  type WidgetFormsView,
   WidgetSettings,
   type WidgetSettingsView,
 } from '@hamnivo/contracts';
@@ -20,6 +25,7 @@ import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
+import { teamsForBrand } from '../decisions/team-routing.service.js';
 import { enforce } from '../identity/staff.guard.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { parseAppearance } from './appearance.js';
@@ -29,8 +35,18 @@ export interface BrandSurface {
   proactive: ProactiveSettings;
   /** How the chat looks and what it says (W03); the defaults when left out. */
   appearance?: WidgetAppearance;
+  /** The pre-chat form (W26) and the contact form (W11). */
+  forms: WidgetForms;
+  /** Who must agree before chatting (W27), and the version of the words they agree to. */
+  consent: ConsentSettings;
+  consentVersion: number;
+  /** The direct chat link is on (W28). */
+  directLink: boolean;
   settingsUpdatedAt: Date | null;
   proactiveUpdatedAt: Date | null;
+  formsUpdatedAt: Date | null;
+  consentUpdatedAt: Date | null;
+  directLinkUpdatedAt: Date | null;
 }
 
 /** Stored settings, or the contract's defaults when there are none or they no longer parse. */
@@ -53,9 +69,52 @@ export async function brandSurface(tx: TenantTx, brandId: string): Promise<Brand
     settings: parsed(WidgetSettings, row?.settings),
     proactive: parsed(ProactiveSettings, row?.proactive),
     appearance: parseAppearance(look?.appearance),
+    forms: parsed(WidgetForms, row?.forms),
+    consent: parsed(ConsentSettings, row?.consent),
+    consentVersion: row?.consentVersion ?? 0,
+    directLink: row?.directLink ?? false,
     settingsUpdatedAt: row?.settingsUpdatedAt ?? null,
     proactiveUpdatedAt: row?.proactiveUpdatedAt ?? null,
+    formsUpdatedAt: row?.formsUpdatedAt ?? null,
+    consentUpdatedAt: row?.consentUpdatedAt ?? null,
+    directLinkUpdatedAt: row?.directLinkUpdatedAt ?? null,
   };
+}
+
+/** The page that opens a brand's chat on its own (W28). */
+export function directLinkUrl(widgetOrigin: string, widgetPublicId: string): string | null {
+  try {
+    return new URL(`/c/${encodeURIComponent(widgetPublicId)}`, widgetOrigin).toString();
+  } catch {
+    return null;
+  }
+}
+
+type SurfaceChange =
+  | { settings: WidgetSettings }
+  | { proactive: ProactiveSettings }
+  | { forms: WidgetForms }
+  | { consent: ConsentSettings; consentVersion: number }
+  | { directLink: boolean };
+
+function columnsOf(change: SurfaceChange, now: Date) {
+  if ('settings' in change) return { settings: change.settings, settingsUpdatedAt: now };
+  if ('proactive' in change) return { proactive: change.proactive, proactiveUpdatedAt: now };
+  if ('forms' in change) return { forms: change.forms, formsUpdatedAt: now };
+  if ('consent' in change) {
+    return {
+      consent: change.consent,
+      consentVersion: change.consentVersion,
+      consentUpdatedAt: now,
+    };
+  }
+  return { directLink: change.directLink, directLinkUpdatedAt: now };
+}
+
+/** The same words in every language, whatever order the keys came in. */
+function sameText(a: ConsentSettings['text'], b: ConsentSettings['text']): boolean {
+  if (a === null || b === null) return a === b;
+  return (['en', 'ar', 'hi', 'ur'] as const).every((l) => (a[l] ?? null) === (b[l] ?? null));
 }
 
 /**
@@ -115,13 +174,10 @@ export class WidgetSettingsService {
   private async save(
     tx: TenantTx,
     brand: typeof schema.brands.$inferSelect,
-    change: { settings: WidgetSettings } | { proactive: ProactiveSettings },
+    change: SurfaceChange,
   ): Promise<number> {
     const now = this.clock();
-    const values =
-      'settings' in change
-        ? { settings: change.settings, settingsUpdatedAt: now }
-        : { proactive: change.proactive, proactiveUpdatedAt: now };
+    const values = columnsOf(change, now);
     await tx
       .insert(schema.brandWidgetSettings)
       .values({ tenantId: brand.tenantId, brandId: brand.id, ...values })
@@ -203,6 +259,183 @@ export class WidgetSettingsService {
         },
       });
       return { brandId, settings: proactive, updatedAt: this.clock().toISOString() };
+    });
+  }
+
+  private audit(
+    tx: TenantTx,
+    principal: StaffPrincipal,
+    brandId: string,
+    action: string,
+    data: Record<string, unknown>,
+  ) {
+    return appendAudit(tx, {
+      actorType: 'staff',
+      actorId: toPublicId('staff', principal.staffMemberId),
+      action,
+      targetType: 'brand',
+      targetId: brandId,
+      outcome: 'success',
+      data,
+    });
+  }
+
+  async getForms(principal: StaffPrincipal, brandId: string): Promise<WidgetFormsView> {
+    return this.tx(principal, async (tx) => {
+      const brand = await this.brand(tx, principal, brandId, 'widget.configure', false);
+      const surface = await brandSurface(tx, brand.id);
+      return {
+        brandId,
+        forms: surface.forms,
+        configVersion: brand.configVersion,
+        updatedAt: surface.formsUpdatedAt?.toISOString() ?? null,
+      };
+    });
+  }
+
+  /**
+   * Replaces both forms (W26, W11). A department answer must lead to a team that may take the
+   * brand's conversations, so a customer's choice never routes a chat nowhere.
+   */
+  async updateForms(
+    principal: StaffPrincipal,
+    brandId: string,
+    forms: WidgetForms,
+  ): Promise<WidgetFormsView> {
+    return this.tx(principal, async (tx) => {
+      const brand = await this.brand(tx, principal, brandId, 'widget.configure', true);
+      const teams = new Set(
+        (await teamsForBrand(tx, brand)).map((r) => toPublicId('team', r.team.id)),
+      );
+      for (const [formName, form] of [
+        ['prechat', forms.prechat],
+        ['offline', forms.offline],
+      ] as const) {
+        for (const [index, field] of form.fields.entries()) {
+          if (field.kind !== 'department') continue;
+          const unknown = field.options.findIndex((o) => !o.teamId || !teams.has(o.teamId));
+          if (unknown >= 0) {
+            throw new AppError('VALIDATION_FAILED', {
+              detail: 'Each department leads to a support team that can take this brand’s chats.',
+              fields: [
+                {
+                  path: `${formName}.fields.${index}.options.${unknown}.teamId`,
+                  message: 'Choose one of the brand’s support teams',
+                },
+              ],
+            });
+          }
+        }
+      }
+      const version = await this.save(tx, brand, { forms });
+      await this.audit(tx, principal, brandId, 'brand.widget_forms.updated', {
+        prechat: {
+          enabled: forms.prechat.enabled,
+          fields: forms.prechat.fields.map((f) => ({
+            id: f.id,
+            kind: f.kind,
+            required: f.required,
+          })),
+        },
+        offline: {
+          enabled: forms.offline.enabled,
+          when: forms.offline.when,
+          fields: forms.offline.fields.map((f) => ({
+            id: f.id,
+            kind: f.kind,
+            required: f.required,
+          })),
+        },
+      });
+      return {
+        brandId,
+        forms,
+        configVersion: version,
+        updatedAt: this.clock().toISOString(),
+      };
+    });
+  }
+
+  async getConsent(principal: StaffPrincipal, brandId: string): Promise<ConsentSettingsView> {
+    return this.tx(principal, async (tx) => {
+      const brand = await this.brand(tx, principal, brandId, 'widget.configure', false);
+      const surface = await brandSurface(tx, brand.id);
+      return {
+        brandId,
+        consent: surface.consent,
+        noticeVersion: surface.consentVersion,
+        configVersion: brand.configVersion,
+        updatedAt: surface.consentUpdatedAt?.toISOString() ?? null,
+      };
+    });
+  }
+
+  /**
+   * Replaces the consent settings (W27). New words get a new version, so customers who agreed to
+   * the old ones are asked again; turning consent on for the first time is version 1.
+   */
+  async updateConsent(
+    principal: StaffPrincipal,
+    brandId: string,
+    consent: ConsentSettings,
+  ): Promise<ConsentSettingsView> {
+    return this.tx(principal, async (tx) => {
+      const brand = await this.brand(tx, principal, brandId, 'widget.configure', true);
+      const before = await brandSurface(tx, brand.id);
+      const changed = !sameText(before.consent.text, consent.text) || before.consentVersion === 0;
+      const noticeVersion = changed ? before.consentVersion + 1 : before.consentVersion;
+      const version = await this.save(tx, brand, { consent, consentVersion: noticeVersion });
+      await this.audit(tx, principal, brandId, 'brand.consent.updated', {
+        mode: { from: before.consent.mode, to: consent.mode },
+        noticeVersion: { from: before.consentVersion, to: noticeVersion },
+      });
+      return {
+        brandId,
+        consent,
+        noticeVersion,
+        configVersion: version,
+        updatedAt: this.clock().toISOString(),
+      };
+    });
+  }
+
+  async getDirectLink(principal: StaffPrincipal, brandId: string): Promise<DirectLinkView> {
+    return this.tx(principal, async (tx) => {
+      const brand = await this.brand(tx, principal, brandId, 'widget.configure', false);
+      const surface = await brandSurface(tx, brand.id);
+      return {
+        brandId,
+        enabled: surface.directLink,
+        url: directLinkUrl(this.config.PUBLIC_WIDGET_ORIGIN, brand.widgetPublicId),
+        configVersion: brand.configVersion,
+        updatedAt: surface.directLinkUpdatedAt?.toISOString() ?? null,
+      };
+    });
+  }
+
+  /**
+   * Turns the direct chat link on or off (W28). Off, a chat opened from the link ends at its next
+   * token renewal, since the session's origin is checked again then.
+   */
+  async updateDirectLink(
+    principal: StaffPrincipal,
+    brandId: string,
+    enabled: boolean,
+  ): Promise<DirectLinkView> {
+    return this.tx(principal, async (tx) => {
+      const brand = await this.brand(tx, principal, brandId, 'widget.configure', true);
+      const before = (await brandSurface(tx, brand.id)).directLink;
+      const version = await this.save(tx, brand, { directLink: enabled });
+      await this.audit(tx, principal, brandId, 'brand.direct_link.updated', {
+        enabled: { from: before, to: enabled },
+      });
+      return {
+        brandId,
+        enabled,
+        url: directLinkUrl(this.config.PUBLIC_WIDGET_ORIGIN, brand.widgetPublicId),
+        configVersion: version,
+        updatedAt: this.clock().toISOString(),
+      };
     });
   }
 }

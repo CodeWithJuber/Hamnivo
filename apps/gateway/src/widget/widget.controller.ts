@@ -14,6 +14,7 @@ import { Body, Controller, Get, HttpCode, Param, Post, Query, Req, Res } from '@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { IdempotencyService, validIdempotencyKey } from '../common/idempotency.service.js';
 import { parseInput } from '../common/validation.js';
+import { countryOf } from '../visitors/privacy.js';
 import { WidgetConversationsService } from './conversations.service.js';
 import { WidgetEventsService } from './events.service.js';
 import { WidgetSessionsService } from './sessions.service.js';
@@ -32,14 +33,16 @@ export class WidgetController {
 
   @Post('sessions')
   @HttpCode(201)
-  createSession(@Body() body: unknown) {
+  createSession(@Body() body: unknown, @Req() request: FastifyRequest) {
     const input = parseInput(CreateWidgetSessionRequest, body);
     return this.sessions.create({
       widgetId: input.widgetId,
       ...(input.locale ? { locale: input.locale } : {}),
       ...(input.resumeToken ? { resumeToken: input.resumeToken } : {}),
-      ...(input.hostOrigin ? { hostOrigin: input.hostOrigin } : {}),
+      ...(input.hostOrigin && !input.direct ? { hostOrigin: input.hostOrigin } : {}),
       ...(input.test ? { test: true } : {}),
+      ...(input.direct ? { direct: true } : {}),
+      country: countryOf(request.headers),
     });
   }
 
@@ -54,15 +57,27 @@ export class WidgetController {
 
   @Post('sessions/refresh')
   @HttpCode(200)
-  refresh(@Body() body: unknown) {
-    return this.sessions.refresh(parseInput(RefreshWidgetSessionRequest, body).refreshToken);
+  refresh(@Body() body: unknown, @Req() request: FastifyRequest) {
+    return this.sessions.refresh(
+      parseInput(RefreshWidgetSessionRequest, body).refreshToken,
+      undefined,
+      countryOf(request.headers),
+    );
   }
 
   @Post('identity')
   @WidgetRoute()
   @HttpCode(200)
-  identify(@CurrentWidget() claims: WidgetClaims, @Body() body: unknown) {
-    return this.sessions.identify(claims, parseInput(IdentifyRequest, body).assertion);
+  identify(
+    @CurrentWidget() claims: WidgetClaims,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+  ) {
+    return this.sessions.identify(
+      claims,
+      parseInput(IdentifyRequest, body).assertion,
+      countryOf(request.headers),
+    );
   }
 
   @Post('sessions/reset')
@@ -95,7 +110,10 @@ export class WidgetController {
         key: validIdempotencyKey(request.headers['idempotency-key']),
         body: input,
       },
-      async () => ({ status: 201, body: await this.conversations.start(claims, input) }),
+      async () => ({
+        status: 201,
+        body: await this.conversations.start(claims, input, countryOf(request.headers)),
+      }),
     );
     reply.status(result.status);
     if (result.replayed) reply.header('idempotent-replayed', 'true');

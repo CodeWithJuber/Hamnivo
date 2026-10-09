@@ -7,9 +7,9 @@ Statuses: `implemented` (code + automated tests), `implemented-live-unverified` 
 fakes/fixtures, not against the live third-party service), `inherited` (provided by Chatwoot CE and
 verified through the adapter), `partial`, `interface-only`, `in-progress`, `deferred`, `planned`.
 
-**Blueprint features (232):** planned: 73 · in-progress: 57 · implemented: 76 · implemented-live-unverified: 8 · partial: 18
+**Blueprint features (237):** planned: 78 · in-progress: 57 · implemented: 76 · implemented-live-unverified: 8 · partial: 18
 
-**Design states (168):** planned: 53 · in-progress: 19 · implemented: 84 · partial: 12
+**Design states (177):** planned: 62 · in-progress: 19 · implemented: 84 · partial: 12
 
 ## Blueprint features
 
@@ -42,6 +42,9 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | W23 | Message edits and deletion | P1 | C | partial | `apps/gateway/src/authority/redaction.ts`, `apps/gateway/src/widget/messages.service.ts`, `apps/gateway/test/customer-surface.int.test.ts`, `apps/widget/src/components/MessageActions.tsx`, `apps/widget/e2e/surface.spec.ts`, `packages/chatwoot/src/authority.ts` — Customers delete their own messages within the brand's window (0 to 60 minutes; 0 turns it off). Chatwoot keeps a marker, the journal's stored copies lose their text, and the lane gets one message.redacted whichever path reports it. After the window, or where the authority cannot, the customer is told so. Edits are not offered: Chatwoot CE has no customer edits, so there is no revision history. |
 | W24 | Extended content types | P2 | A | partial | `apps/gateway/src/authority/extended-parts.ts`, `apps/gateway/test/customer-surface.test.ts`, `apps/widget/src/components/Parts.tsx`, `packages/chatwoot/src/mapping.ts`, `packages/chatwoot/test/mapping.test.ts` — Shared places and contacts from the authority render as cards (coordinates, phone numbers and addresses validated; links only to a map, tel: and mailto:), and anything unknown falls back to its text. Audio, video, polls and per-channel capability negotiation are not done. |
 | W25 | Notification preferences | P1 | C | partial | `apps/gateway/src/widget/customer-emails.service.ts`, `apps/gateway/src/widget/notifications.service.ts`, `apps/gateway/test/customer-surface.int.test.ts`, `apps/widget/src/components/Settings.tsx`, `apps/widget/e2e/surface.spec.ts`, `packages/db/src/schema/customer-surface.ts` — Verified customers with a verified address choose transcript and reply-waiting emails, sent through the mailer. Reply emails never carry the reply's text, wait for a delay, skip replies already read and come at most every 30 minutes; transcripts hold only what the customer could see. Every email has a signed one-click unsubscribe link that asks first. Quiet hours are not done. |
+| W26 | Pre-chat form | P0 | C | planned |  |
+| W27 | Consent before chatting | P0 | C | planned |  |
+| W28 | Direct chat link | P1 | C | planned |  |
 
 ### Human agent workspace
 
@@ -65,6 +68,8 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | H16 | Skill-based routing | P1 | C | planned |  |
 | H17 | Merge/split and linked cases | P1 | C | partial | `apps/console/src/pages/inbox/ContextPanel.tsx`, `apps/gateway/src/inbox/collaboration.service.ts`, `apps/gateway/test/inbox-workspace.int.test.ts` — Conversations can be linked, with a note, and unlinked; both keep their own authors, times, notes and sources. Merging and splitting are left out on purpose: Chatwoot keeps the transcripts. |
 | H18 | Workforce forecasting | P2 | A | planned |  |
+| H19 | Tickets | P0 | C | planned |  |
+| H20 | Visitor blocking | P1 | C | planned |  |
 
 ### Administration
 
@@ -629,4 +634,28 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | HNV-28-04 | Hook/plugin test | Schema failure or recursive trigger blocked | planned |  |
 | HNV-28-05 | Workflow release | Version publish review | planned |  |
 | HNV-28-06 | Workflow operations | Run failed or rollback | planned |  |
+
+### 29 · Tickets
+
+| ID | Screen | State | Status | Evidence / note |
+|---|---|---|---|---|
+| HNV-29-01 | Inbox tickets queue | Tickets listed | planned |  |
+| HNV-29-02 | Ticket control | State or priority changed | planned |  |
+| HNV-29-03 | Make this a ticket | Chat becomes a ticket | planned |  |
+
+### 30 · Before a chat starts
+
+| ID | Screen | State | Status | Evidence / note |
+|---|---|---|---|---|
+| HNV-30-01 | Widget home | Honest availability | planned |  |
+| HNV-30-02 | Pre-chat form | Answers before the chat | planned |  |
+| HNV-30-03 | Consent | Agreement asked | planned |  |
+| HNV-30-04 | Contact form | Nobody can answer | planned |  |
+| HNV-30-05 | Direct chat link | Chat on its own page | planned |  |
+
+### 31 · Visitor blocking
+
+| ID | Screen | State | Status | Evidence / note |
+|---|---|---|---|---|
+| HNV-31-01 | Block visitor | Visitor blocked | planned |  |
 

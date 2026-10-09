@@ -202,6 +202,20 @@ export const DEFAULT_WIDGET_TEXT = {
     hi: 'हमारी टीम अभी उपलब्ध नहीं है। आपके संदेश यहाँ सुरक्षित हैं, और कोई व्यक्ति उन्हें पढ़ेगा।',
     ur: 'ہماری ٹیم ابھی موجود نہیں ہے۔ آپ کے پیغامات یہاں محفوظ ہیں، اور کوئی شخص انہیں پڑھے گا۔',
   },
+  /** What a customer agrees to before chatting (W27). `{brand}` is the brand's name. */
+  consent: {
+    en: '{brand} keeps this chat, and what you share in it, so the team can help you. You can ask for it to be deleted at any time.',
+    ar: 'تحتفظ {brand} بهذه المحادثة وبما تشاركه فيها حتى يتمكن الفريق من مساعدتك. يمكنك طلب حذفها في أي وقت.',
+    hi: '{brand} यह चैट और इसमें आपकी साझा की गई बातें रखता है, ताकि टीम आपकी मदद कर सके। आप कभी भी इसे हटाने के लिए कह सकते हैं।',
+    ur: '{brand} یہ چیٹ اور اس میں آپ کی بتائی گئی باتیں محفوظ رکھتا ہے تاکہ ٹیم آپ کی مدد کر سکے۔ آپ کسی بھی وقت اسے حذف کرنے کا کہہ سکتے ہیں۔',
+  },
+  /** After the contact form is sent (W11). */
+  offlineThanks: {
+    en: 'Thank you. Your message is with our team, and we answer messages in the order they arrive.',
+    ar: 'شكرًا لك. رسالتك لدى فريقنا، ونرد على الرسائل بحسب ترتيب وصولها.',
+    hi: 'धन्यवाद। आपका संदेश हमारी टीम के पास है, और हम संदेशों का जवाब उसी क्रम में देते हैं जिसमें वे आते हैं।',
+    ur: 'شکریہ۔ آپ کا پیغام ہماری ٹیم کے پاس ہے، اور ہم پیغامات کا جواب اسی ترتیب سے دیتے ہیں جس میں وہ آتے ہیں۔',
+  },
 } as const satisfies Record<string, Record<'en' | 'ar' | 'hi' | 'ur', string>>;
 
 /** The default main colour: ink from the brand palette. */

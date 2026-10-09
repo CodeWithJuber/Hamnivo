@@ -62,6 +62,13 @@ export function frameAncestors(
   }
 }
 
-/** Sessions store "unknown" when the page did not say where it was. */
+/** What a session from the brand's direct chat link (W28) stores as its origin. */
+export const DIRECT_ORIGIN = 'direct';
+
+/**
+ * The website a session came from, as an origin. Sessions store "unknown" when the page did not
+ * say where it was, and "direct" when the chat was opened from the brand's link: neither is a
+ * website.
+ */
 export const sessionOrigin = (stored: string): string | undefined =>
-  stored === 'unknown' ? undefined : stored;
+  stored === 'unknown' || stored === DIRECT_ORIGIN ? undefined : stored;

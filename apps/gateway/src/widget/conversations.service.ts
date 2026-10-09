@@ -2,12 +2,14 @@ import { randomUUID } from 'node:crypto';
 import type {
   CustomerConversation,
   FeedbackRequest,
+  FormAnswers,
   HandoffRequest,
   MessagePage,
   SendMessageRequest,
   StartConversationRequest,
 } from '@hamnivo/contracts';
 import {
+  appendAudit,
   type Db,
   fromPublicId,
   newId,
@@ -35,6 +37,7 @@ import { contractMessage, publicationFacts } from '../authority/views.js';
 import { EntitlementsService } from '../billing/entitlements.service.js';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
+import { teamsForBrand } from '../decisions/team-routing.service.js';
 import { AvailabilityService } from '../inbox/availability.service.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
@@ -42,8 +45,10 @@ import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { parseAppearance } from './appearance.js';
 import { WidgetAttachmentsService } from './attachments.service.js';
+import { assertConsent } from './consent.js';
 import { AuthorityContactsService } from './contacts.service.js';
 import { handoffOutcome } from './copy.js';
+import { type AcceptedAnswers, acceptAnswers, answersNote } from './forms.js';
 import { isStudioOrigin } from './origins.js';
 import {
   advanceCustomerRead,
@@ -51,8 +56,9 @@ import {
   staffSeenAt,
   unreadCounts,
 } from './read-state.js';
+import { brandSurface } from './settings.service.js';
 import { sha256, type WidgetClaims } from './tokens.service.js';
-import { customerConversation, lastPreview, principalConversations } from './views.js';
+import { customerConversation, lastPreview, principalConversations, ticketFacts } from './views.js';
 
 /**
  * The customer side of a conversation (W05–W07, W12): start, send (exactly once through the
@@ -118,10 +124,12 @@ export class WidgetConversationsService {
     return this.tx(claims, async (tx) => {
       const control = await this.own(tx, claims, this.conversationId(publicId));
       const unread = await unreadCounts(tx, [control.id]);
+      const tickets = await ticketFacts(tx, [control.id]);
       return customerConversation(
         control,
         await lastPreview(tx, control.id),
         unread.get(control.id) ?? 0,
+        tickets.get(control.id),
       );
     });
   }
@@ -129,7 +137,49 @@ export class WidgetConversationsService {
   async start(
     claims: WidgetClaims,
     input: z.output<typeof StartConversationRequest>,
+    /** The request's country (CF-IPCountry), only to decide whether consent is asked (W27). */
+    country: string | null = null,
   ): Promise<CustomerConversation> {
+    const opened = await this.open(claims, {
+      country,
+      form: 'prechat',
+      answers: input.prechat ?? {},
+      aiFirst: true,
+    });
+    const publicId = toPublicId('conversation', opened.conversationId);
+    // Without a typed message, the pre-chat form's question is what the customer asked (W26).
+    const firstMessage = input.firstMessage ?? opened.accepted?.question ?? undefined;
+    if (firstMessage) {
+      await this.send(claims, publicId, {
+        clientMessageId: input.clientMessageId ?? randomUUID(),
+        parts: [{ type: 'text', text: firstMessage, format: 'plain' }],
+        ...(input.context ? { context: input.context } : {}),
+      });
+    }
+    return this.get(claims, publicId);
+  }
+
+  /**
+   * Opens a conversation for the customer: consent first where the brand asks for it (W27), the
+   * form's answers checked (W26 before a chat, W11 for the contact form), then the conversation in
+   * the authority and Hamnivo's record of it. A department answer sets the team, and staff get a
+   * private note with the answers. `aiFirst: false` hands the conversation to people at once.
+   */
+  async open(
+    claims: WidgetClaims,
+    options: {
+      country: string | null;
+      form: 'prechat' | 'offline';
+      answers: FormAnswers;
+      aiFirst: boolean;
+      /** Runs in the transaction that records the conversation (the contact form's ticket). */
+      onRecorded?: (
+        tx: TenantTx,
+        conversationId: string,
+        accepted: AcceptedAnswers | null,
+      ) => Promise<void>;
+    },
+  ): Promise<{ conversationId: string; accepted: AcceptedAnswers | null }> {
     // The plan's conversations for the period (A08): checked before anything is opened.
     await this.entitlements.assertCanStartConversation(claims.tenantId);
     const setup = await this.tx(claims, async (tx) => {
@@ -143,11 +193,40 @@ export class WidgetConversationsService {
             eq(schema.authorityInboxes.status, 'active'),
           ),
         );
-      const [principal] = await tx
+      let [principal] = await tx
         .select()
         .from(schema.customerPrincipals)
         .where(eq(schema.customerPrincipals.id, claims.principalId));
-      return { inbox, principal };
+      const surface = await brandSurface(tx, claims.brandId);
+      await assertConsent(tx, surface, claims.principalId, options.country);
+      const form = options.form === 'prechat' ? surface.forms.prechat : surface.forms.offline;
+      const asked =
+        options.form === 'offline' ||
+        (form.enabled && !(surface.forms.prechat.skipVerified && principal?.kind === 'verified'));
+      const accepted = asked
+        ? acceptAnswers(
+            form.fields,
+            options.answers,
+            options.form === 'prechat' ? 'prechat' : 'answers',
+          )
+        : null;
+      // A name typed by an anonymous visitor names them for staff; a signed-in customer keeps
+      // the name their website gave.
+      if (
+        principal &&
+        accepted?.name &&
+        (principal.kind === 'anonymous' || !principal.displayName)
+      ) {
+        [principal] = await tx
+          .update(schema.customerPrincipals)
+          .set({ displayName: accepted.name })
+          .where(eq(schema.customerPrincipals.id, principal.id))
+          .returning();
+      }
+      const teamId = accepted?.teamId
+        ? await this.chosenTeam(tx, claims.brandId, accepted.teamId)
+        : null;
+      return { inbox, principal, accepted, teamId };
     });
     if (!setup.inbox || !setup.principal) {
       throw new AppError('AUTHORITY_UNAVAILABLE', {
@@ -155,10 +234,11 @@ export class WidgetConversationsService {
         retryable: false,
       });
     }
-    const inbox = setup.inbox;
+    const { inbox, accepted } = setup;
     const runtime = await this.registry.get(claims.tenantId, inbox.connectionId);
     const conversationId = newId();
     let conversationRef: string;
+    let contactRef: string | null = null;
     let aiOwned = Boolean(runtime.primaryBot);
     let status: 'open' | 'pending' | 'resolved' | 'snoozed' = aiOwned ? 'pending' : 'open';
     let version: number | null = null;
@@ -174,10 +254,23 @@ export class WidgetConversationsService {
         aiOwned = state.owner.kind === 'bot';
         status = state.status;
         version = state.version;
+        contactRef = state.contactRef;
       }
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw authorityUnavailable(error, 'The chat could not be started. Please try again.');
+    }
+    // The answers go on the contact too, for staff working in Chatwoot; a failure here loses
+    // nothing, since the note below carries the same answers.
+    if (accepted && contactRef && (accepted.name || Object.keys(accepted.attributes).length > 0)) {
+      await runtime.authority
+        .updateContact(contactRef, {
+          ...(accepted.name ? { name: accepted.name } : {}),
+          attributes: accepted.attributes,
+        })
+        .catch((error: unknown) =>
+          this.logger.warn(`form answers not added to the contact: ${String(error)}`),
+        );
     }
     const handedOver = await this.tx(claims, async (tx) => {
       await tx.insert(schema.conversationControls).values({
@@ -215,34 +308,107 @@ export class WidgetConversationsService {
         intervalSeconds: RECONCILE_MIN_SECONDS,
         nextPollAt: new Date(this.clock().getTime() + RECONCILE_MIN_SECONDS * 1000),
       });
+      if (setup.teamId) await this.chooseTeam(tx, claims, conversationId, setup.teamId);
+      const note = accepted
+        ? answersNote(
+            options.form === 'prechat'
+              ? 'Before the chat, the customer answered:'
+              : 'The customer left a message with the contact form while nobody could answer:',
+            accepted,
+          )
+        : null;
+      if (note) {
+        await enqueueOutbox(tx, claims.tenantId, {
+          topic: 'conversation.note',
+          aggregateType: 'conversation',
+          aggregateId: conversationId,
+          payload: {
+            conversationId,
+            key: `hv1:n:${uuidV5(conversationId, `form:${options.form}`)}`,
+            text: note,
+          },
+        });
+      }
+      await options.onRecorded?.(tx, conversationId, accepted);
       if (!aiOwned) return [];
       // Without a published answering agent (or with the AI stopped), people answer from the start.
       const decision = await this.agents.answering(tx, claims.brandId);
-      if (decision.answering) return [];
+      if (decision.answering && options.aiFirst) return [];
       const result = await this.ownership.transition(
         tx,
         claims.tenantId,
         conversationId,
         { kind: 'queue' },
-        {
-          origin: 'hamnivo',
-          reason: decision.reason,
-          actor: { type: 'system', id: 'ai' },
-          handoffNote: HANDOFF_NOTES[decision.reason],
-        },
+        decision.answering
+          ? {
+              origin: 'hamnivo',
+              reason: 'customer_request',
+              actor: { type: 'customer', id: toPublicId('customer', claims.principalId) },
+              handoffNote:
+                'The customer left a message with the contact form while nobody could answer. Reply here; they get an email once they confirm their address.',
+            }
+          : {
+              origin: 'hamnivo',
+              reason: decision.reason,
+              actor: { type: 'system', id: 'ai' },
+              handoffNote: HANDOFF_NOTES[decision.reason],
+            },
       );
       return result.journal;
     });
     await this.journal.notify(claims.tenantId, conversationId, handedOver);
-    const publicId = toPublicId('conversation', conversationId);
-    if (input.firstMessage) {
-      await this.send(claims, publicId, {
-        clientMessageId: input.clientMessageId ?? randomUUID(),
-        parts: [{ type: 'text', text: input.firstMessage, format: 'plain' }],
-        ...(input.context ? { context: input.context } : {}),
-      });
+    return { conversationId, accepted };
+  }
+
+  /** The team a department answer leads to, while it can still take the brand's chats. */
+  private async chosenTeam(tx: TenantTx, brandId: string, teamPublicId: string) {
+    let teamId: string;
+    try {
+      teamId = fromPublicId('team', teamPublicId);
+    } catch {
+      return null;
     }
-    return this.get(claims, publicId);
+    const [brand] = await tx.select().from(schema.brands).where(eq(schema.brands.id, brandId));
+    if (!brand) return null;
+    const teams = await teamsForBrand(tx, brand);
+    return teams.some((row) => row.team.id === teamId) ? teamId : null;
+  }
+
+  /**
+   * The customer chose a department (W26): the conversation goes to that team through the inbox's
+   * own path, and routing leaves a team it did not choose alone.
+   */
+  private async chooseTeam(
+    tx: TenantTx,
+    claims: WidgetClaims,
+    conversationId: string,
+    teamId: string,
+  ): Promise<void> {
+    await tx
+      .insert(schema.conversationInboxState)
+      .values({ tenantId: claims.tenantId, conversationId, teamId })
+      .onConflictDoUpdate({
+        target: [
+          schema.conversationInboxState.tenantId,
+          schema.conversationInboxState.conversationId,
+        ],
+        set: { teamId, updatedAt: this.clock() },
+      });
+    await enqueueOutbox(tx, claims.tenantId, {
+      topic: 'conversation.team_changed',
+      aggregateType: 'conversation',
+      aggregateId: conversationId,
+      payload: { conversationId, teamId, actorStaffMemberId: null },
+    });
+    await appendAudit(tx, {
+      actorType: 'customer',
+      actorId: toPublicId('customer', claims.principalId),
+      action: 'conversation.routed',
+      targetType: 'conversation',
+      targetId: toPublicId('conversation', conversationId),
+      outcome: 'success',
+      data: { from: null, team: toPublicId('team', teamId), source: 'customer_choice' },
+    });
   }
 
   async send(

@@ -1,4 +1,4 @@
-import type { Message, MessagePart } from '@hamnivo/contracts';
+import { type Message, type MessagePart, ticketReference } from '@hamnivo/contracts';
 import {
   type ClaimedOutboxEvent,
   type Db,
@@ -8,7 +8,7 @@ import {
   withTenant,
 } from '@hamnivo/db';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, desc, eq, gt, ne } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, ne } from 'drizzle-orm';
 import { AuthorityRegistry } from '../authority/registry.js';
 import { authorityMessageUuid } from '../authority/uuid.js';
 import { contractMessage, publicationFacts } from '../authority/views.js';
@@ -20,6 +20,8 @@ import { type EmailKind, UnsubscribeTokens } from './notifications.service.js';
 import { NOTIFY_COPY, type NotifyCopy, notifyLocale } from './notifications-copy.js';
 import { originAllowed } from './origins.js';
 import { brandSurface } from './settings.service.js';
+import { TICKET_COPY } from './ticket-copy.js';
+import { chatLink } from './ticket-emails.service.js';
 
 /** A conversation emails its customer about waiting replies at most once in this time. */
 const REPLY_EMAIL_GAP_MS = 30 * 60_000;
@@ -261,6 +263,8 @@ export class CustomerEmailsService {
     };
     const tenantId = event.tenantId;
     const dedupeKey = `reply:${conversationId}:${authorityId}`;
+    // A ticket whose address the customer confirmed gets the answer itself by email (H19).
+    if (await this.ticketReply(tenantId, conversationId, authorityId, dedupeKey)) return;
     const now = this.clock();
     const context = await withTenant(
       this.db,
@@ -364,5 +368,153 @@ export class CustomerEmailsService {
       status: 'sent',
     });
     this.logger.log(`reply-waiting email sent for conversation ${conversationId}`);
+  }
+
+  /**
+   * The answer to a ticket from the contact form, by email (W11, H19). Only to an address the
+   * customer confirmed, only replies they have not read in the chat, at most one email per
+   * conversation in a while, and never after they stopped these emails. Returns false when the
+   * conversation is not such a ticket, so the usual "a reply is waiting" email applies.
+   */
+  private async ticketReply(
+    tenantId: string,
+    conversationId: string,
+    authorityId: number,
+    dedupeKey: string,
+  ): Promise<boolean> {
+    const now = this.clock();
+    const context = await withTenant(
+      this.db,
+      { tenantId, actorId: 'notifications' },
+      async (tx) => {
+        const [followup] = await tx
+          .select()
+          .from(schema.ticketFollowups)
+          .where(
+            and(
+              eq(schema.ticketFollowups.conversationId, conversationId),
+              isNotNull(schema.ticketFollowups.confirmedAt),
+            ),
+          );
+        if (!followup) return null;
+        const skip = (reason: string) => ({ followup, reason, mail: null });
+        const [done] = await tx
+          .select({ id: schema.customerNotifications.id })
+          .from(schema.customerNotifications)
+          .where(eq(schema.customerNotifications.dedupeKey, dedupeKey));
+        if (done) return skip('already_handled');
+        const [prefs] = await tx
+          .select({ unsubscribedAt: schema.customerNotificationPreferences.unsubscribedAt })
+          .from(schema.customerNotificationPreferences)
+          .where(eq(schema.customerNotificationPreferences.principalId, followup.principalId));
+        if (prefs?.unsubscribedAt) return skip('turned_off');
+        const j = schema.conversationJournal;
+        const [reply] = await tx
+          .select({ seq: j.seq, event: j.event })
+          .from(j)
+          .where(
+            and(
+              eq(j.conversationId, conversationId),
+              eq(j.lane, 'customer'),
+              eq(j.eventType, 'message.created'),
+              eq(j.authorityId, authorityId),
+            ),
+          );
+        if (!reply) return skip('unknown_reply');
+        const [read] = await tx
+          .select({ seq: schema.conversationReadState.customerReadSeq })
+          .from(schema.conversationReadState)
+          .where(eq(schema.conversationReadState.conversationId, conversationId));
+        if ((read?.seq ?? 0) >= reply.seq) return skip('read');
+        const n = schema.customerNotifications;
+        const [recent] = await tx
+          .select({ id: n.id })
+          .from(n)
+          .where(
+            and(
+              eq(n.conversationId, conversationId),
+              eq(n.kind, 'reply_waiting'),
+              eq(n.status, 'sent'),
+              gt(n.createdAt, new Date(now.getTime() - REPLY_EMAIL_GAP_MS)),
+            ),
+          )
+          .limit(1);
+        if (recent) return skip('recently_notified');
+        const [brand] = await tx
+          .select()
+          .from(schema.brands)
+          .where(eq(schema.brands.id, followup.brandId));
+        const [state] = await tx
+          .select({ number: schema.conversationInboxState.ticketNumber })
+          .from(schema.conversationInboxState)
+          .where(eq(schema.conversationInboxState.conversationId, conversationId));
+        const [principal] = await tx
+          .select({ locale: schema.customerPrincipals.locale })
+          .from(schema.customerPrincipals)
+          .where(eq(schema.customerPrincipals.id, followup.principalId));
+        const message = (reply.event as { data?: { message?: Message } }).data?.message;
+        if (!brand || !state?.number || !message) return skip('unknown_reply');
+        return {
+          followup,
+          reason: null,
+          mail: {
+            brand,
+            number: state.number,
+            message,
+            locale: principal?.locale ?? null,
+            link: await chatLink(tx, this.config, brand, followup.principalId),
+          },
+        };
+      },
+    );
+    if (!context) return false;
+    const { followup, reason, mail } = context;
+    if (reason === 'already_handled') return true;
+    if (reason !== null || !mail) {
+      await this.record(tenantId, {
+        principalId: followup.principalId,
+        conversationId,
+        kind: 'reply_waiting',
+        dedupeKey,
+        status: 'skipped',
+        skipReason: reason ?? 'unknown_reply',
+      });
+      return true;
+    }
+    const lang = notifyLocale(mail.locale);
+    const copy = TICKET_COPY[lang];
+    const reference = ticketReference(mail.number);
+    const when = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Date(mail.message.createdAt),
+    );
+    const unsubscribe = this.unsubscribeUrl(tenantId, followup.principalId, 'all');
+    await this.mailer.send({
+      to: followup.email,
+      subject: copy.replySubject(mail.brand.name, reference),
+      text: [
+        copy.replyIntro(mail.brand.name, reference),
+        '',
+        transcriptLine(mail.message, NOTIFY_COPY[lang], when),
+        '',
+        ...(mail.link ? [`${copy.noEmailReplies} ${mail.link}`, ''] : []),
+        '—',
+        `${copy.stop} ${unsubscribe}`,
+      ].join('\n'),
+      senderName: mail.brand.name,
+      template: 'customer.ticket_reply',
+      headers: {
+        'List-Unsubscribe': `<${unsubscribe}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
+    });
+    await this.record(tenantId, {
+      principalId: followup.principalId,
+      conversationId,
+      kind: 'reply_waiting',
+      dedupeKey,
+      status: 'sent',
+    });
+    this.logger.log(`ticket answer emailed for conversation ${conversationId}`);
+    return true;
   }
 }

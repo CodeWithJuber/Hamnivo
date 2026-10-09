@@ -55,7 +55,9 @@ import { SecretBroker } from './secrets/secret-broker.service.js';
 import { AuthorityContactsService } from './widget/contacts.service.js';
 import { CustomerEmailsService } from './widget/customer-emails.service.js';
 import { REPLY_WAITING_TOPIC, TRANSCRIPT_TOPIC } from './widget/notify-queue.js';
+import { TICKET_CONFIRM_TOPIC } from './widget/offline-messages.service.js';
 import { WIDGET_SURFACE_WORKER_PROVIDERS } from './widget/surface.module.js';
+import { TicketEmailsService } from './widget/ticket-emails.service.js';
 import { MaintenanceService } from './worker/maintenance.service.js';
 
 /** Outbox topics with a consumer that needs no other service. */
@@ -144,6 +146,7 @@ export class WorkerModule {
             CommerceCardsService,
             WebhookFanout,
             CustomerEmailsService,
+            TicketEmailsService,
             ActionExecutor,
             ActionsWorker,
             ChatwootProvisioning,
@@ -162,6 +165,7 @@ export class WorkerModule {
             cards: CommerceCardsService,
             webhooks: WebhookFanout,
             emails: CustomerEmailsService,
+            ticketEmails: TicketEmailsService,
             executor: ActionExecutor,
             actions: ActionsWorker,
             provisioning: ChatwootProvisioning,
@@ -197,6 +201,7 @@ export class WorkerModule {
               [WEBHOOK_SOURCE_TOPIC, (event) => webhooks.onSource(event)],
               [TRANSCRIPT_TOPIC, (event) => emails.onTranscript(event)],
               [REPLY_WAITING_TOPIC, (event) => emails.onReplyWaiting(event)],
+              [TICKET_CONFIRM_TOPIC, (event) => ticketEmails.onConfirm(event)],
               [ACTION_EXECUTE_TOPIC, (event) => executor.onExecute(event)],
               [ACTION_RECONCILE_TOPIC, (event) => actions.onReconcile(event)],
               ...saasOutboxHandlers(provisioning, notices),

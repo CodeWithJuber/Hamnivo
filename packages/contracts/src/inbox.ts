@@ -7,6 +7,7 @@ import { AvailabilityStatus, CustomerTypingSignal, InboxAlertEvent } from './inb
 import { Sender } from './participants.js';
 import { SourcePart } from './parts.js';
 import { OwnerMode } from './staff-conversations.js';
+import { TicketPriority, TicketSource, TicketState } from './tickets.js';
 
 /**
  * The staff inbox (H01–H17). Conversations, messages, notes, assignment, tags and saved replies
@@ -14,8 +15,8 @@ import { OwnerMode } from './staff-conversations.js';
  * filtered by the member's grants. Nothing here is visible to customers.
  */
 
-/** Which conversations a queue shows. */
-export const InboxQueue = z.enum(['mine', 'unassigned', 'ai', 'team', 'all']);
+/** Which conversations a queue shows. `tickets`: conversations that are tickets (H19). */
+export const InboxQueue = z.enum(['mine', 'unassigned', 'ai', 'team', 'tickets', 'all']);
 export type InboxQueue = z.infer<typeof InboxQueue>;
 
 /** `active` is everything open or pending (neither snoozed nor resolved). */
@@ -76,6 +77,19 @@ export type InboxCustomer = z.infer<typeof InboxCustomer>;
 
 export const InboxTeamRef = z.object({ id: typeId('team'), name: z.string() });
 
+/** A conversation's ticket (H19): its number, where it stands and how it started. */
+export const InboxTicket = z
+  .object({
+    number: z.int().positive(),
+    /** #1042, as people quote it. */
+    reference: z.string(),
+    state: TicketState,
+    source: TicketSource,
+    openedAt: Timestamp,
+  })
+  .meta({ id: 'InboxTicket' });
+export type InboxTicket = z.infer<typeof InboxTicket>;
+
 /** One row of the shared inbox. */
 export const InboxConversation = z
   .object({
@@ -102,6 +116,10 @@ export const InboxConversation = z
       .nullable(),
     labels: z.array(z.string()),
     snoozedUntil: Timestamp.nullable(),
+    /** Set when the conversation is a ticket. */
+    ticket: InboxTicket.nullable(),
+    /** Chatwoot's priority, on any conversation; null when none is set. */
+    priority: TicketPriority.nullable(),
     /** When the customer last wrote while nobody has answered yet (waiting for a person). */
     waitingSince: Timestamp.nullable(),
     /**
@@ -121,6 +139,7 @@ export const InboxCounts = z
     unassigned: z.int().nonnegative(),
     ai: z.int().nonnegative(),
     team: z.int().nonnegative(),
+    tickets: z.int().nonnegative(),
     all: z.int().nonnegative(),
   })
   .meta({ id: 'InboxCounts' });
@@ -134,6 +153,9 @@ export const InboxListQuery = z.object({
   language: LanguageTag.optional(),
   label: z.string().min(1).max(255).optional(),
   teamId: typeId('team').optional(),
+  /** Tickets in this state; implies the tickets queue's conversations (any status). */
+  ticketState: TicketState.optional(),
+  priority: TicketPriority.optional(),
   cursor: Cursor.optional(),
   limit: z.coerce.number().int().min(1).max(50).default(25),
 });
@@ -274,6 +296,27 @@ export const StatusRequest = z
     expectedEpoch: z.int().nonnegative().optional(),
   })
   .meta({ id: 'StatusRequest' });
+
+// ------------------------------------------------------------------ tickets and priority (H19)
+
+/**
+ * Make a conversation a ticket. A ticket is set Pending or Closed through the status route
+ * (snoozed until the customer writes, or resolved).
+ */
+export const MakeTicketRequest = z
+  .object({
+    priority: TicketPriority.optional(),
+    expectedEpoch: z.int().nonnegative().optional(),
+  })
+  .meta({ id: 'MakeTicketRequest' });
+
+/** Set or clear the priority (Chatwoot's, shared with anyone working in Chatwoot). */
+export const PriorityRequest = z
+  .object({
+    priority: TicketPriority.nullable(),
+    expectedEpoch: z.int().nonnegative().optional(),
+  })
+  .meta({ id: 'PriorityRequest' });
 
 // ------------------------------------------------------------------ tags and fields (H04)
 

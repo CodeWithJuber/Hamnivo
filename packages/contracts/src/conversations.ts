@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ClientMessageId, Timestamp, Visibility } from './common.js';
 import { Sender } from './participants.js';
 import { AttachmentPart, MessagePart, TextPart } from './parts.js';
+import { TicketState } from './tickets.js';
 
 /** Delivery states shown to a sender (W06). "delivered"/"read" only where the channel supports them. */
 export const DeliveryState = z.enum([
@@ -53,6 +54,8 @@ export const CustomerConversation = z
     lastMessagePreview: z.string().max(200).nullable(),
     /** Latest journal sequence the server has for this conversation. */
     latestSequence: z.int().nonnegative(),
+    /** Set when the conversation is a ticket (H19): its reference and where it stands. */
+    ticket: z.object({ reference: z.string(), state: TicketState }).nullable(),
   })
   .meta({ id: 'CustomerConversation' });
 export type CustomerConversation = z.infer<typeof CustomerConversation>;
@@ -97,11 +100,20 @@ export const SendMessageResponse = z
   .meta({ id: 'SendMessageResponse' });
 export type SendMessageResponse = z.infer<typeof SendMessageResponse>;
 
+/** Answers to one of the brand's forms, by field id (W26, W11); a list answer is the option's id. */
+export const FormAnswers = z.record(
+  z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
+  z.string().trim().max(2000),
+);
+export type FormAnswers = z.infer<typeof FormAnswers>;
+
 export const StartConversationRequest = z
   .object({
     clientMessageId: ClientMessageId.optional(),
     firstMessage: z.string().min(1).max(10_000).optional(),
     context: PageContext.optional(),
+    /** Answers to the brand's pre-chat form (W26), checked against it when the chat starts. */
+    prechat: FormAnswers.optional(),
   })
   .meta({ id: 'StartConversationRequest' });
 

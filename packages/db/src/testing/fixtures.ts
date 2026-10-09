@@ -600,6 +600,20 @@ async function seedVisitors(
     url: 'https://shop.example/pricing',
     title: 'Pricing',
   });
+  // Consent before chatting, a ticket's address and the tenant's ticket counter (W27, H19).
+  await tx
+    .insert(s.chatConsents)
+    .values({ tenantId, brandId: ref.brandId, principalId: ref.principalId, noticeVersion: 1 });
+  await tx.insert(s.ticketFollowups).values({
+    tenantId,
+    brandId: ref.brandId,
+    conversationId: ref.conversationId,
+    principalId: ref.principalId,
+    email: 'aisha@example.com',
+    confirmTokenHash: bytes(),
+    confirmationSentAt: new Date(),
+  });
+  await tx.insert(s.tenantCounters).values({ tenantId, name: 'ticket', value: 1 });
 }
 
 /**
@@ -1193,6 +1207,10 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       conversationId: ids.conversationId,
       teamId,
       labels: ['delivery'],
+      priority: 'high',
+      ticketNumber: 1,
+      ticketSource: 'offline_form',
+      ticketOpenedAt: new Date(),
     });
     const otherConversationId = newId();
     await tx.insert(s.conversationControls).values({

@@ -1,5 +1,5 @@
 import { schema, type TenantTx } from '@hamnivo/db';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { enqueueOutbox } from '../outbox/outbox.js';
 
 type ControlRow = typeof schema.conversationControls.$inferSelect;
@@ -39,9 +39,25 @@ export async function queueTranscript(
   });
 }
 
+/** A ticket from the contact form whose address the customer confirmed (W11, H19). */
+async function confirmedTicket(tx: TenantTx, conversationId: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: schema.ticketFollowups.id })
+    .from(schema.ticketFollowups)
+    .where(
+      and(
+        eq(schema.ticketFollowups.conversationId, conversationId),
+        isNotNull(schema.ticketFollowups.confirmedAt),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
 /**
- * Queues a "a reply is waiting" check for a reply from staff or the assistant, due after a delay.
- * If the customer read it in the meantime, nothing is sent.
+ * Queues a "a reply is waiting" check for a reply from staff or the assistant, due after a delay:
+ * for customers who asked for these emails, and for tickets whose address was confirmed (their
+ * email carries the answer). If the customer read it in the meantime, nothing is sent.
  */
 export async function queueReplyWaiting(
   tx: TenantTx,
@@ -50,7 +66,11 @@ export async function queueReplyWaiting(
   authorityId: number,
   dueAt: Date,
 ): Promise<void> {
-  if (!control.principalId || !(await wants(tx, control.principalId, 'replyWaiting'))) return;
+  if (!control.principalId) return;
+  const queued =
+    (await wants(tx, control.principalId, 'replyWaiting')) ||
+    (await confirmedTicket(tx, control.id));
+  if (!queued) return;
   await tx.insert(schema.outboxEvents).values({
     tenantId,
     topic: REPLY_WAITING_TOPIC,

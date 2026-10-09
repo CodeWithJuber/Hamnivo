@@ -12,7 +12,9 @@ import type {
   AuthorityMessage,
   AuthorityOwner,
   AuthoritySavedReply,
+  ContactUpdate,
   ConversationAuthority,
+  ConversationPriority,
   ConversationStatus,
   EnsureContactInput,
   EnsuredContact,
@@ -153,6 +155,24 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
       }) as never,
     );
     return { contactRef: String(contact.id), sourceId: String(contact.source_id) };
+  }
+
+  async updateContact(contactRef: string, update: ContactUpdate): Promise<void> {
+    const changes: Json = {};
+    if (update.name !== undefined) changes.name = update.name ?? '';
+    if (update.attributes && Object.keys(update.attributes).length > 0) {
+      // Merged here, so the contact's other attributes stay whatever Chatwoot does with the rest.
+      const current = await this.getContact(contactRef, { kind: 'integration' });
+      changes.custom_attributes = { ...current.attributes, ...update.attributes };
+    }
+    if (Object.keys(changes).length === 0) return;
+    await call(
+      'updateContact',
+      this.integration.PUT('/api/v1/accounts/{account_id}/contacts/{id}', {
+        params: { path: { account_id: this.options.accountId, id: Number(contactRef) } },
+        body: changes as never,
+      }) as never,
+    );
   }
 
   async openConversation(input: {
@@ -701,6 +721,21 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
           status: 'snoozed',
           ...(until ? { snoozed_until: Math.floor(until.getTime() / 1000) } : {}),
         } as never,
+      }) as never,
+    );
+  }
+
+  async setPriority(
+    conversationRef: string,
+    priority: ConversationPriority | null,
+    actor: ActorCredential,
+  ): Promise<void> {
+    const client = await this.as(actor);
+    await call(
+      'togglePriority',
+      client.POST('/api/v1/accounts/{account_id}/conversations/{conversation_id}/toggle_priority', {
+        params: { path: this.conversationPath(conversationRef) },
+        body: { priority } as never,
       }) as never,
     );
   }

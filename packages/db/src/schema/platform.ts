@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  check,
   index,
   integer,
   jsonb,
@@ -99,5 +100,24 @@ export const usageEntries = pgTable(
     index('usage_entries_meter_idx').on(t.tenantId, t.meter, t.occurredAt),
     tenantIsolation(),
     platformRead(),
+  ],
+);
+
+/**
+ * Numbers that count up within a tenant, such as ticket references (#1042). A number is taken
+ * with one upsert that increments the row, so two tickets never share a number.
+ */
+export const tenantCounters = pgTable(
+  'tenant_counters',
+  {
+    tenantId: tenantId(),
+    name: text('name').notNull(),
+    value: bigint('value', { mode: 'number' }).notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ name: 'tenant_counters_pkey', columns: [t.tenantId, t.name] }),
+    check('tenant_counters_value_ck', sql`${t.value} >= 0`),
+    check('tenant_counters_name_ck', sql`${t.name} ~ '^[a-z][a-z_]{0,39}$'`),
+    tenantIsolation(),
   ],
 );

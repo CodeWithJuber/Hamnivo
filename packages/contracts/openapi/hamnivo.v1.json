@@ -9845,6 +9845,7 @@
                 "unassigned",
                 "ai",
                 "team",
+                "tickets",
                 "all"
               ]
             }
@@ -9912,6 +9913,31 @@
               "type": "string",
               "description": "team identifier (TypeID with prefix \"team\")",
               "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticketState",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "pending",
+                "closed"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "priority",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "urgent",
+                "high",
+                "medium",
+                "low"
+              ]
             }
           },
           {
@@ -10560,6 +10586,140 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/StatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxConversationDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/conversations/{conversationId}/ticket": {
+      "post": {
+        "operationId": "makeTicket",
+        "summary": "Make the conversation a ticket with a reference number; Pending and Closed go through the status route (conversations.status)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MakeTicketRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxConversationDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/conversations/{conversationId}/priority": {
+      "post": {
+        "operationId": "setConversationPriority",
+        "summary": "Set or clear the priority, shared with Chatwoot (conversations.status)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriorityRequest"
               }
             }
           }
@@ -18679,6 +18839,104 @@
         }
       }
     },
+    "/v1/widget/consent": {
+      "post": {
+        "operationId": "giveConsent",
+        "summary": "Record that I agree to the brand’s current words before chatting (W27); kept with the words’ version, never with my country",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded"
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/widget/offline-messages": {
+      "post": {
+        "operationId": "sendOfflineMessage",
+        "summary": "Leave a message while nobody can answer (W11): it becomes a ticket, and one email asks me to confirm my address",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "description": "Retry-safe key bound to the request body hash; reuse with a different body returns 409",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfflineMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ticket created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfflineMessageResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/notifications/unsubscribe": {
       "get": {
         "operationId": "unsubscribePage",
@@ -18748,6 +19006,96 @@
         "responses": {
           "200": {
             "description": "An HTML page confirming the change",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/confirm-email": {
+      "get": {
+        "operationId": "confirmEmailPage",
+        "summary": "The page a ticket’s confirmation link opens; it asks before confirming, so link scanners change nothing",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 1024,
+              "description": "Signed confirmation token from the email"
+            },
+            "required": true,
+            "description": "Signed confirmation token from the email"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An HTML page with a confirmation button",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "confirmEmail",
+        "summary": "Confirm the address a ticket’s answers may be emailed to",
+        "tags": [
+          "Notifications"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "schema": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 1024,
+              "description": "Signed confirmation token from the email"
+            },
+            "required": true,
+            "description": "Signed confirmation token from the email"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An HTML page saying what happens next",
             "content": {
               "text/html": {
                 "schema": {
@@ -18996,6 +19344,372 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProactiveSettingsView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/widget-forms": {
+      "get": {
+        "operationId": "getWidgetForms",
+        "summary": "The pre-chat form and the contact form for when nobody can answer (widget.configure)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Forms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetFormsView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateWidgetForms",
+        "summary": "Replace both forms; the widget picks them up at once (widget.configure)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWidgetFormsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Forms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetFormsView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/consent": {
+      "get": {
+        "operationId": "getConsentSettings",
+        "summary": "Who must agree before chatting, and to which words (widget.configure)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consent settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentSettingsView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateConsentSettings",
+        "summary": "Replace the consent settings; new words get a new version, so customers agree again (widget.configure)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConsentSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consent settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentSettingsView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/direct-link": {
+      "get": {
+        "operationId": "getDirectLink",
+        "summary": "The page that opens the chat on its own, and whether it is on (widget.configure)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Direct link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectLinkView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateDirectLink",
+        "summary": "Turn the direct chat link on or off; turning it off ends the chats opened from it (widget.configure)",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDirectLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Direct link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectLinkView"
                 }
               }
             }
@@ -24345,6 +25059,9 @@
           },
           "test": {
             "type": "boolean"
+          },
+          "direct": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -24392,6 +25109,17 @@
           },
           "context": {
             "$ref": "#/components/schemas/PageContext"
+          },
+          "prechat": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 2000
+            }
           }
         }
       },
@@ -26959,6 +27687,54 @@
           "status"
         ]
       },
+      "MakeTicketRequest": {
+        "type": "object",
+        "properties": {
+          "priority": {
+            "type": "string",
+            "enum": [
+              "urgent",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "expectedEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "PriorityRequest": {
+        "type": "object",
+        "properties": {
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "priority"
+        ]
+      },
       "SetTagsRequest": {
         "type": "object",
         "properties": {
@@ -28605,6 +29381,47 @@
           }
         }
       },
+      "ConsentRequest": {
+        "type": "object",
+        "properties": {
+          "noticeVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "noticeVersion"
+        ]
+      },
+      "OfflineMessageRequest": {
+        "type": "object",
+        "properties": {
+          "clientRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "answers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          },
+          "context": {
+            "$ref": "#/components/schemas/PageContext"
+          }
+        },
+        "required": [
+          "clientRequestId",
+          "answers"
+        ]
+      },
       "UpdateWidgetSettingsRequest": {
         "$ref": "#/components/schemas/WidgetSettings"
       },
@@ -28857,6 +29674,446 @@
             "maximum": 168
           },
           "onlyWhenAvailable": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateWidgetFormsRequest": {
+        "$ref": "#/components/schemas/WidgetForms"
+      },
+      "WidgetForms": {
+        "type": "object",
+        "properties": {
+          "prechat": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "default": false,
+                "type": "boolean"
+              },
+              "fields": {
+                "default": [
+                  {
+                    "id": "name",
+                    "kind": "name",
+                    "label": {
+                      "en": "Your name",
+                      "ar": "اسمك",
+                      "hi": "आपका नाम",
+                      "ur": "آپ کا نام"
+                    },
+                    "required": true,
+                    "options": []
+                  }
+                ],
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "name",
+                        "email",
+                        "phone",
+                        "question",
+                        "department",
+                        "text",
+                        "choice"
+                      ]
+                    },
+                    "label": {
+                      "type": "object",
+                      "properties": {
+                        "en": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "ar": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "hi": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "ur": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        }
+                      },
+                      "required": [
+                        "en"
+                      ]
+                    },
+                    "required": {
+                      "default": false,
+                      "type": "boolean"
+                    },
+                    "options": {
+                      "default": [],
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+                          },
+                          "label": {
+                            "type": "object",
+                            "properties": {
+                              "en": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "ar": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "hi": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "ur": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              }
+                            },
+                            "required": [
+                              "en"
+                            ]
+                          },
+                          "teamId": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "team identifier (TypeID with prefix \"team\")",
+                                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "label"
+                  ]
+                }
+              },
+              "skipVerified": {
+                "default": true,
+                "type": "boolean"
+              }
+            }
+          },
+          "offline": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "default": true,
+                "type": "boolean"
+              },
+              "when": {
+                "default": "either",
+                "type": "string",
+                "enum": [
+                  "closed",
+                  "nobody_online",
+                  "either"
+                ]
+              },
+              "fields": {
+                "default": [
+                  {
+                    "id": "name",
+                    "kind": "name",
+                    "label": {
+                      "en": "Your name",
+                      "ar": "اسمك",
+                      "hi": "आपका नाम",
+                      "ur": "آپ کا نام"
+                    },
+                    "required": false,
+                    "options": []
+                  },
+                  {
+                    "id": "email",
+                    "kind": "email",
+                    "label": {
+                      "en": "Your email",
+                      "ar": "بريدك الإلكتروني",
+                      "hi": "आपका ईमेल",
+                      "ur": "آپ کی ای میل"
+                    },
+                    "required": true,
+                    "options": []
+                  },
+                  {
+                    "id": "question",
+                    "kind": "question",
+                    "label": {
+                      "en": "How can we help?",
+                      "ar": "كيف يمكننا المساعدة؟",
+                      "hi": "हम कैसे मदद कर सकते हैं?",
+                      "ur": "ہم کیسے مدد کر سکتے ہیں؟"
+                    },
+                    "required": true,
+                    "options": []
+                  }
+                ],
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "name",
+                        "email",
+                        "phone",
+                        "question",
+                        "department",
+                        "text",
+                        "choice"
+                      ]
+                    },
+                    "label": {
+                      "type": "object",
+                      "properties": {
+                        "en": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "ar": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "hi": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "ur": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        }
+                      },
+                      "required": [
+                        "en"
+                      ]
+                    },
+                    "required": {
+                      "default": false,
+                      "type": "boolean"
+                    },
+                    "options": {
+                      "default": [],
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+                          },
+                          "label": {
+                            "type": "object",
+                            "properties": {
+                              "en": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "ar": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "hi": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "ur": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              }
+                            },
+                            "required": [
+                              "en"
+                            ]
+                          },
+                          "teamId": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "team identifier (TypeID with prefix \"team\")",
+                                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "label"
+                  ]
+                }
+              },
+              "thanks": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "en": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "ar": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "hi": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "ur": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      }
+                    },
+                    "required": [
+                      "en"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "aiFirst": {
+                "default": false,
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "UpdateConsentSettingsRequest": {
+        "$ref": "#/components/schemas/ConsentSettings"
+      },
+      "ConsentSettings": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "default": "off",
+            "type": "string",
+            "enum": [
+              "off",
+              "everyone",
+              "eu"
+            ]
+          },
+          "text": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "en": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "ar": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "hi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "ur": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "en"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "UpdateDirectLinkRequest": {
+        "$ref": "#/components/schemas/DirectLinkSettings"
+      },
+      "DirectLinkSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
             "default": false,
             "type": "boolean"
           }
@@ -30317,12 +31574,24 @@
               },
               "timezone": {
                 "type": "string"
+              },
+              "staffOnline": {
+                "type": "boolean"
+              },
+              "hoursSet": {
+                "type": "boolean"
+              },
+              "open": {
+                "type": "boolean"
               }
             },
             "required": [
               "humanAvailable",
               "nextOpenAt",
-              "timezone"
+              "timezone",
+              "staffOnline",
+              "hoursSet",
+              "open"
             ],
             "additionalProperties": false
           },
@@ -30537,6 +31806,308 @@
               "triggers"
             ],
             "additionalProperties": false
+          },
+          "forms": {
+            "type": "object",
+            "properties": {
+              "prechat": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "skipVerified": {
+                    "type": "boolean"
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "name",
+                            "email",
+                            "phone",
+                            "question",
+                            "department",
+                            "text",
+                            "choice"
+                          ]
+                        },
+                        "label": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string",
+                            "enum": [
+                              "en",
+                              "ar",
+                              "hi",
+                              "ur"
+                            ]
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "required": [
+                            "en",
+                            "ar",
+                            "hi",
+                            "ur"
+                          ]
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string",
+                                  "enum": [
+                                    "en",
+                                    "ar",
+                                    "hi",
+                                    "ur"
+                                  ]
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "required": [
+                                  "en",
+                                  "ar",
+                                  "hi",
+                                  "ur"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "label",
+                        "required",
+                        "options"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "skipVerified",
+                  "fields"
+                ],
+                "additionalProperties": false
+              },
+              "offline": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "when": {
+                    "type": "string",
+                    "enum": [
+                      "closed",
+                      "nobody_online",
+                      "either"
+                    ]
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "name",
+                            "email",
+                            "phone",
+                            "question",
+                            "department",
+                            "text",
+                            "choice"
+                          ]
+                        },
+                        "label": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string",
+                            "enum": [
+                              "en",
+                              "ar",
+                              "hi",
+                              "ur"
+                            ]
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "required": [
+                            "en",
+                            "ar",
+                            "hi",
+                            "ur"
+                          ]
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string",
+                                  "enum": [
+                                    "en",
+                                    "ar",
+                                    "hi",
+                                    "ur"
+                                  ]
+                                },
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "required": [
+                                  "en",
+                                  "ar",
+                                  "hi",
+                                  "ur"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "label",
+                        "required",
+                        "options"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "thanks": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "enum": [
+                        "en",
+                        "ar",
+                        "hi",
+                        "ur"
+                      ]
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "required": [
+                      "en",
+                      "ar",
+                      "hi",
+                      "ur"
+                    ]
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "when",
+                  "fields",
+                  "thanks"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "prechat",
+              "offline"
+            ],
+            "additionalProperties": false
+          },
+          "consent": {
+            "type": "object",
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "given": {
+                "type": "boolean"
+              },
+              "noticeVersion": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "text": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "en",
+                    "ar",
+                    "hi",
+                    "ur"
+                  ]
+                },
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "required": [
+                  "en",
+                  "ar",
+                  "hi",
+                  "ur"
+                ]
+              }
+            },
+            "required": [
+              "required",
+              "given",
+              "noticeVersion",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          "direct": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -30553,7 +32124,10 @@
           "help",
           "messageDeletion",
           "notifications",
-          "proactive"
+          "proactive",
+          "forms",
+          "consent",
+          "direct"
         ],
         "additionalProperties": false
       },
@@ -30612,6 +32186,34 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "ticket": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "reference": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "pending",
+                      "closed"
+                    ]
+                  }
+                },
+                "required": [
+                  "reference",
+                  "state"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -30622,7 +32224,8 @@
           "updatedAt",
           "unreadCount",
           "lastMessagePreview",
-          "latestSequence"
+          "latestSequence",
+          "ticket"
         ],
         "additionalProperties": false
       },
@@ -30664,6 +32267,7 @@
               "QUOTA_EXCEEDED",
               "PLAN_LIMIT_REACHED",
               "IDENTITY_REQUIRED",
+              "CONSENT_REQUIRED",
               "ASSERTION_INVALID",
               "ACTION_REQUIRES_APPROVAL",
               "APPROVAL_EXPIRED",
@@ -41617,6 +43221,32 @@
               }
             ]
           },
+          "ticket": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxTicket"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "waitingSince": {
             "anyOf": [
               {
@@ -41665,6 +43295,8 @@
           "lastMessage",
           "labels",
           "snoozedUntil",
+          "ticket",
+          "priority",
           "waitingSince",
           "unreadCount",
           "lastActivityAt",
@@ -41782,6 +43414,49 @@
         ],
         "additionalProperties": false
       },
+      "InboxTicket": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reference": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "closed"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "offline_form",
+              "staff",
+              "automation"
+            ]
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "number",
+          "reference",
+          "state",
+          "source",
+          "openedAt"
+        ],
+        "additionalProperties": false
+      },
       "InboxCounts": {
         "type": "object",
         "properties": {
@@ -41805,6 +43480,11 @@
             "minimum": 0,
             "maximum": 9007199254740991
           },
+          "tickets": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
           "all": {
             "type": "integer",
             "minimum": 0,
@@ -41816,6 +43496,7 @@
           "unassigned",
           "ai",
           "team",
+          "tickets",
           "all"
         ],
         "additionalProperties": false
@@ -42279,6 +43960,32 @@
               }
             ]
           },
+          "ticket": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxTicket"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "waitingSince": {
             "anyOf": [
               {
@@ -42342,6 +44049,8 @@
           "lastMessage",
           "labels",
           "snoozedUntil",
+          "ticket",
+          "priority",
           "waitingSince",
           "unreadCount",
           "lastActivityAt",
@@ -43073,6 +44782,7 @@
                   "QUOTA_EXCEEDED",
                   "PLAN_LIMIT_REACHED",
                   "IDENTITY_REQUIRED",
+                  "CONSENT_REQUIRED",
                   "ASSERTION_INVALID",
                   "ACTION_REQUIRES_APPROVAL",
                   "APPROVAL_EXPIRED",
@@ -43391,6 +45101,7 @@
                         "QUOTA_EXCEEDED",
                         "PLAN_LIMIT_REACHED",
                         "IDENTITY_REQUIRED",
+                        "CONSENT_REQUIRED",
                         "ASSERTION_INVALID",
                         "ACTION_REQUIRES_APPROVAL",
                         "APPROVAL_EXPIRED",
@@ -52393,6 +54104,30 @@
         ],
         "additionalProperties": false
       },
+      "OfflineMessageResponse": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/CustomerConversation"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "confirmationSent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "conversation",
+          "reference",
+          "email",
+          "confirmationSent"
+        ],
+        "additionalProperties": false
+      },
       "WidgetSettingsView": {
         "type": "object",
         "properties": {
@@ -52441,6 +54176,132 @@
         "required": [
           "brandId",
           "settings",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "WidgetFormsView": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string"
+          },
+          "forms": {
+            "$ref": "#/components/schemas/WidgetFormsOutput"
+          },
+          "configVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "brandId",
+          "forms",
+          "configVersion",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ConsentSettingsView": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/ConsentSettingsOutput"
+          },
+          "noticeVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "configVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "brandId",
+          "consent",
+          "noticeVersion",
+          "configVersion",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "DirectLinkView": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "configVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "brandId",
+          "enabled",
+          "url",
+          "configVersion",
           "updatedAt"
         ],
         "additionalProperties": false
@@ -57169,6 +59030,466 @@
           "seconds",
           "visits",
           "message"
+        ],
+        "additionalProperties": false
+      },
+      "WidgetFormsOutput": {
+        "type": "object",
+        "properties": {
+          "prechat": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "default": false,
+                "type": "boolean"
+              },
+              "fields": {
+                "default": [
+                  {
+                    "id": "name",
+                    "kind": "name",
+                    "label": {
+                      "en": "Your name",
+                      "ar": "اسمك",
+                      "hi": "आपका नाम",
+                      "ur": "آپ کا نام"
+                    },
+                    "required": true,
+                    "options": []
+                  }
+                ],
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "name",
+                        "email",
+                        "phone",
+                        "question",
+                        "department",
+                        "text",
+                        "choice"
+                      ]
+                    },
+                    "label": {
+                      "type": "object",
+                      "properties": {
+                        "en": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "ar": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "hi": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "ur": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        }
+                      },
+                      "required": [
+                        "en"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "required": {
+                      "default": false,
+                      "type": "boolean"
+                    },
+                    "options": {
+                      "default": [],
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+                          },
+                          "label": {
+                            "type": "object",
+                            "properties": {
+                              "en": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "ar": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "hi": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "ur": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              }
+                            },
+                            "required": [
+                              "en"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "teamId": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "team identifier (TypeID with prefix \"team\")",
+                                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "teamId"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "label",
+                    "required",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "skipVerified": {
+                "default": true,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "enabled",
+              "fields",
+              "skipVerified"
+            ],
+            "additionalProperties": false
+          },
+          "offline": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "default": true,
+                "type": "boolean"
+              },
+              "when": {
+                "default": "either",
+                "type": "string",
+                "enum": [
+                  "closed",
+                  "nobody_online",
+                  "either"
+                ]
+              },
+              "fields": {
+                "default": [
+                  {
+                    "id": "name",
+                    "kind": "name",
+                    "label": {
+                      "en": "Your name",
+                      "ar": "اسمك",
+                      "hi": "आपका नाम",
+                      "ur": "آپ کا نام"
+                    },
+                    "required": false,
+                    "options": []
+                  },
+                  {
+                    "id": "email",
+                    "kind": "email",
+                    "label": {
+                      "en": "Your email",
+                      "ar": "بريدك الإلكتروني",
+                      "hi": "आपका ईमेल",
+                      "ur": "آپ کی ای میل"
+                    },
+                    "required": true,
+                    "options": []
+                  },
+                  {
+                    "id": "question",
+                    "kind": "question",
+                    "label": {
+                      "en": "How can we help?",
+                      "ar": "كيف يمكننا المساعدة؟",
+                      "hi": "हम कैसे मदद कर सकते हैं?",
+                      "ur": "ہم کیسے مدد کر سکتے ہیں؟"
+                    },
+                    "required": true,
+                    "options": []
+                  }
+                ],
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "name",
+                        "email",
+                        "phone",
+                        "question",
+                        "department",
+                        "text",
+                        "choice"
+                      ]
+                    },
+                    "label": {
+                      "type": "object",
+                      "properties": {
+                        "en": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "ar": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "hi": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "ur": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        }
+                      },
+                      "required": [
+                        "en"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "required": {
+                      "default": false,
+                      "type": "boolean"
+                    },
+                    "options": {
+                      "default": [],
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+                          },
+                          "label": {
+                            "type": "object",
+                            "properties": {
+                              "en": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "ar": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "hi": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              },
+                              "ur": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              }
+                            },
+                            "required": [
+                              "en"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "teamId": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "team identifier (TypeID with prefix \"team\")",
+                                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "teamId"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "label",
+                    "required",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "thanks": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "en": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "ar": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "hi": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "ur": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      }
+                    },
+                    "required": [
+                      "en"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "aiFirst": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "enabled",
+              "when",
+              "fields",
+              "thanks",
+              "aiFirst"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "prechat",
+          "offline"
+        ],
+        "additionalProperties": false
+      },
+      "ConsentSettingsOutput": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "default": "off",
+            "type": "string",
+            "enum": [
+              "off",
+              "everyone",
+              "eu"
+            ]
+          },
+          "text": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "en": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "ar": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "hi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "ur": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "en"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "mode",
+          "text"
         ],
         "additionalProperties": false
       },

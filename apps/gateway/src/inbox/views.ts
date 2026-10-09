@@ -1,8 +1,9 @@
 import type { InboxConversation, OwnerReason } from '@hamnivo/contracts';
-import { OwnerReason as OwnerReasons } from '@hamnivo/contracts';
+import { OwnerReason as OwnerReasons, ticketReference } from '@hamnivo/contracts';
 import { schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { customerView } from '../authority/views.js';
+import { ticketStateOf } from '../tickets/tickets.js';
 
 const c = schema.conversationControls;
 const st = schema.conversationInboxState;
@@ -18,6 +19,10 @@ export const rowColumns = {
   control: c,
   labels: st.labels,
   snoozedUntil: st.snoozedUntil,
+  priority: st.priority,
+  ticketNumber: st.ticketNumber,
+  ticketSource: st.ticketSource,
+  ticketOpenedAt: st.ticketOpenedAt,
   teamId: st.teamId,
   teamName: team.name,
   customerName: p.displayName,
@@ -197,6 +202,17 @@ export function toInboxConversation(
     labels: row.labels ?? [],
     snoozedUntil:
       control.authorityStatus === 'snoozed' ? (row.snoozedUntil?.toISOString() ?? null) : null,
+    ticket:
+      row.ticketNumber && row.ticketSource && row.ticketOpenedAt
+        ? {
+            number: row.ticketNumber,
+            reference: ticketReference(row.ticketNumber),
+            state: ticketStateOf(control.authorityStatus, row.snoozedUntil ?? null),
+            source: row.ticketSource,
+            openedAt: row.ticketOpenedAt.toISOString(),
+          }
+        : null,
+    priority: row.priority ?? null,
     waitingSince: waiting
       ? (control.ownerChangedAt ?? control.lastCustomerMessageAt ?? control.createdAt).toISOString()
       : null,

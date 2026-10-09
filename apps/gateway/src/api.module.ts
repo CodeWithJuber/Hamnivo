@@ -63,6 +63,7 @@ import { InboxMessagesService } from './inbox/messages.service.js';
 import { InboxSignals } from './inbox/signals.service.js';
 import { StatusService } from './inbox/status.service.js';
 import { TeamsService } from './inbox/teams.service.js';
+import { TicketsService } from './inbox/tickets.service.js';
 import { TypingSignals } from './inbox/typing.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { KnowledgeController } from './knowledge/knowledge.controller.js';
@@ -244,6 +245,7 @@ export class ApiModule {
         InboxMessagesService,
         AssignmentService,
         StatusService,
+        TicketsService,
         AnnotationsService,
         AssistService,
         CollaborationService,

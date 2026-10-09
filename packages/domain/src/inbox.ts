@@ -1,4 +1,4 @@
-import type { ActorCredential, AuthorityMessage } from './authority.js';
+import type { ActorCredential, AuthorityMessage, ConversationPriority } from './authority.js';
 
 /**
  * Staff inbox operations on the conversation authority (H03–H07, H10). Every call names the actor,
@@ -100,6 +100,12 @@ export interface StaffInboxAuthority {
   getContact(contactRef: string, actor: ActorCredential): Promise<AuthorityContact>;
   /** Snooze until a time; without one, until the customer writes. */
   snooze(conversationRef: string, until: Date | null, actor: ActorCredential): Promise<void>;
+  /** Sets the priority, or clears it with null (H19). */
+  setPriority(
+    conversationRef: string,
+    priority: ConversationPriority | null,
+    actor: ActorCredential,
+  ): Promise<void>;
   /** A team with this name in the account, created when missing (integration user). */
   ensureTeam(name: string): Promise<{ ref: string }>;
   addTeamMembers(teamRef: string, userRefs: string[]): Promise<void>;

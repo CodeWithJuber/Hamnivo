@@ -1,10 +1,12 @@
-import type {
-  AuthorityConversationState,
-  AuthorityMessage,
-  AuthorityMessageDirection,
-  AuthorityOwner,
-  AuthoritySender,
-  ConversationStatus,
+import {
+  type AuthorityConversationState,
+  type AuthorityMessage,
+  type AuthorityMessageDirection,
+  type AuthorityOwner,
+  type AuthoritySender,
+  CONVERSATION_PRIORITIES,
+  type ConversationPriority,
+  type ConversationStatus,
 } from '@hamnivo/domain';
 
 type Json = Record<string, unknown>;
@@ -134,7 +136,17 @@ export function toConversation(raw: unknown): AuthorityConversationState {
     snoozedUntil: timeOf(c.snoozed_until),
     // Unix seconds on the conversation (0 when nobody looked yet); ISO in list metadata.
     staffLastSeenAt: timeOf(c.agent_last_seen_at),
+    // Absent from some payloads: then nothing is known, and a stored priority is kept.
+    ...('priority' in c ? { priority: priorityOf(c.priority) } : {}),
   };
+}
+
+const PRIORITIES = new Set<string>(CONVERSATION_PRIORITIES);
+
+function priorityOf(value: unknown): ConversationPriority | null {
+  return typeof value === 'string' && PRIORITIES.has(value)
+    ? (value as ConversationPriority)
+    : null;
 }
 
 /** Chatwoot sends times as ISO strings or Unix seconds depending on the endpoint. */

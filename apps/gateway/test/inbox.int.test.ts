@@ -105,7 +105,14 @@ describe('shared inbox (H01)', () => {
     const all = await north.owner.get('/v1/inbox/conversations?queue=all');
     expect(all.status, JSON.stringify(all.body)).toBe(200);
     expect(ids(all.body)).toEqual(expect.arrayContaining([c1, c2, c3]));
-    expect(all.body.counts).toEqual({ mine: 0, unassigned: 1, ai: 2, team: 0, all: 3 });
+    expect(all.body.counts).toEqual({
+      mine: 0,
+      unassigned: 1,
+      ai: 2,
+      team: 0,
+      tickets: 0,
+      all: 3,
+    });
 
     const first = all.body.items.find((i: { id: string }) => i.id === c1);
     expect(first).toMatchObject({
