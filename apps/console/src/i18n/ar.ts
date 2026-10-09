@@ -1,3 +1,4 @@
+import { automationsAr } from './automations/ar';
 import { cachingAr } from './caching';
 import { chatWidgetAr } from './chat-widget/ar';
 import { checksAr } from './checks';
@@ -1349,6 +1350,7 @@ export const ar: Translation = {
   reports: reportsAr,
   chatSettings: chatSettingsAr,
   chatWidget: chatWidgetAr,
+  automations: automationsAr,
   memory: {
     title: 'ذاكرة العملاء',
     description: 'أدِر ما نتذكره عن عملائك.',
@@ -2277,6 +2279,7 @@ export const ar: Translation = {
     brands: 'العلامات التجارية',
     widget: 'أداة الدردشة',
     agents: 'وكلاء الذكاء الاصطناعي',
+    automations: 'الأتمتة',
     knowledge: 'المعرفة',
     tools: 'الأدوات والإجراءات',
     decisions: 'القرارات',
@@ -2323,12 +2326,15 @@ export const ar: Translation = {
     widget: {
       configure: 'إعداد أداة الدردشة',
       identity_keys: 'تسجيل المفاتيح التي تتحقق من هوية العملاء',
-      proactive: 'تحديد متى تدعو الدردشة زوار الموقع إلى التحدث',
     },
     agents: {
       read: 'عرض وكلاء الذكاء الاصطناعي وإصداراتهم',
       manage: 'تعديل مسودات وكلاء الذكاء الاصطناعي',
       publish: 'نشر وكلاء الذكاء الاصطناعي أو التراجع عنهم',
+    },
+    automations: {
+      read: 'عرض قواعد الأتمتة وما فعلته',
+      manage: 'إنشاء قواعد الأتمتة ونشرها وإيقافها، ومنها رسائل الموقع',
     },
     knowledge: { read: 'قراءة مصادر المعرفة', manage: 'إضافة المعرفة وتعديلها وإيقافها' },
     tools: {

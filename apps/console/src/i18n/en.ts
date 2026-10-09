@@ -1,3 +1,4 @@
+import { automationsEn } from './automations/en';
 import { cachingEn } from './caching';
 import { chatWidgetEn } from './chat-widget/en';
 import { checksEn } from './checks';
@@ -1361,6 +1362,7 @@ export const en = {
   reports: reportsEn,
   chatSettings: chatSettingsEn,
   chatWidget: chatWidgetEn,
+  automations: automationsEn,
   memory: {
     title: 'Customer memory',
     description: 'Manage what we remember about your customers.',
@@ -2298,6 +2300,7 @@ export const en = {
     brands: 'Brands',
     widget: 'Chat widget',
     agents: 'AI agents',
+    automations: 'Automations',
     knowledge: 'Knowledge',
     tools: 'Tools and actions',
     decisions: 'Decisions',
@@ -2344,12 +2347,15 @@ export const en = {
     widget: {
       configure: 'Configure the chat widget',
       identity_keys: 'Register the keys that verify customer identity',
-      proactive: 'Choose when the chat invites website visitors to talk',
     },
     agents: {
       read: 'View AI agents and their versions',
       manage: 'Edit AI agent drafts',
       publish: 'Publish or roll back AI agents',
+    },
+    automations: {
+      read: 'View automations and what they did',
+      manage: 'Create, publish and turn off automations, including website prompts',
     },
     knowledge: { read: 'Read knowledge sources', manage: 'Add, edit and retire knowledge' },
     tools: {
