@@ -32,6 +32,7 @@ import { IdempotencyService } from './common/idempotency.service.js';
 import type { AppConfig } from './config.js';
 import { StaffConversationsController } from './conversations/staff-conversations.controller.js';
 import { StaffConversationsService } from './conversations/staff-conversations.service.js';
+import { WhatsappTemplatesService } from './conversations/whatsapp-templates.service.js';
 import { DecisionsController } from './decisions/decisions.controller.js';
 import { decisionAdminProviders, decisionProviders } from './decisions/decisions.providers.js';
 import {
@@ -248,6 +249,7 @@ export class ApiModule {
         CustomerTypingService,
         DraftsService,
         StaffConversationsService,
+        WhatsappTemplatesService,
         InboxService,
         InboxMessagesService,
         AssignmentService,

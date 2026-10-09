@@ -1,7 +1,12 @@
 import { ChatwootError } from '@hamnivo/chatwoot';
 import type { Message } from '@hamnivo/contracts';
 import { type Db, newId, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo/db';
-import type { AuthorityMessage, MessageAuthor, OutgoingAttachment } from '@hamnivo/domain';
+import type {
+  AppendMessageInput,
+  AuthorityMessage,
+  MessageAuthor,
+  OutgoingAttachment,
+} from '@hamnivo/domain';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, ne } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
@@ -35,6 +40,8 @@ export interface OutboundInput {
   visibility: 'public' | 'private';
   text: string;
   contentAttributes?: Record<string, unknown>;
+  /** A WhatsApp template message (D14); `text` is its rendered transcript. */
+  template?: AppendMessageInput['template'];
   /**
    * Files that travel with the message (W09), read after `load` ran, so they can be claimed in
    * the same transaction as the ledger reservation.
@@ -171,6 +178,7 @@ export class OutboundMessagesService {
           text: input.text,
           ...(input.contentAttributes ? { contentAttributes: input.contentAttributes } : {}),
           ...(files.length > 0 ? { attachments: files } : {}),
+          ...(input.template ? { template: input.template } : {}),
         }));
       } catch (error) {
         const retryable = !(error instanceof ChatwootError) || error.retryable;

@@ -7935,10 +7935,67 @@
         }
       }
     },
+    "/v1/conversations/{conversationId}/whatsapp-templates": {
+      "get": {
+        "operationId": "listWhatsappTemplates",
+        "summary": "The WhatsApp templates approved for this conversation's number, and whether free text can be sent now (conversations.reply)",
+        "tags": [
+          "Conversations"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatsappTemplateList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/conversations/{conversationId}/messages": {
       "post": {
         "operationId": "sendStaffMessage",
-        "summary": "Reply to the customer or write an internal note as yourself (conversations.reply / conversations.note)",
+        "summary": "Reply to the customer, with text or a WhatsApp template, or write an internal note as yourself (conversations.reply / conversations.note)",
         "tags": [
           "Conversations"
         ],
@@ -28466,11 +28523,71 @@
             "type": "string",
             "description": "run identifier (TypeID with prefix \"run\")",
             "example": "run_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "template": {
+            "$ref": "#/components/schemas/TemplateMessage"
           }
         },
         "required": [
-          "clientMessageId",
-          "text"
+          "clientMessageId"
+        ]
+      },
+      "TemplateMessage": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "values": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "header": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 1000
+                }
+              },
+              "body": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 1000
+                }
+              },
+              "buttons": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 1000
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "name",
+          "language"
         ]
       },
       "SetTeamRoutingRequest": {
@@ -43220,6 +43337,187 @@
           "customerStatus",
           "authorityStatus",
           "lastActivityAt"
+        ],
+        "additionalProperties": false
+      },
+      "WhatsappTemplateList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WhatsappTemplate"
+            }
+          },
+          "windowOpen": {
+            "type": "boolean"
+          },
+          "windowClosesAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastSyncedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "windowOpen",
+          "windowClosesAt",
+          "lastSyncedAt"
+        ],
+        "additionalProperties": false
+      },
+      "WhatsappTemplate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "header": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "footer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "buttons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "quick_reply",
+                    "url",
+                    "phone_number",
+                    "copy_code",
+                    "other"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "variables": {
+            "type": "object",
+            "properties": {
+              "header": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "body": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "buttons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "url",
+                        "copy_code"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "index",
+                    "type",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "header",
+              "body",
+              "buttons"
+            ],
+            "additionalProperties": false
+          },
+          "unsupported": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "not_approved",
+                  "authentication",
+                  "media_header"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "language",
+          "category",
+          "header",
+          "body",
+          "footer",
+          "buttons",
+          "variables",
+          "unsupported"
         ],
         "additionalProperties": false
       },

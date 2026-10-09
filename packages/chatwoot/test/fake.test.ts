@@ -956,6 +956,109 @@ describe('fake Chatwoot channel inboxes', () => {
       ['channel_reply', tg.conversationId, undefined],
     ]);
   });
+
+  const orderUpdate = {
+    name: 'order_update',
+    language: 'en_US',
+    status: 'APPROVED',
+    category: 'UTILITY',
+    components: [
+      { type: 'BODY', text: 'Hi {{1}}, order {{2}} is on its way.' },
+      {
+        type: 'BUTTONS',
+        buttons: [{ type: 'URL', text: 'Track', url: 'https://shop.example/t/{{1}}' }],
+      },
+    ],
+  };
+
+  it('lists WhatsApp templates, sends one, and fails what Meta would refuse (D14)', async () => {
+    const { fake, authority, createInbox, email } = await channelSetup();
+    const whatsapp = await createInbox('WhatsApp', {
+      type: 'whatsapp',
+      phone_number: '+15557654321',
+      provider: 'whatsapp_cloud',
+      provider_config: { api_key: 'k', phone_number_id: 'p', business_account_id: 'b' },
+    });
+    const inbox = Number(whatsapp.id);
+    expect(await authority.listWhatsappTemplates(String(inbox))).toEqual({
+      templates: [],
+      lastSyncedAt: null,
+    });
+    const synced = new Date('2026-10-01T10:00:00Z');
+    fake.setWhatsappTemplates(
+      inbox,
+      [orderUpdate, { ...orderUpdate, name: 'draft', status: 'PENDING' }],
+      synced,
+    );
+    const listed = await authority.listWhatsappTemplates(String(inbox));
+    expect(listed.lastSyncedAt).toEqual(synced);
+    expect(listed.templates.map((t) => [t.name, t.status])).toEqual([
+      ['order_update', 'APPROVED'],
+      ['draft', 'PENDING'],
+    ]);
+    // Only WhatsApp inboxes have templates.
+    expect(await authority.listWhatsappTemplates(String(email.id)).catch((e) => e)).toMatchObject({
+      status: 422,
+      retryable: false,
+    });
+
+    const chat = await fake.receiveChannelMessage(inbox, { from: '971501234567', content: 'Hi' });
+    const ref = String(chat.conversationId);
+    fake.outbound.length = 0;
+    const template = {
+      name: 'order_update',
+      language: 'en_US',
+      category: 'UTILITY',
+      processedParams: {
+        body: { '1': 'Aisha', '2': '1042' },
+        buttons: [{ type: 'url', parameter: '1042' }],
+      },
+    };
+    const sent = await authority.appendMessage({
+      conversationRef: ref,
+      key: `hv1:m:${randomUUID()}`,
+      author: { kind: 'integration' },
+      visibility: 'public',
+      text: 'Hi Aisha, order 1042 is on its way.',
+      template,
+    });
+    expect(fake.outbound).toEqual([
+      expect.objectContaining({
+        kind: 'channel_reply',
+        messageId: Number(sent.message.ref),
+        template: {
+          name: 'order_update',
+          language: 'en_US',
+          category: 'UTILITY',
+          processedParams: template.processedParams,
+        },
+      }),
+    ]);
+    const failedText = async (extra: Partial<Parameters<typeof authority.appendMessage>[0]>) => {
+      const { message } = await authority.appendMessage({
+        conversationRef: ref,
+        key: `hv1:m:${randomUUID()}`,
+        author: { kind: 'integration' },
+        visibility: 'public',
+        text: 'x',
+        ...extra,
+      });
+      const [stored] = (await authority.listMessages(ref, { view: 'staff' })).filter(
+        (m) => m.ref === message.ref,
+      );
+      return stored?.contentAttributes.external_error ?? null;
+    };
+    // A missing variable or an unapproved template fails at Meta, and nothing is delivered.
+    expect(
+      await failedText({ template: { ...template, processedParams: { body: { '1': 'Aisha' } } } }),
+    ).toMatch(/parameters/);
+    expect(await failedText({ template: { ...template, name: 'draft' } })).toMatch(/not found/);
+    expect(fake.outbound).toHaveLength(1);
+    // Free text more than 24 hours after the customer last wrote fails too; a template does not.
+    fake.ageConversation(chat.conversationId, 25);
+    expect(await failedText({})).toMatch(/outside messaging window/);
+    expect(await failedText({ template })).toBeNull();
+  });
 });
 
 describe('client timeouts', () => {

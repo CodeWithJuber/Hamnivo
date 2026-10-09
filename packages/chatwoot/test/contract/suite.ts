@@ -849,6 +849,18 @@ export function authorityContract(
         expect(await inboxBot(inboxId)).toBeNull();
       });
 
+      it('has WhatsApp templates only on WhatsApp inboxes (D14)', async () => {
+        const inbox = await createInbox('Contract mail templates', {
+          type: 'email',
+          email: `hv-tpl-${randomUUID().slice(0, 8)}@hamnivo.invalid`,
+          imap_enabled: false,
+          smtp_enabled: false,
+        });
+        expect(
+          await authority.listWhatsappTemplates(String(inbox.id)).catch((e) => e),
+        ).toMatchObject({ status: 422, retryable: false });
+      });
+
       it('adds WhatsApp Cloud and Telegram inboxes (the fake only: they need Meta and Telegram)', async (ctx) => {
         if (!t.fake) ctx.skip();
         const number = `+1555${String(Date.now()).slice(-7)}`;

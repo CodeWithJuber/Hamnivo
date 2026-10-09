@@ -21,6 +21,7 @@ import { AppError } from '../common/app-error.js';
 import { InboxAccess } from '../inbox/access.js';
 import { DraftsService } from '../inbox/drafts.service.js';
 import { CLOCK, type Clock } from '../tokens.js';
+import { type PreparedTemplate, WhatsappTemplatesService } from './whatsapp-templates.service.js';
 
 function staffView(control: ControlRow): StaffConversation {
   const view = customerView(control.ownerMode, control.authorityStatus);
@@ -70,6 +71,7 @@ export class StaffConversationsService {
     private readonly registry: AuthorityRegistry,
     private readonly staffLinks: StaffLinksService,
     private readonly drafts: DraftsService,
+    private readonly templates: WhatsappTemplatesService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -189,6 +191,11 @@ export class StaffConversationsService {
     const internal = input.visibility === 'internal';
     const permission: Permission = internal ? 'conversations.note' : 'conversations.reply';
     const lane = internal ? 'internal' : 'public';
+    // A WhatsApp template (D14) is checked against Chatwoot's list first; its text is rendered.
+    const prepared: PreparedTemplate | null = input.template
+      ? await this.templates.prepare(principal, publicId, input.template)
+      : null;
+    const text = prepared?.text ?? input.text ?? '';
     const control = await this.access.tx(principal, async (tx) => {
       const control = await this.authorized(tx, principal, publicId, permission);
       if (!internal) {
@@ -203,7 +210,8 @@ export class StaffConversationsService {
               'A colleague is handling this conversation. Take it over first. Nothing was sent.',
           });
         }
-        await assertReplyWindow(tx, control, this.clock());
+        // A template is what WhatsApp allows once the 24-hour window has closed.
+        if (!prepared) await assertReplyWindow(tx, control, this.clock());
       }
       await this.drafts.startOutgoing(tx, {
         tenantId: principal.tenantId,
@@ -211,7 +219,7 @@ export class StaffConversationsService {
         staffMemberId: principal.staffMemberId,
         lane,
         clientMessageId: input.clientMessageId,
-        text: input.text,
+        text,
         clearDraft: input.clearDraft,
       });
       return control;
@@ -240,26 +248,52 @@ export class StaffConversationsService {
         conversationId: control.id,
         sender: { kind: 'staff', id: principal.staffMemberId },
         clientMessageId: input.clientMessageId,
+        // A retry with another template or other values is a different message (IDEMPOTENCY_CONFLICT).
         requestHash: createHash('sha256')
-          .update(canonicalize({ text: input.text, visibility: input.visibility }) ?? '')
+          .update(
+            canonicalize(
+              input.template
+                ? { template: input.template, visibility: input.visibility }
+                : { text: input.text, visibility: input.visibility },
+            ) ?? '',
+          )
           .digest(),
         author: { kind: 'staff', userRef: String(externalUserId) },
         visibility: internal ? 'private' : 'public',
-        text: input.text,
+        text,
+        ...(prepared ? { template: prepared.template } : {}),
         load: (tx) => this.authorized(tx, principal, publicId, permission),
-        // A reply that started from an AI suggestion is still the person's own; the audit says so.
-        ...(input.suggestionId
+        ...(input.suggestionId || prepared
           ? {
               onCommitted: async (tx: TenantTx) => {
-                await appendAudit(tx, {
-                  actorType: 'staff',
-                  actorId: toPublicId('staff', principal.staffMemberId),
-                  action: 'conversation.copilot_reply_sent',
-                  targetType: 'conversation',
-                  targetId: publicId,
-                  outcome: 'success',
-                  data: { suggestionId: input.suggestionId, visibility: input.visibility },
-                });
+                // A reply that started from an AI suggestion is still the person's own; the
+                // audit says so.
+                if (input.suggestionId) {
+                  await appendAudit(tx, {
+                    actorType: 'staff',
+                    actorId: toPublicId('staff', principal.staffMemberId),
+                    action: 'conversation.copilot_reply_sent',
+                    targetType: 'conversation',
+                    targetId: publicId,
+                    outcome: 'success',
+                    data: { suggestionId: input.suggestionId, visibility: input.visibility },
+                  });
+                }
+                if (prepared) {
+                  await appendAudit(tx, {
+                    actorType: 'staff',
+                    actorId: toPublicId('staff', principal.staffMemberId),
+                    action: 'conversation.template_sent',
+                    targetType: 'conversation',
+                    targetId: publicId,
+                    outcome: 'success',
+                    data: {
+                      template: prepared.template.name,
+                      language: prepared.template.language,
+                      category: prepared.template.category,
+                    },
+                  });
+                }
               },
             }
           : {}),

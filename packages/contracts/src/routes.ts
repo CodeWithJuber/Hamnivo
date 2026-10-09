@@ -49,6 +49,7 @@ import {
   StaffMessageRequest,
   StaffMessageResponse,
   TakeoverRequest,
+  WhatsappTemplateList,
 } from './staff-conversations.js';
 import { actionInboxRoutes, actionWidgetRoutes, toolAdminRoutes } from './tool-routes.js';
 import { visitorStaffRoutes, visitorWidgetRoutes } from './visitor-routes.js';
@@ -384,12 +385,23 @@ export const conversationRoutes = {
     body: TakeoverRequest,
     success: { status: 200, description: 'The AI answers again', schema: StaffConversation },
   },
+  listWhatsappTemplates: {
+    method: 'get',
+    path: '/v1/conversations/{conversationId}/whatsapp-templates',
+    operationId: 'listWhatsappTemplates',
+    summary:
+      "The WhatsApp templates approved for this conversation's number, and whether free text can be sent now (conversations.reply)",
+    tags: ['Conversations'],
+    auth: 'staff_session',
+    params: staffConversationParams,
+    success: { status: 200, description: 'Templates', schema: WhatsappTemplateList },
+  },
   sendStaffMessage: {
     method: 'post',
     path: '/v1/conversations/{conversationId}/messages',
     operationId: 'sendStaffMessage',
     summary:
-      'Reply to the customer or write an internal note as yourself (conversations.reply / conversations.note)',
+      'Reply to the customer, with text or a WhatsApp template, or write an internal note as yourself (conversations.reply / conversations.note)',
     tags: ['Conversations'],
     auth: 'staff_session',
     params: staffConversationParams,

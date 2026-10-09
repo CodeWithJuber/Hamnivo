@@ -19,7 +19,9 @@ import type {
   EnsureContactInput,
   EnsuredContact,
   StaffInboxAuthority,
+  WhatsappTemplate,
 } from '@hamnivo/domain';
+import { parseWhatsappTemplate } from '@hamnivo/domain';
 import { type ChatwootClient, ChatwootError, call, createChatwootClient } from './client.js';
 import { BLOB_PATH, timeOf, toConversation, toMessage } from './mapping.js';
 
@@ -237,6 +239,29 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
     return payload.map((c) => toConversation(c));
   }
 
+  /**
+   * The WhatsApp templates Chatwoot keeps for an inbox (synced from Meta), and when it last tried
+   * to sync them (D14). Read live: Hamnivo keeps no copy.
+   */
+  async listWhatsappTemplates(
+    inboxRef: string,
+  ): Promise<{ templates: WhatsappTemplate[]; lastSyncedAt: Date | null }> {
+    const result = await call<Json>(
+      'listWhatsappMessageTemplates',
+      this.integration.GET('/api/v1/accounts/{account_id}/inboxes/{id}/message_templates', {
+        params: { path: { ...this.accountPath, id: Number(inboxRef) } },
+      }) as never,
+    );
+    const payload = Array.isArray(result.payload) ? result.payload : [];
+    const synced = (result.meta as Json | undefined)?.last_sync_attempt_at;
+    return {
+      templates: payload
+        .map((t) => parseWhatsappTemplate(t))
+        .filter((t): t is WhatsappTemplate => t !== null),
+      lastSyncedAt: typeof synced === 'string' ? new Date(synced) : null,
+    };
+  }
+
   async listMessages(
     conversationRef: string,
     options:
@@ -305,6 +330,18 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
         : {}),
       ...(input.externalCreatedAt
         ? { external_created_at: Math.floor(input.externalCreatedAt.getTime() / 1000) }
+        : {}),
+      ...(input.template
+        ? {
+            template_params: {
+              name: input.template.name,
+              language: input.template.language,
+              category: input.template.category,
+              processed_params: input.template.processedParams,
+              // `content` is the rendered text, as the customer reads it.
+              content_mode: 'rendered',
+            },
+          }
         : {}),
     };
     const created = await call<Json>(
