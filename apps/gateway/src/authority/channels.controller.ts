@@ -1,4 +1,4 @@
-import { UpdateChannelRequest } from '@hamnivo/contracts';
+import { ConnectEmailRequest, UpdateChannelRequest, UpdateEmailRequest } from '@hamnivo/contracts';
 import type { StaffPrincipal } from '@hamnivo/policy';
 import { Body, Controller, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
 import { parseInput } from '../common/validation.js';
@@ -31,5 +31,39 @@ export class ChannelsController {
     @Body() body: unknown,
   ) {
     return this.channels.update(principal, channelId, parseInput(UpdateChannelRequest, body));
+  }
+
+  /** Never kept for replays: the request holds the mailbox's passwords. */
+  @Post('brands/:brandId/channels/email')
+  @StaffRoute({ tenant: true, permission: 'integrations.manage' })
+  async connectEmail(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('brandId') brandId: string,
+    @Body() body: unknown,
+  ) {
+    return this.channels.connectEmail(principal, brandId, parseInput(ConnectEmailRequest, body));
+  }
+
+  @Get('channels/:channelId/email')
+  @StaffRoute({ tenant: true, permission: 'integrations.manage' })
+  async emailSettings(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('channelId') channelId: string,
+  ) {
+    return this.channels.emailSettings(principal, channelId);
+  }
+
+  @Put('channels/:channelId/email')
+  @StaffRoute({ tenant: true, permission: 'integrations.manage' })
+  async updateEmail(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('channelId') channelId: string,
+    @Body() body: unknown,
+  ) {
+    return this.channels.updateEmailSettings(
+      principal,
+      channelId,
+      parseInput(UpdateEmailRequest, body),
+    );
   }
 }

@@ -832,6 +832,7 @@ export function authorityContract(
           name: 'Contract mail',
           channelType: 'Channel::Email',
           address,
+          needsReauthorization: false,
         });
         expect(inboxes).toContainEqual(
           expect.objectContaining({ id: account.inbox.id, channelType: 'Channel::Api' }),

@@ -6,7 +6,7 @@ import { automationRoutes } from './automation-routes.js';
 import { analyticsRoutes, billingRoutes } from './billing-routes.js';
 import { blockRoutes } from './blocks.js';
 import { cacheRoutes } from './cache-routes.js';
-import { channelRoutes } from './channels.js';
+import { channelRoutes, emailChannelRoutes } from './channels.js';
 import { checkRoutes } from './check-routes.js';
 import {
   commerceAdminRoutes,
@@ -439,6 +439,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...automationRoutes,
   ...blockRoutes,
   ...channelRoutes,
+  ...emailChannelRoutes,
   ...toolAdminRoutes,
   ...aiPowerRoutes,
   ...actionInboxRoutes,

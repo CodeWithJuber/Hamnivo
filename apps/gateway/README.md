@@ -429,6 +429,13 @@ without it goes to people (`channel_ai_off`). Each channel inbox's cursor lists 
 conversations every minute, so lost webhooks are caught. `GET /v1/admin/brands/{id}/channels`
 and `PUT /v1/admin/channels/{id}` under `integrations.manage`.
 
+Email (D13): `POST /v1/admin/brands/{id}/channels/email` creates the Chatwoot email inbox (IMAP
+and SMTP; Chatwoot keeps the passwords and signs in before it accepts), `GET`/`PUT
+/v1/admin/channels/{id}/email` read and change its settings (passwords only when sent). Chatwoot's
+422 becomes field errors. Adopted email conversations are tickets (source `email`); senders like
+`no-reply@` and `mailer-daemon@` get no automatic answer; `reauthorization_required` shows as
+"Needs attention".
+
 ## Customer surface (W02, W05–W07, W09, W17–W19, W22–W25)
 
 `src/widget/surface.*`, `attachments.service.ts`, `messages.service.ts`, `help.service.ts`,

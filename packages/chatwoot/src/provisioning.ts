@@ -401,6 +401,11 @@ export interface ChatwootInboxSummary {
   channelType: string;
   /** The email address, phone number or `@bot_name` customers write to; null when none. */
   address: string | null;
+  /**
+   * Chatwoot can no longer sign in to the channel (a changed mailbox password, a revoked token)
+   * and asks for the credentials again.
+   */
+  needsReauthorization: boolean;
 }
 
 function inboxAddress(inbox: Json): string | null {
@@ -444,6 +449,7 @@ export async function listInboxes(options: {
     name: String(inbox.name ?? ''),
     channelType: String(inbox.channel_type ?? ''),
     address: inboxAddress(inbox),
+    needsReauthorization: inbox.reauthorization_required === true,
   }));
 }
 
@@ -470,4 +476,142 @@ export async function setInboxAgentBot(options: {
       body: { agent_bot: options.botId } as never,
     }) as never,
   );
+}
+
+/** A mailbox Chatwoot reads by IMAP and sends from by SMTP (the brand's own address). */
+export interface EmailInboxSettings {
+  name: string;
+  email: string;
+  imap: { address: string; port: number; ssl: boolean; login: string; password?: string };
+  smtp: {
+    address: string;
+    port: number;
+    /** STARTTLS (port 587) or TLS from the start (port 465). */
+    security: 'starttls' | 'tls' | 'none';
+    login: string;
+    password?: string;
+  };
+}
+
+/** Chatwoot's channel fields for a mailbox; passwords only when given (an edit keeps the old). */
+function emailChannel(settings: EmailInboxSettings): Json {
+  return {
+    email: settings.email,
+    imap_enabled: true,
+    imap_address: settings.imap.address,
+    imap_port: settings.imap.port,
+    imap_enable_ssl: settings.imap.ssl,
+    imap_login: settings.imap.login,
+    ...(settings.imap.password ? { imap_password: settings.imap.password } : {}),
+    smtp_enabled: true,
+    smtp_address: settings.smtp.address,
+    smtp_port: settings.smtp.port,
+    smtp_enable_starttls_auto: settings.smtp.security === 'starttls',
+    smtp_enable_ssl_tls: settings.smtp.security === 'tls',
+    smtp_authentication: 'login',
+    smtp_openssl_verify_mode: 'peer',
+    smtp_login: settings.smtp.login,
+    ...(settings.smtp.password ? { smtp_password: settings.smtp.password } : {}),
+  };
+}
+
+/**
+ * Creates an email inbox that reads the brand's mailbox. Chatwoot checks the IMAP sign-in as it
+ * creates it and answers 422 when it fails. Auto-assignment is off: Hamnivo routes.
+ */
+export async function createEmailInbox(
+  options: { baseUrl: string; token: string; accountId: number; fetch?: typeof fetch },
+  settings: EmailInboxSettings,
+): Promise<ChatwootInboxSummary> {
+  const client = createChatwootClient({
+    baseUrl: options.baseUrl,
+    token: options.token,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+  const inbox = await call<Json>(
+    'createInbox',
+    client.POST('/api/v1/accounts/{account_id}/inboxes', {
+      params: { path: { account_id: options.accountId } },
+      body: {
+        name: settings.name,
+        enable_auto_assignment: false,
+        channel: { type: 'email', ...emailChannel(settings) },
+      } as never,
+    }) as never,
+  );
+  return {
+    id: Number(inbox.id),
+    name: String(inbox.name ?? settings.name),
+    channelType: String(inbox.channel_type ?? 'Channel::Email'),
+    address: inboxAddress(inbox) ?? settings.email,
+    needsReauthorization: inbox.reauthorization_required === true,
+  };
+}
+
+/** Changes a mailbox's settings; a password left out stays as Chatwoot has it. */
+export async function updateEmailInbox(
+  options: {
+    baseUrl: string;
+    token: string;
+    accountId: number;
+    inboxId: number;
+    fetch?: typeof fetch;
+  },
+  settings: EmailInboxSettings,
+): Promise<void> {
+  const client = createChatwootClient({
+    baseUrl: options.baseUrl,
+    token: options.token,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+  await call(
+    'updateInbox',
+    client.PATCH('/api/v1/accounts/{account_id}/inboxes/{id}', {
+      params: { path: { account_id: options.accountId, id: options.inboxId } },
+      body: { name: settings.name, channel: emailChannel(settings) } as never,
+    }) as never,
+  );
+}
+
+/** A mailbox's settings as Chatwoot shows them (it never returns the passwords). */
+export async function getEmailInbox(options: {
+  baseUrl: string;
+  token: string;
+  accountId: number;
+  inboxId: number;
+  fetch?: typeof fetch;
+}): Promise<EmailInboxSettings> {
+  const client = createChatwootClient({
+    baseUrl: options.baseUrl,
+    token: options.token,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+  const inbox = await call<Json>(
+    'getInbox',
+    client.GET('/api/v1/accounts/{account_id}/inboxes/{id}', {
+      params: { path: { account_id: options.accountId, id: options.inboxId } },
+    }) as never,
+  );
+  const text = (key: string) => (typeof inbox[key] === 'string' ? (inbox[key] as string) : '');
+  return {
+    name: text('name'),
+    email: text('email'),
+    imap: {
+      address: text('imap_address'),
+      port: Number(inbox.imap_port ?? 993) || 993,
+      ssl: inbox.imap_enable_ssl !== false,
+      login: text('imap_login'),
+    },
+    smtp: {
+      address: text('smtp_address'),
+      port: Number(inbox.smtp_port ?? 587) || 587,
+      security:
+        inbox.smtp_enable_ssl_tls === true
+          ? 'tls'
+          : inbox.smtp_enable_starttls_auto === false
+            ? 'none'
+            : 'starttls',
+      login: text('smtp_login'),
+    },
+  };
 }

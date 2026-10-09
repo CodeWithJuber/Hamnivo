@@ -6,12 +6,11 @@ and can be answered by the AI if you allow it.
 
 ## Add a channel
 
-For now, add the channel in Chatwoot. Connecting channels from Studio is coming next.
-
-1. In Chatwoot, open **Settings → Inboxes → Add inbox** and set up Email, WhatsApp or Telegram.
-2. In Studio, open **Settings → Channels** and choose **Check for new channels**. Studio also
-   checks by itself every few minutes.
-3. The channel appears with its address, for example `help@yourshop.com`.
+- **Email:** choose **Connect email** on **Settings → Channels**. See
+  [Connect your support email](email-channel.md).
+- **WhatsApp and Telegram:** for now, add them in Chatwoot (**Settings → Inboxes → Add inbox**),
+  then choose **Check for new channels** in Studio. Studio also checks by itself every few
+  minutes. Connecting them from Studio is coming next.
 
 ## Who answers
 

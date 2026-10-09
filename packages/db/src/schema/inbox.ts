@@ -120,7 +120,7 @@ export const teamAuthorityLinks = pgTable(
  * snooze time so queues can be filtered without asking Chatwoot. Written when staff change them
  * through Hamnivo and when Chatwoot reports a newer conversation state.
  */
-export const TICKET_SOURCES = ['offline_form', 'staff', 'automation'] as const;
+export const TICKET_SOURCES = ['offline_form', 'staff', 'automation', 'email'] as const;
 export const CONVERSATION_PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 
 export const conversationInboxState = pgTable(
@@ -158,7 +158,7 @@ export const conversationInboxState = pgTable(
     ),
     check(
       'conversation_inbox_state_ticket_ck',
-      sql`(${t.ticketNumber} is null and ${t.ticketSource} is null and ${t.ticketOpenedAt} is null) or (${t.ticketNumber} > 0 and ${t.ticketSource} in ('offline_form', 'staff', 'automation') and ${t.ticketOpenedAt} is not null)`,
+      sql`(${t.ticketNumber} is null and ${t.ticketSource} is null and ${t.ticketOpenedAt} is null) or (${t.ticketNumber} > 0 and ${t.ticketSource} in ('offline_form', 'staff', 'automation', 'email') and ${t.ticketOpenedAt} is not null)`,
     ),
     foreignKey({
       name: 'conversation_inbox_state_conversation_fk',

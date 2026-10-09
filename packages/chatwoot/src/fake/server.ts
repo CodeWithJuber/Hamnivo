@@ -53,6 +53,8 @@ interface Inbox {
   lockToSingleConversation: boolean;
   botId: number | null;
   members: Set<number>;
+  /** Chatwoot can no longer sign in to the channel (`reauthorization_required`). */
+  reauthorizationRequired?: boolean;
 }
 interface Bot {
   id: number;
@@ -283,6 +285,11 @@ export interface FakeChatwoot {
     accountId: number,
     input: { type: 'email' | 'whatsapp' | 'telegram'; name?: string; address?: string },
   ): { id: number };
+  /**
+   * Marks a channel as one Chatwoot can no longer sign in to (a changed mailbox password), as
+   * its IMAP poller does after failed sign-ins; saving new credentials clears it.
+   */
+  setReauthorizationRequired(inboxId: number, required: boolean): void;
   /** Connects an integration (Slack, Dialogflow…) that would receive message events. */
   addIntegrationHook(accountId: number, appId: string, inboxId?: number | null): void;
   /** Resolves when every queued webhook has been delivered, dropped or failed. */
@@ -829,17 +836,22 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
   // ---------------------------------------------------------------- state changes
 
   /**
-   * The subject of a reply from an email inbox: Chatwoot answers in the thread (`Re:` and the
-   * subject the customer wrote). Hamnivo can set its own in the `hv_email_subject` conversation
-   * attribute (a ticket reference, say), which is used as it is.
+   * The subject of a reply from an email inbox, as Chatwoot's ConversationReplyMailer writes it:
+   * the customer's subject (with `Re:` once the conversation has more than one message), or the
+   * conversation number when the conversation has no subject.
    */
   function replySubject(conversation: Conversation): string {
-    const own = conversation.customAttributes.hv_email_subject;
-    if (typeof own === 'string' && own.trim()) return own;
     const subject = conversation.additionalAttributes.mail_subject;
-    return typeof subject === 'string' && subject
-      ? `Re: ${subject}`
-      : `[#${conversation.displayId}] New messages on this conversation`;
+    if (typeof subject !== 'string' || !subject) {
+      return `[#${conversation.displayId}] New messages on this conversation`;
+    }
+    const chats = [...s.messages.values()].filter(
+      (m) =>
+        m.conversationId === conversation.id &&
+        !m.private &&
+        (m.messageType === 0 || m.messageType === 1),
+    ).length;
+    return chats > 1 ? `Re: ${subject}` : subject;
   }
 
   /**
@@ -1103,6 +1115,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     smtp_login: '',
     smtp_domain: '',
     smtp_enable_starttls_auto: true,
+    smtp_enable_ssl_tls: false,
     smtp_authentication: 'login',
     smtp_openssl_verify_mode: 'none',
   };
@@ -1261,6 +1274,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       csat_survey_enabled: inbox.csatEnabled,
       working_hours_enabled: inbox.workingHoursEnabled,
       lock_to_single_conversation: inbox.lockToSingleConversation,
+      ...(inbox.channel === 'Channel::Api'
+        ? {}
+        : { reauthorization_required: inbox.reauthorizationRequired === true }),
     };
     switch (inbox.channel) {
       case 'Channel::Api':
@@ -1325,6 +1341,11 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       flag('lock_to_single_conversation') ?? next.lockToSingleConversation;
     if (typeof input.channel === 'object' && input.channel !== null) {
       applyChannel(next, input.channel as Json);
+      // New credentials that work end Chatwoot's request to sign in again.
+      const channel = input.channel as Json;
+      if (channel.imap_password || channel.api_key || channel.bot_token) {
+        next.reauthorizationRequired = false;
+      }
     }
     Object.assign(inbox, next);
     return inboxApi(inbox);
@@ -2659,6 +2680,12 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         messages: own(s.messages.values()),
         inboxes: own(s.inboxes.values()),
       };
+    },
+    setReauthorizationRequired(inboxId, required) {
+      const inbox = s.inboxes.get(inboxId);
+      if (!inbox || inbox.channel === 'Channel::Api')
+        throw new Error(`No channel inbox ${inboxId}`);
+      inbox.reauthorizationRequired = required;
     },
     createChannelInbox(accountId, input) {
       if (!s.accounts.has(accountId)) throw new Error(`The fake has no account ${accountId}`);
