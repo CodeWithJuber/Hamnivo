@@ -9,7 +9,9 @@ import {
   InboxMessagesQuery,
   InboxSearchQuery,
   LinkRequest,
+  MakeTicketRequest,
   PresenceUpdate,
+  PriorityRequest,
   ReviewRequest,
   SaveDraftRequest,
   SavedRepliesQuery,
@@ -52,6 +54,7 @@ import { InboxLiveService } from './live.service.js';
 import { InboxMessagesService } from './messages.service.js';
 import { StatusService } from './status.service.js';
 import { TeamsService } from './teams.service.js';
+import { TicketsService } from './tickets.service.js';
 
 const Lane = z.object({ lane: DraftLane });
 const Outgoing = z.object({ clientMessageId: z.uuid() });
@@ -74,6 +77,7 @@ export class InboxController {
     private readonly collaboration: CollaborationService,
     private readonly bulk: BulkService,
     private readonly live: InboxLiveService,
+    private readonly tickets: TicketsService,
   ) {}
 
   @Get('conversations')
@@ -170,6 +174,28 @@ export class InboxController {
     @Body() body: unknown,
   ) {
     return this.status.set(principal, id, parseInput(StatusRequest, body));
+  }
+
+  @Post('conversations/:conversationId/ticket')
+  @StaffRoute({ tenant: true, permission: 'conversations.read' })
+  @HttpCode(200)
+  makeTicket(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('conversationId') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.tickets.make(principal, id, parseInput(MakeTicketRequest, body));
+  }
+
+  @Post('conversations/:conversationId/priority')
+  @StaffRoute({ tenant: true, permission: 'conversations.read' })
+  @HttpCode(200)
+  setPriority(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('conversationId') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.tickets.setPriority(principal, id, parseInput(PriorityRequest, body));
   }
 
   @Get('conversations/:conversationId/tags')

@@ -1,5 +1,6 @@
 export * from './authority.js';
 export * from './business-hours.js';
+export * from './chat-forms.js';
 export * from './cache.js';
 export * from './checks.js';
 export * from './decision-questions.js';

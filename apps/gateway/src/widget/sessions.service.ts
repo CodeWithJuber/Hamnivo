@@ -21,11 +21,13 @@ import { decodeProtectedHeader, importJWK, type JWK, jwtVerify } from 'jose';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { assertWidgetOnline, widgetLoads } from '../identity/tenants.readonly.js';
+import { AvailabilityService } from '../inbox/availability.service.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { filesScannable } from './attachments.service.js';
+import { consentState } from './consent.js';
 import { launcherConfig, widgetConfig } from './copy.js';
-import { frameAncestors, originAllowed, sessionOrigin } from './origins.js';
+import { DIRECT_ORIGIN, frameAncestors, originAllowed, sessionOrigin } from './origins.js';
 import { SessionSignals } from './session-signals.service.js';
 import { brandSurface } from './settings.service.js';
 import {
@@ -59,6 +61,7 @@ export class WidgetSessionsService {
     private readonly tokens: WidgetTokens,
     private readonly secrets: SecretBroker,
     private readonly signals: SessionSignals,
+    private readonly availability: AvailabilityService,
   ) {}
 
   /** `test`: a test chat opened from Studio, whose page is Studio itself (and never anyone else's). */
@@ -120,21 +123,31 @@ export class WidgetSessionsService {
     resumeToken?: string;
     hostOrigin?: string;
     test?: boolean;
+    /** Opened from the brand's direct chat link (W28), not from a website. */
+    direct?: boolean;
+    /** The request's country (CF-IPCountry), only to decide whether consent is asked. */
+    country?: string | null;
   }): Promise<WidgetSession> {
     const widget = await resolveWidget(this.db, input.widgetId);
     if (widget?.brandStatus !== 'active') {
       throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
     }
     assertWidgetOnline(widget.tenantStatus);
-    this.checkOrigin(widget.allowedOrigins, input.hostOrigin, input.test === true);
+    const country = input.country ?? null;
+    if (input.direct) {
+      await this.checkDirectLink(widget.tenantId, widget.brandId);
+    } else {
+      this.checkOrigin(widget.allowedOrigins, input.hostOrigin, input.test === true);
+    }
     if (input.resumeToken) {
       try {
-        return await this.refresh(input.resumeToken, input.widgetId);
+        return await this.refresh(input.resumeToken, input.widgetId, country);
       } catch {
         // An expired or foreign resume token starts a fresh anonymous session instead.
       }
     }
     const now = this.clock();
+    const origin = input.direct ? DIRECT_ORIGIN : (input.hostOrigin ?? 'unknown');
     return withTenant(this.db, { tenantId: widget.tenantId, actorId: 'widget' }, async (tx) => {
       const [principal] = await tx
         .insert(schema.customerPrincipals)
@@ -147,14 +160,24 @@ export class WidgetSessionsService {
         })
         .returning();
       if (!principal) throw new Error('principal insert returned nothing');
-      return this.openSession(
-        tx,
-        widget.tenantId,
-        widget.brandId,
-        principal,
-        input.hostOrigin ?? 'unknown',
-      );
+      return this.openSession(tx, widget.tenantId, widget.brandId, principal, origin, country);
     });
+  }
+
+  /** A chat from the direct link (W28) may start only while the brand keeps the link on. */
+  private async checkDirectLink(tenantId: string, brandId: string): Promise<void> {
+    const on = await withTenant(this.db, { tenantId, actorId: 'widget' }, async (tx) => {
+      const [row] = await tx
+        .select({ directLink: schema.brandWidgetSettings.directLink })
+        .from(schema.brandWidgetSettings)
+        .where(eq(schema.brandWidgetSettings.brandId, brandId));
+      return row?.directLink === true;
+    });
+    if (!on) {
+      throw new AppError('ORIGIN_NOT_ALLOWED', {
+        detail: 'This chat cannot be opened from a link. Please use the chat on the website.',
+      });
+    }
   }
 
   private async openSession(
@@ -163,6 +186,7 @@ export class WidgetSessionsService {
     brandId: string,
     principal: PrincipalRow,
     hostOrigin: string,
+    country: string | null,
     identityKeyId: string | null = null,
   ): Promise<WidgetSession> {
     const now = this.clock();
@@ -182,7 +206,7 @@ export class WidgetSessionsService {
       })
       .returning();
     if (!session) throw new Error('session insert returned nothing');
-    return this.view(tx, session, principal, refresh.secret);
+    return this.view(tx, session, principal, refresh.secret, country);
   }
 
   private async view(
@@ -190,12 +214,15 @@ export class WidgetSessionsService {
     session: SessionRow,
     principal: PrincipalRow,
     secret: string,
+    country: string | null,
   ): Promise<WidgetSession> {
     const [brand] = await tx
       .select()
       .from(schema.brands)
       .where(eq(schema.brands.id, session.brandId));
     if (!brand) throw new AppError('NOT_FOUND');
+    const surface = await brandSurface(tx, brand.id);
+    const consent = await consentState(tx, surface, principal.id, country);
     const access = await this.tokens.issue({
       tenantId: session.tenantId,
       brandId: session.brandId,
@@ -213,15 +240,26 @@ export class WidgetSessionsService {
         verified: principal.kind === 'verified',
         displayName: principal.displayName,
       },
-      config: widgetConfig(brand as BrandRow, this.clock(), await brandSurface(tx, brand.id), {
+      config: widgetConfig(brand as BrandRow, this.clock(), surface, {
         filesScannable: filesScannable(this.config),
+        staffOnline: await this.availability.anyOnline(tx, session.tenantId, {
+          workspaceId: brand.workspaceId,
+          brandId: brand.id,
+        }),
+        consentRequired: consent.required,
+        consentGiven: consent.given,
+        direct: session.hostOrigin === DIRECT_ORIGIN,
       }),
       conversations: await principalConversations(tx, principal.id),
     };
   }
 
   /** Rotates the refresh token. Reusing an old one revokes the session (theft detection). */
-  async refresh(refreshToken: string, widgetId?: string): Promise<WidgetSession> {
+  async refresh(
+    refreshToken: string,
+    widgetId?: string,
+    country: string | null = null,
+  ): Promise<WidgetSession> {
     const expired = () =>
       new AppError('SESSION_EXPIRED', { detail: 'Please start a new chat session.' });
     const [sessionPart, secret] = refreshToken.split('.');
@@ -267,16 +305,17 @@ export class WidgetSessionsService {
         return { error: true as const };
       }
       // A website removed from the brand's list can no longer keep its chats going. A test chat
-      // from Studio never was on the list: it began as a test, which is the only way in.
-      if (
-        !originAllowed(
-          brand.allowedOrigins,
-          sessionOrigin(session.hostOrigin),
-          this.config.PUBLIC_CONSOLE_ORIGIN,
-        )
-      ) {
-        return { error: true as const };
-      }
+      // from Studio never was on the list: it began as a test, which is the only way in. A chat
+      // from the direct link keeps going only while the brand keeps the link on (W28).
+      const allowed =
+        session.hostOrigin === DIRECT_ORIGIN
+          ? (await brandSurface(tx, brand.id)).directLink
+          : originAllowed(
+              brand.allowedOrigins,
+              sessionOrigin(session.hostOrigin),
+              this.config.PUBLIC_CONSOLE_ORIGIN,
+            );
+      if (!allowed) return { error: true as const };
       const next = newRefreshSecret();
       const [rotated] = await tx
         .update(schema.widgetSessions)
@@ -293,7 +332,10 @@ export class WidgetSessionsService {
         .from(schema.customerPrincipals)
         .where(eq(schema.customerPrincipals.id, session.principalId));
       if (!rotated || !principal) return { error: true as const };
-      return { error: false as const, value: await this.view(tx, rotated, principal, next.secret) };
+      return {
+        error: false as const,
+        value: await this.view(tx, rotated, principal, next.secret, country),
+      };
     });
     if (outcome.error) throw expired();
     return outcome.value;
@@ -316,7 +358,11 @@ export class WidgetSessionsService {
    * current principal gets a new principal and session; the old session is revoked, which also
    * closes its streams.
    */
-  async identify(claims: WidgetClaims, assertion: string): Promise<WidgetSession> {
+  async identify(
+    claims: WidgetClaims,
+    assertion: string,
+    country: string | null = null,
+  ): Promise<WidgetSession> {
     const invalid = (detail: string) => new AppError('ASSERTION_INVALID', { detail });
     let kid: string | undefined;
     try {
@@ -326,7 +372,7 @@ export class WidgetSessionsService {
     }
     if (!kid) throw invalid('The identity assertion has no key id (kid).');
     const now = this.clock();
-    const session = await this.verifyAndSwitch(claims, assertion, kid, now, invalid);
+    const session = await this.verifyAndSwitch(claims, assertion, kid, now, invalid, country);
     // The previous session's streams end now (W18): nothing of the previous person keeps flowing.
     await this.signals.ended(claims.tenantId, [claims.sessionId]);
     return session;
@@ -338,6 +384,7 @@ export class WidgetSessionsService {
     kid: string,
     now: Date,
     invalid: (detail: string) => AppError,
+    country: string | null,
   ): Promise<WidgetSession> {
     return withTenant(this.db, { tenantId: claims.tenantId, actorId: 'widget' }, async (tx) => {
       const [key] = await tx
@@ -440,6 +487,7 @@ export class WidgetSessionsService {
         claims.brandId,
         principal,
         current?.hostOrigin ?? 'unknown',
+        country,
         key.id,
       );
     });

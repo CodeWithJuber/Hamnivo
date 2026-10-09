@@ -1,7 +1,8 @@
 import type { CustomerConversation, MessagePart } from '@hamnivo/contracts';
 import { schema, type TenantTx, toPublicId } from '@hamnivo/db';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { customerView } from '../authority/views.js';
+import { customerTicket } from '../tickets/tickets.js';
 import { unreadCounts } from './read-state.js';
 
 type ControlRow = typeof schema.conversationControls.$inferSelect;
@@ -52,10 +53,28 @@ export async function lastPreview(tx: TenantTx, conversationId: string): Promise
   return text ? text.slice(0, 200) : null;
 }
 
+/** Ticket numbers and snooze times of these conversations (H19). */
+export async function ticketFacts(
+  tx: TenantTx,
+  conversationIds: string[],
+): Promise<Map<string, { number: number | null; snoozedUntil: Date | null }>> {
+  if (conversationIds.length === 0) return new Map();
+  const s = schema.conversationInboxState;
+  const rows = await tx
+    .select({ id: s.conversationId, number: s.ticketNumber, snoozedUntil: s.snoozedUntil })
+    .from(s)
+    .where(inArray(s.conversationId, conversationIds));
+  return new Map(rows.map((r) => [r.id, { number: r.number, snoozedUntil: r.snoozedUntil }]));
+}
+
 export function customerConversation(
   row: ControlRow,
   preview: string | null,
   unreadCount = 0,
+  facts: { number: number | null; snoozedUntil: Date | null } = {
+    number: null,
+    snoozedUntil: null,
+  },
 ): CustomerConversation {
   const view = customerView(row.ownerMode, row.authorityStatus);
   return {
@@ -67,6 +86,7 @@ export function customerConversation(
     unreadCount,
     lastMessagePreview: preview,
     latestSequence: row.journalSeq,
+    ticket: customerTicket(facts.number, row.authorityStatus, facts.snoozedUntil),
   };
 }
 
@@ -87,13 +107,19 @@ export async function principalConversations(
     .where(eq(c.principalId, principalId))
     .orderBy(desc(c.lastActivityAt))
     .limit(limit);
-  const unread = await unreadCounts(
-    tx,
-    rows.map((row) => row.id),
-  );
+  const ids = rows.map((row) => row.id);
+  const unread = await unreadCounts(tx, ids);
+  const tickets = await ticketFacts(tx, ids);
   const items: CustomerConversation[] = [];
   for (const row of rows) {
-    items.push(customerConversation(row, await lastPreview(tx, row.id), unread.get(row.id) ?? 0));
+    items.push(
+      customerConversation(
+        row,
+        await lastPreview(tx, row.id),
+        unread.get(row.id) ?? 0,
+        tickets.get(row.id),
+      ),
+    );
   }
   return items;
 }

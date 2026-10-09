@@ -7,14 +7,17 @@ import { ATTACHMENT_SCANNER, WidgetAttachmentsService } from './attachments.serv
 
 export { filesScannable } from './attachments.service.js';
 
+import { WidgetConsentService } from './consent.js';
 import { CustomerEmailsService } from './customer-emails.service.js';
 import { WidgetHelpService } from './help.service.js';
 import { WidgetMessagesService } from './messages.service.js';
 import { WidgetNotificationsService } from './notifications.service.js';
+import { OfflineMessagesService } from './offline-messages.service.js';
 import { SessionSignals } from './session-signals.service.js';
 import { WidgetSettingsController } from './settings.controller.js';
 import { WidgetSettingsService } from './settings.service.js';
 import { NotificationsController, WidgetSurfaceController } from './surface.controller.js';
+import { TicketEmailsService } from './ticket-emails.service.js';
 
 /** A scanner that refuses everything: production without ClamAV never takes customer files. */
 class NoScanner implements Scanner {
@@ -51,8 +54,14 @@ export function widgetSurfaceApiProviders(config: AppConfig, scanner?: Scanner):
     WidgetMessagesService,
     WidgetHelpService,
     WidgetNotificationsService,
+    WidgetConsentService,
+    OfflineMessagesService,
+    TicketEmailsService,
   ];
 }
 
-/** The worker side: customer emails (W25). */
-export const WIDGET_SURFACE_WORKER_PROVIDERS: Provider[] = [CustomerEmailsService];
+/** The worker side: customer emails (W25) and ticket confirmations (W11, H19). */
+export const WIDGET_SURFACE_WORKER_PROVIDERS: Provider[] = [
+  CustomerEmailsService,
+  TicketEmailsService,
+];

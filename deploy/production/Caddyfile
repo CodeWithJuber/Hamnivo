@@ -45,6 +45,19 @@
 		Content-Security-Policy "default-src 'self'; script-src 'self' {$HAMNIVO_CAPTCHA_ORIGIN}; frame-src 'self' {$HAMNIVO_CAPTCHA_ORIGIN} {$HAMNIVO_CHAT_ORIGIN}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 		X-Frame-Options DENY
 	}
+	# The brand's direct chat link (W28): the chat on its own page, opened from a link rather than
+	# framed by a website. Nobody may frame it, search engines leave it out, and the gateway decides
+	# per brand whether the link works at all (the session is refused while it is off).
+	@direct path /c/*
+	route @direct {
+		rewrite * /index.html
+		header {
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+			X-Robots-Tag "noindex, nofollow"
+			Cache-Control no-store
+		}
+	}
+
 	@assets path /assets/*
 	header @assets Cache-Control "public, max-age=31536000, immutable"
 	@app not path /assets/*

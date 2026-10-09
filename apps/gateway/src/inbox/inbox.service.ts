@@ -10,7 +10,20 @@ import { fromPublicId, InvalidPublicIdError, schema, type TenantTx, toPublicId }
 import type { AuthorityMessage } from '@hamnivo/domain';
 import type { StaffPrincipal } from '@hamnivo/policy';
 import { Injectable, Logger } from '@nestjs/common';
-import { and, desc, eq, ilike, inArray, lt, ne, or, type SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 import type { z } from 'zod';
 import { authorityUnavailable } from '../authority/outbound.service.js';
 import { AuthorityRegistry } from '../authority/registry.js';
@@ -56,6 +69,30 @@ function decodeCursor(value: string | undefined): Cursor | null {
   });
 }
 
+/** Tickets in one state (H19): Closed is resolved, Pending waits for the customer. */
+function ticketStateCondition(
+  state: z.output<typeof InboxListQuery>['ticketState'],
+): SQL | undefined {
+  switch (state) {
+    case undefined:
+      return undefined;
+    case 'closed':
+      return and(isNotNull(st.ticketNumber), eq(c.authorityStatus, 'resolved'));
+    case 'pending':
+      return and(
+        isNotNull(st.ticketNumber),
+        eq(c.authorityStatus, 'snoozed'),
+        isNull(st.snoozedUntil),
+      );
+    case 'open':
+      return and(
+        isNotNull(st.ticketNumber),
+        ne(c.authorityStatus, 'resolved'),
+        or(ne(c.authorityStatus, 'snoozed'), isNotNull(st.snoozedUntil)),
+      );
+  }
+}
+
 /** `mine` needs the caller; `team` needs the caller's teams. */
 function queueCondition(
   queue: z.output<typeof InboxListQuery>['queue'],
@@ -71,6 +108,8 @@ function queueCondition(
       return eq(c.ownerMode, 'AI_ACTIVE');
     case 'team':
       return teamIds.length ? inArray(st.teamId, teamIds) : sql`false`;
+    case 'tickets':
+      return isNotNull(st.ticketNumber);
     case 'all':
       return undefined;
   }
@@ -144,7 +183,9 @@ export class InboxService {
       const teams = await this.myTeams(tx, principal.staffMemberId);
       const filters = and(
         InboxAccess.condition(scope),
-        statusCondition(query.status),
+        // A ticket state names its own statuses (Pending is snoozed, Closed is resolved).
+        query.ticketState ? ticketStateCondition(query.ticketState) : statusCondition(query.status),
+        query.priority ? eq(st.priority, query.priority) : undefined,
         query.brandId ? eq(c.brandId, fromPublicId('brand', query.brandId)) : undefined,
         query.channel
           ? inArray(schema.authorityInboxes.channelType, channelTypes(query.channel))
@@ -191,6 +232,9 @@ export class InboxService {
             ? sql<number>`count(*) filter (where ${inArray(st.teamId, teams)})`
             : sql<number>`0`
           ).mapWith(Number),
+          tickets: sql<number>`count(*) filter (where ${st.ticketNumber} is not null)`.mapWith(
+            Number,
+          ),
           all: sql<number>`count(*)`.mapWith(Number),
         })
         .from(c)
@@ -214,7 +258,7 @@ export class InboxService {
           rows.length > query.limit && tail
             ? encodeCursor({ t: tail.activityKey, id: tail.control.id })
             : null,
-        counts: counts ?? { mine: 0, unassigned: 0, ai: 0, team: 0, all: 0 },
+        counts: counts ?? { mine: 0, unassigned: 0, ai: 0, team: 0, tickets: 0, all: 0 },
       };
     });
   }

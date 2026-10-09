@@ -188,6 +188,9 @@ describe('honest availability (W11)', () => {
       humanAvailable: false,
       nextOpenAt: tomorrow(),
       timezone: 'UTC',
+      staffOnline: expect.any(Boolean),
+      hoursSet: true,
+      open: false,
     });
     const started = await guest.call('POST', '/v1/widget/conversations', {
       clientMessageId: randomUUID(),
@@ -214,6 +217,9 @@ describe('honest availability (W11)', () => {
       humanAvailable: true,
       nextOpenAt: null,
       timezone: 'Asia/Karachi',
+      staffOnline: expect.any(Boolean),
+      hoursSet: true,
+      open: true,
     });
     expect((await setHours(null)).body.businessHours).toBeNull();
     const unknown = await new Visitor(slice.baseUrl, shop.brand.widgetId, shop.hostOrigin).open();
@@ -221,6 +227,9 @@ describe('honest availability (W11)', () => {
       humanAvailable: false,
       nextOpenAt: null,
       timezone: 'UTC',
+      staffOnline: expect.any(Boolean),
+      hoursSet: false,
+      open: false,
     });
   });
 

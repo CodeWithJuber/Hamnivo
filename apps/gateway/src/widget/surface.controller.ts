@@ -1,9 +1,12 @@
 import {
+  ConsentRequest,
   customerSurfaceWidgetRoutes,
+  OfflineMessageRequest,
   ReactionRequest,
   UpdateNotificationPreferencesRequest,
   widgetRoutes,
 } from '@hamnivo/contracts';
+import { toPublicId } from '@hamnivo/db';
 import {
   Body,
   Controller,
@@ -18,12 +21,17 @@ import {
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from '../common/app-error.js';
+import { IdempotencyService, validIdempotencyKey } from '../common/idempotency.service.js';
 import { parseInput } from '../common/validation.js';
+import { countryOf } from '../visitors/privacy.js';
 import { WidgetAttachmentsService } from './attachments.service.js';
+import { WidgetConsentService } from './consent.js';
 import { WidgetHelpService } from './help.service.js';
 import { WidgetMessagesService } from './messages.service.js';
 import { WidgetNotificationsService } from './notifications.service.js';
+import { OfflineMessagesService } from './offline-messages.service.js';
 import { WidgetSessionsService } from './sessions.service.js';
+import { TicketEmailsService } from './ticket-emails.service.js';
 import type { WidgetClaims } from './tokens.service.js';
 import { CurrentWidget, WidgetRoute } from './widget.guard.js';
 
@@ -45,7 +53,46 @@ export class WidgetSurfaceController {
     private readonly messages: WidgetMessagesService,
     private readonly help: WidgetHelpService,
     private readonly notifications: WidgetNotificationsService,
+    private readonly consent: WidgetConsentService,
+    private readonly offline: OfflineMessagesService,
+    private readonly idempotency: IdempotencyService,
   ) {}
+
+  /** "I agree" to the brand's words before chatting (W27). */
+  @Post('consent')
+  @WidgetRoute()
+  @HttpCode(204)
+  async giveConsent(@CurrentWidget() claims: WidgetClaims, @Body() body: unknown): Promise<void> {
+    await this.consent.give(claims, parseInput(ConsentRequest, body).noticeVersion);
+  }
+
+  /** The contact form while nobody can answer (W11): a ticket, once per request id. */
+  @Post('offline-messages')
+  @WidgetRoute()
+  async sendOfflineMessage(
+    @CurrentWidget() claims: WidgetClaims,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const input = parseInput(OfflineMessageRequest, body);
+    const result = await this.idempotency.run(
+      {
+        tenantId: claims.tenantId,
+        actor: `customer:${toPublicId('customer', claims.principalId)}`,
+        route: customerSurfaceWidgetRoutes.sendOfflineMessage.operationId,
+        key: validIdempotencyKey(request.headers['idempotency-key'] ?? input.clientRequestId),
+        body: input,
+      },
+      async () => ({
+        status: 201,
+        body: await this.offline.send(claims, input, countryOf(request.headers)),
+      }),
+    );
+    reply.status(result.status);
+    if (result.replayed) reply.header('idempotent-replayed', 'true');
+    return result.body;
+  }
 
   /**
    * Read by the loader on the brand's website, before the chat loads. A browser on a website the
@@ -161,7 +208,10 @@ export class WidgetSurfaceController {
 /** Unsubscribe links in customer emails (W25): a signed token and no session. */
 @Controller('v1/notifications')
 export class NotificationsController {
-  constructor(private readonly notifications: WidgetNotificationsService) {}
+  constructor(
+    private readonly notifications: WidgetNotificationsService,
+    private readonly tickets: TicketEmailsService,
+  ) {}
 
   private async send(reply: FastifyReply, page: { status: number; html: string }) {
     await reply
@@ -181,5 +231,16 @@ export class NotificationsController {
   @Post('unsubscribe')
   async unsubscribe(@Query('token') token: unknown, @Res() reply: FastifyReply): Promise<void> {
     await this.send(reply, await this.notifications.unsubscribe(String(token ?? '')));
+  }
+
+  /** The page a ticket's confirmation link opens (W11, H19): it asks before confirming. */
+  @Get('confirm-email')
+  async confirmEmailPage(@Query('token') token: unknown, @Res() reply: FastifyReply) {
+    await this.send(reply, await this.tickets.confirmPage(String(token ?? '')));
+  }
+
+  @Post('confirm-email')
+  async confirmEmail(@Query('token') token: unknown, @Res() reply: FastifyReply) {
+    await this.send(reply, await this.tickets.confirm(String(token ?? '')));
   }
 }

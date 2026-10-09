@@ -11,7 +11,7 @@ import {
 import { contractMessage } from '../src/authority/views.js';
 import type { AppConfig } from '../src/config.js';
 import { cleanFileName, filesScannable, sniff } from '../src/widget/attachments.service.js';
-import { launcherConfig, widgetConfig } from '../src/widget/copy.js';
+import { DEFAULT_SURFACE, launcherConfig, widgetConfig } from '../src/widget/copy.js';
 import { transcriptLine } from '../src/widget/customer-emails.service.js';
 import { excerptOf } from '../src/widget/help.service.js';
 import { escapeHtml, maskEmail, UnsubscribeTokens } from '../src/widget/notifications.service.js';
@@ -301,6 +301,7 @@ describe('the widget’s and the loader’s configuration (W02, W19)', () => {
     updatedAt: new Date(),
   } as typeof schema.brands.$inferSelect;
   const surface = (proactive: Partial<ProactiveSettings>): BrandSurface => ({
+    ...DEFAULT_SURFACE,
     settings: WidgetSettings.parse({ layout: { mode: 'inline' } }),
     proactive: ProactiveSettings.parse({
       enabled: true,
@@ -314,8 +315,6 @@ describe('the widget’s and the loader’s configuration (W02, W19)', () => {
       ],
       ...proactive,
     }),
-    settingsUpdatedAt: null,
-    proactiveUpdatedAt: null,
   });
   // Friday 2 October 2026: 11:00 and 20:00 in Karachi.
   const working = new Date('2026-10-02T06:00:00Z');
