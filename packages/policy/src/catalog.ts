@@ -63,6 +63,10 @@ export const PERMISSIONS = {
     stepUp: true,
     stepUpReads: true,
   },
+  'visitors.block': {
+    description: 'Block and unblock visitors who misuse the chat',
+    scopes: ALL,
+  },
   'inbox.manage': {
     description: 'Configure inboxes, routing and business hours',
     scopes: ['tenant', 'workspace', 'brand', 'inbox'],

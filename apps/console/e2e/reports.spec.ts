@@ -115,7 +115,7 @@ test('HNV-23-01 HNV-23-02 O04 · reports withhold small groups, then show the da
   test.setTimeout(180_000);
   const workspace = await seedWorkspace({ connect: true, publish: true });
   const { staff } = workspace;
-  await customerAsks(workspace.brand.widgetId, 'Where is my order?');
+  const first = await customerAsks(workspace.brand.widgetId, 'Where is my order?');
   await customerAsks(workspace.brand.widgetId, 'Do you ship to Lahore?');
   await expect
     .poll(async () => (await overview(staff)).totals.firstResponseMedianSeconds.sample, {
@@ -170,6 +170,13 @@ test('HNV-23-01 HNV-23-02 O04 · reports withhold small groups, then show the da
   const reasons = page.getByTestId('handoff-reasons');
   await expect(reasons).toContainText('The customer asked for a person');
   await expect(reasons).toContainText('Small sample');
+  // Chats that went wrong: none missed or left with the contact form; no chat was closed, so
+  // there is no reopen rate yet.
+  await expect(page.getByRole('heading', { name: 'Chats that went wrong' })).toBeVisible();
+  await expect(page.getByTestId('tile-missed')).toContainText('Missed chats');
+  await expect(page.getByTestId('tile-offline-messages')).toContainText('Contact form messages0');
+  await expect(page.getByTestId('tile-reopened')).toContainText('Small sample');
+  await expect(page.getByTestId('tile-reopened')).toContainText('Withheld: fewer than 5');
   await page.getByText('Show the numbers as a table').click();
   await expect(table.getByRole('row').last()).toContainText('6');
 
@@ -211,6 +218,24 @@ test('HNV-23-01 HNV-23-02 O04 · reports withhold small groups, then show the da
   await expect(page).toHaveURL(/tab=ai/);
   violations.push(...(await audit(page, 'reports ai (en)')));
 
+  // Tickets: none yet, then one the team made, withheld as a small group like everything else.
+  await page.getByRole('tab', { name: 'Tickets' }).click();
+  await expect(page).toHaveURL(/tab=tickets/);
+  await expect(page.getByTestId('report-empty')).toContainText('No tickets in this date range');
+  await staff.call('POST', `/v1/inbox/conversations/${first.id}/ticket`, { priority: 'high' });
+  await page.reload();
+  await expect(page.getByRole('tab', { name: 'Tickets', selected: true })).toBeVisible();
+  for (const tile of ['created', 'open', 'close-time']) {
+    await expect(page.getByTestId(`tile-tickets-${tile}`)).toBeVisible();
+  }
+  await expect(page.getByTestId('tile-tickets-created')).toContainText('Small sample');
+  await expect(page.getByTestId('tile-tickets-closed')).toContainText('0');
+  const priorities = page.getByTestId('tickets-by-priority');
+  await expect(priorities.getByRole('row').nth(1)).toContainText('HighSmall sample');
+  const sources = page.getByTestId('tickets-by-source');
+  await expect(sources.getByRole('row').nth(1)).toContainText('StaffSmall sample');
+  violations.push(...(await audit(page, 'reports tickets (en)')));
+
   // Right to left: the same report in Arabic.
   await page.goto('/reports?lang=ar');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
@@ -220,7 +245,7 @@ test('HNV-23-01 HNV-23-02 O04 · reports withhold small groups, then show the da
 
   // On a phone, every tab (the day table open) fits without sideways scrolling and passes axe.
   const overflowing: string[] = [];
-  for (const tab of ['quality', 'teams', 'ai', 'billing']) {
+  for (const tab of ['quality', 'teams', 'tickets', 'ai', 'billing']) {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/reports?tab=${tab}&lang=ar`);
     await expect(page.locator('h1').first()).toBeVisible();

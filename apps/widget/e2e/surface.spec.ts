@@ -976,3 +976,60 @@ test.describe('reopen (W15)', () => {
       .not.toBe('resolved');
   });
 });
+
+test.describe('chat that isn’t available (H20)', () => {
+  test('a blocked visitor reads only that chat isn’t available, can still read, and chats again once unblocked', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const frame = await openWidget(page);
+    await ask(frame, 'You are all useless, answer me now');
+    await waitForAnswer(frame);
+    const id = await conversationOf(frame);
+    // The team blocks the visitor from the chat, as Studio does, and leaves the chat open.
+    const block = (await staff('POST', `/v1/inbox/conversations/${id}/block`, {
+      reason: 'Abusive messages',
+      duration: 'day',
+      closeChat: false,
+    })) as { id: string; active: boolean };
+    expect(block.active).toBe(true);
+
+    // The next message is refused: the chat says chat isn't available, without an error or why.
+    await textbox(frame).fill('Hello? Anyone?');
+    await textbox(frame).press('Enter');
+    const notice = frame.getByTestId('chat-unavailable');
+    await expect(notice).toHaveText('Chat isn’t available right now.');
+    await expect(frame.getByRole('alert').filter({ hasText: 'Not sent.' })).toContainText(
+      'Not sent. Chat isn’t available right now.',
+    );
+    await expect(textbox(frame)).toHaveCount(0);
+    await expect(frame.getByRole('button', { name: 'Talk to a person' })).toHaveCount(0);
+    await expect(frame.getByRole('button', { name: 'Retry' })).toHaveCount(0);
+    await expect(frame.locator('body')).not.toContainText(/block/i);
+    // The gateway refused it: the team never receives it.
+    const seen = await staff('GET', `/v1/inbox/conversations/${id}/messages`);
+    expect(JSON.stringify(seen)).toContain('You are all useless, answer me now');
+    expect(JSON.stringify(seen)).not.toContain('Hello? Anyone?');
+    await audit(page);
+    // The visitor drops the message that wasn't sent.
+    await frame.getByRole('button', { name: 'Remove' }).click();
+    await expect(frame.getByText('Hello? Anyone?')).toHaveCount(0);
+
+    // On the next visit the session says so at once; the conversation can still be read.
+    const again = await openWidget(page);
+    await expect(again.getByTestId('chat-unavailable')).toHaveText(
+      'Chat isn’t available right now.',
+    );
+    await expect(again.getByText('You are all useless, answer me now').first()).toBeVisible();
+    await expect(textbox(again)).toHaveCount(0);
+    await expect(again.locator('body')).not.toContainText(/block/i);
+    await audit(page);
+
+    // Unblocked, the visitor can chat again.
+    await staff('DELETE', `/v1/visitors/blocks/${block.id}`);
+    const after = await openWidget(page);
+    await expect(textbox(after)).toBeVisible();
+    await expect(after.getByTestId('chat-unavailable')).toHaveCount(0);
+    await ask(after, 'Sorry about earlier');
+  });
+});

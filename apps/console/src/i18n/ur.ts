@@ -1,4 +1,5 @@
 import { automationsUr } from './automations/ur';
+import { blockingUr } from './blocking/ur';
 import { cachingUr } from './caching';
 import { chatWidgetUr } from './chat-widget/ur';
 import { checksUr } from './checks';
@@ -963,6 +964,7 @@ export const ur: Translation = {
       all: 'سب',
     },
     tickets: ticketsUr,
+    blocking: blockingUr,
     keys: {
       plain: 'کلیدیں: حرکت کے لیے ↑ ↓ یا J K، کھولنے کے لیے Enter، واپسی کے لیے Esc۔',
       withSelect:
@@ -2315,6 +2317,7 @@ export const ur: Translation = {
   },
   permissionAreas: {
     conversations: 'گفتگو',
+    visitors: 'وزیٹر',
     inbox: 'ان باکس اور روٹنگ',
     teams: 'ٹیمیں',
     members: 'اراکین',
@@ -2357,6 +2360,7 @@ export const ur: Translation = {
       review: 'دوسروں کی گفتگو کا جائزہ لیں اور رہنمائی کریں',
       export: 'گفتگو کے ٹرانسکرپٹ ایکسپورٹ کریں',
     },
+    visitors: { block: 'چیٹ کا غلط استعمال کرنے والے وزیٹرز کو بلاک اور ان بلاک کریں' },
     inbox: { manage: 'ان باکس، روٹنگ اور کام کے اوقات سیٹ کریں' },
     teams: { manage: 'ٹیمیں بنائیں اور رکنیت سنبھالیں' },
     members: {

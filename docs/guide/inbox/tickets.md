@@ -43,3 +43,15 @@ Good to know:
   happens. Look again and try once more.
 - A conversation never gets a second ticket number.
 - The customer sees their ticket's reference and state in the chat.
+
+## Ticket reports
+
+**Reports → Tickets** shows, for the dates you choose:
+
+- tickets created and closed, and how many are open right now;
+- the median time from opening a ticket to closing it;
+- tickets by priority and by source (contact form, staff, automation).
+
+**Reports → Quality** also counts missed chats (the customer wrote and nobody answered within an
+hour), contact form messages and how often closed chats are opened again. Small groups are hidden,
+as everywhere in Reports, so no single customer can be picked out.

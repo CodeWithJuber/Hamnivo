@@ -393,3 +393,111 @@ describe('commerce aggregates', () => {
     expect(held.commerce[0]).toMatchObject({ orders: null, revenueMinor: null, suppressed: true });
   });
 });
+
+describe('missed chats, contact form messages, reopens and tickets (O04, H19)', () => {
+  let brand3: string;
+  let brand3Public: string;
+
+  beforeAll(async () => {
+    const third = await shop.owner.post('/v1/admin/brands', {
+      workspaceId: shop.workspaceId,
+      name: 'Stats Desk',
+      allowedOrigins: ['https://desk.example'],
+    });
+    expect(third.status, JSON.stringify(third.body)).toBe(201);
+    brand3Public = third.body.id;
+    brand3 = fromPublicId('brand', brand3Public);
+    const connectionId = fromPublicId('connection', shop.connection.id);
+    const at = '2026-09-04T09:00:00Z';
+    // c1–c3 got no answer, c4 an answer after two hours, c5 within a minute; c6 never wrote.
+    const plan = [
+      { response: null, resolved: 600, reopened: true, ticket: true },
+      { response: null, resolved: 1200, reopened: true, ticket: true },
+      { response: null, resolved: null, reopened: false, ticket: true },
+      { response: 7200, resolved: 9000, reopened: true, ticket: false },
+      { response: 60, resolved: 300, reopened: false, ticket: false },
+      { response: undefined, resolved: 1800, reopened: false, ticket: true },
+    ] as const;
+    await withTenant(slice.app, { tenantId }, async (tx) => {
+      const [inbox] = await tx
+        .select({ id: schema.authorityInboxes.id })
+        .from(schema.authorityInboxes)
+        .where(eq(schema.authorityInboxes.brandId, brand1));
+      if (!inbox) throw new Error('no inbox');
+      const [principal] = await tx
+        .insert(schema.customerPrincipals)
+        .values({ tenantId, brandId: brand3, kind: 'anonymous' })
+        .returning();
+      let n = 0;
+      for (const planned of plan) {
+        n += 1;
+        const id = newId();
+        await tx.insert(schema.conversationControls).values({
+          id,
+          tenantId,
+          connectionId,
+          inboxId: inbox.id,
+          brandId: brand3,
+          principalId: principal?.id ?? null,
+          externalConversationId: 95_000 + n,
+          ownerMode: 'WAITING_HUMAN',
+          authorityStatus: planned.resolved === null ? 'open' : 'resolved',
+          createdAt: new Date(at),
+        });
+        await tx
+          .update(schema.conversationMetrics)
+          .set({
+            firstCustomerMessageAt: planned.response === undefined ? null : new Date(at),
+            firstResponseAt:
+              planned.response === null || planned.response === undefined
+                ? null
+                : plus(at, planned.response),
+            firstResolvedAt: planned.resolved === null ? null : plus(at, planned.resolved),
+            lastResolvedAt: planned.resolved === null ? null : plus(at, planned.resolved),
+            reopenCount: planned.reopened ? 1 : 0,
+          })
+          .where(eq(schema.conversationMetrics.id, id));
+        if (planned.ticket) {
+          await tx.insert(schema.conversationInboxState).values({
+            tenantId,
+            conversationId: id,
+            priority: 'high',
+            ticketNumber: 500 + n,
+            ticketSource: 'offline_form',
+            ticketOpenedAt: new Date(at),
+          });
+        }
+      }
+    });
+  });
+
+  it('counts missed chats, contact form messages and reopens', async () => {
+    const res = await shop.owner.get(
+      `/v1/admin/analytics/overview?${RANGE}&brandId=${brand3Public}`,
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const { quality } = res.body;
+    expect(quality.missed).toMatchObject({ value: 4, sample: 5, suppressed: false });
+    expect(quality.missed.rate).toBeCloseTo(0.8, 3);
+    expect(quality.offlineMessages).toEqual({ value: 4, sample: 6, suppressed: false });
+    expect(quality.reopened).toMatchObject({ value: 3, sample: 5, suppressed: false });
+    expect(quality.reopened.rate).toBeCloseTo(0.6, 3);
+  });
+
+  it('reports tickets opened, closed and open now, withholding small groups', async () => {
+    const { tickets } = (
+      await shop.owner.get(`/v1/admin/analytics/overview?${RANGE}&brandId=${brand3Public}`)
+    ).body;
+    expect(tickets.created).toMatchObject({ value: 4, suppressed: false });
+    expect(tickets.closed).toMatchObject({ value: 3, suppressed: false });
+    // One open ticket is fewer than three: withheld.
+    expect(tickets.openNow).toMatchObject({ value: null, suppressed: true });
+    expect(tickets.closeMedianSeconds).toEqual({ value: 1200, suppressed: false, sample: 3 });
+    expect(tickets.byPriority).toEqual([{ priority: 'high', count: 4, suppressed: false }]);
+    expect(tickets.bySource).toEqual([{ source: 'offline_form', count: 4, suppressed: false }]);
+    const csv = await shop.owner.get(`/v1/admin/analytics/export?${RANGE}&brandId=${brand3Public}`);
+    const lines = String(csv.body).trim().split('\r\n');
+    expect(lines).toContain('quality,missed,4,0.8,false,5');
+    expect(lines).toContain('tickets,created,4,,false,');
+  });
+});

@@ -241,6 +241,8 @@ export class AnalyticsService {
         left join brands b on b.tenant_id = m.tenant_id and b.id = m.brand_id
         left join conversation_inbox_state s on s.tenant_id = m.tenant_id and s.conversation_id = m.id`;
       const inRange = sql`m.created_at >= ${range.start} and m.created_at < ${range.end}`;
+      // A customer still waiting less than an hour is not missed yet.
+      const hourAgo = new Date(now.getTime() - 3_600_000);
 
       const { rows: totalsRows } = await tx.execute<Record<string, unknown>>(sql`
         select
@@ -254,6 +256,13 @@ export class AnalyticsService {
           count(*) filter (where ${inRange} and m.first_response_at is not null and m.first_customer_message_at is not null) as frt_sample,
           percentile_cont(0.5) within group (order by extract(epoch from m.first_response_at - m.first_customer_message_at))
             filter (where ${inRange} and m.first_response_at is not null and m.first_customer_message_at is not null) as frt_median,
+          count(*) filter (where ${inRange} and m.first_customer_message_at is not null
+            and (m.first_response_at is not null or m.first_customer_message_at < ${hourAgo})) as missed_sample,
+          count(*) filter (where ${inRange} and m.first_customer_message_at is not null
+            and (m.first_response_at is null and m.first_customer_message_at < ${hourAgo}
+                 or m.first_response_at > m.first_customer_message_at + interval '1 hour')) as missed,
+          count(*) filter (where ${inRange} and s.ticket_source = 'offline_form') as offline_messages,
+          count(*) filter (where ${inRange} and m.reopen_count > 0) as reopened,
           count(*) filter (where ${inRange} and m.first_resolved_at is not null) as resolution_sample,
           percentile_cont(0.5) within group (order by extract(epoch from m.first_resolved_at - m.created_at))
             filter (where ${inRange} and m.first_resolved_at is not null) as resolution_median
@@ -323,6 +332,36 @@ export class AnalyticsService {
         from ${metricsFrom}
         where ${where} and ${inRange}
         group by 1 order by 2 desc`);
+
+      // Tickets (H19): opened in the range, and open now whenever they were opened.
+      const ticketsFrom = sql`${metricsFrom}
+        join conversation_controls c on c.tenant_id = m.tenant_id and c.id = m.id`;
+      const opened = sql`s.ticket_opened_at >= ${range.start} and s.ticket_opened_at < ${range.end}`;
+      const { rows: ticketRows } = await tx.execute<Record<string, unknown>>(sql`
+        select
+          count(*) filter (where ${opened}) as created,
+          count(*) filter (where ${opened} and c.authority_status = 'resolved') as closed,
+          count(*) filter (where c.authority_status <> 'resolved') as open_now,
+          count(*) filter (where ${opened} and c.authority_status = 'resolved'
+            and m.last_resolved_at >= s.ticket_opened_at) as close_sample,
+          percentile_cont(0.5) within group (order by extract(epoch from m.last_resolved_at - s.ticket_opened_at))
+            filter (where ${opened} and c.authority_status = 'resolved'
+              and m.last_resolved_at >= s.ticket_opened_at) as close_median
+        from ${ticketsFrom}
+        where ${where} and s.ticket_number is not null`);
+      const { rows: ticketPriorityRows } = await tx.execute<{
+        priority: string | null;
+        n: string;
+      }>(sql`
+        select s.priority as priority, count(*) as n
+        from ${metricsFrom}
+        where ${where} and s.ticket_number is not null and ${opened}
+        group by 1 order by 2 desc, 1`);
+      const { rows: ticketSourceRows } = await tx.execute<{ source: string; n: string }>(sql`
+        select s.ticket_source as source, count(*) as n
+        from ${metricsFrom}
+        where ${where} and s.ticket_number is not null and ${opened}
+        group by 1 order by 2 desc, 1`);
 
       // Commerce and AI runs reach conversations recorded before analytics began, too.
       const controlsFrom = sql`conversation_controls m
@@ -412,6 +451,14 @@ export class AnalyticsService {
         { k, totalShown: true },
       );
       const ai = aiRows[0] ?? {};
+      const tk = ticketRows[0] ?? {};
+      const closeSample = num(tk.close_sample);
+      /** A count, withheld when it is a small group. */
+      const count = (value: number, sample: number) => ({
+        value: protectCount(value, k),
+        suppressed: protectCount(value, k) === null,
+        sample,
+      });
 
       return {
         range: { from: range.from, to: range.to, timezone: tz, days: range.days },
@@ -457,6 +504,47 @@ export class AnalyticsService {
             suppressed: csatSample > 0 && csatSample < k,
             sample: csatSample,
           },
+        },
+        quality: {
+          missed: {
+            value: protectCount(num(t.missed), k),
+            suppressed: protectCount(num(t.missed), k) === null,
+            sample: num(t.missed_sample),
+            rate: round(heldRate(num(t.missed), num(t.missed_sample), k)),
+          },
+          offlineMessages: count(num(t.offline_messages), conversations),
+          reopened: {
+            value: protectCount(num(t.reopened), k),
+            suppressed: protectCount(num(t.reopened), k) === null,
+            sample: resolved,
+            rate: round(heldRate(num(t.reopened), resolved, k)),
+          },
+        },
+        tickets: {
+          created: count(num(tk.created), num(tk.created)),
+          closed: count(num(tk.closed), num(tk.created)),
+          openNow: count(num(tk.open_now), num(tk.open_now)),
+          closeMedianSeconds: {
+            value: closeSample >= k ? round(numOrNull(tk.close_median), 1) : null,
+            suppressed: closeSample > 0 && closeSample < k,
+            sample: closeSample,
+          },
+          byPriority: protectBreakdown(
+            ticketPriorityRows.map((row) => ({ priority: row.priority, count: num(row.n) })),
+            { k, totalShown: true },
+          ).map((row) => ({
+            priority: row.priority as Overview['tickets']['byPriority'][number]['priority'],
+            count: row.suppressed ? null : row.count,
+            suppressed: row.suppressed,
+          })),
+          bySource: protectBreakdown(
+            ticketSourceRows.map((row) => ({ source: row.source, count: num(row.n) })),
+            { k, totalShown: true },
+          ).map((row) => ({
+            source: row.source as Overview['tickets']['bySource'][number]['source'],
+            count: row.suppressed ? null : row.count,
+            suppressed: row.suppressed,
+          })),
         },
         daily: daily.map((day) => ({
           date: day.date,
@@ -580,6 +668,61 @@ export class AnalyticsService {
     metric('first_response_median_seconds', o.totals.firstResponseMedianSeconds);
     metric('resolution_median_seconds', o.totals.resolutionMedianSeconds);
     metric('csat_average', o.totals.csatAverage);
+    lines.push([
+      'quality',
+      'missed',
+      o.quality.missed.value,
+      o.quality.missed.rate ?? '',
+      o.quality.missed.suppressed,
+      o.quality.missed.sample,
+    ]);
+    lines.push([
+      'quality',
+      'offline_messages',
+      o.quality.offlineMessages.value,
+      '',
+      o.quality.offlineMessages.suppressed,
+      o.quality.offlineMessages.sample,
+    ]);
+    lines.push([
+      'quality',
+      'reopened',
+      o.quality.reopened.value,
+      o.quality.reopened.rate ?? '',
+      o.quality.reopened.suppressed,
+      o.quality.reopened.sample,
+    ]);
+    lines.push([
+      'tickets',
+      'created',
+      o.tickets.created.value,
+      '',
+      o.tickets.created.suppressed,
+      '',
+    ]);
+    lines.push(['tickets', 'closed', o.tickets.closed.value, '', o.tickets.closed.suppressed, '']);
+    lines.push([
+      'tickets',
+      'open_now',
+      o.tickets.openNow.value,
+      '',
+      o.tickets.openNow.suppressed,
+      '',
+    ]);
+    lines.push([
+      'tickets',
+      'close_median_seconds',
+      o.tickets.closeMedianSeconds.value,
+      '',
+      o.tickets.closeMedianSeconds.suppressed,
+      o.tickets.closeMedianSeconds.sample,
+    ]);
+    for (const row of o.tickets.byPriority) {
+      lines.push(['ticket_priority', row.priority ?? 'none', row.count, '', row.suppressed, '']);
+    }
+    for (const row of o.tickets.bySource) {
+      lines.push(['ticket_source', row.source, row.count, '', row.suppressed, '']);
+    }
     for (const day of o.daily) {
       lines.push(['daily', day.date, day.conversations, day.previous, day.suppressed, '']);
     }

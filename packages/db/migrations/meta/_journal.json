@@ -372,6 +372,20 @@
       "when": 1791546014661,
       "tag": "20261009114014_automations_data",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791550188004,
+      "tag": "20261009124947_visitor_blocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791550190945,
+      "tag": "20261009124950_visitor_blocks_security",
+      "breakpoints": true
     }
   ]
 }

@@ -22,3 +22,11 @@ export async function purgeVisitors(
     visitors: Number(row?.visitors_removed ?? 0),
   };
 }
+
+/** Removes blocks lifted or expired more than 90 days ago, across tenants (worker maintenance). */
+export async function purgeVisitorBlocks(db: Db, batch = 5000): Promise<number> {
+  const { rows } = await db.execute<{ purge_visitor_blocks: string }>(
+    sql`select app.purge_visitor_blocks(${batch}::int)`,
+  );
+  return Number(rows[0]?.purge_visitor_blocks ?? 0);
+}

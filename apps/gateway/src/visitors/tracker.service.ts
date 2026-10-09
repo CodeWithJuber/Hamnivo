@@ -15,6 +15,7 @@ import { AppError } from '../common/app-error.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { originAllowed } from '../widget/origins.js';
 import type { WidgetClaims } from '../widget/tokens.service.js';
+import { isVisitorBlocked } from './blocks.js';
 import { visitorNotice } from './copy.js';
 import { isAutomated, readDevice } from './device.js';
 import { VisitorInvites } from './invites.js';
@@ -103,6 +104,10 @@ export class VisitorTracker {
         if (!page || page.origin !== origin) return { tracking: true, visitorId: null };
         const now = this.clock();
         const visitor = await this.visitorOf(tx, widget.tenantId, widget.brandId, input.key, now);
+        // A blocked browser is neither followed nor invited (H20).
+        if (await isVisitorBlocked(tx, widget.brandId, visitor.id, visitor.principalId, now)) {
+          return { tracking: false, visitorId: null };
+        }
         await this.record(tx, {
           tenantId: widget.tenantId,
           brandId: widget.brandId,

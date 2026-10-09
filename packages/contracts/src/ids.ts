@@ -82,6 +82,7 @@ export const ID_PREFIX = {
   visitor: 'vis',
   automation: 'aut',
   automationRun: 'arun',
+  visitorBlock: 'blk',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

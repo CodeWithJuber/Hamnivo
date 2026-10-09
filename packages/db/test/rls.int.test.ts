@@ -97,6 +97,7 @@ const NEVER_DELETED = new Set([
   'http_tool_sources',
   'http_tool_endpoints',
   'tenant_counters',
+  'visitor_blocks',
 ]);
 
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
@@ -311,6 +312,7 @@ describe('two-tenant isolation', () => {
     'automations',
     'automation_versions',
     'automation_runs',
+    'visitor_blocks',
     'sso_domains',
     'sso_connections',
     'team_routing',
@@ -513,6 +515,7 @@ describe('two-tenant isolation', () => {
       'automations',
       'automation_versions',
       'automation_runs',
+      'visitor_blocks',
       'sso_domains',
       'sso_connections',
       'team_routing',

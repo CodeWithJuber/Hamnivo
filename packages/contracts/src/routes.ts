@@ -4,6 +4,7 @@ import { agentRoutes } from './agent-routes.js';
 import { aiPowerRoutes } from './ai-power.js';
 import { automationRoutes } from './automation-routes.js';
 import { analyticsRoutes, billingRoutes } from './billing-routes.js';
+import { blockRoutes } from './blocks.js';
 import { cacheRoutes } from './cache-routes.js';
 import { checkRoutes } from './check-routes.js';
 import {
@@ -435,6 +436,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...notificationRoutes,
   ...customerSurfaceAdminRoutes,
   ...automationRoutes,
+  ...blockRoutes,
   ...toolAdminRoutes,
   ...aiPowerRoutes,
   ...actionInboxRoutes,

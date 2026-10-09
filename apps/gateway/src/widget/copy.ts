@@ -131,6 +131,8 @@ export interface ConfigContext {
   consentGiven?: boolean;
   /** The session was opened from the brand's direct chat link (W28). */
   direct?: boolean;
+  /** False when this customer is blocked (H20); the widget says only that chat is unavailable. */
+  chatAvailable?: boolean;
 }
 
 const LOCALES: Locale[] = ['en', 'ar', 'hi', 'ur'];
@@ -288,6 +290,7 @@ export function widgetConfig(
       text: consentText(brand.name, surface.consent.text),
     },
     direct: options.direct === true,
+    chatAvailable: options.chatAvailable !== false,
   };
 }
 

@@ -3,6 +3,10 @@ import { automationsAr } from '../src/i18n/automations/ar';
 import { automationsEn } from '../src/i18n/automations/en';
 import { automationsHi } from '../src/i18n/automations/hi';
 import { automationsUr } from '../src/i18n/automations/ur';
+import { blockingAr } from '../src/i18n/blocking/ar';
+import { blockingEn } from '../src/i18n/blocking/en';
+import { blockingHi } from '../src/i18n/blocking/hi';
+import { blockingUr } from '../src/i18n/blocking/ur';
 import { chatWidgetAr } from '../src/i18n/chat-widget/ar';
 import { chatWidgetEn } from '../src/i18n/chat-widget/en';
 import { chatWidgetHi } from '../src/i18n/chat-widget/hi';
@@ -33,13 +37,15 @@ const placeholders = (text: string) =>
 /** Text that is the same in every language. */
 const SAME_EVERYWHERE = new Set<string>([]);
 
-// The Chat widget page, Automations and the inbox's tickets work completely in each launch language (U05).
+// The Chat widget page, Automations, the inbox's tickets and blocking visitors work completely in
+// each launch language (U05).
 // TypeScript already requires every key; this also checks placeholders, empty text and text
 // copied from the English.
 for (const [name, english, translations] of [
   ['chat widget', chatWidgetEn, { ar: chatWidgetAr, hi: chatWidgetHi, ur: chatWidgetUr }],
   ['tickets', ticketsEn, { ar: ticketsAr, hi: ticketsHi, ur: ticketsUr }],
   ['automations', automationsEn, { ar: automationsAr, hi: automationsHi, ur: automationsUr }],
+  ['blocking', blockingEn, { ar: blockingAr, hi: blockingHi, ur: blockingUr }],
 ] as const) {
   const source = flatten(english);
   describe(`the ${name} text in every language`, () => {

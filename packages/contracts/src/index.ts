@@ -8,6 +8,7 @@ export * from './automation-routes.js';
 export * from './automations.js';
 export * from './billing.js';
 export * from './billing-routes.js';
+export * from './blocks.js';
 export * from './brands.js';
 export * from './bridge.js';
 export * from './cache.js';

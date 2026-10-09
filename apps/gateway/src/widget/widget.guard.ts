@@ -8,11 +8,12 @@ import {
   SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import { AppError } from '../common/app-error.js';
 import { assertWidgetOnline } from '../identity/tenants.readonly.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
+import { blockedCondition, refusedWhenBlocked } from '../visitors/blocks.js';
 import { type WidgetClaims, WidgetTokens } from './tokens.service.js';
 
 declare module 'fastify' {
@@ -55,6 +56,9 @@ export class WidgetGuard implements CanActivate {
     const token = bearerOf(request);
     if (!token) throw new AppError('AUTH_REQUIRED', { detail: 'A widget session is required.' });
     const claims = await this.tokens.verify(token);
+    const now = this.clock();
+    // A blocked customer may still read and make privacy choices, but not chat (H20).
+    const checkBlock = refusedWhenBlocked(request.method, request.url);
     // Revocation (sign-out, identity switch, refresh-token theft) applies on the next request.
     const [session] = await withTenant(this.db, { tenantId: claims.tenantId }, (tx) =>
       tx
@@ -62,16 +66,23 @@ export class WidgetGuard implements CanActivate {
           revokedAt: schema.widgetSessions.revokedAt,
           expiresAt: schema.widgetSessions.expiresAt,
           tenantStatus: schema.tenants.status,
+          blocked: checkBlock
+            ? sql<boolean>`${blockedCondition(claims.brandId, claims.principalId, now)}`
+            : sql<boolean>`false`,
         })
         .from(schema.widgetSessions)
         .innerJoin(schema.tenants, eq(schema.tenants.id, schema.widgetSessions.tenantId))
         .where(eq(schema.widgetSessions.id, claims.sessionId)),
     );
-    if (!session || session.revokedAt || session.expiresAt <= this.clock()) {
+    if (!session || session.revokedAt || session.expiresAt <= now) {
       throw new AppError('SESSION_EXPIRED', { detail: 'This chat session has ended.' });
     }
     // A suspended workspace's chat is offline; a closed one's is gone.
     assertWidgetOnline(session.tenantStatus);
+    if (session.blocked) {
+      // The same words for every reason chat is unavailable: never that they were blocked.
+      throw new AppError('CHAT_UNAVAILABLE', { detail: 'Chat isn’t available right now.' });
+    }
     request.widget = claims;
     return true;
   }
