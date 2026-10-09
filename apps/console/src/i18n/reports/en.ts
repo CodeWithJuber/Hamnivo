@@ -10,6 +10,7 @@ export const reportsEn = {
   tabs: {
     quality: 'Service quality',
     teams: 'Team activity',
+    tickets: 'Tickets',
     ai: 'AI usage',
     billing: 'Billing',
   },
@@ -84,6 +85,50 @@ export const reportsEn = {
       human_reply: 'A person replied in Chatwoot',
       return_to_ai: 'Returned to the AI',
       unknown: 'Not recorded',
+    },
+  },
+  quality: {
+    title: 'Chats that went wrong',
+    description:
+      'Customers who wrote and got no answer within an hour, messages left with the contact form while nobody could answer, and closed chats opened again.',
+    missed: 'Missed chats',
+    missedNote: '{{rate}} of {{count}} chats where the customer wrote',
+    offlineMessages: 'Contact form messages',
+    offlineMessagesNote: 'Left while nobody could answer',
+    reopened: 'Reopen rate',
+    reopenedNote: 'Of {{count}} closed chats, opened again',
+  },
+  tickets: {
+    title: 'Tickets',
+    created: 'Created',
+    createdNote: 'Opened in this range',
+    closed: 'Closed',
+    closedNote: 'Opened in this range, and closed since',
+    openNow: 'Open now',
+    openNowNote: 'Open or waiting for the customer, whenever they were opened',
+    closeMedian: 'Median time to close',
+    byPriority: 'By priority',
+    bySource: 'By source',
+    priority: 'Priority',
+    source: 'Source',
+    count: 'Tickets',
+    priorities: {
+      urgent: 'Urgent',
+      high: 'High',
+      medium: 'Medium',
+      low: 'Low',
+      none: 'No priority',
+    },
+    sources: {
+      offline_form: 'Contact form',
+      staff: 'Staff',
+      automation: 'Automation',
+    },
+    emptyList: 'No tickets in this range.',
+    empty: {
+      title: 'No tickets in this date range',
+      description:
+        'Tickets come from the contact form, from your team and from automations. Try a different date range.',
     },
   },
   commerce: {

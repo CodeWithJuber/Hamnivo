@@ -1,4 +1,5 @@
 import { automationsEn } from './automations/en';
+import { blockingEn } from './blocking/en';
 import { cachingEn } from './caching';
 import { chatWidgetEn } from './chat-widget/en';
 import { checksEn } from './checks';
@@ -951,6 +952,7 @@ export const en = {
       all: 'All',
     },
     tickets: ticketsEn,
+    blocking: blockingEn,
     keys: {
       plain: 'Keys: ↑ ↓ or J K to move, Enter to open, Esc to come back.',
       withSelect: 'Keys: ↑ ↓ or J K to move, Enter to open, X to select, Esc to come back.',
@@ -2291,6 +2293,7 @@ export const en = {
   },
   permissionAreas: {
     conversations: 'Conversations',
+    visitors: 'Visitors',
     inbox: 'Inboxes and routing',
     teams: 'Teams',
     members: 'Members',
@@ -2333,6 +2336,7 @@ export const en = {
       review: 'Review and coach other people’s conversations',
       export: 'Export conversation transcripts',
     },
+    visitors: { block: 'Block and unblock visitors who misuse the chat' },
     inbox: { manage: 'Configure inboxes, routing and business hours' },
     teams: { manage: 'Create teams and manage membership' },
     members: {

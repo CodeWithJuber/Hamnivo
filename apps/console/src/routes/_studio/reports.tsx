@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { ReportsPage } from '../../pages/reports/ReportsPage';
 
-export type ReportsTab = 'quality' | 'teams' | 'ai' | 'billing';
+export type ReportsTab = 'quality' | 'teams' | 'tickets' | 'ai' | 'billing';
 export type ReportRange = '7d' | '30d' | '90d' | 'custom';
 
 export interface ReportsSearch {
@@ -16,7 +16,7 @@ export interface ReportsSearch {
   channelType?: string;
 }
 
-const TABS: readonly ReportsTab[] = ['quality', 'teams', 'ai', 'billing'];
+const TABS: readonly ReportsTab[] = ['quality', 'teams', 'tickets', 'ai', 'billing'];
 const RANGES: readonly ReportRange[] = ['7d', '30d', '90d', 'custom'];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined);

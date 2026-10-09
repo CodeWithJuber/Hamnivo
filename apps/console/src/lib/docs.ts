@@ -34,6 +34,8 @@ export const DOCS = {
   /** The guides for people working in the inbox. */
   inbox: {
     tickets: guide('inbox', 'tickets'),
+    /** Blocking a visitor who misuses the chat, and unblocking them. */
+    blockingVisitors: guide('inbox', 'blocking-visitors'),
   },
   /** An installation guide for one website platform, by its file name without `.md`. */
   integration: (slug: string) => guide('integrations', slug),

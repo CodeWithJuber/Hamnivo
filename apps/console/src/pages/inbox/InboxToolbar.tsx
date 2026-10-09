@@ -3,7 +3,14 @@ import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { NativeSelect, NativeSelectOption } from '@hamnivo/ui/components/native-select';
 import { cn } from '@hamnivo/ui/lib/utils';
 import { Link } from '@tanstack/react-router';
-import { BellIcon, BellRingIcon, CircleIcon, MessageSquareTextIcon, UsersIcon } from 'lucide-react';
+import {
+  BanIcon,
+  BellIcon,
+  BellRingIcon,
+  CircleIcon,
+  MessageSquareTextIcon,
+  UsersIcon,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -112,6 +119,14 @@ export function InboxToolbar() {
             <Link to="/saved-replies" search={{}} data-testid="saved-replies-link">
               <MessageSquareTextIcon aria-hidden="true" />
               {t('inboxAlerts.library.link')}
+            </Link>
+          </Button>
+        ) : null}
+        {can('visitors.block') ? (
+          <Button asChild variant="secondary" size="sm">
+            <Link to="/blocked" search={{}} data-testid="blocked-link">
+              <BanIcon aria-hidden="true" />
+              {t('inbox.blocking.page.link')}
             </Link>
           </Button>
         ) : null}

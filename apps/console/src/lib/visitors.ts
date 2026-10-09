@@ -23,6 +23,8 @@ export const DEFAULT_VISITOR_SETTINGS: VisitorSettings = {
 };
 
 export const visitorKeys = {
+  /** Every brand's live list. */
+  anyLive: ['visitors', 'live'] as const,
   conversation: (id: string) => ['visitors', 'conversation', id] as const,
   live: (brandId: string) => ['visitors', 'live', brandId] as const,
   settings: (brandId: string) => ['visitors', 'settings', brandId] as const,

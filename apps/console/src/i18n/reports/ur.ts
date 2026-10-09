@@ -12,6 +12,7 @@ export const reportsUr: ReportsTranslation = {
   tabs: {
     quality: 'سروس کا معیار',
     teams: 'ٹیم کی سرگرمی',
+    tickets: 'ٹکٹ',
     ai: 'AI کا استعمال',
     billing: 'بلنگ',
   },
@@ -87,6 +88,50 @@ export const reportsUr: ReportsTranslation = {
       human_reply: 'Chatwoot میں کسی انسان نے جواب دیا',
       return_to_ai: 'AI کو واپس کی گئی',
       unknown: 'درج نہیں',
+    },
+  },
+  quality: {
+    title: 'جو چیٹس ٹھیک نہیں رہیں',
+    description:
+      'گاہک جنہوں نے لکھا اور ایک گھنٹے میں جواب نہیں ملا، کوئی جواب دینے والا نہ ہونے پر رابطہ فارم سے چھوڑے گئے پیغامات، اور بند چیٹس جو دوبارہ کھولی گئیں۔',
+    missed: 'چھوٹی ہوئی چیٹس',
+    missedNote: 'ان {{count}} چیٹس میں سے {{rate}} جن میں گاہک نے لکھا',
+    offlineMessages: 'رابطہ فارم کے پیغامات',
+    offlineMessagesNote: 'جب کوئی جواب دینے والا نہیں تھا، تب چھوڑے گئے',
+    reopened: 'دوبارہ کھولنے کی شرح',
+    reopenedNote: '{{count}} بند چیٹس میں سے، جو دوبارہ کھولی گئیں',
+  },
+  tickets: {
+    title: 'ٹکٹ',
+    created: 'بنائے گئے',
+    createdNote: 'اس مدت میں کھولے گئے',
+    closed: 'بند کیے گئے',
+    closedNote: 'اس مدت میں کھلے، اور پھر بند ہوئے',
+    openNow: 'ابھی کھلے',
+    openNowNote: 'کھلے یا گاہک کے انتظار میں، چاہے کبھی بھی کھولے گئے ہوں',
+    closeMedian: 'بند ہونے کا درمیانی وقت',
+    byPriority: 'ترجیح کے لحاظ سے',
+    bySource: 'ذریعے کے لحاظ سے',
+    priority: 'ترجیح',
+    source: 'ذریعہ',
+    count: 'ٹکٹ',
+    priorities: {
+      urgent: 'فوری',
+      high: 'زیادہ',
+      medium: 'درمیانی',
+      low: 'کم',
+      none: 'کوئی ترجیح نہیں',
+    },
+    sources: {
+      offline_form: 'رابطہ فارم',
+      staff: 'ٹیم',
+      automation: 'آٹومیشن',
+    },
+    emptyList: 'اس مدت میں کوئی ٹکٹ نہیں۔',
+    empty: {
+      title: 'اس تاریخ کی حد میں کوئی ٹکٹ نہیں',
+      description:
+        'ٹکٹ رابطہ فارم، آپ کی ٹیم اور آٹومیشن سے آتے ہیں۔ کوئی اور تاریخ کی حد آزمائیں۔',
     },
   },
   commerce: {

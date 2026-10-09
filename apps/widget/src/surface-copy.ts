@@ -17,6 +17,8 @@ export const SURFACE_COPY = {
       noResults: 'No articles match “{{query}}”. You can ask us below.',
       resultsFor: 'Help articles for “{{query}}”',
       searchFailed: 'Search isn’t working right now. You can ask us below.',
+      noResultsOnly: 'No articles match “{{query}}”.',
+      searchFailedOnly: 'Search isn’t working right now. Try again later.',
       openArticle: 'Open the article',
     },
     conversations: {
@@ -60,6 +62,7 @@ export const SURFACE_COPY = {
         files: 'A file in it can’t be sent any more. Edit the message and attach the file again.',
         invalid: 'It can’t be sent as it is. Edit it and try again.',
         closed: 'This conversation can’t take messages right now.',
+        unavailable: 'Chat isn’t available right now.',
         other: 'It couldn’t be sent. Try again in a moment.',
       },
       retry: 'Retry',
@@ -173,6 +176,9 @@ export const SURFACE_COPY = {
       done: 'This conversation is open again. Write your message below.',
       failed: 'That didn’t work. Try again.',
     },
+    unavailable: {
+      notice: 'Chat isn’t available right now.',
+    },
     tickets: {
       label: 'Ticket {{reference}}',
       open: 'Open',
@@ -193,6 +199,8 @@ export const SURFACE_COPY = {
       noResults: 'لا توجد مقالات تطابق «{{query}}». يمكنك أن تسألنا أدناه.',
       resultsFor: 'مقالات المساعدة عن «{{query}}»',
       searchFailed: 'البحث لا يعمل الآن. يمكنك أن تسألنا أدناه.',
+      noResultsOnly: 'لا توجد مقالات تطابق «{{query}}».',
+      searchFailedOnly: 'البحث لا يعمل الآن. حاول مرة أخرى لاحقًا.',
       openArticle: 'افتح المقال',
     },
     conversations: {
@@ -236,6 +244,7 @@ export const SURFACE_COPY = {
         files: 'لم يعد ممكنًا إرسال ملف فيها. عدّل الرسالة وأرفق الملف من جديد.',
         invalid: 'لا يمكن إرسالها كما هي. عدّلها وحاول مرة أخرى.',
         closed: 'لا تقبل هذه المحادثة رسائل الآن.',
+        unavailable: 'المحادثة غير متاحة الآن.',
         other: 'تعذّر إرسالها. حاول بعد قليل.',
       },
       retry: 'إعادة المحاولة',
@@ -348,6 +357,9 @@ export const SURFACE_COPY = {
       done: 'أُعيد فتح هذه المحادثة. اكتب رسالتك أدناه.',
       failed: 'لم ينجح ذلك. حاول مرة أخرى.',
     },
+    unavailable: {
+      notice: 'المحادثة غير متاحة الآن.',
+    },
     tickets: {
       label: 'التذكرة {{reference}}',
       open: 'مفتوحة',
@@ -368,6 +380,8 @@ export const SURFACE_COPY = {
       noResults: '“{{query}}” से मिलता कोई लेख नहीं है। आप नीचे हमसे पूछ सकते हैं।',
       resultsFor: '“{{query}}” के लिए मदद के लेख',
       searchFailed: 'अभी खोज काम नहीं कर रही है। आप नीचे हमसे पूछ सकते हैं।',
+      noResultsOnly: '“{{query}}” से मिलता कोई लेख नहीं है।',
+      searchFailedOnly: 'अभी खोज काम नहीं कर रही है। बाद में फिर कोशिश करें।',
       openArticle: 'लेख खोलें',
     },
     conversations: {
@@ -411,6 +425,7 @@ export const SURFACE_COPY = {
         files: 'इसकी एक फ़ाइल अब नहीं भेजी जा सकती। संदेश बदलें और फ़ाइल फिर से जोड़ें।',
         invalid: 'इसे ऐसे नहीं भेजा जा सकता। बदलें और फिर कोशिश करें।',
         closed: 'यह बातचीत अभी संदेश नहीं ले सकती।',
+        unavailable: 'चैट अभी उपलब्ध नहीं है।',
         other: 'यह नहीं भेजा जा सका। थोड़ी देर में फिर कोशिश करें।',
       },
       retry: 'फिर कोशिश करें',
@@ -524,6 +539,9 @@ export const SURFACE_COPY = {
       done: 'यह बातचीत फिर से खुल गई है। नीचे अपना संदेश लिखें।',
       failed: 'यह नहीं हुआ। फिर कोशिश करें।',
     },
+    unavailable: {
+      notice: 'चैट अभी उपलब्ध नहीं है।',
+    },
     tickets: {
       label: 'टिकट {{reference}}',
       open: 'खुला',
@@ -544,6 +562,8 @@ export const SURFACE_COPY = {
       noResults: '“{{query}}” سے ملتا کوئی مضمون نہیں۔ آپ نیچے ہم سے پوچھ سکتے ہیں۔',
       resultsFor: '“{{query}}” کے لیے مدد کے مضامین',
       searchFailed: 'ابھی تلاش کام نہیں کر رہی۔ آپ نیچے ہم سے پوچھ سکتے ہیں۔',
+      noResultsOnly: '“{{query}}” سے ملتا کوئی مضمون نہیں۔',
+      searchFailedOnly: 'ابھی تلاش کام نہیں کر رہی۔ بعد میں دوبارہ کوشش کریں۔',
       openArticle: 'مضمون کھولیں',
     },
     conversations: {
@@ -588,6 +608,7 @@ export const SURFACE_COPY = {
           'اس کی ایک فائل اب نہیں بھیجی جا سکتی۔ پیغام میں ترمیم کریں اور فائل دوبارہ منسلک کریں۔',
         invalid: 'اسے ایسے نہیں بھیجا جا سکتا۔ ترمیم کریں اور دوبارہ کوشش کریں۔',
         closed: 'یہ گفتگو ابھی پیغامات نہیں لے سکتی۔',
+        unavailable: 'چیٹ ابھی دستیاب نہیں ہے۔',
         other: 'یہ نہیں بھیجا جا سکا۔ تھوڑی دیر میں دوبارہ کوشش کریں۔',
       },
       retry: 'دوبارہ کوشش کریں',
@@ -700,6 +721,9 @@ export const SURFACE_COPY = {
       button: 'مجھے ابھی بھی مدد چاہیے',
       done: 'یہ گفتگو دوبارہ کھل گئی ہے۔ نیچے اپنا پیغام لکھیں۔',
       failed: 'یہ نہیں ہو سکا۔ دوبارہ کوشش کریں۔',
+    },
+    unavailable: {
+      notice: 'چیٹ ابھی دستیاب نہیں ہے۔',
     },
     tickets: {
       label: 'ٹکٹ {{reference}}',

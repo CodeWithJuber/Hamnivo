@@ -1,5 +1,6 @@
 import {
   EventStream,
+  HamnivoApiError,
   type HamnivoClient,
   Outbox,
   type OutgoingAttachment,
@@ -52,6 +53,12 @@ export interface ChatState {
   lastSync: string | null;
   /** AI replies still being written or checked: provisional, never shown as messages. */
   drafts: readonly Draft[];
+  /**
+   * The gateway refused a chat write with CHAT_UNAVAILABLE (H20): chat isn't available to this
+   * visitor, though help, past conversations and privacy choices are. Cleared by a session that
+   * says chat is available again.
+   */
+  unavailable: boolean;
 }
 
 /** A deleted message keeps its place and author, nothing of what it said (W23). */
@@ -114,29 +121,52 @@ const EMPTY: ChatState = {
   firstUnreadId: null,
   lastSync: null,
   drafts: [],
+  unavailable: false,
 };
 
 const PAGE = 50;
 const messageOf = (error: unknown) => String((error as Error)?.message ?? error);
 
+/** The gateway's answer to a chat write from a visitor who can't chat now (H20). */
+export const isChatUnavailable = (error: unknown) =>
+  error instanceof HamnivoApiError && error.code === 'CHAT_UNAVAILABLE';
+
+/** Whether chat is available to the visitor on screen: their session says so, and no write was refused. */
+export const chatAvailable = (state: Pick<ChatState, 'session' | 'unavailable'>) =>
+  state.session?.config.chatAvailable !== false && !state.unavailable;
+
 /**
  * Whether the person agreed before chatting follows their session (W27): it changes when they
- * agree, and when the brand's words change. The rest of the configuration stays as it started.
+ * agree, and when the brand's words change. So does whether chat is available to them (H20), for
+ * example once a block is lifted. The rest of the configuration stays as it started.
  */
 function followConsent(state: ChatState, session: WidgetSession): ChatState {
   const shown = state.session;
+  if (!shown || shown.principal.id !== session.principal.id) return state;
   const next = session.config?.consent;
-  if (!shown || !next || shown.principal.id !== session.principal.id) return state;
   const now = shown.config.consent;
-  if (
-    now &&
-    now.required === next.required &&
-    now.given === next.given &&
-    now.noticeVersion === next.noticeVersion
-  ) {
-    return state;
-  }
-  return { ...state, session: { ...shown, config: { ...shown.config, consent: next } } };
+  const sameConsent =
+    !next ||
+    (now &&
+      now.required === next.required &&
+      now.given === next.given &&
+      now.noticeVersion === next.noticeVersion);
+  const available = session.config?.chatAvailable;
+  const sameAvailability = available === undefined || available === shown.config.chatAvailable;
+  if (sameConsent && sameAvailability) return state;
+  return {
+    ...state,
+    // A session that says chat is available again outweighs an earlier refusal.
+    unavailable: available === true ? false : state.unavailable,
+    session: {
+      ...shown,
+      config: {
+        ...shown.config,
+        ...(next && !sameConsent ? { consent: next } : {}),
+        ...(available !== undefined ? { chatAvailable: available } : {}),
+      },
+    },
+  };
 }
 
 /** The error a suspended workspace's chat starts with: it shows offline until the workspace is back. */
@@ -156,6 +186,15 @@ const startErrorOf = (error: unknown) =>
  */
 export function useChat(client: HamnivoClient) {
   const [state, setState] = useState<ChatState>(EMPTY);
+  /**
+   * Notes a refusal because chat isn't available (H20) and says whether it was one; the widget
+   * then shows that chat isn't available instead of an error.
+   */
+  const unavailableBy = useCallback((error: unknown): boolean => {
+    if (!isChatUnavailable(error)) return false;
+    setState((s) => (s.unavailable ? s : { ...s, unavailable: true }));
+    return true;
+  }, []);
   const stream = useRef<EventStream | null>(null);
   const outbox = useRef<Outbox | null>(null);
   const attaching = useRef<Promise<void> | null>(null);
@@ -458,12 +497,13 @@ export function useChat(client: HamnivoClient) {
         if (current === generation.current) await attach(conversation, Boolean(input.firstMessage));
       });
       // A start that failed can be tried again: once back online, or after agreeing (W27).
-      started.catch(() => {
+      started.catch((error) => {
         if (attaching.current === started) attaching.current = null;
+        unavailableBy(error);
       });
       return started;
     },
-    [attach, client],
+    [attach, client, unavailableBy],
   );
 
   /** The conversation to send in, started first when there is none yet. */
@@ -516,7 +556,13 @@ export function useChat(client: HamnivoClient) {
   const leaveMessage = useCallback(
     async (answers: FormAnswers, clientRequestId: string): Promise<OfflineMessageResponse> => {
       const current = generation.current;
-      const sent = await client.sendOfflineMessage({ answers }, clientRequestId);
+      let sent: OfflineMessageResponse;
+      try {
+        sent = await client.sendOfflineMessage({ answers }, clientRequestId);
+      } catch (error) {
+        unavailableBy(error);
+        throw error;
+      }
       if (current === generation.current) {
         setState((s) => ({
           ...s,
@@ -528,7 +574,7 @@ export function useChat(client: HamnivoClient) {
       }
       return sent;
     },
-    [client],
+    [client, unavailableBy],
   );
 
   const send = useCallback(
@@ -648,7 +694,13 @@ export function useChat(client: HamnivoClient) {
     const conversation = stream.current ? state.conversation : null;
     const id = conversation?.id ?? (await client.listConversations()).items[0]?.id;
     if (!id || current !== generation.current) return;
-    const outcome = await client.requestHandoff(id, crypto.randomUUID());
+    let outcome: Awaited<ReturnType<HamnivoClient['requestHandoff']>>;
+    try {
+      outcome = await client.requestHandoff(id, crypto.randomUUID());
+    } catch (error) {
+      unavailableBy(error);
+      throw error;
+    }
     if (current !== generation.current) return;
     setState((s) =>
       s.conversation
@@ -659,14 +711,20 @@ export function useChat(client: HamnivoClient) {
           }
         : s,
     );
-  }, [client, startFor, state.conversation]);
+  }, [client, startFor, state.conversation, unavailableBy]);
 
   /** Opens the closed conversation on screen again, with its history (W15). */
   const reopen = useCallback(async () => {
     const conversation = state.conversation;
     if (!conversation) return;
     const current = generation.current;
-    const reopened = await client.reopen(conversation.id);
+    let reopened: Awaited<ReturnType<HamnivoClient['reopen']>>;
+    try {
+      reopened = await client.reopen(conversation.id);
+    } catch (error) {
+      unavailableBy(error);
+      throw error;
+    }
     if (current !== generation.current) return;
     setState((s) => ({
       ...s,
@@ -674,7 +732,22 @@ export function useChat(client: HamnivoClient) {
         s.conversation?.id === reopened.id ? { ...s.conversation, ...reopened } : s.conversation,
       conversations: s.conversations.map((c) => (c.id === reopened.id ? reopened : c)),
     }));
-  }, [client, state.conversation]);
+  }, [client, state.conversation, unavailableBy]);
+
+  // A message the gateway refuses now because chat isn't available switches the chat to say so.
+  // Refusals kept from an earlier visit (the outbox survives a reload) don't: the session says
+  // whether chat is available now.
+  const sending = useRef(new Set<string>());
+  useEffect(() => {
+    let refused = false;
+    for (const item of state.outgoing) {
+      if (item.state === 'sending') sending.current.add(item.clientMessageId);
+      else if (sending.current.delete(item.clientMessageId)) {
+        refused ||= item.state === 'failed' && item.errorCode === 'CHAT_UNAVAILABLE';
+      }
+    }
+    if (refused) setState((s) => (s.unavailable ? s : { ...s, unavailable: true }));
+  }, [state.outgoing]);
 
   /** Outgoing messages not yet visible as confirmed messages. */
   const pending = useMemo(
@@ -706,5 +779,6 @@ export function useChat(client: HamnivoClient) {
     consentRequired,
     leaveMessage,
     reopen,
+    unavailableBy,
   };
 }

@@ -21,7 +21,10 @@ import { formatDate, formatNumber } from '../../lib/format';
 import {
   type AnalyticsOverview,
   downloadCsv,
+  noTickets,
   type ReportFilters,
+  ticketsByPriority,
+  ticketsBySource,
   useAnalytics,
 } from '../../lib/reports';
 import { useTenant } from '../../lib/tenant';
@@ -113,6 +116,10 @@ export function useLocaleFormat() {
           }).format(value),
   };
 }
+
+/** A count as the page writes it, or null (shown as withheld) when too few stand behind it. */
+const count = (metric: { value: number | null }) =>
+  metric.value === null ? null : formatNumber(metric.value);
 
 /** One headline number with what it stands on; withheld values say why, in neutral text. */
 function Tile({
@@ -248,6 +255,7 @@ function QualityTab({ overview }: { overview: AnalyticsOverview }) {
   const { t } = useTranslation();
   const format = useLocaleFormat();
   const totals = overview.totals;
+  const quality = overview.quality;
   const k = overview.minimumGroupSize;
   const rateNote = (rate: number | null, sample: number) =>
     rate === null
@@ -303,6 +311,43 @@ function QualityTab({ overview }: { overview: AnalyticsOverview }) {
           note={t('reports.basedOn', { count: totals.resolutionMedianSeconds.sample })}
         />
       </div>
+      <Section
+        id="went-wrong"
+        title={t('reports.quality.title')}
+        description={t('reports.quality.description')}
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Tile
+            testId="tile-missed"
+            label={t('reports.quality.missed')}
+            value={count(quality.missed)}
+            note={
+              quality.missed.rate === null
+                ? t('reports.fewer', { count: k })
+                : t('reports.quality.missedNote', {
+                    rate: format.percent(quality.missed.rate),
+                    count: quality.missed.sample,
+                  })
+            }
+          />
+          <Tile
+            testId="tile-offline-messages"
+            label={t('reports.quality.offlineMessages')}
+            value={count(quality.offlineMessages)}
+            note={t('reports.quality.offlineMessagesNote')}
+          />
+          <Tile
+            testId="tile-reopened"
+            label={t('reports.quality.reopened')}
+            value={format.percent(quality.reopened.rate)}
+            note={
+              quality.reopened.rate === null
+                ? t('reports.fewer', { count: k })
+                : t('reports.quality.reopenedNote', { count: quality.reopened.sample })
+            }
+          />
+        </div>
+      </Section>
       <Section id="per-day" title={t('reports.chart.title')}>
         <ConversationsChart
           days={overview.daily}
@@ -497,6 +542,107 @@ function TeamsTab({ overview }: { overview: AnalyticsOverview }) {
   );
 }
 
+/** A short table of counts by name, with withheld counts said in words, like the reasons above. */
+function CountTable({
+  testId,
+  head,
+  rows,
+}: {
+  testId: string;
+  head: string;
+  rows: Array<{ key: string; name: string; count: number | null }>;
+}) {
+  const { t } = useTranslation();
+  if (rows.length === 0) {
+    return <p className="text-sm text-text-secondary">{t('reports.tickets.emptyList')}</p>;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <Table data-testid={testId}>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="whitespace-normal">{head}</TableHead>
+            <TableHead className="whitespace-normal">{t('reports.tickets.count')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.key} data-key={row.key}>
+              <TableCell className="whitespace-normal">{row.name}</TableCell>
+              <TableCell className="whitespace-normal tabular-nums">
+                {row.count === null ? t('reports.smallSample') : formatNumber(row.count)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function TicketsTab({ overview }: { overview: AnalyticsOverview }) {
+  const { t } = useTranslation();
+  const format = useLocaleFormat();
+  const tickets = overview.tickets;
+  // Highest priority first, then tickets with none; sources in a fixed order, always in words.
+  const byPriority = ticketsByPriority(tickets).map((row) => ({
+    key: row.priority ?? 'none',
+    name: t(`reports.tickets.priorities.${row.priority ?? 'none'}`),
+    count: row.count,
+  }));
+  const bySource = ticketsBySource(tickets).map((row) => ({
+    key: row.source,
+    name: t(`reports.tickets.sources.${row.source}`),
+    count: row.count,
+  }));
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Tile
+          testId="tile-tickets-created"
+          label={t('reports.tickets.created')}
+          value={count(tickets.created)}
+          note={t('reports.tickets.createdNote')}
+        />
+        <Tile
+          testId="tile-tickets-closed"
+          label={t('reports.tickets.closed')}
+          value={count(tickets.closed)}
+          note={t('reports.tickets.closedNote')}
+        />
+        <Tile
+          testId="tile-tickets-open"
+          label={t('reports.tickets.openNow')}
+          value={count(tickets.openNow)}
+          note={t('reports.tickets.openNowNote')}
+        />
+        <Tile
+          testId="tile-tickets-close-time"
+          label={t('reports.tickets.closeMedian')}
+          value={format.seconds(tickets.closeMedianSeconds.value)}
+          note={t('reports.basedOn', { count: tickets.closeMedianSeconds.sample })}
+        />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Section id="tickets-by-priority" title={t('reports.tickets.byPriority')}>
+          <CountTable
+            testId="tickets-by-priority"
+            head={t('reports.tickets.priority')}
+            rows={byPriority}
+          />
+        </Section>
+        <Section id="tickets-by-source" title={t('reports.tickets.bySource')}>
+          <CountTable
+            testId="tickets-by-source"
+            head={t('reports.tickets.source')}
+            rows={bySource}
+          />
+        </Section>
+      </div>
+    </div>
+  );
+}
+
 function AiTab({ overview }: { overview: AnalyticsOverview }) {
   const { t } = useTranslation();
   const format = useLocaleFormat();
@@ -544,7 +690,7 @@ function AiTab({ overview }: { overview: AnalyticsOverview }) {
   );
 }
 
-/** Reports (O04, board 23): service quality, teams, AI use and billing, aggregates only. */
+/** Reports (O04, board 23): service quality, teams, tickets, AI use and billing, aggregates only. */
 export function ReportsPage() {
   const { t } = useTranslation();
   const { can, tenantId } = useTenant();
@@ -571,6 +717,7 @@ export function ReportsPage() {
   const visible: Record<ReportsTab, boolean> = {
     quality: can('analytics.read'),
     teams: can('analytics.read'),
+    tickets: can('analytics.read'),
     ai: can('analytics.read'),
     billing: can('billing.read'),
   };
@@ -656,21 +803,29 @@ export function ReportsPage() {
               </p>
             </div>
           ) : null}
-          {(['quality', 'teams', 'ai'] as const).map((value) => (
+          {(['quality', 'teams', 'tickets', 'ai'] as const).map((value) => (
             <TabsContent key={value} value={value} className="pt-4">
               <QueryState
                 query={analytics}
                 label={t('reports.loading')}
                 permitted={can('analytics.read')}
-                isEmpty={() => empty}
+                isEmpty={(data) => (value === 'tickets' ? noTickets(data) : empty)}
                 empty={
                   <div
                     className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-8 text-center"
                     data-testid="report-empty"
                   >
                     <BarChart3Icon className="size-6 text-text-muted" aria-hidden="true" />
-                    <p className="font-medium text-text">{t('reports.empty.title')}</p>
-                    <p className="text-sm text-text-secondary">{t('reports.empty.description')}</p>
+                    <p className="font-medium text-text">
+                      {value === 'tickets'
+                        ? t('reports.tickets.empty.title')
+                        : t('reports.empty.title')}
+                    </p>
+                    <p className="text-sm text-text-secondary">
+                      {value === 'tickets'
+                        ? t('reports.tickets.empty.description')
+                        : t('reports.empty.description')}
+                    </p>
                     <Button
                       variant="secondary"
                       onClick={() =>
@@ -693,6 +848,8 @@ export function ReportsPage() {
                     <QualityTab overview={data} />
                   ) : value === 'teams' ? (
                     <TeamsTab overview={data} />
+                  ) : value === 'tickets' ? (
+                    <TicketsTab overview={data} />
                   ) : (
                     <AiTab overview={data} />
                   )
