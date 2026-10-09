@@ -1,9 +1,11 @@
 import { cachingEn } from './caching';
+import { chatWidgetEn } from './chat-widget/en';
 import { checksEn } from './checks';
 import { commerceEn } from './commerce/en';
 import { decisionsEn } from './decisions';
 import { developerEn } from './developer/en';
 import { reportsEn } from './reports/en';
+import { ticketsEn } from './tickets/en';
 import { toolsEn } from './tools';
 import { chatSettingsEn } from './widget/en';
 
@@ -944,8 +946,10 @@ export const en = {
       unassigned: 'Waiting for a person',
       ai: 'AI answering',
       team: 'My teams',
+      tickets: 'Tickets',
       all: 'All',
     },
+    tickets: ticketsEn,
     keys: {
       plain: 'Keys: ↑ ↓ or J K to move, Enter to open, Esc to come back.',
       withSelect: 'Keys: ↑ ↓ or J K to move, Enter to open, X to select, Esc to come back.',
@@ -1007,6 +1011,11 @@ export const en = {
       team: {
         title: 'Nothing in your teams',
         description: 'Conversations given to your teams show up here.',
+      },
+      tickets: {
+        title: 'No tickets yet',
+        description:
+          'Messages left with the contact form while nobody could answer become tickets. So does any conversation you make a ticket.',
       },
       all: {
         title: 'No conversations yet',
@@ -1351,6 +1360,7 @@ export const en = {
   developer: developerEn,
   reports: reportsEn,
   chatSettings: chatSettingsEn,
+  chatWidget: chatWidgetEn,
   memory: {
     title: 'Customer memory',
     description: 'Manage what we remember about your customers.',

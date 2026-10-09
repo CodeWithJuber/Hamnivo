@@ -4,9 +4,13 @@ import {
   type ChannelFilter,
   type InboxQueue,
   type InboxSearch,
+  PRIORITIES,
   QUEUES,
   STATUSES,
   type StatusFilter,
+  TICKET_STATES,
+  type TicketPriority,
+  type TicketState,
 } from '../../lib/inbox';
 import { InboxPage } from '../../pages/inbox/InboxPage';
 
@@ -28,6 +32,13 @@ export const Route = createFileRoute('/_studio/inbox')({
     if (queue) result.queue = queue;
     if (status) result.status = status;
     if (channel) result.channel = channel;
+    // A ticket's state and priority narrow the tickets queue only.
+    if (queue === 'tickets') {
+      const ticketState = oneOf<TicketState>(TICKET_STATES, search.ticketState);
+      const priority = oneOf<TicketPriority>(PRIORITIES, search.priority);
+      if (ticketState) result.ticketState = ticketState;
+      if (priority) result.priority = priority;
+    }
     const brand = text(search.brand, 64);
     const language = text(search.language, 35);
     const tag = text(search.tag, 255);

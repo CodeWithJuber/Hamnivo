@@ -54,6 +54,7 @@ describe('the menu', () => {
       reports: ['/reports'],
       settings: [
         '/brands',
+        '/chat-widget',
         '/hours',
         '/team',
         '/support-teams',
@@ -88,6 +89,8 @@ describe('the menu', () => {
       '/finance': 'commerce.read',
       '/reports': ['analytics.read', 'billing.read'],
       '/brands': 'brands.manage',
+      // The chat's look, behaviour, forms, consent and link: for whoever configures the widget.
+      '/chat-widget': 'widget.configure',
       '/hours': 'brands.manage',
       '/team': 'members.read',
       '/support-teams': 'members.read',
@@ -180,7 +183,8 @@ describe('who sees which entry', () => {
       ['reports', '/reports'],
       ['settings', '/settings/billing'],
     ]);
-    expect(entries(role('developer'))).toContainEqual(['settings', '/team']);
+    // A developer installs the widget, so Settings opens on the chat widget.
+    expect(entries(role('developer'))).toContainEqual(['settings', '/chat-widget']);
   });
 
   // The table "What each role sees" in docs/using-hamnivo.md: change it together with this one.
@@ -207,6 +211,7 @@ describe('who sees which entry', () => {
       reports: ['/reports'],
       settings: [
         '/brands',
+        '/chat-widget',
         '/hours',
         '/team',
         '/support-teams',
@@ -247,7 +252,7 @@ describe('who sees which entry', () => {
     expect(pagesOf('developer')).toEqual({
       ...home,
       ai: ['/agents', '/models'],
-      settings: ['/team', '/support-teams', '/developer'],
+      settings: ['/chat-widget', '/team', '/support-teams', '/developer'],
     });
     expect(pagesOf('analyst')).toEqual({
       ...home,

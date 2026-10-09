@@ -27,35 +27,36 @@ test('W02 W09 W17 W23 W25 · choose how the chat looks and what customers can do
   const workspace = await seedWorkspace();
   await workspace.staff.signIn(context);
   await page.goto('/brands');
-  const open = page.getByRole('button', { name: 'Chat settings for Noor Books' });
-  // By keyboard: to the button, open, and Escape returns focus to it.
+  // By keyboard: the brand's card leads to its Chat widget page, and the Behaviour tab.
+  const open = page.getByRole('link', { name: 'Chat widget settings for Noor Books' });
   await tabTo(page, open);
   await page.keyboard.press('Enter');
-  const dialog = page.getByTestId('chat-settings-dialog');
-  await expect(dialog.getByRole('radio', { name: 'Floating button' })).toBeChecked();
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(open).toBeFocused();
+  await expect(page).toHaveURL(new RegExp(`/chat-widget\\?brand=${workspace.brand.id}`));
+  await page.getByRole('tab', { name: 'Behaviour' }).click();
+  await expect(page).toHaveURL(/tab=behaviour/);
+  const form = page.getByTestId('chat-settings-form');
+  await expect(form.getByRole('radio', { name: 'Floating button' })).toBeChecked();
 
-  await open.click();
-  await dialog.getByRole('radio', { name: 'Side panel' }).click();
-  await dialog.getByRole('combobox', { name: 'Button corner' }).selectOption('bottom-left');
-  await dialog.getByRole('checkbox', { name: 'GIF pictures' }).click();
+  await form.getByRole('radio', { name: 'Side panel' }).click();
+  await form.getByRole('combobox', { name: 'Button corner' }).selectOption('bottom-left');
+  await form.getByRole('checkbox', { name: 'GIF pictures' }).click();
   // Checked before saving: the gateway would refuse files over 10 MB.
-  await dialog.getByRole('textbox', { name: 'Largest file (MB)' }).fill('50');
-  await dialog.getByRole('button', { name: 'Add a question' }).click();
-  const question = dialog.getByRole('group', { name: 'Question 1' });
+  await form.getByRole('textbox', { name: 'Largest file (MB)' }).fill('50');
+  await form.getByRole('button', { name: 'Add a question' }).click();
+  const question = form.getByRole('group', { name: 'Question 1' });
   await question.getByRole('textbox', { name: 'English' }).fill('Where is my order?');
   await question.getByRole('textbox', { name: 'Arabic' }).fill('أين طلبي؟');
-  await dialog
+  // The picture beside the form offers the question before the customer writes.
+  await expect(page.getByTestId('preview-suggestions')).toContainText('Where is my order?');
+  await form
     .getByRole('textbox', { name: 'Customers can delete a message for (minutes)' })
     .fill('5');
-  await dialog.getByRole('button', { name: 'Save settings' }).click();
-  await expect(dialog.getByText('Enter a whole number from 1 to 10.').first()).toBeVisible();
-  await dialog.getByRole('textbox', { name: 'Largest file (MB)' }).fill('5');
-  expect(await audit(page, 'chat settings dialog')).toEqual([]);
-  await dialog.getByRole('button', { name: 'Save settings' }).click();
-  await expect(dialog).toBeHidden();
+  await form.getByRole('button', { name: 'Save settings' }).click();
+  await expect(form.getByText('Enter a whole number from 1 to 10.').first()).toBeVisible();
+  await form.getByRole('textbox', { name: 'Largest file (MB)' }).fill('5');
+  expect(await audit(page, 'chat widget behaviour tab')).toEqual([]);
+  await form.getByRole('button', { name: 'Save settings' }).click();
+  await expect(form.getByTestId('behaviour-unsaved')).toBeHidden();
 
   const saved = await workspace.staff.call<WidgetSettingsView>(
     'GET',
@@ -130,13 +131,12 @@ test('W19 · proactive prompts: off by default, checked before saving, then on',
 test('W02 W19 · the settings read right to left in Arabic', async ({ page, context }) => {
   const workspace = await seedWorkspace();
   await workspace.staff.signIn(context);
-  await page.goto('/brands?lang=ar');
+  await page.goto(`/chat-widget?brand=${workspace.brand.id}&tab=behaviour&lang=ar`);
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-  await page.getByRole('button', { name: 'إعدادات المحادثة لـ Noor Books' }).click();
-  const dialog = page.getByTestId('chat-settings-dialog');
-  await expect(dialog.getByRole('radio', { name: 'زر عائم' })).toBeChecked();
-  expect(await audit(page, 'chat settings dialog (ar)')).toEqual([]);
-  await page.keyboard.press('Escape');
+  const form = page.getByTestId('chat-settings-form');
+  await expect(form.getByRole('radio', { name: 'زر عائم' })).toBeChecked();
+  expect(await audit(page, 'chat widget behaviour tab (ar)')).toEqual([]);
+  await page.goto('/brands?lang=ar');
   await page.getByRole('button', { name: 'الرسائل الاستباقية لـ Noor Books' }).click();
   await page.getByTestId('proactive-dialog').getByRole('button', { name: 'أضف رسالة' }).click();
   expect(await audit(page, 'proactive dialog (ar)')).toEqual([]);

@@ -1,10 +1,12 @@
 import { cachingHi } from './caching';
+import { chatWidgetHi } from './chat-widget/hi';
 import { checksHi } from './checks';
 import { commerceHi } from './commerce/hi';
 import { decisionsHi } from './decisions';
 import { developerHi } from './developer/hi';
 import type { Translation } from './en';
 import { reportsHi } from './reports/hi';
+import { ticketsHi } from './tickets/hi';
 import { toolsHi } from './tools';
 import { chatSettingsHi } from './widget/hi';
 
@@ -939,8 +941,10 @@ export const hi: Translation = {
       unassigned: 'किसी व्यक्ति का इंतज़ार',
       ai: 'AI जवाब दे रहा है',
       team: 'मेरी टीमें',
+      tickets: 'टिकट',
       all: 'सभी',
     },
+    tickets: ticketsHi,
     keys: {
       plain: 'कुंजियाँ: चलने के लिए ↑ ↓ या J K, खोलने के लिए Enter, वापस आने के लिए Esc।',
       withSelect: 'कुंजियाँ: चलने के लिए ↑ ↓ या J K, खोलने के लिए Enter, चुनने के लिए X, वापस आने के लिए Esc।',
@@ -1002,6 +1006,11 @@ export const hi: Translation = {
       team: {
         title: 'आपकी टीमों में कुछ नहीं है',
         description: 'आपकी टीमों को दी गई बातचीत यहाँ दिखती हैं।',
+      },
+      tickets: {
+        title: 'अभी कोई टिकट नहीं',
+        description:
+          'जब कोई जवाब देने के लिए न हो, तब संपर्क फ़ॉर्म से छोड़े गए संदेश टिकट बन जाते हैं। वह हर बातचीत भी, जिसे आप टिकट बनाते हैं।',
       },
       all: {
         title: 'अभी कोई बातचीत नहीं',
@@ -1344,6 +1353,7 @@ export const hi: Translation = {
   developer: developerHi,
   reports: reportsHi,
   chatSettings: chatSettingsHi,
+  chatWidget: chatWidgetHi,
   memory: {
     title: 'ग्राहक मेमोरी',
     description: 'तय करें कि हम आपके ग्राहकों के बारे में क्या याद रखते हैं।',

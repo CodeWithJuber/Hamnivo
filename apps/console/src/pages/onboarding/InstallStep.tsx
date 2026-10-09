@@ -6,9 +6,14 @@ import { useTranslation } from 'react-i18next';
 import { CopyButton } from '../../components/CopyButton';
 import { SelectField } from '../../components/Fields';
 import { DOCS } from '../../lib/docs';
-import { guideSlug, isPlatform, PLATFORMS, type PlatformId } from '../../lib/install';
+import {
+  guideSlug,
+  installSnippet,
+  isPlatform,
+  PLATFORMS,
+  type PlatformId,
+} from '../../lib/install';
 import type { Brand } from '../../lib/types';
-import { installSnippet } from '../BrandsPage';
 
 /**
  * Step 6: put the chat on the website. Pick where the website is built to get that platform's

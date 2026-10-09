@@ -3,20 +3,33 @@ import { Button } from '@hamnivo/ui/components/button';
 import { FieldDescription, FieldLegend, FieldSet } from '@hamnivo/ui/components/field';
 import { FormErrorSummary } from '@hamnivo/ui/components/form-error-summary';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
+import { ReasonedAction } from '@hamnivo/ui/components/reasoned-action';
+import { useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, Trash2Icon } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppDialog, DialogFooter } from '../components/AppDialog';
-import { CheckboxField, ChoiceField, SelectField, TextField } from '../components/Fields';
+import {
+  CheckboxField,
+  ChoiceField,
+  SelectField,
+  TextareaField,
+  TextField,
+} from '../components/Fields';
 import { ActionError, QueryState } from '../components/States';
-import { api } from '../lib/api';
+import { api, isApiError } from '../lib/api';
 import { useStudioMutation, useStudioQuery } from '../lib/queries';
+import { isCancelled } from '../lib/reauth';
+import { useTenant } from '../lib/tenant';
 import type { Brand } from '../lib/types';
+import { firstPreviewLanguage, PreviewColumn } from './settings/PreviewColumn';
+import { previewLookOf, WidgetPreview } from './settings/WidgetPreview';
 
 /**
  * A brand's chat settings (widget.configure: W02 layout, W09 files, W17 help, W23 deletion, W25
- * emails) and its proactive prompts (widget.proactive, W19), each in its own dialog. The gateway
- * checks every value again; the limits here only say early what it would refuse.
+ * emails), shown on the Behaviour tab of the Chat widget page, and its proactive prompts
+ * (widget.proactive, W19) in a dialog. The gateway checks every value again; the limits here only
+ * say early what it would refuse.
  */
 
 type Settings = C.WidgetSettings;
@@ -54,8 +67,15 @@ function whole(value: string, min: number, max: number): number | null {
   return number >= min && number <= max ? number : null;
 }
 
-const settingsPath = (brand: Brand) => `/v1/admin/brands/${brand.id}/widget-settings`;
-const proactivePath = (brand: Brand) => `/v1/admin/brands/${brand.id}/proactive`;
+const settingsPath = (brand: Pick<Brand, 'id'>) => `/v1/admin/brands/${brand.id}/widget-settings`;
+const proactivePath = (brand: Pick<Brand, 'id'>) => `/v1/admin/brands/${brand.id}/proactive`;
+
+/** The query key and address of a brand's chat settings. */
+export const widgetSettingsKey = (brandId: string) => ['widget-settings', brandId] as const;
+export const useWidgetSettings = (brandId: string, enabled = true) =>
+  useStudioQuery<C.WidgetSettingsView>(widgetSettingsKey(brandId), settingsPath({ id: brandId }), {
+    enabled,
+  });
 
 /** One text per language, English first and required. */
 export function LocalizedFields({
@@ -66,6 +86,9 @@ export function LocalizedFields({
   maxLength,
   error,
   onChange,
+  multiline = false,
+  placeholders,
+  others,
 }: {
   id: string;
   legend: string;
@@ -74,27 +97,70 @@ export function LocalizedFields({
   maxLength: number;
   error?: string | undefined;
   onChange: (value: Texts) => void;
+  /** Several lines per language, for longer words such as a consent question. */
+  multiline?: boolean;
+  /** Greyed words shown in an empty box: what customers read when it stays empty. */
+  placeholders?: Partial<Texts> | undefined;
+  /**
+   * Keeps the other languages behind a disclosure with this name (English stays in view), for
+   * lists where every item has words of its own. Its name says how many are written.
+   */
+  others?: (written: number) => string;
 }) {
   const { t } = useTranslation();
+  const written = LANGS.filter((lang) => lang !== 'en' && value[lang].trim()).length;
+  const [open, setOpen] = useState(false);
+  const field = (lang: Lang) => {
+    const common = {
+      id: `${id}-${lang}`,
+      label: t(`chatSettings.languages.${lang}`),
+      lang,
+      dir: 'auto',
+      value: value[lang],
+      maxLength,
+      error: lang === 'en' ? error : undefined,
+      ...(placeholders?.[lang] ? { placeholder: placeholders[lang] } : {}),
+    };
+    return multiline ? (
+      <TextareaField
+        key={lang}
+        {...common}
+        rows={3}
+        onChange={(event) => onChange({ ...value, [lang]: event.target.value })}
+      />
+    ) : (
+      <TextField
+        key={lang}
+        {...common}
+        onChange={(event) => onChange({ ...value, [lang]: event.target.value })}
+      />
+    );
+  };
   return (
     <FieldSet className="gap-3 rounded-lg border border-border p-3">
       <FieldLegend variant="label" className="mb-0">
         {legend}
       </FieldLegend>
       {hint ? <FieldDescription className="mt-0">{hint}</FieldDescription> : null}
-      {LANGS.map((lang) => (
-        <TextField
-          key={lang}
-          id={`${id}-${lang}`}
-          label={t(`chatSettings.languages.${lang}`)}
-          lang={lang}
-          dir="auto"
-          value={value[lang]}
-          maxLength={maxLength}
-          error={lang === 'en' ? error : undefined}
-          onChange={(event) => onChange({ ...value, [lang]: event.target.value })}
-        />
-      ))}
+      {others ? (
+        <>
+          {field('en')}
+          <details
+            open={open}
+            onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
+            className="rounded-md"
+          >
+            <summary className="cursor-pointer text-sm font-medium text-text">
+              {others(written)}
+            </summary>
+            <div className="mt-3 flex flex-col gap-3">
+              {LANGS.filter((lang) => lang !== 'en').map(field)}
+            </div>
+          </details>
+        </>
+      ) : (
+        LANGS.map(field)
+      )}
     </FieldSet>
   );
 }
@@ -125,30 +191,78 @@ const settingsDraft = (s: Settings): SettingsDraft => ({
   emails: s.notifications.email,
 });
 
-function SettingsForm({
+/** Where the gateway's refusal of a settings field points (`attachments.maxMegabytes` …). */
+export function settingsControlOfPath(path: string): string {
+  const [area, key, index, lang] = path.split('.');
+  if (area === 'layout') return key === 'position' ? 'chat-position' : 'chat-mode-bubble';
+  if (area === 'attachments') {
+    if (key === 'maxMegabytes') return 'chat-maxMegabytes';
+    if (key === 'maxFiles') return 'chat-maxFiles';
+    if (key === 'allowedTypes') return `chat-type-${TYPE_KEYS['image/png']}`;
+    return 'chat-files';
+  }
+  if (area === 'help') {
+    if (key === 'suggestions' && index !== undefined && /^\d+$/.test(index)) {
+      return `chat-suggestion-${index}-${lang && (LANGS as string[]).includes(lang) ? lang : 'en'}`;
+    }
+    return 'chat-search';
+  }
+  if (area === 'deletion') return 'chat-deletion';
+  if (area === 'notifications') return 'chat-emails';
+  return 'chat-mode-bubble';
+}
+
+/**
+ * How the chat behaves (W02 layout, W09 files, W17 help, W23 deletion, W25 emails). On the Chat
+ * widget page (`layout="page"`) it shows a picture of the chat beside the fields and keeps Save in
+ * place; in a dialog (`layout="dialog"`) it has Cancel and closes once saved.
+ */
+export function SettingsForm({
   brand,
   initial,
+  layout = 'dialog',
+  appearance,
   onDone,
+  onDirtyChange,
 }: {
-  brand: Brand;
+  brand: Pick<Brand, 'id' | 'name'>;
   initial: Settings;
-  onDone: () => void;
+  layout?: 'dialog' | 'page';
+  /** The brand's saved look, to draw the picture in its colours (page only). */
+  appearance?: C.WidgetAppearance | undefined;
+  /** Cancel, or done after saving (dialog only). */
+  onDone?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { can, tenantId } = useTenant();
+  const client = useQueryClient();
   const announce = useAnnouncer();
-  const [draft, setDraft] = useState(() => settingsDraft(initial));
+  const saved = settingsDraft(initial);
+  const [draft, setDraft] = useState(saved);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [server, setServer] = useState<Record<string, string>>({});
   const [attempted, setAttempted] = useState(false);
+  const [lang, setLang] = useState<Lang>(() => firstPreviewLanguage(i18n.language));
+  const page = layout === 'page';
+  const editable = can('widget.configure');
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const save = useStudioMutation(
     (body: Settings, tenant) =>
       api<C.WidgetSettingsView>(settingsPath(brand), { method: 'PUT', body, tenant }),
-    [['widget-settings', brand.id]],
+    [widgetSettingsKey(brand.id)],
   );
-  const set = (patch: Partial<SettingsDraft>) => setDraft((d) => ({ ...d, ...patch }));
+  const set = (patch: Partial<SettingsDraft>) =>
+    setDraft((d) => {
+      const next = { ...d, ...patch };
+      onDirtyChange?.(JSON.stringify(next) !== JSON.stringify(saved));
+      return next;
+    });
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setAttempted(true);
+    setServer({});
     const next: Record<string, string> = {};
     const maxMegabytes = whole(draft.maxMegabytes, 1, 10);
     const maxFiles = whole(draft.maxFiles, 1, 5);
@@ -165,7 +279,7 @@ function SettingsForm({
     setErrors(next);
     if (Object.keys(next).length > 0) return;
     try {
-      await save.mutateAsync({
+      const result = await save.mutateAsync({
         layout: { mode: draft.mode, position: draft.position },
         attachments: {
           enabled: draft.files,
@@ -179,37 +293,49 @@ function SettingsForm({
         deletion: { windowMinutes: minutes as number },
         notifications: { email: draft.emails },
       });
+      // What was saved is the new starting point at once, without waiting for a reload.
+      client.setQueryData([tenantId, ...widgetSettingsKey(brand.id)], result);
       announce(t('chatSettings.saved', { name: brand.name }));
-      onDone();
-    } catch {
-      // Shown below the form.
+      onDirtyChange?.(false);
+      onDone?.();
+    } catch (error) {
+      if (isApiError(error, 'VALIDATION_FAILED')) {
+        const fields: Record<string, string> = {};
+        for (const field of error.fields) {
+          const id = settingsControlOfPath(field.path);
+          fields[id] ??= field.message;
+        }
+        setServer(fields);
+      }
     }
   };
 
+  const idOf = (field: string) =>
+    field.startsWith('suggestion-')
+      ? `chat-${field}-en`
+      : field === 'types'
+        ? `chat-type-${TYPE_KEYS['image/png']}`
+        : `chat-${field}`;
   const summary = attempted
-    ? Object.entries(errors).map(([field, message]) => ({
-        fieldId: field.startsWith('suggestion-')
-          ? `chat-${field}-en`
-          : field === 'types'
-            ? `chat-type-${TYPE_KEYS['image/png']}`
-            : `chat-${field}`,
-        message,
-      }))
+    ? [
+        ...Object.entries(errors).map(([field, message]) => ({ fieldId: idOf(field), message })),
+        ...Object.entries(server)
+          .filter(([id]) => !Object.keys(errors).some((field) => idOf(field) === id))
+          .map(([fieldId, message]) => ({ fieldId, message })),
+      ]
     : [];
+  /** A field's own error, from the check here or from the gateway. */
+  const errorOf = (field: string) => errors[field] ?? server[idOf(field)];
 
-  return (
-    <form
-      className="flex flex-col gap-6"
-      onSubmit={submit}
-      noValidate
-      data-testid="chat-settings-form"
-    >
+  const fields = (
+    <>
       <FormErrorSummary title={t('auth.errorSummary')} errors={summary} />
       <ChoiceField
         id="chat-mode"
         legend={t('chatSettings.layout.legend')}
         hint={t('chatSettings.layout.note')}
         value={draft.mode}
+        error={server['chat-mode-bubble']}
         onValueChange={(mode) => set({ mode: mode as SettingsDraft['mode'] })}
         choices={MODES.map((mode) => ({
           value: mode,
@@ -221,6 +347,7 @@ function SettingsForm({
         id="chat-position"
         label={t('chatSettings.layout.side')}
         value={draft.position}
+        error={server['chat-position']}
         onChange={(event) => set({ position: event.target.value as SettingsDraft['position'] })}
         options={[
           { value: 'bottom-right', label: t('chatSettings.layout.right') },
@@ -259,9 +386,9 @@ function SettingsForm({
                   }
                 />
               ))}
-              {errors.types ? (
+              {errorOf('types') ? (
                 <p className="text-sm text-danger" role="alert">
-                  {errors.types}
+                  {errorOf('types')}
                 </p>
               ) : null}
             </FieldSet>
@@ -272,7 +399,7 @@ function SettingsForm({
                 hint={t('chatSettings.files.maxMegabytesHint')}
                 inputMode="numeric"
                 value={draft.maxMegabytes}
-                error={errors.maxMegabytes}
+                error={errorOf('maxMegabytes')}
                 onChange={(event) => set({ maxMegabytes: event.target.value })}
               />
               <TextField
@@ -281,7 +408,7 @@ function SettingsForm({
                 hint={t('chatSettings.files.maxFilesHint')}
                 inputMode="numeric"
                 value={draft.maxFiles}
-                error={errors.maxFiles}
+                error={errorOf('maxFiles')}
                 onChange={(event) => set({ maxFiles: event.target.value })}
               />
             </div>
@@ -308,7 +435,7 @@ function SettingsForm({
               legend={t('chatSettings.help.question', { number: index + 1 })}
               value={question}
               maxLength={120}
-              error={errors[`suggestion-${index}`]}
+              error={errorOf(`suggestion-${index}`)}
               onChange={(value) =>
                 set({
                   suggestions: draft.suggestions.map((q, i) => (i === index ? value : q)),
@@ -346,7 +473,7 @@ function SettingsForm({
         hint={t('chatSettings.deletion.hint')}
         inputMode="numeric"
         value={draft.deleteMinutes}
-        error={errors.deletion}
+        error={errorOf('deletion')}
         onChange={(event) => set({ deleteMinutes: event.target.value })}
       />
       <CheckboxField
@@ -356,54 +483,105 @@ function SettingsForm({
         checked={draft.emails}
         onCheckedChange={(emails) => set({ emails })}
       />
-      <ActionError error={save.error} />
-      <DialogFooter>
-        <Button type="button" variant="secondary" onClick={onDone} disabled={save.isPending}>
-          {t('app.cancel')}
-        </Button>
-        <Button type="submit" busy={save.isPending}>
-          {t('chatSettings.save')}
-        </Button>
-      </DialogFooter>
-    </form>
+      <ActionError error={isCancelled(save.error) ? null : save.error} />
+      {isCancelled(save.error) ? (
+        <p role="status" className="text-sm text-text-secondary">
+          {t('app.cancelled')}
+        </p>
+      ) : null}
+      {page ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <ReasonedAction reason={editable ? null : t('chatWidget.noPermission')}>
+            <Button type="submit" busy={save.isPending} disabled={!dirty}>
+              {t('chatSettings.save')}
+            </Button>
+          </ReasonedAction>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={!dirty || save.isPending}
+            onClick={() => {
+              setDraft(saved);
+              setErrors({});
+              setServer({});
+              setAttempted(false);
+              onDirtyChange?.(false);
+            }}
+          >
+            {t('chatWidget.reset')}
+          </Button>
+          {dirty ? (
+            <span className="text-sm text-text-secondary" data-testid="behaviour-unsaved">
+              {t('chatWidget.unsaved')}
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={onDone} disabled={save.isPending}>
+            {t('app.cancel')}
+          </Button>
+          <Button type="submit" busy={save.isPending}>
+            {t('chatSettings.save')}
+          </Button>
+        </DialogFooter>
+      )}
+    </>
   );
-}
 
-export function ChatSettingsDialog({
-  brand,
-  open,
-  onOpenChange,
-}: {
-  brand: Brand;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { t } = useTranslation();
-  const query = useStudioQuery<C.WidgetSettingsView>(
-    ['widget-settings', brand.id],
-    settingsPath(brand),
-    { enabled: open },
-  );
+  if (!page) {
+    return (
+      <form
+        className="flex flex-col gap-6"
+        onSubmit={submit}
+        noValidate
+        data-testid="chat-settings-form"
+      >
+        {fields}
+      </form>
+    );
+  }
+
+  const suggestions = draft.suggestions
+    .map((question) => question[lang].trim() || question.en.trim())
+    .filter(Boolean);
   return (
-    <AppDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t('chatSettings.title', { name: brand.name })}
-      description={t('chatSettings.description')}
-      className="sm:max-w-2xl"
-      testId="chat-settings-dialog"
+    <form
+      className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]"
+      onSubmit={submit}
+      noValidate
+      data-testid="chat-settings-form"
     >
-      <QueryState query={query} label={t('chatSettings.loading')}>
-        {(data) => (
-          <SettingsForm
-            key={`${data.configVersion}`}
-            brand={brand}
-            initial={data.settings}
-            onDone={() => onOpenChange(false)}
-          />
-        )}
-      </QueryState>
-    </AppDialog>
+      <section
+        aria-labelledby="behaviour-title"
+        className="flex min-w-0 flex-col gap-6 rounded-xl border border-border bg-surface p-4 shadow-sm sm:p-6"
+      >
+        <div className="flex flex-col gap-1">
+          <h2 id="behaviour-title" tabIndex={-1} className="text-lg font-semibold text-text">
+            {t('chatWidget.behaviour.title')}
+          </h2>
+          <p className="text-sm text-text-secondary">{t('chatWidget.behaviour.description')}</p>
+        </div>
+        {fields}
+      </section>
+      <PreviewColumn
+        id="behaviour-preview"
+        lang={lang}
+        onLangChange={setLang}
+        note={t('chatWidget.preview.layout', {
+          layout: t(`chatSettings.layout.${draft.mode}`),
+          side:
+            draft.position === 'bottom-left'
+              ? t('chatSettings.layout.left')
+              : t('chatSettings.layout.right'),
+        })}
+      >
+        <WidgetPreview
+          look={previewLookOf(appearance, brand.name, lang)}
+          content={{ suggestions, attachments: draft.files }}
+        />
+      </PreviewColumn>
+    </form>
   );
 }
 

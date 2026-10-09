@@ -1,12 +1,15 @@
 import { Button } from '@hamnivo/ui/components/button';
 import { FormErrorSummary } from '@hamnivo/ui/components/form-error-summary';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
+import { ReasonedAction } from '@hamnivo/ui/components/reasoned-action';
+import { cn } from '@hamnivo/ui/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppDialog, DialogFooter } from '../../components/AppDialog';
+import { DialogFooter } from '../../components/AppDialog';
 import { CheckboxField, SelectField, TextField } from '../../components/Fields';
-import { ActionError, QueryState } from '../../components/States';
-import { LANGUAGE_NAMES, LOCALES, type Locale } from '../../i18n';
+import { ActionError } from '../../components/States';
+import { LANGUAGE_NAMES, LOCALES } from '../../i18n';
 import { isApiError } from '../../lib/api';
 import {
   type AppearanceDraft,
@@ -21,7 +24,7 @@ import { isCancelled } from '../../lib/reauth';
 import {
   checkColour,
   onColour,
-  useAppearance,
+  setupKeys,
   useSaveAppearance,
   type WidgetAppearanceView,
 } from '../../lib/setup';
@@ -33,7 +36,7 @@ import {
 import { useTenant } from '../../lib/tenant';
 import type { Brand } from '../../lib/types';
 import { LocalizedFields } from '../BrandChatSettings';
-import { DiscardChangesDialog } from './DiscardChangesDialog';
+import { firstPreviewLanguage } from './PreviewColumn';
 import { previewAway, previewText, WidgetPreview } from './WidgetPreview';
 
 const SELECTABLE_LANGUAGES: readonly ChatLanguage[] = LOCALES;
@@ -42,39 +45,51 @@ const SELECTABLE_LANGUAGES: readonly ChatLanguage[] = LOCALES;
 const pickerValue = (colour: string) =>
   /^#[0-9a-f]{6}$/i.test(colour) ? colour.toLowerCase() : '#000000';
 
+/**
+ * How a brand's chat looks and what it says (W03, board 04): the main colour, logo, corners,
+ * greeting, offline text, rating and privacy link, with a live picture of the chat beside the
+ * fields. Nothing reaches customers until it is saved.
+ *
+ * It sits on the Look tab of the Chat widget page (`layout="page"`: Save stays put after saving,
+ * and the page asks before leaving with changes), and in a dialog (`layout="dialog"`, with Cancel,
+ * closing once saved).
+ */
 export function AppearanceForm({
   brand,
   view,
+  layout = 'dialog',
   onDirtyChange,
   onCancel,
   onSaved,
 }: {
-  brand: Brand;
+  brand: Pick<Brand, 'id' | 'name'>;
   view: WidgetAppearanceView;
-  onDirtyChange: (dirty: boolean) => void;
-  /** Leaving without saving: the caller asks first when there are changes. */
-  onCancel: () => void;
-  onSaved: () => void;
+  layout?: 'dialog' | 'page';
+  onDirtyChange?: (dirty: boolean) => void;
+  /** Leaving without saving: the caller asks first when there are changes. Shows Cancel. */
+  onCancel?: () => void;
+  onSaved?: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const { can, tenantId } = useTenant();
+  const client = useQueryClient();
   const announce = useAnnouncer();
   const save = useSaveAppearance(brand.id);
   const saved = draftOf(view.appearance);
   const [draft, setDraft] = useState<AppearanceDraft>(saved);
   const [attempted, setAttempted] = useState(false);
   const [server, setServer] = useState<Record<string, string>>({});
-  const [lang, setLang] = useState<ChatLanguage>(
-    (SELECTABLE_LANGUAGES as readonly string[]).includes(i18n.language)
-      ? (i18n.language as Locale)
-      : 'en',
-  );
+  const [lang, setLang] = useState<ChatLanguage>(() => firstPreviewLanguage(i18n.language));
   const [away, setAway] = useState(false);
+  const page = layout === 'page';
+  const editable = can('widget.configure');
+  const dirty = isDirty(draft, saved);
 
   const set = (patch: Partial<AppearanceDraft>) => {
     const next = { ...draft, ...patch };
     setDraft(next);
     setServer({});
-    onDirtyChange(isDirty(next, saved));
+    onDirtyChange?.(isDirty(next, saved));
   };
 
   const problems = problemsOf(draft);
@@ -117,9 +132,12 @@ export function AppearanceForm({
     setAttempted(true);
     if (Object.values(errors).some(Boolean)) return;
     try {
-      await save.mutateAsync(bodyOf(draft));
+      const result = await save.mutateAsync(bodyOf(draft));
+      // What was saved is the new starting point at once, without waiting for a reload.
+      client.setQueryData([tenantId, ...setupKeys.appearance(brand.id)], result);
       announce(t('setup.appearance.saved', { name: brand.name }));
-      onSaved();
+      onDirtyChange?.(false);
+      onSaved?.();
     } catch (error) {
       if (isApiError(error, 'VALIDATION_FAILED')) {
         const fields: Record<string, string> = {};
@@ -132,9 +150,183 @@ export function AppearanceForm({
     }
   };
 
+  const reset = () => {
+    setDraft(saved);
+    setServer({});
+    setAttempted(false);
+    onDirtyChange?.(false);
+  };
+
   const colour = drawnColour(draft, DEFAULT_PRIMARY_COLOR);
   const on = onColour(colour);
   const logo = draft.logoUrl.trim() && !problems.logoUrl ? draft.logoUrl.trim() : null;
+
+  const fields = (
+    <>
+      <FormErrorSummary title={t('auth.errorSummary')} errors={summary} />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <TextField
+            id="look-colour"
+            label={t('setup.appearance.colour.label')}
+            hint={t('setup.appearance.colour.hint')}
+            value={draft.colour}
+            dir="ltr"
+            maxLength={7}
+            spellCheck={false}
+            className="font-mono"
+            onChange={(event) => set({ colour: event.target.value })}
+            error={errors.colour}
+          />
+          <input
+            type="color"
+            aria-label={t('setup.appearance.colour.pick')}
+            value={pickerValue(draft.colour)}
+            onChange={(event) => set({ colour: event.target.value.toUpperCase() })}
+            className="mb-1 h-10 w-14 cursor-pointer rounded-md border border-input bg-surface p-1"
+          />
+        </div>
+        {check?.problem && check.suggestion ? (
+          <div
+            className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface-sunken p-3 text-sm"
+            data-testid="colour-suggestion"
+          >
+            <span
+              aria-hidden="true"
+              className="size-6 shrink-0 rounded-md border border-border"
+              style={{ backgroundColor: check.suggestion }}
+            />
+            <span className="min-w-0 flex-1 text-text">
+              {t('setup.appearance.colour.suggest', { colour: check.suggestion })}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => set({ colour: check.suggestion ?? draft.colour })}
+            >
+              {t('setup.appearance.colour.apply', { colour: check.suggestion })}
+            </Button>
+          </div>
+        ) : null}
+      </div>
+      <TextField
+        id="look-logo"
+        label={t('setup.appearance.logo.label')}
+        hint={t('setup.appearance.logo.hint')}
+        labelNote={t('app.optional')}
+        type="url"
+        value={draft.logoUrl}
+        dir="ltr"
+        spellCheck={false}
+        maxLength={500}
+        onChange={(event) => set({ logoUrl: event.target.value })}
+        error={errors.logo}
+      />
+      <div className="flex flex-col gap-2">
+        <label htmlFor="look-radius" className="text-sm font-medium text-text">
+          {t('setup.appearance.radius.label')}{' '}
+          <span className="font-normal text-text-secondary">
+            ({t('setup.appearance.radius.value', { px: draft.radius })})
+          </span>
+        </label>
+        <input
+          id="look-radius"
+          type="range"
+          min={0}
+          max={24}
+          step={1}
+          value={draft.radius}
+          aria-describedby="look-radius-hint"
+          onChange={(event) => set({ radius: Number(event.target.value) })}
+          className="w-full"
+        />
+        <p id="look-radius-hint" className="text-sm text-text-secondary">
+          {t('setup.appearance.radius.hint')}
+        </p>
+      </div>
+      <LocalizedFields
+        id="look-greeting"
+        legend={t('setup.appearance.greeting.label')}
+        hint={t('setup.appearance.greeting.hint')}
+        value={draft.greeting}
+        maxLength={300}
+        error={errors.greeting}
+        onChange={(greeting) => set({ greeting })}
+      />
+      <LocalizedFields
+        id="look-offline"
+        legend={t('setup.appearance.offline.label')}
+        hint={t('setup.appearance.offline.hint')}
+        value={draft.offline}
+        maxLength={300}
+        error={errors.offline}
+        onChange={(offline) => set({ offline })}
+      />
+      <CheckboxField
+        id="look-csat"
+        label={t('setup.appearance.csat.label')}
+        hint={t('setup.appearance.csat.hint')}
+        checked={draft.csat}
+        onCheckedChange={(csat) => set({ csat })}
+      />
+      <TextField
+        id="look-privacy"
+        label={t('setup.appearance.privacy.label')}
+        hint={t('setup.appearance.privacy.hint')}
+        labelNote={t('app.optional')}
+        type="url"
+        value={draft.privacyUrl}
+        dir="ltr"
+        spellCheck={false}
+        maxLength={500}
+        onChange={(event) => set({ privacyUrl: event.target.value })}
+        error={errors.privacy}
+      />
+      <ActionError error={isCancelled(save.error) ? null : save.error} />
+      {isCancelled(save.error) ? (
+        <p role="status" className="text-sm text-text-secondary">
+          {t('app.cancelled')}
+        </p>
+      ) : null}
+      {page ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <ReasonedAction reason={editable ? null : t('chatWidget.noPermission')}>
+            <Button type="submit" busy={save.isPending} disabled={!dirty}>
+              {t('setup.appearance.save')}
+            </Button>
+          </ReasonedAction>
+          <Button type="button" variant="ghost" disabled={!dirty || save.isPending} onClick={reset}>
+            {t('setup.appearance.reset')}
+          </Button>
+          {dirty ? (
+            <span className="text-sm text-text-secondary" data-testid="look-unsaved">
+              {t('chatWidget.unsaved')}
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={!isDirty(draft, saved) || save.isPending}
+            onClick={reset}
+          >
+            {t('setup.appearance.reset')}
+          </Button>
+          {onCancel ? (
+            <Button type="button" variant="secondary" onClick={onCancel} disabled={save.isPending}>
+              {t('app.cancel')}
+            </Button>
+          ) : null}
+          <Button type="submit" busy={save.isPending}>
+            {t('setup.appearance.save')}
+          </Button>
+        </DialogFooter>
+      )}
+    </>
+  );
 
   return (
     <form
@@ -143,156 +335,28 @@ export function AppearanceForm({
       noValidate
       data-testid="appearance-form"
     >
-      <div className="flex min-w-0 flex-col gap-6">
-        <FormErrorSummary title={t('auth.errorSummary')} errors={summary} />
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <TextField
-              id="look-colour"
-              label={t('setup.appearance.colour.label')}
-              hint={t('setup.appearance.colour.hint')}
-              value={draft.colour}
-              dir="ltr"
-              maxLength={7}
-              spellCheck={false}
-              className="font-mono"
-              onChange={(event) => set({ colour: event.target.value })}
-              error={errors.colour}
-            />
-            <input
-              type="color"
-              aria-label={t('setup.appearance.colour.pick')}
-              value={pickerValue(draft.colour)}
-              onChange={(event) => set({ colour: event.target.value.toUpperCase() })}
-              className="mb-1 h-10 w-14 cursor-pointer rounded-md border border-input bg-surface p-1"
-            />
+      {page ? (
+        <section
+          aria-labelledby="look-title"
+          className="flex min-w-0 flex-col gap-6 rounded-xl border border-border bg-surface p-4 shadow-sm sm:p-6"
+        >
+          <div className="flex flex-col gap-1">
+            <h2 id="look-title" tabIndex={-1} className="text-lg font-semibold text-text">
+              {t('setup.appearance.title', { name: brand.name })}
+            </h2>
+            <p className="text-sm text-text-secondary">{t('setup.appearance.description')}</p>
           </div>
-          {check?.problem && check.suggestion ? (
-            <div
-              className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface-sunken p-3 text-sm"
-              data-testid="colour-suggestion"
-            >
-              <span
-                aria-hidden="true"
-                className="size-6 shrink-0 rounded-md border border-border"
-                style={{ backgroundColor: check.suggestion }}
-              />
-              <span className="min-w-0 flex-1 text-text">
-                {t('setup.appearance.colour.suggest', { colour: check.suggestion })}
-              </span>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => set({ colour: check.suggestion ?? draft.colour })}
-              >
-                {t('setup.appearance.colour.apply', { colour: check.suggestion })}
-              </Button>
-            </div>
-          ) : null}
-        </div>
-        <TextField
-          id="look-logo"
-          label={t('setup.appearance.logo.label')}
-          hint={t('setup.appearance.logo.hint')}
-          labelNote={t('app.optional')}
-          type="url"
-          value={draft.logoUrl}
-          dir="ltr"
-          spellCheck={false}
-          maxLength={500}
-          onChange={(event) => set({ logoUrl: event.target.value })}
-          error={errors.logo}
-        />
-        <div className="flex flex-col gap-2">
-          <label htmlFor="look-radius" className="text-sm font-medium text-text">
-            {t('setup.appearance.radius.label')}{' '}
-            <span className="font-normal text-text-secondary">
-              ({t('setup.appearance.radius.value', { px: draft.radius })})
-            </span>
-          </label>
-          <input
-            id="look-radius"
-            type="range"
-            min={0}
-            max={24}
-            step={1}
-            value={draft.radius}
-            aria-describedby="look-radius-hint"
-            onChange={(event) => set({ radius: Number(event.target.value) })}
-            className="w-full"
-          />
-          <p id="look-radius-hint" className="text-sm text-text-secondary">
-            {t('setup.appearance.radius.hint')}
-          </p>
-        </div>
-        <LocalizedFields
-          id="look-greeting"
-          legend={t('setup.appearance.greeting.label')}
-          hint={t('setup.appearance.greeting.hint')}
-          value={draft.greeting}
-          maxLength={300}
-          error={errors.greeting}
-          onChange={(greeting) => set({ greeting })}
-        />
-        <LocalizedFields
-          id="look-offline"
-          legend={t('setup.appearance.offline.label')}
-          hint={t('setup.appearance.offline.hint')}
-          value={draft.offline}
-          maxLength={300}
-          error={errors.offline}
-          onChange={(offline) => set({ offline })}
-        />
-        <CheckboxField
-          id="look-csat"
-          label={t('setup.appearance.csat.label')}
-          hint={t('setup.appearance.csat.hint')}
-          checked={draft.csat}
-          onCheckedChange={(csat) => set({ csat })}
-        />
-        <TextField
-          id="look-privacy"
-          label={t('setup.appearance.privacy.label')}
-          hint={t('setup.appearance.privacy.hint')}
-          labelNote={t('app.optional')}
-          type="url"
-          value={draft.privacyUrl}
-          dir="ltr"
-          spellCheck={false}
-          maxLength={500}
-          onChange={(event) => set({ privacyUrl: event.target.value })}
-          error={errors.privacy}
-        />
-        <ActionError error={isCancelled(save.error) ? null : save.error} />
-        {isCancelled(save.error) ? (
-          <p role="status" className="text-sm text-text-secondary">
-            {t('app.cancelled')}
-          </p>
-        ) : null}
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={!isDirty(draft, saved) || save.isPending}
-            onClick={() => {
-              setDraft(saved);
-              setServer({});
-              setAttempted(false);
-              onDirtyChange(false);
-            }}
-          >
-            {t('setup.appearance.reset')}
-          </Button>
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={save.isPending}>
-            {t('app.cancel')}
-          </Button>
-          <Button type="submit" busy={save.isPending}>
-            {t('setup.appearance.save')}
-          </Button>
-        </DialogFooter>
-      </div>
-      <div className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:self-start">
+          {fields}
+        </section>
+      ) : (
+        <div className="flex min-w-0 flex-col gap-6">{fields}</div>
+      )}
+      <div
+        className={cn(
+          'flex min-w-0 flex-col gap-3 lg:sticky lg:self-start',
+          page ? 'lg:top-20' : 'lg:top-0',
+        )}
+      >
         <h3 className="text-sm font-semibold text-text">{t('setup.appearance.previewTitle')}</h3>
         <p className="text-sm text-text-secondary">{t('setup.appearance.previewNote')}</p>
         <div className="grid grid-cols-2 gap-3">
@@ -339,68 +403,5 @@ export function AppearanceForm({
         />
       </div>
     </form>
-  );
-}
-
-/**
- * How a brand's chat looks and what it says (W03, board 04): the main colour, logo, corners,
- * greeting, offline text, rating and privacy link, with a live picture of the chat beside the
- * fields. Nothing reaches customers until it is saved, and leaving with changes asks first.
- */
-export function AppearanceDialog({
-  brand,
-  open,
-  onOpenChange,
-}: {
-  brand: Brand;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { t } = useTranslation();
-  const { can } = useTenant();
-  const appearance = useAppearance(brand.id, open && can('widget.configure'));
-  const [dirty, setDirty] = useState(false);
-  const [leaving, setLeaving] = useState(false);
-
-  const close = () => {
-    setDirty(false);
-    setLeaving(false);
-    onOpenChange(false);
-  };
-  const request = (next: boolean) => {
-    if (next) return;
-    if (dirty) setLeaving(true);
-    else close();
-  };
-
-  return (
-    <>
-      <AppDialog
-        open={open}
-        onOpenChange={request}
-        title={t('setup.appearance.title', { name: brand.name })}
-        description={t('setup.appearance.description')}
-        className="sm:max-w-5xl"
-        testId="appearance-dialog"
-      >
-        <QueryState
-          query={appearance}
-          label={t('setup.appearance.loading')}
-          permitted={can('widget.configure')}
-        >
-          {(view) => (
-            <AppearanceForm
-              key={`${brand.id}-${view.configVersion}`}
-              brand={brand}
-              view={view}
-              onDirtyChange={setDirty}
-              onCancel={() => request(false)}
-              onSaved={close}
-            />
-          )}
-        </QueryState>
-      </AppDialog>
-      <DiscardChangesDialog open={leaving} onKeep={() => setLeaving(false)} onDiscard={close} />
-    </>
   );
 }

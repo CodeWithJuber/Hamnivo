@@ -1,23 +1,97 @@
-import { StatusBadge } from '@hamnivo/ui/components/status-badge';
+import { StatusBadge, type StatusTone } from '@hamnivo/ui/components/status-badge';
 import i18next from 'i18next';
 import {
   BadgeCheckIcon,
   BotIcon,
   CheckCircle2Icon,
+  ChevronDownIcon,
+  ChevronsUpIcon,
+  ChevronUpIcon,
+  CircleDotIcon,
   ClockIcon,
+  EqualIcon,
   GlobeIcon,
   HandIcon,
+  HourglassIcon,
   MailIcon,
   MessageCircleIcon,
   MessageSquareIcon,
   MoonIcon,
   PauseIcon,
   PhoneIcon,
+  TicketIcon,
   UserRoundIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { InboxConversation } from '../../lib/inbox';
+import type { InboxConversation, TicketPriority, TicketState } from '../../lib/inbox';
 import { useTenant } from '../../lib/tenant';
+
+const TICKET_TONES: Record<TicketState, StatusTone> = {
+  open: 'info',
+  pending: 'warning',
+  closed: 'success',
+};
+const TICKET_ICONS = { open: CircleDotIcon, pending: HourglassIcon, closed: CheckCircle2Icon };
+
+/** Where a ticket stands, in words and with an icon (never colour alone). */
+export function TicketStateBadge({ state }: { state: TicketState }) {
+  const { t } = useTranslation();
+  const Icon = TICKET_ICONS[state];
+  return (
+    <StatusBadge
+      tone={TICKET_TONES[state]}
+      icon={<Icon className="size-3.5" aria-hidden="true" />}
+      data-ticket-state={state}
+    >
+      {t(`inbox.tickets.stateBadge.${state}`)}
+    </StatusBadge>
+  );
+}
+
+/** A ticket's reference as people quote it: "#1042", with a ticket icon and its name for readers. */
+export function TicketReference({ reference }: { reference: string }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs font-medium text-text"
+      data-testid="ticket-reference"
+    >
+      <TicketIcon className="size-3.5 shrink-0" aria-hidden="true" />
+      <span className="sr-only">{t('inbox.tickets.reference', { reference })}</span>
+      <bdi dir="ltr" aria-hidden="true">
+        {reference}
+      </bdi>
+    </span>
+  );
+}
+
+const PRIORITY_TONES: Record<TicketPriority, StatusTone> = {
+  urgent: 'danger',
+  high: 'warning',
+  medium: 'info',
+  low: 'neutral',
+};
+const PRIORITY_ICONS = {
+  urgent: ChevronsUpIcon,
+  high: ChevronUpIcon,
+  medium: EqualIcon,
+  low: ChevronDownIcon,
+};
+
+/** How urgent a conversation is, in words and with an icon (never colour alone). */
+export function PriorityBadge({ priority }: { priority: TicketPriority }) {
+  const { t } = useTranslation();
+  const Icon = PRIORITY_ICONS[priority];
+  return (
+    <StatusBadge
+      tone={PRIORITY_TONES[priority]}
+      icon={<Icon className="size-3.5" aria-hidden="true" />}
+      data-priority={priority}
+    >
+      {t(`inbox.tickets.priorityBadge.${priority}`)}
+    </StatusBadge>
+  );
+}
 
 const locale = () => i18next.resolvedLanguage ?? i18next.language ?? 'en';
 
