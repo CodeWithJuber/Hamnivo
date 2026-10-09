@@ -923,7 +923,9 @@ test.describe('direct chat link (W28)', () => {
     const url = (link.url as string | null) ?? `${s.widgetOrigin}/c/${s.widgetId}`;
     // The widget reads its id from this path.
     expect(new URL(url).pathname).toBe(`/c/${s.widgetId}`);
-    await page.goto(url);
+    // Production builds name the gateway (VITE_HAMNIVO_API); this test build is told it here.
+    const opened = `${url}?api=${encodeURIComponent(s.apiBase)}`;
+    await page.goto(opened);
     await expect(page.getByTestId('ai-disclosure')).toBeVisible();
     await expect(page).toHaveTitle('Noor Books');
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
