@@ -106,12 +106,18 @@ export class WidgetSurfaceController {
   ) {
     const input = parseInput(customerSurfaceWidgetRoutes.launcherConfig.query, query);
     const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
-    const config = await this.sessions.launcher(input.widgetId, origin, input.locale);
+    const config = await this.sessions.launcher(
+      input.widgetId,
+      origin,
+      input.locale,
+      countryOf(request.headers),
+    );
     if (origin) {
       reply.header('access-control-allow-origin', origin);
       reply.header('vary', 'Origin');
     }
-    reply.header('cache-control', 'public, max-age=60');
+    // The prompts depend on this visitor's country and who is online: never a shared cache.
+    reply.header('cache-control', 'private, max-age=60');
     return config;
   }
 

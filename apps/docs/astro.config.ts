@@ -42,6 +42,10 @@ export default defineConfig({
           items: [{ autogenerate: { directory: 'inbox' } }],
         },
         {
+          label: 'Automation',
+          items: [{ autogenerate: { directory: 'automation' } }],
+        },
+        {
           label: 'AI',
           items: [{ autogenerate: { directory: 'ai' } }],
         },

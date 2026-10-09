@@ -2,8 +2,7 @@ import {
   ConsentSettings,
   type ConsentSettingsView,
   type DirectLinkView,
-  ProactiveSettings,
-  type ProactiveSettingsView,
+  PromptLimits,
   type WidgetAppearance,
   WidgetForms,
   type WidgetFormsView,
@@ -23,6 +22,7 @@ import { authorize, type Permission, type StaffPrincipal } from '@hamnivo/policy
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
+import { type PublishedAutomation, publishedAutomations } from '../automations/definitions.js';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { teamsForBrand } from '../decisions/team-routing.service.js';
@@ -32,7 +32,10 @@ import { parseAppearance } from './appearance.js';
 
 export interface BrandSurface {
   settings: WidgetSettings;
-  proactive: ProactiveSettings;
+  /** How many website prompts one visitor sees a day, and the quiet time after closing one. */
+  promptLimits: PromptLimits;
+  /** Website automations that are on and published (G21), in the brand's order. */
+  prompts: PublishedAutomation[];
   /** How the chat looks and what it says (W03); the defaults when left out. */
   appearance?: WidgetAppearance;
   /** The pre-chat form (W26) and the contact form (W11). */
@@ -43,7 +46,7 @@ export interface BrandSurface {
   /** The direct chat link is on (W28). */
   directLink: boolean;
   settingsUpdatedAt: Date | null;
-  proactiveUpdatedAt: Date | null;
+  promptLimitsUpdatedAt: Date | null;
   formsUpdatedAt: Date | null;
   consentUpdatedAt: Date | null;
   directLinkUpdatedAt: Date | null;
@@ -55,7 +58,7 @@ function parsed<T>(schemaOf: z.ZodType<T>, value: unknown): T {
   return result.success ? result.data : schemaOf.parse({});
 }
 
-/** A brand's widget settings, proactive prompts and appearance (defaults when it has none). */
+/** A brand's widget settings, website prompts and appearance (defaults when it has none). */
 export async function brandSurface(tx: TenantTx, brandId: string): Promise<BrandSurface> {
   const [row] = await tx
     .select()
@@ -67,14 +70,15 @@ export async function brandSurface(tx: TenantTx, brandId: string): Promise<Brand
     .where(eq(schema.brandAppearance.brandId, brandId));
   return {
     settings: parsed(WidgetSettings, row?.settings),
-    proactive: parsed(ProactiveSettings, row?.proactive),
+    promptLimits: parsed(PromptLimits, row?.proactive),
+    prompts: await publishedAutomations(tx, brandId, 'visitor'),
     appearance: parseAppearance(look?.appearance),
     forms: parsed(WidgetForms, row?.forms),
     consent: parsed(ConsentSettings, row?.consent),
     consentVersion: row?.consentVersion ?? 0,
     directLink: row?.directLink ?? false,
     settingsUpdatedAt: row?.settingsUpdatedAt ?? null,
-    proactiveUpdatedAt: row?.proactiveUpdatedAt ?? null,
+    promptLimitsUpdatedAt: row?.proactiveUpdatedAt ?? null,
     formsUpdatedAt: row?.formsUpdatedAt ?? null,
     consentUpdatedAt: row?.consentUpdatedAt ?? null,
     directLinkUpdatedAt: row?.directLinkUpdatedAt ?? null,
@@ -90,16 +94,18 @@ export function directLinkUrl(widgetOrigin: string, widgetPublicId: string): str
   }
 }
 
-type SurfaceChange =
+export type SurfaceChange =
   | { settings: WidgetSettings }
-  | { proactive: ProactiveSettings }
+  | { promptLimits: PromptLimits }
   | { forms: WidgetForms }
   | { consent: ConsentSettings; consentVersion: number }
   | { directLink: boolean };
 
 function columnsOf(change: SurfaceChange, now: Date) {
   if ('settings' in change) return { settings: change.settings, settingsUpdatedAt: now };
-  if ('proactive' in change) return { proactive: change.proactive, proactiveUpdatedAt: now };
+  if ('promptLimits' in change) {
+    return { proactive: change.promptLimits, proactiveUpdatedAt: now };
+  }
   if ('forms' in change) return { forms: change.forms, formsUpdatedAt: now };
   if ('consent' in change) {
     return {
@@ -118,10 +124,36 @@ function sameText(a: ConsentSettings['text'], b: ConsentSettings['text']): boole
 }
 
 /**
+ * Writes one column of a brand's settings row and publishes a new configuration version, which
+ * the widget and the loader pick up at once. The brand row must be locked.
+ */
+export async function saveSurface(
+  tx: TenantTx,
+  brand: typeof schema.brands.$inferSelect,
+  change: SurfaceChange,
+  now: Date,
+): Promise<number> {
+  const values = columnsOf(change, now);
+  await tx
+    .insert(schema.brandWidgetSettings)
+    .values({ tenantId: brand.tenantId, brandId: brand.id, ...values })
+    .onConflictDoUpdate({
+      target: [schema.brandWidgetSettings.tenantId, schema.brandWidgetSettings.brandId],
+      set: { ...values, updatedAt: now },
+    });
+  const version = brand.configVersion + 1;
+  await tx
+    .update(schema.brands)
+    .set({ configVersion: version, updatedAt: now })
+    .where(and(eq(schema.brands.id, brand.id)));
+  return version;
+}
+
+/**
  * Brand settings for the customer surface (Studio and the admin API): the widget's layout,
- * files, help home, deletion window and email offers need widget.configure; proactive prompts
- * have their own permission, widget.proactive (W19). Each change is audited and publishes a new
- * configuration version, which the widget and the loader pick up at once.
+ * files, help home, deletion window, email offers, forms, consent and direct link need
+ * widget.configure (website prompts are automations, G21). Each change is audited and publishes a
+ * new configuration version, which the widget and the loader pick up at once.
  */
 @Injectable()
 export class WidgetSettingsService {
@@ -170,27 +202,12 @@ export class WidgetSettingsService {
     return brand;
   }
 
-  /** Writes one column of the brand's settings row and publishes a new configuration version. */
-  private async save(
+  private save(
     tx: TenantTx,
     brand: typeof schema.brands.$inferSelect,
     change: SurfaceChange,
   ): Promise<number> {
-    const now = this.clock();
-    const values = columnsOf(change, now);
-    await tx
-      .insert(schema.brandWidgetSettings)
-      .values({ tenantId: brand.tenantId, brandId: brand.id, ...values })
-      .onConflictDoUpdate({
-        target: [schema.brandWidgetSettings.tenantId, schema.brandWidgetSettings.brandId],
-        set: { ...values, updatedAt: now },
-      });
-    const version = brand.configVersion + 1;
-    await tx
-      .update(schema.brands)
-      .set({ configVersion: version, updatedAt: now })
-      .where(and(eq(schema.brands.id, brand.id)));
-    return version;
+    return saveSurface(tx, brand, change, this.clock());
   }
 
   async getSettings(principal: StaffPrincipal, brandId: string): Promise<WidgetSettingsView> {
@@ -220,45 +237,6 @@ export class WidgetSettingsService {
         data: { before, after: settings },
       });
       return { brandId, settings, configVersion: version };
-    });
-  }
-
-  async getProactive(principal: StaffPrincipal, brandId: string): Promise<ProactiveSettingsView> {
-    return this.tx(principal, async (tx) => {
-      const brand = await this.brand(tx, principal, brandId, 'widget.proactive', false);
-      const surface = await brandSurface(tx, brand.id);
-      return {
-        brandId,
-        settings: surface.proactive,
-        updatedAt: surface.proactiveUpdatedAt?.toISOString() ?? null,
-      };
-    });
-  }
-
-  async updateProactive(
-    principal: StaffPrincipal,
-    brandId: string,
-    proactive: ProactiveSettings,
-  ): Promise<ProactiveSettingsView> {
-    return this.tx(principal, async (tx) => {
-      const brand = await this.brand(tx, principal, brandId, 'widget.proactive', true);
-      const before = (await brandSurface(tx, brand.id)).proactive;
-      await this.save(tx, brand, { proactive });
-      await appendAudit(tx, {
-        actorType: 'staff',
-        actorId: toPublicId('staff', principal.staffMemberId),
-        action: 'brand.proactive.updated',
-        targetType: 'brand',
-        targetId: brandId,
-        outcome: 'success',
-        data: {
-          enabled: { from: before.enabled, to: proactive.enabled },
-          triggers: proactive.triggers.map((t) => ({ id: t.id, kind: t.kind, path: t.path })),
-          maxPerDay: proactive.maxPerDay,
-          dismissHours: proactive.dismissHours,
-        },
-      });
-      return { brandId, settings: proactive, updatedAt: this.clock().toISOString() };
     });
   }
 

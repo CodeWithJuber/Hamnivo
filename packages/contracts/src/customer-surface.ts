@@ -101,86 +101,40 @@ export const WidgetSettingsView = z
   .meta({ id: 'WidgetSettingsView' });
 export type WidgetSettingsView = z.infer<typeof WidgetSettingsView>;
 
-/** What starts a proactive prompt (W19). */
+/** What started a proactive prompt in W19; kept only to describe the retired `triggers` list. */
 export const ProactiveTriggerKind = z.enum(['page_path', 'time_on_page', 'returning_visitor']);
 export type ProactiveTriggerKind = z.infer<typeof ProactiveTriggerKind>;
 
-/** A path on the website, such as `/pricing`; it matches that page and the pages below it. */
-const PagePath = z
-  .string()
-  .regex(/^\/[^\s?#]{0,200}$/, 'Expected a path such as /pricing, without ? or #');
-
-export const ProactiveTrigger = z
-  .object({
-    /** Stable within the brand (lower-case letters, digits and dashes). */
-    id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/, 'Use lower-case letters, digits and dashes'),
-    kind: ProactiveTriggerKind,
-    /** Required for page_path; for the others it limits the trigger to those pages. */
-    path: PagePath.nullable().default(null),
-    /** Seconds on the page before the prompt shows (at least 10 for time_on_page). */
-    seconds: z.int().min(0).max(600).default(5),
-    /** returning_visitor: the visit (on separate days) from which it shows, 2 to 20. */
-    visits: z.int().min(2).max(20).nullable().default(null),
-    message: LocalizedText(160),
-  })
-  .superRefine((trigger, ctx) => {
-    if (trigger.kind === 'page_path' && !trigger.path) {
-      ctx.addIssue({ code: 'custom', path: ['path'], message: 'A page path trigger needs a path' });
-    }
-    if (trigger.kind === 'time_on_page' && trigger.seconds < 10) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['seconds'],
-        message: 'Wait at least 10 seconds on the page',
-      });
-    }
-    if (trigger.kind === 'returning_visitor' && trigger.visits === null) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['visits'],
-        message: 'Say from which visit to show it',
-      });
-    }
-  })
-  .meta({ id: 'ProactiveTrigger' });
-export type ProactiveTrigger = z.infer<typeof ProactiveTrigger>;
-
 /**
- * Proactive prompts (W19; widget.proactive). Off until a brand turns them on. The caps are
- * bounded here, so no configuration can show a visitor more than three prompts a day.
+ * Website prompts' limits for a brand (stored as `brand_widget_settings.proactive`). The prompts
+ * themselves are website automations (G21). The bounds mean no configuration can show a visitor
+ * more than three prompts a day.
  */
-export const ProactiveSettings = z
+export const PromptLimits = z
   .object({
-    enabled: z.boolean().default(false),
-    triggers: z
-      .array(ProactiveTrigger)
-      .max(5)
-      .default([])
-      .refine((all) => new Set(all.map((t) => t.id)).size === all.length, {
-        message: 'Trigger ids must be unique',
-      }),
     /** Prompts one visitor may see in a day (1–3). */
     maxPerDay: z.int().min(1).max(3).default(1),
     /** After a visitor dismisses a prompt, none for this many hours (1 hour to 7 days). */
     dismissHours: z.int().min(1).max(168).default(24),
-    /** Only while people are working (the brand's business hours). */
-    onlyWhenAvailable: z.boolean().default(false),
   })
-  .meta({ id: 'ProactiveSettings' });
-export type ProactiveSettings = z.infer<typeof ProactiveSettings>;
+  .meta({ id: 'PromptLimits' });
+export type PromptLimits = z.infer<typeof PromptLimits>;
 
-export const UpdateProactiveSettingsRequest = ProactiveSettings.meta({
-  id: 'UpdateProactiveSettingsRequest',
-});
-
-export const ProactiveSettingsView = z
-  .object({
-    brandId: z.string(),
-    settings: ProactiveSettings,
-    updatedAt: Timestamp.nullable(),
-  })
-  .meta({ id: 'ProactiveSettingsView' });
-export type ProactiveSettingsView = z.infer<typeof ProactiveSettingsView>;
+/**
+ * A condition the loader checks in the visitor's browser, as `[field, operator, value]`: the page
+ * address or referrer (contains, starts_with, is, not_contains), visits so far (at_least,
+ * at_most) or the device from the window's width (is, is_not).
+ */
+export const BrowserCondition = z.union([
+  z.tuple([
+    z.enum(['page_url', 'referrer']),
+    z.enum(['contains', 'starts_with', 'is', 'not_contains']),
+    z.string(),
+  ]),
+  z.tuple([z.literal('visit_count'), z.enum(['at_least', 'at_most']), z.int()]),
+  z.tuple([z.literal('device'), z.enum(['is', 'is_not']), z.array(z.string())]),
+]);
+export type BrowserCondition = z.infer<typeof BrowserCondition>;
 
 /**
  * What the loader needs before the widget loads (public; the widget ID is not a secret): the
@@ -207,6 +161,7 @@ export const LauncherConfig = z
       enabled: z.boolean(),
       maxPerDay: z.int(),
       dismissHours: z.int(),
+      /** Retired with W19's triggers; always empty, so loaders from before G21 show nothing. */
       triggers: z.array(
         z.object({
           id: z.string(),
@@ -214,6 +169,21 @@ export const LauncherConfig = z
           path: z.string().nullable(),
           seconds: z.int(),
           visits: z.int().nullable(),
+          message: z.string(),
+        }),
+      ),
+      /**
+       * Website automations that may prompt this visitor (G21), in the brand's order. The gateway
+       * already checked what it knows (country, language, hours, who is online); `when` is left
+       * for the browser: all of it, or one of it when `any`.
+       */
+      rules: z.array(
+        z.object({
+          id: z.string(),
+          /** Seconds on the page before the prompt shows. */
+          seconds: z.int(),
+          any: z.boolean(),
+          when: z.array(BrowserCondition),
           message: z.string(),
         }),
       ),

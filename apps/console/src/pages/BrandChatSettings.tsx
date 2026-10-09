@@ -8,7 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, Trash2Icon } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppDialog, DialogFooter } from '../components/AppDialog';
+import { DialogFooter } from '../components/AppDialog';
 import {
   CheckboxField,
   ChoiceField,
@@ -16,7 +16,7 @@ import {
   TextareaField,
   TextField,
 } from '../components/Fields';
-import { ActionError, QueryState } from '../components/States';
+import { ActionError } from '../components/States';
 import { api, isApiError } from '../lib/api';
 import { useStudioMutation, useStudioQuery } from '../lib/queries';
 import { isCancelled } from '../lib/reauth';
@@ -27,13 +27,12 @@ import { previewLookOf, WidgetPreview } from './settings/WidgetPreview';
 
 /**
  * A brand's chat settings (widget.configure: W02 layout, W09 files, W17 help, W23 deletion, W25
- * emails), shown on the Behaviour tab of the Chat widget page, and its proactive prompts
- * (widget.proactive, W19) in a dialog. The gateway checks every value again; the limits here only
- * say early what it would refuse.
+ * emails), shown on the Behaviour tab of the Chat widget page. The gateway checks every value
+ * again; the limits here only say early what it would refuse. (Website prompts are automations
+ * now: see the Automations page.)
  */
 
 type Settings = C.WidgetSettings;
-type Proactive = C.ProactiveSettings;
 export type Lang = 'en' | 'ar' | 'hi' | 'ur';
 export const LANGS: Lang[] = ['en', 'ar', 'hi', 'ur'];
 const TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'] as const;
@@ -45,7 +44,6 @@ const TYPE_KEYS = {
   'application/pdf': 'pdf',
 } as const;
 const MODES = ['bubble', 'panel', 'inline', 'fullpage'] as const;
-const KINDS = ['page_path', 'time_on_page', 'returning_visitor'] as const;
 
 export type Texts = Record<Lang, string>;
 export const texts = (value?: Partial<Record<Lang, string>>): Texts => ({
@@ -68,7 +66,6 @@ function whole(value: string, min: number, max: number): number | null {
 }
 
 const settingsPath = (brand: Pick<Brand, 'id'>) => `/v1/admin/brands/${brand.id}/widget-settings`;
-const proactivePath = (brand: Pick<Brand, 'id'>) => `/v1/admin/brands/${brand.id}/proactive`;
 
 /** The query key and address of a brand's chat settings. */
 export const widgetSettingsKey = (brandId: string) => ['widget-settings', brandId] as const;
@@ -582,329 +579,5 @@ export function SettingsForm({
         />
       </PreviewColumn>
     </form>
-  );
-}
-
-interface TriggerDraft {
-  id: string;
-  kind: C.ProactiveTrigger['kind'];
-  path: string;
-  seconds: string;
-  visits: string;
-  message: Texts;
-}
-
-const triggerDraft = (trigger: C.ProactiveTrigger): TriggerDraft => ({
-  id: trigger.id,
-  kind: trigger.kind,
-  path: trigger.path ?? '',
-  seconds: String(trigger.seconds),
-  visits: trigger.visits === null ? '' : String(trigger.visits),
-  message: texts(trigger.message),
-});
-
-function ProactiveForm({
-  brand,
-  initial,
-  onDone,
-}: {
-  brand: Brand;
-  initial: Proactive;
-  onDone: () => void;
-}) {
-  const { t } = useTranslation();
-  const announce = useAnnouncer();
-  const [enabled, setEnabled] = useState(initial.enabled);
-  const [maxPerDay, setMaxPerDay] = useState(String(initial.maxPerDay));
-  const [dismissHours, setDismissHours] = useState(String(initial.dismissHours));
-  const [onlyWhenAvailable, setOnlyWhenAvailable] = useState(initial.onlyWhenAvailable);
-  const [triggers, setTriggers] = useState(() => initial.triggers.map(triggerDraft));
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [attempted, setAttempted] = useState(false);
-  const save = useStudioMutation(
-    (body: Proactive, tenant) =>
-      api<C.ProactiveSettingsView>(proactivePath(brand), { method: 'PUT', body, tenant }),
-    [['proactive', brand.id]],
-  );
-  const change = (index: number, patch: Partial<TriggerDraft>) =>
-    setTriggers((all) =>
-      all.map((trigger, i) => (i === index ? { ...trigger, ...patch } : trigger)),
-    );
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setAttempted(true);
-    const next: Record<string, string> = {};
-    const perDay = whole(maxPerDay, 1, 3);
-    const hours = whole(dismissHours, 1, 168);
-    if (perDay === null) next.maxPerDay = t('chatSettings.invalidNumber', { min: 1, max: 3 });
-    if (hours === null) next.dismissHours = t('chatSettings.invalidNumber', { min: 1, max: 168 });
-    const seen = new Set<string>();
-    const built = triggers.map((trigger, index) => {
-      const number = index + 1;
-      const id = trigger.id.trim();
-      if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(id))
-        next[`trigger-${index}-id`] = t('chatSettings.proactive.idInvalid', { number });
-      else if (seen.has(id))
-        next[`trigger-${index}-id`] = t('chatSettings.proactive.idDuplicate', { number });
-      seen.add(id);
-      const path = trigger.path.trim();
-      if (trigger.kind === 'page_path' && !path)
-        next[`trigger-${index}-path`] = t('chatSettings.proactive.pathRequired', { number });
-      else if (path && !/^\/[^\s?#]{0,200}$/.test(path))
-        next[`trigger-${index}-path`] = t('chatSettings.proactive.pathInvalid', { number });
-      const minSeconds = trigger.kind === 'time_on_page' ? 10 : 0;
-      const seconds = whole(trigger.seconds, minSeconds, 600);
-      if (seconds === null)
-        next[`trigger-${index}-seconds`] = t('chatSettings.invalidNumber', {
-          min: minSeconds,
-          max: 600,
-        });
-      const visits = trigger.kind === 'returning_visitor' ? whole(trigger.visits, 2, 20) : null;
-      if (trigger.kind === 'returning_visitor' && visits === null)
-        next[`trigger-${index}-visits`] = t('chatSettings.invalidNumber', { min: 2, max: 20 });
-      if (!trigger.message.en.trim())
-        next[`trigger-${index}-message`] = t('chatSettings.proactive.messageRequired', { number });
-      return {
-        id,
-        kind: trigger.kind,
-        path: path || null,
-        seconds: seconds ?? 0,
-        visits,
-        message: localized(trigger.message),
-      };
-    });
-    setErrors(next);
-    if (Object.keys(next).length > 0) return;
-    try {
-      await save.mutateAsync({
-        enabled,
-        maxPerDay: perDay as number,
-        dismissHours: hours as number,
-        onlyWhenAvailable,
-        triggers: built,
-      });
-      announce(t('chatSettings.proactive.saved', { name: brand.name }));
-      onDone();
-    } catch {
-      // Shown below the form.
-    }
-  };
-
-  const summary = attempted
-    ? Object.entries(errors).map(([field, message]) => ({
-        fieldId: field.startsWith('trigger-')
-          ? `proactive-${field}${field.endsWith('-message') ? '-en' : ''}`
-          : `proactive-${field}`,
-        message,
-      }))
-    : [];
-
-  return (
-    <form className="flex flex-col gap-6" onSubmit={submit} noValidate data-testid="proactive-form">
-      <FormErrorSummary title={t('auth.errorSummary')} errors={summary} />
-      <CheckboxField
-        id="proactive-enabled"
-        label={t('chatSettings.proactive.enabled')}
-        hint={t('chatSettings.proactive.enabledHint')}
-        checked={enabled}
-        onCheckedChange={setEnabled}
-      />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
-          id="proactive-maxPerDay"
-          label={t('chatSettings.proactive.maxPerDay')}
-          hint={t('chatSettings.proactive.maxPerDayHint')}
-          inputMode="numeric"
-          value={maxPerDay}
-          error={errors.maxPerDay}
-          onChange={(event) => setMaxPerDay(event.target.value)}
-        />
-        <TextField
-          id="proactive-dismissHours"
-          label={t('chatSettings.proactive.dismissHours')}
-          hint={t('chatSettings.proactive.dismissHoursHint')}
-          inputMode="numeric"
-          value={dismissHours}
-          error={errors.dismissHours}
-          onChange={(event) => setDismissHours(event.target.value)}
-        />
-      </div>
-      <CheckboxField
-        id="proactive-onlyWhenAvailable"
-        label={t('chatSettings.proactive.onlyWhenAvailable')}
-        hint={t('chatSettings.proactive.onlyWhenAvailableHint')}
-        checked={onlyWhenAvailable}
-        onCheckedChange={setOnlyWhenAvailable}
-      />
-      <FieldSet className="gap-4">
-        <FieldLegend variant="label" className="mb-0">
-          {t('chatSettings.proactive.prompts')}
-        </FieldLegend>
-        <FieldDescription className="mt-0">
-          {t('chatSettings.proactive.promptsHint')}
-        </FieldDescription>
-        {triggers.map((trigger, index) => {
-          const number = index + 1;
-          const id = `proactive-trigger-${index}`;
-          return (
-            // biome-ignore lint/suspicious/noArrayIndexKey: the position is the identity here
-            <FieldSet key={index} className="gap-3 rounded-lg border border-border p-3">
-              <FieldLegend variant="label" className="mb-0">
-                {t('chatSettings.proactive.prompt', { number })}
-              </FieldLegend>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField
-                  id={`${id}-id`}
-                  label={t('chatSettings.proactive.id')}
-                  hint={t('chatSettings.proactive.idHint')}
-                  dir="ltr"
-                  value={trigger.id}
-                  maxLength={32}
-                  error={errors[`trigger-${index}-id`]}
-                  onChange={(event) => change(index, { id: event.target.value })}
-                />
-                <SelectField
-                  id={`${id}-kind`}
-                  label={t('chatSettings.proactive.kind')}
-                  value={trigger.kind}
-                  onChange={(event) =>
-                    change(index, { kind: event.target.value as TriggerDraft['kind'] })
-                  }
-                  options={KINDS.map((kind) => ({
-                    value: kind,
-                    label: t(`chatSettings.proactive.kinds.${kind}`),
-                  }))}
-                />
-                <TextField
-                  id={`${id}-path`}
-                  label={t('chatSettings.proactive.path')}
-                  hint={
-                    trigger.kind === 'page_path'
-                      ? t('chatSettings.proactive.pathHint')
-                      : t('chatSettings.proactive.pathOptionalHint')
-                  }
-                  dir="ltr"
-                  value={trigger.path}
-                  maxLength={201}
-                  error={errors[`trigger-${index}-path`]}
-                  onChange={(event) => change(index, { path: event.target.value })}
-                />
-                <TextField
-                  id={`${id}-seconds`}
-                  label={t('chatSettings.proactive.seconds')}
-                  hint={t('chatSettings.proactive.secondsHint')}
-                  inputMode="numeric"
-                  value={trigger.seconds}
-                  error={errors[`trigger-${index}-seconds`]}
-                  onChange={(event) => change(index, { seconds: event.target.value })}
-                />
-                {trigger.kind === 'returning_visitor' ? (
-                  <TextField
-                    id={`${id}-visits`}
-                    label={t('chatSettings.proactive.visits')}
-                    hint={t('chatSettings.proactive.visitsHint')}
-                    inputMode="numeric"
-                    value={trigger.visits}
-                    error={errors[`trigger-${index}-visits`]}
-                    onChange={(event) => change(index, { visits: event.target.value })}
-                  />
-                ) : null}
-              </div>
-              <LocalizedFields
-                id={`${id}-message`}
-                legend={t('chatSettings.proactive.message')}
-                hint={t('chatSettings.proactive.messageHint')}
-                value={trigger.message}
-                maxLength={160}
-                error={errors[`trigger-${index}-message`]}
-                onChange={(message) => change(index, { message })}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="self-start"
-                onClick={() => setTriggers((all) => all.filter((_, i) => i !== index))}
-              >
-                <Trash2Icon aria-hidden="true" />
-                {t('chatSettings.proactive.remove', { number })}
-              </Button>
-            </FieldSet>
-          );
-        })}
-        {triggers.length < 5 ? (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="self-start"
-            onClick={() =>
-              setTriggers((all) => [
-                ...all,
-                {
-                  id: '',
-                  kind: 'page_path',
-                  path: '',
-                  seconds: '5',
-                  visits: '',
-                  message: texts(),
-                },
-              ])
-            }
-          >
-            <PlusIcon aria-hidden="true" />
-            {t('chatSettings.proactive.add')}
-          </Button>
-        ) : null}
-      </FieldSet>
-      <ActionError error={save.error} />
-      <DialogFooter>
-        <Button type="button" variant="secondary" onClick={onDone} disabled={save.isPending}>
-          {t('app.cancel')}
-        </Button>
-        <Button type="submit" busy={save.isPending}>
-          {t('chatSettings.proactive.save')}
-        </Button>
-      </DialogFooter>
-    </form>
-  );
-}
-
-export function ProactiveDialog({
-  brand,
-  open,
-  onOpenChange,
-}: {
-  brand: Brand;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { t } = useTranslation();
-  const query = useStudioQuery<C.ProactiveSettingsView>(
-    ['proactive', brand.id],
-    proactivePath(brand),
-    { enabled: open },
-  );
-  return (
-    <AppDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t('chatSettings.proactive.title', { name: brand.name })}
-      description={t('chatSettings.proactive.description')}
-      className="sm:max-w-2xl"
-      testId="proactive-dialog"
-    >
-      <QueryState query={query} label={t('chatSettings.proactive.loading')}>
-        {(data) => (
-          <ProactiveForm
-            key={data.updatedAt ?? 'new'}
-            brand={brand}
-            initial={data.settings}
-            onDone={() => onOpenChange(false)}
-          />
-        )}
-      </QueryState>
-    </AppDialog>
   );
 }

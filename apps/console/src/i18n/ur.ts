@@ -1,3 +1,4 @@
+import { automationsUr } from './automations/ur';
 import { cachingUr } from './caching';
 import { chatWidgetUr } from './chat-widget/ur';
 import { checksUr } from './checks';
@@ -1375,6 +1376,7 @@ export const ur: Translation = {
   reports: reportsUr,
   chatSettings: chatSettingsUr,
   chatWidget: chatWidgetUr,
+  automations: automationsUr,
   memory: {
     title: 'کسٹمر میموری',
     description: 'طے کریں کہ ہم آپ کے کسٹمرز کے بارے میں کیا یاد رکھتے ہیں۔',
@@ -2322,6 +2324,7 @@ export const ur: Translation = {
     brands: 'برانڈز',
     widget: 'چیٹ ویجیٹ',
     agents: 'AI ایجنٹس',
+    automations: 'آٹومیشن',
     knowledge: 'معلومات',
     tools: 'ٹولز اور اقدامات',
     decisions: 'فیصلے',
@@ -2368,12 +2371,15 @@ export const ur: Translation = {
     widget: {
       configure: 'چیٹ ویجیٹ سیٹ کریں',
       identity_keys: 'کسٹمر کی شناخت کی تصدیق کرنے والی کلیدیں درج کریں',
-      proactive: 'طے کریں کہ چیٹ ویب سائٹ کے وزیٹرز کو بات کرنے کی دعوت کب دے',
     },
     agents: {
       read: 'AI ایجنٹس اور ان کے ورژن دیکھیں',
       manage: 'AI ایجنٹس کے مسودے بدلیں',
       publish: 'AI ایجنٹس شائع کریں یا واپس لیں',
+    },
+    automations: {
+      read: 'آٹومیشن اور انہوں نے کیا کیا، یہ دیکھیں',
+      manage: 'آٹومیشن بنائیں، شائع کریں اور بند کریں، ویب سائٹ کے پیغامات سمیت',
     },
     knowledge: { read: 'معلومات کے ذرائع پڑھیں', manage: 'معلومات شامل کریں، بدلیں اور ہٹائیں' },
     tools: {

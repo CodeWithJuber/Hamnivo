@@ -5,7 +5,7 @@ import {
   type HandoffResponse,
   type LauncherConfig,
   type LocalizedText,
-  ProactiveSettings,
+  PromptLimits,
   WidgetAppearance,
   type WidgetConfig,
   type WidgetFormField,
@@ -14,6 +14,7 @@ import {
 } from '@hamnivo/contracts';
 import type { schema } from '@hamnivo/db';
 import { isOpen, nextOpening } from '@hamnivo/domain';
+import { splitForBrowser } from '@hamnivo/domain/automations';
 import { onPrimary } from './appearance.js';
 import type { BrandSurface } from './settings.service.js';
 
@@ -104,14 +105,15 @@ const DEFAULT_APPEARANCE = WidgetAppearance.parse({});
 /** Defaults for a brand that has saved no settings. */
 export const DEFAULT_SURFACE: BrandSurface = {
   settings: WidgetSettings.parse({}),
-  proactive: ProactiveSettings.parse({}),
+  promptLimits: PromptLimits.parse({}),
+  prompts: [],
   appearance: DEFAULT_APPEARANCE,
   forms: WidgetForms.parse({}),
   consent: ConsentSettings.parse({}),
   consentVersion: 0,
   directLink: false,
   settingsUpdatedAt: null,
-  proactiveUpdatedAt: null,
+  promptLimitsUpdatedAt: null,
   formsUpdatedAt: null,
   consentUpdatedAt: null,
   directLinkUpdatedAt: null,
@@ -201,7 +203,7 @@ export function widgetConfig(
   surface: BrandSurface = DEFAULT_SURFACE,
   options: ConfigContext = {},
 ): WidgetConfig {
-  const { settings, proactive } = surface;
+  const { settings } = surface;
   const appearance = surface.appearance ?? DEFAULT_APPEARANCE;
   const copy = Object.fromEntries(
     (Object.keys(COPY) as Locale[]).map((locale) => [
@@ -219,8 +221,6 @@ export function widgetConfig(
   ) as WidgetConfig['copy'];
   const availability = availabilityOf(brand, now, options.staffOnline === true);
   const { prechat, offline } = surface.forms;
-  const prompting =
-    proactive.enabled && (!proactive.onlyWhenAvailable || availability.humanAvailable);
   return {
     widgetId: brand.widgetPublicId,
     version: brand.configVersion,
@@ -258,15 +258,13 @@ export function widgetConfig(
     messageDeletion: { windowSeconds: settings.deletion.windowMinutes * 60 },
     notifications: { email: settings.notifications.email },
     proactive: {
-      triggers: prompting
-        ? proactive.triggers.map((trigger) => ({
-            id: trigger.id,
-            kind: trigger.kind,
-            message: Object.fromEntries(
-              LOCALES.map((locale) => [locale, textIn(trigger.message, locale)]),
-            ) as Record<Locale, string>,
-          }))
-        : [],
+      triggers: (surface.prompts ?? []).flatMap((rule) =>
+        rule.definition.actions.flatMap((action) =>
+          action.type === 'show_prompt'
+            ? [{ id: rule.publicId, message: everyLocale(action.message) }]
+            : [],
+        ),
+      ),
     },
     forms: {
       prechat: {
@@ -325,20 +323,50 @@ const LAUNCHER_COPY: Record<Locale, Omit<LauncherConfig['launcher'], 'accent' | 
   },
 };
 
+/** What the gateway knows about a visitor when the loader asks (never stored). */
+export interface LauncherContext {
+  /** From the edge's country header, for this request only. */
+  country?: string | null;
+  /** Someone on the team is online right now (asked only when a rule needs it). */
+  staffOnline?: boolean;
+}
+
 /**
- * What the loader needs before the widget loads (W02, W19): the layout, launcher colours and
- * labels, and the proactive prompts in one language. Prompts are only sent while the brand has
- * them on (and, when it asks, while people are working); the loader enforces the caps.
+ * What the loader needs before the widget loads (W02, G21): the layout, launcher colours and
+ * labels, and the website prompts in one language. Each published website automation is checked
+ * here against what the gateway knows (country, language, hours, who is online); what is left
+ * goes to the loader, which checks the page, referrer, visits and device and keeps to the brand's
+ * daily limit.
  */
 export function launcherConfig(
   brand: typeof schema.brands.$inferSelect,
   surface: BrandSurface,
   locale: string | null | undefined,
   now: Date,
+  context: LauncherContext = {},
 ): LauncherConfig {
   const lang = localeOf(locale);
   const config = widgetConfig(brand, now, surface);
-  const shown = new Set(config.proactive.triggers.map((t) => t.id));
+  const facts = {
+    country: context.country ?? null,
+    language: locale ?? null,
+    hours_open: brand.businessHours ? config.availability.open : null,
+    anyone_online: context.staffOnline ?? null,
+  };
+  const rules = surface.prompts.flatMap((rule) => {
+    const prompt = rule.definition.actions.find((action) => action.type === 'show_prompt');
+    const split = prompt ? splitForBrowser(rule.definition, facts) : null;
+    if (prompt?.type !== 'show_prompt' || !split) return [];
+    return [
+      {
+        id: rule.publicId,
+        seconds: rule.definition.event.seconds,
+        any: split.any,
+        when: split.when,
+        message: textIn(prompt.message, lang),
+      },
+    ];
+  });
   return {
     widgetId: brand.widgetPublicId,
     version: brand.configVersion,
@@ -351,19 +379,11 @@ export function launcherConfig(
       ...LAUNCHER_COPY[lang],
     },
     proactive: {
-      enabled: shown.size > 0,
-      maxPerDay: surface.proactive.maxPerDay,
-      dismissHours: surface.proactive.dismissHours,
-      triggers: surface.proactive.triggers
-        .filter((t) => shown.has(t.id))
-        .map((t) => ({
-          id: t.id,
-          kind: t.kind,
-          path: t.path,
-          seconds: t.seconds,
-          visits: t.visits,
-          message: textIn(t.message, lang),
-        })),
+      enabled: rules.length > 0,
+      maxPerDay: surface.promptLimits.maxPerDay,
+      dismissHours: surface.promptLimits.dismissHours,
+      triggers: [],
+      rules,
     },
   };
 }

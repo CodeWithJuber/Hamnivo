@@ -68,6 +68,7 @@ const APPEND_ONLY = new Set([
   'handoff_packets',
   'billing_events',
   'chat_consents',
+  'automation_versions',
 ]);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
@@ -307,6 +308,9 @@ describe('two-tenant isolation', () => {
     'chat_consents',
     'ticket_followups',
     'tenant_counters',
+    'automations',
+    'automation_versions',
+    'automation_runs',
     'sso_domains',
     'sso_connections',
     'team_routing',
@@ -506,6 +510,9 @@ describe('two-tenant isolation', () => {
       'chat_consents',
       'ticket_followups',
       'tenant_counters',
+      'automations',
+      'automation_versions',
+      'automation_runs',
       'sso_domains',
       'sso_connections',
       'team_routing',

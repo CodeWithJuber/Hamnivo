@@ -1,4 +1,4 @@
-import { ATTACHMENT_TYPES, ProactiveSettings, WidgetSettings } from '@hamnivo/contracts';
+import { ATTACHMENT_TYPES, type AutomationDefinition, WidgetSettings } from '@hamnivo/contracts';
 import { type schema, toPublicId } from '@hamnivo/db';
 import type { AuthorityAttachment, AuthorityMessage } from '@hamnivo/domain';
 import { describe, expect, it } from 'vitest';
@@ -300,52 +300,83 @@ describe('the widget’s and the loader’s configuration (W02, W19)', () => {
     createdAt: new Date(),
     updatedAt: new Date(),
   } as typeof schema.brands.$inferSelect;
-  const surface = (proactive: Partial<ProactiveSettings>): BrandSurface => ({
+  const pricing: AutomationDefinition = {
+    event: { type: 'page_view', seconds: 30 },
+    match: 'all',
+    conditions: [{ field: 'page_url', op: 'starts_with', value: '/pricing' }],
+    actions: [{ type: 'show_prompt', message: { en: 'Questions?', ar: 'أسئلة؟' } }],
+  };
+  const prompt = (definition: AutomationDefinition) => ({
+    id: '0191b0f0-0000-7000-8000-0000000000aa',
+    publicId: 'aut_01j9zk7w3xq8r4t2v6m5n1p0aa',
+    brandId: brand.id,
+    name: 'Pricing help',
+    versionId: '0191b0f0-0000-7000-8000-0000000000ab',
+    version: 1,
+    definition,
+  });
+  const surface = (definitions: AutomationDefinition[] = [pricing]): BrandSurface => ({
     ...DEFAULT_SURFACE,
     settings: WidgetSettings.parse({ layout: { mode: 'inline' } }),
-    proactive: ProactiveSettings.parse({
-      enabled: true,
-      triggers: [
-        {
-          id: 'pricing',
-          kind: 'page_path',
-          path: '/pricing',
-          message: { en: 'Questions?', ar: 'أسئلة؟' },
-        },
-      ],
-      ...proactive,
-    }),
+    prompts: definitions.map(prompt),
   });
   // Friday 2 October 2026: 11:00 and 20:00 in Karachi.
   const working = new Date('2026-10-02T06:00:00Z');
   const evening = new Date('2026-10-02T15:00:00Z');
 
-  it('offers prompts only while the brand has them on, and, if it asks, while people work', () => {
-    expect(widgetConfig(brand, evening, surface({})).proactive.triggers).toHaveLength(1);
-    expect(widgetConfig(brand, evening, surface({ enabled: false })).proactive.triggers).toEqual(
-      [],
-    );
-    const onlyWorking = surface({ onlyWhenAvailable: true });
-    expect(widgetConfig(brand, working, onlyWorking).proactive.triggers).toHaveLength(1);
-    expect(widgetConfig(brand, evening, onlyWorking).proactive.triggers).toEqual([]);
-    expect(launcherConfig(brand, onlyWorking, 'ar', evening).proactive).toMatchObject({
-      enabled: false,
-      triggers: [],
-    });
-    expect(launcherConfig(brand, onlyWorking, 'ar', working).proactive.triggers).toEqual([
+  it('gives the widget every published prompt’s words, by automation, in every language', () => {
+    expect(widgetConfig(brand, evening, surface()).proactive.triggers).toEqual([
       {
-        id: 'pricing',
-        kind: 'page_path',
-        path: '/pricing',
-        seconds: 5,
-        visits: null,
-        message: 'أسئلة؟',
+        id: 'aut_01j9zk7w3xq8r4t2v6m5n1p0aa',
+        message: { en: 'Questions?', ar: 'أسئلة؟', hi: 'Questions?', ur: 'Questions?' },
       },
     ]);
+    expect(widgetConfig(brand, evening, surface([])).proactive.triggers).toEqual([]);
+  });
+
+  it('checks what the gateway knows and leaves the page to the loader', () => {
+    expect(launcherConfig(brand, surface(), 'ar', evening).proactive).toEqual({
+      enabled: true,
+      maxPerDay: 1,
+      dismissHours: 24,
+      triggers: [],
+      rules: [
+        {
+          id: 'aut_01j9zk7w3xq8r4t2v6m5n1p0aa',
+          seconds: 30,
+          any: false,
+          when: [['page_url', 'starts_with', '/pricing']],
+          message: 'أسئلة؟',
+        },
+      ],
+    });
+    // Only while people work: decided here, by the brand's hours.
+    const onlyWorking = surface([
+      {
+        ...pricing,
+        conditions: [...pricing.conditions, { field: 'hours_open', op: 'is', value: true }],
+      },
+    ]);
+    expect(launcherConfig(brand, onlyWorking, 'en', working).proactive.rules).toHaveLength(1);
+    expect(launcherConfig(brand, onlyWorking, 'en', evening).proactive).toMatchObject({
+      enabled: false,
+      rules: [],
+    });
+    // By country, from the request; an unknown country never matches.
+    const gulf = surface([
+      { ...pricing, conditions: [{ field: 'country', op: 'is', value: ['AE', 'SA'] }] },
+    ]);
+    expect(
+      launcherConfig(brand, gulf, 'en', working, { country: 'AE' }).proactive.rules[0]?.when,
+    ).toEqual([]);
+    expect(launcherConfig(brand, gulf, 'en', working, { country: 'DE' }).proactive.rules).toEqual(
+      [],
+    );
+    expect(launcherConfig(brand, gulf, 'en', working).proactive.rules).toEqual([]);
   });
 
   it('gives the loader its layout and labels in the visitor’s language', () => {
-    const config = launcherConfig(brand, surface({}), 'ur', working);
+    const config = launcherConfig(brand, surface(), 'ur', working);
     expect(config).toMatchObject({
       version: 4,
       locale: 'ur',
@@ -353,13 +384,13 @@ describe('the widget’s and the loader’s configuration (W02, W19)', () => {
       layout: { mode: 'inline', position: 'bottom-right' },
       launcher: { accent: '#192A30', onAccent: '#FFFFFF', openLabel: 'چیٹ کھولیں' },
     });
-    expect(launcherConfig(brand, surface({}), 'fr', working).locale).toBe('en');
+    expect(launcherConfig(brand, surface(), 'fr', working).locale).toBe('en');
   });
 
   it('does not offer files where they cannot be scanned', () => {
-    expect(widgetConfig(brand, working, surface({})).features.attachments).toBe(true);
+    expect(widgetConfig(brand, working, surface()).features.attachments).toBe(true);
     expect(
-      widgetConfig(brand, working, surface({}), { filesScannable: false }).features.attachments,
+      widgetConfig(brand, working, surface(), { filesScannable: false }).features.attachments,
     ).toBe(false);
   });
 });
