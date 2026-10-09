@@ -25,6 +25,8 @@ export interface WidgetParams {
   mode: WidgetLayoutMode | null;
   /** Studio's test chat: its own session, and the conversations it starts are marked as tests. */
   test?: boolean;
+  /** The brand's direct chat link (W28): the chat on its own page, with no website around it. */
+  direct?: boolean;
 }
 
 export function App({ params, bridge }: { params: WidgetParams; bridge: HostBridge }) {
@@ -36,13 +38,22 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
         apiBase: params.apiBase,
         widgetId: params.widgetId,
         locale: params.locale,
-        ...(params.hostOrigin ? { hostOrigin: params.hostOrigin } : {}),
+        ...(params.direct
+          ? { direct: true }
+          : params.hostOrigin
+            ? { hostOrigin: params.hostOrigin }
+            : {}),
         // A test chat keeps its own session, never a real visitor's.
         ...(params.test ? { test: true, storage: prefixedStorage(defaultStorage(), 'test:') } : {}),
       }),
     [params],
   );
   const chat = useChat(client);
+  // On its own page the chat is the page: the tab says whose chat it is.
+  const brandName = chat.state.session?.config.brand.name;
+  useEffect(() => {
+    if (params.direct && brandName) document.title = brandName;
+  }, [params.direct, brandName]);
   const replies = chat.state.messages.filter((m) => m.sender.kind !== 'customer').length;
   const language = useReplyLanguage(client, chat.state.session?.principal.id ?? null, replies);
   const { saveLocale } = language;
@@ -202,6 +213,10 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           onReact={chat.react}
           onOpenConversation={chat.open}
           onFilesConversation={chat.conversationForFiles}
+          onStart={chat.start}
+          onReopen={chat.reopen}
+          onLeaveMessage={chat.leaveMessage}
+          onConsentRequired={chat.consentRequired}
           language={language}
           memory={memory}
           onClose={

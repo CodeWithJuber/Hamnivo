@@ -1,6 +1,7 @@
 import type {
   CustomerConversation,
   CustomerMemory,
+  FormAnswers,
   HandoffResponse,
   HelpSearchResponse,
   MemoryChange,
@@ -11,6 +12,8 @@ import type {
   MessagePage,
   MessagePart,
   NotificationPreferences,
+  OfflineMessageRequest,
+  OfflineMessageResponse,
   ReactionEmoji,
   SetWidgetLanguageRequest,
   VisitorLinkResponse,
@@ -26,6 +29,18 @@ type Conversation = CustomerConversation;
 export type UploadedFile = Extract<MessagePart, { type: 'attachment' }>;
 type Page = MessagePage;
 type Handoff = HandoffResponse;
+/** What the website says about the page the chat was opened on (verified by the gateway). */
+export type PageContext = NonNullable<OfflineMessageRequest['context']>;
+
+/** How a conversation starts: its first message, and the answers to the pre-chat form (W26). */
+export interface StartConversationInput {
+  firstMessage?: string;
+  /** Makes a retry of the first message create it once. */
+  clientMessageId?: string;
+  /** Answers to the brand's pre-chat form by field id; a list answer is the option's id. */
+  prechat?: FormAnswers;
+  context?: PageContext;
+}
 
 export interface HamnivoClientOptions {
   /** Gateway origin, e.g. `https://api.example.com`. */
@@ -38,6 +53,11 @@ export interface HamnivoClientOptions {
    * and the conversations it starts are marked as tests (left out of reports and counts).
    */
   test?: boolean;
+  /**
+   * Opened from the brand's direct chat link (W28): the chat's own page, with no website around
+   * it, so no host origin is sent.
+   */
+  direct?: boolean;
   locale?: string;
   storage?: KeyValueStorage;
   fetch?: typeof fetch;
@@ -130,11 +150,13 @@ export class HamnivoClient {
     path: string,
     body?: unknown,
     token?: string,
+    headers: Record<string, string> = {},
   ): Promise<Response> {
     try {
       return await this.fetchImpl(`${this.options.apiBase.replace(/\/$/, '')}${path}`, {
         method,
         headers: {
+          ...headers,
           ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
@@ -151,7 +173,12 @@ export class HamnivoClient {
     const response = await this.raw('POST', '/v1/widget/sessions', {
       widgetId: this.options.widgetId,
       ...(this.options.locale ? { locale: this.options.locale } : {}),
-      ...(this.options.hostOrigin ? { hostOrigin: this.options.hostOrigin } : {}),
+      // The direct chat link has no website around it, so there is no host origin to check.
+      ...(this.options.direct
+        ? { direct: true }
+        : this.options.hostOrigin
+          ? { hostOrigin: this.options.hostOrigin }
+          : {}),
       ...(this.options.test ? { test: true } : {}),
       ...(resumeToken ? { resumeToken } : {}),
     });
@@ -195,10 +222,15 @@ export class HamnivoClient {
   }
 
   /** Authorized JSON request with one renewal on an expired session. */
-  async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    let response = await this.raw(method, path, body, await this.token());
+  async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    headers?: Record<string, string>,
+  ): Promise<T> {
+    let response = await this.raw(method, path, body, await this.token(), headers);
     if (response.status === 401) {
-      response = await this.raw(method, path, body, (await this.renew()).accessToken);
+      response = await this.raw(method, path, body, (await this.renew()).accessToken, headers);
     }
     if (!response.ok) throw await problemOf(response);
     return (response.status === 204 ? undefined : await response.json()) as T;
@@ -235,10 +267,66 @@ export class HamnivoClient {
     return this.request('GET', '/v1/widget/conversations');
   }
 
-  startConversation(
-    input: { firstMessage?: string; clientMessageId?: string } = {},
-  ): Promise<Conversation> {
+  /**
+   * Starts a conversation. With pre-chat answers (W26) the gateway checks them against the
+   * brand's form (VALIDATION_FAILED names the fields); a visitor who must agree first and has not
+   * gets CONSENT_REQUIRED (W27).
+   */
+  startConversation(input: StartConversationInput = {}): Promise<Conversation> {
     return this.request('POST', '/v1/widget/conversations', input);
+  }
+
+  /** Opens a closed conversation again, keeping its history (W15). */
+  reopen(conversationId: string): Promise<Conversation> {
+    return this.request(
+      'POST',
+      `/v1/widget/conversations/${encodeURIComponent(conversationId)}/reopen`,
+    );
+  }
+
+  /** Rates a closed conversation from 1 to 5, with an optional comment (CSAT). */
+  feedback(conversationId: string, input: { rating: number; comment?: string }): Promise<void> {
+    return this.request(
+      'POST',
+      `/v1/widget/conversations/${encodeURIComponent(conversationId)}/feedback`,
+      input,
+    );
+  }
+
+  /**
+   * Records that the visitor agreed to the brand's words of this version before chatting (W27).
+   * The session on this device then says so, and listeners hear of it.
+   */
+  async giveConsent(noticeVersion: number): Promise<void> {
+    await this.request('POST', '/v1/widget/consent', { noticeVersion });
+    // The gateway takes only the current words, so the version agreed to is the current one.
+    const session = this.session;
+    if (session?.config?.consent) {
+      this.adopt({
+        ...session,
+        config: {
+          ...session.config,
+          consent: { ...session.config.consent, given: true, noticeVersion },
+        },
+      });
+    }
+  }
+
+  /**
+   * Leaves a message while nobody can answer (W11): it becomes a ticket, answered by email once
+   * the visitor confirms their address. A retry must use the same request id and answers, so it
+   * creates nothing twice.
+   */
+  sendOfflineMessage(
+    input: { answers: FormAnswers; context?: PageContext },
+    clientRequestId: string,
+  ): Promise<OfflineMessageResponse> {
+    return this.request(
+      'POST',
+      '/v1/widget/offline-messages',
+      { clientRequestId, ...input },
+      { 'idempotency-key': clientRequestId },
+    );
   }
 
   getConversation(id: string): Promise<Conversation> {

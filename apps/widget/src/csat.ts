@@ -27,11 +27,7 @@ export async function sendRating(
   comment: string,
 ): Promise<void> {
   const note = comment.trim();
-  await client.request(
-    'POST',
-    `/v1/widget/conversations/${encodeURIComponent(conversationId)}/feedback`,
-    { rating, ...(note ? { comment: note } : {}) },
-  );
+  await client.feedback(conversationId, { rating, ...(note ? { comment: note } : {}) });
   try {
     client.storage.setItem(ratedKey(client.options.widgetId, conversationId), String(rating));
   } catch {
