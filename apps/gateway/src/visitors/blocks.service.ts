@@ -2,7 +2,7 @@ import type { BlockDuration, VisitorBlock, VisitorBlockList } from '@hamnivo/con
 import { appendAudit, fromPublicId, schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
-import { aliasedTable, and, desc, eq, gte, isNull, or } from 'drizzle-orm';
+import { aliasedTable, and, desc, eq, gt, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
 import { enforce } from '../identity/staff.guard.js';
 import { InboxAccess } from '../inbox/access.js';
@@ -18,11 +18,18 @@ const DURATION_MS: Record<BlockDuration, number | null> = {
   month: 30 * DAY_MS,
   always: null,
 };
+/** A block in force at `now`: not lifted, and not past its end. */
+const stillActive = (now: Date) =>
+  and(
+    isNull(schema.visitorBlocks.liftedAt),
+    or(isNull(schema.visitorBlocks.expiresAt), gt(schema.visitorBlocks.expiresAt, now)),
+  );
+
 /** Lifted and expired blocks stay listed this long (then maintenance removes them). */
 const HISTORY_MS = 90 * DAY_MS;
 
-/** "Visitor 7F3A": a short, stable code for an anonymous visitor, from their id. */
-const visitorLabel = (id: string) => `Visitor ${id.replaceAll('-', '').slice(-4).toUpperCase()}`;
+/** "7F3A": a short, stable code that tells anonymous visitors apart, from their id. */
+const codeOf = (id: string) => id.replaceAll('-', '').slice(-4).toUpperCase();
 
 /**
  * Blocking visitors (H20) for Studio and the API, under `visitors.block`. A block is on the
@@ -83,6 +90,19 @@ export class VisitorBlocksService {
             'This conversation did not come from the chat on a website, so there is no visitor to block.',
         });
       }
+      // Blocking again (or retrying) changes nothing while a block is in force.
+      const [existing] = await tx
+        .select()
+        .from(schema.visitorBlocks)
+        .where(
+          and(
+            eq(schema.visitorBlocks.brandId, control.brandId),
+            eq(schema.visitorBlocks.principalId, control.principalId),
+            stillActive(now),
+          ),
+        )
+        .limit(1);
+      if (existing) return existing;
       const [customer] = await tx
         .select()
         .from(schema.customerPrincipals)
@@ -101,7 +121,7 @@ export class VisitorBlocksService {
           principalId: control.principalId,
           visitorId: browser?.id ?? null,
           externalSubject: customer?.kind === 'verified' ? customer.externalSubject : null,
-          label: customer?.displayName ?? visitorLabel(control.principalId),
+          label: customer?.displayName ?? codeOf(control.principalId),
           conversationId: control.id,
           reason: input.reason,
           createdBy: principal.staffMemberId,
@@ -153,6 +173,18 @@ export class VisitorBlocksService {
           brandId: visitor.brandId,
         }),
       );
+      const [existing] = await tx
+        .select()
+        .from(schema.visitorBlocks)
+        .where(
+          and(
+            eq(schema.visitorBlocks.brandId, visitor.brandId),
+            eq(schema.visitorBlocks.visitorId, visitor.id),
+            stillActive(now),
+          ),
+        )
+        .limit(1);
+      if (existing) return existing;
       const [customer] = visitor.principalId
         ? await tx
             .select()
@@ -167,7 +199,7 @@ export class VisitorBlocksService {
           principalId: visitor.principalId,
           visitorId: visitor.id,
           externalSubject: customer?.kind === 'verified' ? customer.externalSubject : null,
-          label: customer?.displayName ?? visitorLabel(visitor.id),
+          label: customer?.displayName ?? codeOf(visitor.id),
           reason: input.reason,
           createdBy: principal.staffMemberId,
           createdAt: now,
@@ -203,15 +235,11 @@ export class VisitorBlocksService {
         active: query.status === 'active',
         since: new Date(now.getTime() - HISTORY_MS),
         now,
+        // Only the brands the caller's grants reach, before the list is cut short.
+        ...(scope.all ? {} : { brandIds: scope.brandIds, workspaceIds: scope.workspaceIds }),
       }),
     );
-    const visible = rows.filter(
-      (r) =>
-        scope.all ||
-        scope.brandIds.includes(r.block.brandId) ||
-        scope.workspaceIds.includes(r.workspaceId),
-    );
-    return { items: visible.map((r) => this.toView(r, now)) };
+    return { items: rows.map((r) => this.toView(r, now)) };
   }
 
   /** Unblocks at once; the record stays, marked lifted. */
@@ -257,7 +285,15 @@ export class VisitorBlocksService {
 
   private rows(
     tx: TenantTx,
-    filter: { id?: string; brandId?: string | null; active?: boolean; since?: Date; now: Date },
+    filter: {
+      id?: string;
+      brandId?: string | null;
+      active?: boolean;
+      since?: Date;
+      now: Date;
+      brandIds?: string[];
+      workspaceIds?: string[];
+    },
   ) {
     const b = schema.visitorBlocks;
     const creator = aliasedTable(schema.staffMembers, 'creator');
@@ -265,10 +301,17 @@ export class VisitorBlocksService {
     const conditions = [
       filter.id ? eq(b.id, filter.id) : undefined,
       filter.brandId ? eq(b.brandId, filter.brandId) : undefined,
-      filter.active
-        ? and(isNull(b.liftedAt), or(isNull(b.expiresAt), gte(b.expiresAt, filter.now)))
-        : undefined,
+      filter.active ? stillActive(filter.now) : undefined,
       filter.since && !filter.active ? gte(b.createdAt, filter.since) : undefined,
+      filter.brandIds || filter.workspaceIds
+        ? or(
+            filter.brandIds?.length ? inArray(b.brandId, filter.brandIds) : undefined,
+            filter.workspaceIds?.length
+              ? inArray(schema.brands.workspaceId, filter.workspaceIds)
+              : undefined,
+            sql`false`,
+          )
+        : undefined,
     ].filter((c) => c !== undefined);
     return tx
       .select({
@@ -277,6 +320,7 @@ export class VisitorBlocksService {
         creatorName: creator.displayName,
         lifterName: lifter.displayName,
         signedIn: schema.customerPrincipals.kind,
+        customerName: schema.customerPrincipals.displayName,
         conversationExists: schema.conversationControls.id,
       })
       .from(b)
@@ -295,11 +339,14 @@ export class VisitorBlocksService {
     now: Date,
   ): VisitorBlock {
     const { block } = row;
+    const code = codeOf(block.principalId ?? block.visitorId ?? block.id);
     const active = block.liftedAt === null && (block.expiresAt === null || block.expiresAt > now);
     return {
       id: toPublicId('visitorBlock', block.id),
       brandId: toPublicId('brand', block.brandId),
-      who: block.label,
+      // The name as it is now, or as it was when blocked (an erased customer keeps no name).
+      name: row.customerName ?? (block.label === code ? null : block.label),
+      code,
       signedIn: block.externalSubject !== null || row.signedIn === 'verified',
       customerId: block.principalId ? toPublicId('customer', block.principalId) : null,
       visitorId: block.visitorId ? toPublicId('visitor', block.visitorId) : null,

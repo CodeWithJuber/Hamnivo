@@ -29,6 +29,8 @@ export const blockingAr: BlockingTranslation = {
   },
   page: {
     link: 'المحظورون',
+    /** An anonymous visitor, by the short code that tells them apart. */
+    anonymous: 'زائر {{code}}',
     title: 'الزوار المحظورون',
     description:
       'الزوار الذين لا يمكنهم مراسلة علاماتك التجارية، وسبب حظرهم وحتى متى. ارفع الحظر هنا ليتمكنوا من المراسلة فورًا.',

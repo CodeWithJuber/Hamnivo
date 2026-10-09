@@ -26,8 +26,10 @@ export const VisitorBlock = z
   .object({
     id: z.string(),
     brandId: z.string(),
-    /** How staff know the visitor: their name, or "Visitor" and a short code. */
-    who: z.string(),
+    /** The customer's name, when they gave one or the website signed them in. */
+    name: z.string().nullable(),
+    /** A short code that tells anonymous visitors apart ("7F3A"); Studio words it per language. */
+    code: z.string(),
     signedIn: z.boolean(),
     customerId: z.string().nullable(),
     visitorId: z.string().nullable(),

@@ -29,6 +29,8 @@ export const blockingHi: BlockingTranslation = {
   },
   page: {
     link: 'ब्लॉक किए गए',
+    /** An anonymous visitor, by the short code that tells them apart. */
+    anonymous: 'विज़िटर {{code}}',
     title: 'ब्लॉक किए गए विज़िटर',
     description:
       'जो विज़िटर आपके ब्रांड से चैट नहीं कर सकते, उन्हें क्यों और कब तक ब्लॉक किया गया है। यहाँ अनब्लॉक करें, तो वे तुरंत फिर चैट कर सकते हैं।',

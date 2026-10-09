@@ -53,14 +53,22 @@ export async function isVisitorBlocked(
 }
 
 /**
- * Widget requests a blocked customer may still make: reading, privacy choices (memory, email
- * preferences), marking messages read and signing out. Everything else that writes is refused.
+ * Widget requests a blocked customer may still make: reading; privacy choices (memory, email
+ * preferences, consent, deleting their own message); their language; marking messages read;
+ * signing in or out; and linking the browser, so the page-tracking notice still shows. Everything
+ * else that writes (starting or continuing a chat, the contact form, reopening, files, ratings,
+ * reactions, shopping and actions) is refused.
  */
 const STILL_ALLOWED = [
   /^\/v1\/widget\/memory\//,
   /^\/v1\/widget\/notifications$/,
+  /^\/v1\/widget\/consent$/,
+  /^\/v1\/widget\/language$/,
+  /^\/v1\/widget\/identity$/,
   /^\/v1\/widget\/sessions\/reset$/,
+  /^\/v1\/widget\/visitors\/link$/,
   /^\/v1\/widget\/conversations\/[^/]+\/read$/,
+  /^\/v1\/widget\/conversations\/[^/]+\/messages\/[^/]+\/delete$/,
 ];
 
 export function refusedWhenBlocked(method: string, path: string): boolean {

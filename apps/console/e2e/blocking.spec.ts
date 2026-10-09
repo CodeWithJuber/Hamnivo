@@ -7,9 +7,14 @@ import { expect, type Page, test } from '@playwright/test';
 import { memberOf, overflowAt } from './access';
 import { audit, customerAsks, seedWorkspace, type Workspace } from './support';
 
+/** The name Studio shows for a block, in English. */
+const nameOf = (block: { name: string | null; code: string } | undefined) =>
+  block ? (block.name ?? `Visitor ${block.code}`) : '';
+
 interface Block {
   id: string;
-  who: string;
+  name: string | null;
+  code: string;
   reason: string;
   active: boolean;
   conversationId: string | null;
@@ -100,13 +105,12 @@ test('H20 · block a visitor from a chat for 24 hours and close it, see them on 
   }
   const row = table.getByTestId('block-row');
   await expect(row).toHaveCount(1);
-  await expect(row).toContainText(block?.who ?? '');
+  await expect(row).toContainText(nameOf(block));
   await expect(row).toContainText('Abusive messages to the team');
   await expect(row).toContainText('Sara Staff');
-  await expect(row.getByRole('link', { name: `Open the chat with ${block?.who}` })).toHaveAttribute(
-    'href',
-    `/inbox/${id}`,
-  );
+  await expect(
+    row.getByRole('link', { name: `Open the chat with ${nameOf(block)}` }),
+  ).toHaveAttribute('href', `/inbox/${id}`);
   violations.push(...(await audit(page, 'blocked (en)')));
 
   // Right to left: the same page in Arabic, on a phone too.
@@ -126,18 +130,18 @@ test('H20 · block a visitor from a chat for 24 hours and close it, see them on 
 
   // Unblocking asks first; cancelling keeps the block.
   await open(page, '/blocked?lang=en');
-  await page.getByRole('button', { name: `Unblock ${block?.who}` }).click();
+  await page.getByRole('button', { name: `Unblock ${nameOf(block)}` }).click();
   const confirm = page.getByTestId('unblock-dialog');
-  await expect(confirm.getByRole('heading', { name: `Unblock ${block?.who}?` })).toBeVisible();
+  await expect(confirm.getByRole('heading', { name: `Unblock ${nameOf(block)}?` })).toBeVisible();
   violations.push(...(await audit(page, 'unblock dialog (en)')));
   await confirm.getByRole('button', { name: 'Cancel' }).click();
   await expect(confirm).toBeHidden();
   expect((await blocks('active')).items).toHaveLength(1);
-  await page.getByRole('button', { name: `Unblock ${block?.who}` }).click();
+  await page.getByRole('button', { name: `Unblock ${nameOf(block)}` }).click();
   await confirm.getByRole('button', { name: 'Unblock' }).click();
   await expect(confirm).toBeHidden();
   await expect(page.locator('[data-slot="announcer-polite"]')).toHaveText(
-    `${block?.who} is unblocked.`,
+    `${nameOf(block)} is unblocked.`,
   );
   await expect(page.getByTestId('block-row')).toHaveCount(0);
   await expect(page.getByText('Nobody is blocked')).toBeVisible();

@@ -56284,7 +56284,13 @@
           "brandId": {
             "type": "string"
           },
-          "who": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
             "type": "string"
           },
           "signedIn": {
@@ -56396,7 +56402,8 @@
         "required": [
           "id",
           "brandId",
-          "who",
+          "name",
+          "code",
           "signedIn",
           "customerId",
           "visitorId",

@@ -29,6 +29,8 @@ export const blockingUr: BlockingTranslation = {
   },
   page: {
     link: 'بلاک شدہ',
+    /** An anonymous visitor, by the short code that tells them apart. */
+    anonymous: 'وزیٹر {{code}}',
     title: 'بلاک شدہ وزیٹر',
     description:
       'جو وزیٹر آپ کے برانڈز سے چیٹ نہیں کر سکتے، انہیں کیوں اور کب تک بلاک کیا گیا۔ یہاں ان بلاک کریں تو وہ فوراً پھر چیٹ کر سکتے ہیں۔',

@@ -2389,9 +2389,10 @@
       "apps/gateway/test/analytics.int.test.ts",
       "apps/console/src/pages/reports/ReportsPage.tsx",
       "apps/console/src/pages/reports/ConversationsChart.tsx",
-      "apps/console/e2e/reports.spec.ts"
+      "apps/console/e2e/reports.spec.ts",
+      "apps/console/src/lib/reports.ts"
     ],
-    "note": "Workspace reports from aggregates only, per date range and time zone, with team and channel filters: conversations per day against the previous period, AI-resolved and handed-off rates, median first response and resolution time, CSAT, handoff reasons, team and channel breakdowns, orders and refunds per currency, AI replies and tokens, and the answer-cache hit rate. Numbers on fewer conversations or responses than ANALYTICS_MIN_GROUP_SIZE are withheld, with complementary suppression; the CSV export follows the same rules. Reopen rate, SLA attainment and cost per resolved case are not built."
+    "note": "Workspace reports from aggregates only, per date range and time zone, with team and channel filters: conversations per day against the previous period, AI-resolved and handed-off rates, median first response and resolution time, CSAT, handoff reasons, team and channel breakdowns, orders and refunds per currency, AI replies and tokens, and the answer-cache hit rate. Numbers on fewer conversations or responses than ANALYTICS_MIN_GROUP_SIZE are withheld, with complementary suppression; the CSV export follows the same rules. Reopen rate, SLA attainment and cost per resolved case are not built. Also missed chats (no answer within an hour), contact form messages and reopen rate, and a Tickets report: created, closed, open now, median time to close, by priority and by source, with the same withholding of small groups."
   },
   "HNV-19-01": {
     "status": "implemented",
@@ -3179,5 +3180,33 @@
       "apps/console/src/pages/automations/HistoryPanels.tsx"
     ],
     "note": "Publishing keeps an immutable version and checks the rule; restore copies a version into the draft. No staged rollout or diff view."
+  },
+  "H20": {
+    "status": "implemented",
+    "evidence": [
+      "packages/contracts/src/blocks.ts",
+      "packages/db/src/schema/visitors.ts",
+      "apps/gateway/src/visitors/blocks.ts",
+      "apps/gateway/src/visitors/blocks.service.ts",
+      "apps/gateway/src/widget/widget.guard.ts",
+      "apps/gateway/test/blocks.int.test.ts",
+      "apps/console/src/components/BlockVisitorDialog.tsx",
+      "apps/console/src/pages/visitors/BlockedPage.tsx",
+      "apps/console/e2e/blocking.spec.ts",
+      "apps/widget/test/unavailable.test.tsx",
+      "apps/widget/e2e/surface.spec.ts",
+      "docs/adr/0012-blocking-without-ip-addresses.md",
+      "docs/guide/inbox/blocking-visitors.md"
+    ],
+    "note": "Block from a chat or from Live visitors with a required reason and 24 hours, 7 days, 30 days or until lifted; never an IP address: the customer, their browser key and a signed-in account. The widget says only that chat isn't available; reading, help, privacy choices, sign-in and the tracking notice stay open. Blocking again keeps one block; blocks are lifted, not deleted, audited, and purged 90 days after they end."
+  },
+  "HNV-31-01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/components/BlockVisitorDialog.tsx",
+      "apps/console/src/pages/visitors/BlockedPage.tsx",
+      "apps/console/e2e/blocking.spec.ts"
+    ],
+    "note": "Required reason, four durations, Also close this chat; Blocked list with Unblock and a confirm step; axe in English and Arabic."
   }
 }

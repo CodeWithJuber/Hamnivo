@@ -20,7 +20,8 @@ const HOUR = 3_600_000;
 const block = (patch: Partial<VisitorBlock> = {}): VisitorBlock => ({
   id: 'blk_1',
   brandId: 'brand_1',
-  who: 'Visitor 7F3A',
+  name: null,
+  code: '7F3A',
   signedIn: false,
   customerId: 'cus_1',
   visitorId: null,

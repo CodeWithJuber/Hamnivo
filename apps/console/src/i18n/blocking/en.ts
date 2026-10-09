@@ -31,6 +31,8 @@ export const blockingEn = {
   },
   page: {
     link: 'Blocked',
+    /** An anonymous visitor, by the short code that tells them apart. */
+    anonymous: 'Visitor {{code}}',
     title: 'Blocked visitors',
     description:
       'Visitors who can’t chat with your brands, why they were blocked and until when. Unblock someone here and they can chat again at once.',

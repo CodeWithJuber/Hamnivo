@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@hamnivo/ui/components/table';
 import { Link } from '@tanstack/react-router';
+import type { TFunction } from 'i18next';
 import { ArrowLeftIcon, BanIcon, ShieldCheckIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +33,10 @@ import { DOCS } from '../../lib/docs';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { useBrandRefs } from '../../lib/names';
 import { useTenant } from '../../lib/tenant';
+
+/** How a blocked visitor is named: their name, or "Visitor" and their short code. */
+export const blockName = (t: TFunction, block: VisitorBlock): string =>
+  block.name ?? t('inbox.blocking.page.anonymous', { code: block.code });
 
 const COLUMNS = ['who', 'reason', 'by', 'when', 'expires', 'actions'] as const;
 
@@ -75,6 +80,7 @@ function BlockRow({
   onUnblock: (block: VisitorBlock) => void;
 }) {
   const { t } = useTranslation();
+  const nameOf = (block: VisitorBlock) => blockName(t, block);
   const active = isActive(block);
   return (
     <TableRow
@@ -85,7 +91,7 @@ function BlockRow({
       <TableCell className="min-w-36">
         <div className="flex flex-col items-start gap-1">
           <span className="font-medium text-text">
-            <bdi>{block.who}</bdi>
+            <bdi>{nameOf(block)}</bdi>
           </span>
           {block.signedIn ? (
             <StatusBadge tone="info" icon={null}>
@@ -127,7 +133,7 @@ function BlockRow({
                 to="/inbox/$conversationId"
                 params={{ conversationId: block.conversationId }}
                 search={{}}
-                aria-label={t('inbox.blocking.page.openChatFor', { name: block.who })}
+                aria-label={t('inbox.blocking.page.openChatFor', { name: nameOf(block) })}
               >
                 {t('inbox.blocking.page.openChat')}
               </Link>
@@ -137,7 +143,7 @@ function BlockRow({
             <Button
               variant="secondary"
               size="sm"
-              aria-label={t('inbox.blocking.page.unblockFor', { name: block.who })}
+              aria-label={t('inbox.blocking.page.unblockFor', { name: nameOf(block) })}
               onClick={() => onUnblock(block)}
               data-testid="unblock"
             >
@@ -166,6 +172,7 @@ export function BlockedPage({
   onChange: (next: { status?: BlockListStatus; brand?: string }) => void;
 }) {
   const { t } = useTranslation();
+  const nameOf = (block: VisitorBlock) => blockName(t, block);
   const { can } = useTenant();
   const announce = useAnnouncer();
   const permitted = can('visitors.block');
@@ -293,14 +300,18 @@ export function BlockedPage({
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title={t('inbox.blocking.page.confirm.title', { name: unblocking?.who ?? '' })}
+        title={t('inbox.blocking.page.confirm.title', {
+          name: unblocking ? nameOf(unblocking) : '',
+        })}
         confirmLabel={t('inbox.blocking.page.confirm.submit')}
-        failureNote={t('inbox.blocking.page.confirm.failed', { name: unblocking?.who ?? '' })}
+        failureNote={t('inbox.blocking.page.confirm.failed', {
+          name: unblocking ? nameOf(unblocking) : '',
+        })}
         testId="unblock-dialog"
         onConfirm={async () => {
           if (!unblocking) return;
           await lift.mutateAsync(unblocking.id);
-          announce(t('inbox.blocking.page.confirm.done', { name: unblocking.who }));
+          announce(t('inbox.blocking.page.confirm.done', { name: nameOf(unblocking) }));
         }}
       >
         <p>{t('inbox.blocking.page.confirm.body')}</p>

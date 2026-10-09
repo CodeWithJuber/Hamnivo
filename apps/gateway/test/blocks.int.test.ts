@@ -87,7 +87,16 @@ describe('blocking from a chat (H20)', () => {
       liftedAt: null,
       active: true,
     });
-    expect(made.body.who).toMatch(/^Visitor [0-9A-F]{4}$/);
+    expect(made.body.name).toBeNull();
+    expect(made.body.code).toMatch(/^[0-9A-F]{4}$/);
+    // Blocking again, or a retry, keeps the one block.
+    const twice = await shop.owner.post(`/v1/inbox/conversations/${blocked.id}/block`, {
+      reason: 'Again',
+      duration: 'day',
+      closeChat: false,
+    });
+    expect(twice.status).toBe(201);
+    expect(twice.body.id).toBe(made.body.id);
     const days = (Date.parse(made.body.expiresAt) - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(6.9);
     expect(days).toBeLessThan(7.1);
@@ -104,6 +113,14 @@ describe('blocking from a chat (H20)', () => {
     expect(refused.status).toBe(403);
     expect(refused.body.code).toBe('CHAT_UNAVAILABLE');
     expect(JSON.stringify(refused.body)).not.toMatch(/block/i);
+    // Privacy choices and the browser link stay open.
+    expect(
+      (
+        await blocked.visitor.call('POST', '/v1/widget/visitors/link', {
+          visitorKey: 'k'.repeat(32),
+        })
+      ).status,
+    ).toBe(200);
     const again = await blocked.visitor.call('POST', '/v1/widget/conversations', {
       firstMessage: 'New chat',
       clientMessageId: randomUUID(),
