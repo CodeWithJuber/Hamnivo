@@ -37,6 +37,25 @@ external-store runtime and the Hamnivo design tokens.
   reply-waiting emails (W25); others are told why they cannot.
 - **Handoff.** "Talk to a person" asks for a human, and the waiting state is shown until someone
   takes over.
+- **Who can answer, and a message for later** (W11, H19).
+  - Under the greeting, in words with an icon: someone is online, the team is busy, it is away
+    until a named time (in the brand's time zone), or nobody is online. Read only from the
+    configuration.
+  - While nobody can answer (the brand chooses: outside business hours, nobody online, or
+    either), home offers "Leave a message". The brand's form is checked before sending, with the
+    problems listed at the top and the first one focused. The message becomes a ticket: its
+    reference is shown, a link goes to the visitor's email, and the ticket joins their
+    conversations with its state ("Open", "Waiting for your reply", "Closed").
+- **Before the first conversation** (W26, W27).
+  - The brand's pre-chat form, unless signed-in customers may go straight in. The visitor's first
+    message waits, starts the question field, and goes with the answers; "Not now" gives it back.
+  - Consent, when the brand asks for it: its words, its privacy policy and a box never ticked in
+    advance. When the words change, the visitor is asked again.
+- **Reopening** (W15). "I still need help" opens a closed conversation again, from the rating or
+  the closed banner.
+- **Direct chat link** (W28). `/c/<widgetId>` is the chat on its own page, without a website
+  around it: the session is opened as direct, the tab shows the brand's name, and search engines
+  are asked not to index it.
 - **Customer memory** (when the brand's assistant uses it).
   - Asks first: what would be remembered, why, what never is and for how long, with two equal
     answers. Nothing is remembered without a yes.

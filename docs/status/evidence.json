@@ -721,27 +721,38 @@
     "note": "Replaying a whole conversation through the reconciler neither duplicates messages nor repeats a takeover, and repeated webhook deliveries are applied once (tested). Commerce: replayed payment and refund webhooks, repeated approval taps, lost provider answers (timeouts before and after the provider acted) and repeated worker runs leave one payment page, one charge, one refund and one card each (tested). Pending: tool crash cases, and a test that kills the worker process mid-call."
   },
   "W15": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/widget/conversations.service.ts",
       "apps/gateway/test/conversation-flow.int.test.ts",
-      "packages/db/src/schema/authority.ts"
+      "apps/widget/src/components/Csat.tsx",
+      "apps/widget/src/components/Reopen.tsx",
+      "apps/widget/e2e/surface.spec.ts",
+      "packages/client/src/client.ts",
+      "packages/client/test/forms.test.ts"
     ],
-    "note": "Customers rate a resolved conversation (1 to 5 with an optional comment; a new rating replaces the old one) and reopen it without writing; staff see each rating as a private note, and a reopened AI conversation returns to people if the AI may no longer answer (tested). Rating and reopen controls in the widget are pending."
+    "note": "Customers rate a resolved conversation (1 to 5 with an optional comment) and reopen it with I still need help, from the rating card or, when rating is off, from the closed banner; staff see each rating as a private note, and a reopened AI conversation returns to people if the AI may no longer answer (tested in the gateway and the browser)."
   },
   "W11": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/gateway/src/widget/copy.ts",
+      "apps/gateway/src/widget/offline-messages.service.ts",
+      "apps/gateway/src/widget/ticket-emails.service.ts",
       "apps/gateway/src/widget/customer-emails.service.ts",
       "apps/gateway/test/conversation-flow.int.test.ts",
+      "apps/gateway/test/front-door.int.test.ts",
+      "apps/widget/src/availability.ts",
+      "apps/widget/src/components/StatusLine.tsx",
+      "apps/widget/src/components/ContactForm.tsx",
       "apps/widget/e2e/surface.spec.ts",
+      "apps/console/src/pages/chat-widget/FormsTab.tsx",
+      "apps/console/e2e/chat-widget.spec.ts",
       "packages/domain/src/business-hours.ts",
-      "packages/domain/test/business-hours.test.ts",
       "apps/console/src/pages/settings/HoursPage.tsx",
-      "apps/console/src/lib/hours.ts"
+      "docs/guide/setup/chat-widget-forms.md"
     ],
-    "note": "Brands set business hours (time zone, weekly spans, closed dates; clock changes handled). The widget configuration says whether people are working and when they are back, never claiming availability without hours; \"talk to a person\" answers queued or offline with the return time in the customer's language. Offline, the widget shows a banner with the last update and a way to try again, and messages wait and go out once (tested). Verified customers can get an email when a reply waits (W25). Syncing Chatwoot working hours and a contact path for anonymous visitors are pending. Studio now edits the hours and holidays (A05), and a brand can write its own offline message (W03)."
+    "note": "Brands set business hours, and the widget says honestly who can answer: online, here but busy, away until a time in the brand's time zone, or nobody online. When the hours are closed or nobody is online (the brand chooses), a contact form takes the customer's message: it becomes a ticket for people (H19), and one email asks to confirm the address without repeating what was written; answers are emailed only to a confirmed address. Offline, the widget keeps unsent messages and sends them once. Tested in the gateway (20 cases) and in the browser, including Arabic at 320 px. Replying by email waits for the email channel (D13)."
   },
   "A04": {
     "status": "in-progress",
@@ -3048,5 +3059,73 @@
       "apps/console/test/setup-screens.test.tsx"
     ],
     "note": "An invalid colour, address or text is explained next to its field and in a linked error summary, and what was typed is kept. The gateway checks again and its reasons are shown the same way."
+  },
+  "W26": {
+    "status": "implemented",
+    "evidence": [
+      "packages/contracts/src/widget-forms.ts",
+      "apps/gateway/src/widget/forms.ts",
+      "apps/gateway/src/widget/conversations.service.ts",
+      "apps/gateway/test/front-door.int.test.ts",
+      "apps/widget/src/components/StartGate.tsx",
+      "apps/widget/src/components/ChatForm.tsx",
+      "apps/widget/e2e/surface.spec.ts",
+      "apps/console/src/pages/chat-widget/FormsTab.tsx",
+      "apps/console/src/lib/widget-forms.ts",
+      "apps/console/test/widget-forms.test.ts",
+      "apps/console/e2e/chat-widget.spec.ts",
+      "docs/guide/setup/chat-widget-forms.md"
+    ],
+    "note": "Up to six questions per brand in four languages (name, email, phone, question, team, short text, list), checked by the gateway when the chat starts. The name names the customer; a typed email and phone become contact attributes and are never the customer's verified address; a team answer sets the conversation's team, which routing then leaves alone; staff get every answer in a private note; the question becomes the first message. Customers the website signed in may skip it."
+  },
+  "W27": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/widget/consent.ts",
+      "packages/domain/src/chat-forms.ts",
+      "packages/domain/test/chat-forms.test.ts",
+      "apps/gateway/test/front-door.int.test.ts",
+      "apps/widget/src/components/StartGate.tsx",
+      "apps/widget/e2e/surface.spec.ts",
+      "apps/console/src/pages/chat-widget/PrivacyTab.tsx",
+      "apps/console/e2e/chat-widget.spec.ts",
+      "packages/db/src/schema/customer-surface.ts",
+      "docs/guide/setup/consent.md"
+    ],
+    "note": "Off, every visitor, or connections from the EU, EEA and UK (unknown countries are asked too); the country is read per request and never stored. Never pre-ticked; the gateway refuses a chat without agreement to the current words, and new words ask again. Agreements are append-only, with the words' version and the time."
+  },
+  "W28": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/widget/sessions.service.ts",
+      "apps/gateway/src/widget/origins.ts",
+      "apps/gateway/test/front-door.int.test.ts",
+      "apps/widget/src/direct.ts",
+      "apps/widget/src/main.tsx",
+      "apps/widget/e2e/surface.spec.ts",
+      "apps/console/src/pages/chat-widget/ShareTab.tsx",
+      "apps/console/e2e/chat-widget.spec.ts",
+      "deploy/production/Caddyfile",
+      "docs/guide/setup/direct-link.md"
+    ],
+    "note": "The chat on its own page at /c/<widget>, off by default; a session from the link is allowed only while the brand keeps it on, and turning it off ends those sessions at their next renewal. Caddy serves the page unframable and with noindex. Studio shows the link, a QR code (SVG, downloadable) and the install code."
+  },
+  "H19": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/tickets/tickets.ts",
+      "apps/gateway/src/inbox/tickets.service.ts",
+      "apps/gateway/src/inbox/inbox.service.ts",
+      "apps/gateway/src/inbox/projection.ts",
+      "packages/chatwoot/src/authority.ts",
+      "packages/chatwoot/test/contract/suite.ts",
+      "apps/gateway/test/front-door.int.test.ts",
+      "apps/console/src/pages/inbox/ConversationPane.tsx",
+      "apps/console/test/inbox-tickets.test.tsx",
+      "apps/console/e2e/chat-widget.spec.ts",
+      "docs/adr/0010-tickets-are-conversations.md",
+      "docs/guide/inbox/tickets.md"
+    ],
+    "note": "A ticket is a conversation with a tenant-wide number (ADR 0010): Open, Pending (snoozed until the customer writes) or Closed (resolved), with Chatwoot's priority set as the staff member and taken over when changed in Chatwoot. From the contact form or by staff; a Tickets queue with state and priority filters; every change audited and fenced by the ownership epoch. The queue orders by activity, not priority. The Chatwoot contract cases run against the fake here; the real run is left to CI."
   }
 }

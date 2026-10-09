@@ -13,11 +13,14 @@ import {
   type HamnivoClient,
   type OutgoingAttachment,
   type OutgoingMessage,
+  type StartConversationInput,
 } from '@hamnivo/client';
 import type {
   DeliveryState,
+  FormAnswers,
   Message,
   MessagePart,
+  OfflineMessageResponse,
   ReactionEmoji,
   ReplyLanguage,
   WidgetLanguageState,
@@ -38,10 +41,19 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { offlineFormApplies } from '../availability.js';
 import { CommerceCard, type Part } from '../commerce/Cards.js';
 import { ShopBar } from '../commerce/ShopBar.js';
 import type { Commerce } from '../commerce/useCommerce.js';
 import { type Draft, draftText } from '../drafts.js';
+import {
+  consentNeeded,
+  type FieldValues,
+  firstMessageOf,
+  isConsentRequired,
+  labelOf,
+  prechatNeeded,
+} from '../forms.js';
 import { LANGUAGE_NAMES, LOCALES, type Locale, REPLY_LANGUAGE_NAMES } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
 import type { ChatState } from '../useChat.js';
@@ -50,6 +62,7 @@ import type { MemoryControls } from '../useMemory.js';
 import { useTypingReports } from '../useTyping.js';
 import { BidiText, directionOf } from './BidiText.js';
 import { BrandMark } from './BrandMark.js';
+import { ContactForm } from './ContactForm.js';
 import { Conversations } from './Conversations.js';
 import { Csat } from './Csat.js';
 import { Home } from './Home.js';
@@ -58,8 +71,12 @@ import { MemoryPanel, useSlotLabel } from './MemoryPanel.js';
 import { DeleteMessage, EMOJI_NAMES, Reactions } from './MessageActions.js';
 import { Contact, Files, fileSize, Place, Unknown } from './Parts.js';
 import { PrivacyLink } from './PrivacyLink.js';
+import { Reopen } from './Reopen.js';
 import { Settings } from './Settings.js';
 import { StaffTypingLine } from './StaffTyping.js';
+import { StartGate } from './StartGate.js';
+import { StatusLine } from './StatusLine.js';
+import { TicketLine } from './TicketLine.js';
 import { VisitorNotice } from './VisitorNotice.js';
 
 interface Source {
@@ -786,7 +803,19 @@ function SeenReporter({
   return null;
 }
 
-type View = 'chat' | 'memory' | 'settings' | 'conversations';
+type View = 'chat' | 'memory' | 'settings' | 'conversations' | 'contact';
+
+/**
+ * What the visitor did before the first conversation, kept while the chat asks its pre-chat form
+ * or for consent (W26, W27): a message, "talk to a person", or files to attach.
+ */
+type Intent = { kind: 'send'; text: string } | { kind: 'handoff' } | { kind: 'files' };
+
+/** Puts focus back in the message box, after it comes back. */
+const focusComposer = () =>
+  requestAnimationFrame(() =>
+    document.querySelector<HTMLTextAreaElement>('textarea[aria-label]')?.focus(),
+  );
 
 export function Chat(props: {
   client: HamnivoClient;
@@ -817,6 +846,17 @@ export function Chat(props: {
   onReact: (messageId: string, emoji: ReactionEmoji) => Promise<void>;
   onOpenConversation: (conversationId: string) => Promise<void>;
   onFilesConversation: () => Promise<string | null>;
+  /** Starts the first conversation with the pre-chat answers and first message (W26). */
+  onStart: (input: StartConversationInput) => Promise<void>;
+  /** Opens the closed conversation on screen again (W15). */
+  onReopen: () => Promise<void>;
+  /** Leaves a message while nobody can answer (W11); it becomes a ticket (H19). */
+  onLeaveMessage: (
+    answers: FormAnswers,
+    clientRequestId: string,
+  ) => Promise<OfflineMessageResponse>;
+  /** The gateway asked for consent again: the chat asks with the words now in force (W27). */
+  onConsentRequired: () => Promise<void>;
   onClose?: (() => void) | undefined;
   language: {
     state: WidgetLanguageState | null;
@@ -887,6 +927,105 @@ export function Chat(props: {
     chipsRef.current.flatMap((c) => (c.state === 'ready' && c.file ? [c.file] : []));
   const draftScope = `${session.principal.id}:${conversation?.id ?? 'new'}`;
 
+  // Before the first conversation the chat may ask its pre-chat form, or for consent (W26, W27).
+  // The visitor's first step (a message, "talk to a person", files) waits for it, then goes on.
+  const askPrechat = prechatNeeded(session);
+  const mustAgree = consentNeeded(config);
+  const gated = !conversation && (askPrechat || mustAgree);
+  const [gate, setGate] = useState<{ intent: Intent; messageId: string } | null>(null);
+  /** Files waiting for the conversation the gate starts (null when the visitor stepped back). */
+  const fileWaiters = useRef<Array<(conversationId: string | null) => void>>([]);
+  /** Answers given in this visit, so a second try starts from them; never stored. */
+  const prechatAnswers = useRef<FieldValues>({});
+  const contactAnswers = useRef<FieldValues>({});
+  const newScope = `${session.principal.id}:new`;
+
+  const releaseFiles = (conversationId: string | null) => {
+    for (const resolve of fileWaiters.current.splice(0)) resolve(conversationId);
+  };
+  // Another person (signed in or out) starts with nothing asked and nothing remembered.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the person changes
+  useEffect(() => {
+    setGate(null);
+    releaseFiles(null);
+    prechatAnswers.current = {};
+    contactAnswers.current = {};
+    setView((current) => (current === 'contact' ? 'chat' : current));
+  }, [session.principal.id]);
+
+  const openGate = (intent: Intent) => {
+    // What the visitor wrote stays on this device as a draft until the chat starts.
+    if (intent.kind === 'send') client.drafts.set(newScope, intent.text);
+    setGate((current) => current ?? { intent, messageId: crypto.randomUUID() });
+  };
+  const waitForGate = (intent: Intent) =>
+    new Promise<string | null>((resolve) => {
+      fileWaiters.current.push(resolve);
+      openGate(intent);
+    });
+  /** The gateway wants consent the chat thought it had (new words): ask, then go on. */
+  const askAgain = async (error: unknown, intent: Intent) => {
+    if (conversation || !isConsentRequired(error)) throw error;
+    await props.onConsentRequired();
+    openGate(intent);
+  };
+
+  const send = async (text: string, files: readonly OutgoingAttachment[] = []) => {
+    if (gated) return openGate({ kind: 'send', text });
+    try {
+      await props.onSend(text, files);
+    } catch (error) {
+      await askAgain(error, { kind: 'send', text });
+    }
+  };
+  const handoff = async () => {
+    if (gated) return openGate({ kind: 'handoff' });
+    try {
+      await props.onHandoff();
+    } catch (error) {
+      await askAgain(error, { kind: 'handoff' });
+    }
+  };
+  const filesConversation = async (): Promise<string | null> => {
+    if (gated) return waitForGate({ kind: 'files' });
+    try {
+      return await props.onFilesConversation();
+    } catch (error) {
+      if (conversation || !isConsentRequired(error)) throw error;
+      await props.onConsentRequired();
+      return waitForGate({ kind: 'files' });
+    }
+  };
+
+  /**
+   * Agrees when asked, then starts the chat. With the pre-chat form the answers go with the start,
+   * and so does the first message; with consent alone the first step simply goes on.
+   */
+  const passGate = async (answers: FormAnswers, values: FieldValues) => {
+    if (!gate) return;
+    const { intent, messageId } = gate;
+    if (mustAgree) await client.giveConsent(config.consent.noticeVersion);
+    if (askPrechat) {
+      const pending = intent.kind === 'send' ? intent.text : '';
+      const firstMessage = firstMessageOf(config.forms.prechat.fields, values, pending);
+      await props.onStart({
+        prechat: answers,
+        ...(firstMessage ? { firstMessage, clientMessageId: messageId } : {}),
+      });
+    } else if (intent.kind === 'send') {
+      await props.onSend(intent.text);
+    } else {
+      await props.onStart({});
+    }
+    client.drafts.clear(newScope);
+    prechatAnswers.current = {};
+    setGate(null);
+    releaseFiles(await props.onFilesConversation().catch(() => null));
+    focusComposer();
+    // The chat has started; asking for a person goes as it always does.
+    if (intent.kind === 'handoff') await props.onHandoff().catch(() => undefined);
+  };
+
   const runtime = useExternalStoreRuntime<ThreadMessageLike>({
     messages,
     convertMessage: (m) => m,
@@ -897,13 +1036,21 @@ export function Chat(props: {
       setChips([]);
       client.drafts.clear(draftScope);
       try {
-        await props.onSend(text, files);
+        await send(text, files);
       } catch {
         // Not sent (for example offline before the conversation existed): the words come back.
         runtime.thread.composer.setText(text);
       }
     },
   });
+
+  /** "Not now": the visitor's words go back in the message box, and files are not attached. */
+  const cancelGate = () => {
+    if (gate?.intent.kind === 'send') runtime.thread.composer.setText(gate.intent.text);
+    setGate(null);
+    releaseFiles(null);
+    focusComposer();
+  };
 
   const sendFiles = () => {
     const files = readyFiles();
@@ -947,7 +1094,7 @@ export function Chat(props: {
       };
     });
     setChips((current) => [...current, ...added.map((a) => a.chip)]);
-    const conversationId = await props.onFilesConversation().catch(() => null);
+    const conversationId = await filesConversation().catch(() => null);
     for (const { chip, file, refused } of added) {
       if (refused) continue;
       const update = (patch: Partial<Chip>) =>
@@ -1016,7 +1163,7 @@ export function Chat(props: {
     onRemove: (id) => {
       props.onRemove(id);
     },
-    onHelp: canAskPerson ? () => void props.onHandoff() : undefined,
+    onHelp: canAskPerson ? () => void handoff() : undefined,
     onOpenMemory: () => show('memory'),
     onDelete: props.onDelete,
     onReact: props.onReact,
@@ -1035,9 +1182,19 @@ export function Chat(props: {
     : null;
   const proactive = props.prompt ? { brand: config.brand.name, text: props.prompt } : null;
   const allowFiles = config.features.attachments;
-  const hasOthers = state.conversations.length > 1;
+  // A message left while nobody could answer is listed even before a chat is on screen.
+  const hasOthers = state.conversations.some((c) => c.id !== conversation?.id);
   const empty = state.messages.length === 0 && props.pending.length === 0;
   const centered = props.mode === 'fullpage';
+  const resolved = conversation?.status === 'resolved';
+  const reopen = async () => {
+    await props.onReopen();
+    focusComposer();
+  };
+  // Who can answer is said on the home screen; the header says it while home is out of sight.
+  const statusInHeader =
+    empty && Boolean(config.availability) && (view !== 'chat' || gate !== null);
+  const contact = offlineFormApplies(config) ? () => show('contact') : null;
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
@@ -1054,6 +1211,16 @@ export function Chat(props: {
             <p className="text-sm text-text-muted" data-testid="ai-disclosure">
               {copy.aiDisclosure}
             </p>
+            {conversation?.ticket ? (
+              <p className="mt-1 text-xs text-text-muted" data-testid="header-ticket">
+                <TicketLine ticket={conversation.ticket} />
+              </p>
+            ) : null}
+            {statusInHeader ? (
+              <div className="mt-1">
+                <StatusLine availability={config.availability} locale={locale} compact />
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {memoryShown ? (
@@ -1127,16 +1294,16 @@ export function Chat(props: {
           ) : null}
         </header>
         {banner ? (
-          <p
-            role="status"
-            className="border-b border-border bg-surface-sunken px-4 py-2 text-sm text-text"
-            data-testid="status-banner"
-          >
-            {banner}
-          </p>
+          <div className="flex flex-col gap-2 border-b border-border bg-surface-sunken px-4 py-2">
+            <p role="status" className="text-sm text-text" data-testid="status-banner">
+              {banner}
+            </p>
+            {/* Without a rating to ask, the banner is where to open the conversation again. */}
+            {resolved && !config.features.csat ? <Reopen onReopen={reopen} /> : null}
+          </div>
         ) : null}
-        {config.features.csat && conversation?.status === 'resolved' ? (
-          <Csat client={client} conversationId={conversation.id} />
+        {config.features.csat && conversation && resolved ? (
+          <Csat client={client} conversationId={conversation.id} onReopen={reopen} />
         ) : null}
         {offline ? (
           <div
@@ -1185,6 +1352,24 @@ export function Chat(props: {
             onBack={() => back('hv-more')}
           />
         ) : null}
+        {view === 'contact' ? (
+          <ContactForm
+            config={config}
+            locale={locale}
+            remembered={contactAnswers.current}
+            onValues={(values) => {
+              contactAnswers.current = values;
+            }}
+            onAgree={() => client.giveConsent(config.consent.noticeVersion)}
+            onLeave={async (answers, clientRequestId) => {
+              const sent = await props.onLeaveMessage(answers, clientRequestId);
+              contactAnswers.current = {};
+              return sent;
+            }}
+            onConsentRequired={props.onConsentRequired}
+            onBack={() => back('hv-contact-open')}
+          />
+        ) : null}
         <ThreadPrimitive.Root
           className={view === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}
         >
@@ -1212,14 +1397,38 @@ export function Chat(props: {
                 </Button>
               </div>
             ) : null}
-            {empty ? (
+            {gate ? (
+              <StartGate
+                fields={askPrechat ? config.forms.prechat.fields : []}
+                consent={
+                  mustAgree
+                    ? {
+                        text: labelOf(config.consent.text, locale),
+                        privacyPolicyUrl: config.privacyPolicyUrl,
+                      }
+                    : null
+                }
+                pending={gate.intent.kind === 'send' ? gate.intent.text : ''}
+                remembered={prechatAnswers.current}
+                locale={locale}
+                onSubmit={passGate}
+                onConsentRequired={props.onConsentRequired}
+                onValues={(values) => {
+                  prechatAnswers.current = values;
+                }}
+                onCancel={cancelGate}
+              />
+            ) : empty ? (
               <Home
                 client={client}
                 greeting={copy.greeting}
                 prompt={proactive}
                 suggestions={config.help?.suggestions?.[locale] ?? []}
                 search={config.features.helpCenter}
-                onAsk={(question) => void props.onSend(question)}
+                availability={config.availability}
+                locale={locale}
+                onContact={contact}
+                onAsk={(question) => void send(question)}
               />
             ) : null}
             {askConsent && remembered ? (
@@ -1261,40 +1470,45 @@ export function Chat(props: {
           </ThreadPrimitive.Viewport>
           <div className="border-t border-border bg-surface px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <ShopBar commerce={props.commerce} locale={locale} />
-            {canAskPerson ? (
-              <Button
-                variant="link"
-                className="mb-1 h-auto text-sm"
-                onClick={() => void props.onHandoff()}
-              >
-                {t('talkToPerson')}
-              </Button>
-            ) : null}
-            <LanguageQuestion
-              state={props.language.state}
-              onChoose={props.language.choose}
-              onDismiss={props.language.dismiss}
-            />
-            <StaffTypingLine name={props.staffTyping} />
-            <VisitorNotice text={props.visitorNotice} />
-            <Composer
-              label={t('placeholder')}
-              send={offline ? t('surface.offline.queue') : t('send')}
-              draftScope={draftScope}
-              conversationId={conversation?.id ?? null}
-              client={client}
-              chips={chips}
-              attach={{
-                allowed: allowFiles,
-                accept: limits.allowedMimeTypes.join(','),
-                maxFiles,
-                maxMb: Math.round(limits.maxBytes / (1024 * 1024)),
-              }}
-              onFiles={(files) => void addFiles(files)}
-              onRemoveChip={(id) => setChips((current) => current.filter((c) => c.id !== id))}
-              onSendFiles={sendFiles}
-              locale={locale}
-            />
+            {/* While the chat asks before starting, its card is the one thing to answer. */}
+            {gate ? null : (
+              <>
+                {canAskPerson ? (
+                  <Button
+                    variant="link"
+                    className="mb-1 h-auto text-sm"
+                    onClick={() => void handoff()}
+                  >
+                    {t('talkToPerson')}
+                  </Button>
+                ) : null}
+                <LanguageQuestion
+                  state={props.language.state}
+                  onChoose={props.language.choose}
+                  onDismiss={props.language.dismiss}
+                />
+                <StaffTypingLine name={props.staffTyping} />
+                <VisitorNotice text={props.visitorNotice} />
+                <Composer
+                  label={t('placeholder')}
+                  send={offline ? t('surface.offline.queue') : t('send')}
+                  draftScope={draftScope}
+                  conversationId={conversation?.id ?? null}
+                  client={client}
+                  chips={chips}
+                  attach={{
+                    allowed: allowFiles,
+                    accept: limits.allowedMimeTypes.join(','),
+                    maxFiles,
+                    maxMb: Math.round(limits.maxBytes / (1024 * 1024)),
+                  }}
+                  onFiles={(files) => void addFiles(files)}
+                  onRemoveChip={(id) => setChips((current) => current.filter((c) => c.id !== id))}
+                  onSendFiles={sendFiles}
+                  locale={locale}
+                />
+              </>
+            )}
             <PrivacyLink url={config.privacyPolicyUrl} />
           </div>
         </ThreadPrimitive.Root>

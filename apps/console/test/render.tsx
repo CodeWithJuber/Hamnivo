@@ -50,6 +50,7 @@ const PATHS = [
   '/finance',
   '/reports',
   '/brands',
+  '/chat-widget',
   '/hours',
   '/team',
   '/support-teams',

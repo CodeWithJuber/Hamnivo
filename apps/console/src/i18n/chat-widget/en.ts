@@ -1,0 +1,222 @@
+/**
+ * Studio: the Chat widget page (Settings), one brand at a time: how the chat looks (W03), how it
+ * behaves (W02, W09, W17, W23, W25), what it asks before a chat and while nobody can answer (W26,
+ * W11), consent before chatting (W27), and the direct link with its QR code (W28).
+ */
+export const chatWidgetEn = {
+  nav: 'Chat widget',
+  title: 'Chat widget',
+  description:
+    'How the chat looks and behaves on your website, what it asks customers, and how to share it. Each tab saves on its own, and websites get the changes within a minute.',
+  loading: 'Loading the chat widget settings',
+  brand: 'Brand',
+  open: 'Chat widget',
+  openLabel: 'Chat widget settings for {{name}}',
+  noPermission: 'Your role can’t change the chat widget. Ask a workspace owner or administrator.',
+  forbidden: {
+    title: 'You can’t change the chat widget',
+    description:
+      'Ask a workspace owner or administrator for a role that may configure the chat widget.',
+  },
+  noBrands: {
+    title: 'No brand yet',
+    description: 'Add a brand and its website first. Then set up its chat here.',
+    action: 'Go to Brands and install',
+  },
+  tabs: {
+    label: 'Parts of the chat',
+    look: 'Look',
+    behaviour: 'Behaviour',
+    forms: 'Forms',
+    privacy: 'Privacy',
+    share: 'Share',
+  },
+  unsaved: 'You have changes that are not saved.',
+  reset: 'Undo changes',
+  guideLook: 'How to change the look',
+  preview: {
+    note: 'A picture of the chat with your changes, before you save. To try the real chat, use Test chat on Brands and install.',
+    language: 'Language',
+    screen: 'Show',
+    screens: {
+      prechat: 'Before a chat starts',
+      offline: 'Contact form',
+      thanks: 'After sending',
+    },
+    prechatOff: 'The pre-chat form is off: customers go straight to the chat.',
+    offlineOff:
+      'The contact form is off: customers can still write, and read the answer when they come back.',
+    consentOff: 'Consent is off: nobody is asked to agree before chatting.',
+    layout: 'On your website: {{layout}}, {{side}}.',
+  },
+  behaviour: {
+    title: 'How the chat behaves',
+    description: 'Where the chat sits, what customers can send and find, and the emails they get.',
+  },
+  forms: {
+    guide: 'How the forms work',
+    save: 'Save forms',
+    saved: 'Forms saved for {{name}}. Websites get them within a minute.',
+    prechat: {
+      title: 'Before a chat starts',
+      description:
+        'Ask a few things before the chat begins, so the right person answers with what they need. Every extra question means fewer customers start a chat.',
+      enabled: 'Ask these questions before a chat starts',
+      enabledHint: 'When this is off, customers start writing straight away.',
+      skipVerified: 'Skip the questions for customers your website signed in',
+      skipVerifiedHint:
+        'Your website already told us who they are, so they go straight to the chat.',
+    },
+    offline: {
+      title: 'When nobody can answer',
+      description:
+        'Instead of waiting, customers leave a message. It becomes a ticket in the inbox, and the answer goes to their email once they confirm the address.',
+      enabled: 'Show a contact form when nobody can answer',
+      enabledHint:
+        'When this is off, customers can still write in the chat and read the answer when they come back.',
+      when: 'When to show it',
+      whens: {
+        either: 'Outside business hours, or when nobody is online',
+        eitherHint: 'Customers never wait without knowing that nobody is there.',
+        closed: 'Only outside business hours',
+        closedHint: 'Needs business hours. Without them, the form never shows.',
+        nobody_online: 'Only when nobody on the team is online',
+        nobody_onlineHint: 'Also during business hours, when everyone is away or offline.',
+      },
+      thanks: 'Thank-you message',
+      thanksHint:
+        'What customers read after sending. Left empty, Hamnivo’s own words are used (shown greyed). Other languages show the English until you write them.',
+      aiFirst: 'Let the AI assistant answer first',
+      aiFirstHint:
+        'The AI assistant tries to answer the message. People follow up when it hands the ticket over.',
+      emailLocked: 'Always asked and required: the answer reaches the customer at this address.',
+      questionLocked: 'Always asked and required: it is what your team answers.',
+      lockedRemove: 'The contact form can’t work without this question.',
+    },
+    fields: {
+      legend: 'Questions',
+      count: '{{n}} of {{max}} questions',
+      empty: 'No questions yet. Add one, or turn this form off.',
+      field: 'Question {{number}}: {{name}}',
+      kind: 'Kind of answer',
+      kinds: {
+        name: 'Name',
+        email: 'Email address',
+        phone: 'Phone number',
+        question: 'Their question',
+        department: 'Team to talk to',
+        text: 'Short text',
+        choice: 'Pick from a list',
+      },
+      label: 'What the customer reads',
+      labelHint: 'English is required. Other languages show the English until you write them.',
+      required: 'Customers must answer this',
+      moveUp: 'Move {{name}} up',
+      moveDown: 'Move {{name}} down',
+      moved: '{{name}} is now question {{number}}.',
+      remove: 'Remove {{name}}',
+      removeShort: 'Remove',
+      removed: '{{name}} removed.',
+      add: 'Add a question',
+      added: '{{name}} added at the end.',
+      full: 'A form can ask at most {{max}} questions. Remove one to add another.',
+      options: 'Answers to pick from',
+      optionsHint: 'From {{min}} to {{max}} answers.',
+      departmentHint: 'Each answer sends the conversation to a support team.',
+      option: 'Answer {{number}}',
+      team: 'Team for answer {{number}}',
+      teamPlaceholder: 'Choose a team',
+      noTeams: 'Add a support team first: each answer leads to one.',
+      noTeamsLink: 'Go to Support teams',
+      addOption: 'Add an answer',
+      removeOption: 'Remove answer {{number}} of {{name}}',
+      otherLanguages: 'Arabic, Hindi and Urdu ({{n}} of 3 written)',
+      optionsFull: 'A list can have at most {{max}} answers.',
+    },
+    problems: {
+      at: '{{form}}, question {{number}}',
+      label: '{{at}}: write what it says in English.',
+      duplicateKind: '{{at}}: this kind of answer is asked already. Ask for it once.',
+      fewOptions: '{{at}}: give at least {{min}} answers.',
+      manyOptions: '{{at}}: give at most {{max}} answers.',
+      optionLabel: '{{at}}: write answer {{option}} in English.',
+      optionTeam: '{{at}}: choose the team for answer {{option}}.',
+      tooManyFields: '{{form}}: ask at most {{max}} questions.',
+      needsEmail:
+        'The contact form needs a required email address, so the answer can reach the customer.',
+      needsQuestion:
+        'The contact form needs their question, required, so your team knows what to answer.',
+      thanksEnglish:
+        'Write the thank-you message in English first. Other languages fall back to it.',
+      forms: {
+        prechat: 'Pre-chat form',
+        offline: 'Contact form',
+      },
+    },
+  },
+  privacy: {
+    title: 'Consent before chatting',
+    description:
+      'Ask customers to agree before a chat starts. Their answer is kept with the version of the words they agreed to.',
+    guide: 'How consent works',
+    mode: 'Who is asked',
+    modes: {
+      off: 'Nobody',
+      offHint: 'Customers start chatting straight away.',
+      everyone: 'Every visitor',
+      everyoneHint: 'Everyone agrees once, before their first message.',
+      eu: 'Only visitors from the EU, EEA and UK',
+      euHint: 'We check where the connection comes from on each visit and never store it.',
+    },
+    text: 'The words customers agree to',
+    textHint:
+      'Left empty, Hamnivo’s own words are used (shown greyed). Other languages show the English until you write them.',
+    reconsent: 'Changing the words asks customers who agreed before to agree again.',
+    reconsentNow:
+      'You changed the words: after you save, customers who agreed before are asked again.',
+    version: 'Customers have agreed to version {{version}} of the words.',
+    versionNone: 'Nobody has agreed yet: these words have not been saved.',
+    privacyLink: 'Privacy policy link',
+    privacyLinkHint: 'Shown with the question. You set it on the Look tab.',
+    privacyNone: 'No privacy policy link yet.',
+    privacyEdit: 'Change it on the Look tab',
+    save: 'Save consent settings',
+    saved: 'Consent settings saved for {{name}}.',
+    english: 'Write the words in English first. Other languages fall back to them.',
+  },
+  share: {
+    link: {
+      title: 'Direct chat link',
+      description:
+        'A page with only the chat on it, to share in emails, on social media or in print.',
+      guide: 'How the direct link works',
+      enabled: 'Let people open the chat from a link',
+      enabledHint: 'Turning it off ends the chats that were opened from the link.',
+      save: 'Save link setting',
+      savedOn: 'The direct chat link is on for {{name}}.',
+      savedOff: 'The direct chat link is off for {{name}}.',
+      url: 'Chat link',
+      copy: 'Copy link',
+      copied: 'Link copied',
+      copyFailed: 'Copying didn’t work. The link is selected: copy it yourself.',
+      open: 'Open',
+      openLabel: 'Open the chat link in a new tab',
+      off: 'The link is off. Turn it on and save to get the link and its QR code.',
+      noUrl:
+        'The link can’t be made yet: this server doesn’t know the chat’s web address. Ask the person who runs your Hamnivo server to set it.',
+      anyWebsite: 'The link works even on websites that are not in your allowed list.',
+    },
+    qr: {
+      title: 'QR code',
+      description: 'Print it on receipts, packaging or posters. A phone camera opens the chat.',
+      label: 'QR code that opens the chat of {{name}}',
+      download: 'Download QR code',
+      downloaded: 'QR code downloaded.',
+      off: 'The QR code appears here once the link is on.',
+    },
+    install: {
+      noAccess: 'Someone who manages brands can copy the install code from Brands and install.',
+      guides: 'How to put the code on your website',
+    },
+  },
+} as const;

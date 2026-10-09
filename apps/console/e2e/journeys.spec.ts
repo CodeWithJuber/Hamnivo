@@ -52,7 +52,10 @@ test('HNV-02-01 HNV-03-02 HNV-17-02 HNV-17-03 HNV-17-05 · sign up, create a wor
   await page.getByLabel('Workspace name').fill(`Noor Books ${randomBytes(2).toString('hex')}`);
   await page.getByRole('button', { name: 'Create workspace' }).click();
 
-  // A new workspace says what to do first.
+  // A new workspace starts in the guided setup; it can be left for later.
+  await expect(page.getByRole('heading', { level: 1, name: 'Welcome to Hamnivo' })).toBeVisible();
+  await page.getByRole('link', { name: 'Finish later' }).click();
+  // Then the overview says what to do first.
   await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
   await expect(page.getByText('No brands yet')).toBeVisible();
   await page.getByRole('link', { name: 'Create a brand' }).click();

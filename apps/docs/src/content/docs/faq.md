@@ -36,7 +36,7 @@ imported.
 ## Can I change how the chat looks?
 
 Yes: your colour, logo, corners, greeting and offline message, with a live preview. Go to
-**Settings** → **Brands and install** and press **Look and wording** on your brand.
+**Settings** → **Chat widget** and open the **Look** tab.
 
 ## What happens if the AI can't answer?
 

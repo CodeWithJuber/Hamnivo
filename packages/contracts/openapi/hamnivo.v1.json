@@ -54264,6 +54264,9 @@
           "brandId": {
             "type": "string"
           },
+          "widgetId": {
+            "type": "string"
+          },
           "enabled": {
             "type": "boolean"
           },
@@ -54299,6 +54302,7 @@
         },
         "required": [
           "brandId",
+          "widgetId",
           "enabled",
           "url",
           "configVersion",

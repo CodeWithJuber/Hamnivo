@@ -20,6 +20,16 @@ export const DOCS = {
     widgetLook: guide('setup', 'widget-look'),
     testChat: guide('setup', 'test-chat'),
     businessHours: guide('setup', 'business-hours'),
+    /** The pre-chat form and the contact form for when nobody can answer. */
+    chatWidgetForms: guide('setup', 'chat-widget-forms'),
+    /** Asking customers to agree before they chat. */
+    consent: guide('setup', 'consent'),
+    /** The page with only the chat on it, and its QR code. */
+    directLink: guide('setup', 'direct-link'),
+  },
+  /** The guides for people working in the inbox. */
+  inbox: {
+    tickets: guide('inbox', 'tickets'),
   },
   /** An installation guide for one website platform, by its file name without `.md`. */
   integration: (slug: string) => guide('integrations', slug),

@@ -7,8 +7,9 @@ import { createIdentityAssertion } from '@hamnivo/server';
 import { type BrowserContext, expect, type FrameLocator, type Page, test } from '@playwright/test';
 
 /**
- * The customer surface in a browser (W02, W05–W07, W09, W11, W14, W17–W19, W22–W25), on the
- * stack from e2e/stack.ts: a host page on another origin, the loader, the widget and the gateway.
+ * The customer surface in a browser (W02, W05–W07, W09, W11, W14, W15, W17–W19, W22–W28, H19),
+ * on the stack from e2e/stack.ts: a host page on another origin, the loader, the widget and the
+ * gateway.
  */
 
 interface Stack {
@@ -57,6 +58,12 @@ const settings = (body: unknown) =>
   staff('PUT', `/v1/admin/brands/${stack().brandId}/widget-settings`, body);
 const proactive = (body: unknown) =>
   staff('PUT', `/v1/admin/brands/${stack().brandId}/proactive`, body);
+const widgetForms = (body: unknown) =>
+  staff('PUT', `/v1/admin/brands/${stack().brandId}/widget-forms`, body);
+const consentSettings = (body: unknown) =>
+  staff('PUT', `/v1/admin/brands/${stack().brandId}/consent`, body);
+const directLink = (body: unknown) =>
+  staff('PUT', `/v1/admin/brands/${stack().brandId}/direct-link`, body);
 
 async function openWidget(page: Page, path = '/'): Promise<FrameLocator> {
   await page.goto(`${stack().hostUrl}${path}`);
@@ -97,11 +104,11 @@ async function signIn(page: Page, customer: { id: string; email?: string }) {
   );
 }
 
-async function audit(page: Page) {
-  const results = await new AxeBuilder({ page })
-    .include('iframe[data-hamnivo-frame]')
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
-    .analyze();
+/** Checks the chat in its frame, or the whole page where the chat is the page (W28). */
+async function audit(page: Page, { frame = true } = {}) {
+  const builder = new AxeBuilder({ page });
+  if (frame) builder.include('iframe[data-hamnivo-frame]');
+  const results = await builder.withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
   expect(
     results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`),
   ).toEqual([]);
@@ -688,5 +695,281 @@ test.describe('signed-in customers (W18, W25)', () => {
       'Sign in on the website to get emails about your conversations.',
     );
     await expect(frame.getByTestId('email-settings').getByRole('checkbox')).toHaveCount(0);
+  });
+});
+
+test.describe('contact form and tickets (W11, H19)', () => {
+  test.beforeAll(async () => {
+    await widgetForms({
+      offline: {
+        enabled: true,
+        when: 'either',
+        thanks: { en: 'We read every message within a day.' },
+      },
+    });
+  });
+  test.afterAll(async () => {
+    await widgetForms({});
+  });
+
+  test('leaves a message while nobody can answer, and follows the ticket it becomes', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const frame = await openWidget(page);
+    // Nobody from the team is online in this stack, and the brand has set no business hours.
+    await expect(frame.getByTestId('availability')).toHaveText(
+      'Nobody is online right now. Your message will wait for a person.',
+    );
+    const card = frame.getByTestId('contact-card');
+    await expect(card).toContainText('Nobody can answer right now');
+    await expect(card).toContainText('Leave a message and we’ll answer by email.');
+    // The assistant may still answer, so the message box stays.
+    await expect(textbox(frame)).toBeVisible();
+    await audit(page);
+
+    await card.getByRole('button', { name: 'Leave a message' }).click();
+    const form = frame.getByTestId('contact-form');
+    await expect(form.getByRole('heading', { name: 'Leave a message' })).toBeFocused();
+    // Mistakes are listed at the top, each on its field, and the first one gets focus.
+    await form.getByRole('button', { name: 'Send message' }).click();
+    const summary = form.locator('[data-slot="form-error-summary"]');
+    await expect(summary).toContainText('Check these answers');
+    await expect(summary).toContainText('Your email: Fill this in.');
+    await expect(summary).toContainText('How can we help?: Fill this in.');
+    const email = form.getByRole('textbox', { name: 'Your email (required)', exact: true });
+    await expect(email).toBeFocused();
+    await expect(email).toHaveAttribute('aria-invalid', 'true');
+    await expect(email).toHaveAttribute('autocomplete', 'email');
+    await audit(page);
+    await email.fill('amina@example');
+    const question = 'Can I change the address on order 1042?';
+    await form.getByRole('textbox', { name: 'How can we help? (required)' }).fill(question);
+    await form.getByRole('button', { name: 'Send message' }).click();
+    await expect(summary).toContainText('Enter an email address like name@example.com.');
+    await email.fill(`amina-${randomUUID().slice(0, 8)}@example.com`);
+    await form.getByRole('textbox', { name: 'Your name', exact: true }).fill('Amina Noor');
+    await form.getByRole('button', { name: 'Send message' }).click();
+
+    const thanks = frame.getByTestId('ticket-thanks');
+    await expect(thanks.getByRole('heading', { name: 'Message sent' })).toBeFocused();
+    const said = thanks.getByTestId('ticket-reference');
+    await expect(said).toHaveText(/^Your reference is #\d+\.$/);
+    const reference = ((await said.textContent()) ?? '').match(/#\d+/)?.[0] as string;
+    await expect(thanks).toContainText('We read every message within a day.');
+    await expect(thanks).toContainText(
+      /We sent a link to \S+@example\.com\. Open it so we can send our answer there\./,
+    );
+    await audit(page);
+
+    // The ticket is one of the customer's conversations, with its reference and state.
+    await thanks.getByRole('button', { name: 'Back to start' }).click();
+    await expect(frame.getByTestId('home')).toBeVisible();
+    await frame.getByRole('button', { name: 'More options' }).click();
+    await frame.getByRole('button', { name: 'Your conversations' }).click();
+    const item = frame.getByTestId('conversation-item').filter({ hasText: reference });
+    await expect(item).toContainText(`Ticket ${reference} · Open`);
+    await item.click();
+    await expect(frame.getByTestId('header-ticket')).toHaveText(`Ticket ${reference} · Open`);
+    await expect(frame.getByText(question).first()).toBeVisible();
+
+    // The team sees it as a ticket from the contact form, and waits for the customer's answer.
+    const id = await conversationOf(frame);
+    const detail = await staff('GET', `/v1/inbox/conversations/${id}`);
+    expect(detail.ticket).toMatchObject({ reference, state: 'open', source: 'offline_form' });
+    await staff('POST', `/v1/inbox/conversations/${id}/status`, { status: 'snoozed' });
+    const again = await openWidget(page);
+    await expect(again.getByTestId('header-ticket')).toHaveText(
+      `Ticket ${reference} · Waiting for your reply`,
+      { timeout: 15_000 },
+    );
+  });
+
+  test.describe('on a phone, in Arabic', () => {
+    test.use({ viewport: { width: 320, height: 640 }, isMobile: true, hasTouch: true });
+
+    test('the form fits at 320 px and reads right to left', async ({ page }) => {
+      const frame = await openWidget(page);
+      await frame.getByRole('combobox', { name: 'Language' }).selectOption('ar');
+      await expect(frame.locator('html')).toHaveAttribute('dir', 'rtl');
+      await frame.getByTestId('contact-card').getByRole('button', { name: 'اترك رسالة' }).click();
+      const form = frame.getByTestId('contact-form');
+      await form.getByRole('button', { name: 'أرسل الرسالة' }).click();
+      await expect(form.locator('[data-slot="form-error-summary"]')).toContainText(
+        'راجع هذه الإجابات',
+      );
+      await fits(frame);
+      await audit(page);
+    });
+  });
+});
+
+test.describe('pre-chat form (W26)', () => {
+  test.beforeAll(async () => {
+    await widgetForms({
+      prechat: {
+        enabled: true,
+        skipVerified: true,
+        fields: [
+          { id: 'name', kind: 'name', label: { en: 'Your name', ar: 'اسمك' }, required: true },
+          { id: 'order', kind: 'text', label: { en: 'Order number' }, required: false },
+          { id: 'question', kind: 'question', label: { en: 'How can we help?' }, required: true },
+        ],
+      },
+      // The contact form stays out of the way here.
+      offline: { enabled: false },
+    });
+  });
+  test.afterAll(async () => {
+    await widgetForms({});
+  });
+
+  test('asks before the first message, keeps what was written, then starts with it', async ({
+    page,
+  }) => {
+    const frame = await openWidget(page);
+    await textbox(frame).fill('Where is my order?');
+    await textbox(frame).press('Enter');
+    const gate = frame.getByTestId('prechat');
+    await expect(gate.getByRole('heading', { name: 'Before we start' })).toBeFocused();
+    // The question starts with what the visitor wrote; nothing was sent yet.
+    await expect(gate.getByRole('textbox', { name: 'How can we help? (required)' })).toHaveValue(
+      'Where is my order?',
+    );
+    await expect(frame.locator('[data-sender="customer"]')).toHaveCount(0);
+    await audit(page);
+    await gate.getByRole('button', { name: 'Start chat' }).click();
+    await expect(gate.locator('[data-slot="form-error-summary"]')).toContainText(
+      'Your name: Fill this in.',
+    );
+    const name = gate.getByRole('textbox', { name: 'Your name (required)' });
+    await expect(name).toBeFocused();
+    // "Not now" gives the words back to the message box.
+    await gate.getByRole('button', { name: 'Not now' }).click();
+    await expect(textbox(frame)).toHaveValue('Where is my order?');
+    await textbox(frame).press('Enter');
+    await name.fill('Amina Noor');
+    await gate.getByRole('textbox', { name: 'Order number' }).fill('1042');
+    await gate.getByRole('button', { name: 'Start chat' }).click();
+    await expect(gate).toHaveCount(0);
+    await expect(frame.locator('[data-sender="customer"]').last()).toContainText(
+      'Where is my order?',
+    );
+    await waitForAnswer(frame);
+    // The next message goes straight on: the form is asked once.
+    await ask(frame, 'Thank you');
+    await expect(gate).toHaveCount(0);
+  });
+
+  test('lets a customer the website signed in go straight in', async ({ page }) => {
+    const frame = await openWidget(page);
+    await signIn(page, { id: `amina-${randomUUID().slice(0, 8)}` });
+    await ask(frame, 'Signed in, so no form');
+    await expect(frame.getByTestId('prechat')).toHaveCount(0);
+  });
+});
+
+test.describe('consent (W27)', () => {
+  test.afterAll(async () => {
+    await consentSettings({ mode: 'off' });
+  });
+
+  test('asks before the first message, never ticked in advance, then sends it', async ({
+    page,
+  }) => {
+    await consentSettings({
+      mode: 'everyone',
+      text: { en: 'We keep this chat for 30 days to help you. Ask us to delete it at any time.' },
+    });
+    const frame = await openWidget(page);
+    await textbox(frame).fill('Is the shop open on Friday?');
+    await textbox(frame).press('Enter');
+    const card = frame.getByTestId('consent-card');
+    await expect(card).toContainText('We keep this chat for 30 days to help you.');
+    await expect(card.getByTestId('pending-message')).toHaveText('Is the shop open on Friday?');
+    const agree = card.getByRole('checkbox', { name: 'I agree' });
+    await expect(agree).not.toBeChecked();
+    await audit(page);
+    await card.getByRole('button', { name: 'Continue' }).click();
+    await expect(card).toContainText('Tick “I agree” to continue.');
+    await expect(agree).toBeFocused();
+    await agree.check();
+    await card.getByRole('button', { name: 'Continue' }).click();
+    await expect(card).toHaveCount(0);
+    await expect(frame.locator('[data-sender="customer"]').last()).toContainText(
+      'Is the shop open on Friday?',
+    );
+    await waitForAnswer(frame);
+  });
+
+  test('is not asked when the brand does not ask for it', async ({ page }) => {
+    await consentSettings({ mode: 'off' });
+    const frame = await openWidget(page);
+    await ask(frame, 'No consent asked here');
+    await expect(frame.getByTestId('consent-card')).toHaveCount(0);
+  });
+});
+
+test.describe('direct chat link (W28)', () => {
+  test.afterAll(async () => {
+    await directLink({ enabled: false });
+  });
+
+  test('opens the chat on its own page, out of search results, and closes with the link', async ({
+    page,
+  }) => {
+    const s = stack();
+    const link = await directLink({ enabled: true });
+    const url = (link.url as string | null) ?? `${s.widgetOrigin}/c/${s.widgetId}`;
+    // The widget reads its id from this path.
+    expect(new URL(url).pathname).toBe(`/c/${s.widgetId}`);
+    // Production builds name the gateway (VITE_HAMNIVO_API); this test build is told it here.
+    const opened = `${url}?api=${encodeURIComponent(s.apiBase)}`;
+    await page.goto(opened);
+    await expect(page.getByTestId('ai-disclosure')).toBeVisible();
+    await expect(page).toHaveTitle('Noor Books');
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
+    await expect(page.getByRole('heading', { level: 1, name: 'Noor Books' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Language' })).toBeVisible();
+    // No website around it: nothing to close back to.
+    await expect(page.getByRole('button', { name: 'Close chat' })).toHaveCount(0);
+    await audit(page, { frame: false });
+    const box = page.getByRole('textbox', { name: 'Write a message…' });
+    await box.fill('Hello from the link');
+    await box.press('Enter');
+    await expect(page.locator('[data-sender="customer"]').last()).toContainText(
+      'Hello from the link',
+    );
+    await expect(page.locator('[data-sender="ai_primary"]').last()).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // Turned off, the link opens no chat.
+    await directLink({ enabled: false });
+    await page.reload();
+    await expect(page.getByRole('alert')).toHaveText('The chat could not start. Please try again.');
+  });
+});
+
+test.describe('reopen (W15)', () => {
+  test('“I still need help” opens a closed conversation again', async ({ page }) => {
+    const frame = await openWidget(page);
+    await ask(frame, 'Thanks, that answers it');
+    await waitForAnswer(frame);
+    const id = await conversationOf(frame);
+    await staff('POST', `/v1/inbox/conversations/${id}/status`, { status: 'resolved' });
+    const banner = frame.getByTestId('status-banner');
+    await expect(banner).toHaveText('This conversation is closed. Write to reopen it.', {
+      timeout: 15_000,
+    });
+    await audit(page);
+    await frame.getByRole('button', { name: 'I still need help' }).click();
+    await expect(banner).toHaveCount(0);
+    await expect(textbox(frame)).toBeFocused();
+    await expect
+      .poll(async () => (await staff('GET', `/v1/inbox/conversations/${id}`)).status, {
+        timeout: 15_000,
+      })
+      .not.toBe('resolved');
   });
 });

@@ -43,9 +43,17 @@ export type PresenceEntry = C.PresenceEntry;
 export type InboxQueue = C.InboxQueue;
 export type FieldValue = string | number | boolean | null;
 
-export const QUEUES = ['mine', 'unassigned', 'ai', 'team', 'all'] as const;
+export type InboxTicket = C.InboxTicket;
+export type TicketState = C.TicketState;
+export type TicketPriority = C.TicketPriority;
+
+export const QUEUES = ['mine', 'unassigned', 'ai', 'team', 'tickets', 'all'] as const;
 export const STATUSES = ['active', 'snoozed', 'resolved', 'all'] as const;
 export const CHANNELS = ['chat', 'email', 'whatsapp', 'sms', 'other'] as const;
+/** Where a ticket stands (H19), in the order the inbox offers them. */
+export const TICKET_STATES: readonly TicketState[] = ['open', 'pending', 'closed'];
+/** Chatwoot's priorities, most urgent first. */
+export const PRIORITIES: readonly TicketPriority[] = ['urgent', 'high', 'medium', 'low'];
 export type StatusFilter = (typeof STATUSES)[number];
 export type ChannelFilter = (typeof CHANNELS)[number];
 
@@ -58,7 +66,24 @@ export interface InboxSearch {
   language?: string;
   tag?: string;
   q?: string;
+  /** The tickets queue only: tickets in this state. */
+  ticketState?: TicketState;
+  /** The tickets queue only: tickets of this priority. */
+  priority?: TicketPriority;
 }
+
+/**
+ * The status a ticket state is set with (the status route): Pending waits for the customer, so it
+ * is snoozed with no time (it opens again when they write); Closed is resolved.
+ */
+export const statusOfTicketState = (
+  state: TicketState,
+): { status: 'open' | 'snoozed' | 'resolved' } =>
+  state === 'pending'
+    ? { status: 'snoozed' }
+    : state === 'closed'
+      ? { status: 'resolved' }
+      : { status: 'open' };
 
 export const inboxKeys = {
   all: ['inbox'] as const,
@@ -103,8 +128,12 @@ export function useInboxList(search: InboxSearch, pageSize = 25) {
     queryKey: [tenantId, ...inboxKeys.list(search), pageSize],
     queryFn: ({ pageParam, signal }) => {
       const query = new URLSearchParams({ limit: String(pageSize) });
+      const tickets = search.queue === 'tickets';
       query.set('queue', search.queue ?? 'all');
-      query.set('status', search.status ?? 'active');
+      // A ticket's state replaces the status filter: a closed ticket is still a ticket.
+      query.set('status', tickets ? 'all' : (search.status ?? 'active'));
+      if (tickets && search.ticketState) query.set('ticketState', search.ticketState);
+      if (tickets && search.priority) query.set('priority', search.priority);
       if (search.brand) query.set('brandId', search.brand);
       if (search.channel) query.set('channel', search.channel);
       if (search.language) query.set('language', search.language);
@@ -256,6 +285,20 @@ export const setStatus = (
   id: string,
   body: { status: 'open' | 'resolved' | 'snoozed'; snoozedUntil?: string; expectedEpoch?: number },
 ) => api<InboxDetail>(path(id, '/status'), { method: 'POST', tenant: tenantId, body });
+
+/** Makes the conversation a ticket with a reference number (H19). */
+export const makeTicket = (
+  tenantId: string,
+  id: string,
+  body: { priority?: TicketPriority; expectedEpoch?: number },
+) => api<InboxDetail>(path(id, '/ticket'), { method: 'POST', tenant: tenantId, body });
+
+/** Sets or clears the priority, shared with anyone working in Chatwoot. */
+export const setPriority = (
+  tenantId: string,
+  id: string,
+  body: { priority: TicketPriority | null; expectedEpoch?: number },
+) => api<InboxDetail>(path(id, '/priority'), { method: 'POST', tenant: tenantId, body });
 
 export interface SendInput {
   clientMessageId: string;

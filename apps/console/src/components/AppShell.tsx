@@ -107,6 +107,7 @@ function useMenu(pathname: string): { entries: MenuEntry[]; section: MenuSection
     '/finance': t('commerce.nav.finance'),
     '/reports': t('reports.nav'),
     '/brands': t('nav.brands'),
+    '/chat-widget': t('chatWidget.nav'),
     '/hours': t('setup.hours.nav'),
     '/team': t('nav.team'),
     '/support-teams': t('setup.teams.nav'),

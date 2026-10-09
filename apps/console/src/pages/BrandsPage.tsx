@@ -10,7 +10,6 @@ import {
   GlobeIcon,
   MessageSquareTextIcon,
   MessagesSquareIcon,
-  PaletteIcon,
   PencilIcon,
   PlugZapIcon,
   PlusIcon,
@@ -27,7 +26,7 @@ import { PageHeader } from '../components/PageHeader';
 import { ProvisioningProgress } from '../components/ProvisioningProgress';
 import { ActionError, QueryState } from '../components/States';
 import { api, newIdempotencyKey } from '../lib/api';
-import { GATEWAY_ORIGIN, WIDGET_ORIGIN } from '../lib/config';
+import { installSnippet } from '../lib/install';
 import {
   keys,
   useAuthorityConnections,
@@ -37,9 +36,8 @@ import {
 } from '../lib/queries';
 import { useTenant } from '../lib/tenant';
 import type { AuthorityConnection, Brand } from '../lib/types';
-import { ChatSettingsDialog, ProactiveDialog } from './BrandChatSettings';
+import { ProactiveDialog } from './BrandChatSettings';
 import { connectionFor } from './OverviewPage';
-import { AppearanceDialog } from './settings/AppearanceDialog';
 import { HoursSummary } from './settings/HoursSummary';
 import { TestChatDialog } from './settings/TestChat';
 
@@ -63,11 +61,6 @@ export function parseWebsites(value: string): { origins: string[]; invalid: stri
     invalid.push(line.trim());
   }
   return { origins: [...new Set(origins)], invalid };
-}
-
-/** The loader tag for a brand (packages/widget-loader); the widget ID is not a secret. */
-export function installSnippet(widgetId: string): string {
-  return `<script src="${WIDGET_ORIGIN}/loader.js" data-widget-id="${widgetId}" data-api="${GATEWAY_ORIGIN}" async></script>`;
 }
 
 function CreateBrandDialog({
@@ -396,9 +389,7 @@ function BrandCard({
   const { t } = useTranslation();
   const { can } = useTenant();
   const [editing, setEditing] = useState(false);
-  const [chatSettings, setChatSettings] = useState(false);
   const [proactive, setProactive] = useState(false);
-  const [look, setLook] = useState(false);
   const [testing, setTesting] = useState(false);
   const snippet = installSnippet(brand.widgetId);
   // The test chat needs the chat engine. Someone who cannot see its status is let try: the
@@ -431,27 +422,16 @@ function BrandCard({
             <StatusBadge tone="neutral">{t('status.connection.disabled')}</StatusBadge>
           ) : null}
           {can('widget.configure') ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setChatSettings(true)}
-              aria-label={t('chatSettings.openLabel', { name: brand.name })}
-              data-testid="chat-settings"
-            >
-              <SlidersHorizontalIcon aria-hidden="true" />
-              {t('chatSettings.open')}
-            </Button>
-          ) : null}
-          {can('widget.configure') ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setLook(true)}
-              aria-label={t('setup.appearance.openLabel', { name: brand.name })}
-              data-testid="appearance"
-            >
-              <PaletteIcon aria-hidden="true" />
-              {t('setup.appearance.open')}
+            <Button asChild variant="secondary" size="sm">
+              <Link
+                to="/chat-widget"
+                search={{ brand: brand.id }}
+                aria-label={t('chatWidget.openLabel', { name: brand.name })}
+                data-testid="chat-widget-link"
+              >
+                <SlidersHorizontalIcon aria-hidden="true" />
+                {t('chatWidget.open')}
+              </Link>
             </Button>
           ) : null}
           <ReasonedAction reason={engineMissing ? t('setup.testChat.needsEngine') : null}>
@@ -493,9 +473,7 @@ function BrandCard({
         </div>
       </div>
       <EditBrandDialog brand={brand} open={editing} onOpenChange={setEditing} />
-      <ChatSettingsDialog brand={brand} open={chatSettings} onOpenChange={setChatSettings} />
       <ProactiveDialog brand={brand} open={proactive} onOpenChange={setProactive} />
-      <AppearanceDialog brand={brand} open={look} onOpenChange={setLook} />
       <TestChatDialog brand={brand} open={testing} onOpenChange={setTesting} />
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">

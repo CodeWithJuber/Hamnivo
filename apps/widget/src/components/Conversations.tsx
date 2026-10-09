@@ -3,10 +3,12 @@ import { Button } from '@hamnivo/ui/components/button';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BidiText } from './BidiText.js';
+import { TicketLine } from './TicketLine.js';
 
 /**
  * The visitor's conversations (W18). A signed-in customer sees the same list on every device; an
- * anonymous visitor only what this browser started.
+ * anonymous visitor only what this browser started. A ticket shows its reference and where it
+ * stands (H19), which also says whether it is closed.
  */
 export function Conversations(props: {
   conversations: readonly CustomerConversation[];
@@ -49,7 +51,11 @@ export function Conversations(props: {
                     {when.format(new Date(conversation.updatedAt))}
                   </time>
                   {current ? <span>· {t('surface.conversations.current')}</span> : null}
-                  {conversation.status === 'resolved' ? (
+                  {conversation.ticket ? (
+                    <span className="inline-flex flex-wrap items-center gap-1">
+                      · <TicketLine ticket={conversation.ticket} />
+                    </span>
+                  ) : conversation.status === 'resolved' ? (
                     <span>· {t('surface.conversations.closed')}</span>
                   ) : null}
                   {conversation.unreadCount > 0 ? (

@@ -5,18 +5,22 @@ import { StarIcon } from 'lucide-react';
 import { type FormEvent, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ratedKey, readRated, sendRating } from '../csat.js';
+import { Reopen } from './Reopen.js';
 
 /**
  * Asks for a rating from 1 to 5 once a conversation is closed, when the brand wants one. The
  * stars are native radio buttons, so the arrow keys, labels and focus work as everywhere else,
  * and the comment is optional. A rating already sent from this device is thanked, not asked again.
+ * Either way the customer can open the conversation again (W15).
  */
 export function Csat({
   client,
   conversationId,
+  onReopen,
 }: {
   client: HamnivoClient;
   conversationId: string;
+  onReopen?: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const announce = useAnnouncer();
@@ -30,13 +34,12 @@ export function Csat({
 
   if (given !== null) {
     return (
-      <p
-        role="status"
-        className="border-b border-border bg-surface-sunken px-4 py-2 text-sm text-text"
-        data-testid="csat-thanks"
-      >
-        {t('appearance.csat.thanks')}
-      </p>
+      <div className="flex flex-col gap-2 border-b border-border bg-surface-sunken px-4 py-2">
+        <p role="status" className="text-sm text-text" data-testid="csat-thanks">
+          {t('appearance.csat.thanks')}
+        </p>
+        {onReopen ? <Reopen onReopen={onReopen} /> : null}
+      </div>
     );
   }
 
@@ -122,6 +125,7 @@ export function Csat({
           </span>
         ) : null}
       </div>
+      {onReopen ? <Reopen onReopen={onReopen} /> : null}
     </form>
   );
 }

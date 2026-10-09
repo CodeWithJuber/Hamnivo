@@ -237,6 +237,8 @@ export const UpdateDirectLinkRequest = DirectLinkSettings.meta({ id: 'UpdateDire
 export const DirectLinkView = z
   .object({
     brandId: z.string(),
+    /** The brand's widget ID, which the install code carries too. */
+    widgetId: z.string(),
     enabled: z.boolean(),
     /** The page that opens the chat on its own; null when the chat's address is not configured. */
     url: z.url().nullable(),

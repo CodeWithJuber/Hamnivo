@@ -405,6 +405,7 @@ export class WidgetSettingsService {
       const surface = await brandSurface(tx, brand.id);
       return {
         brandId,
+        widgetId: brand.widgetPublicId,
         enabled: surface.directLink,
         url: directLinkUrl(this.config.PUBLIC_WIDGET_ORIGIN, brand.widgetPublicId),
         configVersion: brand.configVersion,
@@ -431,6 +432,7 @@ export class WidgetSettingsService {
       });
       return {
         brandId,
+        widgetId: brand.widgetPublicId,
         enabled,
         url: directLinkUrl(this.config.PUBLIC_WIDGET_ORIGIN, brand.widgetPublicId),
         configVersion: version,
