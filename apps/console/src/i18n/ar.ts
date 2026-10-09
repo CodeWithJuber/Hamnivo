@@ -1,6 +1,7 @@
 import { automationsAr } from './automations/ar';
 import { blockingAr } from './blocking/ar';
 import { cachingAr } from './caching';
+import { channelsAr } from './channels/ar';
 import { chatWidgetAr } from './chat-widget/ar';
 import { checksAr } from './checks';
 import { commerceAr } from './commerce/ar';
@@ -1075,6 +1076,7 @@ export const ar: Translation = {
       asked: 'طلب العميل التحدث إلى شخص.',
       askedSince: 'طلب العميل التحدث إلى شخص {{time}}.',
       released: 'أُعيدت هذه المحادثة إلى قائمة الانتظار.',
+      channelAiOff: 'الذكاء الاصطناعي لا يرد على هذه القناة، لذا يجب أن يرد شخص من فريقك.',
       waiting: 'هذه المحادثة بانتظار شخص.',
       takeOver: 'تولَّ المحادثة',
       claim: 'أسندها إليّ',
@@ -1352,6 +1354,7 @@ export const ar: Translation = {
   reports: reportsAr,
   chatSettings: chatSettingsAr,
   chatWidget: chatWidgetAr,
+  channels: channelsAr,
   automations: automationsAr,
   memory: {
     title: 'ذاكرة العملاء',

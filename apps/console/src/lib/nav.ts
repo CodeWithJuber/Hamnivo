@@ -29,6 +29,7 @@ export type NavPath =
   | '/reports'
   | '/brands'
   | '/chat-widget'
+  | '/channels'
   | '/automations'
   | '/hours'
   | '/team'
@@ -88,6 +89,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     routes: [
       { to: '/brands', permission: 'brands.manage' },
       { to: '/chat-widget', permission: 'widget.configure' },
+      { to: '/channels', permission: 'integrations.manage' },
       { to: '/automations', permission: 'automations.read' },
       { to: '/hours', permission: 'brands.manage' },
       { to: '/team', permission: 'members.read' },

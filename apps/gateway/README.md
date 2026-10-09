@@ -416,6 +416,19 @@ email choices, read receipts and sign-out stay open); new sessions get `chatAvai
 the tracker stores nothing for a blocked browser. Blocks are lifted, not deleted, and purged 90
 days after they end.
 
+## Channels: email, WhatsApp and Telegram (D13, D14, ADR 0013)
+
+`src/authority/channel-inboxes.service.ts`, `adopt.ts`, `channel-poll.service.ts`. Discovery
+records the account's non-API inboxes as `purpose = 'channel'` (every five minutes through the
+`inbox`/`all` cursor, and `POST /v1/admin/brands/{id}/channels/find`). The processor adopts a
+conversation without a control row on an active, unpaused channel inbox, never one carrying
+`hv_conversation`; the customer is a `channel` principal keyed by address. Each incoming channel
+message gets a committed ledger row (`hv1:x:`) and the same outbox events as a widget message.
+`ai_answers` (off by default) attaches the bot to the Chatwoot inbox; a bot-owned conversation
+without it goes to people (`channel_ai_off`). Each channel inbox's cursor lists its recent
+conversations every minute, so lost webhooks are caught. `GET /v1/admin/brands/{id}/channels`
+and `PUT /v1/admin/channels/{id}` under `integrations.manage`.
+
 ## Customer surface (W02, W05–W07, W09, W17–W19, W22–W25)
 
 `src/widget/surface.*`, `attachments.service.ts`, `messages.service.ts`, `help.service.ts`,

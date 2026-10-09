@@ -58,6 +58,14 @@ export function parseChatwootEvent(payload: unknown): AuthorityEvent {
         type: event === 'message_created' ? 'message.created' : 'message.updated',
         accountRef: acc,
         message: toMessage(p, String(conversation.display_id ?? conversation.id ?? '')),
+        ...(conversation.inbox_id !== undefined
+          ? {
+              conversation: toConversation({
+                ...conversation,
+                id: conversation.display_id ?? conversation.id,
+              }),
+            }
+          : {}),
       };
     }
     case 'conversation_created':

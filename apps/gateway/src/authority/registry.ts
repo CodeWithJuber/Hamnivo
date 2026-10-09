@@ -13,7 +13,7 @@ export interface RuntimeInbox {
   id: string;
   externalInboxId: number;
   brandId: string | null;
-  purpose: 'live' | 'import';
+  purpose: 'live' | 'import' | 'channel';
   webhookSecret: string | null;
 }
 

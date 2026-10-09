@@ -76,6 +76,7 @@ export const reportsEn = {
       ai_stopped: 'AI replies were stopped',
       no_agent: 'No AI agent was published',
       assist_mode: 'The AI only suggests replies',
+      channel_ai_off: 'The AI does not answer on this channel',
       staff_takeover: 'A person took over',
       staff_reply: 'A person replied',
       staff_assign: 'Assigned to a person',

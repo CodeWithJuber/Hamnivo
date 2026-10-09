@@ -20606,6 +20606,187 @@
         }
       }
     },
+    "/v1/admin/brands/{brandId}/channels": {
+      "get": {
+        "operationId": "listChannels",
+        "summary": "The brand's email, WhatsApp and Telegram channels, and those of its Chatwoot account that answer for no brand yet (integrations.manage)",
+        "tags": [
+          "Channels"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelInboxList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/channels/find": {
+      "post": {
+        "operationId": "findChannels",
+        "summary": "Looks for inboxes made in the brand's Chatwoot account since the last check (integrations.manage)",
+        "tags": [
+          "Channels"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelInboxList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/channels/{channelId}": {
+      "put": {
+        "operationId": "updateChannel",
+        "summary": "Turns the AI on or off for a channel, sets its team, pauses it or claims it for a brand (integrations.manage)",
+        "tags": [
+          "Channels"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channelId",
+            "schema": {
+              "type": "string",
+              "description": "Channel ID (inb_…)"
+            },
+            "required": true,
+            "description": "Channel ID (inb_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChannelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelInbox"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/tools": {
       "get": {
         "operationId": "listTools",
@@ -31355,6 +31536,34 @@
           "duration"
         ]
       },
+      "UpdateChannelRequest": {
+        "type": "object",
+        "properties": {
+          "brandId": {
+            "type": "string",
+            "description": "brand identifier (TypeID with prefix \"brd\")",
+            "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "aiAnswers": {
+            "type": "boolean"
+          },
+          "defaultTeamId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "team identifier (TypeID with prefix \"team\")",
+                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paused": {
+            "type": "boolean"
+          }
+        }
+      },
       "CreateToolRequest": {
         "type": "object",
         "properties": {
@@ -38181,7 +38390,8 @@
                   "type": "string",
                   "enum": [
                     "live",
-                    "import"
+                    "import",
+                    "channel"
                   ]
                 },
                 "externalInboxId": {
@@ -44348,7 +44558,8 @@
                   "ai_stopped",
                   "ai_unavailable",
                   "ai_blocked",
-                  "ai_escalated"
+                  "ai_escalated",
+                  "channel_ai_off"
                 ]
               },
               {
@@ -45087,7 +45298,8 @@
                   "ai_stopped",
                   "ai_unavailable",
                   "ai_blocked",
-                  "ai_escalated"
+                  "ai_escalated",
+                  "channel_ai_off"
                 ]
               },
               {
@@ -56430,6 +56642,143 @@
         },
         "required": [
           "items"
+        ],
+        "additionalProperties": false
+      },
+      "ChannelInboxList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelInbox"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "ChannelInbox": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "inbox identifier (TypeID with prefix \"inb\")",
+            "example": "inb_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "brandId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "brand identifier (TypeID with prefix \"brd\")",
+                "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "email",
+              "whatsapp",
+              "telegram",
+              "other"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "needs_attention",
+              "paused"
+            ]
+          },
+          "problem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aiAnswers": {
+            "type": "boolean"
+          },
+          "defaultTeamId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "team identifier (TypeID with prefix \"team\")",
+                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversationsThisWeek": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "lastEventAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pausedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "kind",
+          "name",
+          "address",
+          "status",
+          "problem",
+          "aiAnswers",
+          "defaultTeamId",
+          "conversationsThisWeek",
+          "lastEventAt",
+          "pausedAt",
+          "createdAt"
         ],
         "additionalProperties": false
       },

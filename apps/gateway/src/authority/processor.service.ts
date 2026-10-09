@@ -27,6 +27,7 @@ import { retryDelayMs } from '../outbox/relay.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, REDIS } from '../tokens.js';
 import { queueReplyWaiting, queueTranscript } from '../widget/notify-queue.js';
 import { applyStaffSeen } from '../widget/read-state.js';
+import { ChannelAdoption } from './adopt.js';
 import { reactionOf } from './extended-parts.js';
 import { INBOX_SIGNAL } from './ingress.service.js';
 import { type JournalEntry, JournalService } from './journal.service.js';
@@ -68,6 +69,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     private readonly journal: JournalService,
     private readonly ownership: OwnershipService,
     private readonly publications: PublicationsService,
+    private readonly adoption: ChannelAdoption,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -187,7 +189,14 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     switch (event.type) {
       case 'message.created':
       case 'message.updated':
-        return this.applyMessage(tx, tenantId, connectionId, event.type, event.message);
+        return this.applyMessage(
+          tx,
+          tenantId,
+          connectionId,
+          event.type,
+          event.message,
+          event.conversation,
+        );
       case 'conversation.created':
       case 'conversation.updated':
       case 'conversation.status_changed':
@@ -203,8 +212,17 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     connectionId: string,
     type: 'message.created' | 'message.updated',
     message: AuthorityMessage,
+    conversation?: AuthorityConversationState,
   ): Promise<Notification[]> {
-    const control = await this.control(tx, connectionId, message.conversationRef);
+    let control = await this.control(tx, connectionId, message.conversationRef);
+    const adopted: JournalEntry[] = [];
+    // A channel conversation whose first webhook was lost: its message carries it (ADR 0013).
+    if (!control && conversation && type === 'message.created') {
+      adopted.push(
+        ...((await this.adoption.adopt(tx, tenantId, connectionId, conversation)) ?? []),
+      );
+      control = await this.control(tx, connectionId, message.conversationRef);
+    }
     if (!control) return [];
     const authorityId = Number(message.ref);
     const now = this.clock();
@@ -252,7 +270,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
       await confirmCardPublication(tx, message.key, message, now);
     }
 
-    const entries: JournalEntry[] = [];
+    const entries: JournalEntry[] = [...adopted];
     const lane = laneOf(message);
     // Webhooks and the reconciler can both deliver a message; only its first sighting acts on it.
     let fresh = false;
@@ -314,6 +332,9 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
           new Date(now.getTime() + this.config.CUSTOMER_REPLY_EMAIL_DELAY_SECONDS * 1000),
         );
       }
+    }
+    if (type === 'message.created') {
+      await this.adoption.customerMessage(tx, tenantId, control, message);
     }
     if (message.direction === 'incoming') {
       await tx
@@ -405,7 +426,13 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     connectionId: string,
     state: AuthorityConversationState,
   ): Promise<Notification[]> {
-    const control = await this.control(tx, connectionId, state.ref);
+    let control = await this.control(tx, connectionId, state.ref);
+    const adopted: JournalEntry[] = [];
+    if (!control) {
+      // Chatwoot started it on an email, WhatsApp or Telegram inbox: Hamnivo takes it over.
+      adopted.push(...((await this.adoption.adopt(tx, tenantId, connectionId, state)) ?? []));
+      control = await this.control(tx, connectionId, state.ref);
+    }
     if (!control) return [];
     // When staff last looked moves without a new version (Chatwoot writes it directly), so it is
     // read before the version check (W06).
@@ -420,7 +447,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     if (control.authorityUpdatedAt !== null && state.version <= control.authorityUpdatedAt) {
       return receipts.length ? [{ tenantId, conversationId: control.id, entries: receipts }] : [];
     }
-    const entries: JournalEntry[] = [...receipts];
+    const entries: JournalEntry[] = [...adopted, ...receipts];
     await tx
       .update(schema.conversationControls)
       .set({

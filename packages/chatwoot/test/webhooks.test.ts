@@ -118,6 +118,43 @@ describe('parseChatwootEvent (real v4.18.0 deliveries)', () => {
     expect(message).toMatchObject({ type: 'message.created', message: { conversationRef: '1' } });
   });
 
+  it('carries the conversation of a message event, with the contact who wrote', () => {
+    const payload = webhooks.find((w) => w.event === 'message_created')?.payload ?? {};
+    const event = parseChatwootEvent(payload);
+    if (event.type !== 'message.created') throw new Error(event.type);
+    expect(event.conversation).toMatchObject({
+      ref: '1',
+      inboxRef: '1',
+      status: 'pending',
+      owner: { kind: 'bot', botRef: '1' },
+      contact: { name: 'Ayesha', email: null, phone: null },
+      subject: null,
+    });
+    // An email conversation: the display id is the reference, the subject comes along.
+    const conversation = payload.conversation as Record<string, unknown>;
+    const email = parseChatwootEvent({
+      ...payload,
+      conversation: {
+        ...conversation,
+        id: 77,
+        display_id: 3,
+        additional_attributes: { mail_subject: 'Refund' },
+        meta: { sender: { id: 1, name: 'Ayesha', email: 'ayesha@example.com', type: 'contact' } },
+      },
+    });
+    expect(email).toMatchObject({
+      message: { conversationRef: '3' },
+      conversation: {
+        ref: '3',
+        contact: { email: 'ayesha@example.com' },
+        subject: 'Refund',
+      },
+    });
+    // Without the conversation's inbox nothing is made up.
+    const thin = parseChatwootEvent({ ...payload, conversation: { id: 1 } });
+    expect('conversation' in thin).toBe(false);
+  });
+
   it('maps typing and keeps unknown events instead of dropping them', () => {
     expect(
       parseChatwootEvent({

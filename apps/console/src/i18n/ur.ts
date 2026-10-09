@@ -1,6 +1,7 @@
 import { automationsUr } from './automations/ur';
 import { blockingUr } from './blocking/ur';
 import { cachingUr } from './caching';
+import { channelsUr } from './channels/ur';
 import { chatWidgetUr } from './chat-widget/ur';
 import { checksUr } from './checks';
 import { commerceUr } from './commerce/ur';
@@ -1098,6 +1099,7 @@ export const ur: Translation = {
       asked: 'صارف نے کسی شخص سے بات کرنا چاہی۔',
       askedSince: 'صارف نے {{time}} کسی شخص سے بات کرنا چاہی۔',
       released: 'یہ گفتگو قطار میں واپس رکھی گئی۔',
+      channelAiOff: 'اس چینل پر AI جواب نہیں دیتا، اس لیے کسی شخص کو جواب دینا ہوگا۔',
       waiting: 'یہ گفتگو کسی شخص کا انتظار کر رہی ہے۔',
       takeOver: 'گفتگو سنبھالیں',
       claim: 'مجھے سونپیں',
@@ -1378,6 +1380,7 @@ export const ur: Translation = {
   reports: reportsUr,
   chatSettings: chatSettingsUr,
   chatWidget: chatWidgetUr,
+  channels: channelsUr,
   automations: automationsUr,
   memory: {
     title: 'کسٹمر میموری',

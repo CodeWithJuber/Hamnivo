@@ -51,6 +51,7 @@ const PATHS = [
   '/reports',
   '/brands',
   '/chat-widget',
+  '/channels',
   '/automations',
   '/automations/$automationId',
   '/hours',

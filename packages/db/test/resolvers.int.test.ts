@@ -4,6 +4,7 @@ import {
   claimIntegrationInbox,
   claimOutbox,
   claimReconcileCursors,
+  claimReconcileInboxCursors,
   closeDb,
   createDb,
   ensureReconcileCursors,
@@ -200,6 +201,25 @@ describe('worker maintenance', () => {
       expect.objectContaining({ scope: 'conversation', scopeRef: '11', lastExternalId: 41 }),
     ]);
     expect(await ensureReconcileCursors(h.app)).toBe(0);
+  });
+
+  it('leases channel inbox cursors apart from conversation cursors (ADR 0013)', async () => {
+    await withTenant(h.app, { tenantId: a.tenantId }, (tx) =>
+      tx.insert(schema.reconcileCursors).values({
+        tenantId: a.tenantId,
+        connectionId: a.connectionId,
+        scope: 'inbox',
+        scopeRef: '7',
+        intervalSeconds: 60,
+        nextPollAt: new Date(Date.now() - 1000),
+      }),
+    );
+    const conversations = await claimReconcileCursors(h.app, { limit: 10, leaseSeconds: 60 });
+    expect(conversations.some((c) => c.conversationRef === '7')).toBe(false);
+    expect(await claimReconcileInboxCursors(h.app, { limit: 10, leaseSeconds: 60 })).toEqual([
+      { tenantId: a.tenantId, connectionId: a.connectionId, inboxRef: '7', intervalSeconds: 60 },
+    ]);
+    expect(await claimReconcileInboxCursors(h.app, { limit: 10, leaseSeconds: 60 })).toEqual([]);
   });
 });
 

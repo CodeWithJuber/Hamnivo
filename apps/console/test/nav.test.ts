@@ -55,6 +55,7 @@ describe('the menu', () => {
       settings: [
         '/brands',
         '/chat-widget',
+        '/channels',
         '/automations',
         '/hours',
         '/team',
@@ -92,6 +93,8 @@ describe('the menu', () => {
       '/brands': 'brands.manage',
       // The chat's look, behaviour, forms, consent and link: for whoever configures the widget.
       '/chat-widget': 'widget.configure',
+      // Email, WhatsApp and Telegram through Chatwoot: for whoever connects services.
+      '/channels': 'integrations.manage',
       // Website prompts and chat rules: seen by whoever may read automations, changed by managers.
       '/automations': 'automations.read',
       '/hours': 'brands.manage',
@@ -216,6 +219,7 @@ describe('who sees which entry', () => {
       settings: [
         '/brands',
         '/chat-widget',
+        '/channels',
         '/automations',
         '/hours',
         '/team',
@@ -257,7 +261,7 @@ describe('who sees which entry', () => {
     expect(pagesOf('developer')).toEqual({
       ...home,
       ai: ['/agents', '/models'],
-      settings: ['/chat-widget', '/team', '/support-teams', '/developer'],
+      settings: ['/chat-widget', '/channels', '/team', '/support-teams', '/developer'],
     });
     expect(pagesOf('analyst')).toEqual({
       ...home,

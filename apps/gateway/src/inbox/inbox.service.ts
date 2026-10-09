@@ -417,14 +417,23 @@ export class InboxService {
       }
     }
     const verified = principalRow?.kind === 'verified';
+    // A customer from email or WhatsApp is known by the address they wrote from (ADR 0013).
+    const channelAddress =
+      principalRow?.kind === 'channel' && !principalRow.channelHandle?.startsWith('chatwoot:')
+        ? principalRow.channelHandle
+        : null;
     return {
-      displayName: principalRow?.displayName?.trim() || 'Visitor',
+      displayName: principalRow?.displayName?.trim() || channelAddress || 'Visitor',
       identity: principalRow ? (verified ? 'verified' : 'anonymous') : 'unknown',
       externalId: verified ? (principalRow?.externalSubject ?? null) : null,
       // An address the website did not verify is shown as such, never as the customer's.
       email: principalRow?.emailVerifiedAt ? (principalRow.email ?? null) : null,
       unverifiedEmail:
-        principalRow && !principalRow.emailVerifiedAt ? (principalRow.email ?? null) : null,
+        principalRow && !principalRow.emailVerifiedAt
+          ? (principalRow.email ??
+            (principalRow.channelKind === 'email' ? channelAddress : null) ??
+            null)
+          : null,
       language: principalRow?.locale ?? null,
       brand: brand ? { id: toPublicId('brand', brand.id), name: brand.name } : null,
       customerSince: principalRow?.createdAt.toISOString() ?? null,

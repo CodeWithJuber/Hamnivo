@@ -1,6 +1,7 @@
 import { automationsHi } from './automations/hi';
 import { blockingHi } from './blocking/hi';
 import { cachingHi } from './caching';
+import { channelsHi } from './channels/hi';
 import { chatWidgetHi } from './chat-widget/hi';
 import { checksHi } from './checks';
 import { commerceHi } from './commerce/hi';
@@ -1080,6 +1081,7 @@ export const hi: Translation = {
       asked: 'ग्राहक ने किसी व्यक्ति से बात करनी चाही।',
       askedSince: 'ग्राहक ने {{time}} किसी व्यक्ति से बात करनी चाही।',
       released: 'यह बातचीत कतार में वापस रखी गई।',
+      channelAiOff: 'इस चैनल पर AI जवाब नहीं देता, इसलिए किसी व्यक्ति को जवाब देना होगा।',
       waiting: 'यह बातचीत किसी व्यक्ति का इंतज़ार कर रही है।',
       takeOver: 'बातचीत संभालें',
       claim: 'मुझे सौंपें',
@@ -1357,6 +1359,7 @@ export const hi: Translation = {
   reports: reportsHi,
   chatSettings: chatSettingsHi,
   chatWidget: chatWidgetHi,
+  channels: channelsHi,
   automations: automationsHi,
   memory: {
     title: 'ग्राहक मेमोरी',

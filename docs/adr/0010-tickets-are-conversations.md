@@ -35,8 +35,8 @@ Two Chatwoot facts shape the mapping:
 - **The priority is Chatwoot's.** Hamnivo sets it through `toggle_priority` as the staff member and
   keeps a copy for queue filters; a change made inside Chatwoot comes back with the next state.
 - **Tickets start from the widget or from staff.** The contact form (W11) makes one when nobody can
-  answer, and staff can make any conversation a ticket. Email and WhatsApp tickets follow once
-  Hamnivo adopts conversations that Chatwoot creates (phase 2).
+  answer, and staff can make any conversation a ticket. Hamnivo now adopts conversations that Chatwoot
+  creates (ADR 0013); email and WhatsApp conversations become tickets with the email channel.
 - **Answers by email go only to a confirmed address.** The contact form's address is typed, not
   verified. One email asks to confirm it and never repeats what was written, so a form cannot be
   used to send a third party text of someone else's choosing. Once confirmed, staff replies are

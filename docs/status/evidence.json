@@ -3208,5 +3208,37 @@
       "apps/console/e2e/blocking.spec.ts"
     ],
     "note": "Required reason, four durations, Also close this chat; Blocked list with Unblock and a confirm step; axe in English and Arabic."
+  },
+  "D13": {
+    "status": "in-progress",
+    "evidence": [
+      "docs/adr/0013-hamnivo-follows-every-conversation-in-its-chatwoot-account.md",
+      "apps/gateway/src/authority/adopt.ts",
+      "apps/gateway/src/authority/channel-inboxes.service.ts",
+      "apps/gateway/src/authority/channel-poll.service.ts",
+      "apps/gateway/test/channels.int.test.ts",
+      "packages/chatwoot/src/fake/server.ts",
+      "packages/chatwoot/test/fake.test.ts",
+      "apps/console/src/pages/channels/ChannelsPage.tsx",
+      "apps/console/e2e/channels.spec.ts",
+      "docs/guide/setup/channels.md"
+    ],
+    "note": "Email conversations from a Chatwoot email inbox (IMAP/SMTP) are adopted (ADR 0013): found by discovery, for the account's brand, given to people unless the owner turns on \"AI answers here\", with the customer known by their unverified address; each incoming email enters the message ledger (hv1:x:) so routing, automations and the AI start as for web chat. Webhook replays and the reconciler adopt nothing twice, and a minute-by-minute inbox poll finds conversations whose webhooks were lost (tested end to end against the fake, 11 cases). Settings → Channels lists the channels with the AI switch, team and pause. Connecting a mailbox from Studio and ticket references in subjects come next."
+  },
+  "D14": {
+    "status": "in-progress",
+    "evidence": [
+      "docs/adr/0013-hamnivo-follows-every-conversation-in-its-chatwoot-account.md",
+      "apps/gateway/src/authority/adopt.ts",
+      "apps/gateway/src/authority/channel-inboxes.service.ts",
+      "apps/gateway/src/authority/channel-poll.service.ts",
+      "apps/gateway/test/channels.int.test.ts",
+      "packages/chatwoot/src/fake/server.ts",
+      "packages/chatwoot/test/fake.test.ts",
+      "apps/console/src/pages/channels/ChannelsPage.tsx",
+      "apps/console/e2e/channels.spec.ts",
+      "docs/guide/setup/channels.md"
+    ],
+    "note": "WhatsApp and Telegram inboxes made in Chatwoot are found and their conversations adopted the same way as email (ADR 0013), with the AI off until the owner turns it on. Connecting them from Studio, the WhatsApp 24-hour window and per-channel capabilities come next."
   }
 }

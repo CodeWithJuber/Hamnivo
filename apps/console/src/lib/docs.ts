@@ -26,6 +26,8 @@ export const DOCS = {
     consent: guide('setup', 'consent'),
     /** The page with only the chat on it, and its QR code. */
     directLink: guide('setup', 'direct-link'),
+    /** Email, WhatsApp and Telegram in the same inbox (ADR 0013). */
+    channels: guide('setup', 'channels'),
   },
   /** Rules that act on their own: website prompts and chat automations. */
   automation: {

@@ -11,6 +11,8 @@ import { BrandsService } from './admin/brands.service.js';
 import { IdentityKeysController } from './admin/identity-keys.controller.js';
 import { IdentityKeysService } from './admin/identity-keys.service.js';
 import { AuditController } from './audit/audit.controller.js';
+import { ChannelInboxesService } from './authority/channel-inboxes.service.js';
+import { ChannelsController } from './authority/channels.controller.js';
 import { ConnectionsController } from './authority/connections.controller.js';
 import { ConnectionsService } from './authority/connections.service.js';
 import { ChatwootIngressController } from './authority/ingress.controller.js';
@@ -159,6 +161,7 @@ export class ApiModule {
         BrandsController,
         IdentityKeysController,
         ConnectionsController,
+        ChannelsController,
         ChatwootIngressController,
         WidgetController,
         StaffConversationsController,
@@ -230,6 +233,7 @@ export class ApiModule {
         BrandsService,
         IdentityKeysService,
         ConnectionsService,
+        ChannelInboxesService,
         AuthorityRegistry,
         IngressService,
         JournalService,

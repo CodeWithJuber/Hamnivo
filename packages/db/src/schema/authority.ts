@@ -84,8 +84,12 @@ export const authorityInboxes = pgTable(
     tenantId: tenantId(),
     connectionId: uuid('connection_id').notNull(),
     brandId: uuid('brand_id'),
-    /** `import` inboxes have no webhooks, bot or automation (migration, M01–M08). */
-    purpose: text('purpose', { enum: ['live', 'import'] }).notNull(),
+    /**
+     * `live`: the brand's web chat. `import` inboxes have no webhooks, bot or automation
+     * (migration, M01–M08). `channel`: an email, WhatsApp or Telegram inbox whose conversations
+     * Chatwoot creates and Hamnivo adopts (ADR 0013).
+     */
+    purpose: text('purpose', { enum: ['live', 'import', 'channel'] }).notNull(),
     externalInboxId: integer('external_inbox_id').notNull(),
     /** Client API inbox identifier (API channel). */
     inboxIdentifier: text('inbox_identifier'),
@@ -96,6 +100,20 @@ export const authorityInboxes = pgTable(
     status: text('status', { enum: ['active', 'disabled'] })
       .notNull()
       .default('active'),
+    /** The inbox's name in Chatwoot (channel inboxes). */
+    name: text('name'),
+    /** The address customers write to: an email address, a phone number or `@bot` name. */
+    displayAddress: text('display_address'),
+    /** Channel inboxes: the AI answers new conversations here; off until the owner turns it on. */
+    aiAnswers: boolean('ai_answers').notNull().default(false),
+    /** Channel inboxes: the team new conversations go to. */
+    defaultTeamId: uuid('default_team_id'),
+    /** When a conversation or message last came in on this inbox. */
+    lastEventAt: tstz('last_event_at'),
+    /** The channel's state as last checked (`{ ok, message?, checkedAt }`). */
+    health: jsonb('health').$type<{ ok: boolean; message?: string; checkedAt: string }>(),
+    /** Channel inboxes: new conversations are not adopted while paused. */
+    pausedAt: tstz('paused_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

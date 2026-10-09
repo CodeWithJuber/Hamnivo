@@ -106,6 +106,7 @@ describe('the row of pages above a page', () => {
     expect(settings?.map((link) => link.href)).toEqual([
       '/brands',
       '/chat-widget',
+      '/channels',
       '/automations',
       '/hours',
       '/team',
