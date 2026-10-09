@@ -97,6 +97,8 @@ interface Conversation {
   /** Unix seconds when an agent last opened the conversation (update_last_seen). */
   agentLastSeenAt: number | null;
   contactLastSeenAt: number | null;
+  /** urgent, high, medium or low; absent or null when none is set. */
+  priority?: string | null;
 }
 interface Label {
   id: number;
@@ -567,7 +569,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       first_reply_created_at: 0,
       unread_count: 0,
       messages: last ? [messageApi(last)] : [],
-      priority: null,
+      priority: c.priority ?? null,
       waiting_since: c.waitingSince ? Math.floor(c.waitingSince) : 0,
     };
   }
@@ -599,7 +601,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       snoozed_until: c.snoozedUntil ? new Date(c.snoozedUntil * 1000).toISOString() : null,
       unread_count: 0,
       first_reply_created_at: null,
-      priority: null,
+      priority: c.priority ?? null,
       waiting_since: c.waitingSince ? Math.floor(c.waitingSince) : 0,
       agent_last_seen_at: Math.floor(c.agentLastSeenAt ?? 0),
       contact_last_seen_at: Math.floor(c.contactLastSeenAt ?? 0),
@@ -1413,6 +1415,21 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     };
   });
 
+  // Like Chatwoot: given custom attributes are merged into the contact's, others are kept.
+  app.put('/api/v1/accounts/:account_id/contacts/:id', async (request) => {
+    const { accountId } = accountAccess(request, 'contacts#update');
+    const contact = s.contacts.get(Number((request.params as Json).id));
+    if (!contact || contact.accountId !== accountId) throw notFound();
+    const changes = body(request);
+    if (typeof changes.name === 'string') contact.name = changes.name;
+    const attributes = changes.custom_attributes;
+    if (typeof attributes === 'object' && attributes !== null) {
+      contact.customAttributes = { ...contact.customAttributes, ...(attributes as Json) };
+    }
+    emit(accountId, 'contact_updated', contactWebhook(contact));
+    return { payload: contactApi(contact) };
+  });
+
   /** Conversations a user may read: administrators all of the account, agents their inboxes. */
   function readable(principal: Principal, accountId: number, c: Conversation): boolean {
     if (c.accountId !== accountId) return false;
@@ -1927,6 +1944,22 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
             : null,
         },
       };
+    },
+  );
+
+  app.post(
+    '/api/v1/accounts/:account_id/conversations/:conversation_id/toggle_priority',
+    async (request) => {
+      const { conversation } = conversationAccess(request, 'conversations#toggle_priority');
+      const requested = body(request).priority;
+      const priority =
+        typeof requested === 'string' && ['urgent', 'high', 'medium', 'low'].includes(requested)
+          ? requested
+          : null;
+      const changed = (conversation.priority ?? null) !== priority;
+      conversation.priority = priority;
+      touch(conversation, changed ? ['priority'] : []);
+      return {};
     },
   );
 

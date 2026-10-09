@@ -96,6 +96,14 @@ describe('toConversation (real v4.18.0 payloads)', () => {
     expect(toConversation({ ...snoozed, snoozed_until: null }).snoozedUntil).toBeNull();
     expect(toConversation(api.getConversation).snoozedUntil).toBeNull();
   });
+
+  it('reads the priority when the payload has one, and leaves it unknown when it does not', () => {
+    expect(toConversation({ ...api.getConversation, priority: 'urgent' }).priority).toBe('urgent');
+    expect(toConversation({ ...api.getConversation, priority: null }).priority).toBeNull();
+    expect(toConversation({ ...api.getConversation, priority: 'someday' }).priority).toBeNull();
+    const { priority: _priority, ...without } = api.getConversation as Record<string, unknown>;
+    expect('priority' in toConversation(without)).toBe(false);
+  });
 });
 
 describe('attachments and read markers (v4.18.0 shapes)', () => {

@@ -673,6 +673,36 @@ export function authorityContract(
         expect(JSON.stringify(contact)).not.toContain(state.sourceId);
       });
 
+      it('renames a contact and merges attributes into the ones it has (W26)', async () => {
+        await authority.updateContact(state.contactRef, {
+          attributes: { hv_prechat_phone: '+971 4 123 4567' },
+        });
+        await authority.updateContact(state.contactRef, {
+          name: 'Ayesha K.',
+          attributes: { hv_prechat_email: 'ayesha@example.com' },
+        });
+        const contact = await authority.getContact(state.contactRef, asStaff());
+        expect(contact).toMatchObject({ name: 'Ayesha K.' });
+        expect(contact.attributes).toMatchObject({
+          hv_prechat_phone: '+971 4 123 4567',
+          hv_prechat_email: 'ayesha@example.com',
+        });
+        // A typed address goes into an attribute only, never the contact's email.
+        expect(contact.email).toBeNull();
+        await authority.updateContact(state.contactRef, { name: 'Ayesha' });
+        expect((await authority.getContact(state.contactRef, asStaff())).name).toBe('Ayesha');
+      });
+
+      it('sets, changes and clears the priority, and reports it with the state (H19)', async () => {
+        const ref = state.conversationRef;
+        await authority.setPriority(ref, 'high', asStaff());
+        expect((await authority.getState(ref)).priority).toBe('high');
+        await authority.setPriority(ref, 'urgent', asStaff());
+        expect((await authority.getState(ref)).priority).toBe('urgent');
+        await authority.setPriority(ref, null, asStaff());
+        expect((await authority.getState(ref)).priority).toBeNull();
+      });
+
       it('snoozes until a time or the next customer message, and reopens', async () => {
         const ref = state.conversationRef;
         const until = new Date(Date.now() + 3_600_000);
