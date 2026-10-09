@@ -6,9 +6,11 @@ import { blockingUr } from '../src/i18n/blocking/ur';
 import { ApiError } from '../src/lib/api';
 import {
   BLOCK_DURATIONS,
+  blocksSender,
   expiryFor,
   fieldError,
   isActive,
+  isSenderChannel,
   standingOf,
   type VisitorBlock,
 } from '../src/lib/blocks';
@@ -23,6 +25,7 @@ const block = (patch: Partial<VisitorBlock> = {}): VisitorBlock => ({
   name: null,
   code: '7F3A',
   signedIn: false,
+  channel: null,
   customerId: 'cus_1',
   visitorId: null,
   conversationId: 'conv_1',
@@ -117,6 +120,34 @@ describe('the blocked visitor’s side, as Studio explains it', () => {
     expect(blockingEn.dialog.explanation).toBe(
       'They will see that chat isn’t available. Clearing their browser gets around a block; signed-in customers stay blocked on any device.',
     );
+  });
+});
+
+describe('the blocked sender’s side, on email, WhatsApp and Telegram', () => {
+  it('is a sender on every channel but the website’s chat', () => {
+    expect(isSenderChannel('chat')).toBe(false);
+    for (const channel of ['email', 'whatsapp', 'telegram', 'sms', 'other'] as const) {
+      expect(isSenderChannel(channel)).toBe(true);
+    }
+    const from = (channel: 'chat' | 'whatsapp') =>
+      ({ kind: 'conversation', conversationId: 'conv_1', name: 'Amina', channel }) as const;
+    expect(blocksSender(from('whatsapp'))).toBe(true);
+    expect(blocksSender(from('chat'))).toBe(false);
+    expect(blocksSender({ kind: 'visitor', visitorId: 'vis_1', name: 'Visitor 7F3A' })).toBe(false);
+    expect(blocksSender(null)).toBe(false);
+  });
+
+  it('says their messages still arrive, closed without an answer, for this address only', () => {
+    expect(blockingEn.menuItemSender).toBe('Block sender…');
+    expect(blockingEn.dialog.sender.explanation).toBe(
+      'Their messages will still arrive, but each conversation is closed automatically, without an answer. They are not told. The block covers this address on this channel only.',
+    );
+    expect(blockingEn.dialog.sender.explanation).not.toContain('browser');
+    for (const tree of [blockingAr, blockingHi, blockingUr]) {
+      expect(tree.dialog.sender.explanation).not.toBe(blockingEn.dialog.sender.explanation);
+      expect(tree.dialog.sender.explanation).not.toBe(tree.dialog.explanation);
+      expect(tree.menuItemSender).not.toBe(tree.menuItem);
+    }
   });
 });
 

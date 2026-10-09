@@ -2,6 +2,11 @@
  * Blocking visitors (H20) in a real browser: from a chat's More actions (a reason, 24 hours, the
  * chat closed), the block on the Blocked page linked from the inbox, unblocking after a confirm,
  * and what an agent without `visitors.block` sees. English and Arabic, with axe audits.
+ *
+ * Senders on email, WhatsApp and Telegram: a customer's channel message can only be made inside
+ * the stack's own process (the fake Chatwoot's receiveChannelMessage), so the test answers for the
+ * gateway there: a web chat is shown as a WhatsApp conversation, and the Blocked page lists
+ * channel blocks as the gateway words them. Blocking itself still goes to the gateway.
  */
 import { expect, type Page, test } from '@playwright/test';
 import { memberOf, overflowAt } from './access';
@@ -13,8 +18,10 @@ const nameOf = (block: { name: string | null; code: string } | undefined) =>
 
 interface Block {
   id: string;
+  brandId: string;
   name: string | null;
   code: string;
+  channel: { kind: string; address: string | null } | null;
   reason: string;
   active: boolean;
   conversationId: string | null;
@@ -177,4 +184,127 @@ test('H20 · an agent cannot block: no menu entry, no Blocked link, and the page
   await expect(page.getByTestId('forbidden')).toContainText('You can’t see blocked visitors');
   expect(await audit(page, 'blocked, forbidden (en)')).toEqual([]);
   await context.close();
+});
+
+test('H20 · a WhatsApp sender is blocked as a sender: their messages still arrive, closed unanswered', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(150_000);
+  const { id } = await customerAsks(workspace.brand.widgetId, 'Buy followers now, cheap!!!');
+  await workspace.staff.signIn(context);
+  // The conversation as the gateway shows a WhatsApp one.
+  await page.route(`**/v1/inbox/conversations/${id}`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const response = await route.fetch();
+    const body = (await response.json()) as Record<string, unknown>;
+    await route.fulfill({ status: response.status(), json: { ...body, channel: 'whatsapp' } });
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, `/inbox/${id}`);
+  const name = ((await page.getByTestId('conversation-title').textContent()) ?? '').trim();
+
+  await page.getByTestId('more-menu').click();
+  await expect(page.getByRole('menuitem', { name: 'Block visitor…' })).toHaveCount(0);
+  await page.getByRole('menuitem', { name: 'Block sender…' }).click();
+  const dialog = page.getByTestId('block-dialog');
+  await expect(dialog.getByRole('heading', { name: `Block ${name}` })).toBeVisible();
+  await expect(dialog).toContainText(
+    'Their messages will still arrive, but each conversation is closed automatically, without an answer. They are not told. The block covers this address on this channel only.',
+  );
+  await expect(dialog).not.toContainText('browser');
+  const closeChat = dialog.getByRole('checkbox', { name: 'Also close this conversation' });
+  await expect(closeChat).toBeChecked();
+  const violations = await audit(page, 'block sender dialog (en)');
+
+  await dialog.getByRole('textbox', { name: 'Reason' }).fill('Spam on WhatsApp');
+  await dialog.getByRole('button', { name: 'Block sender' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('[data-slot="announcer-polite"]')).toHaveText(
+    `${name} is blocked, and the conversation is closed.`,
+  );
+  const blocked = (await blocks('active')).items.find((one) => one.conversationId === id);
+  expect(blocked).toMatchObject({ reason: 'Spam on WhatsApp', active: true });
+
+  // Right to left: the same dialog in Arabic, on a phone.
+  await open(page, `/inbox/${id}?lang=ar`);
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByTestId('more-menu').click();
+  await page.getByRole('menuitem', { name: 'حظر المُرسِل…' }).click();
+  await expect(dialog).toContainText('يشمل الحظر هذا العنوان على هذه القناة فقط.');
+  await expect(dialog.getByRole('button', { name: 'احظر المُرسِل' })).toBeVisible();
+  violations.push(...(await audit(page, 'block sender dialog (ar)')));
+  await dialog.getByRole('button', { name: 'إلغاء' }).click();
+  await expect(dialog).toBeHidden();
+  expect(violations).toEqual([]);
+});
+
+test('H20 · the Blocked page names senders by their address and channel', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(120_000);
+  await workspace.staff.signIn(context);
+  const at = new Date().toISOString();
+  const sender = (id: string, channel: Block['channel'], name: string | null = null) => ({
+    id,
+    brandId: workspace.brand.id,
+    name,
+    code: id.slice(-4).toUpperCase(),
+    signedIn: false,
+    channel,
+    customerId: null,
+    visitorId: null,
+    conversationId: null,
+    reason: 'Spam',
+    createdBy: null,
+    createdAt: at,
+    expiresAt: null,
+    liftedAt: null,
+    liftedBy: null,
+    active: true,
+  });
+  // The list as the gateway sends it, with three channel senders added.
+  await page.route('**/v1/visitors/blocks?*', async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as { items: Block[] };
+    await route.fulfill({
+      status: response.status(),
+      json: {
+        items: [
+          sender('blk_e2email', { kind: 'email', address: 'amina@customer.example' }),
+          sender('blk_e2ewhat', { kind: 'whatsapp', address: '+971501234567' }, 'Omar Khan'),
+          sender('blk_e2etele', { kind: 'telegram', address: null }),
+          ...body.items,
+        ],
+      },
+    });
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, '/blocked?lang=en');
+  const email = page.locator('[data-block-id="blk_e2email"]');
+  await expect(email.getByTestId('block-sender')).toHaveText('amina@customer.example on Email');
+  await expect(email.getByTestId('block-sender').locator('bdi')).toHaveAttribute('dir', 'ltr');
+  await expect(
+    email.getByRole('button', { name: 'Unblock amina@customer.example on Email' }),
+  ).toBeVisible();
+  // A name, when the sender gave one, stays the main label.
+  const whatsapp = page.locator('[data-block-id="blk_e2ewhat"]');
+  await expect(whatsapp).toContainText('Omar Khan');
+  await expect(whatsapp.getByTestId('block-sender')).toHaveText('+971501234567 on WhatsApp');
+  await expect(whatsapp.getByRole('button', { name: 'Unblock Omar Khan' })).toBeVisible();
+  const telegram = page.locator('[data-block-id="blk_e2etele"]');
+  await expect(telegram.getByTestId('block-sender')).toHaveText('Telegram sender');
+  await expect(telegram.getByTestId('block-sender')).toHaveAttribute('data-channel', 'telegram');
+  const violations = await audit(page, 'blocked senders (en)');
+
+  // Right to left, on a phone too: the address keeps its own direction.
+  await open(page, '/blocked?lang=ar');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(whatsapp.getByTestId('block-sender')).toHaveText('+971501234567 على واتساب');
+  await expect(telegram.getByTestId('block-sender')).toHaveText('مُرسِل على تيليجرام');
+  violations.push(...(await audit(page, 'blocked senders (ar)')));
+  violations.push(...(await overflowAt(page, [320, 390])));
+  expect(violations).toEqual([]);
 });

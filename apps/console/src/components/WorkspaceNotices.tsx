@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useWorkspaceNotices } from '../lib/access';
 import { formatDateTime } from '../lib/format';
 import { useTenant } from '../lib/tenant';
-import type { IncidentNotice } from '../lib/types';
+import type { IncidentNotice, WorkspaceNotices as Notices } from '../lib/types';
 
 const INCIDENT_STYLE: Record<IncidentNotice['severity'], { box: string; icon: typeof InfoIcon }> = {
   notice: { box: 'border-info/30 bg-info-subtle', icon: InfoIcon },
@@ -14,8 +14,72 @@ const INCIDENT_STYLE: Record<IncidentNotice['severity'], { box: string; icon: ty
 };
 
 /**
+ * Email, WhatsApp or Telegram channels that have not worked for 15 minutes (A11), for people who
+ * manage integrations: one is named with what Chatwoot says; several are listed. "Fix it" opens
+ * Channels on the (first) channel's brand.
+ */
+function ChannelsDown({ channels }: { channels: Notices['unhealthyChannels'] }) {
+  const { t } = useTranslation();
+  const [first] = channels;
+  if (!first) return null;
+  const words = (channel: typeof first) => ({
+    channel: t(`channels.kind.${channel.kind}`),
+    brand: channel.brandName,
+    time: formatDateTime(channel.since),
+  });
+  return (
+    <div
+      data-testid="channel-down-banner"
+      className="flex flex-wrap items-start gap-3 border-b border-warning/40 bg-warning-subtle px-4 py-3 sm:px-6 lg:px-8"
+    >
+      <AlertTriangleIcon className="mt-0.5 size-5 shrink-0 text-text" aria-hidden="true" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+        {channels.length === 1 ? (
+          <>
+            <p className="font-medium text-text">{t('access.notices.channelDown', words(first))}</p>
+            <p className="text-text-secondary">
+              <bdi>{first.name}</bdi>
+              {first.address ? (
+                <>
+                  {' · '}
+                  <bdi dir="ltr" className="break-all">
+                    {first.address}
+                  </bdi>
+                </>
+              ) : null}
+            </p>
+            {first.problem ? (
+              <p className="text-text-secondary">
+                {t('channels.problem', { problem: first.problem })}
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <p className="font-medium text-text">
+              {t('access.notices.channelsDown', { n: channels.length })}
+            </p>
+            <ul className="flex flex-col gap-0.5 text-text-secondary">
+              {channels.map((channel) => (
+                <li key={channel.id}>{t('access.notices.channelItem', words(channel))}</li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+      <Button asChild variant="secondary" size="sm">
+        <Link to="/channels" search={{ brand: first.brandId }}>
+          {t('access.notices.fixChannel')}
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+/**
  * Banners every member sees (A17, A18): Hamnivo support reading this workspace right now, a
- * request waiting for an owner, and platform incidents.
+ * request waiting for an owner, and platform incidents. People who manage integrations also see
+ * channels that stopped working.
  */
 export function WorkspaceNotices() {
   const { t } = useTranslation();
@@ -24,7 +88,13 @@ export function WorkspaceNotices() {
   const data = notices.data;
   if (!data) return null;
   const pending = can('support.grant') ? data.pendingSupportRequests : 0;
-  if (data.supportAccess.length === 0 && pending === 0 && data.incidents.length === 0) return null;
+  if (
+    data.supportAccess.length === 0 &&
+    pending === 0 &&
+    data.incidents.length === 0 &&
+    data.unhealthyChannels.length === 0
+  )
+    return null;
   return (
     <section aria-label={t('access.notices.label')} className="flex flex-col" data-testid="notices">
       {data.incidents.map((incident) => {
@@ -95,6 +165,7 @@ export function WorkspaceNotices() {
           </Button>
         </div>
       ) : null}
+      <ChannelsDown channels={data.unhealthyChannels} />
     </section>
   );
 }

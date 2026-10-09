@@ -34,8 +34,8 @@ They cannot start a chat, send a message, use the contact form or reopen a chat.
 
 ## Email, WhatsApp and Telegram
 
-You can also block a sender on a channel: open their conversation and use **More actions** in
-the same way.
+You can also block a sender on a channel: open their conversation, then **More actions** →
+**Block sender…**. Write the reason and choose how long, as above.
 
 - Their messages still arrive, and your team can still read them.
 - Nobody answers: no AI reply, no ticket number, no team and no automations.

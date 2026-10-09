@@ -2,7 +2,8 @@
  * Blocking visitors (H20) in Studio: the block dialog in a chat and on Live visitors, and the list
  * of blocks to unblock from. The gateway decides who may block (`visitors.block`) and which brands
  * a person sees; this file asks for it and words it. A blocked visitor is told only that chat
- * isn't available, never that they were blocked.
+ * isn't available, never that they were blocked. On email, WhatsApp and Telegram a block covers
+ * one sender: their messages still arrive, but each conversation is closed without an answer.
  */
 import type * as C from '@hamnivo/contracts';
 import { useQueryClient } from '@tanstack/react-query';
@@ -93,8 +94,26 @@ export function useVisitorBlocks(brandId: string, status: BlockListStatus) {
 
 /** Who is blocked: the customer of a chat, or a browser on Live visitors. */
 export type BlockTarget =
-  | { kind: 'conversation'; conversationId: string; name: string }
+  | {
+      kind: 'conversation';
+      conversationId: string;
+      name: string;
+      /** Where the conversation came from: the website's chat, or a sender's channel. */
+      channel: C.InboxConversation['channel'];
+    }
   | { kind: 'visitor'; visitorId: string; name: string };
+
+/**
+ * Whether the customer of a conversation is a sender on email, WhatsApp, Telegram or another
+ * channel, rather than a visitor of the website's chat. A sender is blocked by their address on
+ * that channel only.
+ */
+export const isSenderChannel = (channel: C.InboxConversation['channel']): boolean =>
+  channel !== 'chat';
+
+/** Whether a block would cover a sender on a channel (see `isSenderChannel`). */
+export const blocksSender = (target: BlockTarget | null): boolean =>
+  target?.kind === 'conversation' && isSenderChannel(target.channel);
 
 export interface BlockInput {
   target: BlockTarget;

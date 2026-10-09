@@ -2,6 +2,7 @@ import type { BlockingTranslation } from './types';
 
 export const blockingAr: BlockingTranslation = {
   menuItem: 'حظر الزائر…',
+  menuItemSender: 'حظر المُرسِل…',
   action: 'حظر',
   actionFor: 'حظر {{name}}',
   dialog: {
@@ -16,6 +17,14 @@ export const blockingAr: BlockingTranslation = {
     submit: 'احظر الزائر',
     done: 'تم حظر {{name}}.',
     doneClosed: 'تم حظر {{name}} وإغلاق المحادثة.',
+    /** A sender on email, WhatsApp or Telegram. */
+    sender: {
+      explanation:
+        'ستظل رسائلهم تصل، لكن كل محادثة تُغلق تلقائيًا دون رد. ولن يُبلَّغوا بذلك. يشمل الحظر هذا العنوان على هذه القناة فقط.',
+      closeChat: 'أغلق هذه المحادثة أيضًا',
+      submit: 'احظر المُرسِل',
+      doneClosed: 'تم حظر {{name}} وإغلاق المحادثة.',
+    },
   },
   durations: {
     day: '24 ساعة',
@@ -31,6 +40,10 @@ export const blockingAr: BlockingTranslation = {
     link: 'المحظورون',
     /** An anonymous visitor, by the short code that tells them apart. */
     anonymous: 'زائر {{code}}',
+    /** After a sender's address, which comes first in every language: "amina@… on Email". */
+    senderOn: 'على {{channel}}',
+    /** A sender with no address (Telegram). */
+    senderNoAddress: 'مُرسِل على {{channel}}',
     title: 'الزوار المحظورون',
     description:
       'الزوار الذين لا يمكنهم مراسلة علاماتك التجارية، وسبب حظرهم وحتى متى. ارفع الحظر هنا ليتمكنوا من المراسلة فورًا.',

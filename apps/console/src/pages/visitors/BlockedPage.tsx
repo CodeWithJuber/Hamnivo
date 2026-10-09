@@ -33,10 +33,54 @@ import { DOCS } from '../../lib/docs';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import { useBrandRefs } from '../../lib/names';
 import { useTenant } from '../../lib/tenant';
+import { CHANNEL_ICONS } from '../inbox/parts';
 
-/** How a blocked visitor is named: their name, or "Visitor" and their short code. */
+type BlockedSender = NonNullable<VisitorBlock['channel']>;
+
+/** A sender as words: "amina@… on Email", or "Telegram sender" when the channel has no address. */
+export function senderName(t: TFunction, channel: BlockedSender): string {
+  const kind = t(`channels.kind.${channel.kind}`);
+  return channel.address
+    ? `${channel.address} ${t('inbox.blocking.page.senderOn', { channel: kind })}`
+    : t('inbox.blocking.page.senderNoAddress', { channel: kind });
+}
+
+/**
+ * How a blocked customer is named: their name, a sender's address and channel, or "Visitor" and
+ * their short code.
+ */
 export const blockName = (t: TFunction, block: VisitorBlock): string =>
-  block.name ?? t('inbox.blocking.page.anonymous', { code: block.code });
+  block.name ??
+  (block.channel
+    ? senderName(t, block.channel)
+    : t('inbox.blocking.page.anonymous', { code: block.code }));
+
+/**
+ * A blocked sender with their channel's icon. The address reads left to right in every language;
+ * it is the main label when the sender gave no name.
+ */
+function Sender({ channel, main }: { channel: BlockedSender; main: boolean }) {
+  const { t } = useTranslation();
+  const Icon = CHANNEL_ICONS[channel.kind];
+  const kind = t(`channels.kind.${channel.kind}`);
+  return (
+    <span
+      className={`flex items-center gap-1.5 ${main ? 'font-medium text-text' : 'text-xs text-text-secondary'}`}
+      data-testid="block-sender"
+      data-channel={channel.kind}
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+      {channel.address ? (
+        <span className="min-w-0 break-all">
+          <bdi dir="ltr">{channel.address}</bdi>{' '}
+          {t('inbox.blocking.page.senderOn', { channel: kind })}
+        </span>
+      ) : (
+        <span>{t('inbox.blocking.page.senderNoAddress', { channel: kind })}</span>
+      )}
+    </span>
+  );
+}
 
 const COLUMNS = ['who', 'reason', 'by', 'when', 'expires', 'actions'] as const;
 
@@ -90,9 +134,12 @@ function BlockRow({
     >
       <TableCell className="min-w-36">
         <div className="flex flex-col items-start gap-1">
-          <span className="font-medium text-text">
-            <bdi>{nameOf(block)}</bdi>
-          </span>
+          {block.name || !block.channel ? (
+            <span className="font-medium text-text">
+              <bdi>{nameOf(block)}</bdi>
+            </span>
+          ) : null}
+          {block.channel ? <Sender channel={block.channel} main={!block.name} /> : null}
           {block.signedIn ? (
             <StatusBadge tone="info" icon={null}>
               {t('inbox.blocking.page.signedIn')}
@@ -158,8 +205,8 @@ function BlockRow({
 }
 
 /**
- * Visitors blocked from chatting (H20), newest first: who, why, by whom, when and until when, with
- * the chat it came from. Unblocking asks first, then the visitor can chat again at once. For
+ * Visitors blocked from chatting (H20), and senders blocked on email, WhatsApp or Telegram, newest
+ * first: who, why, by whom, when and until when, with the chat it came from. Unblocking asks first, then the visitor can chat again at once. For
  * people who may block visitors; the list is limited to the brands their role reaches.
  */
 export function BlockedPage({

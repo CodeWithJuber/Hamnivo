@@ -215,9 +215,11 @@
   "A11": {
     "status": "implemented",
     "evidence": [
+      "apps/console/e2e/channels.spec.ts",
       "apps/console/src/components/ProvisioningProgress.tsx",
       "apps/console/src/components/WorkspaceNotices.tsx",
       "apps/console/src/pages/channels/ChannelsPage.tsx",
+      "apps/console/test/channel-senders.test.tsx",
       "apps/gateway/src/authority/channel-health.ts",
       "apps/gateway/src/authority/channel-inboxes.service.ts",
       "apps/gateway/src/authority/connections.service.ts",
@@ -3198,6 +3200,7 @@
       "apps/console/e2e/blocking.spec.ts",
       "apps/console/src/components/BlockVisitorDialog.tsx",
       "apps/console/src/pages/visitors/BlockedPage.tsx",
+      "apps/console/test/channel-senders.test.tsx",
       "apps/gateway/src/authority/adopt.ts",
       "apps/gateway/src/authority/sync.service.ts",
       "apps/gateway/src/visitors/blocks.service.ts",
