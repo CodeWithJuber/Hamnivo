@@ -217,6 +217,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           onReopen={chat.reopen}
           onLeaveMessage={chat.leaveMessage}
           onConsentRequired={chat.consentRequired}
+          onUnavailable={chat.unavailableBy}
           language={language}
           memory={memory}
           onClose={

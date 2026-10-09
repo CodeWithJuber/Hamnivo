@@ -56,7 +56,7 @@ import {
 } from '../forms.js';
 import { LANGUAGE_NAMES, LOCALES, type Locale, REPLY_LANGUAGE_NAMES } from '../i18n.js';
 import { renderMarkdown } from '../markdown.js';
-import type { ChatState } from '../useChat.js';
+import { type ChatState, chatAvailable } from '../useChat.js';
 import type { DisplayControls } from '../useDisplay.js';
 import type { MemoryControls } from '../useMemory.js';
 import { useTypingReports } from '../useTyping.js';
@@ -233,6 +233,8 @@ interface BubbleContext {
   offline: boolean;
   /** How long after sending a message can be deleted; 0 when it can't (W23). */
   deleteWindowMs: number;
+  /** Chat isn't available to this visitor (H20): messages can be read, not answered or reacted to. */
+  readOnly: boolean;
   onRetry: (id: string) => void;
   onEdit: (id: string) => void;
   onRemove: (id: string) => void;
@@ -243,7 +245,10 @@ interface BubbleContext {
 }
 
 /** Why a message was not sent, in words a customer can act on (HNV-06-03). */
-function causeOf(code: string | undefined): 'files' | 'invalid' | 'closed' | 'other' {
+function causeOf(
+  code: string | undefined,
+): 'files' | 'invalid' | 'closed' | 'unavailable' | 'other' {
+  if (code === 'CHAT_UNAVAILABLE') return 'unavailable';
   if (code === 'UPLOAD_REJECTED' || code === 'FEATURE_DISABLED') return 'files';
   if (code === 'VALIDATION_FAILED' || code === 'IDEMPOTENCY_CONFLICT') return 'invalid';
   if (code === 'NOT_FOUND' || code === 'CONVERSATION_CLOSED') return 'closed';
@@ -255,18 +260,25 @@ function Delivery({ custom, ctx }: { custom: Partial<Custom>; ctx: BubbleContext
   const { t } = useTranslation();
   const id = custom.clientMessageId;
   if (custom.state === 'failed' && id) {
+    const cause = causeOf(custom.errorCode);
+    // While chat isn't available, sending again or editing can't help; the message can go.
+    const stuck = cause === 'unavailable' || ctx.readOnly;
     return (
       <div className="flex max-w-[85%] flex-col items-end gap-1 text-xs" role="alert">
         <span className="text-danger">
-          {t('surface.delivery.failed')} {t(`surface.delivery.causes.${causeOf(custom.errorCode)}`)}
+          {t('surface.delivery.failed')} {t(`surface.delivery.causes.${cause}`)}
         </span>
         <span className="flex flex-wrap justify-end gap-3">
-          <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onRetry(id)}>
-            {t('surface.delivery.retry')}
-          </Button>
-          <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onEdit(id)}>
-            {t('surface.delivery.edit')}
-          </Button>
+          {stuck ? null : (
+            <>
+              <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onRetry(id)}>
+                {t('surface.delivery.retry')}
+              </Button>
+              <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onEdit(id)}>
+                {t('surface.delivery.edit')}
+              </Button>
+            </>
+          )}
           <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onRemove(id)}>
             {t('surface.delivery.remove')}
           </Button>
@@ -384,6 +396,7 @@ function Bubble({ message, ctx }: { message: ThreadMessageLike; ctx: BubbleConte
   const messageId = custom.messageId;
   const canDelete =
     mine &&
+    !ctx.readOnly &&
     custom.state === 'accepted' &&
     !custom.deleted &&
     messageId !== undefined &&
@@ -391,6 +404,7 @@ function Bubble({ message, ctx }: { message: ThreadMessageLike; ctx: BubbleConte
     Date.now() - Date.parse(custom.createdAt ?? '') < ctx.deleteWindowMs;
   const canReact =
     !mine &&
+    !ctx.readOnly &&
     !custom.deleted &&
     messageId !== undefined &&
     (custom.kind === 'ai_primary' || custom.kind === 'human_agent');
@@ -857,6 +871,8 @@ export function Chat(props: {
   ) => Promise<OfflineMessageResponse>;
   /** The gateway asked for consent again: the chat asks with the words now in force (W27). */
   onConsentRequired: () => Promise<void>;
+  /** Notes a refusal because chat isn't available (H20); true when it was one. */
+  onUnavailable: (error: unknown) => boolean;
   onClose?: (() => void) | undefined;
   language: {
     state: WidgetLanguageState | null;
@@ -898,12 +914,18 @@ export function Chat(props: {
   const copy = config.copy[locale] ?? config.copy.en;
   const conversation = state.conversation;
   const offline = state.connection === 'offline';
+  // Chat isn't available to this visitor (H20): help, reading and privacy choices still work, and
+  // the chat says only that chat isn't available, never why.
+  const available = chatAvailable(state);
+  const noticeRef = useRef<HTMLParagraphElement>(null);
   const messages = useMemo(
     () => toThread(state.messages, props.pending, t('you'), state.firstUnreadId, state.drafts),
     [state.messages, props.pending, t, state.firstUnreadId, state.drafts],
   );
   const canAskPerson =
-    conversation?.responder !== 'person' && conversation?.status !== 'waiting_for_person';
+    available &&
+    conversation?.responder !== 'person' &&
+    conversation?.status !== 'waiting_for_person';
   const last = state.messages.at(-1);
   const aiWriting =
     conversation?.responder === 'ai' &&
@@ -952,6 +974,27 @@ export function Chat(props: {
     contactAnswers.current = {};
     setView((current) => (current === 'contact' ? 'chat' : current));
   }, [session.principal.id]);
+
+  // When a write is refused because chat isn't available, nothing waits to start a chat or leave
+  // a message any more; the visitor hears it once, and focus does not get lost with the message box.
+  const wasAvailable = useRef(available);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when availability changes
+  useEffect(() => {
+    if (available) {
+      wasAvailable.current = true;
+      return;
+    }
+    setGate(null);
+    releaseFiles(null);
+    setView((current) => (current === 'contact' ? 'chat' : current));
+    if (!wasAvailable.current) return;
+    wasAvailable.current = false;
+    announce(t('surface.unavailable.notice'));
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body || !active.isConnected) noticeRef.current?.focus();
+    });
+  }, [available]);
 
   const openGate = (intent: Intent) => {
     // What the visitor wrote stays on this device as a draft until the chat starts.
@@ -1117,6 +1160,7 @@ export function Chat(props: {
         });
         announce(`${part.name}: ${t('surface.files.ready')}`);
       } catch (error) {
+        props.onUnavailable(error);
         const reason =
           error instanceof HamnivoApiError
             ? error.code === 'FEATURE_DISABLED'
@@ -1158,6 +1202,7 @@ export function Chat(props: {
     locale,
     offline,
     deleteWindowMs: (config.messageDeletion?.windowSeconds ?? 0) * 1000,
+    readOnly: !available,
     onRetry: props.onRetry,
     onEdit: edit,
     onRemove: (id) => {
@@ -1194,7 +1239,7 @@ export function Chat(props: {
   // Who can answer is said on the home screen; the header says it while home is out of sight.
   const statusInHeader =
     empty && Boolean(config.availability) && (view !== 'chat' || gate !== null);
-  const contact = offlineFormApplies(config) ? () => show('contact') : null;
+  const contact = available && offlineFormApplies(config) ? () => show('contact') : null;
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
@@ -1299,10 +1344,10 @@ export function Chat(props: {
               {banner}
             </p>
             {/* Without a rating to ask, the banner is where to open the conversation again. */}
-            {resolved && !config.features.csat ? <Reopen onReopen={reopen} /> : null}
+            {resolved && !config.features.csat && available ? <Reopen onReopen={reopen} /> : null}
           </div>
         ) : null}
-        {config.features.csat && conversation && resolved ? (
+        {config.features.csat && conversation && resolved && available ? (
           <Csat client={client} conversationId={conversation.id} onReopen={reopen} />
         ) : null}
         {offline ? (
@@ -1428,6 +1473,7 @@ export function Chat(props: {
                 availability={config.availability}
                 locale={locale}
                 onContact={contact}
+                available={available}
                 onAsk={(question) => void send(question)}
               />
             ) : null}
@@ -1469,9 +1515,21 @@ export function Chat(props: {
             ) : null}
           </ThreadPrimitive.Viewport>
           <div className="border-t border-border bg-surface px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            <ShopBar commerce={props.commerce} locale={locale} />
+            {available ? <ShopBar commerce={props.commerce} locale={locale} /> : null}
             {/* While the chat asks before starting, its card is the one thing to answer. */}
-            {gate ? null : (
+            {!available ? (
+              <>
+                <p
+                  ref={noticeRef}
+                  tabIndex={-1}
+                  className="mb-1 rounded-xl bg-surface-sunken px-3 py-2.5 text-sm text-text outline-none"
+                  data-testid="chat-unavailable"
+                >
+                  {t('surface.unavailable.notice')}
+                </p>
+                <VisitorNotice text={props.visitorNotice} />
+              </>
+            ) : gate ? null : (
               <>
                 {canAskPerson ? (
                   <Button

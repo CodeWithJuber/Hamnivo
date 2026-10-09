@@ -21,7 +21,9 @@ const webLink = (url: string | null): string | null => {
  * right now, the words of a proactive prompt the visitor opened, the brand's suggested questions
  * (each starts the conversation) and a search of the brand's public help. Results are the brand's
  * own articles, never generated text. While nobody can answer, a card offers to leave a message;
- * the questions and the message box stay, since the assistant may still help.
+ * the questions and the message box stay, since the assistant may still help. While chat isn't
+ * available to this visitor (H20), help search stays and the questions show without starting a
+ * chat; the chat says why below, in neutral words.
  */
 export function Home(props: {
   client: HamnivoClient;
@@ -35,10 +37,13 @@ export function Home(props: {
   locale?: string;
   /** Opens the contact form; null while someone can answer or the brand has none. */
   onContact?: (() => void) | null;
+  /** False while chat isn't available to this visitor: nothing here starts a chat. */
+  available?: boolean;
   onAsk: (question: string) => void;
 }) {
   const { t } = useTranslation();
   const searchId = useId();
+  const available = props.available !== false;
   const [query, setQuery] = useState('');
   const [state, setState] = useState<
     | { phase: 'idle' }
@@ -79,10 +84,10 @@ export function Home(props: {
       >
         {props.greeting}
       </p>
-      {props.availability ? (
+      {props.availability && available ? (
         <StatusLine availability={props.availability} locale={props.locale ?? 'en'} />
       ) : null}
-      {props.onContact ? (
+      {props.onContact && available ? (
         <section
           aria-labelledby={`${searchId}-contact`}
           className="flex flex-col gap-2 rounded-2xl border border-primary/40 bg-surface p-4"
@@ -115,6 +120,7 @@ export function Home(props: {
                   size="sm"
                   className="h-auto min-h-10 max-w-full whitespace-normal py-1.5 text-start"
                   dir="auto"
+                  disabled={!available}
                   onClick={() => props.onAsk(question)}
                 >
                   {question}
@@ -157,12 +163,16 @@ export function Home(props: {
               <p className="text-sm text-text-muted">{t('surface.home.searching')}</p>
             ) : null}
             {state.phase === 'failed' ? (
-              <p className="text-sm text-text-muted">{t('surface.home.searchFailed')}</p>
+              <p className="text-sm text-text-muted">
+                {available ? t('surface.home.searchFailed') : t('surface.home.searchFailedOnly')}
+              </p>
             ) : null}
             {state.phase === 'done' ? (
               state.items.length === 0 ? (
                 <p className="text-sm text-text-muted">
-                  {t('surface.home.noResults', { query: state.query })}
+                  {available
+                    ? t('surface.home.noResults', { query: state.query })
+                    : t('surface.home.noResultsOnly', { query: state.query })}
                 </p>
               ) : (
                 <>
