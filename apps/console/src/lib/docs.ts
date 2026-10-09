@@ -30,6 +30,10 @@ export const DOCS = {
     channels: guide('setup', 'channels'),
     /** Connecting the brand's own mailbox over IMAP and SMTP (D13). */
     emailChannel: guide('setup', 'email-channel'),
+    /** Connecting a WhatsApp Business number on Meta's Cloud API (D14). */
+    whatsappChannel: guide('setup', 'whatsapp'),
+    /** Connecting a Telegram bot made with @BotFather (D14). */
+    telegramChannel: guide('setup', 'telegram'),
   },
   /** Rules that act on their own: website prompts and chat automations. */
   automation: {

@@ -436,6 +436,13 @@ and SMTP; Chatwoot keeps the passwords and signs in before it accepts), `GET`/`P
 `no-reply@` and `mailer-daemon@` get no automatic answer; `reauthorization_required` shows as
 "Needs attention".
 
+WhatsApp and Telegram (D14, W24): `POST /v1/admin/brands/{id}/channels/whatsapp` (Cloud API;
+returns Meta's callback URL on `CHATWOOT_PUBLIC_URL` and Chatwoot's verify token, again at `GET
+/v1/admin/channels/{id}/whatsapp`) and `POST …/channels/telegram`; Chatwoot checks and keeps the
+tokens. `CHANNEL_CAPABILITIES` (domain) holds each channel's limits: on WhatsApp a public staff
+reply more than 24 hours after the customer is refused with `CHANNEL_WINDOW_CLOSED`, automation
+messages are dropped (`window_closed`), and the inbox row carries `replyWindowClosesAt`.
+
 ## Customer surface (W02, W05–W07, W09, W17–W19, W22–W25)
 
 `src/widget/surface.*`, `attachments.service.ts`, `messages.service.ts`, `help.service.ts`,

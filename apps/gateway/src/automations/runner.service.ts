@@ -24,6 +24,7 @@ import {
 } from '@hamnivo/domain/automations';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, arrayContains, count, desc, eq, gte } from 'drizzle-orm';
+import { replyWindowIsOpen } from '../authority/channel-window.js';
 import { OwnershipService } from '../authority/ownership.service.js';
 import { AuthorityRegistry, type ConnectionRuntime } from '../authority/registry.js';
 import { uuidV5 } from '../authority/uuid.js';
@@ -299,7 +300,10 @@ export class AutomationRunner {
           ? 'ai_has_chat'
           : (sent?.n ?? 0) >= MAX_AUTOMATED_MESSAGES_PER_DAY
             ? 'message_limit'
-            : null;
+            : // WhatsApp takes no free text 24 hours after the customer last wrote (W24).
+              !(await replyWindowIsOpen(tx, locked, this.clock()))
+              ? 'window_closed'
+              : null;
       return {
         actions: dropped ? actions.filter((action) => action.type !== 'send_message') : actions,
         dropped,

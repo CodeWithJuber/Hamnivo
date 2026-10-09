@@ -1,4 +1,10 @@
-import { ConnectEmailRequest, UpdateChannelRequest, UpdateEmailRequest } from '@hamnivo/contracts';
+import {
+  ConnectEmailRequest,
+  ConnectTelegramRequest,
+  ConnectWhatsappRequest,
+  UpdateChannelRequest,
+  UpdateEmailRequest,
+} from '@hamnivo/contracts';
 import type { StaffPrincipal } from '@hamnivo/policy';
 import { Body, Controller, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
 import { parseInput } from '../common/validation.js';
@@ -64,6 +70,45 @@ export class ChannelsController {
       principal,
       channelId,
       parseInput(UpdateEmailRequest, body),
+    );
+  }
+
+  /** Never kept for replays: the request holds the WhatsApp access token. */
+  @Post('brands/:brandId/channels/whatsapp')
+  @StaffRoute({ tenant: true, permission: 'integrations.manage' })
+  async connectWhatsapp(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('brandId') brandId: string,
+    @Body() body: unknown,
+  ) {
+    return this.channels.connectWhatsapp(
+      principal,
+      brandId,
+      parseInput(ConnectWhatsappRequest, body),
+    );
+  }
+
+  @Get('channels/:channelId/whatsapp')
+  @StaffRoute({ tenant: true, permission: 'integrations.manage' })
+  async whatsappSetup(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('channelId') channelId: string,
+  ) {
+    return this.channels.whatsappSetup(principal, channelId);
+  }
+
+  /** Never kept for replays: the request holds the bot token. */
+  @Post('brands/:brandId/channels/telegram')
+  @StaffRoute({ tenant: true, permission: 'integrations.manage' })
+  async connectTelegram(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('brandId') brandId: string,
+    @Body() body: unknown,
+  ) {
+    return this.channels.connectTelegram(
+      principal,
+      brandId,
+      parseInput(ConnectTelegramRequest, body),
     );
   }
 }

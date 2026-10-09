@@ -80,6 +80,11 @@ const EnvSchema = z.object({
   /** Chatwoot and the operator's Platform App token, used to provision tenant accounts. */
   CHATWOOT_URL: z.url().optional(),
   CHATWOOT_PLATFORM_TOKEN: z.string().min(8).optional(),
+  /**
+   * Chatwoot's public address, where Meta and Telegram deliver channel messages (its
+   * FRONTEND_URL); defaults to CHATWOOT_URL when the gateway reaches Chatwoot the same way.
+   */
+  CHATWOOT_PUBLIC_URL: z.url().optional(),
   /** Base URL Chatwoot uses to reach this gateway's webhook endpoints (default PUBLIC_API_ORIGIN). */
   CHATWOOT_WEBHOOK_BASE_URL: z.url().optional(),
   /** Chatwoot request timeout in milliseconds. */

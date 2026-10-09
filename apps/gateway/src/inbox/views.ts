@@ -1,6 +1,7 @@
 import type { InboxConversation, OwnerReason } from '@hamnivo/contracts';
 import { OwnerReason as OwnerReasons, ticketReference } from '@hamnivo/contracts';
 import { schema, type TenantTx, toPublicId } from '@hamnivo/db';
+import { channelNameOf, replyWindowClosesAt } from '@hamnivo/domain';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { customerView } from '../authority/views.js';
 import { ticketStateOf } from '../tickets/tickets.js';
@@ -26,6 +27,7 @@ export const rowColumns = {
   teamId: st.teamId,
   teamName: team.name,
   customerName: p.displayName,
+  customerHandle: p.channelHandle,
   customerKind: p.kind,
   customerLocale: p.locale,
   brandName: b.name,
@@ -63,6 +65,8 @@ export function channelOf(channelType: string): InboxConversation['channel'] {
       return 'email';
     case 'Channel::Whatsapp':
       return 'whatsapp';
+    case 'Channel::Telegram':
+      return 'telegram';
     case 'Channel::Sms':
     case 'Channel::TwilioSms':
       return 'sms';
@@ -80,10 +84,12 @@ export function channelTypes(channel: InboxConversation['channel']): string[] {
       return ['Channel::Email'];
     case 'whatsapp':
       return ['Channel::Whatsapp'];
+    case 'telegram':
+      return ['Channel::Telegram'];
     case 'sms':
       return ['Channel::Sms', 'Channel::TwilioSms'];
     case 'other':
-      return ['Channel::Telegram', 'Channel::Line', 'Channel::FacebookPage', 'Channel::Instagram'];
+      return ['Channel::Line', 'Channel::FacebookPage', 'Channel::Instagram'];
   }
 }
 
@@ -189,7 +195,12 @@ export function toInboxConversation(
     ownerChangedAt: control.ownerChangedAt?.toISOString() ?? null,
     team: row.teamId ? { id: toPublicId('team', row.teamId), name: row.teamName ?? '' } : null,
     customer: {
-      displayName: row.customerName?.trim() || 'Visitor',
+      // A customer from email or WhatsApp is known by the address they wrote from (ADR 0013).
+      displayName:
+        row.customerName?.trim() ||
+        (row.customerHandle && !row.customerHandle.startsWith('chatwoot:')
+          ? row.customerHandle
+          : 'Visitor'),
       identity:
         row.customerKind === 'verified'
           ? 'verified'
@@ -216,6 +227,11 @@ export function toInboxConversation(
     waitingSince: waiting
       ? (control.ownerChangedAt ?? control.lastCustomerMessageAt ?? control.createdAt).toISOString()
       : null,
+    replyWindowClosesAt:
+      replyWindowClosesAt(
+        channelNameOf(row.channelType),
+        control.lastCustomerMessageAt,
+      )?.toISOString() ?? null,
     unreadCount,
     lastActivityAt: control.lastActivityAt.toISOString(),
     createdAt: control.createdAt.toISOString(),

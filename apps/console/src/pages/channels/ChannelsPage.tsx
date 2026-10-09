@@ -13,11 +13,13 @@ import {
   MailPlusIcon,
   MessageCircleIcon,
   MessageSquareIcon,
+  MessageSquarePlusIcon,
   PauseIcon,
   PlayIcon,
   RefreshCwIcon,
   SendIcon,
   SettingsIcon,
+  WebhookIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -50,12 +52,25 @@ import type { Team } from '../../lib/types';
 import type { ChannelsSearch } from '../../routes/_studio/channels';
 import { ChannelProblem, SavedNote } from './ChannelNotes';
 import { ConnectEmailDialog, EmailSettingsDialog } from './EmailDialogs';
+import {
+  ConnectTelegramDialog,
+  ConnectWhatsappDialog,
+  WhatsappSetupDialog,
+} from './MessagingDialogs';
 
 const KIND_ICONS: Record<ChannelKind, LucideIcon> = {
   email: MailIcon,
   whatsapp: MessageSquareIcon,
   telegram: SendIcon,
   other: InboxIcon,
+};
+
+/** The channels Studio connects itself; others are added in Chatwoot and found with a check. */
+type ConnectKind = 'email' | 'whatsapp' | 'telegram';
+const CONNECT_ICONS: Record<ConnectKind, LucideIcon> = {
+  email: MailPlusIcon,
+  whatsapp: MessageSquarePlusIcon,
+  telegram: SendIcon,
 };
 
 const STATUS_TONES: Record<ChannelStatus, StatusTone> = {
@@ -141,12 +156,15 @@ function ChannelCard({
   const [pausing, setPausing] = useState(false);
   /** Email settings: closed, open, or open to fix the sign-in (incoming password ready). */
   const [settings, setSettings] = useState<'closed' | 'open' | 'fix'>('closed');
+  /** Meta set-up of a WhatsApp channel: the callback address and verify token. */
+  const [metaSetup, setMetaSetup] = useState(false);
   const id = `channel-${channel.id}`;
   const titleId = `${id}-title`;
   const name = channel.name;
   const claimed = channel.brandId !== null;
   const paused = channel.status === 'paused';
   const mailbox = channel.kind === 'email' && claimed;
+  const whatsapp = channel.kind === 'whatsapp' && claimed;
   const openSettings = (mode: 'open' | 'fix') => {
     setNote(null);
     setProblem(null);
@@ -300,6 +318,23 @@ function ChannelCard({
                   {t('channels.email.settings.action')}
                 </Button>
               ) : null}
+              {whatsapp ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  id={`${id}-meta-setup`}
+                  aria-label={t('channels.whatsapp.setup.label', { name })}
+                  data-testid="channel-meta-setup"
+                  onClick={() => {
+                    setNote(null);
+                    setProblem(null);
+                    setMetaSetup(true);
+                  }}
+                >
+                  <WebhookIcon aria-hidden="true" />
+                  {t('channels.whatsapp.setup.action')}
+                </Button>
+              ) : null}
               {paused ? (
                 <Button
                   type="button"
@@ -369,6 +404,15 @@ function ChannelCard({
         />
       ) : null}
 
+      {whatsapp ? (
+        <WhatsappSetupDialog
+          channel={channel}
+          open={metaSetup}
+          onOpenChange={setMetaSetup}
+          fallbackFocus={() => document.getElementById(`${id}-meta-setup`)}
+        />
+      ) : null}
+
       <ConfirmDialog
         open={pausing}
         onOpenChange={setPausing}
@@ -411,7 +455,7 @@ function BrandChannels({ brand }: { brand: BrandRef }) {
   const find = useFindChannels(brand.id);
   const teams = useBrandTeams(brand.id);
   const [found, setFound] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
+  const [connecting, setConnecting] = useState<ConnectKind | null>(null);
 
   const check = async () => {
     setFound(null);
@@ -437,20 +481,40 @@ function BrandChannels({ brand }: { brand: BrandRef }) {
       {find.isPending ? t('channels.check.busy') : t('channels.check.action')}
     </Button>
   );
-  const connectButton = (testId: string) => (
-    <Button
-      type="button"
-      id={testId}
-      data-testid={testId}
-      onClick={() => {
-        setFound(null);
-        setConnecting(true);
-      }}
-    >
-      <MailPlusIcon aria-hidden="true" />
-      {t('channels.email.connect.action')}
-    </Button>
+  const connectButton = (kind: ConnectKind, suffix = '') => {
+    const Icon = CONNECT_ICONS[kind];
+    return (
+      <Button
+        type="button"
+        variant={kind === 'email' ? 'default' : 'secondary'}
+        id={`connect-${kind}${suffix}`}
+        data-testid={`connect-${kind}${suffix}`}
+        onClick={() => {
+          setFound(null);
+          setConnecting(kind);
+        }}
+      >
+        <Icon aria-hidden="true" />
+        {t(`channels.${kind}.connect.action`)}
+      </Button>
+    );
+  };
+  const connectButtons = (suffix = '') => (
+    <>
+      {connectButton('email', suffix)}
+      {connectButton('whatsapp', suffix)}
+      {connectButton('telegram', suffix)}
+    </>
   );
+  const say = (text: string) => {
+    setFound(text);
+    announce(text);
+  };
+  const dialogOpen = (kind: ConnectKind) => ({
+    open: connecting === kind,
+    onOpenChange: (open: boolean) => setConnecting(open ? kind : null),
+    fallbackFocus: () => document.getElementById(`connect-${kind}`),
+  });
   const checkResult = (
     <>
       <SavedNote text={found} />
@@ -458,18 +522,32 @@ function BrandChannels({ brand }: { brand: BrandRef }) {
     </>
   );
   const connectDialog = (
-    <ConnectEmailDialog
-      brandId={brand.id}
-      teams={teams}
-      open={connecting}
-      onOpenChange={setConnecting}
-      fallbackFocus={() => document.getElementById('connect-email')}
-      onConnected={() => {
-        const text = t('channels.email.connect.done');
-        setFound(text);
-        announce(text);
-      }}
-    />
+    <>
+      <ConnectEmailDialog
+        brandId={brand.id}
+        teams={teams}
+        {...dialogOpen('email')}
+        onConnected={() => say(t('channels.email.connect.done'))}
+      />
+      <ConnectWhatsappDialog
+        brandId={brand.id}
+        teams={teams}
+        {...dialogOpen('whatsapp')}
+        onConnected={() => say(t('channels.whatsapp.connect.done'))}
+      />
+      <ConnectTelegramDialog
+        brandId={brand.id}
+        teams={teams}
+        {...dialogOpen('telegram')}
+        onConnected={(channel) =>
+          say(
+            channel.address
+              ? t('channels.telegram.connect.done', { bot: channel.address })
+              : t('channels.telegram.connect.doneUnnamed'),
+          )
+        }
+      />
+    </>
   );
 
   return (
@@ -481,7 +559,7 @@ function BrandChannels({ brand }: { brand: BrandRef }) {
             {items.length > 0 ? (
               <div className="flex flex-col items-start gap-2">
                 <div className="flex flex-wrap gap-2">
-                  {connectButton('connect-email')}
+                  {connectButtons()}
                   {checkButton('secondary')}
                 </div>
                 {checkResult}
@@ -506,7 +584,7 @@ function BrandChannels({ brand }: { brand: BrandRef }) {
                 action={
                   <div className="flex flex-col items-center gap-2">
                     <div className="flex flex-wrap justify-center gap-2">
-                      {connectButton('connect-email-empty')}
+                      {connectButtons('-empty')}
                       {checkButton('secondary')}
                     </div>
                     {checkResult}

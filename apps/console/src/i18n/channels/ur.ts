@@ -74,7 +74,7 @@ export const channelsUr: ChannelsTranslation = {
   empty: {
     title: 'ابھی کوئی ای میل، واٹس ایپ یا ٹیلی گرام چینل نہیں۔',
     description:
-      'اپنا سپورٹ ای میل یہیں جوڑیں۔ واٹس ایپ یا ٹیلی گرام کے لیے چینل Chatwoot میں شامل کریں (Settings ← Inboxes)، پھر یہاں دوبارہ دیکھیں۔',
+      'اپنا سپورٹ ای میل، واٹس ایپ بزنس نمبر یا ٹیلی گرام بوٹ یہیں جوڑیں۔ Chatwoot میں شامل کیے گئے چینلز «نئے چینلز تلاش کریں» سے یہاں نظر آتے ہیں۔',
   },
   check: {
     action: 'نئے چینلز تلاش کریں',
@@ -184,6 +184,99 @@ export const channelsUr: ChannelsTranslation = {
       label: '{{name}} کا سائن اِن ٹھیک کریں',
       hint: 'Chatwoot اس میل باکس میں سائن اِن نہیں کر پا رہا۔ ایسا اکثر پاس ورڈ بدلنے کے بعد ہوتا ہے۔ نیا پاس ورڈ لکھیں۔',
     },
+  },
+  whatsapp: {
+    connect: {
+      action: 'واٹس ایپ جوڑیں',
+      title: 'واٹس ایپ جوڑیں',
+      steps: {
+        number: 'آپ کا نمبر',
+        answering: 'جواب کون دے گا',
+        webhook: 'Meta کا ویب ہُک سیٹ کریں',
+      },
+      intros: {
+        number: 'Meta کے Cloud API پر آپ کا واٹس ایپ بزنس نمبر۔',
+        answering:
+          'چنیں کہ یہاں واٹس ایپ پیغامات کا جواب کون دے گا۔ بعد میں اسے کارڈ پر بدل سکتے ہیں۔',
+        webhook: 'آخری مرحلہ: Meta کو بتائیں کہ آپ کے گاہکوں کے پیغامات کہاں بھیجنے ہیں۔',
+      },
+      guide: 'واٹس ایپ کیسے جوڑیں',
+      submit: 'جوڑیں',
+      busy: 'Meta سے جانچ ہو رہی ہے…',
+      busyHint:
+        'نمبر جوڑنے سے پہلے Chatwoot آپ کا ایکسیس ٹوکن Meta سے جانچتا ہے۔ اس میں تھوڑا وقت لگ سکتا ہے۔',
+      connected: 'آپ کا واٹس ایپ نمبر جڑ گیا۔ اب Meta کا ویب ہُک سیٹ کریں۔',
+      done: 'واٹس ایپ جڑ گیا۔ Meta کا ویب ہُک سیٹ ہوتے ہی پیغامات آپ کے ان باکس میں آنے لگیں گے۔',
+    },
+    fields: {
+      nameDefault: 'واٹس ایپ',
+      phoneNumber: 'کاروباری فون نمبر',
+      phoneNumberHint: '+ اور ملک کے کوڈ کے ساتھ، جیسے ‎+971 50 123 4567۔',
+      phoneNumberId: 'فون نمبر آئی ڈی (Phone number ID)',
+      businessAccountId: 'واٹس ایپ بزنس اکاؤنٹ آئی ڈی (WhatsApp Business Account ID)',
+      accessToken: 'ایکسیس ٹوکن',
+      accessTokenHint: 'یہ سیدھا Chatwoot کو جاتا ہے۔ Studio اسے نہیں رکھتا۔',
+    },
+    help: {
+      title: 'یہ کہاں ملیں گے',
+      text: 'یہ Meta کے WhatsApp Manager → API setup میں ملیں گے۔ کسی system user کا مستقل ایکسیس ٹوکن استعمال کریں۔',
+      link: 'Meta کی Cloud API گائیڈ',
+    },
+    errors: {
+      phoneNumber: 'نمبر + اور ملک کے کوڈ کے ساتھ لکھیں، جیسے ‎+971501234567۔',
+      phoneNumberId: 'Phone number ID لکھیں۔ اس میں صرف ہندسے ہوتے ہیں۔',
+      businessAccountId: 'WhatsApp Business Account ID لکھیں۔ اس میں صرف ہندسے ہوتے ہیں۔',
+      accessToken: 'ایکسیس ٹوکن لکھیں۔ یہ کم از کم 20 حروف کا ہوتا ہے۔',
+    },
+    setup: {
+      action: 'Meta سیٹ اپ',
+      label: '{{name}} کا Meta سیٹ اپ',
+      title: 'Meta کا ویب ہُک سیٹ کریں',
+      loading: 'Meta سیٹ اپ لوڈ ہو رہا ہے',
+      instructions:
+        'Meta کے App Dashboard → WhatsApp → Configuration → Webhook میں یہ دونوں چسپاں کریں، Verify and save چنیں، پھر messages کو سبسکرائب کریں۔',
+      callbackUrl: 'کال بیک URL (Callback URL)',
+      verifyToken: 'ویریفائی ٹوکن (Verify token)',
+      copy: 'کاپی کریں',
+      copyLabel: '{{field}} کاپی کریں',
+      noToken: 'Chatwoot نے ابھی Verify token نہیں بنایا۔ تھوڑی دیر بعد Meta سیٹ اپ دوبارہ کھولیں۔',
+      done: 'ہو گیا',
+    },
+  },
+  telegram: {
+    connect: {
+      action: 'ٹیلی گرام جوڑیں',
+      title: 'ٹیلی گرام جوڑیں',
+      intro:
+        'اپنا ٹیلی گرام بوٹ جوڑیں۔ لوگ بوٹ کو جو پیغامات بھیجتے ہیں وہ آپ کے ان باکس میں آتے ہیں۔',
+      guide: 'ٹیلی گرام کیسے جوڑیں',
+      submit: 'جوڑیں',
+      busy: 'ٹیلی گرام سے جانچ ہو رہی ہے…',
+      done: 'ٹیلی گرام {{bot}} کے طور پر جڑ گیا۔ نئے پیغامات آپ کے ان باکس میں نظر آئیں گے۔',
+      doneUnnamed: 'ٹیلی گرام جڑ گیا۔ نئے پیغامات آپ کے ان باکس میں نظر آئیں گے۔',
+    },
+    fields: {
+      nameDefault: 'ٹیلی گرام',
+      botToken: 'بوٹ ٹوکن',
+      botTokenHint: 'یہ سیدھا Chatwoot کو جاتا ہے۔ Studio اسے نہیں رکھتا۔',
+    },
+    help: {
+      title: 'بوٹ ٹوکن حاصل کریں',
+      text: 'ٹیلی گرام پر ‎@BotFather کو پیغام بھیجیں، ‎/newbot بھیجیں اور جو ٹوکن وہ دے اسے کاپی کریں۔',
+      link: 'BotFather کے بارے میں ٹیلی گرام کی گائیڈ',
+    },
+    errors: {
+      botToken: '‎@BotFather سے ملا ٹوکن لکھیں۔ یہ ‎123456789:AAH…‎ جیسا ہوتا ہے، بغیر اسپیس کے۔',
+    },
+  },
+  reply: {
+    email: 'آپ کا جواب ای میل سے بھیجا جاتا ہے۔',
+    whatsapp: 'آپ کا جواب واٹس ایپ پر بھیجا جاتا ہے۔',
+    telegram: 'آپ کا جواب ٹیلی گرام پر بھیجا جاتا ہے۔',
+    minutesLeft_one: 'آپ بس ایک منٹ اور جواب دے سکتے ہیں۔',
+    minutesLeft_other: 'آپ مزید {{count}} منٹ تک جواب دے سکتے ہیں۔',
+    closed:
+      'واٹس ایپ اب صرف ٹیمپلیٹ پیغامات کی اجازت دیتا ہے۔ گاہک کے دوبارہ لکھنے کے بعد آپ پھر جواب دے سکتے ہیں۔',
   },
   chatwoot: {
     title: 'Chatwoot نے جواب نہیں دیا',

@@ -114,6 +114,11 @@ export const ur: Translation = {
       description: 'آپ کی حفاظت کے لیے، اس کے لیے حالیہ سائن اِن ضروری ہے۔',
       action: 'دوبارہ سائن اِن کریں',
     },
+    channelWindow: {
+      title: 'اب صرف ٹیمپلیٹ پیغامات بھیجے جا سکتے ہیں',
+      description:
+        'واٹس ایپ گاہک کے آخری پیغام کے بعد 24 گھنٹے تک ہی جواب دینے دیتا ہے۔ کچھ نہیں بھیجا گیا۔ گاہک کے دوبارہ لکھنے کے بعد آپ پھر جواب دے سکتے ہیں۔',
+    },
     unknown: { title: 'کچھ غلط ہو گیا', description: 'دوبارہ کوشش کریں۔' },
     page: {
       title: 'یہ صفحہ لوڈ نہیں ہو سکا',
@@ -1083,6 +1088,7 @@ export const ur: Translation = {
       chat: 'ویب سائٹ چیٹ',
       email: 'ای میل',
       whatsapp: 'WhatsApp',
+      telegram: 'Telegram',
       sms: 'SMS',
       other: 'دوسرا چینل',
     },

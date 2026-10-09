@@ -486,3 +486,139 @@ describe('connecting a mailbox (D13)', () => {
     expect(again.body.items.find((c: Json) => c.id === orders.id).status).toBe('connected');
   });
 });
+
+describe('WhatsApp and Telegram (D14, W24)', () => {
+  const whatsapp = {
+    name: 'Shop WhatsApp',
+    phoneNumber: '+971501234567',
+    phoneNumberId: '1098765',
+    businessAccountId: '2234567',
+    accessToken: 'EAAG-access-token-for-the-test',
+  };
+  let wa: Json;
+  let tg: Json;
+  let waInbox: number;
+  let tgInbox: number;
+
+  const externalOf = async (channelId: string) =>
+    withTenant(slice.app, { tenantId }, async (tx) => {
+      const [row] = await tx
+        .select({ external: schema.authorityInboxes.externalInboxId })
+        .from(schema.authorityInboxes)
+        .where(eq(schema.authorityInboxes.id, fromPublicId('inbox', channelId)));
+      return row?.external as number;
+    });
+
+  it('connects a WhatsApp number and gives what Meta asks for, never the token', async () => {
+    const path = `/v1/admin/brands/${shop.brand.id}/channels/whatsapp`;
+    const refused = await shop.owner.post(path, { ...whatsapp, accessToken: 'bad-token' });
+    // The token is checked by shape first, then by Chatwoot with Meta.
+    expect(refused.status).toBe(422);
+    const rejected = await shop.owner.post(path, {
+      ...whatsapp,
+      accessToken: 'bad-token'.padEnd(20, '-'),
+    });
+    expect(rejected.status).toBe(422);
+    const made = await shop.owner.post(path, whatsapp);
+    expect(made.status, JSON.stringify(made.body)).toBe(201);
+    expect(made.body).toMatchObject({
+      channel: { kind: 'whatsapp', address: '+971501234567', aiAnswers: false },
+      setup: {
+        callbackUrl: `${slice.fake.url}/webhooks/whatsapp/+971501234567`,
+        verifyToken: expect.any(String),
+      },
+    });
+    wa = made.body.channel;
+    waInbox = await externalOf(wa.id);
+    const setup = await shop.owner.get(`/v1/admin/channels/${wa.id}/whatsapp`);
+    expect(setup.body).toEqual(made.body.setup);
+    const stored = await withTenant(slice.app, { tenantId }, async (tx) => ({
+      inboxes: await tx.select().from(schema.authorityInboxes),
+      audit: await tx.select().from(schema.auditEvents),
+    }));
+    expect(JSON.stringify(stored)).not.toContain(whatsapp.accessToken);
+    expect(JSON.stringify(made.body)).not.toContain(whatsapp.accessToken);
+  });
+
+  it('refuses a bad WhatsApp token next to its field', async () => {
+    const refused = await shop.owner.post(`/v1/admin/brands/${shop.brand.id}/channels/whatsapp`, {
+      ...whatsapp,
+      phoneNumber: '+971509999999',
+      accessToken: 'bad-token'.padEnd(24, '-'),
+    });
+    expect(refused.status).toBe(422);
+    expect(refused.body.fields.map((f: Json) => f.path)).toContain('accessToken');
+  });
+
+  it('connects a Telegram bot', async () => {
+    const path = `/v1/admin/brands/${shop.brand.id}/channels/telegram`;
+    expect((await shop.owner.post(path, { name: 'Bot', botToken: 'not-a-token' })).status).toBe(
+      422,
+    );
+    const made = await shop.owner.post(path, {
+      name: 'Shop bot',
+      botToken: '1234567:AAH-test-token-abcdefghijklmnop',
+    });
+    expect(made.status, JSON.stringify(made.body)).toBe(201);
+    expect(made.body).toMatchObject({ kind: 'telegram', address: expect.stringMatching(/^@/) });
+    tg = made.body;
+    tgInbox = await externalOf(tg.id);
+  });
+
+  it('lets people reply on WhatsApp for 24 hours after the customer wrote, and not after', async () => {
+    const asked = await slice.fake.receiveChannelMessage(waInbox, {
+      from: '+971555000111',
+      name: 'Hana',
+      content: 'Is the blue one in stock?',
+    });
+    await slice.drain();
+    const listed = await shop.owner.get('/v1/inbox/conversations?channel=whatsapp');
+    expect(listed.body.items).toHaveLength(1);
+    const chat = listed.body.items[0];
+    expect(chat).toMatchObject({ channel: 'whatsapp', customer: { displayName: 'Hana' } });
+    const closes = Date.parse(chat.replyWindowClosesAt);
+    expect(closes - Date.now()).toBeGreaterThan(23.9 * 3_600_000);
+    const reply = (text: string, visibility = 'public') =>
+      shop.owner.post(`/v1/conversations/${chat.id}/messages`, {
+        clientMessageId: crypto.randomUUID(),
+        text,
+        visibility,
+      });
+    const sent = await reply('Yes, in all sizes.');
+    expect(sent.status, JSON.stringify(sent.body)).toBe(202);
+    await slice.drain();
+    expect(
+      slice.fake.outbound.filter(
+        (o) => o.kind === 'channel_reply' && o.conversationId === asked.conversationId,
+      ),
+    ).toHaveLength(1);
+
+    // A day later, WhatsApp takes only template messages.
+    await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .update(schema.conversationControls)
+        .set({ lastCustomerMessageAt: new Date(Date.now() - 25 * 3_600_000) })
+        .where(eq(schema.conversationControls.externalConversationId, asked.conversationId)),
+    );
+    const late = await reply('Are you still there?');
+    expect(late.status).toBe(409);
+    expect(late.body).toMatchObject({ code: 'CHANNEL_WINDOW_CLOSED' });
+    // Notes for the team are not messages to the customer.
+    expect((await reply('Customer went quiet.', 'internal')).status).toBe(202);
+    const after = await shop.owner.get('/v1/inbox/conversations?channel=whatsapp');
+    expect(Date.parse(after.body.items[0].replyWindowClosesAt)).toBeLessThan(Date.now());
+  });
+
+  it('shows Telegram as its own channel, with no reply window', async () => {
+    await slice.fake.receiveChannelMessage(tgInbox, {
+      from: '99887766',
+      name: 'Omar',
+      content: 'Hello bot',
+    });
+    await slice.drain();
+    const listed = await shop.owner.get('/v1/inbox/conversations?channel=telegram');
+    expect(listed.body.items).toEqual([
+      expect.objectContaining({ channel: 'telegram', replyWindowClosesAt: null }),
+    ]);
+  });
+});

@@ -1196,10 +1196,15 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
             if (typeof value === 'string' && value) providerConfig[key] = value;
           }
         }
-        // Chatwoot asks Meta whether the credentials work; the fake only checks they are there.
-        if (WHATSAPP_CLOUD_KEYS.some((key) => !providerConfig[key])) {
+        // Chatwoot asks Meta whether the credentials work; the fake refuses tokens starting with 'bad-token'.
+        if (
+          WHATSAPP_CLOUD_KEYS.some((key) => !providerConfig[key]) ||
+          String(providerConfig.api_key).startsWith('bad-token')
+        ) {
           throw invalid('Provider config Invalid Credentials', 'provider_config');
         }
+        // Like Chatwoot, the token Meta's webhook set-up must echo is made once and kept.
+        providerConfig.webhook_verify_token ??= token(16);
         config.provider_config = providerConfig;
         inbox.address = phone;
         break;
@@ -1207,6 +1212,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       case 'Channel::Telegram': {
         const botToken = given('bot_token') ? String(channel.bot_token).trim() : config.bot_token;
         if (!botToken) throw invalid('Bot token can’t be blank', 'bot_token');
+        // Chatwoot asks Telegram for the bot (getMe); the fake refuses tokens starting with 'bad-token'.
+        if (String(botToken).includes('bad-token'))
+          throw invalid('Bot token is invalid', 'bot_token');
         const reused = [...s.inboxes.values()].some(
           (other) => other.id !== inbox.id && other.channelConfig.bot_token === botToken,
         );
@@ -1292,8 +1300,16 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         const settings = Object.keys(EMAIL_SETTINGS).map((key) => [key, inbox.channelConfig[key]]);
         return { ...json, email: inbox.address, ...Object.fromEntries(settings) };
       }
-      case 'Channel::Whatsapp':
-        return { ...json, phone_number: inbox.address, provider: inbox.channelConfig.provider };
+      case 'Channel::Whatsapp': {
+        // Administrators see the verify token for Meta's webhook set-up; never the access token.
+        const providerConfig = (inbox.channelConfig.provider_config ?? {}) as Json;
+        return {
+          ...json,
+          phone_number: inbox.address,
+          provider: inbox.channelConfig.provider,
+          provider_config: { webhook_verify_token: providerConfig.webhook_verify_token ?? null },
+        };
+      }
       case 'Channel::Telegram':
         return { ...json, bot_name: inbox.address };
     }

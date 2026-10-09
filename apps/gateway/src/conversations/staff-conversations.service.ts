@@ -2,10 +2,11 @@ import { createHash } from 'node:crypto';
 import type { ErrorCode, StaffConversation, StaffMessageRequest } from '@hamnivo/contracts';
 import { appendAudit, schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { Permission, StaffPrincipal } from '@hamnivo/policy';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import canonicalize from 'canonicalize';
 import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
+import { assertReplyWindow } from '../authority/channel-window.js';
 import { JournalService } from '../authority/journal.service.js';
 import { OutboundMessagesService } from '../authority/outbound.service.js';
 import {
@@ -19,6 +20,7 @@ import { customerView } from '../authority/views.js';
 import { AppError } from '../common/app-error.js';
 import { InboxAccess } from '../inbox/access.js';
 import { DraftsService } from '../inbox/drafts.service.js';
+import { CLOCK, type Clock } from '../tokens.js';
 
 function staffView(control: ControlRow): StaffConversation {
   const view = customerView(control.ownerMode, control.authorityStatus);
@@ -68,6 +70,7 @@ export class StaffConversationsService {
     private readonly registry: AuthorityRegistry,
     private readonly staffLinks: StaffLinksService,
     private readonly drafts: DraftsService,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   /** Loads the conversation and checks the permission against its workspace, brand, inbox and team. */
@@ -200,6 +203,7 @@ export class StaffConversationsService {
               'A colleague is handling this conversation. Take it over first. Nothing was sent.',
           });
         }
+        await assertReplyWindow(tx, control, this.clock());
       }
       await this.drafts.startOutgoing(tx, {
         tenantId: principal.tenantId,

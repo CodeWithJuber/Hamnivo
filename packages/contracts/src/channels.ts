@@ -260,3 +260,106 @@ export const emailChannelRoutes = {
     success: { status: 200, description: 'The channel', schema: ChannelInbox },
   },
 } as const satisfies Record<string, RouteDef>;
+
+// ------------------------------------------------------------------ WhatsApp and Telegram (D14)
+
+const answering = {
+  aiAnswers: z.boolean().default(false),
+  defaultTeamId: typeId('team').nullable().default(null),
+};
+
+/**
+ * Connects a WhatsApp Business number on Meta's Cloud API. The access token goes straight to
+ * Chatwoot, which checks it with Meta and keeps it; Hamnivo stores none.
+ */
+export const ConnectWhatsappRequest = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    /** International format: `+` and the country code, then the number. */
+    phoneNumber: z
+      .string()
+      .trim()
+      .regex(/^\+[1-9]\d{6,14}$/),
+    phoneNumberId: z
+      .string()
+      .trim()
+      .regex(/^\d{5,30}$/),
+    businessAccountId: z
+      .string()
+      .trim()
+      .regex(/^\d{5,30}$/),
+    accessToken: z.string().trim().min(20).max(1000),
+    ...answering,
+  })
+  .meta({ id: 'ConnectWhatsappRequest' });
+export type ConnectWhatsappRequest = z.infer<typeof ConnectWhatsappRequest>;
+
+/** What to paste into Meta's webhook set-up for a WhatsApp channel. */
+export const WhatsappSetup = z
+  .object({
+    callbackUrl: z.url(),
+    /** Chatwoot's verify token; null until Chatwoot reports it. */
+    verifyToken: z.string().nullable(),
+  })
+  .meta({ id: 'WhatsappSetup' });
+export type WhatsappSetup = z.infer<typeof WhatsappSetup>;
+
+export const ConnectedWhatsapp = z
+  .object({ channel: ChannelInbox, setup: WhatsappSetup })
+  .meta({ id: 'ConnectedWhatsapp' });
+export type ConnectedWhatsapp = z.infer<typeof ConnectedWhatsapp>;
+
+/** Connects a Telegram bot made with @BotFather; Chatwoot checks the token and keeps it. */
+export const ConnectTelegramRequest = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    botToken: z
+      .string()
+      .trim()
+      .regex(/^\d{3,15}:[\w-]{20,100}$/),
+    ...answering,
+  })
+  .meta({ id: 'ConnectTelegramRequest' });
+export type ConnectTelegramRequest = z.infer<typeof ConnectTelegramRequest>;
+
+export const messagingChannelRoutes = {
+  connectWhatsapp: {
+    method: 'post',
+    path: '/v1/admin/brands/{brandId}/channels/whatsapp',
+    operationId: 'connectWhatsapp',
+    summary:
+      'Connects a WhatsApp Business number (Cloud API) through Chatwoot, which keeps the access token (integrations.manage)',
+    tags: ['Channels'],
+    auth: 'staff_session',
+    params: brandParams,
+    body: ConnectWhatsappRequest,
+    success: {
+      status: 201,
+      description: 'The channel and its Meta set-up',
+      schema: ConnectedWhatsapp,
+    },
+  },
+  getWhatsappSetup: {
+    method: 'get',
+    path: '/v1/admin/channels/{channelId}/whatsapp',
+    operationId: 'getWhatsappSetup',
+    summary:
+      "The callback address and verify token for Meta's webhook set-up (integrations.manage)",
+    tags: ['Channels'],
+    auth: 'staff_session',
+    params: channelParams,
+    success: { status: 200, description: 'Set-up', schema: WhatsappSetup },
+  },
+  connectTelegram: {
+    method: 'post',
+    path: '/v1/admin/brands/{brandId}/channels/telegram',
+    operationId: 'connectTelegram',
+    summary:
+      'Connects a Telegram bot through Chatwoot, which keeps the bot token (integrations.manage)',
+    tags: ['Channels'],
+    auth: 'staff_session',
+    params: brandParams,
+    body: ConnectTelegramRequest,
+    success: { status: 201, description: 'The channel', schema: ChannelInbox },
+  },
+} as const satisfies Record<string, RouteDef>;

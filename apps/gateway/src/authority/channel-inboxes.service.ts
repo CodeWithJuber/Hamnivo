@@ -3,8 +3,11 @@ import {
   ChatwootError,
   type ChatwootInboxSummary,
   createEmailInbox,
+  createTelegramInbox,
+  createWhatsappInbox,
   type EmailInboxSettings,
   getEmailInbox,
+  getWhatsappSetup,
   listInboxes,
   setInboxAgentBot,
   updateEmailInbox,
@@ -12,9 +15,12 @@ import {
 import type {
   ChannelInbox,
   ConnectEmailRequest,
+  ConnectTelegramRequest,
+  ConnectWhatsappRequest,
   EmailChannelSettings,
   UpdateChannelRequest,
   UpdateEmailRequest,
+  WhatsappSetup,
 } from '@hamnivo/contracts';
 import {
   appendAudit,
@@ -82,9 +88,25 @@ const EMAIL_FIELDS: Record<string, string> = {
  * they are about. A sign-in that failed is put on the password, the field people get wrong.
  */
 function emailRefused(error: unknown): AppError {
+  return channelRefused(error, EMAIL_FIELDS, 'mailbox');
+}
+
+/** Chatwoot's field names for WhatsApp and Telegram, as Studio's forms name them. */
+const WHATSAPP_FIELDS: Record<string, string> = {
+  name: 'name',
+  phone_number: 'phoneNumber',
+  provider_config: 'accessToken',
+};
+const TELEGRAM_FIELDS: Record<string, string> = { name: 'name', bot_token: 'botToken' };
+
+function channelRefused(
+  error: unknown,
+  fields: Record<string, string>,
+  what: 'mailbox' | 'WhatsApp number' | 'Telegram bot',
+): AppError {
   if (!(error instanceof ChatwootError) || error.status !== 422) {
     return new AppError('AUTHORITY_UNAVAILABLE', {
-      detail: 'Chatwoot could not be reached to check this mailbox. Please try again.',
+      detail: `Chatwoot could not be reached to check this ${what}. Please try again.`,
       internal: error,
     });
   }
@@ -97,8 +119,8 @@ function emailRefused(error: unknown): AppError {
       ? body.message.trim()
       : 'Chatwoot could not use these settings.';
   const attributes = Array.isArray(body.attributes) ? body.attributes.map(String) : [];
-  let paths = attributes.map((name) => EMAIL_FIELDS[name]).filter((p): p is string => !!p);
-  if (paths.length === 0) {
+  let paths = attributes.map((name) => fields[name]).filter((p): p is string => !!p);
+  if (paths.length === 0 && what === 'mailbox') {
     paths = /smtp/i.test(message)
       ? ['smtp.password']
       : /imap|sign in|login|authenticat/i.test(message)
@@ -106,7 +128,7 @@ function emailRefused(error: unknown): AppError {
         : [];
   }
   return new AppError('VALIDATION_FAILED', {
-    detail: `Chatwoot could not use this mailbox: ${message}`,
+    detail: `Chatwoot could not use this ${what}: ${message}`,
     fields: paths.map((path) => ({ path, message })),
   });
 }
@@ -415,6 +437,92 @@ export class ChannelInboxesService {
     brandPublicId: string,
     input: ConnectEmailRequest,
   ): Promise<ChannelInbox> {
+    return this.connect(principal, brandPublicId, input, 'email', async (admin) => {
+      try {
+        return await createEmailInbox(admin, emailSettings(input));
+      } catch (error) {
+        throw emailRefused(error);
+      }
+    });
+  }
+
+  /**
+   * Connects a WhatsApp Business number; returns what to paste into Meta's webhook set-up.
+   * Chatwoot checks the access token with Meta and keeps it.
+   */
+  async connectWhatsapp(
+    principal: StaffPrincipal,
+    brandPublicId: string,
+    input: ConnectWhatsappRequest,
+  ): Promise<{ channel: ChannelInbox; setup: WhatsappSetup }> {
+    const channel = await this.connect(
+      principal,
+      brandPublicId,
+      input,
+      'whatsapp',
+      async (admin) => {
+        try {
+          return await createWhatsappInbox(admin, input);
+        } catch (error) {
+          throw channelRefused(error, WHATSAPP_FIELDS, 'WhatsApp number');
+        }
+      },
+    );
+    return { channel, setup: await this.whatsappSetup(principal, channel.id) };
+  }
+
+  async connectTelegram(
+    principal: StaffPrincipal,
+    brandPublicId: string,
+    input: ConnectTelegramRequest,
+  ): Promise<ChannelInbox> {
+    return this.connect(principal, brandPublicId, input, 'telegram', async (admin) => {
+      try {
+        return await createTelegramInbox(admin, input);
+      } catch (error) {
+        throw channelRefused(error, TELEGRAM_FIELDS, 'Telegram bot');
+      }
+    });
+  }
+
+  /** The callback address and verify token Meta asks for (never the access token). */
+  async whatsappSetup(principal: StaffPrincipal, channelPublicId: string): Promise<WhatsappSetup> {
+    const row = await this.tx(principal, (tx) =>
+      this.managedChannel(tx, principal, channelPublicId, 'Channel::Whatsapp'),
+    );
+    const runtime = await this.registry.get(principal.tenantId, row.connectionId);
+    try {
+      return await getWhatsappSetup({
+        baseUrl: runtime.baseUrl,
+        token: runtime.integrationToken,
+        accountId: runtime.accountId,
+        inboxId: row.externalInboxId,
+        publicUrl: this.config.CHATWOOT_PUBLIC_URL ?? runtime.baseUrl,
+      });
+    } catch (error) {
+      throw new AppError('AUTHORITY_UNAVAILABLE', {
+        detail: 'Chatwoot could not be reached to read the WhatsApp set-up. Please try again.',
+        internal: error,
+      });
+    }
+  }
+
+  /**
+   * One way to connect any channel: Chatwoot creates the inbox (checking its credentials) and
+   * keeps them; Hamnivo records the channel and follows it at once. Nothing is stored when
+   * Chatwoot refuses, and the request is never kept for replays (it holds credentials).
+   */
+  private async connect(
+    principal: StaffPrincipal,
+    brandPublicId: string,
+    input: { aiAnswers: boolean; defaultTeamId: string | null },
+    kind: 'email' | 'whatsapp' | 'telegram',
+    create: (admin: {
+      baseUrl: string;
+      token: string;
+      accountId: number;
+    }) => Promise<ChatwootInboxSummary>,
+  ): Promise<ChannelInbox> {
     const target = await this.tx(principal, async (tx) => {
       const { brand, connectionId } = await this.brandConnection(tx, principal, brandPublicId);
       if (!connectionId) {
@@ -426,15 +534,11 @@ export class ChannelInboxesService {
       return { brand, connectionId, teamId };
     });
     const runtime = await this.registry.get(principal.tenantId, target.connectionId);
-    let made: ChatwootInboxSummary;
-    try {
-      made = await createEmailInbox(
-        { baseUrl: runtime.baseUrl, token: runtime.integrationToken, accountId: runtime.accountId },
-        emailSettings(input),
-      );
-    } catch (error) {
-      throw emailRefused(error);
-    }
+    const made = await create({
+      baseUrl: runtime.baseUrl,
+      token: runtime.integrationToken,
+      accountId: runtime.accountId,
+    });
     const { row, staffUserIds } = await this.tx(principal, async (tx) => {
       const row = await recordChannel(tx, {
         tenantId: principal.tenantId,
@@ -453,7 +557,7 @@ export class ChannelInboxesService {
         targetId: toPublicId('inbox', row.id),
         outcome: 'success',
         data: {
-          kind: 'email',
+          kind,
           brandId: toPublicId('brand', target.brand.id),
           address: made.address,
           aiAnswers: input.aiAnswers,
@@ -471,7 +575,17 @@ export class ChannelInboxesService {
   }
 
   /** An email channel the principal may manage, with the brand it answers for. */
-  private async emailChannel(tx: TenantTx, principal: StaffPrincipal, channelPublicId: string) {
+  private emailChannel(tx: TenantTx, principal: StaffPrincipal, channelPublicId: string) {
+    return this.managedChannel(tx, principal, channelPublicId, 'Channel::Email');
+  }
+
+  /** A channel of this kind the principal may manage, with the brand it answers for. */
+  private async managedChannel(
+    tx: TenantTx,
+    principal: StaffPrincipal,
+    channelPublicId: string,
+    channelType: string,
+  ) {
     const [row] = await tx
       .select()
       .from(schema.authorityInboxes)
@@ -479,13 +593,13 @@ export class ChannelInboxesService {
         and(
           eq(schema.authorityInboxes.id, fromPublicId('inbox', channelPublicId)),
           eq(schema.authorityInboxes.purpose, 'channel'),
-          eq(schema.authorityInboxes.channelType, 'Channel::Email'),
+          eq(schema.authorityInboxes.channelType, channelType),
           eq(schema.authorityInboxes.status, 'active'),
         ),
       );
-    if (!row?.brandId) throw new AppError('NOT_FOUND', { detail: 'Email channel not found.' });
+    if (!row?.brandId) throw new AppError('NOT_FOUND', { detail: 'Channel not found.' });
     const [brand] = await tx.select().from(schema.brands).where(eq(schema.brands.id, row.brandId));
-    if (!brand) throw new AppError('NOT_FOUND', { detail: 'Email channel not found.' });
+    if (!brand) throw new AppError('NOT_FOUND', { detail: 'Channel not found.' });
     this.decide(principal, { workspaceId: brand.workspaceId, brandId: brand.id });
     return row;
   }

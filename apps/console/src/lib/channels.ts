@@ -22,6 +22,7 @@ export const CHANNEL_KINDS: readonly ChannelKind[] = ['email', 'whatsapp', 'tele
 export const channelKeys = {
   list: (brandId: string) => ['channels', brandId],
   email: (channelId: string) => ['channels', 'email', channelId],
+  whatsapp: (channelId: string) => ['channels', 'whatsapp', channelId],
 } as const;
 
 const listPath = (brandId: string) => `/v1/admin/brands/${encodeURIComponent(brandId)}/channels`;
@@ -488,4 +489,224 @@ export function useUpdateEmail(brandId: string, channelId: string) {
       void client.invalidateQueries({ queryKey: key });
     },
   });
+}
+
+// ------------------------------------------------------------------ WhatsApp and Telegram (D14)
+
+export type ConnectWhatsappBody = C.ConnectWhatsappRequest;
+export type ConnectTelegramBody = C.ConnectTelegramRequest;
+export type WhatsappSetup = C.WhatsappSetup;
+export type ConnectedWhatsapp = C.ConnectedWhatsapp;
+
+/**
+ * The contract's checks for WhatsApp and Telegram (ConnectWhatsappRequest, ConnectTelegramRequest),
+ * kept here as data so the Channels page does not load every contract schema (a test checks them).
+ */
+export const MESSAGING_RULES = {
+  nameMax: 100,
+  /** `+` and the country code, then the number: 7 to 15 digits in all. */
+  phoneNumber: /^\+[1-9]\d{6,14}$/,
+  /** Meta's Phone number ID and WhatsApp Business Account ID. */
+  metaId: /^\d{5,30}$/,
+  accessToken: { min: 20, max: 1000 },
+  /** What @BotFather gives: the bot's number, a colon, then the secret. */
+  botToken: /^\d{3,15}:[\w-]{20,100}$/,
+} as const;
+
+/** A WhatsApp number as Connect WhatsApp holds it while someone types; the token only here. */
+export interface WhatsappDraft {
+  name: string;
+  phoneNumber: string;
+  phoneNumberId: string;
+  businessAccountId: string;
+  accessToken: string;
+  aiAnswers: boolean;
+  /** Empty: no team, routing decides. */
+  defaultTeamId: string;
+}
+
+export function emptyWhatsappDraft(name: string): WhatsappDraft {
+  return {
+    name,
+    phoneNumber: '',
+    phoneNumberId: '',
+    businessAccountId: '',
+    accessToken: '',
+    aiAnswers: false,
+    defaultTeamId: '',
+  };
+}
+
+/** A Telegram bot as Connect Telegram holds it while someone types; the token only here. */
+export interface TelegramDraft {
+  name: string;
+  botToken: string;
+  aiAnswers: boolean;
+  defaultTeamId: string;
+}
+
+export function emptyTelegramDraft(name: string): TelegramDraft {
+  return { name, botToken: '', aiAnswers: false, defaultTeamId: '' };
+}
+
+/** "+971 50-123 4567" → "+971501234567": spaces, dashes, dots and brackets people type go. */
+export const normalisePhone = (value: string) => value.replace(/[\s\-().]/g, '');
+
+const WHATSAPP_CHECKS: Record<string, (draft: WhatsappDraft) => boolean> = {
+  name: (d) => text(MESSAGING_RULES.nameMax)(d.name),
+  phoneNumber: (d) => MESSAGING_RULES.phoneNumber.test(normalisePhone(d.phoneNumber)),
+  phoneNumberId: (d) => MESSAGING_RULES.metaId.test(d.phoneNumberId.trim()),
+  businessAccountId: (d) => MESSAGING_RULES.metaId.test(d.businessAccountId.trim()),
+  accessToken: (d) =>
+    d.accessToken.trim().length >= MESSAGING_RULES.accessToken.min &&
+    d.accessToken.trim().length <= MESSAGING_RULES.accessToken.max,
+};
+
+const TELEGRAM_CHECKS: Record<string, (draft: TelegramDraft) => boolean> = {
+  name: (d) => text(MESSAGING_RULES.nameMax)(d.name),
+  botToken: (d) => MESSAGING_RULES.botToken.test(d.botToken.trim()),
+};
+
+/** The fields of Connect WhatsApp's first step, in the order they are shown. */
+export const WHATSAPP_FIELDS = [
+  'name',
+  'phoneNumber',
+  'phoneNumberId',
+  'businessAccountId',
+  'accessToken',
+] as const;
+export const TELEGRAM_FIELDS = ['name', 'botToken'] as const;
+
+/** The WhatsApp fields among `paths` that would not pass the contract's checks, in order. */
+export function invalidWhatsappFields(
+  draft: WhatsappDraft,
+  paths: readonly string[] = WHATSAPP_FIELDS,
+): string[] {
+  return paths.filter((path) => WHATSAPP_CHECKS[path] && !WHATSAPP_CHECKS[path](draft));
+}
+
+/** The Telegram fields among `paths` that would not pass the contract's checks, in order. */
+export function invalidTelegramFields(
+  draft: TelegramDraft,
+  paths: readonly string[] = TELEGRAM_FIELDS,
+): string[] {
+  return paths.filter((path) => TELEGRAM_CHECKS[path] && !TELEGRAM_CHECKS[path](draft));
+}
+
+/** Connect WhatsApp: 1 the number, 2 who answers, 3 Meta's webhook (after it is connected). */
+export type WhatsappStep = 1 | 2 | 3;
+export const WHATSAPP_STEPS: readonly WhatsappStep[] = [1, 2, 3];
+
+/** The step of Connect WhatsApp that holds a field the gateway named; null for none of them. */
+export function whatsappStepOf(path: string): WhatsappStep | null {
+  if ((WHATSAPP_FIELDS as readonly string[]).includes(path)) return 1;
+  if (path === 'aiAnswers' || path === 'defaultTeamId') return 2;
+  return null;
+}
+
+const teamOrNull = <T>(id: string) => (id || null) as T;
+
+/** What Connect WhatsApp sends: trimmed, the phone number without spaces or dashes. */
+export function connectWhatsappBody(draft: WhatsappDraft): ConnectWhatsappBody {
+  return {
+    name: draft.name.trim(),
+    phoneNumber: normalisePhone(draft.phoneNumber),
+    phoneNumberId: draft.phoneNumberId.trim(),
+    businessAccountId: draft.businessAccountId.trim(),
+    accessToken: draft.accessToken.trim(),
+    aiAnswers: draft.aiAnswers,
+    defaultTeamId: teamOrNull<ConnectWhatsappBody['defaultTeamId']>(draft.defaultTeamId),
+  };
+}
+
+/** What Connect Telegram sends. */
+export function connectTelegramBody(draft: TelegramDraft): ConnectTelegramBody {
+  return {
+    name: draft.name.trim(),
+    botToken: draft.botToken.trim(),
+    aiAnswers: draft.aiAnswers,
+    defaultTeamId: teamOrNull<ConnectTelegramBody['defaultTeamId']>(draft.defaultTeamId),
+  };
+}
+
+const whatsappPath = (channelId: string) =>
+  `/v1/admin/channels/${encodeURIComponent(channelId)}/whatsapp`;
+
+/**
+ * Connect WhatsApp: Chatwoot checks the access token with Meta; the new channel joins the list and
+ * the answer carries what to paste into Meta's webhook set-up.
+ */
+export function useConnectWhatsapp(brandId: string) {
+  const { tenantId } = useTenant();
+  const client = useQueryClient();
+  const key = [tenantId, ...channelKeys.list(brandId)];
+  return useMutation({
+    mutationFn: (body: ConnectWhatsappBody) =>
+      withReauth(() =>
+        api<ConnectedWhatsapp>(`${listPath(brandId)}/whatsapp`, {
+          method: 'POST',
+          body,
+          tenant: tenantId,
+        }),
+      ),
+    onSuccess: async ({ channel, setup }) => {
+      client.setQueryData([tenantId, ...channelKeys.whatsapp(channel.id)], setup);
+      client.setQueryData<Items<ChannelInbox>>(key, (list) => addToList(list, channel));
+      await client.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+/** The callback address and verify token for Meta's webhook set-up of one WhatsApp channel. */
+export function useWhatsappSetup(channelId: string, enabled = true) {
+  const { can } = useTenant();
+  return useStudioQuery<WhatsappSetup>(channelKeys.whatsapp(channelId), whatsappPath(channelId), {
+    enabled: enabled && can('integrations.manage'),
+  });
+}
+
+/** Connect Telegram: Chatwoot asks Telegram for the bot; the new channel joins the list. */
+export function useConnectTelegram(brandId: string) {
+  const { tenantId } = useTenant();
+  const client = useQueryClient();
+  const key = [tenantId, ...channelKeys.list(brandId)];
+  return useMutation({
+    mutationFn: (body: ConnectTelegramBody) =>
+      withReauth(() =>
+        api<ChannelInbox>(`${listPath(brandId)}/telegram`, {
+          method: 'POST',
+          body,
+          tenant: tenantId,
+        }),
+      ),
+    onSuccess: async (channel) => {
+      client.setQueryData<Items<ChannelInbox>>(key, (list) => addToList(list, channel));
+      await client.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+// ------------------------------------------------------------------ reply window (W24)
+
+/** WhatsApp takes free text for this long after the customer last wrote (the domain's rule). */
+export const WHATSAPP_REPLY_WINDOW_HOURS = 24;
+/** The composer counts the minutes left once fewer than this many remain. */
+export const REPLY_WINDOW_SOON_MS = 2 * 3_600_000;
+
+export type ReplyWindow =
+  | { state: 'open' }
+  | { state: 'closing'; minutes: number }
+  | { state: 'closed' };
+
+/**
+ * Whether a reply can go out now, from when the window closes (WhatsApp only; null elsewhere or
+ * when not known, which the gateway decides when the reply is sent).
+ */
+export function replyWindow(closesAt: string | null, now: number = Date.now()): ReplyWindow {
+  if (!closesAt) return { state: 'open' };
+  const left = Date.parse(closesAt) - now;
+  if (Number.isNaN(left)) return { state: 'open' };
+  if (left <= 0) return { state: 'closed' };
+  if (left <= REPLY_WINDOW_SOON_MS) return { state: 'closing', minutes: Math.ceil(left / 60_000) };
+  return { state: 'open' };
 }

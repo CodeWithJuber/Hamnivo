@@ -49,7 +49,7 @@ export type TicketPriority = C.TicketPriority;
 
 export const QUEUES = ['mine', 'unassigned', 'ai', 'team', 'tickets', 'all'] as const;
 export const STATUSES = ['active', 'snoozed', 'resolved', 'all'] as const;
-export const CHANNELS = ['chat', 'email', 'whatsapp', 'sms', 'other'] as const;
+export const CHANNELS = ['chat', 'email', 'whatsapp', 'telegram', 'sms', 'other'] as const;
 /** Where a ticket stands (H19), in the order the inbox offers them. */
 export const TICKET_STATES: readonly TicketState[] = ['open', 'pending', 'closed'];
 /** Chatwoot's priorities, most urgent first. */

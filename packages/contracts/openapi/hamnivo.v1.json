@@ -9882,6 +9882,7 @@
                 "chat",
                 "email",
                 "whatsapp",
+                "telegram",
                 "sms",
                 "other"
               ]
@@ -20976,6 +20977,197 @@
         }
       }
     },
+    "/v1/admin/brands/{brandId}/channels/whatsapp": {
+      "post": {
+        "operationId": "connectWhatsapp",
+        "summary": "Connects a WhatsApp Business number (Cloud API) through Chatwoot, which keeps the access token (integrations.manage)",
+        "tags": [
+          "Channels"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectWhatsappRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The channel and its Meta set-up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectedWhatsapp"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/channels/{channelId}/whatsapp": {
+      "get": {
+        "operationId": "getWhatsappSetup",
+        "summary": "The callback address and verify token for Meta's webhook set-up (integrations.manage)",
+        "tags": [
+          "Channels"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channelId",
+            "schema": {
+              "type": "string",
+              "description": "Channel ID (inb_…)"
+            },
+            "required": true,
+            "description": "Channel ID (inb_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Set-up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatsappSetup"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/brands/{brandId}/channels/telegram": {
+      "post": {
+        "operationId": "connectTelegram",
+        "summary": "Connects a Telegram bot through Chatwoot, which keeps the bot token (integrations.manage)",
+        "tags": [
+          "Channels"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectTelegramRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelInbox"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/tools": {
       "get": {
         "operationId": "listTools",
@@ -31962,6 +32154,92 @@
           "smtp"
         ]
       },
+      "ConnectWhatsappRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "phoneNumber": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{6,14}$"
+          },
+          "phoneNumberId": {
+            "type": "string",
+            "pattern": "^\\d{5,30}$"
+          },
+          "businessAccountId": {
+            "type": "string",
+            "pattern": "^\\d{5,30}$"
+          },
+          "accessToken": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 1000
+          },
+          "aiAnswers": {
+            "default": false,
+            "type": "boolean"
+          },
+          "defaultTeamId": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "team identifier (TypeID with prefix \"team\")",
+                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "phoneNumber",
+          "phoneNumberId",
+          "businessAccountId",
+          "accessToken"
+        ]
+      },
+      "ConnectTelegramRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "botToken": {
+            "type": "string",
+            "pattern": "^\\d{3,15}:[\\w-]{20,100}$"
+          },
+          "aiAnswers": {
+            "default": false,
+            "type": "boolean"
+          },
+          "defaultTeamId": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "team identifier (TypeID with prefix \"team\")",
+                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "botToken"
+        ]
+      },
       "CreateToolRequest": {
         "type": "object",
         "properties": {
@@ -34124,6 +34402,7 @@
               "CAPABILITY_UNSUPPORTED",
               "SEPARATE_APPROVER_REQUIRED",
               "DELETE_WINDOW_CLOSED",
+              "CHANNEL_WINDOW_CLOSED",
               "INTERNAL"
             ]
           },
@@ -44898,6 +45177,7 @@
               "chat",
               "email",
               "whatsapp",
+              "telegram",
               "sms",
               "other"
             ]
@@ -45101,6 +45381,19 @@
               }
             ]
           },
+          "replyWindowClosesAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unreadCount": {
             "type": "integer",
             "minimum": 0,
@@ -45139,6 +45432,7 @@
           "ticket",
           "priority",
           "waitingSince",
+          "replyWindowClosesAt",
           "unreadCount",
           "lastActivityAt",
           "createdAt"
@@ -45639,6 +45933,7 @@
               "chat",
               "email",
               "whatsapp",
+              "telegram",
               "sms",
               "other"
             ]
@@ -45842,6 +46137,19 @@
               }
             ]
           },
+          "replyWindowClosesAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unreadCount": {
             "type": "integer",
             "minimum": 0,
@@ -45895,6 +46203,7 @@
           "ticket",
           "priority",
           "waitingSince",
+          "replyWindowClosesAt",
           "unreadCount",
           "lastActivityAt",
           "createdAt",
@@ -46644,6 +46953,7 @@
                   "CAPABILITY_UNSUPPORTED",
                   "SEPARATE_APPROVER_REQUIRED",
                   "DELETE_WINDOW_CLOSED",
+                  "CHANNEL_WINDOW_CLOSED",
                   "INTERNAL"
                 ]
               },
@@ -46964,6 +47274,7 @@
                         "CAPABILITY_UNSUPPORTED",
                         "SEPARATE_APPROVER_REQUIRED",
                         "DELETE_WINDOW_CLOSED",
+                        "CHANNEL_WINDOW_CLOSED",
                         "INTERNAL"
                       ]
                     },
@@ -57267,6 +57578,42 @@
           "address",
           "imap",
           "smtp"
+        ],
+        "additionalProperties": false
+      },
+      "ConnectedWhatsapp": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/ChannelInbox"
+          },
+          "setup": {
+            "$ref": "#/components/schemas/WhatsappSetup"
+          }
+        },
+        "required": [
+          "channel",
+          "setup"
+        ],
+        "additionalProperties": false
+      },
+      "WhatsappSetup": {
+        "type": "object",
+        "properties": {
+          "callbackUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "verifyToken": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "callbackUrl",
+          "verifyToken"
         ],
         "additionalProperties": false
       },
