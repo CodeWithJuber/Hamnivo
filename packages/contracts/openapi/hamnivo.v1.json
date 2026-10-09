@@ -14119,7 +14119,7 @@
     "/v1/workspace/notices": {
       "get": {
         "operationId": "getWorkspaceNotices",
-        "summary": "Banners every member sees: active support access and platform incidents (any active member)",
+        "summary": "Banners every member sees: active support access, platform incidents and, for people who manage integrations, channels that stopped working (any active member)",
         "tags": [
           "Security"
         ],
@@ -20360,7 +20360,7 @@
     "/v1/inbox/conversations/{conversationId}/block": {
       "post": {
         "operationId": "blockConversationVisitor",
-        "summary": "Block the customer of this chat, their browser and their signed-in account; optionally close the chat (visitors.block)",
+        "summary": "Block the customer of this conversation (on web chat their browser and signed-in account; on email, WhatsApp or Telegram their address); optionally close it (visitors.block)",
         "tags": [
           "Inbox"
         ],
@@ -20505,7 +20505,7 @@
     "/v1/visitors/blocks": {
       "get": {
         "operationId": "listVisitorBlocks",
-        "summary": "Blocked visitors, newest first (visitors.block)",
+        "summary": "Blocked visitors and channel senders, newest first (visitors.block)",
         "tags": [
           "Visitors"
         ],
@@ -20562,7 +20562,7 @@
     "/v1/visitors/blocks/{blockId}": {
       "delete": {
         "operationId": "liftVisitorBlock",
-        "summary": "Unblock: the visitor can chat again at once (visitors.block)",
+        "summary": "Unblock: the visitor or sender is answered again at once (visitors.block)",
         "tags": [
           "Visitors"
         ],
@@ -48651,12 +48651,75 @@
             "items": {
               "$ref": "#/components/schemas/IncidentNotice"
             }
+          },
+          "unhealthyChannels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "inbox identifier (TypeID with prefix \"inb\")",
+                  "example": "inb_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                },
+                "brandId": {
+                  "type": "string",
+                  "description": "brand identifier (TypeID with prefix \"brd\")",
+                  "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                },
+                "brandName": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "email",
+                    "whatsapp",
+                    "telegram",
+                    "other"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "problem": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "since": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                  "description": "RFC 3339 timestamp"
+                }
+              },
+              "required": [
+                "id",
+                "brandId",
+                "brandName",
+                "kind",
+                "name",
+                "address",
+                "problem",
+                "since"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
           "supportAccess",
           "pendingSupportRequests",
-          "incidents"
+          "incidents",
+          "unhealthyChannels"
         ],
         "additionalProperties": false
       },
@@ -57219,6 +57282,38 @@
           "signedIn": {
             "type": "boolean"
           },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "email",
+                      "whatsapp",
+                      "telegram",
+                      "other"
+                    ]
+                  },
+                  "address": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "address"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "customerId": {
             "type": [
               "string",
@@ -57328,6 +57423,7 @@
           "name",
           "code",
           "signedIn",
+          "channel",
           "customerId",
           "visitorId",
           "conversationId",

@@ -40,3 +40,23 @@ with a VPN anyway.
   stay blocked on every device.
 - The guard does one indexed `exists` check on chat writes only; reads pay nothing.
 - A block does not reach other brands of the same tenant: brands keep their own lists.
+
+## Addendum: senders on email, WhatsApp and Telegram (ADR 0013)
+
+Channel customers (`customer_principals.kind = 'channel'`) are known by their address, so a
+block from one of their conversations names that principal, like any other block. There is no
+widget to refuse them, so the channel side decides instead:
+
+- **Messages are kept, and nobody answers.** A blocked sender's message still enters the ledger.
+  Then nothing else starts: no AI turn, routing, automation event, ticket or team. Hamnivo
+  queues `conversation.close_blocked`, which writes a keyed private note ("Closed
+  automatically: this sender is blocked.") and resolves the conversation as the integration.
+- **Adoption is quiet.** A new conversation from a blocked sender gets its control row, but no
+  ticket, default team or hand-over to people.
+- **Closing it is not a chat for automations.** The `chat_closed` event is skipped for a
+  blocked customer.
+- **The sender is never told.** Chatwoot receives every message, and nothing is sent back.
+- **One address, one channel.** A block covers that address on that channel kind for the
+  brand. The same person's other addresses are other customers (ADR 0013).
+- **The address is not copied.** The Blocked list reads the address from the customer, so
+  erasing the customer erases it there too.

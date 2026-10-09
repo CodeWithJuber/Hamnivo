@@ -213,21 +213,26 @@
     "note": "Prometheus metrics (request latency by route template, process metrics) behind a bearer token (tested: hidden without it, served with it) and liveness/readiness checks; alert rules and dashboards pending."
   },
   "A11": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "apps/console/src/components/ProvisioningProgress.tsx",
+      "apps/console/src/components/WorkspaceNotices.tsx",
       "apps/console/src/pages/channels/ChannelsPage.tsx",
+      "apps/gateway/src/authority/channel-health.ts",
       "apps/gateway/src/authority/channel-inboxes.service.ts",
       "apps/gateway/src/authority/connections.service.ts",
       "apps/gateway/src/authority/provisioning.service.ts",
+      "apps/gateway/src/support/support.service.ts",
+      "apps/gateway/test/channel-ops.int.test.ts",
       "apps/gateway/test/saas-operator.int.test.ts",
       "apps/gateway/test/slice.int.test.ts",
       "deploy/compose/chatwoot.yml",
+      "docs/guide/setup/channels.md",
       "packages/chatwoot/src/provisioning.ts",
       "packages/chatwoot/test/contract/suite.ts",
       "scripts/chatwoot/up.sh"
     ],
-    "note": "A brand gets its Chatwoot account by itself: the first brand of a workspace (through the outbox, after a short wait) and a brand a billing system creates with its workspace (the tenant.created handler). Account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed webhooks and Copilot dashboard app; every step is recorded before the next (credentials with the secret broker), so a retry continues the same account, and Connect in Studio is the retry. Studio shows the set-up's progress or why it stopped (tested end to end against the fake, with failures and retries; provisioning also against real Chatwoot v4.18.0-ce). Channels (ADR 0013): email, WhatsApp and Telegram connect from Settings → Channels; discovery reads Chatwoot's reauthorization_required every few minutes and the card shows Needs attention with how to fix it (Fix sign-in for email). An alert to the team when a channel stays unhealthy is pending."
+    "note": "A brand gets its Chatwoot account by itself: the first brand of a workspace (through the outbox, after a short wait) and a brand a billing system creates with its workspace (the tenant.created handler). Account, integration user with adoption guard, HMAC-mandatory API inbox with auto-assignment off, AI agent bot, signed webhooks and Copilot dashboard app; every step is recorded before the next (credentials with the secret broker), so a retry continues the same account, and Connect in Studio is the retry. Studio shows the set-up's progress or why it stopped (tested end to end against the fake, with failures and retries; provisioning also against real Chatwoot v4.18.0-ce). Channels (ADR 0013): email, WhatsApp and Telegram connect from Settings → Channels; discovery reads Chatwoot's reauthorization_required every few minutes and the card shows Needs attention with how to fix it (Fix sign-in for email). A channel still down after 15 minutes emails the people who manage the brand's integrations once, and once more when it works again (a delayed channel.health outbox event, handled once); the same people see a Studio banner linking to Channels. A shorter blip tells nobody. Tested end to end against the fake."
   },
   "E06": {
     "status": "in-progress",
@@ -3190,21 +3195,24 @@
   "H20": {
     "status": "implemented",
     "evidence": [
-      "packages/contracts/src/blocks.ts",
-      "packages/db/src/schema/visitors.ts",
-      "apps/gateway/src/visitors/blocks.ts",
-      "apps/gateway/src/visitors/blocks.service.ts",
-      "apps/gateway/src/widget/widget.guard.ts",
-      "apps/gateway/test/blocks.int.test.ts",
+      "apps/console/e2e/blocking.spec.ts",
       "apps/console/src/components/BlockVisitorDialog.tsx",
       "apps/console/src/pages/visitors/BlockedPage.tsx",
-      "apps/console/e2e/blocking.spec.ts",
-      "apps/widget/test/unavailable.test.tsx",
+      "apps/gateway/src/authority/adopt.ts",
+      "apps/gateway/src/authority/sync.service.ts",
+      "apps/gateway/src/visitors/blocks.service.ts",
+      "apps/gateway/src/visitors/blocks.ts",
+      "apps/gateway/src/widget/widget.guard.ts",
+      "apps/gateway/test/blocks.int.test.ts",
+      "apps/gateway/test/channel-ops.int.test.ts",
       "apps/widget/e2e/surface.spec.ts",
+      "apps/widget/test/unavailable.test.tsx",
       "docs/adr/0012-blocking-without-ip-addresses.md",
-      "docs/guide/inbox/blocking-visitors.md"
+      "docs/guide/inbox/blocking-visitors.md",
+      "packages/contracts/src/blocks.ts",
+      "packages/db/src/schema/visitors.ts"
     ],
-    "note": "Block from a chat or from Live visitors with a required reason and 24 hours, 7 days, 30 days or until lifted; never an IP address: the customer, their browser key and a signed-in account. The widget says only that chat isn't available; reading, help, privacy choices, sign-in and the tracking notice stay open. Blocking again keeps one block; blocks are lifted, not deleted, audited, and purged 90 days after they end."
+    "note": "Block from a chat or from Live visitors with a required reason and 24 hours, 7 days, 30 days or until lifted; never an IP address: the customer, their browser key and a signed-in account. The widget says only that chat isn't available; reading, help, privacy choices, sign-in and the tracking notice stay open. Blocking again keeps one block; blocks are lifted, not deleted, audited, and purged 90 days after they end. Senders on email, WhatsApp and Telegram can be blocked too (one address on one channel): their messages are kept, but nothing answers or follows (no AI, ticket, team or automations), and each conversation is closed with a private note; they are never told."
   },
   "HNV-31-01": {
     "status": "implemented",

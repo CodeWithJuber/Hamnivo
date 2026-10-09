@@ -32,6 +32,19 @@ your team answers.
 - **Pause:** new conversations stay in Chatwoot until you resume. Conversations already in
   Hamnivo carry on.
 
+## When a channel stops working
+
+If Hamnivo cannot reach a channel, for example because a mailbox password changed or a token
+expired, the channel shows **Needs attention** on **Settings → Channels**.
+
+If it is still not working 15 minutes later:
+
+- everyone who manages integrations for that brand gets an email, and
+- Studio shows them a banner with a **Fix it** link.
+
+When the channel works again, they get one more email, and the banner goes away. A problem that
+fixes itself within 15 minutes tells nobody.
+
 ## Good to know
 
 - One customer per address: the same email address or phone number is the same customer in every

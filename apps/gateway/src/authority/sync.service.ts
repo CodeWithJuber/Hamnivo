@@ -72,6 +72,36 @@ export class AuthoritySyncService {
   }
 
   /**
+   * Closes a conversation from a blocked sender (outbox `conversation.close_blocked`): a private
+   * note says why, then the conversation is resolved as the integration. The sender is not told.
+   */
+  async applyBlockedClose(event: ClaimedOutboxEvent): Promise<void> {
+    const payload = event.payload as { conversationId: string; key: string };
+    const [control] = await withTenant(this.db, { tenantId: event.tenantId }, (tx) =>
+      tx
+        .select()
+        .from(schema.conversationControls)
+        .where(eq(schema.conversationControls.id, payload.conversationId)),
+    );
+    if (!control) return;
+    const runtime = await this.registry.get(event.tenantId, control.connectionId);
+    const ref = String(control.externalConversationId);
+    if (!(await runtime.authority.findByKey(ref, payload.key))) {
+      await runtime.authority.appendMessage({
+        conversationRef: ref,
+        key: payload.key,
+        author: { kind: 'integration' },
+        visibility: 'private',
+        text: 'Closed automatically: this sender is blocked. See Inbox → Blocked in Hamnivo to unblock.',
+      });
+    }
+    const state = await runtime.authority.getState(ref);
+    if (state.status !== 'resolved') {
+      await runtime.authority.setStatus(ref, 'resolved', { kind: 'integration' });
+    }
+  }
+
+  /**
    * Applies a team assignment in Chatwoot (outbox `conversation.team_changed`): the Hamnivo team's
    * Chatwoot team is created on first use with the members who have a Chatwoot user, then the
    * conversation is assigned as the staff member who chose the team. Superseded changes are skipped.

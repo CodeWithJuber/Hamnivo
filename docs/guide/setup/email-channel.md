@@ -46,6 +46,9 @@ channels** on Hamnivo's **Channels** page.
 When your mailbox password changes, the channel shows **Needs attention**. Choose **Fix sign-in**,
 type the new (app) password and save.
 
+If it stays like that for 15 minutes, the people who manage integrations get an email and a
+banner in Studio. See [When a channel stops working](channels.md#when-a-channel-stops-working).
+
 ## Your passwords
 
 Hamnivo passes your passwords to your chat engine (Chatwoot), which keeps them to read and send

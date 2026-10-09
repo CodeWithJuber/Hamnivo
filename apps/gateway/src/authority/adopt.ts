@@ -13,6 +13,7 @@ import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
 import { makeTicket } from '../tickets/tickets.js';
 import { CLOCK, type Clock } from '../tokens.js';
+import { isBlocked } from '../visitors/blocks.js';
 import { reactionOf } from './extended-parts.js';
 import type { JournalEntry } from './journal.service.js';
 import { type ControlRow, OwnershipService } from './ownership.service.js';
@@ -91,6 +92,9 @@ export class ChannelAdoption {
     const brandId = inbox.brandId;
     const now = this.clock();
     const { id: principalId, handle } = await this.customer(tx, tenantId, inbox, brandId, state);
+    // A blocked sender (H20): the conversation is kept quietly, with no ticket, team or hand-over;
+    // its messages close it (customerMessage), and nobody is asked to answer.
+    const blocked = await isBlocked(tx, brandId, principalId, now);
     const [bot] =
       state.owner.kind === 'bot'
         ? await tx
@@ -142,6 +146,7 @@ export class ChannelAdoption {
       .update(schema.authorityInboxes)
       .set({ lastEventAt: now })
       .where(eq(schema.authorityInboxes.id, inbox.id));
+    if (blocked) return [];
     // An email is a ticket from the start (ADR 0010): it has a number and waits for an answer.
     if (channelKindOf(inbox.channelType) === 'email') {
       await makeTicket(tx, tenantId, conversationId, 'email', now);
@@ -305,6 +310,19 @@ export class ChannelAdoption {
       .update(schema.authorityInboxes)
       .set({ lastEventAt: now })
       .where(eq(schema.authorityInboxes.id, inbox.id));
+    // A blocked sender (H20): kept for the record, closed with a note, answered by nobody.
+    if (control.brandId && (await isBlocked(tx, control.brandId, control.principalId, now))) {
+      await enqueueOutbox(tx, tenantId, {
+        topic: 'conversation.close_blocked',
+        aggregateType: 'conversation',
+        aggregateId: control.id,
+        payload: {
+          conversationId: control.id,
+          key: `${MESSAGE_KEY_PREFIX.note}${uuidV5(control.id, `blocked:${ledger.id}`)}`,
+        },
+      });
+      return;
+    }
     // A reaction (W22) is not a question: nobody is asked to answer it.
     if (reactionOf(message)) return;
     const conversationId = control.id;

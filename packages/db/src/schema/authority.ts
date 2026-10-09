@@ -111,7 +111,13 @@ export const authorityInboxes = pgTable(
     /** When a conversation or message last came in on this inbox. */
     lastEventAt: tstz('last_event_at'),
     /** The channel's state as last checked (`{ ok, message?, checkedAt }`). */
-    health: jsonb('health').$type<{ ok: boolean; message?: string; checkedAt: string }>(),
+    health: jsonb('health').$type<{
+      ok: boolean;
+      message?: string;
+      checkedAt: string;
+      /** When the team was emailed that it is down (A11). */
+      alertedAt?: string;
+    }>(),
     /** Channel inboxes: new conversations are not adopted while paused. */
     pausedAt: tstz('paused_at'),
     createdAt: createdAt(),

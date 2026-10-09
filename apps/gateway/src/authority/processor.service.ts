@@ -25,6 +25,7 @@ import { projectInboxState } from '../inbox/projection.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { retryDelayMs } from '../outbox/relay.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, REDIS } from '../tokens.js';
+import { isBlocked } from '../visitors/blocks.js';
 import { queueReplyWaiting, queueTranscript } from '../widget/notify-queue.js';
 import { applyStaffSeen } from '../widget/read-state.js';
 import { ChannelAdoption } from './adopt.js';
@@ -465,11 +466,19 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
       entries.push(...resolved);
       // The customer asked for a transcript when a conversation closes (W25).
       await queueTranscript(tx, tenantId, control, resolved[0]?.seq ?? control.journalSeq);
-      await queueAutomationEvent(tx, tenantId, control.brandId, {
-        conversationId: control.id,
-        event: 'chat_closed',
-        ref: `authority:${state.version}`,
-      });
+      // Closing a blocked sender's conversation (H20) is Hamnivo's own housekeeping, not a chat
+      // the brand's automations should follow up on.
+      const blocked =
+        control.brandId !== null &&
+        control.principalId !== null &&
+        (await isBlocked(tx, control.brandId, control.principalId, this.clock()));
+      if (!blocked) {
+        await queueAutomationEvent(tx, tenantId, control.brandId, {
+          conversationId: control.id,
+          event: 'chat_closed',
+          ref: `authority:${state.version}`,
+        });
+      }
     } else if (wasResolved && state.status !== 'resolved') {
       entries.push(
         ...(await this.journal.append(tx, tenantId, control.id, [

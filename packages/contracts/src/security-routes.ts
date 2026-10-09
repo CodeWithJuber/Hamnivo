@@ -145,7 +145,7 @@ export const securityRoutes = {
     path: '/v1/workspace/notices',
     operationId: 'getWorkspaceNotices',
     summary:
-      'Banners every member sees: active support access and platform incidents (any active member)',
+      'Banners every member sees: active support access, platform incidents and, for people who manage integrations, channels that stopped working (any active member)',
     tags: ['Security'],
     auth: 'staff_session',
     success: { status: 200, description: 'Notices', schema: WorkspaceNotices },

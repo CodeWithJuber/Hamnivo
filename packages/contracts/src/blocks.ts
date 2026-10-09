@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ChannelKind } from './channels.js';
 import { Timestamp } from './common.js';
 import type { RouteDef } from './routes.js';
 
@@ -7,6 +8,10 @@ import type { RouteDef } from './routes.js';
  * for a customer the website signed in, that account everywhere. No IP address is stored, so a
  * visitor who clears their browser comes back unblocked; the brand accepts that. A blocked
  * visitor is told only that chat is not available: never that they were blocked.
+ *
+ * On email, WhatsApp and Telegram (ADR 0013) a block covers one sender: that address on that
+ * channel, for the brand. Their messages still arrive and are kept, but nobody answers: each
+ * conversation is closed with a private note, and the sender is not told.
  */
 
 export const BlockDuration = z.enum(['day', 'week', 'month', 'always']);
@@ -31,6 +36,8 @@ export const VisitorBlock = z
     /** A short code that tells anonymous visitors apart ("7F3A"); Studio words it per language. */
     code: z.string(),
     signedIn: z.boolean(),
+    /** A sender on email, WhatsApp or Telegram: the channel and their address (null on Telegram). */
+    channel: z.object({ kind: ChannelKind, address: z.string().nullable() }).nullable(),
     customerId: z.string().nullable(),
     visitorId: z.string().nullable(),
     /** The chat it came from, while it exists. */
@@ -68,7 +75,7 @@ export const blockRoutes = {
     path: '/v1/inbox/conversations/{conversationId}/block',
     operationId: 'blockConversationVisitor',
     summary:
-      'Block the customer of this chat, their browser and their signed-in account; optionally close the chat (visitors.block)',
+      'Block the customer of this conversation (on web chat their browser and signed-in account; on email, WhatsApp or Telegram their address); optionally close it (visitors.block)',
     tags: ['Inbox'],
     auth: 'staff_session',
     params: conversationParams,
@@ -90,7 +97,7 @@ export const blockRoutes = {
     method: 'get',
     path: '/v1/visitors/blocks',
     operationId: 'listVisitorBlocks',
-    summary: 'Blocked visitors, newest first (visitors.block)',
+    summary: 'Blocked visitors and channel senders, newest first (visitors.block)',
     tags: ['Visitors'],
     auth: 'staff_session',
     query: ListVisitorBlocksQuery,
@@ -100,7 +107,7 @@ export const blockRoutes = {
     method: 'delete',
     path: '/v1/visitors/blocks/{blockId}',
     operationId: 'liftVisitorBlock',
-    summary: 'Unblock: the visitor can chat again at once (visitors.block)',
+    summary: 'Unblock: the visitor or sender is answered again at once (visitors.block)',
     tags: ['Visitors'],
     auth: 'staff_session',
     params: z.object({ blockId: z.string().meta({ description: 'Block ID (blk_…)' }) }),
