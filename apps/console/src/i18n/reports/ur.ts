@@ -106,7 +106,7 @@ export const reportsUr: ReportsTranslation = {
     created: 'بنائے گئے',
     createdNote: 'اس مدت میں کھولے گئے',
     closed: 'بند کیے گئے',
-    closedNote: 'اس مدت میں بند کیے گئے',
+    closedNote: 'اس مدت میں کھلے، اور پھر بند ہوئے',
     openNow: 'ابھی کھلے',
     openNowNote: 'کھلے یا گاہک کے انتظار میں، چاہے کبھی بھی کھولے گئے ہوں',
     closeMedian: 'بند ہونے کا درمیانی وقت',

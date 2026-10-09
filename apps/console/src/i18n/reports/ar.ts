@@ -105,7 +105,7 @@ export const reportsAr: ReportsTranslation = {
     created: 'أُنشئت',
     createdNote: 'فُتحت في هذه الفترة',
     closed: 'أُغلقت',
-    closedNote: 'أُغلقت في هذه الفترة',
+    closedNote: 'فُتحت في هذه الفترة وأُغلقت بعدها',
     openNow: 'مفتوحة الآن',
     openNowNote: 'مفتوحة أو بانتظار العميل، أيًّا كان وقت فتحها',
     closeMedian: 'الوسيط لوقت الإغلاق',

@@ -43,7 +43,11 @@ export function BlockVisitorDialog({
   const fromChat = target?.kind === 'conversation';
 
   // Each visitor starts from an empty form.
-  const key = target ? `${target.kind}:${target.name}` : null;
+  const key = target
+    ? target.kind === 'conversation'
+      ? `conversation:${target.conversationId}`
+      : `visitor:${target.visitorId}`
+    : null;
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when another visitor is chosen
   useEffect(() => {
     if (!key) return;

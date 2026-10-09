@@ -103,7 +103,7 @@ export const reportsEn = {
     created: 'Created',
     createdNote: 'Opened in this range',
     closed: 'Closed',
-    closedNote: 'Closed in this range',
+    closedNote: 'Opened in this range, and closed since',
     openNow: 'Open now',
     openNowNote: 'Open or waiting for the customer, whenever they were opened',
     closeMedian: 'Median time to close',
