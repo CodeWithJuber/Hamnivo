@@ -71,6 +71,13 @@ with a control row counted. Owners moving from tawk.to expect one inbox for ever
   (`window_closed`); the inbox shows when it closes. Cards already travel with their fallback
   text, which is what email, WhatsApp and Telegram receive.
 
+- **Hamnivo's message key survives the channel.** Chatwoot's send jobs for WhatsApp, Telegram
+  and email replace a message's `source_id` (where Hamnivo writes its `hv1:` key) with the
+  provider's id once it is sent. Hamnivo therefore also writes the key into
+  `content_attributes.hv_key`, which Chatwoot keeps, and reads it from there when `source_id` no
+  longer holds it. A reply whose API answer was lost is then found by its key and never sent
+  twice.
+
 ## Consequences
 
 - Email, WhatsApp and Telegram conversations appear in the staff inbox, follow routing and

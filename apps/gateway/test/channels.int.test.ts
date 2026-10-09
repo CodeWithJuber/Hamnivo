@@ -1,4 +1,4 @@
-import { fromPublicId, schema, withTenant } from '@hamnivo/db';
+import { fromPublicId, schema, toPublicId, withTenant } from '@hamnivo/db';
 import { and, eq, like, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ChannelPollService } from '../src/authority/channel-poll.service.js';
@@ -607,6 +607,34 @@ describe('WhatsApp and Telegram (D14, W24)', () => {
     expect((await reply('Customer went quiet.', 'internal')).status).toBe(202);
     const after = await shop.owner.get('/v1/inbox/conversations?channel=whatsapp');
     expect(Date.parse(after.body.items[0].replyWindowClosesAt)).toBeLessThan(Date.now());
+  });
+
+  it('finds a reply whose answer was lost, after WhatsApp replaced its id, and sends it once', async () => {
+    const asked = await slice.fake.receiveChannelMessage(waInbox, {
+      from: '+971555000222',
+      name: 'Yusuf',
+      content: 'Do you deliver to Sharjah?',
+    });
+    await slice.drain();
+    const control = await controlOf(asked.conversationId);
+    const chatId = toPublicId('conversation', control?.id as string);
+    const body = { clientMessageId: crypto.randomUUID(), text: 'Yes, every day.' };
+    // Chatwoot stores and sends the reply (WhatsApp replaces its source_id), then the answer is lost.
+    slice.fake.setResponseFault((method, url) =>
+      method === 'POST' && /\/conversations\/\d+\/messages$/.test(url) ? 504 : null,
+    );
+    const failed = await shop.owner.post(`/v1/conversations/${chatId}/messages`, body);
+    slice.fake.setResponseFault(null);
+    expect(failed.status).toBe(503);
+    const retried = await shop.owner.post(`/v1/conversations/${chatId}/messages`, body);
+    expect(retried.status, JSON.stringify(retried.body)).toBe(202);
+    expect(retried.body.status).toBe('duplicate');
+    await slice.drain();
+    expect(
+      slice.fake.outbound.filter(
+        (o) => o.kind === 'channel_reply' && o.conversationId === asked.conversationId,
+      ),
+    ).toHaveLength(1);
   });
 
   it('shows Telegram as its own channel, with no reply window', async () => {

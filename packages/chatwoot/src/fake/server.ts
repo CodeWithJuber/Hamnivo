@@ -910,6 +910,30 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     }
   }
 
+  /**
+   * Chatwoot's send job for a channel (WhatsApp, Telegram, email) replaces the message's
+   * `source_id` with the provider's own id once it is sent, and says so in `message_updated`.
+   * Only `content_attributes` keep what the caller wrote.
+   */
+  function deliverOnChannel(conversation: Conversation, message: Message) {
+    const inbox = s.inboxes.get(conversation.inboxId);
+    if (
+      message.messageType !== 1 ||
+      message.private ||
+      !inbox ||
+      inbox.channel === 'Channel::Api'
+    ) {
+      return;
+    }
+    message.sourceId =
+      inbox.channel === 'Channel::Whatsapp'
+        ? `wamid.${token(16)}`
+        : inbox.channel === 'Channel::Telegram'
+          ? String(1000 + message.id)
+          : `<${token(8)}@mail.hv-fake.invalid>`;
+    emit(conversation.accountId, 'message_updated', messageWebhook(message), conversation);
+  }
+
   function removeConversation(conversation: Conversation) {
     for (const message of messagesOf(conversation)) s.messages.delete(message.id);
     s.conversations.delete(conversation.id);
@@ -2193,7 +2217,10 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       const statusChanged = messageType === 0 && reopenForIncoming(conversation);
       emit(conversation.accountId, 'message_created', messageWebhook(message), conversation);
       touch(conversation, statusChanged ? ['status'] : [], statusChanged);
-      return messageApi(message);
+      // The answer is written before the channel sends it, so it still carries the caller's key.
+      const answer = messageApi(message);
+      deliverOnChannel(conversation, message);
+      return answer;
     },
   );
 

@@ -631,6 +631,30 @@ describe('fake Chatwoot channel inboxes', () => {
     });
   });
 
+  it("keeps Hamnivo's key when the channel replaces the message's id after sending", async () => {
+    const { fake, authority, email } = await channelSetup();
+    const thread = await fake.receiveChannelMessage(Number(email.id), {
+      from: 'lina@example.com',
+      subject: 'Hello',
+      content: 'Hi',
+    });
+    const ref = String(thread.conversationId);
+    const key = `hv1:m:${randomUUID()}`;
+    const sent = await authority.appendMessage({
+      conversationRef: ref,
+      key,
+      author: { kind: 'integration' },
+      visibility: 'public',
+      text: 'Thanks for writing.',
+    });
+    // The answer was written before sending, with the key as given.
+    expect(sent.message.key).toBe(key);
+    const listed = await authority.listMessages(ref, { view: 'staff' });
+    const stored = listed.find((m) => m.ref === sent.message.ref);
+    expect(stored?.key).toBe(key);
+    expect(await authority.findByKey(ref, key)).toMatchObject({ ref: sent.message.ref });
+  });
+
   it('makes channel inboxes as an administrator would in Chatwoot, with members', async () => {
     const { fake, account, options } = await channelSetup();
     const mail = fake.createChannelInbox(account.accountId, {

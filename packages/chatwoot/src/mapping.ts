@@ -59,6 +59,18 @@ function fileNameOf(url: string | null): string | null {
   }
 }
 
+/**
+ * The key Hamnivo wrote. Chatwoot replaces `source_id` with the provider's id once a channel
+ * (WhatsApp, Telegram, email) sends the message, so the key also travels in
+ * `content_attributes.hv_key`, which Chatwoot keeps.
+ */
+function hamnivoKey(m: Json): string | null {
+  const source = str(m.source_id);
+  if (source?.startsWith('hv1:')) return source;
+  const carried = obj(m.content_attributes).hv_key;
+  return typeof carried === 'string' && carried.startsWith('hv1:') ? carried : source;
+}
+
 /** Chatwoot message JSON (API response or webhook) → AuthorityMessage. */
 export function toMessage(raw: unknown, conversationRef?: string): AuthorityMessage {
   const m = obj(raw);
@@ -74,7 +86,7 @@ export function toMessage(raw: unknown, conversationRef?: string): AuthorityMess
       str(conversation.display_id) ??
       str(conversation.id) ??
       '',
-    key: str(m.source_id),
+    key: hamnivoKey(m),
     direction,
     private: m.private === true,
     text: str(m.content),
