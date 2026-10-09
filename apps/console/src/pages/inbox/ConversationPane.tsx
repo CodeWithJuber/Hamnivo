@@ -26,6 +26,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import {
   ArrowLeftIcon,
+  BanIcon,
   BotIcon,
   CheckCircle2Icon,
   CheckIcon,
@@ -46,11 +47,13 @@ import {
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppDialog, DialogFooter } from '../../components/AppDialog';
+import { BlockVisitorDialog } from '../../components/BlockVisitorDialog';
 import { SelectField, TextareaField, TextField } from '../../components/Fields';
 import { useDocumentTitle } from '../../components/PageHeader';
 import { ActionError, ErrorPanel } from '../../components/States';
 import { directionOf, isLocale } from '../../i18n';
 import { api, isApiError } from '../../lib/api';
+import type { BlockTarget } from '../../lib/blocks';
 import { returnFocus, useOpener } from '../../lib/focus';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import {
@@ -762,11 +765,18 @@ function MakeTicketDialog({
   );
 }
 
-/** Less frequent actions on a conversation: for now, making it a ticket. */
+/**
+ * Less frequent actions on a conversation: making it a ticket, and blocking the visitor (H20),
+ * which only people who may block visitors see.
+ */
 function MoreMenu({ detail }: { detail: InboxDetail }) {
   const { t } = useTranslation();
+  const { can } = useTenant();
   const [making, setMaking] = useState(false);
-  if (detail.ticket) return null;
+  const [blocking, setBlocking] = useState<BlockTarget | null>(null);
+  const canTicket = !detail.ticket;
+  const canBlock = can('visitors.block');
+  if (!canTicket && !canBlock) return null;
   return (
     <>
       <DropdownMenu>
@@ -781,13 +791,38 @@ function MoreMenu({ detail }: { detail: InboxDetail }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setMaking(true)} data-testid="make-ticket">
-            <TicketIcon aria-hidden="true" />
-            {t('inbox.tickets.make.item')}
-          </DropdownMenuItem>
+          {canTicket ? (
+            <DropdownMenuItem onSelect={() => setMaking(true)} data-testid="make-ticket">
+              <TicketIcon aria-hidden="true" />
+              {t('inbox.tickets.make.item')}
+            </DropdownMenuItem>
+          ) : null}
+          {canTicket && canBlock ? <DropdownMenuSeparator /> : null}
+          {canBlock ? (
+            <DropdownMenuItem
+              onSelect={() =>
+                setBlocking({
+                  kind: 'conversation',
+                  conversationId: detail.id,
+                  name: detail.customer.displayName,
+                })
+              }
+              data-testid="block-visitor"
+            >
+              <BanIcon aria-hidden="true" />
+              {t('inbox.blocking.menuItem')}
+            </DropdownMenuItem>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      <MakeTicketDialog open={making} onOpenChange={setMaking} detail={detail} />
+      {canTicket ? (
+        <MakeTicketDialog open={making} onOpenChange={setMaking} detail={detail} />
+      ) : null}
+      <BlockVisitorDialog
+        target={blocking}
+        onClose={() => setBlocking(null)}
+        fallbackFocus={() => document.querySelector<HTMLElement>('[data-testid="more-menu"]')}
+      />
     </>
   );
 }

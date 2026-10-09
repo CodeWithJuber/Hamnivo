@@ -15,6 +15,38 @@ export type Budget = z.infer<typeof C.Budget>;
 export type InvoiceSummary = z.infer<typeof C.InvoiceSummary>;
 export type Invoice = z.infer<typeof C.Invoice>;
 
+type Tickets = AnalyticsOverview['tickets'];
+
+/** Ticket priorities, highest first (H19). */
+export const TICKET_PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
+/** Where tickets come from, in the order the report lists them. */
+export const TICKET_SOURCES = ['offline_form', 'staff', 'automation'] as const;
+
+/** Tickets by priority, highest first, then those with none. */
+export function ticketsByPriority(tickets: Tickets): Tickets['byPriority'] {
+  const rank = (priority: Tickets['byPriority'][number]['priority']) =>
+    priority === null ? TICKET_PRIORITIES.length : TICKET_PRIORITIES.indexOf(priority);
+  return [...tickets.byPriority].sort((a, b) => rank(a.priority) - rank(b.priority));
+}
+
+/** Tickets by source: the contact form, staff, then automations. */
+export function ticketsBySource(tickets: Tickets): Tickets['bySource'] {
+  const rank = (source: string) => {
+    const at = (TICKET_SOURCES as readonly string[]).indexOf(source);
+    return at < 0 ? TICKET_SOURCES.length : at;
+  };
+  return [...tickets.bySource].sort((a, b) => rank(a.source) - rank(b.source));
+}
+
+/**
+ * Nothing to show on the Tickets tab: none opened or closed in the range and none open now. A
+ * withheld count (null) is not nothing.
+ */
+export const noTickets = (overview: Pick<AnalyticsOverview, 'tickets'>) =>
+  [overview.tickets.created, overview.tickets.closed, overview.tickets.openNow].every(
+    (metric) => metric.value === 0,
+  );
+
 export interface ReportFilters {
   from: string;
   to: string;

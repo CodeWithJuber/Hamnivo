@@ -1,4 +1,5 @@
 import { automationsHi } from './automations/hi';
+import { blockingHi } from './blocking/hi';
 import { cachingHi } from './caching';
 import { chatWidgetHi } from './chat-widget/hi';
 import { checksHi } from './checks';
@@ -946,6 +947,7 @@ export const hi: Translation = {
       all: 'सभी',
     },
     tickets: ticketsHi,
+    blocking: blockingHi,
     keys: {
       plain: 'कुंजियाँ: चलने के लिए ↑ ↓ या J K, खोलने के लिए Enter, वापस आने के लिए Esc।',
       withSelect: 'कुंजियाँ: चलने के लिए ↑ ↓ या J K, खोलने के लिए Enter, चुनने के लिए X, वापस आने के लिए Esc।',
@@ -2275,6 +2277,7 @@ export const hi: Translation = {
   },
   permissionAreas: {
     conversations: 'बातचीत',
+    visitors: 'विज़िटर',
     inbox: 'इनबॉक्स और रूटिंग',
     teams: 'टीमें',
     members: 'सदस्य',
@@ -2317,6 +2320,7 @@ export const hi: Translation = {
       review: 'दूसरों की बातचीत की समीक्षा करें और मार्गदर्शन दें',
       export: 'बातचीत के ट्रांसक्रिप्ट एक्सपोर्ट करें',
     },
+    visitors: { block: 'चैट का गलत इस्तेमाल करने वाले विज़िटर को ब्लॉक और अनब्लॉक करें' },
     inbox: { manage: 'इनबॉक्स, रूटिंग और कामकाजी घंटे सेट करें' },
     teams: { manage: 'टीमें बनाएं और सदस्यता संभालें' },
     members: {

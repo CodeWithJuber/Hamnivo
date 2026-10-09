@@ -11,12 +11,20 @@ import {
   TableRow,
 } from '@hamnivo/ui/components/table';
 import { Link } from '@tanstack/react-router';
-import { ArrowLeftIcon, ExternalLinkIcon, MessageSquarePlusIcon, UsersIcon } from 'lucide-react';
+import {
+  ArrowLeftIcon,
+  BanIcon,
+  ExternalLinkIcon,
+  MessageSquarePlusIcon,
+  UsersIcon,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BlockVisitorDialog } from '../../components/BlockVisitorDialog';
 import { SelectField } from '../../components/Fields';
 import { PageHeader } from '../../components/PageHeader';
 import { Forbidden, QueryState } from '../../components/States';
+import type { BlockTarget } from '../../lib/blocks';
 import { formatNumber } from '../../lib/format';
 import { useBrandRefs } from '../../lib/names';
 import { useTenant } from '../../lib/tenant';
@@ -42,11 +50,14 @@ function VisitorRow({
   generatedAt,
   locale,
   onInvite,
+  onBlock,
 }: {
   visitor: LiveVisitor;
   generatedAt: string;
   locale: string;
   onInvite: (visitor: LiveVisitor) => void;
+  /** Null when this person may not block visitors. */
+  onBlock: ((visitor: LiveVisitor) => void) | null;
 }) {
   const { t } = useTranslation();
   const span = formatSpan(timeOnSite(visitor, generatedAt), locale);
@@ -124,6 +135,18 @@ function VisitorRow({
               {t('inboxAlerts.live.invite')}
             </Button>
           ) : null}
+          {onBlock ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label={t('inbox.blocking.actionFor', { name: visitor.name })}
+              onClick={() => onBlock(visitor)}
+              data-testid="block-visitor"
+            >
+              <BanIcon aria-hidden="true" />
+              {t('inbox.blocking.action')}
+            </Button>
+          ) : null}
         </div>
       </TableCell>
     </TableRow>
@@ -142,6 +165,8 @@ export function VisitorsPage() {
   const permitted = can('conversations.read');
   const [brandId, setBrandId] = useState('');
   const [inviting, setInviting] = useState<LiveVisitor | null>(null);
+  const [blocking, setBlocking] = useState<BlockTarget | null>(null);
+  const canBlock = can('visitors.block');
   const brands = useBrandRefs();
   const live = useLiveVisitors(brandId);
 
@@ -237,6 +262,16 @@ export function VisitorsPage() {
                           generatedAt={data.generatedAt}
                           locale={locale}
                           onInvite={setInviting}
+                          onBlock={
+                            canBlock
+                              ? (row) =>
+                                  setBlocking({
+                                    kind: 'visitor',
+                                    visitorId: row.id,
+                                    name: row.name,
+                                  })
+                              : null
+                          }
                         />
                       ))}
                     </TableBody>
@@ -254,6 +289,7 @@ export function VisitorsPage() {
         />
       )}
       <InviteDialog visitor={inviting} onClose={() => setInviting(null)} />
+      <BlockVisitorDialog target={blocking} onClose={() => setBlocking(null)} />
     </div>
   );
 }

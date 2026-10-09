@@ -1,4 +1,5 @@
 import { automationsAr } from './automations/ar';
+import { blockingAr } from './blocking/ar';
 import { cachingAr } from './caching';
 import { chatWidgetAr } from './chat-widget/ar';
 import { checksAr } from './checks';
@@ -941,6 +942,7 @@ export const ar: Translation = {
       all: 'الكل',
     },
     tickets: ticketsAr,
+    blocking: blockingAr,
     keys: {
       plain: 'المفاتيح: ↑ ↓ أو J K للتنقل، و Enter للفتح، و Esc للرجوع.',
       withSelect: 'المفاتيح: ↑ ↓ أو J K للتنقل، و Enter للفتح، و X للتحديد، و Esc للرجوع.',
@@ -2270,6 +2272,7 @@ export const ar: Translation = {
   },
   permissionAreas: {
     conversations: 'المحادثات',
+    visitors: 'الزوار',
     inbox: 'صناديق الوارد والتوجيه',
     teams: 'الفرق',
     members: 'الأعضاء',
@@ -2312,6 +2315,7 @@ export const ar: Translation = {
       review: 'مراجعة محادثات الآخرين وتوجيههم',
       export: 'تصدير نصوص المحادثات',
     },
+    visitors: { block: 'حظر الزوار الذين يسيئون استخدام المحادثة ورفع الحظر عنهم' },
     inbox: { manage: 'إعداد صناديق الوارد والتوجيه وساعات العمل' },
     teams: { manage: 'إنشاء الفرق وإدارة أعضائها' },
     members: {
