@@ -32,11 +32,27 @@ A blocked visitor can still:
 
 They cannot start a chat, send a message, use the contact form or reopen a chat.
 
+## Email, WhatsApp and Telegram
+
+You can also block a sender on a channel: open their conversation, then **More actions** →
+**Block sender…**. Write the reason and choose how long, as above.
+
+- Their messages still arrive, and your team can still read them.
+- Nobody answers: no AI reply, no ticket number, no team and no automations.
+- Each conversation they start is closed at once, with a private note: "Closed automatically:
+  this sender is blocked."
+- The sender is never told.
+
+A block covers one address on one channel. A person's WhatsApp number and their email address
+are separate, so block each one if you need to. On the **Blocked** list, a sender shows as
+their address and channel, for example "amina@customer.example on Email".
+
 ## Unblock
 
 1. In the **Inbox**, choose **Blocked** next to **Live visitors**.
 2. Find the visitor. **Active** shows current blocks; **All** shows the last 90 days.
-3. Choose **Unblock** and confirm. They can chat again at once.
+3. Choose **Unblock** and confirm. They can chat again at once, and a sender's next message is
+   answered as usual.
 
 A block also ends by itself when its time is up.
 

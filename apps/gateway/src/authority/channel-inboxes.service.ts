@@ -39,6 +39,7 @@ import type { AppConfig } from '../config.js';
 import { enforce } from '../identity/staff.guard.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { channelKindOf } from './adopt.js';
+import { recordHealthChange } from './channel-health.js';
 import { AuthorityRegistry } from './registry.js';
 
 /** The inbox cursor that looks for new channel inboxes in a Chatwoot account. */
@@ -666,6 +667,16 @@ export class ChannelInboxesService {
     const newPassword = Boolean(input.imap.password || input.smtp.password);
     return this.tx(principal, async (tx) => {
       const now = this.clock();
+      // A new password Chatwoot accepted fixes the sign-in; whoever heard it broke hears it works.
+      if (newPassword && row.health && !row.health.ok) {
+        await recordHealthChange(
+          tx,
+          principal.tenantId,
+          row,
+          { ok: true, checkedAt: now.toISOString() },
+          now,
+        );
+      }
       const [updated] = await tx
         .update(schema.authorityInboxes)
         .set({
@@ -813,6 +824,7 @@ export class ChannelInboxesService {
                 })
                 .where(eq(schema.authorityInboxes.id, row.id));
             }
+            if (healthChanged) await recordHealthChange(tx, tenantId, row, health, now);
             continue;
           }
           await recordChannel(tx, { tenantId, connectionId, brandId, inbox, now });

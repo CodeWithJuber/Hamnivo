@@ -89,4 +89,9 @@ with a control row counted. Owners moving from tawk.to expect one inbox for ever
   customer.
 - A conversation closed before Hamnivo first saw it is not adopted. It stays in Chatwoot's
   history.
-- Blocking (ADR 0012) covers web chat. Blocking a channel address comes later.
+- Blocking (ADR 0012) covers channel senders too: their conversations are closed with a note,
+  and nobody answers (see the ADR 0012 addendum).
+- A channel that stops working (`health.ok = false`) is audited at once. If it is still down 15
+  minutes later, the people who manage the brand's integrations get one email and a Studio
+  banner, and one more email when it works again (`channel.health` outbox events, delayed with
+  `availableAt` and handled once).

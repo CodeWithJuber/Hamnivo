@@ -257,7 +257,8 @@ export function IdentityBadge({ identity }: { identity: 'verified' | 'anonymous'
   );
 }
 
-const CHANNEL_ICONS: Record<InboxConversation['channel'], LucideIcon> = {
+/** Each channel's icon, here and wherever Studio names a channel (the Blocked page). */
+export const CHANNEL_ICONS: Record<InboxConversation['channel'], LucideIcon> = {
   chat: MessageCircleIcon,
   email: MailIcon,
   whatsapp: MessageSquareIcon,

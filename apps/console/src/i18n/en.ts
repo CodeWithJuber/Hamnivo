@@ -2100,6 +2100,12 @@ export const en = {
         outage: 'Service outage',
       },
       since: 'Since {{time}}',
+      channelDown:
+        'The {{channel}} channel of {{brand}} has not worked since {{time}}. New messages may not reach your team.',
+      channelsDown:
+        'Channels that have stopped working: {{n}}. New messages may not reach your team.',
+      channelItem: 'The {{channel}} channel of {{brand}}, since {{time}}',
+      fixChannel: 'Fix it',
     },
     invitation: {
       title: 'Join a workspace',

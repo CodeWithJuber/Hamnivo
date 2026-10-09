@@ -2,6 +2,7 @@ import type { BlockingTranslation } from './types';
 
 export const blockingHi: BlockingTranslation = {
   menuItem: 'विज़िटर को ब्लॉक करें…',
+  menuItemSender: 'भेजने वाले को ब्लॉक करें…',
   action: 'ब्लॉक करें',
   actionFor: '{{name}} को ब्लॉक करें',
   dialog: {
@@ -16,6 +17,14 @@ export const blockingHi: BlockingTranslation = {
     submit: 'विज़िटर को ब्लॉक करें',
     done: '{{name}} ब्लॉक हो गए।',
     doneClosed: '{{name}} ब्लॉक हो गए, और चैट बंद हो गई।',
+    /** A sender on email, WhatsApp or Telegram. */
+    sender: {
+      explanation:
+        'उनके संदेश आते रहेंगे, पर हर बातचीत बिना जवाब के अपने-आप बंद हो जाएगी। उन्हें बताया नहीं जाता। ब्लॉक सिर्फ़ इस चैनल पर इसी पते पर लागू होता है।',
+      closeChat: 'यह बातचीत भी बंद करें',
+      submit: 'भेजने वाले को ब्लॉक करें',
+      doneClosed: '{{name}} ब्लॉक हो गए, और बातचीत बंद हो गई।',
+    },
   },
   durations: {
     day: '24 घंटे',
@@ -31,6 +40,10 @@ export const blockingHi: BlockingTranslation = {
     link: 'ब्लॉक किए गए',
     /** An anonymous visitor, by the short code that tells them apart. */
     anonymous: 'विज़िटर {{code}}',
+    /** After a sender's address, which comes first in every language: "amina@… on Email". */
+    senderOn: '{{channel}} पर',
+    /** A sender with no address (Telegram). */
+    senderNoAddress: '{{channel}} पर भेजने वाले',
     title: 'ब्लॉक किए गए विज़िटर',
     description:
       'जो विज़िटर आपके ब्रांड से चैट नहीं कर सकते, उन्हें क्यों और कब तक ब्लॉक किया गया है। यहाँ अनब्लॉक करें, तो वे तुरंत फिर चैट कर सकते हैं।',

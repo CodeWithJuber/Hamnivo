@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { RoleRef } from './admin.js';
+import { ChannelKind } from './channels.js';
 import { Timestamp } from './common.js';
 import { typeId } from './ids.js';
 
@@ -188,6 +189,22 @@ export const WorkspaceNotices = z
     ),
     pendingSupportRequests: z.number().int().nonnegative(),
     incidents: z.array(IncidentNotice),
+    /**
+     * Email, WhatsApp and Telegram channels that have not worked for more than 15 minutes, for
+     * people who manage the brand's integrations (A11); empty for everyone else.
+     */
+    unhealthyChannels: z.array(
+      z.object({
+        id: typeId('inbox'),
+        brandId: typeId('brand'),
+        brandName: z.string(),
+        kind: ChannelKind,
+        name: z.string(),
+        address: z.string().nullable(),
+        problem: z.string().nullable(),
+        since: Timestamp,
+      }),
+    ),
   })
   .meta({ id: 'WorkspaceNotices' });
 export type WorkspaceNotices = z.infer<typeof WorkspaceNotices>;

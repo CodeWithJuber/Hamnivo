@@ -4,7 +4,9 @@
  * turned on, a team chosen and the channel paused after a confirm. A channel no brand has claimed
  * yet, and Chatwoot failing after the setting was saved, are answered by the test (the stack has
  * one Chatwoot account per brand, so it never has the first; the second needs Chatwoot down).
- * English and Arabic, with axe audits.
+ * A channel that has not worked for 15 minutes (A11) is answered by the test as well: the banner
+ * reads the gateway's notices, and the stack cannot wait that long. English and Arabic, with axe
+ * audits.
  */
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -302,5 +304,83 @@ test('Channels · Arabic, right to left, on a phone too', async ({ page, context
   await expect(page.getByRole('button', { name: 'البحث عن قنوات جديدة' })).toBeVisible();
   const violations = await audit(page, 'channels (ar)');
   violations.push(...(await overflowAt(page)));
+  expect(violations).toEqual([]);
+});
+
+test('A11 · a channel down for 15 minutes shows a banner that leads to Channels', async ({
+  page,
+  context,
+}) => {
+  await workspace.staff.signIn(context);
+  const since = new Date(Date.now() - 20 * 60_000).toISOString();
+  const down = (id: string, kind: string, brandId: string, brandName: string) => ({
+    id,
+    brandId,
+    brandName,
+    kind,
+    name: `${brandName} ${kind}`,
+    address: kind === 'telegram' ? null : '+971501234567',
+    problem: 'Invalid access token',
+    since,
+  });
+  let unhealthy = [down('inbox_e2e_1', 'whatsapp', workspace.brand.id, workspace.brand.name)];
+  // The notices as the gateway sends them, with channels that stopped working added.
+  await page.route('**/v1/workspace/notices', async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as Record<string, unknown>;
+    await route.fulfill({
+      status: response.status(),
+      json: { ...body, unhealthyChannels: unhealthy },
+    });
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/inbox?lang=en');
+  const banner = page.getByTestId('channel-down-banner');
+  await expect(banner).toContainText(
+    new RegExp(
+      `The WhatsApp channel of ${workspace.brand.name} has not worked since .+\\. New messages may not reach your team\\.`,
+    ),
+  );
+  await expect(banner).toContainText(`${workspace.brand.name} whatsapp · +971501234567`);
+  await expect(banner).toContainText('Chatwoot says: Invalid access token');
+  const fix = banner.getByRole('link', { name: 'Fix it' });
+  await expect(fix).toHaveAttribute('href', `/channels?brand=${workspace.brand.id}`);
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+  const violations = await audit(page, 'channel down banner (en)');
+  await fix.click();
+  await expect(page).toHaveURL(new RegExp(`/channels\\?brand=${workspace.brand.id}`));
+  await expect(page.getByRole('heading', { level: 1, name: 'Channels' })).toBeVisible();
+
+  // Several: counted and listed, the link going to the first one's brand.
+  unhealthy = [
+    ...unhealthy,
+    down('inbox_e2e_2', 'email', workspace.brand.id, workspace.brand.name),
+    down('inbox_e2e_3', 'telegram', workspace.brand.id, workspace.brand.name),
+  ];
+  await page.goto('/inbox?lang=en');
+  await expect(banner).toContainText(
+    'Channels that have stopped working: 3. New messages may not reach your team.',
+  );
+  await expect(banner.getByRole('listitem')).toHaveCount(3);
+  await expect(banner.getByRole('listitem').nth(1)).toContainText(
+    `The Email channel of ${workspace.brand.name}, since`,
+  );
+  await expect(banner.getByRole('link', { name: 'Fix it' })).toHaveCount(1);
+
+  // Right to left, on a phone too.
+  unhealthy = unhealthy.slice(0, 1);
+  await page.goto('/inbox?lang=ar');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(banner).toContainText(`قناة واتساب الخاصة بـ ${workspace.brand.name} لا تعمل منذ`);
+  await expect(banner.getByRole('link', { name: 'أصلحها' })).toBeVisible();
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+  violations.push(...(await audit(page, 'channel down banner (ar)')));
+  violations.push(...(await overflowAt(page, [320, 390])));
+
+  // Once it works again, the banner goes.
+  unhealthy = [];
+  await page.goto('/inbox?lang=en');
+  await expect(page.locator('#page-title')).toBeVisible();
+  await expect(banner).toHaveCount(0);
   expect(violations).toEqual([]);
 });

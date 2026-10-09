@@ -1,9 +1,11 @@
 /**
  * Studio: blocking visitors who misuse the chat (H20), from a chat, from Live visitors and on the
  * Blocked page. The visitor is never told they were blocked; only that chat isn't available.
+ * On email, WhatsApp and Telegram it is a sender who is blocked, and they are not told either.
  */
 export const blockingEn = {
   menuItem: 'Block visitor…',
+  menuItemSender: 'Block sender…',
   action: 'Block',
   actionFor: 'Block {{name}}',
   dialog: {
@@ -18,6 +20,14 @@ export const blockingEn = {
     submit: 'Block visitor',
     done: '{{name}} is blocked.',
     doneClosed: '{{name}} is blocked, and the chat is closed.',
+    /** A sender on email, WhatsApp or Telegram. */
+    sender: {
+      explanation:
+        'Their messages will still arrive, but each conversation is closed automatically, without an answer. They are not told. The block covers this address on this channel only.',
+      closeChat: 'Also close this conversation',
+      submit: 'Block sender',
+      doneClosed: '{{name}} is blocked, and the conversation is closed.',
+    },
   },
   durations: {
     day: '24 hours',
@@ -33,6 +43,10 @@ export const blockingEn = {
     link: 'Blocked',
     /** An anonymous visitor, by the short code that tells them apart. */
     anonymous: 'Visitor {{code}}',
+    /** After a sender's address, which comes first in every language: "amina@… on Email". */
+    senderOn: 'on {{channel}}',
+    /** A sender with no address (Telegram). */
+    senderNoAddress: '{{channel}} sender',
     title: 'Blocked visitors',
     description:
       'Visitors who can’t chat with your brands, why they were blocked and until when. Unblock someone here and they can chat again at once.',

@@ -5,6 +5,7 @@ import { ACTION_EXECUTE_TOPIC, ActionExecutor } from './actions/executor.service
 import { ACTION_RECONCILE_TOPIC } from './actions/inbox-actions.service.js';
 import { ActionsWorker } from './actions/worker.service.js';
 import { ChannelAdoption } from './authority/adopt.js';
+import { CHANNEL_HEALTH_TOPIC, ChannelHealthNotices } from './authority/channel-health.js';
 import { ChannelInboxesService } from './authority/channel-inboxes.service.js';
 import { ChannelPollService } from './authority/channel-poll.service.js';
 import { JournalService } from './authority/journal.service.js';
@@ -108,6 +109,7 @@ export class WorkerModule {
         AuthoritySyncService,
         PublicationsService,
         ChannelAdoption,
+        ChannelHealthNotices,
         InboxProcessor,
         ReconcilerService,
         ChannelInboxesService,
@@ -165,6 +167,7 @@ export class WorkerModule {
             ChatwootProvisioning,
             BillingNotices,
             AutomationRunner,
+            ChannelHealthNotices,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -185,6 +188,7 @@ export class WorkerModule {
             provisioning: ChatwootProvisioning,
             notices: BillingNotices,
             automations: AutomationRunner,
+            channelHealth: ChannelHealthNotices,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -192,6 +196,7 @@ export class WorkerModule {
               ['conversation.owner_changed', (event) => sync.applyOwnerChange(event)],
               ['conversation.team_changed', (event) => sync.applyTeamChange(event)],
               ['conversation.note', (event) => sync.applyNote(event)],
+              ['conversation.close_blocked', (event) => sync.applyBlockedClose(event)],
               [
                 'conversation.customer_message',
                 // The reply comes first; memory extraction is queued after it, never before.
@@ -220,6 +225,7 @@ export class WorkerModule {
               [ACTION_EXECUTE_TOPIC, (event) => executor.onExecute(event)],
               [ACTION_RECONCILE_TOPIC, (event) => actions.onReconcile(event)],
               [AUTOMATION_TOPIC, (event) => automations.onEvent(event)],
+              [CHANNEL_HEALTH_TOPIC, (event) => channelHealth.onEvent(event)],
               ...saasOutboxHandlers(provisioning, notices),
             ]),
         },

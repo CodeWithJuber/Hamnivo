@@ -2084,6 +2084,11 @@ export const ar: Translation = {
         outage: 'انقطاع الخدمة',
       },
       since: 'منذ {{time}}',
+      channelDown:
+        'قناة {{channel}} الخاصة بـ {{brand}} لا تعمل منذ {{time}}. قد لا تصل الرسائل الجديدة إلى فريقك.',
+      channelsDown: 'قنوات توقفت عن العمل: {{n}}. قد لا تصل الرسائل الجديدة إلى فريقك.',
+      channelItem: 'قناة {{channel}} الخاصة بـ {{brand}}، منذ {{time}}',
+      fixChannel: 'أصلحها',
     },
     invitation: {
       title: 'الانضمام إلى مساحة عمل',

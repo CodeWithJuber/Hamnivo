@@ -2122,6 +2122,11 @@ export const ur: Translation = {
         outage: 'سروس بند',
       },
       since: '{{time}} سے',
+      channelDown:
+        '{{brand}} کا {{channel}} چینل {{time}} سے کام نہیں کر رہا۔ نئے پیغامات شاید آپ کی ٹیم تک نہ پہنچیں۔',
+      channelsDown: 'کام نہ کرنے والے چینل: {{n}}۔ نئے پیغامات شاید آپ کی ٹیم تک نہ پہنچیں۔',
+      channelItem: '{{brand}} کا {{channel}} چینل، {{time}} سے',
+      fixChannel: 'ٹھیک کریں',
     },
     invitation: {
       title: 'ورک اسپیس میں شامل ہوں',

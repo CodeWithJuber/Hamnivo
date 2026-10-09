@@ -53,7 +53,7 @@ import { useDocumentTitle } from '../../components/PageHeader';
 import { ActionError, ErrorPanel } from '../../components/States';
 import { directionOf, isLocale } from '../../i18n';
 import { api, isApiError } from '../../lib/api';
-import type { BlockTarget } from '../../lib/blocks';
+import { type BlockTarget, isSenderChannel } from '../../lib/blocks';
 import { returnFocus, useOpener } from '../../lib/focus';
 import { formatDateTime, formatRelative } from '../../lib/format';
 import {
@@ -767,7 +767,8 @@ function MakeTicketDialog({
 
 /**
  * Less frequent actions on a conversation: making it a ticket, and blocking the visitor (H20),
- * which only people who may block visitors see.
+ * which only people who may block visitors see. On email, WhatsApp or Telegram it is the sender
+ * who is blocked.
  */
 function MoreMenu({ detail }: { detail: InboxDetail }) {
   const { t } = useTranslation();
@@ -805,12 +806,17 @@ function MoreMenu({ detail }: { detail: InboxDetail }) {
                   kind: 'conversation',
                   conversationId: detail.id,
                   name: detail.customer.displayName,
+                  channel: detail.channel,
                 })
               }
               data-testid="block-visitor"
             >
               <BanIcon aria-hidden="true" />
-              {t('inbox.blocking.menuItem')}
+              {t(
+                isSenderChannel(detail.channel)
+                  ? 'inbox.blocking.menuItemSender'
+                  : 'inbox.blocking.menuItem',
+              )}
             </DropdownMenuItem>
           ) : null}
         </DropdownMenuContent>

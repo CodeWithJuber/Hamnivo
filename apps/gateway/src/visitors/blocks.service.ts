@@ -86,8 +86,7 @@ export class VisitorBlocksService {
       const control = found.control;
       if (!control.brandId || !control.principalId) {
         throw new AppError('VALIDATION_FAILED', {
-          detail:
-            'This conversation did not come from the chat on a website, so there is no visitor to block.',
+          detail: 'This conversation has no customer to block.',
         });
       }
       // Blocking again (or retrying) changes nothing while a block is in force.
@@ -321,6 +320,8 @@ export class VisitorBlocksService {
         lifterName: lifter.displayName,
         signedIn: schema.customerPrincipals.kind,
         customerName: schema.customerPrincipals.displayName,
+        channelKind: schema.customerPrincipals.channelKind,
+        channelHandle: schema.customerPrincipals.channelHandle,
         conversationExists: schema.conversationControls.id,
       })
       .from(b)
@@ -348,6 +349,17 @@ export class VisitorBlocksService {
       name: row.customerName ?? (block.label === code ? null : block.label),
       code,
       signedIn: block.externalSubject !== null || row.signedIn === 'verified',
+      // Read from the customer, not kept on the block, so erasing them erases it here too.
+      channel:
+        row.signedIn === 'channel' && row.channelKind
+          ? {
+              kind: row.channelKind,
+              address:
+                row.channelHandle && !/^(chatwoot|conversation):/.test(row.channelHandle)
+                  ? row.channelHandle
+                  : null,
+            }
+          : null,
       customerId: block.principalId ? toPublicId('customer', block.principalId) : null,
       visitorId: block.visitorId ? toPublicId('visitor', block.visitorId) : null,
       conversationId:

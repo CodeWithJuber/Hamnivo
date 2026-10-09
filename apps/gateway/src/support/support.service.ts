@@ -15,10 +15,12 @@ import {
   toPublicId,
   withTenant,
 } from '@hamnivo/db';
-import type { StaffPrincipal } from '@hamnivo/policy';
+import { authorize, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import type { z } from 'zod';
+import { channelKindOf } from '../authority/adopt.js';
+import { CHANNEL_ALERT_AFTER_MS } from '../authority/channel-health.js';
 import { AppError } from '../common/app-error.js';
 import { APP_DB, CLOCK, type Clock, PLATFORM_DB } from '../tokens.js';
 import { isSupportActive, supportGrantView } from './views.js';
@@ -314,7 +316,56 @@ export class SupportService {
       })),
       pendingSupportRequests: pending.length,
       incidents: await this.incidents(),
+      unhealthyChannels: await this.unhealthyChannels(principal, now),
     };
+  }
+
+  /**
+   * Channels down for more than 15 minutes (A11), for the people who can fix them: those who
+   * manage the brand's integrations. A blip shorter than that shows nothing.
+   */
+  private async unhealthyChannels(
+    principal: StaffPrincipal,
+    now: Date,
+  ): Promise<z.infer<typeof WorkspaceNotices>['unhealthyChannels']> {
+    const rows = await this.tx(principal, (tx) =>
+      tx
+        .select({ inbox: schema.authorityInboxes, brand: schema.brands })
+        .from(schema.authorityInboxes)
+        .innerJoin(schema.brands, eq(schema.brands.id, schema.authorityInboxes.brandId))
+        .where(
+          and(
+            eq(schema.authorityInboxes.purpose, 'channel'),
+            eq(schema.authorityInboxes.status, 'active'),
+            isNull(schema.authorityInboxes.pausedAt),
+            sql`${schema.authorityInboxes.health}->>'ok' = 'false'`,
+          ),
+        ),
+    );
+    return rows
+      .filter(({ inbox, brand }) => {
+        const since = Date.parse(inbox.health?.checkedAt ?? '');
+        return (
+          Number.isFinite(since) &&
+          now.getTime() - since >= CHANNEL_ALERT_AFTER_MS &&
+          authorize(
+            principal,
+            'integrations.manage',
+            { workspaceId: brand.workspaceId, brandId: brand.id },
+            { now },
+          ).allowed
+        );
+      })
+      .map(({ inbox, brand }) => ({
+        id: toPublicId('inbox', inbox.id),
+        brandId: toPublicId('brand', brand.id),
+        brandName: brand.name,
+        kind: channelKindOf(inbox.channelType),
+        name: inbox.name ?? inbox.channelType.replace('Channel::', ''),
+        address: inbox.displayAddress,
+        problem: inbox.health?.message ?? null,
+        since: inbox.health?.checkedAt ?? now.toISOString(),
+      }));
   }
 
   private async incidents(): Promise<z.infer<typeof WorkspaceNotices>['incidents']> {

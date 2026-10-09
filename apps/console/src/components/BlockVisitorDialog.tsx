@@ -6,6 +6,7 @@ import {
   BLOCK_DURATIONS,
   type BlockDuration,
   type BlockTarget,
+  blocksSender,
   expiryFor,
   fieldError,
   REASON_MAX,
@@ -18,9 +19,10 @@ import { ActionError } from './States';
 
 /**
  * Blocks a visitor who misuses the chat (H20): why (for the team only), for how long and, from a
- * chat, whether to close it too. The visitor is told only that chat isn't available. The
- * gateway's field messages show on their field; success is announced, and focus goes back to
- * the control that opened the dialog.
+ * chat, whether to close it too. The visitor is told only that chat isn't available. On email,
+ * WhatsApp or Telegram it blocks the sender instead: their messages still arrive, but nobody
+ * answers them. The gateway's field messages show on their field; success is announced, and focus
+ * goes back to the control that opened the dialog.
  */
 export function BlockVisitorDialog({
   target,
@@ -41,6 +43,8 @@ export function BlockVisitorDialog({
   const [closeChat, setCloseChat] = useState(true);
   const [missing, setMissing] = useState(false);
   const fromChat = target?.kind === 'conversation';
+  // A sender on a channel, not a visitor of the website's chat: worded as such.
+  const sender = blocksSender(target);
 
   // Each visitor starts from an empty form.
   const key = target
@@ -79,9 +83,14 @@ export function BlockVisitorDialog({
         onSuccess: () => {
           void block.refresh(target);
           announce(
-            t(closing ? 'inbox.blocking.dialog.doneClosed' : 'inbox.blocking.dialog.done', {
-              name: target.name,
-            }),
+            t(
+              closing
+                ? sender
+                  ? 'inbox.blocking.dialog.sender.doneClosed'
+                  : 'inbox.blocking.dialog.doneClosed'
+                : 'inbox.blocking.dialog.done',
+              { name: target.name },
+            ),
           );
           onClose();
         },
@@ -101,7 +110,9 @@ export function BlockVisitorDialog({
       open={target !== null}
       onOpenChange={(open) => !open && close()}
       title={t('inbox.blocking.dialog.title', { name: target?.name ?? '' })}
-      description={t('inbox.blocking.dialog.explanation')}
+      description={t(
+        sender ? 'inbox.blocking.dialog.sender.explanation' : 'inbox.blocking.dialog.explanation',
+      )}
       testId="block-dialog"
       {...(fallbackFocus ? { fallbackFocus } : {})}
     >
@@ -143,7 +154,9 @@ export function BlockVisitorDialog({
         {fromChat ? (
           <CheckboxField
             id="block-close-chat"
-            label={t('inbox.blocking.dialog.closeChat')}
+            label={t(
+              sender ? 'inbox.blocking.dialog.sender.closeChat' : 'inbox.blocking.dialog.closeChat',
+            )}
             checked={closeChat}
             onCheckedChange={setCloseChat}
           />
@@ -160,7 +173,7 @@ export function BlockVisitorDialog({
             busy={block.isPending}
             data-testid="block-submit"
           >
-            {t('inbox.blocking.dialog.submit')}
+            {t(sender ? 'inbox.blocking.dialog.sender.submit' : 'inbox.blocking.dialog.submit')}
           </Button>
         </DialogFooter>
       </form>

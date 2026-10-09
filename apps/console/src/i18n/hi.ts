@@ -2089,6 +2089,11 @@ export const hi: Translation = {
         outage: 'सेवा बंद',
       },
       since: '{{time}} से',
+      channelDown:
+        '{{brand}} का {{channel}} चैनल {{time}} से काम नहीं कर रहा। नए संदेश शायद आपकी टीम तक न पहुंचें।',
+      channelsDown: 'काम न कर रहे चैनल: {{n}}। नए संदेश शायद आपकी टीम तक न पहुंचें।',
+      channelItem: '{{brand}} का {{channel}} चैनल, {{time}} से',
+      fixChannel: 'ठीक करें',
     },
     invitation: {
       title: 'वर्कस्पेस से जुड़ें',
