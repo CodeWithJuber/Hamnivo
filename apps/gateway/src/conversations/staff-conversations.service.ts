@@ -302,7 +302,8 @@ export class StaffConversationsService {
       return { messageId: result.message.id, status: result.status };
     } catch (error) {
       const code = error instanceof AppError ? error.code : 'INTERNAL';
-      if (KEPT.has(code)) {
+      // A failed template is not kept to retry as text: the picker resends it, with the same id.
+      if (KEPT.has(code) && !prepared) {
         await this.drafts
           .failOutgoing(principal, control.id, input.clientMessageId, code)
           .catch(() => undefined);

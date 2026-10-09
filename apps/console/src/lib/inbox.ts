@@ -28,6 +28,8 @@ export type StaffDraft = C.StaffDraft;
 export type OutgoingMessage = C.OutgoingMessage;
 export type DraftLane = C.DraftLane;
 export type SavedReply = C.SavedReply;
+export type WhatsappTemplate = C.WhatsappTemplateView;
+export type WhatsappTemplateList = C.WhatsappTemplateList;
 export type CustomerContext = C.CustomerContext;
 export type ConversationTags = C.ConversationTags;
 export type ConversationFields = C.ConversationFields;
@@ -240,6 +242,21 @@ export const useSavedReplies = (id: string, q: string, enabled: boolean) =>
     enabled,
   );
 
+/** WhatsApp: the number's approved templates and whether free text can be sent now (D14). */
+export function useWhatsappTemplates(id: string, enabled: boolean) {
+  const { tenantId } = useTenant();
+  return useQuery({
+    queryKey: [tenantId, ...inboxKeys.part(id, 'whatsapp-templates')],
+    queryFn: ({ signal }) =>
+      api<WhatsappTemplateList>(`/v1/conversations/${encodeURIComponent(id)}/whatsapp-templates`, {
+        tenant: tenantId,
+        signal,
+      }),
+    meta: { studio: true },
+    enabled,
+  });
+}
+
 /**
  * A change to one conversation. It reloads the conversation, its list rows and the listed parts
  * afterwards, whether it worked or not (a refusal usually means the view was out of date).
@@ -300,12 +317,28 @@ export const setPriority = (
   body: { priority: TicketPriority | null; expectedEpoch?: number },
 ) => api<InboxDetail>(path(id, '/priority'), { method: 'POST', tenant: tenantId, body });
 
+/** A WhatsApp template's values: by variable (`1` or a name), and buttons by their position. */
+export interface TemplateValues {
+  header?: Record<string, string>;
+  body?: Record<string, string>;
+  buttons?: Record<string, string>;
+}
+
+/** A WhatsApp template to send instead of text; the server writes the text the customer reads. */
+export interface TemplateSend {
+  name: string;
+  language: string;
+  values: TemplateValues;
+}
+
 export interface SendInput {
   clientMessageId: string;
+  /** Ignored when sending a template. */
   text: string;
   lane: DraftLane;
   expectedEpoch?: number;
   suggestionId?: string;
+  template?: TemplateSend;
 }
 
 export const sendMessage = (tenantId: string, id: string, input: SendInput) =>
@@ -316,9 +349,10 @@ export const sendMessage = (tenantId: string, id: string, input: SendInput) =>
       tenant: tenantId,
       body: {
         clientMessageId: input.clientMessageId,
-        text: input.text,
+        ...(input.template ? { template: input.template } : { text: input.text }),
         visibility: input.lane,
-        clearDraft: true,
+        // A template leaves the reply being written where it is.
+        clearDraft: !input.template,
         ...(input.lane === 'public' && input.expectedEpoch !== undefined
           ? { expectedEpoch: input.expectedEpoch }
           : {}),

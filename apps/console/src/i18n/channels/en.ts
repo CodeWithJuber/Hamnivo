@@ -276,6 +276,55 @@ export const channelsEn = {
     closed:
       'WhatsApp only allows template messages now. You can reply again after the customer writes.',
   },
+  templates: {
+    button: 'Template',
+    open: 'Send a template',
+    title: 'Send a WhatsApp template',
+    description:
+      'After 24 hours without a message from the customer, WhatsApp delivers only templates Meta approved.',
+    loading: 'Loading templates',
+    search: 'Search templates',
+    category: {
+      UTILITY: 'Utility',
+      MARKETING: 'Marketing',
+      AUTHENTICATION: 'Authentication',
+      other: 'Other',
+    },
+    unsupported: {
+      not_approved: 'Waiting for Meta’s approval',
+      authentication: 'One-time codes are sent by your own systems',
+      media_header: 'Templates with a photo, video or document header can’t be sent from here yet',
+    },
+    synced: 'Templates last updated {{time}}.',
+    syncHint: 'New templates appear here after Chatwoot syncs them from Meta.',
+    empty: {
+      title: 'No approved templates yet',
+      description:
+        'Create one in Meta’s WhatsApp Manager. It appears here once Meta approves it and Chatwoot syncs it.',
+      guide: 'How template messages work',
+    },
+    noMatch: 'No template matches “{{query}}”.',
+    back: 'All templates',
+    fields: {
+      title: 'Fill in',
+      none: 'This template has nothing to fill in.',
+      header: 'Header {{variable}}',
+      body: 'Message {{variable}}',
+      button: 'Button “{{label}}”',
+      prefilled: 'Filled in from this conversation.',
+      code: 'The code, up to 15 characters.',
+      url: 'Added to the end of the button’s link.',
+    },
+    preview: 'Preview',
+    send: 'Send template',
+    missing_one: 'Fill in one more value to send.',
+    missing_other: 'Fill in {{count}} more values to send.',
+    errors: {
+      required: 'Fill this in.',
+      code: 'A code can have at most 15 characters.',
+    },
+    sent: 'Template sent.',
+  },
   chatwoot: {
     title: 'Chatwoot didn’t answer',
     description: 'Try again in a moment.',

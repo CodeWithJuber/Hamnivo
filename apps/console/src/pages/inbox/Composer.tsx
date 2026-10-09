@@ -14,6 +14,7 @@ import {
   BookmarkIcon,
   ClockIcon,
   CopyIcon,
+  FileTextIcon,
   GlobeIcon,
   LockIcon,
   type LucideIcon,
@@ -44,6 +45,7 @@ import {
   saveDraft,
   sendMessage,
   sendPresence,
+  type TemplateSend,
   useOnline,
   useSavedReplies,
 } from '../../lib/inbox';
@@ -51,6 +53,7 @@ import { withReauth } from '../../lib/reauth';
 import { useTenant } from '../../lib/tenant';
 import { ownership } from './ConversationPane';
 import { useMyStaffId } from './parts';
+import { TemplateDialog } from './TemplateDialog';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'local' | 'conflict';
 
@@ -420,28 +423,37 @@ function useReplyWindow(channel: InboxDetail['channel'], closesAt: string | null
 
 /**
  * Where a reply goes when it is not web chat (by email, on WhatsApp, on Telegram), and on WhatsApp
- * how long it can still be sent. Once the window has closed, a notice says why replies are off.
+ * how long it can still be sent. Once the window has closed, a notice says why replies are off
+ * and offers a template instead.
  */
 function ReplyChannelLine({
   channel,
   state,
   closed,
+  onTemplate,
 }: {
   channel: InboxDetail['channel'];
   state: ReplyWindow;
   closed: boolean;
+  onTemplate: () => void;
 }) {
   const { t } = useTranslation();
   if (closed) {
     return (
-      <p
-        id="composer-window-closed"
-        className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning-subtle p-2 text-sm text-text"
-        data-testid="reply-window-closed"
-      >
-        <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
-        <span>{t('channels.reply.closed')}</span>
-      </p>
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning-subtle p-2 text-sm text-text">
+        <p
+          id="composer-window-closed"
+          className="flex min-w-0 flex-1 basis-60 items-start gap-2"
+          data-testid="reply-window-closed"
+        >
+          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+          <span>{t('channels.reply.closed')}</span>
+        </p>
+        <Button size="sm" variant="secondary" onClick={onTemplate} data-testid="template-open">
+          <FileTextIcon aria-hidden="true" />
+          {t('channels.templates.open')}
+        </Button>
+      </div>
     );
   }
   if (!isReplyChannel(channel)) return null;
@@ -499,6 +511,7 @@ export function Composer({
   const [suggesting, setSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState<unknown>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [templates, setTemplates] = useState(false);
   const typing = useRef<{ at: number; timer?: ReturnType<typeof setTimeout> }>({ at: 0 });
   const replyRef = useRef<HTMLTextAreaElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
@@ -535,6 +548,8 @@ export function Composer({
         ? t('channels.reply.closed')
         : null;
   const noteBlocked = detail.permissions.note ? null : t('inbox.composer.noNote');
+  // WhatsApp takes an approved template at any time, inside the 24 hours or after them (D14).
+  const canTemplate = detail.channel === 'whatsapp' && detail.permissions.reply && !byOther;
 
   const markTyping = (current: DraftLane) => {
     const now = Date.now();
@@ -614,6 +629,24 @@ export function Composer({
       const at = start + text.length;
       target?.setSelectionRange(at, at);
     });
+  };
+
+  /** Sends a template from the dialog; the dialog shows what went wrong. */
+  const sendTemplate = async (template: TemplateSend, clientMessageId: string) => {
+    try {
+      await withReauth(() =>
+        sendMessage(tenantId, detail.id, {
+          clientMessageId,
+          text: '',
+          lane: 'public',
+          expectedEpoch: detail.ownershipEpoch,
+          template,
+        }),
+      );
+      announce(t('channels.templates.sent'));
+    } finally {
+      await refresh();
+    }
   };
 
   const suggest = async () => {
@@ -746,6 +779,17 @@ export function Composer({
                   }
                 }}
               />
+              {canTemplate ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setTemplates(true)}
+                  data-testid="template-button"
+                >
+                  <FileTextIcon aria-hidden="true" />
+                  {t('channels.templates.button')}
+                </Button>
+              ) : null}
               <Button
                 variant="ghost"
                 size="sm"
@@ -901,11 +945,24 @@ export function Composer({
           {hint ? ` ${hint}` : ''}
         </p>
         {lane === 'public' ? (
-          <ReplyChannelLine channel={detail.channel} state={replyState} closed={closedByWindow} />
+          <ReplyChannelLine
+            channel={detail.channel}
+            state={replyState}
+            closed={closedByWindow}
+            onTemplate={() => setTemplates(true)}
+          />
         ) : null}
         <TabsContent value="public">{editor('public')}</TabsContent>
         <TabsContent value="internal">{editor('internal')}</TabsContent>
       </Tabs>
+      {canTemplate ? (
+        <TemplateDialog
+          open={templates}
+          onOpenChange={setTemplates}
+          detail={detail}
+          onSend={sendTemplate}
+        />
+      ) : null}
     </div>
   );
 }

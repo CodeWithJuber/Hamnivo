@@ -42,8 +42,8 @@ Meta approved, such as an order update.
 1. Create the template in Meta's **WhatsApp Manager** (**Message templates**) and wait for Meta
    to approve it. Your chat engine fetches approved templates from Meta regularly; the picker
    shows when it last did.
-2. In the conversation, choose **Send a template**. The button is also next to **Saved replies**
-   while the window is open.
+2. In the conversation, choose **Send a template**. While the window is still open, use
+   **Template**, next to **Saved replies**.
 3. Pick the template, fill in every value it asks for (a name, an order number…), and check the
    preview. **Send** works once every value is filled in.
 
