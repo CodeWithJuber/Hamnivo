@@ -61,12 +61,32 @@ with a control row counted. Owners moving from tawk.to expect one inbox for ever
 - **Health comes from Chatwoot.** Discovery reads each channel's `reauthorization_required`; a
   channel Chatwoot can no longer sign in to shows "Needs attention" until a new password works.
 
+- **WhatsApp and Telegram connect the same way.** Chatwoot checks the WhatsApp Cloud token with
+  Meta and the bot token with Telegram, and keeps them. For WhatsApp, Studio shows the callback
+  URL on Chatwoot's public host (`CHATWOOT_PUBLIC_URL`) and Chatwoot's verify token for Meta's
+  webhook set-up.
+- **What a channel can carry is one table (W24).** `CHANNEL_CAPABILITIES` in the domain lists
+  cards, attachments, length and the reply window per channel. WhatsApp's 24-hour window refuses
+  staff replies (`CHANNEL_WINDOW_CLOSED`, nothing sent) and drops automation messages
+  (`window_closed`); the inbox shows when it closes. Cards already travel with their fallback
+  text, which is what email, WhatsApp and Telegram receive.
+
+- **Hamnivo's message key survives the channel.** Chatwoot's send jobs for WhatsApp, Telegram
+  and email replace a message's `source_id` (where Hamnivo writes its `hv1:` key) with the
+  provider's id once it is sent. Hamnivo therefore also writes the key into
+  `content_attributes.hv_key`, which Chatwoot keeps, and reads it from there when `source_id` no
+  longer holds it. A reply whose API answer was lost is then found by its key and never sent
+  twice.
+
 ## Consequences
 
 - Email, WhatsApp and Telegram conversations appear in the staff inbox, follow routing and
   automations, and can be answered by the AI where allowed.
-- The Chatwoot account is shared with what Chatwoot itself does on those inboxes. Owners
-  configure the channel in Chatwoot until Studio can connect it (next PRs).
+- The Chatwoot account is shared with what Chatwoot itself does on those inboxes. Studio
+  connects email, WhatsApp Cloud and Telegram; other Chatwoot channels are adopted when added in
+  Chatwoot.
+- WhatsApp template messages are not sent yet, so a conversation past its window waits for the
+  customer.
 - A conversation closed before Hamnivo first saw it is not adopted. It stays in Chatwoot's
   history.
 - Blocking (ADR 0012) covers web chat. Blocking a channel address comes later.

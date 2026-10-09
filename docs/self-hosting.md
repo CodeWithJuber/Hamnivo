@@ -1041,6 +1041,9 @@ curl -b jar -c jar -H 'origin: http://localhost:5173' -H 'content-type: applicat
 This needs `pnpm chatwoot:up` (it writes `CHATWOOT_URL` and `CHATWOOT_PLATFORM_TOKEN` to
 `.env.local`), plus `pnpm api` and `pnpm worker` running. `CHATWOOT_WEBHOOK_BASE_URL` (default
 `http://host.docker.internal:4000`) is how Chatwoot's webhooks reach the gateway.
+`CHATWOOT_PUBLIC_URL` is Chatwoot's public address, shown to owners as the WhatsApp callback URL
+for Meta (production sets it to `HAMNIVO_SUPPORT_ORIGIN`; it defaults to `CHATWOOT_URL`). Meta and
+Telegram must be able to reach it over HTTPS.
 
 1. Use the tenant ID (`tnt_…`) returned above. Find the workspace, then create a brand with the
    websites allowed to embed its chat:

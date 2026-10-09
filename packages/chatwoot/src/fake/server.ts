@@ -910,6 +910,30 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     }
   }
 
+  /**
+   * Chatwoot's send job for a channel (WhatsApp, Telegram, email) replaces the message's
+   * `source_id` with the provider's own id once it is sent, and says so in `message_updated`.
+   * Only `content_attributes` keep what the caller wrote.
+   */
+  function deliverOnChannel(conversation: Conversation, message: Message) {
+    const inbox = s.inboxes.get(conversation.inboxId);
+    if (
+      message.messageType !== 1 ||
+      message.private ||
+      !inbox ||
+      inbox.channel === 'Channel::Api'
+    ) {
+      return;
+    }
+    message.sourceId =
+      inbox.channel === 'Channel::Whatsapp'
+        ? `wamid.${token(16)}`
+        : inbox.channel === 'Channel::Telegram'
+          ? String(1000 + message.id)
+          : `<${token(8)}@mail.hv-fake.invalid>`;
+    emit(conversation.accountId, 'message_updated', messageWebhook(message), conversation);
+  }
+
   function removeConversation(conversation: Conversation) {
     for (const message of messagesOf(conversation)) s.messages.delete(message.id);
     s.conversations.delete(conversation.id);
@@ -1196,10 +1220,15 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
             if (typeof value === 'string' && value) providerConfig[key] = value;
           }
         }
-        // Chatwoot asks Meta whether the credentials work; the fake only checks they are there.
-        if (WHATSAPP_CLOUD_KEYS.some((key) => !providerConfig[key])) {
+        // Chatwoot asks Meta whether the credentials work; the fake refuses tokens starting with 'bad-token'.
+        if (
+          WHATSAPP_CLOUD_KEYS.some((key) => !providerConfig[key]) ||
+          String(providerConfig.api_key).startsWith('bad-token')
+        ) {
           throw invalid('Provider config Invalid Credentials', 'provider_config');
         }
+        // Like Chatwoot, the token Meta's webhook set-up must echo is made once and kept.
+        providerConfig.webhook_verify_token ??= token(16);
         config.provider_config = providerConfig;
         inbox.address = phone;
         break;
@@ -1207,6 +1236,9 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       case 'Channel::Telegram': {
         const botToken = given('bot_token') ? String(channel.bot_token).trim() : config.bot_token;
         if (!botToken) throw invalid('Bot token can’t be blank', 'bot_token');
+        // Chatwoot asks Telegram for the bot (getMe); the fake refuses tokens starting with 'bad-token'.
+        if (String(botToken).includes('bad-token'))
+          throw invalid('Bot token is invalid', 'bot_token');
         const reused = [...s.inboxes.values()].some(
           (other) => other.id !== inbox.id && other.channelConfig.bot_token === botToken,
         );
@@ -1292,8 +1324,16 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
         const settings = Object.keys(EMAIL_SETTINGS).map((key) => [key, inbox.channelConfig[key]]);
         return { ...json, email: inbox.address, ...Object.fromEntries(settings) };
       }
-      case 'Channel::Whatsapp':
-        return { ...json, phone_number: inbox.address, provider: inbox.channelConfig.provider };
+      case 'Channel::Whatsapp': {
+        // Administrators see the verify token for Meta's webhook set-up; never the access token.
+        const providerConfig = (inbox.channelConfig.provider_config ?? {}) as Json;
+        return {
+          ...json,
+          phone_number: inbox.address,
+          provider: inbox.channelConfig.provider,
+          provider_config: { webhook_verify_token: providerConfig.webhook_verify_token ?? null },
+        };
+      }
       case 'Channel::Telegram':
         return { ...json, bot_name: inbox.address };
     }
@@ -2177,7 +2217,10 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       const statusChanged = messageType === 0 && reopenForIncoming(conversation);
       emit(conversation.accountId, 'message_created', messageWebhook(message), conversation);
       touch(conversation, statusChanged ? ['status'] : [], statusChanged);
-      return messageApi(message);
+      // The answer is written before the channel sends it, so it still carries the caller's key.
+      const answer = messageApi(message);
+      deliverOnChannel(conversation, message);
+      return answer;
     },
   );
 

@@ -1,25 +1,18 @@
 import { Button } from '@hamnivo/ui/components/button';
-import { Field, FieldDescription, FieldError, FieldLabel } from '@hamnivo/ui/components/field';
-import { Input } from '@hamnivo/ui/components/input';
-import { Label } from '@hamnivo/ui/components/label';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
-import { Switch } from '@hamnivo/ui/components/switch';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
-  EyeIcon,
-  EyeOffIcon,
   KeyRoundIcon,
   SearchIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppDialog, DialogFooter } from '../../components/AppDialog';
-import { CheckboxField, describedBy, SelectField, TextField } from '../../components/Fields';
+import { DialogFooter } from '../../components/AppDialog';
+import { CheckboxField, SelectField, TextField } from '../../components/Fields';
 import { GuideLink } from '../../components/GuideLink';
 import { QueryState } from '../../components/States';
-import { isApiError } from '../../lib/api';
 import {
   applyProvider,
   type ChannelInbox,
@@ -47,14 +40,20 @@ import {
 import { DOCS } from '../../lib/docs';
 import { isCancelled } from '../../lib/reauth';
 import type { Team } from '../../lib/types';
-import { DiscardChangesDialog, LeaveGuard } from '../settings/DiscardChangesDialog';
+import {
+  fieldId,
+  GuardedDialog,
+  machineText,
+  PasswordField,
+  StepHeading,
+  SwitchRow,
+  serverErrors,
+  useFocusLater,
+} from './ChannelForm';
 import { ChannelProblem, SavedNote } from './ChannelNotes';
 
 type Errors = Record<string, string>;
 type Patch = (path: string, value: string | boolean) => void;
-
-/** The id of a field's control, from the gateway's name for the field (`imap.password`…). */
-const fieldId = (prefix: string, path: string) => `${prefix}-${path.replace('.', '-')}`;
 
 /** Our own message for a field that fails the check before anything is sent. */
 function useFieldMessage() {
@@ -70,82 +69,6 @@ function useFieldMessage() {
       : t('channels.email.errors.password');
   };
 }
-
-/** The gateway's field messages (Chatwoot refused the mailbox), by field. */
-const serverErrors = (error: unknown): { path: string; message: string }[] =>
-  isApiError(error, 'VALIDATION_FAILED') ? error.fields : [];
-
-/**
- * A password, hidden unless shown. It reads left to right in every language and is never filled
- * by the browser from what it saved.
- */
-function PasswordField({
-  id,
-  label,
-  value,
-  onChange,
-  error,
-  hint,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  error?: string | undefined;
-  hint?: ReactNode;
-}) {
-  const { t } = useTranslation();
-  const [visible, setVisible] = useState(false);
-  return (
-    <Field data-invalid={error ? true : undefined} className="gap-2">
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <div className="flex gap-2">
-        <Input
-          id={id}
-          type={visible ? 'text' : 'password'}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          autoComplete="new-password"
-          spellCheck={false}
-          data-1p-ignore
-          data-lpignore="true"
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(id, hint, error)}
-          className="flex-1"
-          dir="ltr"
-          maxLength={500}
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          size="icon"
-          aria-label={t('channels.email.fields.show', { field: label })}
-          aria-pressed={visible}
-          aria-controls={id}
-          title={
-            visible
-              ? t('channels.email.fields.hide', { field: label })
-              : t('channels.email.fields.show', { field: label })
-          }
-          onClick={() => setVisible((shown) => !shown)}
-        >
-          {visible ? <EyeOffIcon aria-hidden="true" /> : <EyeIcon aria-hidden="true" />}
-        </Button>
-      </div>
-      {hint ? <FieldDescription id={`${id}-hint`}>{hint}</FieldDescription> : null}
-      {error ? <FieldError id={`${id}-error`}>{error}</FieldError> : null}
-    </Field>
-  );
-}
-
-/** A host name, port or login: typed left to right, never corrected or capitalised. */
-const machineText = {
-  dir: 'ltr',
-  spellCheck: false,
-  autoCapitalize: 'none',
-  autoCorrect: 'off',
-  autoComplete: 'off',
-} as const;
 
 /** "Use an app password", with where to make one, for providers that ask for it. */
 function AppPasswordNote({ provider }: { provider: EmailProvider | undefined }) {
@@ -183,38 +106,6 @@ function MicrosoftNote() {
           {t('channels.email.microsoft.text')}
         </p>
       </div>
-    </div>
-  );
-}
-
-/** A switch with its label and hint on one bordered row (as on the channel card). */
-function SwitchRow({
-  id,
-  label,
-  hint,
-  checked,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  hint: string;
-  checked: boolean;
-  onChange: (on: boolean) => void;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
-      <div className="flex min-w-0 flex-col gap-1">
-        <Label htmlFor={id}>{label}</Label>
-        <p id={`${id}-hint`} className="text-sm text-text-secondary">
-          {hint}
-        </p>
-      </div>
-      <Switch
-        id={id}
-        checked={checked}
-        aria-describedby={`${id}-hint`}
-        onCheckedChange={onChange}
-      />
     </div>
   );
 }
@@ -340,44 +231,6 @@ function SmtpServerFields({
       />
     </>
   );
-}
-
-/** The step's place and title; it takes focus when the step changes, for screen readers. */
-function StepHeading({ step, title, intro }: { step: EmailStep; title: string; intro: string }) {
-  const { t } = useTranslation();
-  const ref = useRef<HTMLHeadingElement>(null);
-  const first = useRef(true);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: focus moves when the step changes
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    ref.current?.focus();
-  }, [step]);
-  return (
-    <div className="flex flex-col gap-1">
-      <p className="text-sm text-text-secondary" data-testid="email-step">
-        {t('channels.email.connect.step', { step, total: EMAIL_STEPS.length })}
-      </p>
-      <h3 ref={ref} tabIndex={-1} className="text-md font-semibold text-text outline-none">
-        {title}
-      </h3>
-      <p className="text-sm text-text-secondary">{intro}</p>
-    </div>
-  );
-}
-
-/** Focuses a field once it is on screen (after a step change it is rendered first). */
-function useFocusLater(): (id: string) => void {
-  const [target, setTarget] = useState<{ id: string } | null>(null);
-  useEffect(() => {
-    if (!target) return;
-    const element = document.getElementById(target.id);
-    element?.focus();
-    setTarget(null);
-  }, [target]);
-  return (id: string) => setTarget({ id });
 }
 
 const STEP_KEYS = { 1: 'address', 2: 'imap', 3: 'smtp', 4: 'answering' } as const;
@@ -535,6 +388,7 @@ function ConnectEmailForm({
     >
       <StepHeading
         step={step}
+        total={EMAIL_STEPS.length}
         title={t(`channels.email.connect.steps.${stepKey}`)}
         intro={t(`channels.email.connect.intros.${stepKey}`)}
       />
@@ -716,67 +570,6 @@ function ConnectEmailForm({
         )}
       </DialogFooter>
     </form>
-  );
-}
-
-/**
- * A dialog whose content asks before closing with input that is not saved. The content says
- * whether it has any (and whether it is busy, when it cannot be closed); leaving the page asks too.
- */
-function GuardedDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  testId,
-  fallbackFocus,
-  children,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: ReactNode;
-  description?: ReactNode;
-  testId: string;
-  fallbackFocus?: () => HTMLElement | null;
-  children: (guard: {
-    onDirtyChange: (dirty: boolean) => void;
-    onBusyChange: (busy: boolean) => void;
-    /** Closes now (after a save). */
-    close: () => void;
-    /** Closes, asking first when there is input that is not saved. */
-    requestClose: () => void;
-  }) => ReactNode;
-}) {
-  const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const close = () => {
-    setDirty(false);
-    setBusy(false);
-    setAsking(false);
-    onOpenChange(false);
-  };
-  const requestClose = () => {
-    if (busy) return;
-    if (dirty) setAsking(true);
-    else close();
-  };
-  return (
-    <>
-      <AppDialog
-        open={open}
-        onOpenChange={(next) => (next ? onOpenChange(true) : requestClose())}
-        title={title}
-        {...(description ? { description } : {})}
-        testId={testId}
-        className="sm:max-w-xl"
-        {...(fallbackFocus ? { fallbackFocus } : {})}
-      >
-        {children({ onDirtyChange: setDirty, onBusyChange: setBusy, close, requestClose })}
-      </AppDialog>
-      <DiscardChangesDialog open={asking} onKeep={() => setAsking(false)} onDiscard={close} />
-      <LeaveGuard dirty={open && dirty} />
-    </>
   );
 }
 

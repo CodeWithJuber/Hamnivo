@@ -39,6 +39,7 @@ export const ErrorCode = z.enum([
   'CAPABILITY_UNSUPPORTED',
   'SEPARATE_APPROVER_REQUIRED',
   'DELETE_WINDOW_CLOSED',
+  'CHANNEL_WINDOW_CLOSED',
   'INTERNAL',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
@@ -116,6 +117,11 @@ export const ERROR_DEFAULTS: Record<
     status: 409,
     retryable: false,
     title: 'This message can no longer be deleted',
+  },
+  CHANNEL_WINDOW_CLOSED: {
+    status: 409,
+    retryable: false,
+    title: 'This channel only allows template messages now',
   },
   INTERNAL: { status: 500, retryable: true, title: 'Something went wrong on our side' },
 };

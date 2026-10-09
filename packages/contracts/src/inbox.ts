@@ -25,7 +25,7 @@ export const InboxStatusFilter = z.enum(['active', 'snoozed', 'resolved', 'all']
 export const AuthorityStatus = z.enum(['open', 'pending', 'resolved', 'snoozed']);
 
 /** Where a conversation came in. */
-export const InboxChannel = z.enum(['chat', 'email', 'whatsapp', 'sms', 'other']);
+export const InboxChannel = z.enum(['chat', 'email', 'whatsapp', 'telegram', 'sms', 'other']);
 
 /** Why the conversation has its current owner (the latest ownership change). */
 export const OwnerReason = z.enum([
@@ -123,6 +123,11 @@ export const InboxConversation = z
     priority: TicketPriority.nullable(),
     /** When the customer last wrote while nobody has answered yet (waiting for a person). */
     waitingSince: Timestamp.nullable(),
+    /**
+     * WhatsApp: when free text can no longer be sent (24 hours after the customer last wrote);
+     * null on channels without such a window (W24).
+     */
+    replyWindowClosesAt: Timestamp.nullable(),
     /**
      * Customer messages this person has not read yet, from the read marker the server keeps for
      * them. Only chats that are theirs or waiting for a person count; every other chat shows 0.

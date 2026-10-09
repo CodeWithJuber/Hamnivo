@@ -78,7 +78,7 @@ export const channelsAr: ChannelsTranslation = {
   empty: {
     title: 'لا توجد قنوات بريد إلكتروني أو واتساب أو تيليجرام بعد.',
     description:
-      'اربط بريد الدعم الخاص بك من هنا. أما واتساب وتيليجرام فأضف القناة في Chatwoot (الإعدادات ← صناديق الوارد)، ثم ابحث هنا مرة أخرى.',
+      'اربط من هنا بريد الدعم أو رقم واتساب للأعمال أو بوت تيليجرام. أما القنوات التي تضيفها في Chatwoot فتظهر عند البحث عن قنوات جديدة.',
   },
   check: {
     action: 'البحث عن قنوات جديدة',
@@ -190,6 +190,101 @@ export const channelsAr: ChannelsTranslation = {
       label: 'إصلاح تسجيل الدخول لـ {{name}}',
       hint: 'لا يستطيع Chatwoot تسجيل الدخول إلى صندوق البريد هذا، وغالبًا ما يحدث ذلك بعد تغيير كلمة المرور. أدخل كلمة المرور الجديدة.',
     },
+  },
+  whatsapp: {
+    connect: {
+      action: 'ربط واتساب',
+      title: 'ربط واتساب',
+      steps: {
+        number: 'رقمك',
+        answering: 'الردّ',
+        webhook: 'إعداد Webhook لدى Meta',
+      },
+      intros: {
+        number: 'رقم واتساب للأعمال الخاص بك على Cloud API من Meta.',
+        answering: 'اختر من يردّ على رسائل واتساب هنا. يمكنك تغيير ذلك لاحقًا من بطاقة القناة.',
+        webhook: 'الخطوة الأخيرة: أخبر Meta إلى أين ترسل رسائل عملائك.',
+      },
+      guide: 'كيف تربط واتساب',
+      submit: 'ربط',
+      busy: 'جارٍ التحقق مع Meta…',
+      busyHint: 'يتحقق Chatwoot من رمز الوصول لدى Meta قبل ربط الرقم. قد يستغرق ذلك لحظات.',
+      connected: 'رُبط رقم واتساب. أكمل الآن إعداد Webhook لدى Meta.',
+      done: 'رُبط واتساب. ستصل الرسائل إلى صندوق الوارد بعد إعداد Webhook لدى Meta.',
+    },
+    fields: {
+      nameDefault: 'واتساب',
+      phoneNumber: 'رقم هاتف النشاط التجاري',
+      phoneNumberHint: 'مع علامة + ورمز الدولة، مثل ‎+971 50 123 4567.',
+      phoneNumberId: 'معرّف رقم الهاتف (Phone number ID)',
+      businessAccountId: 'معرّف حساب واتساب للأعمال (WhatsApp Business Account ID)',
+      accessToken: 'رمز الوصول',
+      accessTokenHint: 'يُرسَل مباشرة إلى Chatwoot، ولا يحتفظ به Studio.',
+    },
+    help: {
+      title: 'أين تجد هذه البيانات',
+      text: 'تجدها لدى Meta في WhatsApp Manager → API setup. استخدم رمز وصول دائمًا صادرًا لمستخدم نظام (System user).',
+      link: 'دليل Cloud API من Meta',
+    },
+    errors: {
+      phoneNumber: 'أدخل الرقم مع علامة + ورمز الدولة، مثل ‎+971501234567.',
+      phoneNumberId: 'أدخل معرّف رقم الهاتف. يتكوّن من أرقام فقط.',
+      businessAccountId: 'أدخل معرّف حساب واتساب للأعمال. يتكوّن من أرقام فقط.',
+      accessToken: 'أدخل رمز الوصول. طوله 20 حرفًا على الأقل.',
+    },
+    setup: {
+      action: 'إعداد Meta',
+      label: 'إعداد Meta لـ {{name}}',
+      title: 'إعداد Webhook لدى Meta',
+      loading: 'جارٍ تحميل إعداد Meta',
+      instructions:
+        'في Meta افتح App Dashboard → WhatsApp → Configuration → Webhook، والصق هاتين القيمتين، ثم اختر «Verify and save»، واشترك بعد ذلك في حقل messages.',
+      callbackUrl: 'عنوان الاستدعاء (Callback URL)',
+      verifyToken: 'رمز التحقق (Verify token)',
+      copy: 'نسخ',
+      copyLabel: 'نسخ {{field}}',
+      noToken: 'لم يُنشئ Chatwoot رمز التحقق بعد. افتح إعداد Meta مرة أخرى بعد قليل.',
+      done: 'تم',
+    },
+  },
+  telegram: {
+    connect: {
+      action: 'ربط تيليجرام',
+      title: 'ربط تيليجرام',
+      intro:
+        'اربط بوت تيليجرام الخاص بك. تصل الرسائل التي يرسلها الناس إلى البوت إلى صندوق الوارد.',
+      guide: 'كيف تربط تيليجرام',
+      submit: 'ربط',
+      busy: 'جارٍ التحقق مع تيليجرام…',
+      done: 'رُبط تيليجرام باسم {{bot}}. ستظهر الرسائل الجديدة في صندوق الوارد.',
+      doneUnnamed: 'رُبط تيليجرام. ستظهر الرسائل الجديدة في صندوق الوارد.',
+    },
+    fields: {
+      nameDefault: 'تيليجرام',
+      botToken: 'رمز البوت',
+      botTokenHint: 'يُرسَل مباشرة إلى Chatwoot، ولا يحتفظ به Studio.',
+    },
+    help: {
+      title: 'احصل على رمز البوت',
+      text: 'راسل ‎@BotFather على تيليجرام، وأرسل ‎/newbot، ثم انسخ الرمز الذي يعطيك إياه.',
+      link: 'دليل تيليجرام إلى BotFather',
+    },
+    errors: {
+      botToken: 'أدخل الرمز الذي أعطاك إياه ‎@BotFather. يبدو مثل ‎123456789:AAH…‎ دون مسافات.',
+    },
+  },
+  reply: {
+    email: 'يُرسَل ردّك بالبريد الإلكتروني.',
+    whatsapp: 'يُرسَل ردّك عبر واتساب.',
+    telegram: 'يُرسَل ردّك عبر تيليجرام.',
+    // Arabic counts: one minute in words; 3–10 take دقائق, the rest دقيقة after the digits.
+    minutesLeft_zero: 'يمكنك الردّ لمدة {{count}} دقيقة أخرى.',
+    minutesLeft_one: 'يمكنك الردّ لمدة دقيقة واحدة أخرى.',
+    minutesLeft_two: 'يمكنك الردّ لمدة {{count}} دقيقة أخرى.',
+    minutesLeft_few: 'يمكنك الردّ لمدة {{count}} دقائق أخرى.',
+    minutesLeft_many: 'يمكنك الردّ لمدة {{count}} دقيقة أخرى.',
+    minutesLeft_other: 'يمكنك الردّ لمدة {{count}} دقيقة أخرى.',
+    closed: 'لا يسمح واتساب الآن إلا برسائل القوالب. يمكنك الردّ مجددًا بعد أن يكتب العميل.',
   },
   chatwoot: {
     title: 'لم يستجب Chatwoot',

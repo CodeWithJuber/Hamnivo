@@ -24,6 +24,7 @@ type ErrorKey =
   | 'tooLarge'
   | 'rejected'
   | 'disabled'
+  | 'channelWindow'
   | 'internal'
   | 'unknown';
 
@@ -59,6 +60,8 @@ function keyOf(error: ApiError): ErrorKey {
       return 'rejected';
     case 'FEATURE_DISABLED':
       return 'disabled';
+    case 'CHANNEL_WINDOW_CLOSED':
+      return 'channelWindow';
     case 'INTERNAL':
       return 'internal';
     default:

@@ -12,17 +12,23 @@ import { cn } from '@hamnivo/ui/lib/utils';
 import { type UseQueryResult, useQueryClient } from '@tanstack/react-query';
 import {
   BookmarkIcon,
+  ClockIcon,
   CopyIcon,
   GlobeIcon,
   LockIcon,
+  type LucideIcon,
+  MailIcon,
+  MessageSquareIcon,
   SendIcon,
   SparklesIcon,
+  TriangleAlertIcon,
   XIcon,
 } from 'lucide-react';
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActionError } from '../../components/States';
 import { api, isApiError } from '../../lib/api';
+import { type ReplyWindow, replyWindow } from '../../lib/channels';
 import {
   type CopilotSuggestion,
   type DraftLane,
@@ -338,7 +344,9 @@ function OutgoingItem({
       ? t('inbox.outgoing.ownership')
       : item.errorCode === 'AUTHORITY_UNAVAILABLE'
         ? t('inbox.outgoing.unavailable')
-        : t('inbox.outgoing.other');
+        : item.errorCode === 'CHANNEL_WINDOW_CLOSED'
+          ? t('channels.reply.closed')
+          : t('inbox.outgoing.other');
   return (
     <li
       className="flex flex-col gap-2 rounded-lg border border-danger/30 bg-danger-subtle p-3"
@@ -382,6 +390,81 @@ function OutgoingItem({
         </Button>
       </div>
     </li>
+  );
+}
+
+type ReplyChannel = 'email' | 'whatsapp' | 'telegram';
+const REPLY_CHANNEL_ICONS: Record<ReplyChannel, LucideIcon> = {
+  email: MailIcon,
+  whatsapp: MessageSquareIcon,
+  telegram: SendIcon,
+};
+const isReplyChannel = (channel: string): channel is ReplyChannel => channel in REPLY_CHANNEL_ICONS;
+
+/**
+ * WhatsApp's reply window (W24) as it stands now, read again every half minute while it is open,
+ * so "N minutes" counts down and the composer closes when the window does.
+ */
+function useReplyWindow(channel: InboxDetail['channel'], closesAt: string | null): ReplyWindow {
+  const [now, setNow] = useState(() => Date.now());
+  const watched = channel === 'whatsapp' && Boolean(closesAt);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new closing time restarts the clock
+  useEffect(() => {
+    if (!watched) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [watched, closesAt]);
+  return watched ? replyWindow(closesAt, now) : { state: 'open' };
+}
+
+/**
+ * Where a reply goes when it is not web chat (by email, on WhatsApp, on Telegram), and on WhatsApp
+ * how long it can still be sent. Once the window has closed, a notice says why replies are off.
+ */
+function ReplyChannelLine({
+  channel,
+  state,
+  closed,
+}: {
+  channel: InboxDetail['channel'];
+  state: ReplyWindow;
+  closed: boolean;
+}) {
+  const { t } = useTranslation();
+  if (closed) {
+    return (
+      <p
+        id="composer-window-closed"
+        className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning-subtle p-2 text-sm text-text"
+        data-testid="reply-window-closed"
+      >
+        <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+        <span>{t('channels.reply.closed')}</span>
+      </p>
+    );
+  }
+  if (!isReplyChannel(channel)) return null;
+  const Icon = REPLY_CHANNEL_ICONS[channel];
+  return (
+    <p
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary"
+      data-testid="reply-channel"
+    >
+      <span className="inline-flex items-center gap-1">
+        <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+        {t(`channels.reply.${channel}`)}
+      </span>
+      {state.state === 'closing' ? (
+        <span
+          className="inline-flex items-center gap-1 font-medium text-text"
+          data-testid="reply-window-left"
+        >
+          <ClockIcon className="size-3.5 shrink-0" aria-hidden="true" />
+          {t('channels.reply.minutesLeft', { count: state.minutes })}
+        </span>
+      ) : null}
+    </p>
   );
 }
 
@@ -431,6 +514,16 @@ export function Composer({
       client.invalidateQueries({ queryKey: [tenantId, ...inboxKeys.lists] }),
     ]);
 
+  // WhatsApp takes free text for 24 hours after the customer last wrote. The gateway decides; a
+  // refusal it sends (the window closed while this was open) closes the composer here too.
+  const closesAt = detail.replyWindowClosesAt ?? null;
+  const replyState = useReplyWindow(detail.channel, closesAt);
+  // The window the gateway refused a reply in; a new one (the customer wrote) opens it again.
+  const [refusedIn, setRefusedIn] = useState<{ closesAt: string | null } | null>(null);
+  const refused = refusedIn !== null && refusedIn.closesAt === closesAt;
+  const windowClosed = detail.channel === 'whatsapp' && (refused || replyState.state === 'closed');
+  const closedByWindow = windowClosed && detail.permissions.reply && !byOther;
+
   const replyBlocked = !detail.permissions.reply
     ? t('inbox.composer.noReply')
     : byOther
@@ -438,7 +531,9 @@ export function Composer({
           name:
             detail.owner.kind === 'staff' ? detail.owner.displayName : t('inbox.owner.external'),
         })
-      : null;
+      : windowClosed
+        ? t('channels.reply.closed')
+        : null;
   const noteBlocked = detail.permissions.note ? null : t('inbox.composer.noNote');
 
   const markTyping = (current: DraftLane) => {
@@ -465,8 +560,14 @@ export function Composer({
         input.lane === 'internal' ? t('inbox.composer.noteAdded') : t('inbox.composer.sent'),
       );
     } catch (caught) {
-      setError(caught);
-      announce(t('inbox.composer.notSent'), 'assertive');
+      if (isApiError(caught, 'CHANNEL_WINDOW_CLOSED')) {
+        // Nothing was sent; the text stays in the draft. Say why instead of a generic error.
+        setRefusedIn({ closesAt });
+        announce(t('channels.reply.closed'), 'assertive');
+      } else {
+        setError(caught);
+        announce(t('inbox.composer.notSent'), 'assertive');
+      }
     } finally {
       setSending(null);
       await refresh();
@@ -585,6 +686,8 @@ export function Composer({
     const value = current === 'public' ? reply : note;
     const blocked = current === 'public' ? replyBlocked : noteBlocked;
     const id = `composer-${current}`;
+    // The notice above says it already; the field points to it.
+    const byWindow = current === 'public' && closedByWindow;
     return (
       <LaneSurface
         lane={current === 'public' ? 'public' : 'internal'}
@@ -609,7 +712,7 @@ export function Composer({
               ? t('inbox.composer.replyPlaceholder', { name: detail.customer.displayName })
               : t('inbox.composer.notePlaceholder')
           }
-          aria-describedby={`${id}-hint`}
+          aria-describedby={byWindow ? `${id}-hint composer-window-closed` : `${id}-hint`}
           readOnly={Boolean(blocked)}
           dir={value.text ? 'auto' : undefined}
           rows={3}
@@ -632,7 +735,7 @@ export function Composer({
           </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
-          {current === 'public' && detail.permissions.reply ? (
+          {current === 'public' && detail.permissions.reply && !windowClosed ? (
             <>
               <SavedReplies
                 detail={detail}
@@ -659,7 +762,7 @@ export function Composer({
             id={`${id}-hint`}
             className="ms-auto flex flex-wrap items-center gap-2 text-xs text-text-secondary"
           >
-            {blocked ? (
+            {byWindow ? null : blocked ? (
               <span className="text-text">{blocked}</span>
             ) : (
               <>
@@ -797,6 +900,9 @@ export function Composer({
             : t('inbox.lanes.publicDescription')}
           {hint ? ` ${hint}` : ''}
         </p>
+        {lane === 'public' ? (
+          <ReplyChannelLine channel={detail.channel} state={replyState} closed={closedByWindow} />
+        ) : null}
         <TabsContent value="public">{editor('public')}</TabsContent>
         <TabsContent value="internal">{editor('internal')}</TabsContent>
       </Tabs>

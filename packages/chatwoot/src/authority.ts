@@ -298,7 +298,8 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
       message_type: input.author.kind === 'customer' ? 'incoming' : 'outgoing',
       private: input.visibility === 'private',
       source_id: input.key,
-      ...(input.contentAttributes ? { content_attributes: input.contentAttributes } : {}),
+      // Kept by Chatwoot when a channel replaces source_id with the provider's id.
+      content_attributes: { ...(input.contentAttributes ?? {}), hv_key: input.key },
       ...(input.author.kind === 'bot'
         ? { sender_type: 'AgentBot', sender_id: Number(input.author.botRef) }
         : {}),

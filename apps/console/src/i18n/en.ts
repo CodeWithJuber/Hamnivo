@@ -113,6 +113,11 @@ export const en = {
       description: 'For your safety, this needs a recent sign-in.',
       action: 'Sign in again',
     },
+    channelWindow: {
+      title: 'Only template messages can be sent now',
+      description:
+        'WhatsApp allows replies for 24 hours after the customer last wrote. Nothing was sent. You can reply again after the customer writes.',
+    },
     unknown: { title: 'Something went wrong', description: 'Try again.' },
     page: {
       title: 'This page couldn’t load',
@@ -1070,6 +1075,7 @@ export const en = {
       chat: 'Website chat',
       email: 'Email',
       whatsapp: 'WhatsApp',
+      telegram: 'Telegram',
       sms: 'SMS',
       other: 'Other channel',
     },

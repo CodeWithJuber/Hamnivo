@@ -13,12 +13,14 @@ import {
   GlobeIcon,
   HandIcon,
   HourglassIcon,
+  type LucideIcon,
   MailIcon,
   MessageCircleIcon,
   MessageSquareIcon,
   MoonIcon,
   PauseIcon,
   PhoneIcon,
+  SendIcon,
   TicketIcon,
   UserRoundIcon,
 } from 'lucide-react';
@@ -255,13 +257,14 @@ export function IdentityBadge({ identity }: { identity: 'verified' | 'anonymous'
   );
 }
 
-const CHANNEL_ICONS = {
+const CHANNEL_ICONS: Record<InboxConversation['channel'], LucideIcon> = {
   chat: MessageCircleIcon,
   email: MailIcon,
   whatsapp: MessageSquareIcon,
+  telegram: SendIcon,
   sms: PhoneIcon,
   other: GlobeIcon,
-} as const;
+};
 
 /** Channel as an icon with its name for assistive technology (and a tooltip-free text fallback). */
 export function ChannelIcon({ channel }: { channel: InboxConversation['channel'] }) {

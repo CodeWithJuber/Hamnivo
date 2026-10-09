@@ -74,7 +74,7 @@ export const channelsEn = {
   empty: {
     title: 'No email, WhatsApp or Telegram channels yet.',
     description:
-      'Connect your support email here. For WhatsApp or Telegram, add the channel in Chatwoot (Settings → Inboxes), then check again here.',
+      'Connect your support email, a WhatsApp Business number or a Telegram bot here. Channels added in Chatwoot appear when you check for new channels.',
   },
   check: {
     action: 'Check for new channels',
@@ -183,6 +183,98 @@ export const channelsEn = {
       label: 'Fix sign-in for {{name}}',
       hint: 'Chatwoot can’t sign in to this mailbox. This usually happens after a password change. Enter the new password.',
     },
+  },
+  whatsapp: {
+    connect: {
+      action: 'Connect WhatsApp',
+      title: 'Connect WhatsApp',
+      steps: {
+        number: 'Your number',
+        answering: 'Answering',
+        webhook: 'Set up Meta’s webhook',
+      },
+      intros: {
+        number: 'Your WhatsApp Business number on Meta’s Cloud API.',
+        answering:
+          'Choose who answers WhatsApp messages here. You can change this later on the card.',
+        webhook: 'Last step: tell Meta where to send your customers’ messages.',
+      },
+      guide: 'How to connect WhatsApp',
+      submit: 'Connect',
+      busy: 'Checking with Meta…',
+      busyHint:
+        'Chatwoot checks your access token with Meta before it connects the number. This can take a moment.',
+      connected: 'Your WhatsApp number is connected. Now set up Meta’s webhook.',
+      done: 'WhatsApp connected. Messages arrive in your inbox once Meta’s webhook is set up.',
+    },
+    fields: {
+      nameDefault: 'WhatsApp',
+      phoneNumber: 'Business phone number',
+      phoneNumberHint: 'With + and the country code, for example +971 50 123 4567.',
+      phoneNumberId: 'Phone number ID',
+      businessAccountId: 'WhatsApp Business Account ID',
+      accessToken: 'Access token',
+      accessTokenHint: 'It goes straight to Chatwoot. Studio doesn’t keep it.',
+    },
+    help: {
+      title: 'Where to find these',
+      text: 'Find these in Meta’s WhatsApp Manager → API setup. Use a permanent access token from a system user.',
+      link: 'Meta’s Cloud API guide',
+    },
+    errors: {
+      phoneNumber: 'Enter the number with + and the country code, like +971501234567.',
+      phoneNumberId: 'Enter the Phone number ID. It has digits only.',
+      businessAccountId: 'Enter the WhatsApp Business Account ID. It has digits only.',
+      accessToken: 'Enter the access token. It is at least 20 characters long.',
+    },
+    setup: {
+      action: 'Meta set-up',
+      label: 'Meta set-up for {{name}}',
+      title: 'Set up Meta’s webhook',
+      loading: 'Loading Meta’s set-up',
+      instructions:
+        'In Meta’s App Dashboard → WhatsApp → Configuration → Webhook, paste these, choose Verify and save, then subscribe to messages.',
+      callbackUrl: 'Callback URL',
+      verifyToken: 'Verify token',
+      copy: 'Copy',
+      copyLabel: 'Copy {{field}}',
+      noToken: 'Chatwoot hasn’t made a verify token yet. Open Meta set-up again in a moment.',
+      done: 'Done',
+    },
+  },
+  telegram: {
+    connect: {
+      action: 'Connect Telegram',
+      title: 'Connect Telegram',
+      intro: 'Connect your Telegram bot. Messages people send to the bot arrive in your inbox.',
+      guide: 'How to connect Telegram',
+      submit: 'Connect',
+      busy: 'Checking with Telegram…',
+      done: 'Telegram connected as {{bot}}. New messages will appear in your inbox.',
+      doneUnnamed: 'Telegram connected. New messages will appear in your inbox.',
+    },
+    fields: {
+      nameDefault: 'Telegram',
+      botToken: 'Bot token',
+      botTokenHint: 'It goes straight to Chatwoot. Studio doesn’t keep it.',
+    },
+    help: {
+      title: 'Get a bot token',
+      text: 'Message @BotFather on Telegram, send /newbot and copy the token it gives you.',
+      link: 'Telegram’s guide to BotFather',
+    },
+    errors: {
+      botToken: 'Enter the token from @BotFather. It looks like 123456789:AAH… with no spaces.',
+    },
+  },
+  reply: {
+    email: 'Your reply is sent by email.',
+    whatsapp: 'Your reply is sent on WhatsApp.',
+    telegram: 'Your reply is sent on Telegram.',
+    minutesLeft_one: 'You can reply for another minute.',
+    minutesLeft_other: 'You can reply for another {{count}} minutes.',
+    closed:
+      'WhatsApp only allows template messages now. You can reply again after the customer writes.',
   },
   chatwoot: {
     title: 'Chatwoot didn’t answer',

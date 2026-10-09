@@ -7,6 +7,9 @@ import { type FakeChatwoot, startFakeChatwoot } from '../src/fake/index.js';
 import {
   addInboxMembers,
   createEmailInbox,
+  createTelegramInbox,
+  createWhatsappInbox,
+  getWhatsappSetup,
   listInboxes,
   provisionAccount,
   provisionStaffUser,
@@ -586,6 +589,70 @@ describe('fake Chatwoot channel inboxes', () => {
     expect((await listInboxes(options)).find((i) => i.id === made.id)).toMatchObject({
       needsReauthorization: false,
     });
+  });
+
+  it("connects WhatsApp Cloud and Telegram, and gives Meta's set-up without the access token", async () => {
+    const { options } = await channelSetup();
+    const whatsapp = {
+      name: 'Shop WhatsApp',
+      phoneNumber: '+971501234567',
+      phoneNumberId: '1098765',
+      businessAccountId: '2234567',
+      accessToken: 'EAAG-secret',
+    };
+    expect(
+      await createWhatsappInbox(options, { ...whatsapp, accessToken: 'bad-token' }).catch((e) => e),
+    ).toMatchObject({ status: 422, body: { attributes: ['provider_config'] } });
+    const wa = await createWhatsappInbox(options, whatsapp);
+    expect(wa).toMatchObject({ channelType: 'Channel::Whatsapp', address: '+971501234567' });
+    const setup = await getWhatsappSetup({
+      ...options,
+      inboxId: wa.id,
+      publicUrl: 'https://support.shop.example/',
+    });
+    expect(setup).toEqual({
+      callbackUrl: 'https://support.shop.example/webhooks/whatsapp/+971501234567',
+      verifyToken: expect.stringMatching(/^\S{8,}$/),
+    });
+    expect(JSON.stringify(setup)).not.toContain('EAAG-secret');
+    // The token stays the same once made.
+    expect(
+      (await getWhatsappSetup({ ...options, inboxId: wa.id, publicUrl: 'https://x.example' }))
+        .verifyToken,
+    ).toBe(setup.verifyToken);
+
+    expect(
+      await createTelegramInbox(options, { name: 'Bot', botToken: 'bad-token' }).catch((e) => e),
+    ).toMatchObject({ status: 422, body: { attributes: ['bot_token'] } });
+    const tg = await createTelegramInbox(options, { name: 'Shop bot', botToken: '123:abc' });
+    expect(tg).toMatchObject({
+      channelType: 'Channel::Telegram',
+      address: expect.stringMatching(/^@/),
+    });
+  });
+
+  it("keeps Hamnivo's key when the channel replaces the message's id after sending", async () => {
+    const { fake, authority, email } = await channelSetup();
+    const thread = await fake.receiveChannelMessage(Number(email.id), {
+      from: 'lina@example.com',
+      subject: 'Hello',
+      content: 'Hi',
+    });
+    const ref = String(thread.conversationId);
+    const key = `hv1:m:${randomUUID()}`;
+    const sent = await authority.appendMessage({
+      conversationRef: ref,
+      key,
+      author: { kind: 'integration' },
+      visibility: 'public',
+      text: 'Thanks for writing.',
+    });
+    // The answer was written before sending, with the key as given.
+    expect(sent.message.key).toBe(key);
+    const listed = await authority.listMessages(ref, { view: 'staff' });
+    const stored = listed.find((m) => m.ref === sent.message.ref);
+    expect(stored?.key).toBe(key);
+    expect(await authority.findByKey(ref, key)).toMatchObject({ ref: sent.message.ref });
   });
 
   it('makes channel inboxes as an administrator would in Chatwoot, with members', async () => {

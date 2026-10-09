@@ -72,7 +72,7 @@ export const channelsHi: ChannelsTranslation = {
   empty: {
     title: 'अभी कोई ईमेल, WhatsApp या Telegram चैनल नहीं है।',
     description:
-      'अपना सपोर्ट ईमेल यहीं जोड़ें। WhatsApp या Telegram के लिए चैनल Chatwoot में जोड़ें (Settings → Inboxes), फिर यहाँ दोबारा देखें।',
+      'अपना सपोर्ट ईमेल, WhatsApp Business नंबर या Telegram बॉट यहीं जोड़ें। Chatwoot में जोड़े गए चैनल "नए चैनल खोजें" से यहाँ दिखते हैं।',
   },
   check: {
     action: 'नए चैनल खोजें',
@@ -180,6 +180,96 @@ export const channelsHi: ChannelsTranslation = {
       label: '{{name}} का साइन-इन ठीक करें',
       hint: 'Chatwoot इस मेलबॉक्स में साइन इन नहीं कर पा रहा। ऐसा अक्सर पासवर्ड बदलने के बाद होता है। नया पासवर्ड लिखें।',
     },
+  },
+  whatsapp: {
+    connect: {
+      action: 'WhatsApp जोड़ें',
+      title: 'WhatsApp जोड़ें',
+      steps: {
+        number: 'आपका नंबर',
+        answering: 'जवाब कौन देगा',
+        webhook: 'Meta का वेबहुक सेट करें',
+      },
+      intros: {
+        number: 'Meta के Cloud API पर आपका WhatsApp Business नंबर।',
+        answering: 'चुनें कि यहाँ WhatsApp संदेशों का जवाब कौन देगा। बाद में इसे कार्ड पर बदल सकते हैं।',
+        webhook: 'आख़िरी चरण: Meta को बताएँ कि आपके ग्राहकों के संदेश कहाँ भेजने हैं।',
+      },
+      guide: 'WhatsApp कैसे जोड़ें',
+      submit: 'जोड़ें',
+      busy: 'Meta से जाँच हो रही है…',
+      busyHint: 'नंबर जोड़ने से पहले Chatwoot आपके ऐक्सेस टोकन को Meta से जाँचता है। इसमें थोड़ा समय लग सकता है।',
+      connected: 'आपका WhatsApp नंबर जुड़ गया। अब Meta का वेबहुक सेट करें।',
+      done: 'WhatsApp जुड़ गया। Meta का वेबहुक सेट होते ही संदेश आपके इनबॉक्स में आने लगेंगे।',
+    },
+    fields: {
+      nameDefault: 'व्हाट्सऐप',
+      phoneNumber: 'बिज़नेस फ़ोन नंबर',
+      phoneNumberHint: '+ और देश कोड के साथ, जैसे +971 50 123 4567।',
+      phoneNumberId: 'फ़ोन नंबर ID (Phone number ID)',
+      businessAccountId: 'WhatsApp बिज़नेस अकाउंट ID (WhatsApp Business Account ID)',
+      accessToken: 'ऐक्सेस टोकन',
+      accessTokenHint: 'यह सीधे Chatwoot को जाता है। Studio इसे नहीं रखता।',
+    },
+    help: {
+      title: 'ये कहाँ मिलेंगे',
+      text: 'ये Meta के WhatsApp Manager → API setup में मिलेंगे। किसी system user का स्थायी ऐक्सेस टोकन इस्तेमाल करें।',
+      link: 'Meta की Cloud API गाइड',
+    },
+    errors: {
+      phoneNumber: 'नंबर + और देश कोड के साथ लिखें, जैसे +971501234567।',
+      phoneNumberId: 'Phone number ID लिखें। इसमें सिर्फ़ अंक होते हैं।',
+      businessAccountId: 'WhatsApp Business Account ID लिखें। इसमें सिर्फ़ अंक होते हैं।',
+      accessToken: 'ऐक्सेस टोकन लिखें। यह कम से कम 20 अक्षर लंबा होता है।',
+    },
+    setup: {
+      action: 'Meta सेटअप',
+      label: '{{name}} का Meta सेटअप',
+      title: 'Meta का वेबहुक सेट करें',
+      loading: 'Meta सेटअप लोड हो रहा है',
+      instructions:
+        'Meta के App Dashboard → WhatsApp → Configuration → Webhook में ये दोनों चिपकाएँ, Verify and save चुनें, फिर messages को सब्सक्राइब करें।',
+      callbackUrl: 'कॉलबैक URL (Callback URL)',
+      verifyToken: 'वेरिफ़ाई टोकन (Verify token)',
+      copy: 'कॉपी करें',
+      copyLabel: '{{field}} कॉपी करें',
+      noToken: 'Chatwoot ने अभी Verify token नहीं बनाया है। थोड़ी देर बाद Meta सेटअप फिर खोलें।',
+      done: 'हो गया',
+    },
+  },
+  telegram: {
+    connect: {
+      action: 'Telegram जोड़ें',
+      title: 'Telegram जोड़ें',
+      intro: 'अपना Telegram बॉट जोड़ें। लोग बॉट को जो संदेश भेजते हैं, वे आपके इनबॉक्स में आते हैं।',
+      guide: 'Telegram कैसे जोड़ें',
+      submit: 'जोड़ें',
+      busy: 'Telegram से जाँच हो रही है…',
+      done: 'Telegram {{bot}} के रूप में जुड़ गया। नए संदेश आपके इनबॉक्स में दिखेंगे।',
+      doneUnnamed: 'Telegram जुड़ गया। नए संदेश आपके इनबॉक्स में दिखेंगे।',
+    },
+    fields: {
+      nameDefault: 'टेलीग्राम',
+      botToken: 'बॉट टोकन',
+      botTokenHint: 'यह सीधे Chatwoot को जाता है। Studio इसे नहीं रखता।',
+    },
+    help: {
+      title: 'बॉट टोकन पाएँ',
+      text: 'Telegram पर @BotFather को संदेश भेजें, /newbot भेजें और जो टोकन वह दे, उसे कॉपी करें।',
+      link: 'BotFather पर Telegram की गाइड',
+    },
+    errors: {
+      botToken: '@BotFather से मिला टोकन लिखें। यह 123456789:AAH… जैसा दिखता है, बिना स्पेस के।',
+    },
+  },
+  reply: {
+    email: 'आपका जवाब ईमेल से भेजा जाता है।',
+    whatsapp: 'आपका जवाब WhatsApp पर भेजा जाता है।',
+    telegram: 'आपका जवाब Telegram पर भेजा जाता है।',
+    minutesLeft_one: 'आप बस एक मिनट और जवाब दे सकते हैं।',
+    minutesLeft_other: 'आप {{count}} मिनट और जवाब दे सकते हैं।',
+    closed:
+      'WhatsApp अब सिर्फ़ टेम्पलेट संदेशों की अनुमति देता है। ग्राहक के दोबारा लिखने के बाद आप फिर जवाब दे सकते हैं।',
   },
   chatwoot: {
     title: 'Chatwoot ने जवाब नहीं दिया',

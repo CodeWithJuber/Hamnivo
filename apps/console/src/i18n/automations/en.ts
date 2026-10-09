@@ -317,6 +317,8 @@ export const automationsEn = {
         ai_has_chat: 'Message left out: the AI had the chat.',
         message_limit: 'Message left out: the daily limit of automated messages was reached.',
         no_bot: 'Message left out: the chat has no bot to send it.',
+        window_closed:
+          'Message left out: WhatsApp allows only template messages 24 hours after the customer last wrote.',
       },
       noActions: 'Nothing',
     },

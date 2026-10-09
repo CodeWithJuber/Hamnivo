@@ -114,6 +114,11 @@ export const hi: Translation = {
       description: 'आपकी सुरक्षा के लिए, इसके लिए हाल ही का साइन-इन ज़रूरी है।',
       action: 'फिर से साइन इन करें',
     },
+    channelWindow: {
+      title: 'अब सिर्फ़ टेम्पलेट संदेश भेजे जा सकते हैं',
+      description:
+        'WhatsApp ग्राहक के आख़िरी संदेश के बाद 24 घंटे तक ही जवाब देने देता है। कुछ नहीं भेजा गया। ग्राहक के दोबारा लिखने के बाद आप फिर जवाब दे सकते हैं।',
+    },
     unknown: { title: 'कुछ गड़बड़ हुई', description: 'फिर से कोशिश करें।' },
     page: {
       title: 'यह पेज लोड नहीं हो सका',
@@ -1065,6 +1070,7 @@ export const hi: Translation = {
       chat: 'वेबसाइट चैट',
       email: 'ईमेल',
       whatsapp: 'WhatsApp',
+      telegram: 'Telegram',
       sms: 'SMS',
       other: 'दूसरा चैनल',
     },

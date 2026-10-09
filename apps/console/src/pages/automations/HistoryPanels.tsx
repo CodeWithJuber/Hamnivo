@@ -114,6 +114,14 @@ export function VersionsPanel({
   );
 }
 
+/** Why a run left its message out, in words; a reason Studio does not know yet as it came. */
+const RUN_REASONS = ['ai_has_chat', 'message_limit', 'no_bot', 'window_closed'] as const;
+export function runReasonText(t: TFunction, reason: string): string {
+  return (RUN_REASONS as readonly string[]).includes(reason)
+    ? t(`automations.editor.runs.reasons.${reason as (typeof RUN_REASONS)[number]}`)
+    : reason;
+}
+
 const OUTCOME_TONES: Record<AutomationRun['outcome'], StatusTone> = {
   done: 'success',
   skipped: 'neutral',
@@ -124,10 +132,7 @@ const OUTCOME_TONES: Record<AutomationRun['outcome'], StatusTone> = {
 export function RunsPanel({ automation }: { automation: Automation }) {
   const { t } = useTranslation();
   const runs = useAutomationRuns(automation.id, automation.kind === 'conversation');
-  const reasonText = (reason: string) =>
-    reason in { ai_has_chat: 1, message_limit: 1, no_bot: 1 }
-      ? t(`automations.editor.runs.reasons.${reason as 'ai_has_chat'}`)
-      : reason;
+  const reasonText = (reason: string) => runReasonText(t, reason);
   return (
     <Section
       id="automation-runs"

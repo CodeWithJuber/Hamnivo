@@ -114,6 +114,11 @@ export const ar: Translation = {
       description: 'لحمايتك، يتطلب هذا تسجيل دخول حديثًا.',
       action: 'تسجيل الدخول مرة أخرى',
     },
+    channelWindow: {
+      title: 'لا يمكن الآن إرسال إلا رسائل القوالب',
+      description:
+        'يسمح واتساب بالردّ خلال 24 ساعة من آخر رسالة كتبها العميل. لم يُرسَل شيء. يمكنك الردّ مجددًا بعد أن يكتب العميل.',
+    },
     unknown: { title: 'حدث خطأ ما', description: 'حاول مرة أخرى.' },
     page: {
       title: 'تعذّر تحميل هذه الصفحة',
@@ -1060,6 +1065,7 @@ export const ar: Translation = {
       chat: 'دردشة الموقع',
       email: 'البريد الإلكتروني',
       whatsapp: 'WhatsApp',
+      telegram: 'Telegram',
       sms: 'رسائل SMS',
       other: 'قناة أخرى',
     },

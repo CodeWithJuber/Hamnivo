@@ -615,3 +615,103 @@ export async function getEmailInbox(options: {
     },
   };
 }
+
+type AdminOptions = { baseUrl: string; token: string; accountId: number; fetch?: typeof fetch };
+
+function adminClient(options: AdminOptions) {
+  return createChatwootClient({
+    baseUrl: options.baseUrl,
+    token: options.token,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+}
+
+function summaryOf(inbox: Json, fallbackName: string): ChatwootInboxSummary {
+  return {
+    id: Number(inbox.id),
+    name: String(inbox.name ?? fallbackName),
+    channelType: String(inbox.channel_type ?? ''),
+    address: inboxAddress(inbox),
+    needsReauthorization: inbox.reauthorization_required === true,
+  };
+}
+
+/** A WhatsApp Business number on Meta's Cloud API (Chatwoot checks the credentials with Meta). */
+export interface WhatsappInboxSettings {
+  name: string;
+  /** In international format, `+` and digits. */
+  phoneNumber: string;
+  phoneNumberId: string;
+  businessAccountId: string;
+  accessToken: string;
+}
+
+export async function createWhatsappInbox(
+  options: AdminOptions,
+  settings: WhatsappInboxSettings,
+): Promise<ChatwootInboxSummary> {
+  const inbox = await call<Json>(
+    'createInbox',
+    adminClient(options).POST('/api/v1/accounts/{account_id}/inboxes', {
+      params: { path: { account_id: options.accountId } },
+      body: {
+        name: settings.name,
+        enable_auto_assignment: false,
+        channel: {
+          type: 'whatsapp',
+          phone_number: settings.phoneNumber,
+          provider: 'whatsapp_cloud',
+          provider_config: {
+            api_key: settings.accessToken,
+            phone_number_id: settings.phoneNumberId,
+            business_account_id: settings.businessAccountId,
+          },
+        },
+      } as never,
+    }) as never,
+  );
+  return summaryOf(inbox, settings.name);
+}
+
+/**
+ * What Meta's webhook set-up needs for a WhatsApp inbox: the callback address on Chatwoot's
+ * public host and the verify token Chatwoot made. Never the access token.
+ */
+export async function getWhatsappSetup(
+  options: AdminOptions & { inboxId: number; publicUrl: string },
+): Promise<{ callbackUrl: string; verifyToken: string | null }> {
+  const inbox = await call<Json>(
+    'getInbox',
+    adminClient(options).GET('/api/v1/accounts/{account_id}/inboxes/{id}', {
+      params: { path: { account_id: options.accountId, id: options.inboxId } },
+    }) as never,
+  );
+  const config = (
+    typeof inbox.provider_config === 'object' && inbox.provider_config ? inbox.provider_config : {}
+  ) as Json;
+  const phone = String(inbox.phone_number ?? '').replace(/^\+/, '');
+  return {
+    callbackUrl: `${options.publicUrl.replace(/\/+$/, '')}/webhooks/whatsapp/+${phone}`,
+    verifyToken:
+      typeof config.webhook_verify_token === 'string' ? config.webhook_verify_token : null,
+  };
+}
+
+/** A Telegram bot from @BotFather; Chatwoot sets its webhook with Telegram. */
+export async function createTelegramInbox(
+  options: AdminOptions,
+  settings: { name: string; botToken: string },
+): Promise<ChatwootInboxSummary> {
+  const inbox = await call<Json>(
+    'createInbox',
+    adminClient(options).POST('/api/v1/accounts/{account_id}/inboxes', {
+      params: { path: { account_id: options.accountId } },
+      body: {
+        name: settings.name,
+        enable_auto_assignment: false,
+        channel: { type: 'telegram', bot_token: settings.botToken },
+      } as never,
+    }) as never,
+  );
+  return summaryOf(inbox, settings.name);
+}

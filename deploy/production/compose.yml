@@ -43,6 +43,7 @@ x-gateway: &gateway
     MAIL_FROM: ${MAIL_FROM:-}
     WIDGET_SIGNING_KEY: ${WIDGET_SIGNING_KEY:?run hamnivo.sh setup}
     CHATWOOT_URL: http://chatwoot-web:3000
+    CHATWOOT_PUBLIC_URL: ${HAMNIVO_SUPPORT_ORIGIN:?run hamnivo.sh setup}
     CHATWOOT_PLATFORM_TOKEN: ${CHATWOOT_PLATFORM_TOKEN:-}
     CHATWOOT_WEBHOOK_BASE_URL: ${CHATWOOT_WEBHOOK_BASE_URL:?run hamnivo.sh setup}
     ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
