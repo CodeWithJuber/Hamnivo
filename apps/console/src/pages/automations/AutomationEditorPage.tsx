@@ -680,7 +680,10 @@ function Editor({ initial }: { initial: Automation }) {
                   <Button
                     type="button"
                     busy={busy === 'publish'}
-                    disabled={busy !== null || (!dirty && status.key === 'published')}
+                    disabled={
+                      busy !== null ||
+                      (!dirty && base.published !== null && !base.unpublishedChanges)
+                    }
                     onClick={() => void publishNow()}
                     data-testid="publish-automation"
                   >
