@@ -66,7 +66,12 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
 };
 
-function staticServer(port: number, dirs: string[], fallback?: string): Promise<void> {
+/** Serves files from `dirs`; other paths get the page `fallback` names for them, if any. */
+function staticServer(
+  port: number,
+  dirs: string[],
+  fallback?: string | ((path: string) => string | null),
+): Promise<void> {
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://x');
     if (url.pathname === '/health') {
@@ -83,9 +88,10 @@ function staticServer(port: number, dirs: string[], fallback?: string): Promise<
         return;
       }
     }
-    if (fallback) {
+    const page = typeof fallback === 'function' ? fallback(url.pathname) : fallback;
+    if (page) {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      createReadStream(fallback).pipe(response);
+      createReadStream(page).pipe(response);
       return;
     }
     response.writeHead(404).end();
@@ -281,10 +287,12 @@ try {
     ),
   );
   writeFileSync(join(hosts, 'fullpage.html'), page(loader(' data-mode="fullpage"')));
-  await staticServer(ports.widget, [
-    join(root, 'apps/widget/dist'),
-    join(root, 'packages/widget-loader/dist'),
-  ]);
+  // The brand's direct chat link (W28) is the widget's own page at /c/<widgetId>.
+  await staticServer(
+    ports.widget,
+    [join(root, 'apps/widget/dist'), join(root, 'packages/widget-loader/dist')],
+    (path) => (/^\/c\/[^/]+\/?$/.test(path) ? join(root, 'apps/widget/dist/index.html') : null),
+  );
   await staticServer(ports.host, [hosts], hostPage);
   writeFileSync(
     join(root, 'apps/widget/e2e/.stack.json'),
