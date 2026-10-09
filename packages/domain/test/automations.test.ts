@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type AutomationDefinition,
   browserMatches,
+  type Condition,
   checkCondition,
   definitionProblems,
   deviceOf,
@@ -196,8 +197,8 @@ describe('definitionProblems', () => {
 });
 
 describe('splitForBrowser', () => {
-  const page = { field: 'page_url', op: 'contains', value: '/pricing' } as const;
-  const country = { field: 'country', op: 'is', value: ['AE'] } as const;
+  const page: Condition = { field: 'page_url', op: 'contains', value: '/pricing' };
+  const country: Condition = { field: 'country', op: 'is', value: ['AE'] };
 
   it('"all": the gateway decides its conditions, the browser gets the rest', () => {
     expect(

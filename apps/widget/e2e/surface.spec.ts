@@ -45,7 +45,7 @@ async function staff(method: string, path: string, body?: unknown) {
       origin: s.consoleOrigin,
       cookie: s.cookie,
       'x-hamnivo-tenant': s.tenantId,
-      'content-type': 'application/json',
+      ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
@@ -56,8 +56,8 @@ async function staff(method: string, path: string, body?: unknown) {
 
 const settings = (body: unknown) =>
   staff('PUT', `/v1/admin/brands/${stack().brandId}/widget-settings`, body);
-const proactive = (body: unknown) =>
-  staff('PUT', `/v1/admin/brands/${stack().brandId}/proactive`, body);
+const promptLimits = (body: unknown) =>
+  staff('PUT', `/v1/admin/brands/${stack().brandId}/automations/prompt-limits`, body);
 const widgetForms = (body: unknown) =>
   staff('PUT', `/v1/admin/brands/${stack().brandId}/widget-forms`, body);
 const consentSettings = (body: unknown) =>
@@ -453,24 +453,27 @@ test.describe('help before a conversation (W17)', () => {
   });
 });
 
-test.describe('proactive prompts (W19)', () => {
-  const prompts = (maxPerDay: number) =>
-    proactive({
-      enabled: true,
-      maxPerDay,
-      dismissHours: 24,
-      triggers: [
-        {
-          id: 'pricing',
-          kind: 'page_path',
-          path: '/pricing',
-          seconds: 1,
-          message: { en: 'Questions about returns? Ask us here.' },
-        },
-      ],
+test.describe('website prompts (W19, G21)', () => {
+  let automationId: string | null = null;
+  /** One published website automation on /pricing, and the brand's daily limit. */
+  const prompts = async (maxPerDay: number) => {
+    await promptLimits({ maxPerDay, dismissHours: 24 });
+    if (automationId) return;
+    const created = await staff('POST', `/v1/admin/brands/${stack().brandId}/automations`, {
+      name: 'Returns help',
+      publish: true,
+      definition: {
+        event: { type: 'page_view', seconds: 1 },
+        conditions: [{ field: 'page_url', op: 'starts_with', value: '/pricing' }],
+        actions: [
+          { type: 'show_prompt', message: { en: 'Questions about returns? Ask us here.' } },
+        ],
+      },
     });
+    automationId = created.id as string;
+  };
   test.afterAll(async () => {
-    await proactive({ enabled: false });
+    if (automationId) await staff('DELETE', `/v1/admin/automations/${automationId}`);
   });
 
   test('greets once a day on the chosen page, in the brand’s words', async ({ page }) => {
