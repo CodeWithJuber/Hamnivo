@@ -67,6 +67,7 @@ const APPEND_ONLY = new Set([
   'action_approvals',
   'handoff_packets',
   'billing_events',
+  'chat_consents',
 ]);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
@@ -94,6 +95,7 @@ const NEVER_DELETED = new Set([
   'billing_accounts',
   'http_tool_sources',
   'http_tool_endpoints',
+  'tenant_counters',
 ]);
 
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
@@ -302,6 +304,9 @@ describe('two-tenant isolation', () => {
     'visitors',
     'visitor_sessions',
     'visitor_page_views',
+    'chat_consents',
+    'ticket_followups',
+    'tenant_counters',
     'sso_domains',
     'sso_connections',
     'team_routing',
@@ -498,6 +503,9 @@ describe('two-tenant isolation', () => {
       'visitors',
       'visitor_sessions',
       'visitor_page_views',
+      'chat_consents',
+      'ticket_followups',
+      'tenant_counters',
       'sso_domains',
       'sso_connections',
       'team_routing',

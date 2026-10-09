@@ -14,7 +14,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { conversationControls } from './authority.js';
-import { bytea, createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
+import { bytea, citext, createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { customerPrincipals } from './identity.js';
 import { brands, tenantId } from './tenancy.js';
 
@@ -38,14 +38,26 @@ export const brandWidgetSettings = pgTable(
     settings: jsonb('settings').$type<Record<string, unknown>>().notNull().default({}),
     /** ProactiveSettings; `{}` is "off". */
     proactive: jsonb('proactive').$type<Record<string, unknown>>().notNull().default({}),
+    /** WidgetForms: the pre-chat form (W26) and the contact form (W11); `{}` is the defaults. */
+    forms: jsonb('forms').$type<Record<string, unknown>>().notNull().default({}),
+    /** ConsentSettings (W27); `{}` is "off". */
+    consent: jsonb('consent').$type<Record<string, unknown>>().notNull().default({}),
+    /** Goes up whenever the consent words change, so customers agree to the new words. */
+    consentVersion: integer('consent_version').notNull().default(0),
+    /** The direct chat link (W28) is on. */
+    directLink: boolean('direct_link').notNull().default(false),
     settingsUpdatedAt: tstz('settings_updated_at'),
     proactiveUpdatedAt: tstz('proactive_updated_at'),
+    formsUpdatedAt: tstz('forms_updated_at'),
+    consentUpdatedAt: tstz('consent_updated_at'),
+    directLinkUpdatedAt: tstz('direct_link_updated_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     unique('brand_widget_settings_tenant_id_id_key').on(t.tenantId, t.id),
     uniqueIndex('brand_widget_settings_brand_key').on(t.tenantId, t.brandId),
+    check('brand_widget_settings_consent_version_ck', sql`${t.consentVersion} >= 0`),
     foreignKey({
       name: 'brand_widget_settings_brand_fk',
       columns: [t.tenantId, t.brandId],
@@ -235,6 +247,82 @@ export const customerNotifications = pgTable(
     }),
     check('customer_notifications_kind_ck', sql`${t.kind} in ('transcript', 'reply_waiting')`),
     check('customer_notifications_status_ck', sql`${t.status} in ('sent', 'skipped')`),
+    tenantIsolation(),
+  ],
+);
+
+/**
+ * A customer agreed to a brand's consent words before chatting (W27). Append-only: the version
+ * of the words and the time, never the country that made the question appear.
+ */
+export const chatConsents = pgTable(
+  'chat_consents',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    brandId: uuid('brand_id').notNull(),
+    principalId: uuid('principal_id').notNull(),
+    noticeVersion: integer('notice_version').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('chat_consents_tenant_id_id_key').on(t.tenantId, t.id),
+    index('chat_consents_principal_idx').on(t.tenantId, t.principalId, t.noticeVersion),
+    foreignKey({
+      name: 'chat_consents_brand_fk',
+      columns: [t.tenantId, t.brandId],
+      foreignColumns: [brands.tenantId, brands.id],
+    }),
+    foreignKey({
+      name: 'chat_consents_principal_fk',
+      columns: [t.tenantId, t.principalId],
+      foreignColumns: [customerPrincipals.tenantId, customerPrincipals.id],
+    }),
+    check('chat_consents_version_ck', sql`${t.noticeVersion} >= 0`),
+    tenantIsolation(),
+  ],
+);
+
+/**
+ * Where a ticket from the contact form (W11, H19) may be answered by email. The address is what
+ * the customer typed: nothing is sent to it but one confirmation until they confirm it, and the
+ * confirmation never carries what they wrote. The row goes with its conversation.
+ */
+export const ticketFollowups = pgTable(
+  'ticket_followups',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    brandId: uuid('brand_id').notNull(),
+    conversationId: uuid('conversation_id').notNull(),
+    principalId: uuid('principal_id').notNull(),
+    email: citext('email').notNull(),
+    /** SHA-256 of the confirmation token; the token itself is only in the email. */
+    confirmTokenHash: bytea('confirm_token_hash').notNull(),
+    confirmationSentAt: tstz('confirmation_sent_at'),
+    confirmedAt: tstz('confirmed_at'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('ticket_followups_tenant_id_id_key').on(t.tenantId, t.id),
+    uniqueIndex('ticket_followups_conversation_key').on(t.tenantId, t.conversationId),
+    uniqueIndex('ticket_followups_token_key').on(t.confirmTokenHash),
+    index('ticket_followups_email_idx').on(t.tenantId, t.brandId, t.email, t.confirmationSentAt),
+    foreignKey({
+      name: 'ticket_followups_brand_fk',
+      columns: [t.tenantId, t.brandId],
+      foreignColumns: [brands.tenantId, brands.id],
+    }),
+    foreignKey({
+      name: 'ticket_followups_conversation_fk',
+      columns: [t.tenantId, t.conversationId],
+      foreignColumns: [conversationControls.tenantId, conversationControls.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'ticket_followups_principal_fk',
+      columns: [t.tenantId, t.principalId],
+      foreignColumns: [customerPrincipals.tenantId, customerPrincipals.id],
+    }),
     tenantIsolation(),
   ],
 );

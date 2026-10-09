@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SupportedLocale, Timestamp } from './common.js';
 import { CustomerConversation } from './conversations.js';
 import { ProactiveTriggerKind, WidgetLayoutMode } from './customer-surface.js';
+import { WidgetConsentConfig, WidgetFormsConfig } from './widget-forms.js';
 
 export const LauncherPosition = z.enum(['bottom-right', 'bottom-left']);
 /** @deprecated Use WidgetLayoutMode. */
@@ -37,6 +38,12 @@ export const WidgetConfig = z
       humanAvailable: z.boolean(),
       nextOpenAt: Timestamp.nullable(),
       timezone: z.string(),
+      /** Someone on the team is online right now (their own status, not the business hours). */
+      staffOnline: z.boolean(),
+      /** The brand has set business hours; without them nobody can say when people are back. */
+      hoursSet: z.boolean(),
+      /** Inside the brand's business hours right now (false when no hours are set). */
+      open: z.boolean(),
     }),
     features: z.object({
       attachments: z.boolean(),
@@ -75,6 +82,12 @@ export const WidgetConfig = z
         }),
       ),
     }),
+    /** The pre-chat and contact forms (W26, W11). */
+    forms: WidgetFormsConfig,
+    /** Whether this visitor must agree before chatting, and to which words (W27). */
+    consent: WidgetConsentConfig,
+    /** This session was opened from the brand's direct chat link, not from its website (W28). */
+    direct: z.boolean(),
   })
   .meta({ id: 'WidgetConfig' });
 export type WidgetConfig = z.infer<typeof WidgetConfig>;
@@ -96,6 +109,11 @@ export const CreateWidgetSessionRequest = z
      * leave them out.
      */
     test: z.boolean().optional(),
+    /**
+     * Opened from the brand's direct chat link (W28): the chat's own page, with no website
+     * around it. Allowed only while the brand keeps the link on.
+     */
+    direct: z.boolean().optional(),
   })
   .meta({ id: 'CreateWidgetSessionRequest' });
 
