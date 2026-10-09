@@ -498,12 +498,14 @@ export class ChatwootProvisioning {
         channelType: 'Channel::Api',
       });
       // Inboxes made in Chatwoot later (email, WhatsApp, Telegram) are found by this cursor (ADR 0013).
+      // A new account has none yet, so the first look is a full interval away.
       await tx.insert(schema.reconcileCursors).values({
         tenantId,
         connectionId,
         scope: 'inbox',
         scopeRef: CHANNEL_DISCOVERY_REF,
         intervalSeconds: CHANNEL_DISCOVERY_SECONDS,
+        nextPollAt: new Date(this.clock().getTime() + CHANNEL_DISCOVERY_SECONDS * 1000),
       });
       await tx.insert(schema.authorityBots).values({
         tenantId,
