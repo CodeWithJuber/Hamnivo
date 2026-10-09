@@ -406,6 +406,16 @@ a reply, drop a passage or hand the conversation to people.
   under the lock), and at most five a day reach a conversation. Runs are kept 90 days
   (`purge-expired`).
 
+## Blocking visitors (H20, ADR 0012)
+
+`src/visitors/blocks*.ts`. `POST /v1/inbox/conversations/{id}/block`, `POST
+/v1/visitors/{id}/block`, `GET /v1/visitors/blocks`, `DELETE /v1/visitors/blocks/{id}` under
+`visitors.block`. A block names the customer, the browser key and a signed-in account's subject,
+never an IP address. `WidgetGuard` refuses chat writes with `CHAT_UNAVAILABLE` (reads, memory,
+email choices, read receipts and sign-out stay open); new sessions get `chatAvailable: false`;
+the tracker stores nothing for a blocked browser. Blocks are lifted, not deleted, and purged 90
+days after they end.
+
 ## Customer surface (W02, W05–W07, W09, W17–W19, W22–W25)
 
 `src/widget/surface.*`, `attachments.service.ts`, `messages.service.ts`, `help.service.ts`,
