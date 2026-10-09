@@ -20356,6 +20356,256 @@
         }
       }
     },
+    "/v1/inbox/conversations/{conversationId}/block": {
+      "post": {
+        "operationId": "blockConversationVisitor",
+        "summary": "Block the customer of this chat, their browser and their signed-in account; optionally close the chat (visitors.block)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockVisitorRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The block",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitorBlock"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/visitors/{visitorId}/block": {
+      "post": {
+        "operationId": "blockLiveVisitor",
+        "summary": "Block a visitor on the website, and the customer they chat as (visitors.block)",
+        "tags": [
+          "Visitors"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "visitorId",
+            "schema": {
+              "type": "string",
+              "description": "Visitor ID (vis_…)"
+            },
+            "required": true,
+            "description": "Visitor ID (vis_…)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "duration": {
+                    "type": "string",
+                    "enum": [
+                      "day",
+                      "week",
+                      "month",
+                      "always"
+                    ]
+                  }
+                },
+                "required": [
+                  "reason",
+                  "duration"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The block",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitorBlock"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/visitors/blocks": {
+      "get": {
+        "operationId": "listVisitorBlocks",
+        "summary": "Blocked visitors, newest first (visitors.block)",
+        "tags": [
+          "Visitors"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "brandId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "default": "active",
+              "type": "string",
+              "enum": [
+                "active",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Blocks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitorBlockList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/visitors/blocks/{blockId}": {
+      "delete": {
+        "operationId": "liftVisitorBlock",
+        "summary": "Unblock: the visitor can chat again at once (visitors.block)",
+        "tags": [
+          "Visitors"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "blockId",
+            "schema": {
+              "type": "string",
+              "description": "Block ID (blk_…)"
+            },
+            "required": true,
+            "description": "Block ID (blk_…)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The lifted block",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitorBlock"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/tools": {
       "get": {
         "operationId": "listTools",
@@ -31078,6 +31328,33 @@
           "enabled"
         ]
       },
+      "BlockVisitorRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "duration": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "always"
+            ]
+          },
+          "closeChat": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason",
+          "duration"
+        ]
+      },
       "CreateToolRequest": {
         "type": "object",
         "properties": {
@@ -33058,6 +33335,9 @@
           },
           "direct": {
             "type": "boolean"
+          },
+          "chatAvailable": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -33077,7 +33357,8 @@
           "proactive",
           "forms",
           "consent",
-          "direct"
+          "direct",
+          "chatAvailable"
         ],
         "additionalProperties": false
       },
@@ -33218,6 +33499,7 @@
               "PLAN_LIMIT_REACHED",
               "IDENTITY_REQUIRED",
               "CONSENT_REQUIRED",
+              "CHAT_UNAVAILABLE",
               "ASSERTION_INVALID",
               "ACTION_REQUIRES_APPROVAL",
               "APPROVAL_EXPIRED",
@@ -45733,6 +46015,7 @@
                   "PLAN_LIMIT_REACHED",
                   "IDENTITY_REQUIRED",
                   "CONSENT_REQUIRED",
+                  "CHAT_UNAVAILABLE",
                   "ASSERTION_INVALID",
                   "ACTION_REQUIRES_APPROVAL",
                   "APPROVAL_EXPIRED",
@@ -46052,6 +46335,7 @@
                         "PLAN_LIMIT_REACHED",
                         "IDENTITY_REQUIRED",
                         "CONSENT_REQUIRED",
+                        "CHAT_UNAVAILABLE",
                         "ASSERTION_INVALID",
                         "ACTION_REQUIRES_APPROVAL",
                         "APPROVAL_EXPIRED",
@@ -54431,6 +54715,290 @@
             ],
             "additionalProperties": false
           },
+          "quality": {
+            "type": "object",
+            "properties": {
+              "missed": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "offlineMessages": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample"
+                ],
+                "additionalProperties": false
+              },
+              "reopened": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "missed",
+              "offlineMessages",
+              "reopened"
+            ],
+            "additionalProperties": false
+          },
+          "tickets": {
+            "type": "object",
+            "properties": {
+              "created": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample"
+                ],
+                "additionalProperties": false
+              },
+              "closed": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample"
+                ],
+                "additionalProperties": false
+              },
+              "openNow": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample"
+                ],
+                "additionalProperties": false
+              },
+              "closeMedianSeconds": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample"
+                ],
+                "additionalProperties": false
+              },
+              "byPriority": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "priority": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "urgent",
+                            "high",
+                            "medium",
+                            "low"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "count": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "suppressed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "priority",
+                    "count",
+                    "suppressed"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "bySource": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "offline_form",
+                        "staff",
+                        "automation"
+                      ]
+                    },
+                    "count": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "suppressed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "count",
+                    "suppressed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "created",
+              "closed",
+              "openNow",
+              "closeMedianSeconds",
+              "byPriority",
+              "bySource"
+            ],
+            "additionalProperties": false
+          },
           "daily": {
             "type": "array",
             "items": {
@@ -54724,6 +55292,8 @@
           "partial",
           "generatedAt",
           "totals",
+          "quality",
+          "tickets",
           "daily",
           "handoffReasons",
           "teams",
@@ -55702,6 +56272,157 @@
           "reason",
           "actions",
           "ranAt"
+        ],
+        "additionalProperties": false
+      },
+      "VisitorBlock": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "brandId": {
+            "type": "string"
+          },
+          "who": {
+            "type": "string"
+          },
+          "signedIn": {
+            "type": "boolean"
+          },
+          "customerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visitorId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conversationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdBy": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "liftedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "liftedBy": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "who",
+          "signedIn",
+          "customerId",
+          "visitorId",
+          "conversationId",
+          "reason",
+          "createdBy",
+          "createdAt",
+          "expiresAt",
+          "liftedAt",
+          "liftedBy",
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "VisitorBlockList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitorBlock"
+            }
+          }
+        },
+        "required": [
+          "items"
         ],
         "additionalProperties": false
       },
