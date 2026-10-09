@@ -4,12 +4,15 @@ import {
   Outbox,
   type OutgoingAttachment,
   type OutgoingMessage,
+  type StartConversationInput,
   type StreamStatus,
 } from '@hamnivo/client';
 import type {
   CustomerConversation,
+  FormAnswers,
   Message,
   MessagePart,
+  OfflineMessageResponse,
   ReactionEmoji,
   WidgetSession,
 } from '@hamnivo/contracts';
@@ -115,6 +118,26 @@ const EMPTY: ChatState = {
 
 const PAGE = 50;
 const messageOf = (error: unknown) => String((error as Error)?.message ?? error);
+
+/**
+ * Whether the person agreed before chatting follows their session (W27): it changes when they
+ * agree, and when the brand's words change. The rest of the configuration stays as it started.
+ */
+function followConsent(state: ChatState, session: WidgetSession): ChatState {
+  const shown = state.session;
+  const next = session.config?.consent;
+  if (!shown || !next || shown.principal.id !== session.principal.id) return state;
+  const now = shown.config.consent;
+  if (
+    now &&
+    now.required === next.required &&
+    now.given === next.given &&
+    now.noticeVersion === next.noticeVersion
+  ) {
+    return state;
+  }
+  return { ...state, session: { ...shown, config: { ...shown.config, consent: next } } };
+}
 
 /** The error a suspended workspace's chat starts with: it shows offline until the workspace is back. */
 export const CHAT_OFFLINE = 'workspace_suspended';
@@ -367,7 +390,11 @@ export function useChat(client: HamnivoClient) {
     // The session moved to another person without a sign-in here (for example a renewal after
     // the session was ended elsewhere): show that person, never the previous one's chats.
     const offSession = client.onSession((session) => {
-      if (!session || !shown.current || session.principal.id === shown.current) return;
+      if (!session || !shown.current) return;
+      if (session.principal.id === shown.current) {
+        setState((s) => followConsent(s, session));
+        return;
+      }
       void serial(async () => {
         if (client.current === session && session.principal.id !== shown.current) {
           await begin(session);
@@ -425,10 +452,17 @@ export function useChat(client: HamnivoClient) {
 
   /** Starts a conversation and shows it, unless the person changed in the meantime. */
   const startFor = useCallback(
-    (current: number) =>
-      client.startConversation().then(async (conversation) => {
-        if (current === generation.current) await attach(conversation, false);
-      }),
+    (current: number, input: StartConversationInput = {}) => {
+      const started = client.startConversation(input).then(async (conversation) => {
+        // A first message sent with the start is in the history already.
+        if (current === generation.current) await attach(conversation, Boolean(input.firstMessage));
+      });
+      // A start that failed can be tried again: once back online, or after agreeing (W27).
+      started.catch(() => {
+        if (attaching.current === started) attaching.current = null;
+      });
+      return started;
+    },
     [attach, client],
   );
 
@@ -441,6 +475,61 @@ export function useChat(client: HamnivoClient) {
     }
     return current;
   }, [startFor]);
+
+  /**
+   * Starts the first conversation with the pre-chat answers and the visitor's first message
+   * (W26), when the chat asked for them before starting.
+   */
+  const start = useCallback(
+    async (input: StartConversationInput) => {
+      if (outbox.current) return;
+      attaching.current ??= startFor(generation.current, input);
+      await attaching.current;
+    },
+    [startFor],
+  );
+
+  /** The gateway asked for consent again (the brand changed its words): ask with the new ones. */
+  const consentRequired = useCallback(async () => {
+    setState((s) =>
+      s.session?.config.consent
+        ? {
+            ...s,
+            session: {
+              ...s.session,
+              config: {
+                ...s.session.config,
+                consent: { ...s.session.config.consent, given: false },
+              },
+            },
+          }
+        : s,
+    );
+    // A fresh session carries the words in force; consent follows it (see followConsent).
+    await client.renew().catch(() => undefined);
+  }, [client]);
+
+  /**
+   * Leaves a message while nobody can answer (W11). It becomes a ticket (H19), listed with the
+   * person's conversations; the chat stays where it was.
+   */
+  const leaveMessage = useCallback(
+    async (answers: FormAnswers, clientRequestId: string): Promise<OfflineMessageResponse> => {
+      const current = generation.current;
+      const sent = await client.sendOfflineMessage({ answers }, clientRequestId);
+      if (current === generation.current) {
+        setState((s) => ({
+          ...s,
+          conversations: [
+            sent.conversation,
+            ...s.conversations.filter((c) => c.id !== sent.conversation.id),
+          ],
+        }));
+      }
+      return sent;
+    },
+    [client],
+  );
 
   const send = useCallback(
     async (text: string, attachments: readonly OutgoingAttachment[] = []) => {
@@ -572,6 +661,21 @@ export function useChat(client: HamnivoClient) {
     );
   }, [client, startFor, state.conversation]);
 
+  /** Opens the closed conversation on screen again, with its history (W15). */
+  const reopen = useCallback(async () => {
+    const conversation = state.conversation;
+    if (!conversation) return;
+    const current = generation.current;
+    const reopened = await client.reopen(conversation.id);
+    if (current !== generation.current) return;
+    setState((s) => ({
+      ...s,
+      conversation:
+        s.conversation?.id === reopened.id ? { ...s.conversation, ...reopened } : s.conversation,
+      conversations: s.conversations.map((c) => (c.id === reopened.id ? reopened : c)),
+    }));
+  }, [client, state.conversation]);
+
   /** Outgoing messages not yet visible as confirmed messages. */
   const pending = useMemo(
     () =>
@@ -598,5 +702,9 @@ export function useChat(client: HamnivoClient) {
     react,
     open,
     conversationForFiles,
+    start,
+    consentRequired,
+    leaveMessage,
+    reopen,
   };
 }

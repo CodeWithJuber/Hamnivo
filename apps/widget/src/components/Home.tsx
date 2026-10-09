@@ -1,10 +1,11 @@
 import type { HamnivoClient } from '@hamnivo/client';
-import type { HelpArticle } from '@hamnivo/contracts';
+import type { HelpArticle, WidgetConfig } from '@hamnivo/contracts';
 import { Button } from '@hamnivo/ui/components/button';
-import { SearchIcon } from 'lucide-react';
+import { MailIcon, SearchIcon } from 'lucide-react';
 import { type FormEvent, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BidiText } from './BidiText.js';
+import { StatusLine } from './StatusLine.js';
 
 /** Only web links open from the chat. */
 const webLink = (url: string | null): string | null => {
@@ -16,9 +17,11 @@ const webLink = (url: string | null): string | null => {
 };
 
 /**
- * The chat's home before a conversation (W17, W19): the brand's greeting, the words of a proactive
- * prompt the visitor opened, the brand's suggested questions (each starts the conversation) and a
- * search of the brand's public help. Results are the brand's own articles, never generated text.
+ * The chat's home before a conversation (W11, W17, W19): the brand's greeting, who can answer
+ * right now, the words of a proactive prompt the visitor opened, the brand's suggested questions
+ * (each starts the conversation) and a search of the brand's public help. Results are the brand's
+ * own articles, never generated text. While nobody can answer, a card offers to leave a message;
+ * the questions and the message box stay, since the assistant may still help.
  */
 export function Home(props: {
   client: HamnivoClient;
@@ -27,6 +30,11 @@ export function Home(props: {
   prompt: { brand: string; text: string } | null;
   suggestions: readonly string[];
   search: boolean;
+  /** Who can answer right now; left out where the configuration does not say. */
+  availability?: WidgetConfig['availability'] | undefined;
+  locale?: string;
+  /** Opens the contact form; null while someone can answer or the brand has none. */
+  onContact?: (() => void) | null;
   onAsk: (question: string) => void;
 }) {
   const { t } = useTranslation();
@@ -71,6 +79,29 @@ export function Home(props: {
       >
         {props.greeting}
       </p>
+      {props.availability ? (
+        <StatusLine availability={props.availability} locale={props.locale ?? 'en'} />
+      ) : null}
+      {props.onContact ? (
+        <section
+          aria-labelledby={`${searchId}-contact`}
+          className="flex flex-col gap-2 rounded-2xl border border-primary/40 bg-surface p-4"
+          data-testid="contact-card"
+        >
+          <h2 id={`${searchId}-contact`} className="text-[0.9375rem] font-semibold text-text">
+            {t('surface.contact.title')}
+          </h2>
+          <p className="text-sm text-text">{t('surface.contact.body')}</p>
+          <Button
+            id="hv-contact-open"
+            className="h-auto min-h-11 self-start whitespace-normal py-2"
+            onClick={props.onContact}
+          >
+            <MailIcon className="size-4" aria-hidden="true" />
+            {t('surface.contact.open')}
+          </Button>
+        </section>
+      ) : null}
       {props.suggestions.length ? (
         <section aria-labelledby={`${searchId}-suggestions`} className="flex flex-col gap-2">
           <h2 id={`${searchId}-suggestions`} className="text-sm font-medium text-text">
