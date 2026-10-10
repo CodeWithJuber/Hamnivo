@@ -8,6 +8,7 @@ import type {
   Agent,
   AuthorityConnection,
   Brand,
+  BrandInstall,
   Invitation,
   Member,
   ModelConnection,
@@ -31,12 +32,14 @@ const SETUP_PERMISSIONS = [
 
 export const canSetUp = (can: Can) => SETUP_PERMISSIONS.some((permission) => can(permission));
 
-export type SetupStepId = 'brand' | 'engine' | 'aikey' | 'agent' | 'team';
+export type SetupStepId = 'brand' | 'install' | 'engine' | 'aikey' | 'agent' | 'team';
 
 export interface SetupStep {
   id: SetupStepId;
   /** The page where the step is done. */
-  to: '/brands' | '/models' | '/agents' | '/team';
+  to: '/brands' | '/onboarding' | '/models' | '/agents' | '/team';
+  /** The guided setup opens at this step. */
+  search?: { step: 'install' };
   done: boolean;
 }
 
@@ -49,7 +52,12 @@ export type AgentFact = Pick<Agent, 'status' | 'publishedVersion'> & {
 /** What each list says, or `undefined` when this person cannot read it or it did not load. */
 export interface SetupFacts {
   connections: readonly Pick<AuthorityConnection, 'status'>[] | undefined;
-  brands: readonly Pick<Brand, 'status' | 'allowedOrigins'>[] | undefined;
+  brands: readonly Pick<Brand, 'id' | 'status' | 'allowedOrigins'>[] | undefined;
+  /**
+   * Where brands' chat code was seen running on their websites (HNV-01-04). Left out or not
+   * readable, the install step is not shown.
+   */
+  installs?: readonly Pick<BrandInstall, 'brandId'>[] | undefined;
   agents: readonly AgentFact[] | undefined;
   members: readonly Pick<Member, 'id'>[] | undefined;
   invitations: readonly Pick<Invitation, 'status'>[] | undefined;
@@ -97,9 +105,10 @@ function hasLiveAgent(agents: readonly AgentFact[]): boolean | undefined {
 
 /**
  * The setup steps this person can do and the lists can tell about, in the order to do them: the
- * brand and its website first, then the chat engine for it, an AI key, the agent and the team. A
- * step the lists cannot tell about is left out, never guessed. Nothing detects the install code
- * running on a website, so "add a brand" counts once a brand has a website allowed to load it.
+ * brand and its website first, then the chat code on that website, the chat engine, an AI key,
+ * the agent and the team. A step the lists cannot tell about is left out, never guessed. "Add a
+ * brand" counts once a brand has a website allowed to load it; the chat is on the website once a
+ * page there has loaded it (the gateway notes that, HNV-01-04).
  */
 export function setupSteps(facts: SetupFacts, can: Can): SetupStep[] {
   const steps: SetupStep[] = [];
@@ -108,6 +117,15 @@ export function setupSteps(facts: SetupFacts, can: Can): SetupStep[] {
       id: 'brand',
       to: '/brands',
       done: facts.brands.some((b) => b.status === 'active' && b.allowedOrigins.length > 0),
+    });
+  }
+  if (can('brands.manage') && facts.brands && facts.installs) {
+    const active = new Set(facts.brands.filter((b) => b.status === 'active').map((b) => b.id));
+    steps.push({
+      id: 'install',
+      to: '/onboarding',
+      search: { step: 'install' },
+      done: facts.installs.some((install) => active.has(install.brandId)),
     });
   }
   if (can('integrations.manage') && facts.connections) {

@@ -119,6 +119,11 @@ export const setupEn = {
         title: 'Add your brand and website',
         description: 'Name your brand and allow your website, so the chat can load there.',
       },
+      install: {
+        title: 'Put the chat on your website',
+        description:
+          'Paste the code on your website and open a page there. Studio sees it by itself.',
+      },
       engine: {
         title: 'Connect the chat engine',
         description: 'Connect it once for each brand, so chats reach your team.',
@@ -505,8 +510,25 @@ export const setupEn = {
       whereBody:
         'Paste it into every page where the chat should appear, just before the closing </body> tag. On a website builder, look for a place to add custom code or a script to the footer. The guide above shows the exact place.',
       addWebsite: 'Add your website',
-      cannotCheck:
-        'We can’t see your website from here, so we can’t check the code is on it. After you add it, open your website: the chat button should appear. Send a message from it and it shows up in your inbox.',
+      status: {
+        waiting: 'Waiting for your website',
+        waitingBody:
+          'Paste the code, save or publish your website, then open any page of it. This changes by itself once the chat loads there.',
+        check: 'Check now',
+        found: 'The chat is on your website',
+        foundBody:
+          'Open a page of your website and send a message from the chat: it shows up in your inbox.',
+        lastSeen: 'last seen {{time}}',
+        help: 'Not showing up?',
+        helpExact:
+          'The page must be on one of the websites above exactly, with the same https and www.',
+        helpCache:
+          'Open the page after saving it, or clear your website’s cache, so it uses the new code.',
+        helpPolicy:
+          'If your website has a content security policy, it must allow Hamnivo’s scripts, frames and connections.',
+        onWebsite: 'On your website',
+        notSeen: 'Not seen yet',
+      },
       done: 'I’ve added the code',
     },
     team: {

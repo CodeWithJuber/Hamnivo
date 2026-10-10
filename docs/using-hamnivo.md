@@ -88,8 +88,8 @@ Home starts with a block that depends on what you do:
   chats**: how many customers are waiting for a person and how many chats are assigned to you,
   with an **Open inbox** button.
 - If you can do any setup step, it shows **Get set up**, with the steps that are still open, in
-  the order to do them: add a brand and its website, connect the chat engine for it, add an AI
-  key, publish an AI agent, invite a teammate. Each step links to its page, and a step shows only
+  the order to do them: add a brand and its website, put the chat on that website, connect the
+  chat engine for it, add an AI key, publish an AI agent, invite a teammate. Each step links to its page, and a step shows only
   if you can do it. The list disappears when every step is done. A button on it, **Open guided
   setup**, opens the step-by-step guide at `/onboarding` (see the
   [setup guide](guide/setup/getting-started.md)). Two steps look further than a list can:
@@ -99,11 +99,15 @@ Home starts with a block that depends on what you do:
     answers with the offline practice model (the default until you choose a model) does not count,
     because customers would only get canned replies.
 
-  Studio cannot tell whether the install code is on your website, so "add a brand" counts once a
-  brand has a website allowed to load it. When no open step is one you can do, this block shows
-  nothing.
+  - "Add your brand and website" is done once a brand has a website allowed to load the chat.
+    "Put the chat on your website" is done once a page of that website has loaded the chat:
+    Hamnivo notices that by itself, from the chat's code running there. It opens the guided setup
+    at its install step, which turns green as soon as that happens.
 
-Below that, Home is the same for everyone: your brands with their chat connection and AI status,
+  When no open step is one you can do, this block shows nothing.
+
+Below that, Home is the same for everyone: your brands with their chat connection and AI status
+(and, for people who manage brands, when the chat was last seen on the brand's website),
 the AI stop switches, and the latest runs.
 
 ## Setting up without help

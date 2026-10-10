@@ -105,3 +105,62 @@ describe('editing a brand (board 04)', () => {
     expect((await other.owner.patch(brandPath(), { name: 'Taken' })).status).toBe(404);
   });
 });
+
+describe('where the chat runs (HNV-01-04)', () => {
+  let site: Awaited<ReturnType<typeof connectedTenant>>;
+  const installs = () => site.owner.get('/v1/admin/brands/installs');
+  const launcher = (origin?: string) =>
+    fetch(`${slice.baseUrl}/v1/widget/launcher?widgetId=${site.brand.widgetId}`, {
+      headers: origin ? { origin } : {},
+    });
+
+  beforeAll(async () => {
+    site = await connectedTenant(slice, 'install', { publishAgent: false });
+  });
+
+  it('notes an allowed website once its page loads the chat, and nothing else', async () => {
+    expect((await installs()).body).toEqual({ items: [] });
+    // A website the brand did not allow, and a request that names no website, are not installs.
+    expect((await launcher('https://evil.example')).status).toBe(403);
+    expect((await launcher()).status).toBe(200);
+    expect((await installs()).body).toEqual({ items: [] });
+
+    expect((await launcher(site.hostOrigin)).status).toBe(200);
+    const seen = await installs();
+    expect(seen.status).toBe(200);
+    expect(seen.body.items).toEqual([
+      {
+        brandId: site.brand.id,
+        origin: site.hostOrigin,
+        firstSeenAt: expect.any(String),
+        lastSeenAt: expect.any(String),
+      },
+    ]);
+    // Every page loads the launcher; a busy website is written every few minutes, not per page.
+    expect((await launcher(site.hostOrigin)).status).toBe(200);
+    expect((await installs()).body.items[0].lastSeenAt).toBe(seen.body.items[0].lastSeenAt);
+  });
+
+  it('is shown only to the brand’s own workspace', async () => {
+    const others = await shop.owner.get('/v1/admin/brands/installs');
+    expect(others.status).toBe(200);
+    expect(others.body.items.map((item: { brandId: string }) => item.brandId)).not.toContain(
+      site.brand.id,
+    );
+  });
+
+  it('forgets a website taken off the brand’s list', async () => {
+    const other = 'https://other.install.example';
+    expect(
+      (await site.owner.patch(`/v1/admin/brands/${site.brand.id}`, { allowedOrigins: [other] }))
+        .status,
+    ).toBe(200);
+    expect((await installs()).body).toEqual({ items: [] });
+    const rows = await withTenant(
+      slice.app,
+      { tenantId: fromPublicId('tenant', site.tenantId) },
+      (tx) => tx.select().from(schema.brandInstallSightings),
+    );
+    expect(rows).toEqual([]);
+  });
+});

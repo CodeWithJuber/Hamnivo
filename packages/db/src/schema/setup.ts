@@ -1,5 +1,7 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   foreignKey,
   index,
   jsonb,
@@ -129,6 +131,36 @@ export const onboardingProgress = pgTable(
     index('onboarding_progress_brand_idx').on(t.tenantId, t.brandId),
     foreignKey({
       name: 'onboarding_progress_brand_fk',
+      columns: [t.tenantId, t.brandId],
+      foreignColumns: [brands.tenantId, brands.id],
+    }),
+    tenantIsolation(),
+  ],
+);
+
+/**
+ * Where a brand's chat code was seen running (HNV-01-04): one row per brand and allowed website,
+ * written when a page on that website asks for the chat's launcher. Only a website the brand
+ * allows is recorded, and nothing about the visitor: the website, when it was first seen and
+ * when last (updated at most every few minutes). A website taken off the brand's list loses its
+ * row.
+ */
+export const brandInstallSightings = pgTable(
+  'brand_install_sightings',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    brandId: uuid('brand_id').notNull(),
+    origin: text('origin').notNull(),
+    firstSeenAt: tstz('first_seen_at').notNull().defaultNow(),
+    lastSeenAt: tstz('last_seen_at').notNull().defaultNow(),
+  },
+  (t) => [
+    unique('brand_install_sightings_tenant_id_id_key').on(t.tenantId, t.id),
+    uniqueIndex('brand_install_sightings_origin_key').on(t.tenantId, t.brandId, t.origin),
+    check('brand_install_sightings_origin_ck', sql`char_length(${t.origin}) between 1 and 300`),
+    foreignKey({
+      name: 'brand_install_sightings_brand_fk',
       columns: [t.tenantId, t.brandId],
       foreignColumns: [brands.tenantId, brands.id],
     }),
