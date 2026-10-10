@@ -53,16 +53,18 @@ test('reply checks start in comparison mode, take thresholds per language, publi
   await answerCheck.getByRole('radio', { name: 'فعال' }).click();
   await answerCheck.getByRole('button', { name: 'موڈ محفوظ کریں' }).click();
   await expect(answerCheck.getByRole('radio', { name: 'فعال' })).toBeChecked();
-  const checks = await workspace.staff.call<{ items: Array<{ task: string; mode: string }> }>(
-    'GET',
-    `/v1/admin/brands/${workspace.brand.id}/checks`,
-  );
-  expect(checks.items).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ task: 'answer-check', mode: 'live' }),
-      expect.objectContaining({ task: 'escalation', mode: 'shadow' }),
-    ]),
-  );
+  // The radio is checked as soon as it is clicked; the gateway has the new mode once the save
+  // lands, so ask until it does rather than racing it.
+  const modes = async () => {
+    const checks = await workspace.staff.call<{ items: Array<{ task: string; mode: string }> }>(
+      'GET',
+      `/v1/admin/brands/${workspace.brand.id}/checks`,
+    );
+    return Object.fromEntries(checks.items.map((item) => [item.task, item.mode]));
+  };
+  await expect
+    .poll(modes)
+    .toEqual(expect.objectContaining({ 'answer-check': 'live', escalation: 'shadow' }));
 
   violations.push(...(await audit(page, 'reply checks (ur)')));
   expect(violations).toEqual([]);

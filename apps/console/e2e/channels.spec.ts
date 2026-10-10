@@ -383,4 +383,7 @@ test('A11 · a channel down for 15 minutes shows a banner that leads to Channels
   await expect(page.locator('#page-title')).toBeVisible();
   await expect(banner).toHaveCount(0);
   expect(violations).toEqual([]);
+  // Studio keeps asking for notices; one still on its way when the test ends must not fail the
+  // next test ("route.fetch: Test ended").
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
