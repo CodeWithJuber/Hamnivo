@@ -126,6 +126,10 @@ export const hi: Translation = {
     },
   },
   states: {
+    stale: {
+      since: 'इसे रीफ़्रेश नहीं किया जा सका। {{time}} लोड किया गया डेटा दिख रहा है।',
+      unknown: 'इसे रीफ़्रेश नहीं किया जा सका। जो दिख रहा है वह पुराना हो सकता है।',
+    },
     forbiddenTitle: 'आपके पास इस पेज का एक्सेस नहीं है',
     forbiddenDescription: 'वर्कस्पेस के मालिक या एडमिन से एक्सेस देने के लिए कहें।',
     backToOverview: 'सारांश पर वापस जाएं',
@@ -284,6 +288,11 @@ export const hi: Translation = {
     since: '{{time}} से',
   },
   overview: {
+    degraded: {
+      title: 'होम का एक हिस्सा लोड नहीं हो सका',
+      description:
+        'Studio का बाक़ी हिस्सा काम कर रहा है, आपका इनबॉक्स भी। नीचे हर हिस्से को अलग से फिर आज़माया जा सकता है।',
+    },
     title: 'सारांश',
     greeting: 'फिर से स्वागत है, {{name}}।',
     chats: {

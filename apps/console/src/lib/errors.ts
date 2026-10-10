@@ -65,7 +65,12 @@ function keyOf(error: ApiError): ErrorKey {
     case 'INTERNAL':
       return 'internal';
     default:
-      return 'unknown';
+      // A code Studio does not know: the status still says whose problem it is. 502–504 is what
+      // the proxy answers while the gateway or a service behind it is down or restarting.
+      if (error.status === 502 || error.status === 503 || error.status === 504) {
+        return 'unavailable';
+      }
+      return error.status >= 500 ? 'internal' : 'unknown';
   }
 }
 

@@ -2,11 +2,12 @@ import { LoadingRegion, RecoverableError } from '@hamnivo/ui/components/async-st
 import { Button } from '@hamnivo/ui/components/button';
 import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import { Link } from '@tanstack/react-router';
-import { AlertCircleIcon, LockIcon } from 'lucide-react';
+import { AlertCircleIcon, AlertTriangleIcon, LockIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isApiError } from '../lib/api';
 import { describeError } from '../lib/errors';
+import { formatRelative } from '../lib/format';
 import { reauth } from '../lib/reauth';
 
 /** Permission-denied state: says what is missing and who can help (HNV-02-06, HNV-24-02). */
@@ -150,6 +151,41 @@ interface QueryLike<T> {
   isPending: boolean;
   isRefetching?: boolean;
   refetch: () => unknown;
+  /** When the data shown was loaded (milliseconds), for the notice after a failed refresh. */
+  dataUpdatedAt?: number;
+}
+
+/**
+ * The data shown is older than it should be: the last refresh failed (HNV-03-04). Says when it
+ * was loaded and retries this one request; the rest of the page is untouched.
+ */
+export function StaleNotice({
+  updatedAt,
+  onRetry,
+  retrying,
+}: {
+  updatedAt: number | undefined;
+  onRetry: () => void;
+  retrying: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="status"
+      data-testid="stale-notice"
+      className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-warning/40 bg-warning-subtle px-3 py-2 text-sm"
+    >
+      <AlertTriangleIcon className="size-4 shrink-0 text-warning" aria-hidden="true" />
+      <span className="min-w-0 flex-1 text-text">
+        {updatedAt
+          ? t('states.stale.since', { time: formatRelative(new Date(updatedAt).toISOString()) })
+          : t('states.stale.unknown')}
+      </span>
+      <Button type="button" variant="secondary" size="sm" busy={retrying} onClick={onRetry}>
+        {t('app.retry')}
+      </Button>
+    </div>
+  );
 }
 
 /**
@@ -164,6 +200,7 @@ export function QueryState<T>({
   skeleton,
   isEmpty,
   empty,
+  staleNotice = false,
   children,
 }: {
   query: QueryLike<T>;
@@ -173,6 +210,11 @@ export function QueryState<T>({
   skeleton?: ReactNode;
   isEmpty?: (data: T) => boolean;
   empty?: ReactNode;
+  /**
+   * After a failed refresh, keep showing the data with a notice that says how old it is and a
+   * retry (HNV-03-04). Without it the older data shows as if it were current.
+   */
+  staleNotice?: boolean;
   children: (data: T) => ReactNode;
 }) {
   const { t } = useTranslation();
@@ -205,6 +247,26 @@ export function QueryState<T>({
       </LoadingRegion>
     );
   }
-  if (isEmpty?.(query.data) && empty) return <>{empty}</>;
-  return <>{children(query.data)}</>;
+  const notice =
+    staleNotice && query.error ? (
+      <StaleNotice
+        updatedAt={query.dataUpdatedAt}
+        onRetry={() => query.refetch()}
+        retrying={query.isRefetching ?? false}
+      />
+    ) : null;
+  if (isEmpty?.(query.data) && empty) {
+    return (
+      <>
+        {notice}
+        {empty}
+      </>
+    );
+  }
+  return (
+    <>
+      {notice}
+      {children(query.data)}
+    </>
+  );
 }

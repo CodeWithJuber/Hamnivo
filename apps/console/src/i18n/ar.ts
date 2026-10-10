@@ -126,6 +126,10 @@ export const ar: Translation = {
     },
   },
   states: {
+    stale: {
+      since: 'تعذّر تحديث هذا. يُعرض ما حُمّل {{time}}.',
+      unknown: 'تعذّر تحديث هذا. قد يكون ما تراه قديمًا.',
+    },
     forbiddenTitle: 'ليس لديك وصول إلى هذه الصفحة',
     forbiddenDescription: 'اطلب من مالك مساحة العمل أو من مسؤول أن يمنحك الوصول.',
     backToOverview: 'العودة إلى النظرة العامة',
@@ -284,6 +288,10 @@ export const ar: Translation = {
     since: 'منذ {{time}}',
   },
   overview: {
+    degraded: {
+      title: 'تعذّر تحميل جزء من الصفحة الرئيسية',
+      description: 'باقي Studio يعمل، ومنه صندوق الوارد. يمكن إعادة محاولة كل جزء أدناه وحده.',
+    },
     title: 'نظرة عامة',
     greeting: 'مرحبًا بعودتك، {{name}}.',
     chats: {
