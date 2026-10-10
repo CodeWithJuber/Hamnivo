@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { CustomerMemoryCard } from '../src/components/memory/CustomerMemoryCard';
 import { initI18n } from '../src/i18n';
 import { aiPowerKeys } from '../src/lib/ai-power';
+import { formatDateTime } from '../src/lib/format';
 import { keys } from '../src/lib/queries';
 import type { MemoryCustomerDetail, MemoryItem } from '../src/lib/types';
 import { renderStudio, TENANT_ID, textOf } from './render';
@@ -130,11 +131,13 @@ describe('what the AI remembers, beside the conversation', () => {
     expect(text).toContain('Urdu');
     expect(text).toContain('Preferred name');
     expect(text).toContain('Sana');
-    // The source is named, with the day, and says when it came from this very conversation.
-    expect(text).toContain('Customer message · Oct 1, 2026');
-    expect(text).toMatch(/Customer message · Oct 1, 2026, 9:00 AM · this conversation/);
-    expect(text).toContain('Entered by staff · Sep 20, 2026');
-    expect(text).not.toMatch(/Entered by staff · Sep 20, 2026, 9:00 AM · this conversation/);
+    // The source is named, with the day, and says when it came from this very conversation. Times
+    // are shown in the viewer's own time zone, so the expected text is formatted the same way.
+    const observed = formatDateTime('2026-10-01T09:00:00.000Z');
+    const entered = formatDateTime('2026-09-20T09:00:00.000Z');
+    expect(text).toContain(`Customer message · ${observed} · this conversation`);
+    expect(text).toContain(`Entered by staff · ${entered}`);
+    expect(text).not.toContain(`Entered by staff · ${entered} · this conversation`);
     expect(html).toContain('data-testid="memory-card-items"');
   });
 

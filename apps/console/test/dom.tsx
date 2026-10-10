@@ -73,6 +73,10 @@ const PATHS = [
   '/models',
   '/onboarding',
   '/decisions',
+  // Where the command palette's tests go.
+  '/knowledge',
+  '/settings/billing',
+  '/visitors',
 ];
 
 const memberWith = (permissions: readonly string[]): Me =>
