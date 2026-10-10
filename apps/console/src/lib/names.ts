@@ -31,6 +31,9 @@ export function useBrandRefs() {
     items,
     pending: source.isPending && items === undefined,
     error: items === undefined ? source.error : null,
+    /** The last refresh failed while older names are still shown (HNV-03-04). */
+    refreshError: items === undefined ? null : source.error,
+    dataUpdatedAt: source.dataUpdatedAt,
     refetch: () => source.refetch(),
     isRefetching: source.isRefetching,
     permitted: can('brands.manage') || can('members.read'),

@@ -125,6 +125,10 @@ export const en = {
     },
   },
   states: {
+    stale: {
+      since: 'Couldn’t refresh this. Showing what was loaded {{time}}.',
+      unknown: 'Couldn’t refresh this. What you see may be out of date.',
+    },
     forbiddenTitle: 'You don’t have access to this page',
     forbiddenDescription: 'Ask a workspace owner or administrator to give you access.',
     backToOverview: 'Back to overview',
@@ -286,6 +290,11 @@ export const en = {
     since: 'Since {{time}}',
   },
   overview: {
+    degraded: {
+      title: 'Part of Home couldn’t load',
+      description:
+        'The rest of Studio works, including your inbox. Each part below can be tried again on its own.',
+    },
     title: 'Overview',
     greeting: 'Welcome back, {{name}}.',
     chats: {

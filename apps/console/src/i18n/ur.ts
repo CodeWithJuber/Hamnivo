@@ -126,6 +126,10 @@ export const ur: Translation = {
     },
   },
   states: {
+    stale: {
+      since: 'اسے تازہ نہیں کیا جا سکا۔ {{time}} لوڈ کیا گیا ڈیٹا دکھایا جا رہا ہے۔',
+      unknown: 'اسے تازہ نہیں کیا جا سکا۔ جو نظر آ رہا ہے وہ پرانا ہو سکتا ہے۔',
+    },
     forbiddenTitle: 'آپ کو اس صفحے تک رسائی نہیں ہے',
     forbiddenDescription: 'ورک اسپیس کے مالک یا ایڈمن سے رسائی دینے کو کہیں۔',
     backToOverview: 'جائزے پر واپس جائیں',
@@ -290,6 +294,11 @@ export const ur: Translation = {
     since: '{{time}} سے',
   },
   overview: {
+    degraded: {
+      title: 'ہوم کا ایک حصہ لوڈ نہیں ہو سکا',
+      description:
+        'Studio کا باقی حصہ کام کر رہا ہے، آپ کا ان باکس بھی۔ نیچے ہر حصے کو الگ سے دوبارہ آزمایا جا سکتا ہے۔',
+    },
     title: 'جائزہ',
     greeting: 'خوش آمدید، {{name}}۔',
     chats: {

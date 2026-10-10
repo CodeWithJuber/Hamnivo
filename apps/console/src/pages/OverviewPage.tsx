@@ -2,7 +2,7 @@ import { EmptyState } from '@hamnivo/ui/components/async-states';
 import { Button } from '@hamnivo/ui/components/button';
 import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import { Link } from '@tanstack/react-router';
-import { CircleCheckIcon, OctagonPauseIcon } from 'lucide-react';
+import { AlertTriangleIcon, CircleCheckIcon, OctagonPauseIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AgentBadge, ConnectionBadge, OutcomeBadge } from '../components/Badges';
 import { InstallBadge } from '../components/InstallStatus';
@@ -33,6 +33,95 @@ export function agentFor(agents: Agent[] | undefined, brandId: string): Agent | 
   return own.find((a) => a.isDefault) ?? own[0];
 }
 
+/*
+ * Placeholders in the shape of what loads into them (HNV-03-03), so nothing jumps when it arrives:
+ * a brand row with its name, three labelled badges and two buttons; a run with its outcome, agent,
+ * duration and time; the one line that says whether the AI is stopped.
+ */
+function BrandRowsSkeleton() {
+  return (
+    <ul className="flex flex-col divide-y divide-border" data-testid="brands-skeleton">
+      {[0, 1].map((row) => (
+        <li key={row} className="flex flex-wrap items-center gap-x-6 gap-y-3 py-3">
+          <Skeleton className="h-4 min-w-40 flex-1" />
+          {[0, 1, 2].map((column) => (
+            <span key={column} className="flex flex-col gap-1">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </span>
+          ))}
+          <span className="flex gap-2">
+            <Skeleton className="h-9 w-20 rounded-md" />
+            <Skeleton className="h-9 w-24 rounded-md" />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function RunsSkeleton() {
+  return (
+    <ul className="flex flex-col divide-y divide-border" data-testid="runs-skeleton">
+      {[0, 1, 2, 3, 4].map((row) => (
+        <li key={row} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
+          <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="h-3 min-w-24 flex-1" />
+          <Skeleton className="h-3 w-12" />
+          <Skeleton className="h-3 w-16" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function StopsSkeleton() {
+  return (
+    <div className="flex items-center gap-2" data-testid="stops-skeleton">
+      <Skeleton className="size-4 rounded-full" />
+      <Skeleton className="h-4 w-64 max-w-full" />
+    </div>
+  );
+}
+
+/**
+ * Part of Home failed to load or to refresh (HNV-03-04). The cards keep their own notices and
+ * retries; this says the rest of Studio, the inbox included, still works, with a way there.
+ */
+function DegradedNotice() {
+  const { t } = useTranslation();
+  const { can } = useTenant();
+  const brands = useBrandRefs();
+  const switches = useKillSwitches();
+  const runs = useRuns({}, 5);
+  const failed =
+    (brands.permitted && Boolean(brands.error ?? brands.refreshError)) ||
+    (can('agents.read') && Boolean(switches.error)) ||
+    (can('analytics.read') && Boolean(runs.error));
+  if (!failed) return null;
+  return (
+    <section
+      role="status"
+      aria-labelledby="overview-degraded-title"
+      data-testid="overview-degraded"
+      className="flex flex-wrap items-start gap-3 rounded-lg border border-warning/40 bg-warning-subtle p-4"
+    >
+      <AlertTriangleIcon className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+        <h2 id="overview-degraded-title" className="font-semibold text-text">
+          {t('overview.degraded.title')}
+        </h2>
+        <p className="text-text-secondary">{t('overview.degraded.description')}</p>
+      </div>
+      {can('conversations.read') ? (
+        <Button asChild variant="secondary" size="sm">
+          <Link to="/inbox">{t('overview.chats.open')}</Link>
+        </Button>
+      ) : null}
+    </section>
+  );
+}
+
 function BrandsSection() {
   const { t } = useTranslation();
   const { can } = useTenant();
@@ -48,12 +137,15 @@ function BrandsSection() {
       <QueryState
         query={{
           data: brands.items,
-          error: brands.error,
+          error: brands.error ?? brands.refreshError,
           isPending: brands.pending,
           isRefetching: brands.isRefetching,
           refetch: brands.refetch,
+          dataUpdatedAt: brands.dataUpdatedAt,
         }}
         label={t('overview.brands.loading')}
+        skeleton={<BrandRowsSkeleton />}
+        staleNotice
         permitted={brands.permitted}
         isEmpty={(items) => items.length === 0}
         empty={
@@ -162,7 +254,12 @@ function StopsSection() {
         </Button>
       }
     >
-      <QueryState query={switches} label={t('overview.stops.loading')}>
+      <QueryState
+        query={switches}
+        label={t('overview.stops.loading')}
+        skeleton={<StopsSkeleton />}
+        staleNotice
+      >
         {(data) => {
           const active = data.items.filter((s) => s.active);
           if (active.length === 0) {
@@ -219,6 +316,8 @@ function RunsSection() {
       <QueryState
         query={{ ...runs, data: first }}
         label={t('overview.runs.loading')}
+        skeleton={<RunsSkeleton />}
+        staleNotice
         isEmpty={(page) => page.items.length === 0}
         empty={
           <EmptyState
@@ -280,6 +379,7 @@ export function OverviewPage() {
           </>
         }
       />
+      <DegradedNotice />
       {staffOnly && can('conversations.read') ? <YourChats /> : null}
       <GetSetUp />
       {can('agents.read') ? <StopsSection /> : null}

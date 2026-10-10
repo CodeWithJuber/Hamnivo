@@ -822,6 +822,29 @@
     ],
     "note": "A new workspace’s overview says what to do first: a Get set up list with the steps still open (connect the chat engine, add a brand and install the chat, publish an AI agent, invite a teammate), each linking to its page and gone once all are done; people who do not run the workspace see their chats instead (tested). The test widget comes later."
   },
+  "HNV-03-03": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/OverviewPage.tsx",
+      "apps/console/src/components/States.tsx",
+      "apps/console/test/overview-states.test.tsx",
+      "apps/console/e2e/overview-states.spec.ts"
+    ],
+    "note": "While Home loads, each card shows a placeholder in the shape of what loads into it (a brand row with its name, three labelled badges and two buttons; five runs; the stop line) with a hidden status naming what is loading, and turns into a retry after 15 seconds. Tested as rendered HTML and in Chromium with the brands held back: the card keeps its width and its height within a row. The setup list above appears only once its own lists are in, so where the cards sit can still move on a new workspace."
+  },
+  "HNV-03-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/OverviewPage.tsx",
+      "apps/console/src/components/States.tsx",
+      "apps/console/src/lib/errors.ts",
+      "apps/console/src/lib/names.ts",
+      "apps/console/test/overview-states.test.tsx",
+      "apps/console/test/errors.test.ts",
+      "apps/console/e2e/overview-states.spec.ts"
+    ],
+    "note": "A card that fails says why with its own Try again, which asks again for that card only; the others stay as they are. A card whose refresh failed keeps what it showed with a notice saying when that was loaded, and its own retry. Home then says the rest of Studio works, inbox included, with Open inbox. A 502, 503 or 504 the proxy answers is named as a service not responding, not 'something went wrong'. Tested in jsdom against a fake gateway (mutation-checked) and in Chromium with one card's answers failed, axe clean."
+  },
   "HNV-03-05": {
     "status": "implemented",
     "evidence": [

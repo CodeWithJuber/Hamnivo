@@ -110,6 +110,11 @@ Below that, Home is the same for everyone: your brands with their chat connectio
 (and, for people who manage brands, when the chat was last seen on the brand's website),
 the AI stop switches, and the latest runs.
 
+Each part of Home loads on its own. If one cannot load, it says why and has its own **Try again**;
+the rest of Home stays as it is, and a note at the top says the rest of Studio, your inbox
+included, still works, with an **Open inbox** button. If a part could not be refreshed, it keeps
+what it showed and says when that was loaded.
+
 ## Setting up without help
 
 A business owner can set Hamnivo up from Studio alone. The guides for it are in
