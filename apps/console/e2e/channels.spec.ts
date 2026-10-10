@@ -326,12 +326,17 @@ test('A11 · a channel down for 15 minutes shows a banner that leads to Channels
   let unhealthy = [down('inbox_e2e_1', 'whatsapp', workspace.brand.id, workspace.brand.name)];
   // The notices as the gateway sends them, with channels that stopped working added.
   await page.route('**/v1/workspace/notices', async (route) => {
-    const response = await route.fetch();
-    const body = (await response.json()) as Record<string, unknown>;
-    await route.fulfill({
-      status: response.status(),
-      json: { ...body, unhealthyChannels: unhealthy },
-    });
+    try {
+      const response = await route.fetch();
+      const body = (await response.json()) as Record<string, unknown>;
+      await route.fulfill({
+        status: response.status(),
+        json: { ...body, unhealthyChannels: unhealthy },
+      });
+    } catch {
+      // A poll still on its way when the page navigates is dropped with the page ("Response has
+      // been disposed"); there is nobody left to answer. The banner checks below still apply.
+    }
   });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/inbox?lang=en');
@@ -383,4 +388,7 @@ test('A11 · a channel down for 15 minutes shows a banner that leads to Channels
   await expect(page.locator('#page-title')).toBeVisible();
   await expect(banner).toHaveCount(0);
   expect(violations).toEqual([]);
+  // Studio keeps asking for notices; one still on its way when the test ends must not fail the
+  // next test ("route.fetch: Test ended").
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
