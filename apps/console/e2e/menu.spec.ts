@@ -97,10 +97,12 @@ test('HNV-03-01 HNV-03-02 · Home starts with what is left to set up, or with th
   await workspace.staff.signIn(context);
   await page.goto('/overview');
 
-  // Brand and chat engine are done. The published agent answers with the offline practice model
-  // and there is no AI key yet, so those two are still open; the owner has not invited anyone.
+  // Brand and chat engine are done. No page of the website has loaded the chat yet. The published
+  // agent answers with the offline practice model and there is no AI key yet, so those two are
+  // still open; the owner has not invited anyone.
   const steps = page.getByTestId('setup-steps');
-  await expect(steps.getByRole('link')).toHaveCount(3);
+  await expect(steps.getByRole('link')).toHaveCount(4);
+  await expect(steps).toContainText('Put the chat on your website');
   await expect(steps).toContainText('Add an AI key');
   await expect(steps).toContainText('Publish an AI agent');
   await expect(steps).toContainText('Invite a teammate');

@@ -50,9 +50,11 @@ closes the search.
 Some pages are not in the menu:
 
 - **Stop AI** is a red button in the header, on every page, for people who can stop the AI
-  (permission to publish agents). It opens the Stop AI page.
+  (permission to publish agents). It opens the Stop AI page. On a phone it shows only its red
+  stop icon, so the header stays one row.
 - **Account security** and the **Platform console** (operators only) are in the account area at
-  the bottom of the menu, which is a sheet on a phone.
+  the bottom of the menu, which is a sheet on a phone. On a phone, the language is chosen in that
+  sheet too, above the account area; on wider screens it is at the top of the page.
 - [**Live visitors**](guide/inbox/live-visitors.md) (everyone who can read chats) and
   [**Saved replies and tags**](guide/inbox/saved-replies.md) (people who manage the inbox) are
   buttons above the list of chats in the inbox. A row of links for them would push the inbox down.
@@ -86,8 +88,8 @@ Home starts with a block that depends on what you do:
   chats**: how many customers are waiting for a person and how many chats are assigned to you,
   with an **Open inbox** button.
 - If you can do any setup step, it shows **Get set up**, with the steps that are still open, in
-  the order to do them: add a brand and its website, connect the chat engine for it, add an AI
-  key, publish an AI agent, invite a teammate. Each step links to its page, and a step shows only
+  the order to do them: add a brand and its website, put the chat on that website, connect the
+  chat engine for it, add an AI key, publish an AI agent, invite a teammate. Each step links to its page, and a step shows only
   if you can do it. The list disappears when every step is done. A button on it, **Open guided
   setup**, opens the step-by-step guide at `/onboarding` (see the
   [setup guide](guide/setup/getting-started.md)). Two steps look further than a list can:
@@ -97,12 +99,21 @@ Home starts with a block that depends on what you do:
     answers with the offline practice model (the default until you choose a model) does not count,
     because customers would only get canned replies.
 
-  Studio cannot tell whether the install code is on your website, so "add a brand" counts once a
-  brand has a website allowed to load it. When no open step is one you can do, this block shows
-  nothing.
+  - "Add your brand and website" is done once a brand has a website allowed to load the chat.
+    "Put the chat on your website" is done once a page of that website has loaded the chat:
+    Hamnivo notices that by itself, from the chat's code running there. It opens the guided setup
+    at its install step, which turns green as soon as that happens.
 
-Below that, Home is the same for everyone: your brands with their chat connection and AI status,
+  When no open step is one you can do, this block shows nothing.
+
+Below that, Home is the same for everyone: your brands with their chat connection and AI status
+(and, for people who manage brands, when the chat was last seen on the brand's website),
 the AI stop switches, and the latest runs.
+
+Each part of Home loads on its own. If one cannot load, it says why and has its own **Try again**;
+the rest of Home stays as it is, and a note at the top says the rest of Studio, your inbox
+included, still works, with an **Open inbox** button. If a part could not be refreshed, it keeps
+what it showed and says when that was loaded.
 
 ## Setting up without help
 

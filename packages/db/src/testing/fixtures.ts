@@ -1452,6 +1452,12 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       brandId: ids.brandId,
       appearance: { primaryColor: '#192A30', radius: 12, csat: true },
     });
+    // The chat code was seen on the brand's website.
+    await tx.insert(s.brandInstallSightings).values({
+      tenantId,
+      brandId: ids.brandId,
+      origin: 'https://shop.example',
+    });
     // The second conversation is the one an owner opened to try the chat; the first one carries
     // the order and the run that reports are built on, so it must stay a real one.
     await tx.insert(s.testConversations).values({

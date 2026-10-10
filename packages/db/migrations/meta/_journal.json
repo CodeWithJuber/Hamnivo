@@ -407,6 +407,20 @@
       "when": 1791566518044,
       "tag": "20261009172158_email_tickets",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1791614232351,
+      "tag": "20261010063712_brand_install_sightings",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791614239839,
+      "tag": "20261010063719_brand_install_sightings_security",
+      "breakpoints": true
     }
   ]
 }

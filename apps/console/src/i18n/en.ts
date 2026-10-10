@@ -125,6 +125,10 @@ export const en = {
     },
   },
   states: {
+    stale: {
+      since: 'Couldn’t refresh this. Showing what was loaded {{time}}.',
+      unknown: 'Couldn’t refresh this. What you see may be out of date.',
+    },
     forbiddenTitle: 'You don’t have access to this page',
     forbiddenDescription: 'Ask a workspace owner or administrator to give you access.',
     backToOverview: 'Back to overview',
@@ -286,6 +290,11 @@ export const en = {
     since: 'Since {{time}}',
   },
   overview: {
+    degraded: {
+      title: 'Part of Home couldn’t load',
+      description:
+        'The rest of Studio works, including your inbox. Each part below can be tried again on its own.',
+    },
     title: 'Overview',
     greeting: 'Welcome back, {{name}}.',
     chats: {
@@ -430,6 +439,7 @@ export const en = {
       'Each agent answers for one brand. Changes are saved as drafts and go live only when you publish.',
     loading: 'Loading agents',
     columns: {
+      answers: 'Where it answers',
       name: 'Agent',
       brand: 'Brand',
       model: 'Model',
@@ -444,6 +454,30 @@ export const en = {
       title: 'No AI agents yet',
       description:
         'Connecting a brand to Chatwoot creates its assistant as a draft. You can also create one here.',
+    },
+    draftModel: 'Draft: {{model}}',
+    noPurpose: 'No purpose written yet.',
+    answers: {
+      customers:
+        'Answers customers of {{brand}} in web chat and on the brand’s channels where the AI is on.',
+      assist: 'Suggests replies to your team on {{brand}}’s chats. It never writes to customers.',
+      notDefault:
+        'Answers no one: only the default agent of {{brand}} answers. Make it the default to use it.',
+      notLive: 'Answers no one yet: it has not been published.',
+      archived: 'Archived. It answers no one.',
+    },
+    filters: {
+      search: 'Search agents',
+      searchHint: 'By name, display name, purpose, brand or model.',
+      brand: 'Brand',
+      allBrands: 'All brands',
+      state: 'Show',
+      all: 'All agents',
+      answering: 'Answering now',
+      idle: 'Not answering',
+      count: 'Showing {{shown}} of {{total}} agents.',
+      none: 'No agent matches these filters.',
+      clear: 'Clear filters',
     },
     createForm: {
       title: 'Create an agent',

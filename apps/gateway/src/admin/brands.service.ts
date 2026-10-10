@@ -1,5 +1,6 @@
 import type {
   Brand,
+  BrandInstall,
   CreateBrandRequest,
   SetBusinessHoursRequest,
   UpdateBrandRequest,
@@ -16,7 +17,7 @@ import {
 } from '@hamnivo/db';
 import { authorize, type Permission, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
 import { queueFirstBrandSetup } from '../authority/provisioning.service.js';
 import { AppError } from '../common/app-error.js';
@@ -75,6 +76,42 @@ export class BrandsService {
           }).allowed,
       )
       .map(brandView);
+  }
+
+  /**
+   * Where the chat code of each brand this person manages was seen running (HNV-01-04): only on
+   * websites the brand still allows, the most recently seen first.
+   */
+  async installs(principal: StaffPrincipal): Promise<BrandInstall[]> {
+    const rows = await this.tx(principal, (tx) =>
+      tx
+        .select({
+          brandId: schema.brandInstallSightings.brandId,
+          origin: schema.brandInstallSightings.origin,
+          firstSeenAt: schema.brandInstallSightings.firstSeenAt,
+          lastSeenAt: schema.brandInstallSightings.lastSeenAt,
+          workspaceId: schema.brands.workspaceId,
+          allowedOrigins: schema.brands.allowedOrigins,
+        })
+        .from(schema.brandInstallSightings)
+        .innerJoin(schema.brands, eq(schema.brands.id, schema.brandInstallSightings.brandId))
+        .orderBy(desc(schema.brandInstallSightings.lastSeenAt)),
+    );
+    return rows
+      .filter(
+        (row) =>
+          row.allowedOrigins.includes(row.origin) &&
+          this.allowed(principal, 'brands.manage', {
+            workspaceId: row.workspaceId,
+            brandId: row.brandId,
+          }).allowed,
+      )
+      .map((row) => ({
+        brandId: toPublicId('brand', row.brandId),
+        origin: row.origin,
+        firstSeenAt: row.firstSeenAt.toISOString(),
+        lastSeenAt: row.lastSeenAt.toISOString(),
+      }));
   }
 
   async create(
@@ -190,6 +227,17 @@ export class BrandsService {
               .set({ revokedAt: now, revokeReason: 'origin_removed' })
               .where(and(open, inArray(schema.widgetSessions.hostOrigin, refused)))
               .returning({ id: schema.widgetSessions.id });
+      // A website taken off the list is no longer where the chat is installed (HNV-01-04).
+      if (removed.length > 0) {
+        await tx
+          .delete(schema.brandInstallSightings)
+          .where(
+            and(
+              eq(schema.brandInstallSightings.brandId, brand.id),
+              inArray(schema.brandInstallSightings.origin, removed),
+            ),
+          );
+      }
 
       await appendAudit(tx, {
         actorType: 'staff',

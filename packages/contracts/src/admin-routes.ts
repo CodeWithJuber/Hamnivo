@@ -33,6 +33,7 @@ import {
 import {
   AuthorityConnection,
   Brand,
+  BrandInstall,
   ConnectChatwootRequest,
   CreateBrandRequest,
   CreatedIdentityKey,
@@ -379,6 +380,20 @@ export const adminRoutes = {
     tags: ['Administration'],
     auth: 'staff_session',
     success: { status: 200, description: 'Brands', schema: z.object({ items: z.array(Brand) }) },
+  },
+  listBrandInstalls: {
+    method: 'get',
+    path: '/v1/admin/brands/installs',
+    operationId: 'listBrandInstalls',
+    summary:
+      'Where each brand’s chat code was seen running, on its allowed websites (brands.manage)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    success: {
+      status: 200,
+      description: 'Websites where the chat was seen',
+      schema: z.object({ items: z.array(BrandInstall) }),
+    },
   },
   createBrand: {
     method: 'post',

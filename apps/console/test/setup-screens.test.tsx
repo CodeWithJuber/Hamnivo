@@ -1042,9 +1042,10 @@ describe('the guided setup', () => {
   });
 
   describe('installing the chat', () => {
-    const install = (patch: Record<string, unknown> = {}) =>
+    const install = (patch: Record<string, unknown> = {}, installs: unknown[] = []) =>
       onboarding('install', [
         put(setupKeys.onboarding, progress({}, { brandId: 'brd_1' })),
+        put(keys.brandInstalls, { items: installs }),
         ...workspaceLists({ brands: [{ ...brand, ...patch }], connections: [connection] }),
       ]);
 
@@ -1081,18 +1082,55 @@ describe('the guided setup', () => {
       expect(textOf(html)).toContain('Where does this code go?');
     });
 
-    it('is honest that Studio cannot see the website', async () => {
-      const html = await install();
-      const note = html.match(/data-testid="install-honest-note"[^>]*>([\s\S]*?)<\/p>/)?.[1];
-      expect(textOf(note ?? '')).toContain('We can’t see your website from here');
-      expect(textOf(note ?? '')).toContain('the chat button should appear');
-      // Nothing claims the code was found.
-      expect(textOf(html)).not.toContain('Widget detected');
+    it('waits for the website, says what to do and how to check, and claims nothing (HNV-01-03)', async () => {
+      const html = await install({}, []);
+      const status = html.match(/data-testid="install-status"[\s\S]*?<\/section>/)?.[0] ?? '';
+      expect(status).toContain('data-state="waiting"');
+      expect(status).toContain('role="status"');
+      expect(textOf(status)).toContain('Waiting for your website');
+      expect(textOf(status)).toContain('then open any page of it');
+      expect(status).toContain('data-testid="install-check"');
+      expect(textOf(status)).toContain('Not showing up?');
+      expect(textOf(status)).toContain('with the same https and www');
+      expect(textOf(status)).toContain('content security policy');
+      expect(textOf(html)).not.toContain('The chat is on your website');
+    });
+
+    it('says the chat is on the website once a page there loaded it, and where (HNV-01-04)', async () => {
+      const html = await install({}, [
+        {
+          brandId: 'brd_1',
+          origin: 'https://noor.example',
+          firstSeenAt: new Date(Date.now() - 600_000).toISOString(),
+          lastSeenAt: new Date(Date.now() - 120_000).toISOString(),
+        },
+      ]);
+      const status = html.match(/data-testid="install-status"[\s\S]*?<\/section>/)?.[0] ?? '';
+      expect(status).toContain('data-state="found"');
+      expect(textOf(status)).toContain('The chat is on your website');
+      expect(textOf(status)).toContain('https://noor.example');
+      expect(textOf(status)).toContain('last seen 2 minutes ago');
+      expect(status).not.toContain('data-testid="install-check"');
+    });
+
+    it('does not count another brand’s website', async () => {
+      const html = await install({}, [
+        {
+          brandId: 'brd_other',
+          origin: 'https://other.example',
+          firstSeenAt: '2026-10-01T09:00:00.000Z',
+          lastSeenAt: '2026-10-01T09:00:00.000Z',
+        },
+      ]);
+      expect(html).toContain('data-state="waiting"');
+      expect(textOf(html)).not.toContain('https://other.example');
     });
 
     it('warns when no website may load the chat yet, and links to where to add one', async () => {
       const html = await install({ allowedOrigins: [] });
       expect(html).toContain('data-testid="install-no-websites"');
+      // There is nothing to wait for until a website is allowed.
+      expect(html).not.toContain('data-testid="install-status"');
       const add = anchors(html).find((link) => link.text === 'Add your website');
       expect(add?.href).toBe('/brands#brand-brd_1');
     });

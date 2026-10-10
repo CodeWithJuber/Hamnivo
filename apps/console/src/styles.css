@@ -56,11 +56,17 @@ html[data-masked] [data-maskable] {
   user-select: none;
 }
 
-/* Code and snippets keep their own direction and wrap instead of widening the page. */
+/* Code and snippets keep their own direction and wrap instead of widening the page. An inline
+   element's direction only applies with unicode-bidi, and a snippet in a <pre> is a block of its
+   own, so in Arabic and Urdu it reads `<script src=…>` from the left, not reordered. */
 .hv-code {
   font-family: var(--font-mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   direction: ltr;
+  unicode-bidi: isolate;
   text-align: left;
+}
+pre > .hv-code {
+  display: block;
 }

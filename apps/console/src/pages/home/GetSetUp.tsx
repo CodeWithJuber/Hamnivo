@@ -9,6 +9,7 @@ import {
   useAgentDetails,
   useAgents,
   useAuthorityConnections,
+  useBrandInstalls,
   useBrands,
   useMembers,
   useModelConnections,
@@ -21,6 +22,7 @@ function Checklist() {
   const { can, me } = useTenant();
   const connections = useAuthorityConnections();
   const brands = useBrands();
+  const installs = useBrandInstalls();
   const agents = useAgents();
   const members = useMembers();
   const invitations = useInvitations();
@@ -36,6 +38,7 @@ function Checklist() {
     [
       connections,
       brands,
+      installs,
       agents,
       members,
       invitations,
@@ -60,6 +63,7 @@ function Checklist() {
     {
       connections: connections.data?.items,
       brands: brands.data?.items,
+      installs: installs.data?.items,
       agents: facts,
       members: members.data?.items,
       invitations: invitations.data?.items,
@@ -92,6 +96,7 @@ function Checklist() {
           <li key={step.id}>
             <Link
               to={step.to}
+              {...(step.search ? { search: step.search } : {})}
               data-step={step.id}
               className="flex items-center gap-3 rounded-lg border border-border p-3 hover:bg-surface-sunken"
             >

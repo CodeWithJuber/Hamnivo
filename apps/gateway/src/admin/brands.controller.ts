@@ -25,6 +25,13 @@ export class BrandsController {
     return { items: await this.brands.list(principal) };
   }
 
+  /** Where each brand's chat code was seen running (HNV-01-04). Before `:brandId` routes. */
+  @Get('installs')
+  @StaffRoute({ tenant: true, permission: 'brands.manage' })
+  async installs(@CurrentPrincipal() principal: StaffPrincipal) {
+    return { items: await this.brands.installs(principal) };
+  }
+
   @Post()
   @StaffRoute({ tenant: true, permission: 'brands.manage' })
   async create(

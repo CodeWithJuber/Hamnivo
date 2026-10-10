@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CopyButton } from '../../components/CopyButton';
 import { SelectField } from '../../components/Fields';
+import { InstallStatus } from '../../components/InstallStatus';
 import { DOCS } from '../../lib/docs';
 import {
   guideSlug,
@@ -17,8 +18,8 @@ import type { Brand } from '../../lib/types';
 
 /**
  * Step 6: put the chat on the website. Pick where the website is built to get that platform's
- * guide, and copy the code. Nothing here can see the website, so the step says so plainly and
- * tells the owner how to check for themselves.
+ * guide, and copy the code. The step then waits for a page of the brand's website to load the
+ * chat, and says so as soon as one does (HNV-01-03, HNV-01-04).
  */
 export function InstallStep({
   brand,
@@ -113,12 +114,7 @@ export function InstallStep({
           </ul>
         )}
       </div>
-      <p
-        className="rounded-lg border border-border bg-surface-sunken p-3 text-sm text-text"
-        data-testid="install-honest-note"
-      >
-        {t('setup.onboarding.install.cannotCheck')}
-      </p>
+      {brand.allowedOrigins.length > 0 ? <InstallStatus brand={brand} /> : null}
       <div>
         <Button type="button" onClick={() => void onDone()}>
           {t('setup.onboarding.install.done')}

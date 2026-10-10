@@ -48,6 +48,7 @@ describe('who is looked at for setup at all', () => {
 const nothingYet: SetupFacts = {
   connections: [],
   brands: [],
+  installs: [],
   agents: [],
   members: [{ id: 'staff_me' }],
   invitations: [],
@@ -56,7 +57,8 @@ const nothingYet: SetupFacts = {
 };
 const allDone: SetupFacts = {
   connections: [{ status: 'active' }],
-  brands: [{ status: 'active', allowedOrigins: ['https://shop.example.com'] }],
+  brands: [{ id: 'brd_1', status: 'active', allowedOrigins: ['https://shop.example.com'] }],
+  installs: [{ brandId: 'brd_1' }],
   agents: [{ status: 'active', publishedVersion: 1, usesMock: false }],
   members: [{ id: 'staff_me' }, { id: 'staff_other' }],
   invitations: [],
@@ -68,10 +70,12 @@ const done = (facts: SetupFacts, can = owner) =>
   Object.fromEntries(setupSteps(facts, can).map((step) => [step.id, step.done]));
 
 describe('setup steps', () => {
-  it('lists the five steps in order for a new workspace, each with its page', () => {
-    // The brand and its website come first: the chat engine is connected for a brand.
+  it('lists the six steps in order for a new workspace, each with its page', () => {
+    // The brand and its website come first, then the code on that website; the chat engine is
+    // connected for a brand.
     expect(setupSteps(nothingYet, owner)).toEqual([
       { id: 'brand', to: '/brands', done: false },
+      { id: 'install', to: '/onboarding', search: { step: 'install' }, done: false },
       { id: 'engine', to: '/brands', done: false },
       { id: 'aikey', to: '/models', done: false },
       { id: 'agent', to: '/agents', done: false },
@@ -82,6 +86,7 @@ describe('setup steps', () => {
   it('marks every step done when there is nothing left', () => {
     expect(done(allDone)).toEqual({
       brand: true,
+      install: true,
       engine: true,
       aikey: true,
       agent: true,
@@ -100,10 +105,30 @@ describe('setup steps', () => {
 
   it('counts a brand once it can load the chat on a website', () => {
     const brand = (status: 'active' | 'disabled', allowedOrigins: string[]) =>
-      done({ ...nothingYet, brands: [{ status, allowedOrigins }] }).brand;
+      done({ ...nothingYet, brands: [{ id: 'brd_1', status, allowedOrigins }] }).brand;
     expect(brand('active', ['https://shop.example.com'])).toBe(true);
     expect(brand('active', [])).toBe(false);
     expect(brand('disabled', ['https://shop.example.com'])).toBe(false);
+  });
+
+  it('counts the chat as on the website once a page of an active brand’s website loaded it (HNV-01-04)', () => {
+    const brands: SetupFacts['brands'] = [
+      { id: 'brd_1', status: 'active', allowedOrigins: ['https://shop.example.com'] },
+      { id: 'brd_2', status: 'disabled', allowedOrigins: ['https://old.example.com'] },
+    ];
+    const installed = (installs: SetupFacts['installs']) =>
+      setupSteps({ ...nothingYet, brands, installs }, owner).find((step) => step.id === 'install')
+        ?.done;
+    expect(installed([{ brandId: 'brd_1' }])).toBe(true);
+    expect(installed([])).toBe(false);
+    // A brand that is switched off does not count, nor one this person cannot see.
+    expect(installed([{ brandId: 'brd_2' }])).toBe(false);
+    expect(installed([{ brandId: 'brd_other' }])).toBe(false);
+    // Not readable: the step is left out rather than guessed.
+    expect(installed(undefined)).toBeUndefined();
+    expect(
+      setupSteps({ ...nothingYet, installs: [] }, role('agent')).map((step) => step.id),
+    ).not.toContain('install');
   });
 
   describe('the AI key', () => {
@@ -197,19 +222,19 @@ describe('setup steps', () => {
       setupSteps({ ...nothingYet, connections: undefined, agents: undefined }, owner).map(
         (step) => step.id,
       ),
-    ).toEqual(['brand', 'aikey', 'team']);
+    ).toEqual(['brand', 'install', 'aikey', 'team']);
   });
 
   it('shows a step only to someone who can do it', () => {
     const ids = (can: (permission: string) => boolean) =>
       setupSteps(nothingYet, can).map((step) => step.id);
-    expect(ids(holding('brands.manage'))).toEqual(['brand']);
+    expect(ids(holding('brands.manage'))).toEqual(['brand', 'install']);
     expect(ids(holding('integrations.manage'))).toEqual(['engine', 'aikey']);
     expect(ids(holding('agents.publish'))).toEqual(['agent']);
     expect(ids(holding('members.invite'))).toEqual(['team']);
     expect(ids(holding())).toEqual([]);
     // A supervisor reads agents and the team but publishes and invites nothing.
     expect(ids(role('supervisor'))).toEqual([]);
-    expect(ids(role('admin'))).toEqual(['brand', 'engine', 'aikey', 'agent', 'team']);
+    expect(ids(role('admin'))).toEqual(['brand', 'install', 'engine', 'aikey', 'agent', 'team']);
   });
 });
