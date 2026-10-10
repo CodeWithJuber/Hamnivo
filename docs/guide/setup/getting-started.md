@@ -77,11 +77,25 @@ This puts the chat on your website.
 3. Press **Copy install code**.
 4. Paste it where the guide says. On most websites that is every page, just before the closing
    `</body>` tag, or in a box for custom code in the footer.
-5. Open your website. A chat button should appear in the corner.
-6. Press **I've added the code**.
+5. Open any page of your website. A chat button should appear in the corner.
+6. Back in Studio, the box **Waiting for your website** turns green and says **The chat is on your
+   website**, with your website's address. You don't need to do anything: it checks again every
+   few seconds, or press **Check now**.
+7. Press **I've added the code**.
 
-Studio cannot see your website, so it cannot tell you whether the code is there. Check it
-yourself, as in step 5. If you send a message from your website, it shows up in your **Inbox**.
+Hamnivo knows the code works when a page of your website loads the chat. It notes only your
+website's address and the time, nothing about your visitors. Home shows it too: each brand says
+when its chat was last seen on its website.
+
+If the box stays on **Waiting for your website**, open **Not showing up?**:
+
+- The page's address must match a website on the allowed list exactly, including `https` and
+  `www` if you use it.
+- Open the page again after saving it, or clear your website's cache, so it uses the new code.
+- If your website has a content security policy, it must allow Hamnivo's scripts, frames and
+  connections.
+
+Send a message from your website to try it: it shows up in your **Inbox**.
 
 If the step warns that no website is allowed yet, press **Add your website**. Only a website on
 the allowed list can show the chat.

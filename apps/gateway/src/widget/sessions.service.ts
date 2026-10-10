@@ -15,7 +15,7 @@ import {
   toPublicId,
   withTenant,
 } from '@hamnivo/db';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import { decodeProtectedHeader, importJWK, type JWK, jwtVerify } from 'jose';
 import { asksAnyoneOnline } from '../automations/definitions.js';
@@ -29,6 +29,7 @@ import { isBlocked } from '../visitors/blocks.js';
 import { filesScannable } from './attachments.service.js';
 import { consentState } from './consent.js';
 import { launcherConfig, widgetConfig } from './copy.js';
+import { recordSighting, SightingThrottle, sightedOrigin } from './install-sightings.js';
 import { DIRECT_ORIGIN, frameAncestors, originAllowed, sessionOrigin } from './origins.js';
 import { SessionSignals } from './session-signals.service.js';
 import { brandSurface } from './settings.service.js';
@@ -56,6 +57,10 @@ type BrandRow = typeof schema.brands.$inferSelect;
  */
 @Injectable()
 export class WidgetSessionsService {
+  private readonly logger = new Logger(WidgetSessionsService.name);
+  /** When each website was last noted as running the chat (HNV-01-04). */
+  private readonly sightings = new SightingThrottle();
+
   constructor(
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CONFIG) private readonly config: AppConfig,
@@ -110,7 +115,7 @@ export class WidgetSessionsService {
       throw new AppError('NOT_FOUND', { detail: 'This chat is not available.' });
     }
     if (origin !== undefined) this.checkOrigin(widget.allowedOrigins, origin);
-    return withTenant(this.db, { tenantId: widget.tenantId }, async (tx) => {
+    const config = await withTenant(this.db, { tenantId: widget.tenantId }, async (tx) => {
       const [brand] = await tx
         .select()
         .from(schema.brands)
@@ -129,6 +134,34 @@ export class WidgetSessionsService {
         ...(staffOnline === undefined ? {} : { staffOnline }),
       });
     });
+    await this.noteSighting(widget, origin);
+    return config;
+  }
+
+  /**
+   * The chat's code ran on one of the brand's websites (HNV-01-04): noted every few minutes at
+   * most, in its own transaction. A failure never stops the chat from loading.
+   */
+  private async noteSighting(
+    widget: { tenantId: string; brandId: string; allowedOrigins: string[] },
+    origin: string | undefined,
+  ): Promise<void> {
+    const seen = sightedOrigin(widget.allowedOrigins, origin);
+    const at = this.clock();
+    if (!seen || !this.sightings.due(widget.brandId, seen, at.getTime())) return;
+    try {
+      await withTenant(this.db, { tenantId: widget.tenantId }, (tx) =>
+        recordSighting(tx, {
+          tenantId: widget.tenantId,
+          brandId: widget.brandId,
+          origin: seen,
+          at,
+        }),
+      );
+    } catch (error) {
+      this.sightings.forget(widget.brandId, seen);
+      this.logger.warn(`Could not note where the chat runs: ${String(error)}`);
+    }
   }
 
   async create(input: {

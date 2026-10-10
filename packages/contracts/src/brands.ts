@@ -114,6 +114,23 @@ export const Brand = z
   .meta({ id: 'Brand' });
 export type Brand = z.infer<typeof Brand>;
 
+/**
+ * Where a brand's chat code was seen running (HNV-01-04): one of the brand's allowed websites
+ * whose pages loaded the chat. Seen when a page asks for the chat's launcher, which only an
+ * allowed website may; nothing about the visitor is kept. lastSeenAt is updated at most every
+ * few minutes.
+ */
+export const BrandInstall = z
+  .object({
+    brandId: typeId('brand'),
+    /** One of the brand's allowed websites. */
+    origin: z.string(),
+    firstSeenAt: Timestamp,
+    lastSeenAt: Timestamp,
+  })
+  .meta({ id: 'BrandInstall' });
+export type BrandInstall = z.infer<typeof BrandInstall>;
+
 /** Signature algorithms accepted for customer identity assertions (W12). */
 export const IdentityKeyAlg = z.enum(['ES256', 'EdDSA', 'RS256', 'HS256']);
 
