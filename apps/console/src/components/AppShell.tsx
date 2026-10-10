@@ -41,10 +41,12 @@ import {
   type NavPath,
   sectionOf,
 } from '../lib/nav';
+import { useNavLabels } from '../lib/nav-labels';
 import { useKillSwitches } from '../lib/queries';
 import { reauth } from '../lib/reauth';
 import { chooseTenant, useTenant } from '../lib/tenant';
 import type { PlatformOperator } from '../lib/types';
+import { CommandPalette } from './CommandPalette';
 import { LanguageSelect, TranslationNote } from './LanguageSelect';
 import { type SectionTab, SectionTabs } from './SectionTabs';
 import { SuspendedNotice } from './SuspendedNotice';
@@ -83,42 +85,7 @@ interface MenuSection {
 function useMenu(pathname: string): { entries: MenuEntry[]; section: MenuSection | null } {
   const { t } = useTranslation();
   const { can } = useTenant();
-  const groupLabels = {
-    home: t('nav.home'),
-    inbox: t('nav.inbox'),
-    ai: t('nav.ai'),
-    sales: t('nav.sales'),
-    reports: t('reports.nav'),
-    settings: t('nav.settings'),
-  } satisfies Record<NavGroupId, string>;
-  const pageLabels = {
-    '/overview': t('nav.home'),
-    '/inbox': t('nav.inbox'),
-    '/agents': t('nav.agents'),
-    '/knowledge': t('nav.knowledge'),
-    '/memory': t('nav.memory'),
-    '/tools': t('tools.nav'),
-    '/checks': t('checks.nav'),
-    '/decisions': t('decisions.nav'),
-    '/runs': t('nav.runs'),
-    '/caching': t('caching.nav'),
-    '/models': t('nav.models'),
-    '/orders': t('commerce.nav.orders'),
-    '/finance': t('commerce.nav.finance'),
-    '/reports': t('reports.nav'),
-    '/brands': t('nav.brands'),
-    '/chat-widget': t('chatWidget.nav'),
-    '/channels': t('channels.nav'),
-    '/automations': t('automations.nav'),
-    '/hours': t('setup.hours.nav'),
-    '/team': t('nav.team'),
-    '/support-teams': t('setup.teams.nav'),
-    '/security': t('nav.security'),
-    '/developer': t('developer.nav'),
-    '/customer-identity': t('setup.identity.nav'),
-    '/migration': t('migration.nav'),
-    '/settings/billing': t('billing.nav'),
-  } satisfies Record<NavPath, string>;
+  const { groups: groupLabels, pages: pageLabels } = useNavLabels();
 
   const menu = menuFor(can);
   const activeId = groupIdOfPath(pathname);
@@ -369,6 +336,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <HamnivoMark className="size-7" title="Hamnivo" />
           </span>
           <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
+            <CommandPalette />
             {activeCount > 0 ? (
               <Link to="/stop-ai" className="rounded-full" data-testid="ai-stopped-status">
                 <StatusBadge

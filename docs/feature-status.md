@@ -9,7 +9,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 **Blueprint features (237):** planned: 70 · in-progress: 54 · implemented: 86 · implemented-live-unverified: 8 · partial: 19
 
-**Design states (177):** planned: 57 · in-progress: 19 · implemented: 86 · partial: 15
+**Design states (177):** planned: 56 · in-progress: 19 · implemented: 87 · partial: 15
 
 ## Blueprint features
 
@@ -357,7 +357,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 | HNV-03-02 | Overview | No conversations yet | in-progress | `apps/console/src/pages/OverviewPage.tsx`, `apps/console/src/pages/home/GetSetUp.tsx`, `apps/console/src/lib/home.ts`, `apps/console/test/home.test.ts`, `apps/console/test/home-blocks.test.tsx`, `apps/console/e2e/journeys.spec.ts`, `apps/console/e2e/menu.spec.ts` — A new workspace’s overview says what to do first: a Get set up list with the steps still open (connect the chat engine, add a brand and install the chat, publish an AI agent, invite a teammate), each linking to its page and gone once all are done; people who do not run the workspace see their chats instead (tested). The test widget comes later. |
 | HNV-03-03 | Overview | Loading | planned |  |
 | HNV-03-04 | Overview | Partial service degradation | planned |  |
-| HNV-03-05 | Command palette | Search and keyboard navigation | planned |  |
+| HNV-03-05 | Command palette | Search and keyboard navigation | implemented | `apps/console/src/components/CommandPalette.tsx`, `apps/console/src/lib/palette.ts`, `apps/console/src/lib/nav-labels.ts`, `apps/console/src/i18n/palette/en.ts`, `apps/console/test/palette.test.ts`, `apps/console/test/command-palette.test.tsx`, `apps/console/test/app-shell.test.tsx`, `apps/console/e2e/palette.spec.ts` — A Search button in the header and ⌘K or Ctrl+K anywhere (by the physical key, so Arabic, Hindi and Urdu keyboard layouts work) open every page the person can open, grouped as the menu is: the menu's pages, plus the pages behind buttons (guided setup, live visitors, saved replies and tags, blocked visitors, Stop AI) only for people those buttons are shown to, and the account pages. Typing narrows by the page's name, its group's name or its English name; every typed word must appear, so scattered letters never match. The arrow keys choose, Enter opens the page with focus on its heading, Esc closes with focus back where it was, and the shortcut does not open over another dialog. Tested in unit and jsdom tests (mutation-checked) and in Chromium, in English at desktop width and in Arabic at 390 px, with no axe WCAG 2.2 AA violations. Recent pages and actions other than opening a page are not offered. |
 | HNV-03-06 | Workspace switcher | Switch in progress | planned |  |
 
 ### 04 · Widget branding and install preview

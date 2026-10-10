@@ -19,6 +19,10 @@ import { migrationAr } from './migration/ar';
 import { migrationEn } from './migration/en';
 import { migrationHi } from './migration/hi';
 import { migrationUr } from './migration/ur';
+import { paletteAr } from './palette/ar';
+import { paletteEn } from './palette/en';
+import { paletteHi } from './palette/hi';
+import { paletteUr } from './palette/ur';
 import { setupAr } from './setup/ar';
 import { setupEn } from './setup/en';
 import { setupHi } from './setup/hi';
@@ -35,6 +39,7 @@ declare module 'i18next' {
         setup: typeof setupEn;
         inboxAlerts: typeof inboxAlertsEn;
         aiPower: typeof aiPowerEn;
+        palette: typeof paletteEn;
       };
     };
   }
@@ -87,6 +92,7 @@ export async function initI18n(locale: Locale) {
           setup: setupEn,
           inboxAlerts: inboxAlertsEn,
           aiPower: aiPowerEn,
+          palette: paletteEn,
         },
       },
       ar: {
@@ -97,6 +103,7 @@ export async function initI18n(locale: Locale) {
           setup: setupAr,
           inboxAlerts: inboxAlertsAr,
           aiPower: aiPowerAr,
+          palette: paletteAr,
         },
       },
       hi: {
@@ -107,6 +114,7 @@ export async function initI18n(locale: Locale) {
           setup: setupHi,
           inboxAlerts: inboxAlertsHi,
           aiPower: aiPowerHi,
+          palette: paletteHi,
         },
       },
       ur: {
@@ -117,6 +125,7 @@ export async function initI18n(locale: Locale) {
           setup: setupUr,
           inboxAlerts: inboxAlertsUr,
           aiPower: aiPowerUr,
+          palette: paletteUr,
         },
       },
     },

@@ -173,3 +173,15 @@ describe('Stop AI', () => {
     expect(button?.attrs['aria-current']).toBe('page');
   });
 });
+
+describe('Search', () => {
+  it('is a button in the header for everyone, named for what it does, with its shortcut', async () => {
+    for (const permissions of [owner, presetPermissions('agent'), []]) {
+      const html = await shell('/overview', permissions);
+      const button = html.match(/<button[^>]*data-testid="palette-button"[^>]*>/)?.[0] ?? '';
+      expect(button).toContain('aria-label="Search pages"');
+      expect(button).toContain('aria-keyshortcuts="Meta+K Control+K"');
+      expect(button).toContain('aria-haspopup="dialog"');
+    }
+  });
+});

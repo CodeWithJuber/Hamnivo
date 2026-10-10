@@ -34,6 +34,19 @@ as a row of links above the page, so each one is a click away.
 | **Reports** | Reports |
 | **Settings** | Brands and install, Chat widget, Channels, Automations, Business hours, Team and access, Support teams, Security, Developer, Customer sign-in, Import history |
 
+### Find any page with Search
+
+To jump straight to a page, press **⌘K** on a Mac or **Ctrl+K** on Windows and Linux, from
+anywhere in Studio, or choose **Search** at the top of the screen. Type part of a page's name,
+such as "billing" or "team", then use the arrow keys to choose and **Enter** to open it. **Esc**
+closes the search.
+
+- It lists only the pages you can open, grouped like the menu, and marks the page you are on.
+- Typing a group's name, such as "Settings", lists every page in that group.
+- English page names work in every language, so "billing" finds Plan and billing in Arabic,
+  Hindi or Urdu too.
+- It also finds the pages that are not in the menu (below), when you can open them.
+
 Some pages are not in the menu:
 
 - **Stop AI** is a red button in the header, on every page, for people who can stop the AI
