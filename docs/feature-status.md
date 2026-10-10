@@ -9,7 +9,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 **Blueprint features (237):** planned: 70 · in-progress: 54 · implemented: 86 · implemented-live-unverified: 8 · partial: 19
 
-**Design states (177):** planned: 53 · in-progress: 19 · implemented: 91 · partial: 14
+**Design states (177):** planned: 52 · in-progress: 19 · implemented: 92 · partial: 14
 
 ## Blueprint features
 
@@ -441,7 +441,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 | ID | Screen | State | Status | Evidence / note |
 |---|---|---|---|---|
-| HNV-11-01 | Agent directory | Configured agents | planned |  |
+| HNV-11-01 | Agent directory | Configured agents | implemented | `apps/console/src/pages/AgentsPage.tsx`, `apps/console/src/lib/agent-directory.ts`, `apps/console/test/agent-directory.test.ts`, `apps/console/test/agents-page.test.tsx`, `apps/console/e2e/agent-directory.spec.ts` — The AI agents page lists each agent with its display name, purpose and brand, where it answers (as the gateway decides: only a brand's default agent with a published version answers, as a reply to customers or as suggestions for staff; any other agent answers no one, and the page says why), the model customers get (the published version's, with the draft's beside it when it differs) and its live version. Search by name, display name, purpose, brand or model, and filters by brand and by whether an agent answers now, with the count announced and a way to clear them. Model connections and keys are never shown. On a phone each agent is a card. Tested in unit and jsdom tests and in Chromium, in English and in Arabic at 390 px, axe clean. |
 | HNV-11-02 | Agent editor | Draft configuration | implemented | `apps/console/src/pages/AgentEditorPage.tsx`, `apps/console/e2e/journeys.spec.ts` — Agent drafts are edited and saved by keyboard alone, and a draft someone else changed is shown as a conflict instead of being overwritten (tested). |
 | HNV-11-03 | Agent editor | Tools and knowledge grants | implemented | `apps/console/src/components/AgentTools.tsx`, `apps/console/src/pages/ToolsPage.tsx`, `apps/console/e2e/tools.spec.ts`, `apps/gateway/test/actions.int.test.ts` — The agent editor grants tools, each shown with what it can do and who approves; a grant is part of a versioned draft and the test room shows the cases it changes (browser-tested). Stopping a tool takes effect at once, also for approvals already given (tested in the gateway); removing a grant takes effect with the next published version and cancels open requests for it when they are decided or sent. |
 | HNV-11-04 | Agent test room | Simulation | implemented | `apps/console/src/components/Simulations.tsx`, `apps/gateway/src/actions/simulation.service.ts`, `apps/gateway/test/tools.int.test.ts`, `apps/console/e2e/tools.spec.ts` — The test room replays a suite against the draft and the published version, labelled “Test only: nothing was sent”, with each version’s replies, the actions and decisions per case and what changed; every run starts from the frozen cases (browser-tested). Replies come from the deterministic mock model (see G11). |
