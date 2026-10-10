@@ -56,7 +56,10 @@ test('on a phone the language is chosen in the menu, and a menu link leaves focu
   await sheet.getByLabel('Language').selectOption('ar');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   // The sheet moves to the right-hand side for Arabic, and ends up wholly on the screen.
-  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+  // Switching the side can cancel the slide that was running; a cancelled one has nothing to wait for.
+  await page.evaluate(() =>
+    Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))),
+  );
   const box = await sheet.boundingBox();
   expect(box && box.x >= 0 && box.x + box.width <= 390 && box.x > 0).toBe(true);
   await expect(sheet.getByLabel('اللغة')).toBeInViewport();
