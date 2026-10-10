@@ -136,6 +136,12 @@ export const AgentVersion = z
     createdAt: Timestamp,
     publishedAt: Timestamp.nullable(),
     publishedBy: typeId('staff').nullable(),
+    /**
+     * When the version last changed: a draft's last save, or when a version went live (also
+     * again, by a rollback) or was retired. With it Studio says how long the live version has been
+     * live and which version was live before it (HNV-11-06).
+     */
+    updatedAt: Timestamp,
   })
   .meta({ id: 'AgentVersion' });
 export type AgentVersion = z.infer<typeof AgentVersion>;

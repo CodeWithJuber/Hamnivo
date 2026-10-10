@@ -876,9 +876,17 @@
     "note": "Agent drafts are edited and saved by keyboard alone, and a draft someone else changed is shown as a conflict instead of being overwritten (tested)."
   },
   "HNV-11-06": {
-    "status": "in-progress",
-    "evidence": ["apps/console/src/pages/AgentEditorPage.tsx", "apps/console/e2e/journeys.spec.ts"],
-    "note": "Publishing asks for a fresh sign-in and then shows the live version (tested); rollback in Studio comes later."
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/AgentEditorPage.tsx",
+      "apps/console/src/components/AgentVersions.tsx",
+      "apps/gateway/src/runtime/agents.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "apps/console/test/agent-versions.test.tsx",
+      "apps/console/e2e/journeys.spec.ts",
+      "apps/console/e2e/agent-rollback.spec.ts"
+    ],
+    "note": "Publishing asks for a fresh sign-in and then shows the live version (tested). The versions panel says since when the live version is live and when each other version was retired, marks the version live before this one and makes rolling back to it the primary choice; the dialog says customers get that version from their next message, the live one stops answering, the draft is kept, the sign-in is confirmed and the audit log records it. Rolling back publishes the earlier version exactly as it was (same hash), audited as agent.published with rollback: true, and the version rolled back from can be restored the same way. A link stops the agent's replies at once (Stop AI). Tested in the gateway, as rendered HTML and in Chromium with a stale sign-in."
   },
   "HNV-13-06": {
     "status": "implemented",

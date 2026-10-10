@@ -207,6 +207,12 @@ describe('versions', () => {
     const first = versions.body.items.find((v: { version: number }) => v.version === 1);
     expect(first.config.displayName).toBe(base.displayName);
     expect(first.configHash).toBe(rolledBack.published.configHash);
+    // When each version last changed (HNV-11-06): version 1 went live again with the rollback,
+    // after its first publication and no earlier than version 2 was retired by it.
+    const second = versions.body.items.find((v: { version: number }) => v.version === 2);
+    expect(Date.parse(first.updatedAt)).toBeGreaterThan(Date.parse(first.publishedAt));
+    expect(Date.parse(first.updatedAt)).toBeGreaterThanOrEqual(Date.parse(second.updatedAt));
+    expect(Date.parse(second.updatedAt)).toBeGreaterThanOrEqual(Date.parse(second.publishedAt));
   });
 
   it('refuses to publish a model it has no credentials for', async () => {
