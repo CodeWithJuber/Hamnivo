@@ -16,6 +16,7 @@ import type {
   AgentVersion,
   AuthorityConnection,
   Brand,
+  BrandInstall,
   Items,
   KillSwitch,
   KnowledgeDocument,
@@ -96,6 +97,8 @@ export function useStudioMutation<TVars, TResult>(
 
 export const keys = {
   brands: ['brands'],
+  /** Under `brands`, so a change to a brand's websites reloads it too. */
+  brandInstalls: ['brands', 'installs'],
   workspaces: ['workspaces'],
   connections: ['connections'],
   agents: ['agents'],
@@ -114,6 +117,27 @@ export function useBrands() {
   const { can } = useTenant();
   return useStudioQuery<Items<Brand>>(keys.brands, '/v1/admin/brands', {
     enabled: can('brands.manage'),
+  });
+}
+
+/** How often Studio looks again while it waits for a brand's chat to show up on its website. */
+export const INSTALL_POLL_MS = 5_000;
+
+/**
+ * Where each brand's chat code was seen running (HNV-01-04). With `waitFor`, it looks again every
+ * few seconds until that brand's chat has been seen, so the install step turns green by itself.
+ */
+export function useBrandInstalls(options: { waitFor?: string } = {}) {
+  const { can } = useTenant();
+  const { waitFor } = options;
+  return useStudioQuery<Items<BrandInstall>>(keys.brandInstalls, '/v1/admin/brands/installs', {
+    enabled: can('brands.manage'),
+    ...(waitFor
+      ? {
+          refetchInterval: (data: Items<BrandInstall> | undefined) =>
+            data?.items.some((item) => item.brandId === waitFor) ? false : INSTALL_POLL_MS,
+        }
+      : {}),
   });
 }
 

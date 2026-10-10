@@ -3006,9 +3006,10 @@
       "apps/console/test/setup-screens.test.tsx",
       "apps/console/test/setup.test.ts",
       "apps/gateway/test/setup.int.test.ts",
+      "apps/console/e2e/install.spec.ts",
       "docs/guide/setup/getting-started.md"
     ],
-    "note": "A guided setup opens after a workspace is created and from Home: workspace, brand and website, the chat engine (connected by itself), an AI key with a test, a test chat, install with a guide per website platform, and the team. Every step can be skipped, and what was done or skipped is kept at the gateway, so the owner resumes where they stopped. Home’s checklist now puts the brand first, adds the AI key, and does not count an agent that answers with the offline practice model. Knowledge, a handoff team and publishing the agent are not steps of the guide yet (Home’s list covers publishing), and Studio cannot check that the install code is on the website. Screens are tested as rendered HTML and the logic in unit tests; there is no browser journey for it."
+    "note": "A guided setup opens after a workspace is created and from Home: workspace, brand and website, the chat engine (connected by itself), an AI key with a test, a test chat, install with a guide per website platform, and the team. Every step can be skipped, and what was done or skipped is kept at the gateway, so the owner resumes where they stopped. Home’s checklist now puts the brand first, adds the AI key, and does not count an agent that answers with the offline practice model. Knowledge, a handoff team and publishing the agent are not steps of the guide yet (Home’s list covers publishing), and the install step now sees the chat running on the brand’s website by itself (HNV-01-04). Screens are tested as rendered HTML and the logic in unit tests; only the install step has a browser journey (e2e/install.spec.ts)."
   },
   "A05": {
     "status": "implemented",
@@ -3042,13 +3043,33 @@
     "note": "Brand name and website, then the install step. Website is the only channel, so there is no choice of channel."
   },
   "HNV-01-03": {
-    "status": "partial",
+    "status": "implemented",
     "evidence": [
       "apps/console/src/pages/onboarding/InstallStep.tsx",
+      "apps/console/src/components/InstallStatus.tsx",
       "apps/console/src/lib/install.ts",
-      "apps/console/test/setup-screens.test.tsx"
+      "apps/console/test/setup-screens.test.tsx",
+      "apps/console/e2e/install.spec.ts"
     ],
-    "note": "The install code with a copy confirmation, the allowed websites, readable steps and a guide for the website platform. There is no connection check: Studio cannot see the website, and the step says so and how to check by hand."
+    "note": "The install code with a copy confirmation, the allowed websites, readable steps and a guide for the website platform. Once a website is allowed, the step waits for it: it says what to do, looks again every few seconds and has Check now, and Not showing up? names the usual causes (the exact address with https and www, a cached page, a content security policy). The code reads left to right in Arabic and Urdu too. Tested as rendered HTML and in Chromium, in English and in Arabic at 390 px, with no axe violations."
+  },
+  "HNV-01-04": {
+    "status": "implemented",
+    "evidence": [
+      "apps/gateway/src/widget/install-sightings.ts",
+      "apps/gateway/src/widget/sessions.service.ts",
+      "apps/gateway/src/admin/brands.service.ts",
+      "apps/gateway/test/install-sightings.test.ts",
+      "apps/gateway/test/brands.int.test.ts",
+      "packages/contracts/src/brands.ts",
+      "packages/db/src/schema/setup.ts",
+      "apps/console/src/components/InstallStatus.tsx",
+      "apps/console/src/lib/home.ts",
+      "apps/console/test/home.test.ts",
+      "apps/console/test/home-blocks.test.tsx",
+      "apps/console/e2e/install.spec.ts"
+    ],
+    "note": "When a page on one of a brand's allowed websites asks for the chat's launcher (the loader does on every page), the gateway notes the website and the time, at most every five minutes per website and gateway process and never failing the chat; nothing about the visitor is kept, and local pages, Studio and other websites do not count. GET /v1/admin/brands/installs lists them for brands the person manages, only for websites still allowed; taking a website off the list deletes its row. The install step turns green by itself with the website and when it was last seen, Home's checklist has Put the chat on your website (opening the guided setup at that step) and each brand on Home shows when its chat was last seen. Tested in unit and integration tests (mutation-checked) and in Chromium. The test message action is the guided setup's Test chat step, not repeated here."
   },
   "HNV-01-05": {
     "status": "implemented",

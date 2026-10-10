@@ -9,6 +9,7 @@ export type WorkspaceSummary = z.infer<typeof C.WorkspaceSummary>;
 export type Member = z.infer<typeof C.Member>;
 
 export type Brand = C.Brand;
+export type BrandInstall = C.BrandInstall;
 export type AuthorityConnection = C.AuthorityConnection;
 export type CreateBrandRequest = z.input<typeof C.CreateBrandRequest>;
 

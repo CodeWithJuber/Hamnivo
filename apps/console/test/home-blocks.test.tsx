@@ -38,6 +38,13 @@ const brand = {
   status: 'active',
   createdAt: '2026-10-01T09:00:00.000Z',
 };
+/** The chat was seen on the brand's website (HNV-01-04). */
+const install = {
+  brandId: 'brd_1',
+  origin: 'https://noor.example.com',
+  firstSeenAt: '2026-10-01T09:00:00.000Z',
+  lastSeenAt: '2026-10-01T09:00:00.000Z',
+};
 const connection = {
   id: 'con_1',
   kind: 'chatwoot',
@@ -74,6 +81,8 @@ const me = member(SELF_ID, 'Omar');
 interface Lists {
   connections: unknown[];
   brands: unknown[];
+  /** Where brands' chat code was seen (HNV-01-04). */
+  installs: unknown[];
   agents: { id: string }[];
   members: unknown[];
   invitations: unknown[];
@@ -88,6 +97,7 @@ const workspaceWith = (lists: Partial<Lists>) => (client: QueryClient) => {
   const all: Lists = {
     connections: [],
     brands: [],
+    installs: [],
     agents: [],
     members: [me],
     invitations: [],
@@ -98,6 +108,7 @@ const workspaceWith = (lists: Partial<Lists>) => (client: QueryClient) => {
   };
   client.setQueryData([TENANT_ID, ...keys.connections], { items: all.connections });
   client.setQueryData([TENANT_ID, ...keys.brands], { items: all.brands });
+  client.setQueryData([TENANT_ID, ...keys.brandInstalls], { items: all.installs });
   client.setQueryData([TENANT_ID, ...keys.agents], { items: all.agents });
   client.setQueryData([TENANT_ID, ...keys.members], { items: all.members });
   client.setQueryData([TENANT_ID, ...accessKeys.invitations], { items: all.invitations });
@@ -183,9 +194,11 @@ describe('Home for people who run the workspace', () => {
   it('lists every step of a new workspace, each linking to its page', async () => {
     const html = await home(owner, workspaceWith({}));
     expect(html).toContain('Get set up');
-    // The brand and its website come first: the chat engine is connected for a brand.
+    // The brand and its website come first, then the code on that website (the guided setup
+    // opens at its install step); the chat engine is connected for a brand.
     expect(setUp(html)).toEqual([
       ['brand', '/brands'],
+      ['install', '/onboarding?step=install'],
       ['engine', '/brands'],
       ['aikey', '/models'],
       ['agent', '/agents'],
@@ -195,10 +208,11 @@ describe('Home for people who run the workspace', () => {
       .filter((link) => link.attrs['data-step'])
       .map((link) => link.text);
     expect(titles[0]).toContain('Add your brand and website');
-    expect(titles[1]).toContain('Connect the chat engine');
-    expect(titles[2]).toContain('Add an AI key');
-    expect(titles[3]).toContain('Publish an AI agent');
-    expect(titles[4]).toContain('Invite a teammate');
+    expect(titles[1]).toContain('Put the chat on your website');
+    expect(titles[2]).toContain('Connect the chat engine');
+    expect(titles[3]).toContain('Add an AI key');
+    expect(titles[4]).toContain('Publish an AI agent');
+    expect(titles[5]).toContain('Invite a teammate');
     expect(html).not.toContain('Your chats');
   });
 
@@ -218,7 +232,12 @@ describe('Home for people who run the workspace', () => {
   it('shows only the steps that are not done', async () => {
     const html = await home(
       owner,
-      workspaceWith({ connections: [connection], brands: [brand], agents: [] }),
+      workspaceWith({
+        connections: [connection],
+        brands: [brand],
+        installs: [install],
+        agents: [],
+      }),
     );
     expect(setUp(html)).toEqual([
       ['aikey', '/models'],
@@ -230,7 +249,12 @@ describe('Home for people who run the workspace', () => {
   it('counts a key the server holds as the AI key', async () => {
     const html = await home(
       owner,
-      workspaceWith({ connections: [connection], brands: [brand], serverKey: true }),
+      workspaceWith({
+        connections: [connection],
+        brands: [brand],
+        installs: [install],
+        serverKey: true,
+      }),
     );
     expect(setUp(html).map(([id]) => id)).toEqual(['agent', 'team']);
   });
@@ -241,6 +265,7 @@ describe('Home for people who run the workspace', () => {
       workspaceWith({
         connections: [connection],
         brands: [brand],
+        installs: [install],
         modelConnections: [key],
         agents: [agent],
         providers: { agt_1: 'mock' },
@@ -258,6 +283,7 @@ describe('Home for people who run the workspace', () => {
       workspaceWith({
         connections: [connection],
         brands: [brand],
+        installs: [install],
         modelConnections: [key],
         agents: [agent],
         members: [me, member('staff_2', 'Sara')],
@@ -275,6 +301,7 @@ describe('Home for people who run the workspace', () => {
       workspaceWith({
         connections: [connection],
         brands: [brand],
+        installs: [install],
         modelConnections: [key],
         agents: [agent],
         invitations: [{ id: 'inv_1', email: 'sara@example.com', status: 'pending' }],
@@ -292,6 +319,9 @@ describe('Home for people who run the workspace', () => {
   it('skips a step it cannot be told about, and a step the person cannot do', async () => {
     // Someone who manages brands and reads the team, but cannot connect, publish or invite.
     const html = await home(['brands.manage', 'members.read'], workspaceWith({}));
-    expect(setUp(html)).toEqual([['brand', '/brands']]);
+    expect(setUp(html)).toEqual([
+      ['brand', '/brands'],
+      ['install', '/onboarding?step=install'],
+    ]);
   });
 });

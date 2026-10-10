@@ -5,6 +5,7 @@ import { Link } from '@tanstack/react-router';
 import { CircleCheckIcon, OctagonPauseIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AgentBadge, ConnectionBadge, OutcomeBadge } from '../components/Badges';
+import { InstallBadge } from '../components/InstallStatus';
 import { PageHeader, Section } from '../components/PageHeader';
 import { QueryState } from '../components/States';
 import { formatDate, formatDateTime, formatDuration, formatRelative } from '../lib/format';
@@ -103,6 +104,14 @@ function BrandsSection() {
                       </span>
                     )}
                   </span>
+                  {can('brands.manage') ? (
+                    <span className="flex flex-col gap-1">
+                      <span className="text-xs text-text-secondary">
+                        {t('setup.onboarding.install.status.onWebsite')}
+                      </span>
+                      <InstallBadge brandId={brand.id} />
+                    </span>
+                  ) : null}
                   <span className="flex flex-col gap-1">
                     <span className="text-xs text-text-secondary">
                       {t('overview.brands.columns.ai')}
