@@ -9,7 +9,7 @@ verified through the adapter), `partial`, `interface-only`, `in-progress`, `defe
 
 **Blueprint features (237):** planned: 70 · in-progress: 54 · implemented: 86 · implemented-live-unverified: 8 · partial: 19
 
-**Design states (177):** planned: 52 · in-progress: 19 · implemented: 92 · partial: 14
+**Design states (177):** planned: 53 · in-progress: 19 · implemented: 91 · partial: 14
 
 ## Blueprint features
 
