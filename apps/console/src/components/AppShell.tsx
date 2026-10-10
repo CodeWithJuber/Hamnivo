@@ -284,6 +284,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const switches = useKillSwitches();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuOpener = useOpener(menuOpen);
+  // A link in the sheet was followed: once the sheet has closed, focus goes to the new page.
+  const followed = useRef(false);
+  const follow = () => {
+    followed.current = true;
+    setMenuOpen(false);
+  };
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const menu = useMenu(pathname);
   const shownPath = useRef(pathname);
@@ -335,10 +341,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="lg:hidden">
             <HamnivoMark className="size-7" title="Hamnivo" />
           </span>
+          {/* One row on a phone too (320 px, every language): there, Stop AI shows only its icon
+              (its name stays "Stop AI replies"), the language is chosen in the menu sheet, and
+              the "AI stopped" badge gives way to the banner right below the header. */}
           <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
             <CommandPalette />
             {activeCount > 0 ? (
-              <Link to="/stop-ai" className="rounded-full" data-testid="ai-stopped-status">
+              <Link
+                to="/stop-ai"
+                className="rounded-full max-sm:hidden"
+                data-testid="ai-stopped-status"
+              >
                 <StatusBadge
                   tone="danger"
                   icon={<OctagonPauseIcon className="size-3.5" aria-hidden="true" />}
@@ -356,11 +369,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                   data-testid="stop-ai-button"
                 >
                   <OctagonPauseIcon aria-hidden="true" />
-                  {t('shell.stopAi')}
+                  <span className="max-sm:sr-only">{t('shell.stopAi')}</span>
                 </Link>
               </Button>
             ) : null}
-            <LanguageSelect id="studio-language" />
+            <div className="max-sm:hidden">
+              <LanguageSelect id="studio-language" />
+            </div>
           </div>
         </header>
         <KillSwitchBanner />
@@ -383,8 +398,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="w-[min(20rem,85vw)] gap-4 overflow-y-auto bg-surface-muted p-4"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            // After following a link, the new page's heading already has focus.
-            if (document.activeElement === document.body) returnFocus(menuOpener.current);
+            // After following a link, focus goes to the new page's heading. The shell's own move
+            // happens while the sheet still traps focus, so it is done here, once it has closed
+            // (returnFocus without an opener: the heading).
+            returnFocus(followed.current ? null : menuOpener.current);
+            followed.current = false;
           }}
         >
           <div className="flex items-center justify-between gap-2">
@@ -400,11 +418,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             </SheetClose>
           </div>
           <SheetDescription className="sr-only">{t('nav.menu')}</SheetDescription>
-          <WorkspaceSwitcher onNavigate={() => setMenuOpen(false)} />
+          <WorkspaceSwitcher onNavigate={follow} />
           <nav aria-label={t('nav.label')} className="flex-1">
-            <NavLinks entries={menu.entries} onNavigate={() => setMenuOpen(false)} />
+            <NavLinks entries={menu.entries} onNavigate={follow} />
           </nav>
-          <AccountLinks onNavigate={() => setMenuOpen(false)} />
+          {/* On a phone the header has no room for it. */}
+          <div className="px-3 sm:hidden">
+            <LanguageSelect id="studio-language-menu" />
+          </div>
+          <AccountLinks onNavigate={follow} />
         </SheetContent>
       </Sheet>
     </div>

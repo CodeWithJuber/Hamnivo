@@ -50,9 +50,11 @@ closes the search.
 Some pages are not in the menu:
 
 - **Stop AI** is a red button in the header, on every page, for people who can stop the AI
-  (permission to publish agents). It opens the Stop AI page.
+  (permission to publish agents). It opens the Stop AI page. On a phone it shows only its red
+  stop icon, so the header stays one row.
 - **Account security** and the **Platform console** (operators only) are in the account area at
-  the bottom of the menu, which is a sheet on a phone.
+  the bottom of the menu, which is a sheet on a phone. On a phone, the language is chosen in that
+  sheet too, above the account area; on wider screens it is at the top of the page.
 - [**Live visitors**](guide/inbox/live-visitors.md) (everyone who can read chats) and
   [**Saved replies and tags**](guide/inbox/saved-replies.md) (people who manage the inbox) are
   buttons above the list of chats in the inbox. A row of links for them would push the inbox down.
