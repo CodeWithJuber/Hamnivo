@@ -75,6 +75,8 @@ const PATHS = [
   '/decisions',
   // Where the command palette's tests go.
   '/knowledge',
+  '/agents',
+  '/agents/$agentId',
   '/settings/billing',
   '/visitors',
 ];

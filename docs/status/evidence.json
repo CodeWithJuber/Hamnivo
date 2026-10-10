@@ -859,6 +859,17 @@
     ],
     "note": "A Search button in the header and ⌘K or Ctrl+K anywhere (by the physical key, so Arabic, Hindi and Urdu keyboard layouts work) open every page the person can open, grouped as the menu is: the menu's pages, plus the pages behind buttons (guided setup, live visitors, saved replies and tags, blocked visitors, Stop AI) only for people those buttons are shown to, and the account pages. Typing narrows by the page's name, its group's name or its English name; every typed word must appear, so scattered letters never match. The arrow keys choose, Enter opens the page with focus on its heading, Esc closes with focus back where it was, and the shortcut does not open over another dialog. Tested in unit and jsdom tests (mutation-checked) and in Chromium, in English at desktop width and in Arabic at 390 px, with no axe WCAG 2.2 AA violations. Recent pages and actions other than opening a page are not offered."
   },
+  "HNV-11-01": {
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/AgentsPage.tsx",
+      "apps/console/src/lib/agent-directory.ts",
+      "apps/console/test/agent-directory.test.ts",
+      "apps/console/test/agents-page.test.tsx",
+      "apps/console/e2e/agent-directory.spec.ts"
+    ],
+    "note": "The AI agents page lists each agent with its display name, purpose and brand, where it answers (as the gateway decides: only a brand's default agent with a published version answers, as a reply to customers or as suggestions for staff; any other agent answers no one, and the page says why), the model customers get (the published version's, with the draft's beside it when it differs) and its live version. Search by name, display name, purpose, brand or model, and filters by brand and by whether an agent answers now, with the count announced and a way to clear them. Model connections and keys are never shown. On a phone each agent is a card. Tested in unit and jsdom tests and in Chromium, in English and in Arabic at 390 px, axe clean."
+  },
   "HNV-11-02": {
     "status": "implemented",
     "evidence": ["apps/console/src/pages/AgentEditorPage.tsx", "apps/console/e2e/journeys.spec.ts"],
