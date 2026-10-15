@@ -1,0 +1,1 @@
+ALTER TABLE "message_ledger" ADD COLUMN "expects_reply" boolean DEFAULT true NOT NULL;

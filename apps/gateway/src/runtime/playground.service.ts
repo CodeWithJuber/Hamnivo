@@ -228,7 +228,9 @@ export class PlaygroundService {
       .map((m) => m.text.trim())
       .join('\n')
       .slice(-1000);
-    const audience = config.mode === 'assist' ? 'staff' : 'customer';
+    // Public knowledge only, in every mode: an assist draft is sent as it is once approved
+    // (HNV-09-05), so the preview cites only what the customer may see, as a live draft does.
+    const audience = 'customer';
     const started = Date.now();
     const passages = await this.tx(principal, (tx) =>
       this.retrieval.search(tx, {

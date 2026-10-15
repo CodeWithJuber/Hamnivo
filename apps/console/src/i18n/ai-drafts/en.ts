@@ -17,6 +17,7 @@ export const aiDraftsEn = {
   reject: 'Reject',
   sent: 'The draft was sent as you.',
   editedSent: 'Your edited draft was sent.',
+  notSent: 'Not sent. Your reply is kept with your failed sends: try it again from the reply box.',
   rejected: 'The draft was rejected. Nothing was sent.',
   closedBy: '{{name}} already decided on this draft.',
   closed: 'This draft no longer fits the conversation.',

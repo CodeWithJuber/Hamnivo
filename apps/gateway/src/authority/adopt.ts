@@ -303,6 +303,8 @@ export class ChannelAdoption {
         sourceKey: `${MESSAGE_KEY_PREFIX.external}${key}`,
         authorityMessageId: Number(message.ref),
         committedAt: now,
+        // A reaction (W22) asks for no answer.
+        expectsReply: !reactionOf(message),
       })
       .onConflictDoNothing()
       .returning({ id: schema.messageLedger.id });

@@ -25,11 +25,15 @@ just above the reply box, with the sources it cites, numbered as the draft refer
 
 Sending a draft works like any reply: if nobody has the conversation yet, it becomes yours. If you
 press the button twice, or your connection drops and you try again, the customer gets the reply
-once.
+once. If the send fails after you approved it (for example, Chatwoot can't be reached), the card
+says it was not sent, and the reply waits with your failed sends in the reply box, where you can
+retry it.
 
 ## Who can act on a draft
 
-You need a role that can reply to customers. A draft cannot be sent:
+You need a role that can reply to customers and, unless the conversation is already yours, take
+conversations over (sending a draft takes the conversation, as any reply does). A draft cannot be
+sent:
 
 - while a colleague handles the conversation. Studio names them; ask them, or take the conversation
   over first;
@@ -47,7 +51,8 @@ Studio says why, when:
 | The customer wrote again | A new draft that answers everything they said replaces it. |
 | A person picked the conversation up from the queue | Nothing: the draft stays for them. |
 | The conversation went to someone else, or back to the AI | The draft is set aside. |
-| Someone replied by hand | The draft is set aside: it is no longer needed. |
+| Someone replied by hand | The draft is set aside: it is no longer needed. A draft that was still being written when they replied is not shown at all. |
+| The customer reacted to a reply | Nothing: a reaction asks for no answer, so the draft stays. |
 | The conversation was resolved | The draft is set aside. |
 
 ## Good to know
@@ -55,5 +60,9 @@ Studio says why, when:
 - Drafts are kept for 90 days after they were sent, rejected or set aside, then removed. What was
   decided, by whom and why is in the audit log.
 - If a draft was edited, Hamnivo keeps a fingerprint of the text that was sent, not a second copy.
+- A very long draft is cut at the last full sentence that fits (10,000 characters) and ends with
+  "…". Edit it before sending if something is missing.
+- **Test your AI** answers from public sources only too, so what you see there is what a reviewer
+  would be asked to send.
 - A draft is different from **Suggest a reply** in the reply box, which asks the AI for a suggestion
   when you want one.

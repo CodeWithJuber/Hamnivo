@@ -306,6 +306,27 @@ describe('trying an agent', () => {
     expect(system(seen[0])).not.toContain('hush-hush-77');
   });
 
+  it('drafts for review from the same public knowledge as a live assist draft', async () => {
+    await saveDraft({ mode: 'assist' });
+    try {
+      turns.push({ text: 'Here is what our policy says [1]. The Noor team.' });
+      const result = await tryOnce('What is the staff discount code?');
+      expect(result.steps).toContainEqual(
+        expect.objectContaining({ kind: 'guard', name: 'assist_mode', status: 'ok' }),
+      );
+      const retrieval = result.steps.find((step: Record<string, any>) => step.kind === 'retrieval');
+      expect(retrieval).toMatchObject({ detail: { audience: 'customer' } });
+      // An approved draft is sent as it is: the team-only source is neither given nor cited.
+      expect(system(seen[0])).toContain('suggested reply for a support agent');
+      expect(system(seen[0])).not.toContain('hush-hush-77');
+      expect(result.sources.map((source: Record<string, any>) => source.title)).not.toContain(
+        'Discounts',
+      );
+    } finally {
+      await saveDraft({ mode: 'answer' });
+    }
+  });
+
   it('drops citations that match nothing, as a live reply does', async () => {
     turns.push({ text: 'Returns take thirty days [7]. The Noor team.' });
     const result = await tryOnce('How do I return something?');

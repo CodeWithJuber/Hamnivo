@@ -27,11 +27,12 @@ async function draftIn(state: 'pending' | 'approved') {
   return row;
 }
 
-/** A new pending-free draft row for this tenant, ended at `endedAt`. */
+/** A new draft row for this tenant, rejected by a person at `endedAt`, with their decision. */
 async function endedDraft(endedAt: Date) {
   const seeded = await draftIn('approved');
   const runId = newId();
   const id = newId();
+  const decisionId = newId();
   await inA(async (tx) => {
     const [run] = await tx.select().from(schema.runs).where(eq(schema.runs.id, seeded.runId));
     if (!run) throw new Error('the seeded draft has a run');
@@ -42,13 +43,23 @@ async function endedDraft(endedAt: Date) {
       ...seeded,
       id,
       runId,
-      state: 'superseded',
-      supersededReason: 'customer_wrote',
-      decidedBy: null,
+      state: 'rejected',
+      decidedBy: a.staffMemberId,
       decidedAt: endedAt,
     });
+    await tx.insert(schema.aiDraftDecisions).values({
+      id: decisionId,
+      tenantId: a.tenantId,
+      draftId: id,
+      staffMemberId: a.staffMemberId,
+      clientRequestId: newId(),
+      decision: 'rejected',
+      ownerEpoch: seeded.ownerEpoch,
+      reason: 'not_needed',
+      createdAt: endedAt,
+    });
   });
-  return id;
+  return { id, decisionId };
 }
 
 describe('AI drafts (HNV-09-05)', () => {
@@ -153,13 +164,25 @@ describe('AI drafts (HNV-09-05)', () => {
   it('are removed with their decisions 90 days after they ended', async () => {
     const old = await endedDraft(new Date(Date.now() - 100 * 86_400_000));
     const recent = await endedDraft(new Date(Date.now() - 10 * 86_400_000));
+    const approved = await draftIn('approved');
+    const decisions = () =>
+      inA((tx) =>
+        tx
+          .select({ id: schema.aiDraftDecisions.id, draftId: schema.aiDraftDecisions.draftId })
+          .from(schema.aiDraftDecisions),
+      );
+    expect(await decisions()).toContainEqual({ id: old.decisionId, draftId: old.id });
+
     expect(await purgeAiDrafts(h.app)).toBeGreaterThanOrEqual(1);
     const left = await inA((tx) => tx.select({ id: schema.aiDrafts.id }).from(schema.aiDrafts));
     const ids = left.map((r) => r.id);
-    expect(ids).not.toContain(old);
-    expect(ids).toContain(recent);
-    // The approved fixture's decision stays with its recent draft.
-    const decisions = await inA((tx) => tx.select().from(schema.aiDraftDecisions));
-    expect(decisions.length).toBeGreaterThanOrEqual(1);
+    expect(ids).not.toContain(old.id);
+    expect(ids).toContain(recent.id);
+    // The old draft's decision went with it; the recent one's and the approved fixture's stay.
+    const kept = await decisions();
+    expect(kept.map((d) => d.id)).not.toContain(old.decisionId);
+    expect(kept.map((d) => d.draftId)).not.toContain(old.id);
+    expect(kept).toContainEqual({ id: recent.decisionId, draftId: recent.id });
+    expect(kept.map((d) => d.draftId)).toContain(approved.id);
   });
 });

@@ -404,6 +404,11 @@ export const messageLedger = pgTable(
     clientMessageId: uuid('client_message_id').notNull(),
     requestHash: bytea('request_hash').notNull(),
     state: text('state', { enum: LEDGER_STATES }).notNull().default('pending'),
+    /**
+     * The message asks for an answer. A customer's reaction to a reply (W22) does not: it neither
+     * starts an AI reply nor makes the one being written for their question stale.
+     */
+    expectsReply: boolean('expects_reply').notNull().default(true),
     /** Sent to Chatwoot as `source_id` (`hv1:m:{id}`); echoed back in webhooks. */
     sourceKey: text('source_key').notNull(),
     authorityMessageId: bigint('authority_message_id', { mode: 'number' }),
