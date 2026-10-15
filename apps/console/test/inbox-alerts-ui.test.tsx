@@ -115,7 +115,7 @@ describe('sounds and desktop alerts settings', () => {
     for (const label of [
       'A chat is waiting for a person',
       'A customer writes in your chat, or in a chat nobody has taken',
-      'A chat is assigned or transferred to you',
+      'A chat is offered, assigned or transferred to you',
       'Mute all sounds',
       'Volume',
       'Desktop alerts',

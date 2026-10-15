@@ -11,9 +11,12 @@ your team keeps their own.
 | A chat is waiting for a person | A sound, a desktop alert, and the chat counts on your browser tab |
 | A customer writes in your chat, or in a chat nobody has taken yet | A sound, a desktop alert, and a number next to the chat |
 | Someone assigns or transfers a chat to you | A sound and a desktop alert |
+| A chat is [offered to you](offers.md) to accept or decline | The "assigned" sound and a desktop alert |
+| A chat goes past its [reply-time target](reply-targets.md) | The "waiting" sound and a desktop alert |
 
 You only hear about chats you can answer. A chat the AI is handling does not make a sound until a
-person is needed.
+person is needed. In a team that offers chats to one person at a time, the rest of the team hears
+about a chat only when nobody accepted it.
 
 You do not get a sound for a message in the chat you are reading right now, with Studio in front.
 

@@ -149,7 +149,8 @@ export function deriveAlerts(input: {
       chat.offersEndedAt != null &&
       chat.offersEndedEpoch != null &&
       chat.offersEndedEpoch === chat.ownershipEpoch;
-    const offering = Boolean(chat.teamOffers) && !offersEnded;
+    // Only a hand-off to the queue is offered (`conversation.route`); nothing else is held back.
+    const offering = chat.ownerMode === 'WAITING_HUMAN' && Boolean(chat.teamOffers) && !offersEnded;
     const changedAt =
       chat.teamOffers && offersEnded && chat.offersEndedAt
         ? chat.offersEndedAt

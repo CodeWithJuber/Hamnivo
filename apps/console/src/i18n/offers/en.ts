@@ -1,0 +1,81 @@
+/**
+ * Studio text for hand-offs offered to one person at a time (HNV-10-03, HNV-10-06, H02): the
+ * "Offered to you" section with its countdown, accepting and declining, who a chat is offered to,
+ * and the team and per-person settings. Merged under `inbox.offers`.
+ */
+export const offersEn = {
+  title: 'Offered to you',
+  intro:
+    'Accept to make the chat yours. Decline, or let the time run out, and it goes to the next person.',
+  timeLeft: '{{time}} left',
+  timeLeftLabel: 'Time left to accept: {{time}}',
+  timeUp: 'Time is up',
+  round: 'Offer {{round}} of 3',
+  accept: 'Accept',
+  acceptName: 'Accept the chat with {{name}}',
+  decline: 'Decline',
+  declineName: 'Decline the chat with {{name}}',
+  accepted: 'The chat with {{name}} is yours now.',
+  declined: 'You declined the chat with {{name}}. It goes to the next person.',
+  closed: 'This offer is no longer open.',
+  offeredTo: 'Offered to {{name}} · {{time}}',
+  offeredToYou: 'Offered to you · {{time}}',
+  declineDialog: {
+    title: 'Decline this chat',
+    description:
+      'It is offered to the next person who can take it. Your reason is kept so your team lead can balance the work.',
+    reason: 'Why are you declining?',
+    reasonMissing: 'Choose a reason.',
+    reasons: {
+      at_capacity: 'I have too many chats right now',
+      not_my_area: 'This is not my area',
+      going_offline: 'I am going offline',
+      other: 'Something else',
+    },
+    goingOfflineHint: 'Your status becomes Away, so no more chats are offered to you.',
+    note: 'Note',
+    noteHint: 'Optional. Your team lead can read it.',
+    submit: 'Decline chat',
+  },
+  load: '{{open}} of {{max}} chats',
+  loadNoLimit: '{{open}} open chats',
+  team: {
+    summaryQueue: 'New chats wait in the team’s queue for anyone to take.',
+    summaryOffer: 'New chats are offered to one person at a time, {{seconds}} seconds each.',
+    edit: 'How chats arrive',
+    editName: 'Change how chats arrive in {{team}}',
+    title: 'How chats arrive in {{team}}',
+    description: 'Choose how a chat handed to this team reaches its people.',
+    mode: 'When a chat comes to the team',
+    modes: {
+      queue: 'Everyone sees it',
+      queueHint: 'It waits in the team’s queue and anyone in the team takes it.',
+      offer: 'Offer it to one person at a time',
+      offerHint:
+        'It is offered to the best person who is online: under their limit, speaking the customer’s language, with the fewest open chats. If they decline or do not answer in time, the next person is offered it. After three people it waits in the queue. Anyone can still take it meanwhile.',
+    },
+    timeout: 'Seconds to accept',
+    timeoutHint: 'From 15 to 600 seconds.',
+    timeoutInvalid: 'Enter a number of seconds from 15 to 600.',
+    save: 'Save',
+    saved: 'Saved how chats arrive in {{team}}.',
+  },
+  people: {
+    title: 'Languages and limits',
+    description:
+      'Chats are offered first to people who speak the customer’s language, and never to someone at their limit.',
+    none: 'No languages listed',
+    noLimit: 'No limit',
+    limit: 'Up to {{max}} open chats',
+    edit: 'Edit',
+    editName: 'Edit languages and limit for {{name}}',
+    dialogTitle: 'Languages and limit for {{name}}',
+    languages: 'Languages they answer in',
+    max: 'Most open chats at once',
+    maxHint: 'From 1 to 50. Leave it empty for no limit.',
+    maxInvalid: 'Enter a number from 1 to 50, or leave it empty.',
+    save: 'Save',
+    saved: 'Saved languages and limit for {{name}}.',
+    loading: 'Loading languages and limits',
+  },
+};

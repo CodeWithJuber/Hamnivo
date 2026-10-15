@@ -8,6 +8,7 @@ import { checksEn } from './checks';
 import { commerceEn } from './commerce/en';
 import { decisionsEn } from './decisions';
 import { developerEn } from './developer/en';
+import { offersEn } from './offers/en';
 import { reportsEn } from './reports/en';
 import { slaEn } from './sla/en';
 import { ticketsEn } from './tickets/en';
@@ -999,6 +1000,7 @@ export const en = {
     tickets: ticketsEn,
     sla: slaEn,
     aiDrafts: aiDraftsEn,
+    offers: offersEn,
     blocking: blockingEn,
     keys: {
       plain: 'Keys: ↑ ↓ or J K to move, Enter to open, Esc to come back.',

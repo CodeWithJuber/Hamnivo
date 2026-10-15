@@ -9,6 +9,7 @@ import { commerceAr } from './commerce/ar';
 import { decisionsAr } from './decisions';
 import { developerAr } from './developer/ar';
 import type { Translation } from './en';
+import { offersAr } from './offers/ar';
 import { reportsAr } from './reports/ar';
 import { slaAr } from './sla/ar';
 import { ticketsAr } from './tickets/ar';
@@ -988,6 +989,7 @@ export const ar: Translation = {
     tickets: ticketsAr,
     sla: slaAr,
     aiDrafts: aiDraftsAr,
+    offers: offersAr,
     blocking: blockingAr,
     keys: {
       plain: 'المفاتيح: ↑ ↓ أو J K للتنقل، و Enter للفتح، و Esc للرجوع.',

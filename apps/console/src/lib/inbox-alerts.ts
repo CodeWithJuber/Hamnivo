@@ -39,6 +39,8 @@ export function soundFor(sounds: AlertSettings['sounds'], kind: AlertKind): Soun
     case 'sla_overdue':
     case 'chat_waiting':
       return sounds.newChat;
+    // A chat offered to this person (HNV-10-03) is theirs to answer, like an assignment.
+    case 'chat_offered':
     case 'assigned':
       return sounds.assigned;
     case 'customer_message':
@@ -48,6 +50,7 @@ export function soundFor(sounds: AlertSettings['sounds'], kind: AlertKind): Soun
 
 /** When several alerts arrive together, one sound plays: the most important kind. */
 const PRIORITY: readonly AlertKind[] = [
+  'chat_offered',
   'sla_overdue',
   'chat_waiting',
   'assigned',

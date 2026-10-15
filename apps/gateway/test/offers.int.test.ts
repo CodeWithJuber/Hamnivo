@@ -322,6 +322,7 @@ describe('hand-off offered to one person (HNV-10-03, HNV-10-06)', () => {
     // Chen goes offline: the offer is declined for them and goes on (to nobody here).
     const offline = await chen.client.put('/v1/inbox/availability', { status: 'offline' });
     expect(offline.status, JSON.stringify(offline.body)).toBe(200);
+    expect(offline.body).toMatchObject({ choice: 'offline' });
     await slice.drain();
     expect(await offersOf(chen)).toEqual([]);
     const declined = (await audits(slice, shop, first)).find(

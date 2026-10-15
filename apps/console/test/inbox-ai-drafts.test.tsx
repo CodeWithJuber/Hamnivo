@@ -39,6 +39,7 @@ const detail = (patch: Partial<InboxDetail> = {}): InboxDetail => ({
   waitingSince: NOW,
   sla: null,
   aiDraftReady: true,
+  offer: null,
   replyWindowClosesAt: null,
   unreadCount: 0,
   lastActivityAt: NOW,

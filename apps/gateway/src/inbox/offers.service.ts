@@ -508,7 +508,7 @@ export class OffersService {
         'conversations.read',
       );
       if (!this.open(offer, control)) throw await this.closed(tx, offer, control);
-      await this.declineIn(tx, principal, offer, input.reason, input.note ?? null);
+      await this.declineIn(tx, principal, offer, input.reason, input.note ?? null, true);
       return control.id;
     });
     await this.journal.signalInbox(principal.tenantId, conversationId);
@@ -521,6 +521,8 @@ export class OffersService {
     offer: OfferRow,
     reason: z.output<typeof DeclineOfferRequest>['reason'],
     note: string | null,
+    /** Going offline from the offer itself also makes me away (a status I chose stays). */
+    goAway: boolean,
   ): Promise<void> {
     const now = this.clock();
     await tx
@@ -542,7 +544,7 @@ export class OffersService {
       outcome: 'success',
       data: { offer: toPublicId('offer', offer.id), round: offer.round, reason },
     });
-    if (reason === 'going_offline') {
+    if (reason === 'going_offline' && goAway) {
       await tx
         .insert(schema.staffInboxPreferences)
         .values({
@@ -579,7 +581,7 @@ export class OffersService {
         await tx.select({ id: c.id }).from(c).where(eq(c.id, seen.conversationId)).for('update');
         const [offer] = await tx.select().from(o).where(eq(o.id, id));
         if (offer?.state !== 'pending') return null;
-        await this.declineIn(tx, principal, offer, 'going_offline', null);
+        await this.declineIn(tx, principal, offer, 'going_offline', null, false);
         return offer.conversationId;
       });
       if (conversationId) await this.journal.signalInbox(principal.tenantId, conversationId);
