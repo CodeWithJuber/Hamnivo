@@ -1,3 +1,4 @@
+import { aiDraftsHi } from './ai-drafts/hi';
 import { automationsHi } from './automations/hi';
 import { blockingHi } from './blocking/hi';
 import { cachingHi } from './caching';
@@ -535,7 +536,8 @@ export const hi: Translation = {
       answer: 'ग्राहकों को जवाब दें',
       answerHint: 'चैट में जवाब देता है।',
       assist: 'स्टाफ़ की मदद करें',
-      assistHint: 'सुझाव अंदरूनी नोट के रूप में लिखता है। ग्राहकों को कभी जवाब नहीं देता।',
+      assistHint:
+        'आपकी टीम के लिए जवाब का ड्राफ़्ट लिखता है, जिसे वे मंज़ूर करें, बदलें या अस्वीकार करें। ग्राहकों को ख़ुद कभी जवाब नहीं देता।',
     },
     provider: 'प्रोवाइडर',
     providers: {
@@ -711,7 +713,8 @@ export const hi: Translation = {
       public: 'सार्वजनिक जवाब',
       internal: 'सिर्फ़ टीम',
       publicHint: 'ग्राहकों के जवाबों का आधार बन सकता है।',
-      internalHint: 'सिर्फ़ स्टाफ़ और मदद मोड के लिए। ग्राहकों के जवाबों में कभी इस्तेमाल नहीं होता।',
+      internalHint:
+        'सिर्फ़ आपकी टीम के लिए, जैसे जानकारी खोजने में। ग्राहकों के जवाबों या ड्राफ़्ट में कभी इस्तेमाल नहीं होता।',
     },
     sourceStatus: { active: 'सक्रिय', paused: 'रुका हुआ', retired: 'इस्तेमाल बंद' },
     sourceForm: {
@@ -989,6 +992,7 @@ export const hi: Translation = {
     },
     tickets: ticketsHi,
     sla: slaHi,
+    aiDrafts: aiDraftsHi,
     blocking: blockingHi,
     keys: {
       plain: 'कुंजियाँ: चलने के लिए ↑ ↓ या J K, खोलने के लिए Enter, वापस आने के लिए Esc।',

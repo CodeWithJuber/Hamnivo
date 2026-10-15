@@ -69,6 +69,7 @@ const APPEND_ONLY = new Set([
   'billing_events',
   'chat_consents',
   'automation_versions',
+  'ai_draft_decisions',
 ]);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
@@ -98,6 +99,7 @@ const NEVER_DELETED = new Set([
   'http_tool_endpoints',
   'tenant_counters',
   'visitor_blocks',
+  'ai_drafts',
 ]);
 
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
@@ -261,6 +263,8 @@ describe('two-tenant isolation', () => {
     'brand_appearance',
     'brand_install_sightings',
     'sla_policies',
+    'ai_drafts',
+    'ai_draft_decisions',
     'test_conversations',
     'model_connection_tests',
     'onboarding_progress',
@@ -466,6 +470,8 @@ describe('two-tenant isolation', () => {
       'brand_appearance',
       'brand_install_sightings',
       'sla_policies',
+      'ai_drafts',
+      'ai_draft_decisions',
       'test_conversations',
       'model_connection_tests',
       'onboarding_progress',

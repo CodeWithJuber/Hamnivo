@@ -10,6 +10,7 @@ import type {
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, ne } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
+import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
 import { recordHumanReply, syncSla } from '../inbox/sla.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { type JournalEntry, JournalService } from './journal.service.js';
@@ -255,6 +256,9 @@ export class OutboundMessagesService {
     if (entries.length > 0 && input.sender.kind === 'staff' && input.visibility === 'public') {
       await recordHumanReply(tx, input.tenantId, input.conversationId, now);
       await syncSla(tx, input.tenantId, input.conversationId, now);
+      // A person answered by hand: a pending AI draft is no longer needed (HNV-09-05). Approving a
+      // draft decides it before sending, so the draft being sent is never pending here.
+      await supersedeAiDrafts(tx, input.conversationId, 'answered', now);
     }
     if (transitioned && input.onCommitted) await input.onCommitted(tx, control, ledgerId);
     const journaledMessage = (entries[0]?.event.data as { message?: Message } | undefined)?.message;

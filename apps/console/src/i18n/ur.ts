@@ -1,3 +1,4 @@
+import { aiDraftsUr } from './ai-drafts/ur';
 import { automationsUr } from './automations/ur';
 import { blockingUr } from './blocking/ur';
 import { cachingUr } from './caching';
@@ -546,7 +547,8 @@ export const ur: Translation = {
       answer: 'گاہکوں کو جواب دیں',
       answerHint: 'چیٹ میں جواب دیتا ہے۔',
       assist: 'عملے کی مدد کریں',
-      assistHint: 'تجاویز اندرونی نوٹس کے طور پر لکھتا ہے۔ گاہکوں کو کبھی جواب نہیں دیتا۔',
+      assistHint:
+        'آپ کی ٹیم کے لیے جواب کا مسودہ لکھتا ہے، جسے وہ منظور کریں، ترمیم کریں یا مسترد کریں۔ گاہکوں کو خود کبھی جواب نہیں دیتا۔',
     },
     provider: 'فراہم کنندہ',
     providers: {
@@ -726,7 +728,8 @@ export const ur: Translation = {
       public: 'عوامی جوابات',
       internal: 'صرف ٹیم',
       publicHint: 'گاہکوں کے جوابات کی بنیاد بن سکتا ہے۔',
-      internalHint: 'صرف عملے اور مدد کے موڈ کے لیے۔ گاہکوں کے جوابات میں کبھی استعمال نہیں ہوتا۔',
+      internalHint:
+        'صرف آپ کی ٹیم کے لیے، جیسے معلومات کی تلاش میں۔ گاہکوں کے جوابات یا مسودوں میں کبھی استعمال نہیں ہوتا۔',
     },
     sourceStatus: { active: 'فعال', paused: 'موقوف', retired: 'استعمال بند' },
     sourceForm: {
@@ -1007,6 +1010,7 @@ export const ur: Translation = {
     },
     tickets: ticketsUr,
     sla: slaUr,
+    aiDrafts: aiDraftsUr,
     blocking: blockingUr,
     keys: {
       plain: 'کلیدیں: حرکت کے لیے ↑ ↓ یا J K، کھولنے کے لیے Enter، واپسی کے لیے Esc۔',

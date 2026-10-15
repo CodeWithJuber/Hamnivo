@@ -106,6 +106,7 @@ describe('database roles', () => {
         'app.expired_memory_subjects(integer)',
         'app.invitation_pending_for(text)',
         'app.lapsed_billing(timestamp with time zone,integer)',
+        'app.purge_ai_drafts(integer)',
         'app.purge_automation_runs(integer)',
         'app.purge_expired(integer)',
         'app.purge_migration_files(integer)',

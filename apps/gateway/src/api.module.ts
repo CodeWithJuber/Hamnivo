@@ -50,6 +50,8 @@ import { SsoRuntime } from './identity/sso/sso-runtime.js';
 import { StaffGuard } from './identity/staff.guard.js';
 import { TenantsService } from './identity/tenants.service.js';
 import { InboxAccess } from './inbox/access.js';
+import { AiDraftsController } from './inbox/ai-drafts.controller.js';
+import { AiDraftsService } from './inbox/ai-drafts.service.js';
 import { InboxAlertsController } from './inbox/alerts.controller.js';
 import { InboxAlertsService } from './inbox/alerts.service.js';
 import { AnnotationsService } from './inbox/annotations.service.js';
@@ -163,6 +165,7 @@ export class ApiModule {
         AuditController,
         BrandsController,
         SlaController,
+        AiDraftsController,
         IdentityKeysController,
         ConnectionsController,
         ChannelsController,
@@ -236,6 +239,7 @@ export class ApiModule {
         SecretBroker,
         BrandsService,
         SlaService,
+        AiDraftsService,
         IdentityKeysService,
         ConnectionsService,
         ChannelInboxesService,

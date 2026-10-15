@@ -1,3 +1,4 @@
+import { aiDraftsAr } from './ai-drafts/ar';
 import { automationsAr } from './automations/ar';
 import { blockingAr } from './blocking/ar';
 import { cachingAr } from './caching';
@@ -534,7 +535,8 @@ export const ar: Translation = {
       answer: 'الرد على العملاء',
       answerHint: 'يرد في المحادثة.',
       assist: 'مساعدة الموظفين',
-      assistHint: 'يكتب اقتراحات كملاحظات داخلية. لا يرد على العملاء أبدًا.',
+      assistHint:
+        'يكتب مسودة رد ليوافق عليها فريقك أو يعدّلها أو يرفضها. لا يرد على العملاء من تلقاء نفسه أبدًا.',
     },
     provider: 'المزوّد',
     providers: {
@@ -708,7 +710,8 @@ export const ar: Translation = {
       public: 'إجابات عامة',
       internal: 'للفريق فقط',
       publicHint: 'يمكن أن تستند إليه الإجابات المقدمة للعملاء.',
-      internalHint: 'للموظفين ووضع المساعدة فقط. لا يُستخدم أبدًا في إجابات العملاء.',
+      internalHint:
+        'لفريقك فقط، كما في البحث في المعرفة. لا يُستخدم أبدًا في الإجابات أو المسودات للعملاء.',
     },
     sourceStatus: { active: 'نشط', paused: 'متوقف مؤقتًا', retired: 'مُستبعد' },
     sourceForm: {
@@ -984,6 +987,7 @@ export const ar: Translation = {
     },
     tickets: ticketsAr,
     sla: slaAr,
+    aiDrafts: aiDraftsAr,
     blocking: blockingAr,
     keys: {
       plain: 'المفاتيح: ↑ ↓ أو J K للتنقل، و Enter للفتح، و Esc للرجوع.',

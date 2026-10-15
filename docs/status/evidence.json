@@ -508,10 +508,12 @@
   "G03": {
     "status": "in-progress",
     "evidence": [
+      "apps/gateway/src/inbox/ai-drafts.ts",
       "apps/gateway/src/runtime/replies.service.ts",
-      "apps/gateway/test/agents.int.test.ts"
+      "apps/gateway/test/agents.int.test.ts",
+      "apps/gateway/test/ai-drafts.int.test.ts"
     ],
-    "note": "Answer mode replies to customers; assist mode writes suggestions only as internal notes and never answers customers (tested). Grounded answers from knowledge arrive with knowledge sources."
+    "note": "Answer mode replies to customers; assist mode never answers customers: it writes drafts from public knowledge for people to approve, edit or reject in Studio (HNV-09-05), never a Chatwoot note (tested). Grounded answers from knowledge arrive with knowledge sources."
   },
   "G09": {
     "status": "in-progress",
@@ -1237,7 +1239,7 @@
       "apps/gateway/src/inbox/assist.service.ts",
       "apps/gateway/test/inbox.int.test.ts"
     ],
-    "note": "Suggested replies from the brand's agent with the knowledge it cited, built from customer-visible messages only, recorded as a draft run and never sent on their own. Copy, edit, or Send as me through the ownership-checked send (audited). Conversation summaries and next-step suggestions are not built yet."
+    "note": "Suggested replies from the brand's agent with the knowledge it cited, built from customer-visible messages only, recorded as a draft run and never sent on their own. Copy, edit, or Send as me through the ownership-checked send (audited). An assist-mode agent's own drafts are reviewed the same way (HNV-09-05). Conversation summaries and next-step suggestions are not built yet."
   },
   "H13": {
     "status": "in-progress",
@@ -1343,13 +1345,20 @@
     "evidence": ["apps/console/e2e/inbox.spec.ts", "apps/console/src/pages/inbox/Composer.tsx"]
   },
   "HNV-09-05": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
-      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/AiDraftCard.tsx",
       "apps/console/src/pages/inbox/Composer.tsx",
-      "apps/gateway/test/inbox.int.test.ts"
+      "apps/gateway/src/inbox/ai-drafts.service.ts",
+      "apps/gateway/src/runtime/replies.service.ts",
+      "apps/gateway/test/ai-drafts.int.test.ts",
+      "apps/gateway/test/inbox.int.test.ts",
+      "apps/console/test/inbox-ai-drafts.test.tsx",
+      "apps/console/e2e/ai-drafts.spec.ts",
+      "apps/console/e2e/inbox.spec.ts",
+      "docs/guide/inbox/ai-drafts.md"
     ],
-    "note": "On-demand suggestions with their sources, edit, dismiss or send as me. Drafts that an assist-mode agent prepares on its own are not shown yet."
+    "note": "On-demand suggestions (edit, dismiss or send as me), and drafts an assist-mode agent writes on its own: shown above the composer with their public sources, approved, edited in place or rejected with a reason; sent as the reviewer through the ownership-checked send, once; set aside when the customer writes again, the conversation changes hands (a claim from the queue keeps it), a person answers by hand or it is resolved."
   },
   "HNV-09-06": {
     "status": "implemented",

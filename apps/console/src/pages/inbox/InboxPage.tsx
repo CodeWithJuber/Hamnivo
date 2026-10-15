@@ -13,6 +13,7 @@ import {
   LockIcon,
   MessagesSquareIcon,
   SearchIcon,
+  SparklesIcon,
   XIcon,
 } from 'lucide-react';
 import {
@@ -176,6 +177,15 @@ function QueueRow({
             ) : null}
             {conversation.priority ? <PriorityBadge priority={conversation.priority} /> : null}
             {conversation.sla ? <SlaBadge sla={conversation.sla} /> : null}
+            {conversation.aiDraftReady ? (
+              <StatusBadge
+                tone="info"
+                icon={<SparklesIcon className="size-3.5" aria-hidden="true" />}
+                data-testid="draft-ready"
+              >
+                {t('inbox.aiDrafts.badge')}
+              </StatusBadge>
+            ) : null}
             <OwnerBadge conversation={conversation} />
             {/* A ticket's state already says whether it waits or is closed. */}
             {!conversation.ticket &&

@@ -39,6 +39,7 @@ import { EntitlementsService } from '../billing/entitlements.service.js';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { teamsForBrand } from '../decisions/team-routing.service.js';
+import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
 import { AvailabilityService } from '../inbox/availability.service.js';
 import { syncSla } from '../inbox/sla.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
@@ -465,6 +466,8 @@ export class WidgetConversationsService {
           .where(eq(schema.conversationControls.id, conversationId));
         // A customer waiting for a person starts or continues the reply-time clock (H12).
         await syncSla(tx, claims.tenantId, conversationId, this.clock());
+        // A pending AI draft answered what they said before (HNV-09-05).
+        await supersedeAiDrafts(tx, conversationId, 'customer_wrote', this.clock());
         // The AI job decides: a fenced reply while the AI owns the conversation, a suggestion
         // for staff in assist mode, otherwise nothing.
         await enqueueOutbox(tx, claims.tenantId, {

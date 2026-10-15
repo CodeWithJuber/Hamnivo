@@ -26,8 +26,8 @@ see them, review them, retire them and search them in **Knowledge**.
 5. For the whole site, set **Most pages to read** (1 to 500, 50 to start with) and **How many
    links to follow** (0 to 5, 2 to start with). Links are counted from the first page.
 6. Choose how often to **Read again**: every day, every week, or only when you ask.
-7. Choose who can get answers from it: **Public answers**, or **Team only** for staff and assist
-   mode.
+7. Choose who can get answers from it: **Public answers**, or **Team only** for your team's own
+   searches. AI replies and [AI drafts](../inbox/ai-drafts.md) use public sources only.
 8. Choose **Add website**.
 
 Hamnivo starts within a few seconds. The first read can take a few minutes, and you can leave the

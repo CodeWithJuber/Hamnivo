@@ -40,6 +40,7 @@ export const ErrorCode = z.enum([
   'SEPARATE_APPROVER_REQUIRED',
   'DELETE_WINDOW_CLOSED',
   'CHANNEL_WINDOW_CLOSED',
+  'AI_DRAFT_CLOSED',
   'INTERNAL',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
@@ -123,6 +124,11 @@ export const ERROR_DEFAULTS: Record<
     retryable: false,
     title: 'This channel only allows template messages now',
   },
+  AI_DRAFT_CLOSED: {
+    status: 409,
+    retryable: false,
+    title: 'This AI draft is no longer waiting for review',
+  },
   INTERNAL: { status: 500, retryable: true, title: 'Something went wrong on our side' },
 };
 
@@ -172,6 +178,13 @@ export const Problem = z
      * people who may read the conversation.
      */
     currentOwner: ProblemOwner.optional(),
+    /** AI_DRAFT_CLOSED: how the draft ended, and who decided it when a person did. */
+    aiDraft: z
+      .object({
+        state: z.enum(['pending', 'approved', 'edited', 'rejected', 'superseded']),
+        decidedBy: z.string().nullable(),
+      })
+      .optional(),
   })
   .meta({ id: 'Problem', description: 'RFC 9457 problem details' });
 export type Problem = z.infer<typeof Problem>;

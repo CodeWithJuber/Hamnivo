@@ -1,3 +1,4 @@
+import { aiDraftsEn } from './ai-drafts/en';
 import { automationsEn } from './automations/en';
 import { blockingEn } from './blocking/en';
 import { cachingEn } from './caching';
@@ -541,7 +542,8 @@ export const en = {
       answer: 'Answer customers',
       answerHint: 'Replies in the chat.',
       assist: 'Assist staff',
-      assistHint: 'Writes suggestions as internal notes. Never replies to customers.',
+      assistHint:
+        'Writes a draft reply for your team to approve, edit or reject. Never replies to customers on its own.',
     },
     provider: 'Provider',
     providers: {
@@ -718,7 +720,8 @@ export const en = {
       public: 'Public answers',
       internal: 'Team only',
       publicHint: 'Can ground answers to customers.',
-      internalHint: 'Only for staff and assist mode. Never used in customer answers.',
+      internalHint:
+        'Only for your team, such as in knowledge search. Never used in answers or drafts for customers.',
     },
     sourceStatus: { active: 'Active', paused: 'Paused', retired: 'Retired' },
     sourceForm: {
@@ -995,6 +998,7 @@ export const en = {
     },
     tickets: ticketsEn,
     sla: slaEn,
+    aiDrafts: aiDraftsEn,
     blocking: blockingEn,
     keys: {
       plain: 'Keys: ↑ ↓ or J K to move, Enter to open, Esc to come back.',

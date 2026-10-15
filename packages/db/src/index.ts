@@ -1,4 +1,5 @@
 export * from './actions-resolvers.js';
+export * from './ai-drafts.js';
 export * from './ai-power-resolvers.js';
 export * from './audit.js';
 export * from './automations.js';

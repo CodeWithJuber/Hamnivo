@@ -26,6 +26,7 @@ import type { Redis } from 'ioredis';
 import { queueAutomationEvent } from '../automations/events.js';
 import { confirmCardPublication } from '../commerce/card-publisher.service.js';
 import type { AppConfig } from '../config.js';
+import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
 import { projectInboxState } from '../inbox/projection.js';
 import { recordHumanReply, syncSla } from '../inbox/sla.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
@@ -259,6 +260,8 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
         // Whichever commits the message starts the AI job, so it runs exactly once. A reaction
         // (W22) is not a question: nobody is asked to answer it.
         if (ledger.senderKind === 'customer' && !reactionOf(message)) {
+          // A pending AI draft answered what they said before (HNV-09-05).
+          await supersedeAiDrafts(tx, control.id, 'customer_wrote', now);
           await enqueueOutbox(tx, tenantId, {
             topic: 'conversation.customer_message',
             aggregateType: 'conversation',
@@ -362,7 +365,11 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
       message.direction === 'outgoing' &&
       message.sender.kind === 'user' &&
       (message.key === null || message.key.startsWith(MESSAGE_KEY_PREFIX.message));
-    if (humanReply) await recordHumanReply(tx, tenantId, control.id, message.createdAt);
+    if (humanReply) {
+      await recordHumanReply(tx, tenantId, control.id, message.createdAt);
+      // A person answered by hand: a pending AI draft is no longer needed (HNV-09-05).
+      await supersedeAiDrafts(tx, control.id, 'answered', now);
+    }
 
     // A person replying publicly in Chatwoot takes the conversation over from the AI.
     if (
@@ -485,6 +492,8 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     await syncSla(tx, tenantId, control.id, this.clock());
     const wasResolved = control.authorityStatus === 'resolved';
     if (!wasResolved && state.status === 'resolved') {
+      // Resolved in Chatwoot: a pending AI draft is no longer needed (HNV-09-05).
+      await supersedeAiDrafts(tx, control.id, 'resolved', this.clock());
       const resolved = await this.journal.append(tx, tenantId, control.id, [
         { lane: 'customer', type: 'conversation.resolved', data: { canReopen: true } },
       ]);
