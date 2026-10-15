@@ -4,6 +4,7 @@ import {
   ensureReconcileCursors,
   purgeAiDrafts,
   purgeAutomationRuns,
+  purgeConversationOffers,
   purgeExpired,
   purgeMigrationFiles,
   purgeVisitorBlocks,
@@ -67,6 +68,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           // Lifted and expired blocks stay on record for 90 days (H20).
           visitor_blocks_removed: await purgeVisitorBlocks(this.db),
           ai_drafts_removed: await purgeAiDrafts(this.db),
+          // Ended offers stay on record for 90 days (HNV-10-03).
+          offers_removed: await purgeConversationOffers(this.db),
         };
       }
       case 'reconcile-cursors':

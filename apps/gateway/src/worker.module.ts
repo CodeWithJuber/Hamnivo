@@ -32,6 +32,8 @@ import { WebhookDispatcher } from './developer/webhooks/dispatcher.service.js';
 import { WEBHOOK_SOURCE_TOPIC, WebhookFanout } from './developer/webhooks/fanout.service.js';
 import { InboxAccess } from './inbox/access.js';
 import { AvailabilityService } from './inbox/availability.service.js';
+import { OFFER_NEXT_TOPIC, OFFER_TIMEOUT_TOPIC } from './inbox/offers.js';
+import { OffersService } from './inbox/offers.service.js';
 import { SLA_DUE_TOPIC, SLA_RESYNC_TOPIC } from './inbox/sla.js';
 import { SlaService } from './inbox/sla.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
@@ -113,6 +115,7 @@ export class WorkerModule {
         ChannelAdoption,
         ChannelHealthNotices,
         SlaService,
+        OffersService,
         InboxProcessor,
         ReconcilerService,
         ChannelInboxesService,
@@ -172,6 +175,7 @@ export class WorkerModule {
             AutomationRunner,
             ChannelHealthNotices,
             SlaService,
+            OffersService,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -194,12 +198,24 @@ export class WorkerModule {
             automations: AutomationRunner,
             channelHealth: ChannelHealthNotices,
             sla: SlaService,
+            offers: OffersService,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
               ...defaultOutboxHandlers(),
               ['conversation.owner_changed', (event) => sync.applyOwnerChange(event)],
-              ['conversation.team_changed', (event) => sync.applyTeamChange(event)],
+              [
+                'conversation.team_changed',
+                // A conversation that waits in a team which offers conversations is offered to
+                // one of its people (HNV-10-03), whatever the Chatwoot sync did.
+                async (event) => {
+                  try {
+                    await sync.applyTeamChange(event);
+                  } finally {
+                    await offers.afterRoute(event);
+                  }
+                },
+              ],
               ['conversation.note', (event) => sync.applyNote(event)],
               ['conversation.close_blocked', (event) => sync.applyBlockedClose(event)],
               [
@@ -221,7 +237,20 @@ export class WorkerModule {
               ['memory.extract', async (event) => void (await extraction.onExtract(event))],
               ['memory.embed', (event) => index.onEmbed(event)],
               ['memory.deleted', (event) => deletions.complete(event)],
-              ['conversation.route', (event) => routing.onRoute(event)],
+              [
+                'conversation.route',
+                // Routing picks the team; then the team's offers start (HNV-10-03), whether or not
+                // routing changed anything.
+                async (event) => {
+                  try {
+                    await routing.onRoute(event);
+                  } finally {
+                    await offers.afterRoute(event);
+                  }
+                },
+              ],
+              [OFFER_TIMEOUT_TOPIC, (event) => offers.onTimeout(event)],
+              [OFFER_NEXT_TOPIC, (event) => offers.onNext(event)],
               [CARD_TOPIC, (event) => cards.onCardEvent(event)],
               [WEBHOOK_SOURCE_TOPIC, (event) => webhooks.onSource(event)],
               [TRANSCRIPT_TOPIC, (event) => emails.onTranscript(event)],

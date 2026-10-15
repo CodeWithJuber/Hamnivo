@@ -8,6 +8,7 @@ import { actionsInFlightNote, supersedeForOwnerChange } from '../actions/in-flig
 import { inFlightNote } from '../commerce/in-flight.js';
 import { AppError } from '../common/app-error.js';
 import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
+import { settleOffer } from '../inbox/offers.js';
 import { syncSla } from '../inbox/sla.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { CLOCK, type Clock } from '../tokens.js';
@@ -44,7 +45,8 @@ export interface TransitionOptions {
     | 'ai_blocked'
     | 'ai_limit'
     | 'ai_escalated'
-    | 'channel_ai_off';
+    | 'channel_ai_off'
+    | 'offer_accepted';
   /** Audit actor (`stf_…`, `cus_…`, `authority`). */
   actor: { type: 'staff' | 'customer' | 'system'; id: string };
   /** The epoch the caller saw; a different current epoch fails with OWNERSHIP_CHANGED. */
@@ -189,6 +191,8 @@ export class OwnershipService {
     // The reply-time clock follows the owner (H12): it runs while people have the conversation and
     // a customer waits, and ends when the AI takes it back.
     await syncSla(tx, tenantId, conversationId, this.clock());
+    // An offer was for this hand-off (HNV-10-03): someone else taking it ends the offer.
+    await settleOffer(tx, conversationId, this.clock());
 
     const before = customerView(control.ownerMode, control.authorityStatus);
     const after = customerView(mode, control.authorityStatus);

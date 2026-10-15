@@ -13,6 +13,17 @@ export interface AlertChat {
   customerName: string | null;
   /** When the chat went past its reply-time target (H12); null while it is within it. */
   slaBreachedAt?: Date | null;
+  /** The hand-off the chat is at (its ownership epoch). */
+  ownershipEpoch?: number;
+  /** The chat's team offers conversations to one person at a time (HNV-10-03). */
+  teamOffers?: boolean;
+  /** When offering this hand-off ended without anyone accepting, and which hand-off that was. */
+  offersEndedAt?: Date | null;
+  offersEndedEpoch?: number | null;
+  /** The pending offer: its id, who it is for and when it was made. */
+  offerId?: string | null;
+  offerStaffId?: string | null;
+  offeredAt?: Date | null;
 }
 
 /** A customer message (the newest one of a chat is enough to alert). */
@@ -61,8 +72,10 @@ export interface AlertDecision {
 
 /**
  * Which alerts a staff member should get for chats that changed since `since`:
+ * - `chat_offered`: a chat was offered to this person to accept or decline (HNV-10-03);
  * - `chat_waiting`: a chat came to wait for a person (a new chat, a hand-off from the AI, a chat
- *   put back in the queue);
+ *   put back in the queue). In a team that offers chats to one person at a time it comes when
+ *   the offers ended without anyone accepting, not before;
  * - `assigned`: a chat was assigned or transferred to this person by someone else;
  * - `customer_message`: the customer wrote in a chat that is theirs or waiting for a person;
  * - `sla_overdue`: a chat that is theirs or waiting for a person went past its reply-time target
@@ -111,9 +124,38 @@ export function deriveAlerts(input: {
       });
       continue;
     }
-    const changedAt = chat.ownerChangedAt ?? chat.createdAt;
+    const offerKey = chat.offerId ? `${chat.id}:offer:${chat.offerId}` : null;
+    if (
+      waiting(chat) &&
+      offerKey &&
+      chat.offerStaffId === input.me &&
+      chat.offeredAt &&
+      chat.offeredAt.getTime() > since &&
+      !seen.has(offerKey)
+    ) {
+      alerts.push({
+        key: offerKey,
+        kind: 'chat_offered',
+        conversationId: chat.id,
+        customerName: name,
+        preview: previewOf(message?.text),
+        at: chat.offeredAt,
+      });
+      continue;
+    }
+    // While a team offers the chat to one person at a time, the rest of the team is not called;
+    // they hear of it when the offers end without anyone accepting.
+    const offersEnded =
+      chat.offersEndedAt != null &&
+      chat.offersEndedEpoch != null &&
+      chat.offersEndedEpoch === chat.ownershipEpoch;
+    const offering = Boolean(chat.teamOffers) && !offersEnded;
+    const changedAt =
+      chat.teamOffers && offersEnded && chat.offersEndedAt
+        ? chat.offersEndedAt
+        : (chat.ownerChangedAt ?? chat.createdAt);
     const waitingKey = `${chat.id}:waiting:${changedAt.getTime()}`;
-    if (waiting(chat) && changedAt.getTime() > since && !seen.has(waitingKey)) {
+    if (waiting(chat) && !offering && changedAt.getTime() > since && !seen.has(waitingKey)) {
       alerts.push({
         key: waitingKey,
         kind: 'chat_waiting',

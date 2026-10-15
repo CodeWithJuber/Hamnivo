@@ -85,6 +85,8 @@ export const ID_PREFIX = {
   visitorBlock: 'blk',
   /** An AI reply awaiting review (HNV-09-05); `drf` is a streamed reply draft. */
   aiDraft: 'aidr',
+  /** A conversation offered to one person (HNV-10-03). */
+  offer: 'ofr',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

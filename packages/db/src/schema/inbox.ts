@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   check,
   foreignKey,
   index,
@@ -23,6 +24,8 @@ import { tenantId, workspaces } from './tenancy.js';
  * a small projection for queue filters, staff drafts, links between cases and quality reviews.
  */
 
+export const TEAM_ASSIGNMENT_MODES = ['queue', 'offer'] as const;
+
 /** A group of staff that conversations can be assigned to; also a grant scope (`team`). */
 export const teams = pgTable(
   'teams',
@@ -35,6 +38,15 @@ export const teams = pgTable(
     status: text('status', { enum: ['active', 'archived'] })
       .notNull()
       .default('active'),
+    /**
+     * How a conversation handed to the team reaches a person (H02): `queue`, everyone in the team
+     * sees it and anyone claims it; `offer`, it is offered to one person at a time (HNV-10-03).
+     */
+    assignmentMode: text('assignment_mode', { enum: TEAM_ASSIGNMENT_MODES })
+      .notNull()
+      .default('queue'),
+    /** How long one person has to accept an offer before it goes to the next. */
+    offerTimeoutSeconds: integer('offer_timeout_seconds').notNull().default(60),
     createdBy: uuid('created_by'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -52,6 +64,7 @@ export const teams = pgTable(
       columns: [t.tenantId, t.createdBy],
       foreignColumns: [staffMembers.tenantId, staffMembers.id],
     }),
+    check('teams_offer_timeout_ck', sql`${t.offerTimeoutSeconds} between 15 and 600`),
     tenantIsolation(),
   ],
 );
@@ -155,6 +168,13 @@ export const conversationInboxState = pgTable(
     slaPausedMinutes: integer('sla_paused_minutes').notNull().default(0),
     slaDueAt: tstz('sla_due_at'),
     slaBreachedAt: tstz('sla_breached_at'),
+    /**
+     * When offering the conversation to one person at a time ended without anyone accepting
+     * (HNV-10-03): it waits in the team's queue from then on, and the team is told.
+     */
+    offersEndedAt: tstz('offers_ended_at'),
+    /** The ownership epoch of the hand-off whose offers ended (`offers_ended_at`). */
+    offersEndedEpoch: bigint('offers_ended_epoch', { mode: 'number' }),
     updatedAt: updatedAt(),
   },
   (t) => [

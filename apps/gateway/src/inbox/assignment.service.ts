@@ -9,7 +9,7 @@ import { appendAudit, fromPublicId, schema, type TenantTx, toPublicId } from '@h
 import { type Permission, type ResourceScope, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
 import canonicalize from 'canonicalize';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { JournalService } from '../authority/journal.service.js';
 import { OutboundMessagesService } from '../authority/outbound.service.js';
@@ -85,11 +85,32 @@ export class AssignmentService {
     return this.access.tx(principal, async (tx) => {
       const found = await this.access.authorized(tx, principal, publicId, 'conversations.read');
       const staff = await this.eligibleStaff(tx, found.resource);
-      const statuses = await this.availability.statuses(
-        tx,
-        principal.tenantId,
-        staff.map((s) => s.staffMemberId),
-      );
+      const ids = staff.map((s) => s.staffMemberId);
+      const statuses = await this.availability.statuses(tx, principal.tenantId, ids);
+      // How busy each person is, and their limit (HNV-10-03): "3 of 5 chats".
+      const c = schema.conversationControls;
+      const open = ids.length
+        ? await tx
+            .select({ staffMemberId: c.ownerStaffId, count: sql<number>`count(*)::int` })
+            .from(c)
+            .where(
+              and(
+                eq(c.ownerMode, 'HUMAN_ACTIVE'),
+                inArray(c.ownerStaffId, ids),
+                inArray(c.authorityStatus, ['open', 'pending']),
+              ),
+            )
+            .groupBy(c.ownerStaffId)
+        : [];
+      const limits = ids.length
+        ? await tx
+            .select({
+              staffMemberId: schema.staffRoutingProfiles.staffMemberId,
+              maxOpenChats: schema.staffRoutingProfiles.maxOpenChats,
+            })
+            .from(schema.staffRoutingProfiles)
+            .where(inArray(schema.staffRoutingProfiles.staffMemberId, ids))
+        : [];
       const teams = await tx
         .select({ id: schema.teams.id, name: schema.teams.name })
         .from(schema.teams)
@@ -117,6 +138,9 @@ export class AssignmentService {
             found.control.ownerMode === 'HUMAN_ACTIVE' &&
             found.control.ownerStaffId === s.staffMemberId,
           status: statuses.get(s.staffMemberId) ?? 'offline',
+          openChats: Number(open.find((row) => row.staffMemberId === s.staffMemberId)?.count ?? 0),
+          maxOpenChats:
+            limits.find((row) => row.staffMemberId === s.staffMemberId)?.maxOpenChats ?? null,
         })),
         teams: teams.map((t) => ({ id: toPublicId('team', t.id), name: t.name })),
         ai: { available: Boolean(bot) && answering.answering, displayName: bot?.name ?? null },

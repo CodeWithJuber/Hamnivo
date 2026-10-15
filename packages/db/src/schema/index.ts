@@ -21,6 +21,7 @@ export * from './knowledge.js';
 export * from './language.js';
 export * from './memory.js';
 export * from './migration.js';
+export * from './offers.js';
 export * from './operations.js';
 export * from './operators.js';
 export * from './platform.js';

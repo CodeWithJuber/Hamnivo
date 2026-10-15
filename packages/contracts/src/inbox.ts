@@ -29,6 +29,22 @@ export const AuthorityStatus = z.enum(['open', 'pending', 'resolved', 'snoozed']
 /** Where a conversation came in. */
 export const InboxChannel = z.enum(['chat', 'email', 'whatsapp', 'telegram', 'sms', 'other']);
 
+/**
+ * A conversation offered to one person (HNV-10-03): not theirs until they accept. Everyone who sees
+ * the conversation sees who it is offered to and until when.
+ */
+export const InboxOffer = z
+  .object({
+    id: typeId('offer'),
+    staffMemberId: typeId('staff'),
+    displayName: z.string(),
+    expiresAt: Timestamp,
+    /** 1 for the first person offered for this hand-off. */
+    round: z.int().min(1),
+  })
+  .meta({ id: 'InboxOffer' });
+export type InboxOffer = z.infer<typeof InboxOffer>;
+
 /** Why the conversation has its current owner (the latest ownership change). */
 export const OwnerReason = z.enum([
   'staff_takeover',
@@ -48,6 +64,7 @@ export const OwnerReason = z.enum([
   'ai_escalated',
   'channel_ai_off',
   'ai_limit',
+  'offer_accepted',
 ]);
 export type OwnerReason = z.infer<typeof OwnerReason>;
 
@@ -135,6 +152,8 @@ export const InboxConversation = z
     sla: InboxSla.nullable(),
     /** An AI draft is waiting for a person to approve, edit or reject it (HNV-09-05). */
     aiDraftReady: z.boolean(),
+    /** Offered to one person right now, until they accept or decline (HNV-10-03). */
+    offer: InboxOffer.nullable(),
     /**
      * Customer messages this person has not read yet, from the read marker the server keeps for
      * them. Only chats that are theirs or waiting for a person count; every other chat shows 0.
@@ -303,6 +322,10 @@ export const AssigneeOptions = z
         current: z.boolean(),
         /** Online, away or offline right now. */
         status: AvailabilityStatus,
+        /** Open conversations they handle now (H02). */
+        openChats: z.int().nonnegative(),
+        /** The most they take at once; null: no limit. */
+        maxOpenChats: z.int().positive().nullable(),
       }),
     ),
     teams: z.array(InboxTeamRef),
@@ -680,6 +703,9 @@ export type ConversationLink = z.infer<typeof ConversationLink>;
 
 // ------------------------------------------------------------------ teams (H02)
 
+export const TeamAssignmentMode = z.enum(['queue', 'offer']);
+export type TeamAssignmentMode = z.infer<typeof TeamAssignmentMode>;
+
 export const Team = z
   .object({
     id: typeId('team'),
@@ -687,10 +713,26 @@ export const Team = z
     workspaceId: typeId('workspace').nullable(),
     status: z.enum(['active', 'archived']),
     members: z.array(z.object({ staffMemberId: typeId('staff'), displayName: z.string() })),
+    /**
+     * `queue`: everyone in the team sees a conversation handed to it and anyone claims it.
+     * `offer`: it is offered to one person at a time (HNV-10-03).
+     */
+    assignmentMode: TeamAssignmentMode,
+    /** Seconds one person has to accept an offer. */
+    offerTimeoutSeconds: z.int().min(15).max(600),
     createdAt: Timestamp,
   })
   .meta({ id: 'Team' });
 export type Team = z.infer<typeof Team>;
+
+/** Changes a team's name or how conversations reach its people (teams.manage). */
+export const UpdateTeamRequest = z
+  .object({
+    name: z.string().trim().min(1).max(80).optional(),
+    assignmentMode: TeamAssignmentMode.optional(),
+    offerTimeoutSeconds: z.int().min(15).max(600).optional(),
+  })
+  .meta({ id: 'UpdateTeamRequest' });
 
 export const CreateTeamRequest = z
   .object({

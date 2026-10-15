@@ -100,6 +100,7 @@ const NEVER_DELETED = new Set([
   'tenant_counters',
   'visitor_blocks',
   'ai_drafts',
+  'conversation_offers',
 ]);
 
 /** Columns a copy can write (generated columns such as a tsvector are computed, not copied). */
@@ -265,6 +266,8 @@ describe('two-tenant isolation', () => {
     'sla_policies',
     'ai_drafts',
     'ai_draft_decisions',
+    'staff_routing_profiles',
+    'conversation_offers',
     'test_conversations',
     'model_connection_tests',
     'onboarding_progress',
@@ -472,6 +475,8 @@ describe('two-tenant isolation', () => {
       'sla_policies',
       'ai_drafts',
       'ai_draft_decisions',
+      'staff_routing_profiles',
+      'conversation_offers',
       'test_conversations',
       'model_connection_tests',
       'onboarding_progress',

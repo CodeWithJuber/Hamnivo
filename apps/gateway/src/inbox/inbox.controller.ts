@@ -22,6 +22,7 @@ import {
   TeamAssignRequest,
   TransferRequest,
   TranslateRequest,
+  UpdateTeamRequest,
   UrgentQuery,
 } from '@hamnivo/contracts';
 import type { StaffPrincipal } from '@hamnivo/policy';
@@ -407,6 +408,16 @@ export class TeamsController {
   @StaffRoute({ tenant: true, permission: 'teams.manage' })
   create(@CurrentPrincipal() principal: StaffPrincipal, @Body() body: unknown) {
     return this.teams.create(principal, parseInput(CreateTeamRequest, body));
+  }
+
+  @Patch(':teamId')
+  @StaffRoute({ tenant: true, permission: 'teams.manage' })
+  update(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('teamId') teamId: string,
+    @Body() body: unknown,
+  ) {
+    return this.teams.update(principal, teamId, parseInput(UpdateTeamRequest, body));
   }
 
   @Put(':teamId/members')

@@ -27,6 +27,7 @@ import { queueAutomationEvent } from '../automations/events.js';
 import { confirmCardPublication } from '../commerce/card-publisher.service.js';
 import type { AppConfig } from '../config.js';
 import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
+import { settleOffer } from '../inbox/offers.js';
 import { projectInboxState } from '../inbox/projection.js';
 import { recordHumanReply, syncSla } from '../inbox/sla.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
@@ -488,8 +489,10 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
       })
       .where(eq(schema.conversationControls.id, control.id));
     await projectInboxState(tx, tenantId, control.id, connectionId, state);
-    // Status, snooze and priority from Chatwoot move the reply-time clock (H12).
+    // Status, snooze and priority from Chatwoot move the reply-time clock (H12); resolving or
+    // snoozing ends a pending offer (HNV-10-03).
     await syncSla(tx, tenantId, control.id, this.clock());
+    await settleOffer(tx, control.id, this.clock());
     const wasResolved = control.authorityStatus === 'resolved';
     if (!wasResolved && state.status === 'resolved') {
       // Resolved in Chatwoot: a pending AI draft is no longer needed (HNV-09-05).
