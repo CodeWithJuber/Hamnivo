@@ -26,6 +26,7 @@ export * from './platform.js';
 export * from './runtime.js';
 export * from './saas.js';
 export * from './setup.js';
+export * from './sla.js';
 export * from './sso.js';
 export * from './tenancy.js';
 export * from './visitors.js';

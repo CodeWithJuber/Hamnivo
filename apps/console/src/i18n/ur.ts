@@ -9,6 +9,7 @@ import { decisionsUr } from './decisions';
 import { developerUr } from './developer/ur';
 import type { Translation } from './en';
 import { reportsUr } from './reports/ur';
+import { slaUr } from './sla/ur';
 import { ticketsUr } from './tickets/ur';
 import { toolsUr } from './tools';
 import { chatSettingsUr } from './widget/ur';
@@ -998,12 +999,14 @@ export const ur: Translation = {
       label: 'قطاریں',
       mine: 'میری',
       unassigned: 'کسی شخص کا انتظار',
+      overdue: 'تاخیر والی',
       ai: 'AI جواب دے رہا ہے',
       team: 'میری ٹیمیں',
       tickets: 'ٹکٹ',
       all: 'سب',
     },
     tickets: ticketsUr,
+    sla: slaUr,
     blocking: blockingUr,
     keys: {
       plain: 'کلیدیں: حرکت کے لیے ↑ ↓ یا J K، کھولنے کے لیے Enter، واپسی کے لیے Esc۔',
@@ -1059,6 +1062,11 @@ export const ur: Translation = {
       unassigned: {
         title: 'کوئی کسی شخص کا انتظار نہیں کر رہا',
         description: 'جب کوئی صارف کسی شخص سے بات کرنا چاہے تو گفتگو یہاں انتظار کرتی ہے۔',
+      },
+      overdue: {
+        title: 'کچھ بھی تاخیر میں نہیں',
+        description:
+          'جواب کے وقت کا ہدف پار کر چکی گفتگو یہاں نظر آتی ہیں، سب سے زیادہ تاخیر والی پہلے۔',
       },
       ai: {
         title: 'AI اس وقت کسی کو جواب نہیں دے رہا',

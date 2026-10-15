@@ -1452,6 +1452,17 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       brandId: ids.brandId,
       appearance: { primaryColor: '#192A30', radius: 12, csat: true },
     });
+    // Reply-time targets (H12).
+    await tx.insert(s.slaPolicies).values({
+      tenantId,
+      brandId: ids.brandId,
+      targets: {
+        urgent: { firstReplyMinutes: 5, nextReplyMinutes: 10 },
+        high: { firstReplyMinutes: 15, nextReplyMinutes: 30 },
+        medium: { firstReplyMinutes: 60, nextReplyMinutes: 120 },
+        low: { firstReplyMinutes: null, nextReplyMinutes: null },
+      },
+    });
     // The chat code was seen on the brand's website.
     await tx.insert(s.brandInstallSightings).values({
       tenantId,

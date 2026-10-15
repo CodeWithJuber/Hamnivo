@@ -6,6 +6,7 @@ import { typeId } from './ids.js';
 import { AvailabilityStatus, CustomerTypingSignal, InboxAlertEvent } from './inbox-alerts.js';
 import { Sender } from './participants.js';
 import { SourcePart } from './parts.js';
+import { InboxSla } from './sla.js';
 import { OwnerMode } from './staff-conversations.js';
 import { TicketPriority, TicketSource, TicketState } from './tickets.js';
 
@@ -16,7 +17,8 @@ import { TicketPriority, TicketSource, TicketState } from './tickets.js';
  */
 
 /** Which conversations a queue shows. `tickets`: conversations that are tickets (H19). */
-export const InboxQueue = z.enum(['mine', 'unassigned', 'ai', 'team', 'tickets', 'all']);
+/** `overdue`: past its reply-time target (H12). */
+export const InboxQueue = z.enum(['mine', 'unassigned', 'ai', 'team', 'tickets', 'overdue', 'all']);
 export type InboxQueue = z.infer<typeof InboxQueue>;
 
 /** `active` is everything open or pending (neither snoozed nor resolved). */
@@ -45,6 +47,7 @@ export const OwnerReason = z.enum([
   'ai_blocked',
   'ai_escalated',
   'channel_ai_off',
+  'ai_limit',
 ]);
 export type OwnerReason = z.infer<typeof OwnerReason>;
 
@@ -128,6 +131,8 @@ export const InboxConversation = z
      * null on channels without such a window (W24).
      */
     replyWindowClosesAt: Timestamp.nullable(),
+    /** The reply-time clock (H12) while a customer waits for a person; null when none runs. */
+    sla: InboxSla.nullable(),
     /**
      * Customer messages this person has not read yet, from the read marker the server keeps for
      * them. Only chats that are theirs or waiting for a person count; every other chat shows 0.
@@ -146,6 +151,7 @@ export const InboxCounts = z
     ai: z.int().nonnegative(),
     team: z.int().nonnegative(),
     tickets: z.int().nonnegative(),
+    overdue: z.int().nonnegative(),
     all: z.int().nonnegative(),
   })
   .meta({ id: 'InboxCounts' });
@@ -165,6 +171,24 @@ export const InboxListQuery = z.object({
   cursor: Cursor.optional(),
   limit: z.coerce.number().int().min(1).max(50).default(25),
 });
+
+/**
+ * Urgent conversations waiting for a person (HNV-08-02), soonest deadline first, for the section
+ * at the top of the queue.
+ */
+export const UrgentQuery = z.object({
+  brandId: typeId('brand').optional(),
+  teamId: typeId('team').optional(),
+});
+
+export const UrgentList = z
+  .object({
+    items: z.array(InboxConversation).max(10),
+    /** How many there are in all; the list shows the first ten. */
+    total: z.int().nonnegative(),
+  })
+  .meta({ id: 'UrgentList' });
+export type UrgentList = z.infer<typeof UrgentList>;
 
 export const InboxPage = z
   .object({

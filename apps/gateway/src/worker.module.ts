@@ -32,6 +32,8 @@ import { WebhookDispatcher } from './developer/webhooks/dispatcher.service.js';
 import { WEBHOOK_SOURCE_TOPIC, WebhookFanout } from './developer/webhooks/fanout.service.js';
 import { InboxAccess } from './inbox/access.js';
 import { AvailabilityService } from './inbox/availability.service.js';
+import { SLA_DUE_TOPIC, SLA_RESYNC_TOPIC } from './inbox/sla.js';
+import { SlaService } from './inbox/sla.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
@@ -110,6 +112,7 @@ export class WorkerModule {
         PublicationsService,
         ChannelAdoption,
         ChannelHealthNotices,
+        SlaService,
         InboxProcessor,
         ReconcilerService,
         ChannelInboxesService,
@@ -168,6 +171,7 @@ export class WorkerModule {
             BillingNotices,
             AutomationRunner,
             ChannelHealthNotices,
+            SlaService,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -189,6 +193,7 @@ export class WorkerModule {
             notices: BillingNotices,
             automations: AutomationRunner,
             channelHealth: ChannelHealthNotices,
+            sla: SlaService,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -226,6 +231,8 @@ export class WorkerModule {
               [ACTION_RECONCILE_TOPIC, (event) => actions.onReconcile(event)],
               [AUTOMATION_TOPIC, (event) => automations.onEvent(event)],
               [CHANNEL_HEALTH_TOPIC, (event) => channelHealth.onEvent(event)],
+              [SLA_DUE_TOPIC, (event) => sla.onDue(event)],
+              [SLA_RESYNC_TOPIC, (event) => sla.onResync(event)],
               ...saasOutboxHandlers(provisioning, notices),
             ]),
         },

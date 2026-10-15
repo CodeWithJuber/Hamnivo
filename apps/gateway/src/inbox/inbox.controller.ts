@@ -22,6 +22,7 @@ import {
   TeamAssignRequest,
   TransferRequest,
   TranslateRequest,
+  UrgentQuery,
 } from '@hamnivo/contracts';
 import type { StaffPrincipal } from '@hamnivo/policy';
 import {
@@ -84,6 +85,12 @@ export class InboxController {
   @StaffRoute({ tenant: true, permission: 'conversations.read' })
   list(@CurrentPrincipal() principal: StaffPrincipal, @Query() query: unknown) {
     return this.inbox.list(principal, parseInput(InboxListQuery, query));
+  }
+
+  @Get('urgent')
+  @StaffRoute({ tenant: true, permission: 'conversations.read' })
+  urgent(@CurrentPrincipal() principal: StaffPrincipal, @Query() query: unknown) {
+    return this.inbox.urgent(principal, parseInput(UrgentQuery, query));
   }
 
   @Get('search')

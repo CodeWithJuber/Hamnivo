@@ -17,6 +17,7 @@ import { InboxAccess } from './access.js';
 import { InboxService } from './inbox.service.js';
 import { InboxMessagesService } from './messages.service.js';
 import { InboxSignals } from './signals.service.js';
+import { syncSla } from './sla.js';
 
 type ControlRow = typeof schema.conversationControls.$inferSelect;
 
@@ -131,6 +132,8 @@ export class TicketsService {
         set: { priority, updatedAt: this.clock() },
       });
     if ((before?.priority ?? null) === priority) return;
+    // Another priority has other reply-time targets (H12).
+    await syncSla(tx, principal.tenantId, control.id, this.clock());
     await appendAudit(tx, {
       actorType: 'staff',
       actorId: toPublicId('staff', principal.staffMemberId),

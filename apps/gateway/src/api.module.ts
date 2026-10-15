@@ -66,6 +66,8 @@ import { LIBRARY_API_CONTROLLERS, LIBRARY_API_PROVIDERS } from './inbox/library.
 import { InboxLiveService } from './inbox/live.service.js';
 import { InboxMessagesService } from './inbox/messages.service.js';
 import { InboxSignals } from './inbox/signals.service.js';
+import { SlaController } from './inbox/sla.controller.js';
+import { SlaService } from './inbox/sla.service.js';
 import { StatusService } from './inbox/status.service.js';
 import { TeamsService } from './inbox/teams.service.js';
 import { TicketsService } from './inbox/tickets.service.js';
@@ -160,6 +162,7 @@ export class ApiModule {
         SecretsController,
         AuditController,
         BrandsController,
+        SlaController,
         IdentityKeysController,
         ConnectionsController,
         ChannelsController,
@@ -232,6 +235,7 @@ export class ApiModule {
         IdempotencyService,
         SecretBroker,
         BrandsService,
+        SlaService,
         IdentityKeysService,
         ConnectionsService,
         ChannelInboxesService,

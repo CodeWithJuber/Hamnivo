@@ -40,6 +40,7 @@ import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { teamsForBrand } from '../decisions/team-routing.service.js';
 import { AvailabilityService } from '../inbox/availability.service.js';
+import { syncSla } from '../inbox/sla.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
@@ -462,6 +463,8 @@ export class WidgetConversationsService {
           .update(schema.conversationControls)
           .set({ lastCustomerMessageAt: this.clock() })
           .where(eq(schema.conversationControls.id, conversationId));
+        // A customer waiting for a person starts or continues the reply-time clock (H12).
+        await syncSla(tx, claims.tenantId, conversationId, this.clock());
         // The AI job decides: a fenced reply while the AI owns the conversation, a suggestion
         // for staff in assist mode, otherwise nothing.
         await enqueueOutbox(tx, claims.tenantId, {

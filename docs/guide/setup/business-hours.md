@@ -75,6 +75,11 @@ Press **Remove hours** and confirm. With no hours set, the chat never says that 
 available right now. It still accepts a request for a person, and tells the customer it is with
 your team. You can set hours again at any time.
 
+## Reply-time targets
+
+The same page sets how soon your team should reply, by priority. The time counts only during these
+hours. See [reply-time targets](../inbox/reply-targets.md).
+
 ## Check it
 
 Open the [test chat](test-chat.md) and ask for a person, with the preview set to a time when your

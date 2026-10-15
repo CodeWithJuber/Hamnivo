@@ -421,6 +421,20 @@
       "when": 1791614239839,
       "tag": "20261010063719_brand_install_sightings_security",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1792069781636,
+      "tag": "20261015130941_sla",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1792069784458,
+      "tag": "20261015130944_sla_security",
+      "breakpoints": true
     }
   ]
 }

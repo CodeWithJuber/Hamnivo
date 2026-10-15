@@ -1301,13 +1301,18 @@
     ]
   },
   "HNV-08-02": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
-      "apps/console/e2e/inbox.spec.ts",
+      "apps/console/src/pages/inbox/UrgentSection.tsx",
       "apps/console/src/pages/inbox/ConversationPane.tsx",
-      "apps/gateway/test/inbox.int.test.ts"
+      "apps/gateway/src/inbox/inbox.service.ts",
+      "apps/gateway/test/sla.int.test.ts",
+      "apps/gateway/test/inbox.int.test.ts",
+      "apps/console/test/inbox-sla.test.tsx",
+      "apps/console/e2e/sla.spec.ts",
+      "apps/console/e2e/inbox.spec.ts"
     ],
-    "note": "Atomic claim that shows the owner when someone else claimed first; the SLA status waits for H12."
+    "note": "Urgent conversations waiting for a person, soonest deadline first, above the queue with the reason, due time and a Claim button; a claim that loses names who won (currentOwner on OWNERSHIP_CHANGED)."
   },
   "HNV-08-03": {
     "status": "implemented",
@@ -3332,5 +3337,36 @@
       "packages/domain/test/whatsapp-templates.test.ts"
     ],
     "note": "Connect a WhatsApp Business number (Meta Cloud API) or a Telegram bot from Settings → Channels: Chatwoot checks the token with Meta or Telegram and keeps it; Hamnivo stores none. For WhatsApp, Studio shows the callback URL on Chatwoot's public host and Chatwoot's verify token for Meta's webhook set-up. Their conversations are adopted like email (ADR 0013), with the AI off until the owner turns it on, and Telegram is its own channel in the inbox. Tested end to end against the fake; creating WhatsApp and Telegram inboxes against a real Chatwoot needs Meta and Telegram, so the contract suite runs those cases on the fake only. Past the 24-hour window, staff send Meta-approved templates from the composer: Chatwoot's synced list is read live, values are checked and the rendered text is what the customer reads; sent once through the message ledger. Templates with a media header and one-time-code templates are not sent from Hamnivo."
+  },
+  "H12": {
+    "status": "in-progress",
+    "evidence": [
+      "packages/domain/src/sla.ts",
+      "packages/domain/src/business-hours.ts",
+      "packages/domain/test/sla.test.ts",
+      "packages/domain/test/business-time.test.ts",
+      "packages/db/src/schema/sla.ts",
+      "apps/gateway/src/inbox/sla.ts",
+      "apps/gateway/src/inbox/sla.service.ts",
+      "apps/gateway/test/sla.int.test.ts",
+      "apps/console/src/pages/settings/ReplyTargets.tsx",
+      "apps/console/test/inbox-sla.test.tsx",
+      "apps/console/e2e/sla.spec.ts",
+      "docs/adr/0014-reply-time-targets-are-business-time-clocks-hamnivo-keeps.md",
+      "docs/guide/inbox/reply-targets.md"
+    ],
+    "note": "Per-brand first and next reply targets by priority, counted in business hours (ADR 0014); the clock pauses while snoozed and ends with a person's reply or a hand-back to the AI. Overdue queue and count, audit and an alert when a conversation goes overdue. Escalation (reassigning overdue work) and reports on targets met are still to come."
+  },
+  "HNV-08-06": {
+    "status": "partial",
+    "evidence": [
+      "apps/gateway/src/inbox/sla.ts",
+      "apps/gateway/src/inbox/alerts.ts",
+      "apps/gateway/test/sla.int.test.ts",
+      "apps/gateway/test/inbox-alerts.test.ts",
+      "apps/console/src/pages/inbox/parts.tsx",
+      "apps/console/test/inbox-sla.test.tsx"
+    ],
+    "note": "An SLA breach shows as Overdue (badge, queue and count), is audited and alerts the owner or everyone who sees the waiting conversation. A backlog spike is not detected yet."
   }
 }

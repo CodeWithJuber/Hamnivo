@@ -23,6 +23,7 @@ import { queueFirstBrandSetup } from '../authority/provisioning.service.js';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { enforce } from '../identity/staff.guard.js';
+import { queueSlaResync } from '../inbox/sla.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { originAllowed, sessionOrigin } from '../widget/origins.js';
 
@@ -283,6 +284,8 @@ export class BrandsService {
         outcome: 'success',
         data: { timezone: businessHours?.timezone ?? null },
       });
+      // Reply-time clocks count business hours (H12): the open conversations recompute theirs.
+      await queueSlaResync(tx, principal.tenantId, brand.id);
       return brandView(row);
     });
   }

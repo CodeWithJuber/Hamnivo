@@ -9,6 +9,7 @@ import { decisionsHi } from './decisions';
 import { developerHi } from './developer/hi';
 import type { Translation } from './en';
 import { reportsHi } from './reports/hi';
+import { slaHi } from './sla/hi';
 import { ticketsHi } from './tickets/hi';
 import { toolsHi } from './tools';
 import { chatSettingsHi } from './widget/hi';
@@ -980,12 +981,14 @@ export const hi: Translation = {
       label: 'कतारें',
       mine: 'मेरी',
       unassigned: 'किसी व्यक्ति का इंतज़ार',
+      overdue: 'देरी वाली',
       ai: 'AI जवाब दे रहा है',
       team: 'मेरी टीमें',
       tickets: 'टिकट',
       all: 'सभी',
     },
     tickets: ticketsHi,
+    sla: slaHi,
     blocking: blockingHi,
     keys: {
       plain: 'कुंजियाँ: चलने के लिए ↑ ↓ या J K, खोलने के लिए Enter, वापस आने के लिए Esc।',
@@ -1040,6 +1043,10 @@ export const hi: Translation = {
       unassigned: {
         title: 'कोई किसी व्यक्ति का इंतज़ार नहीं कर रहा',
         description: 'जब कोई ग्राहक किसी व्यक्ति से बात करना चाहता है, तो बातचीत यहाँ इंतज़ार करती है।',
+      },
+      overdue: {
+        title: 'कुछ भी देर से नहीं है',
+        description: 'जवाब के समय का लक्ष्य पार कर चुकी बातचीत यहाँ दिखती हैं, सबसे ज़्यादा देरी वाली पहले।',
       },
       ai: {
         title: 'AI अभी किसी को जवाब नहीं दे रहा',

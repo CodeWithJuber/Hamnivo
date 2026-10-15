@@ -141,6 +141,15 @@ export const QuotaInfo = z
   .meta({ id: 'QuotaInfo' });
 export type QuotaInfo = z.infer<typeof QuotaInfo>;
 
+export const ProblemOwner = z
+  .object({
+    kind: z.enum(['staff', 'ai', 'external', 'none']),
+    displayName: z.string().nullable(),
+    ownershipEpoch: z.int().nonnegative(),
+  })
+  .meta({ id: 'ProblemOwner' });
+export type ProblemOwner = z.infer<typeof ProblemOwner>;
+
 /** RFC 9457 problem details with Hamnivo extension members. */
 export const Problem = z
   .object({
@@ -158,6 +167,11 @@ export const Problem = z
     reason: z.string().max(60).optional(),
     fields: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
     quota: QuotaInfo.optional(),
+    /**
+     * OWNERSHIP_CHANGED: who has the conversation now, so a lost claim can say so. Only sent to
+     * people who may read the conversation.
+     */
+    currentOwner: ProblemOwner.optional(),
   })
   .meta({ id: 'Problem', description: 'RFC 9457 problem details' });
 export type Problem = z.infer<typeof Problem>;
