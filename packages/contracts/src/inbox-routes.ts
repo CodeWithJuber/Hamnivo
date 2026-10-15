@@ -44,6 +44,8 @@ import {
   TeamAssignRequest,
   TransferRequest,
   TranslateRequest,
+  UrgentList,
+  UrgentQuery,
 } from './inbox.js';
 import type { RouteDef } from './routes.js';
 
@@ -67,6 +69,17 @@ export const inboxRoutes = {
     auth: 'staff_session',
     query: InboxListQuery,
     success: { status: 200, description: 'A page of conversations', schema: InboxPage },
+  },
+  listUrgentConversations: {
+    method: 'get',
+    path: '/v1/inbox/urgent',
+    operationId: 'listUrgentConversations',
+    summary:
+      'Urgent conversations waiting for a person, soonest reply deadline first (conversations.read)',
+    tags: tag,
+    auth: 'staff_session',
+    query: UrgentQuery,
+    success: { status: 200, description: 'Urgent conversations', schema: UrgentList },
   },
   searchInbox: {
     method: 'get',

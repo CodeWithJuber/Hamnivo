@@ -1,6 +1,7 @@
 import { StatusBadge, type StatusTone } from '@hamnivo/ui/components/status-badge';
-import i18next from 'i18next';
+import i18next, { type TFunction } from 'i18next';
 import {
+  AlarmClockIcon,
   BadgeCheckIcon,
   BotIcon,
   CheckCircle2Icon,
@@ -22,10 +23,12 @@ import {
   PhoneIcon,
   SendIcon,
   TicketIcon,
+  TimerIcon,
   UserRoundIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { InboxConversation, TicketPriority, TicketState } from '../../lib/inbox';
+import { type InboxSla, type ProblemOwner, readSla, type SlaReading, useNow } from '../../lib/sla';
 import { useTenant } from '../../lib/tenant';
 
 const TICKET_TONES: Record<TicketState, StatusTone> = {
@@ -109,9 +112,9 @@ export function shortTime(iso: string, now = new Date()): string {
   return new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'short' }).format(date);
 }
 
-/** How long something has waited, as "5 min", "3 hr" or "2 days" in the interface language. */
-export function formatWaited(iso: string, now = Date.now()): string {
-  const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
+/** A number of minutes as "5 min", "3 hr" or "2 days" in the interface language. */
+export function formatMinutes(total: number): string {
+  const minutes = Math.max(0, Math.round(total));
   const [value, unit]: [number, 'minute' | 'hour' | 'day'] =
     minutes < 60
       ? [minutes, 'minute']
@@ -123,6 +126,11 @@ export function formatWaited(iso: string, now = Date.now()): string {
     unit,
     unitDisplay: unit === 'day' ? 'long' : 'short',
   }).format(value);
+}
+
+/** How long something has waited, as "5 min", "3 hr" or "2 days" in the interface language. */
+export function formatWaited(iso: string, now = Date.now()): string {
+  return formatMinutes((now - new Date(iso).getTime()) / 60_000);
 }
 
 export function timeOfDay(iso: string): string {
@@ -277,4 +285,70 @@ export function ChannelIcon({ channel }: { channel: InboxConversation['channel']
       <span>{t(`inbox.channel.${channel}`)}</span>
     </span>
   );
+}
+
+const SLA_TONES: Record<SlaReading['kind'], StatusTone> = {
+  overdue: 'danger',
+  dueNow: 'danger',
+  dueSoon: 'warning',
+  dueIn: 'neutral',
+  paused: 'neutral',
+  outsideHours: 'neutral',
+};
+const SLA_ICONS: Record<SlaReading['kind'], LucideIcon> = {
+  overdue: AlarmClockIcon,
+  dueNow: AlarmClockIcon,
+  dueSoon: TimerIcon,
+  dueIn: TimerIcon,
+  paused: PauseIcon,
+  outsideHours: MoonIcon,
+};
+
+/** A clock's words: "Reply due in 4 min", "Overdue by 12 min", "Reply time paused". */
+export function slaText(reading: SlaReading, t: TFunction): string {
+  switch (reading.kind) {
+    case 'overdue':
+      return t('inbox.sla.badge.overdue', { time: formatMinutes(reading.minutes) });
+    case 'dueSoon':
+    case 'dueIn':
+      return t(`inbox.sla.badge.${reading.kind}`, { time: formatMinutes(reading.minutes) });
+    default:
+      return t(`inbox.sla.badge.${reading.kind}`);
+  }
+}
+
+/**
+ * When a reply is due (H12), in words and with an icon (never colour alone): red once overdue,
+ * amber when nearly due. It counts down only while the clock runs; the full target is in its
+ * title for anyone who wants it.
+ */
+export function SlaBadge({ sla }: { sla: InboxSla }) {
+  const { t } = useTranslation();
+  const now = useNow(sla.state === 'running');
+  const reading = readSla(sla, now);
+  const Icon = SLA_ICONS[reading.kind];
+  const kind = t(`inbox.sla.badge.${sla.kind}`);
+  return (
+    <StatusBadge
+      tone={SLA_TONES[reading.kind]}
+      icon={<Icon className="size-3.5" aria-hidden="true" />}
+      title={t('inbox.sla.badge.detail', { kind, target: formatMinutes(sla.targetMinutes) })}
+      data-sla={reading.kind}
+      data-testid="sla-badge"
+    >
+      {slaText(reading, t)}
+    </StatusBadge>
+  );
+}
+
+/** Who won a claim that lost (HNV-08-06), from the gateway's answer, in a sentence. */
+export function lostClaimText(owner: ProblemOwner | undefined | null, t: TFunction): string {
+  if (owner?.kind === 'staff' && owner.displayName) {
+    return t('inbox.sla.lost.staff', { name: owner.displayName });
+  }
+  if (owner?.kind === 'ai') {
+    return t('inbox.sla.lost.ai', { name: owner.displayName ?? t('inbox.owner.ai') });
+  }
+  if (owner?.kind === 'external') return t('inbox.sla.lost.external');
+  return t('inbox.sla.lost.none');
 }

@@ -8,6 +8,7 @@ import { commerceEn } from './commerce/en';
 import { decisionsEn } from './decisions';
 import { developerEn } from './developer/en';
 import { reportsEn } from './reports/en';
+import { slaEn } from './sla/en';
 import { ticketsEn } from './tickets/en';
 import { toolsEn } from './tools';
 import { chatSettingsEn } from './widget/en';
@@ -986,12 +987,14 @@ export const en = {
       label: 'Queues',
       mine: 'Mine',
       unassigned: 'Waiting for a person',
+      overdue: 'Overdue',
       ai: 'AI answering',
       team: 'My teams',
       tickets: 'Tickets',
       all: 'All',
     },
     tickets: ticketsEn,
+    sla: slaEn,
     blocking: blockingEn,
     keys: {
       plain: 'Keys: ↑ ↓ or J K to move, Enter to open, Esc to come back.',
@@ -1046,6 +1049,11 @@ export const en = {
       unassigned: {
         title: 'Nobody is waiting for a person',
         description: 'When a customer asks for a person, the conversation waits here.',
+      },
+      overdue: {
+        title: 'Nothing is overdue',
+        description:
+          'Conversations past their reply-time target show up here, the most overdue first.',
       },
       ai: {
         title: 'The AI isn’t answering anyone right now',

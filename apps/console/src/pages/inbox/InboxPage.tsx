@@ -53,10 +53,12 @@ import {
   languageName,
   OwnerBadge,
   PriorityBadge,
+  SlaBadge,
   shortTime,
   TicketReference,
   TicketStateBadge,
 } from './parts';
+import { UrgentSection } from './UrgentSection';
 
 /** The row to put focus back on after leaving a conversation (Esc or Back on a phone). */
 let returnFocusTo: string | null = null;
@@ -173,6 +175,7 @@ function QueueRow({
               </>
             ) : null}
             {conversation.priority ? <PriorityBadge priority={conversation.priority} /> : null}
+            {conversation.sla ? <SlaBadge sla={conversation.sla} /> : null}
             <OwnerBadge conversation={conversation} />
             {/* A ticket's state already says whether it waits or is closed. */}
             {!conversation.ticket &&
@@ -784,6 +787,7 @@ function QueuePane({ open, selectedId }: { open: boolean; selectedId: string | u
       ) : null}
 
       <div className="min-h-0 flex-1 lg:overflow-y-auto">
+        <UrgentSection />
         {search.q ? (
           <SearchResults q={search.q} />
         ) : (

@@ -29,6 +29,7 @@ import { OwnershipService } from '../authority/ownership.service.js';
 import { AuthorityRegistry, type ConnectionRuntime } from '../authority/registry.js';
 import { uuidV5 } from '../authority/uuid.js';
 import { AvailabilityService } from '../inbox/availability.service.js';
+import { syncSla } from '../inbox/sla.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { makeTicket } from '../tickets/tickets.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
@@ -342,8 +343,8 @@ export class AutomationRunner {
           break;
         case 'set_priority':
           await runtime.authority.setPriority(ref, action.priority, INTEGRATION);
-          await this.tx(tenantId, (tx) =>
-            tx
+          await this.tx(tenantId, async (tx) => {
+            await tx
               .insert(schema.conversationInboxState)
               .values({ tenantId, conversationId: control.id, priority: action.priority })
               .onConflictDoUpdate({
@@ -352,8 +353,10 @@ export class AutomationRunner {
                   schema.conversationInboxState.conversationId,
                 ],
                 set: { priority: action.priority, updatedAt: this.clock() },
-              }),
-          );
+              });
+            // Another priority has other reply-time targets (H12).
+            await syncSla(tx, tenantId, control.id, this.clock());
+          });
           break;
         case 'add_note':
         case 'assign_team':

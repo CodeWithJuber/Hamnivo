@@ -382,7 +382,9 @@ describe('the business hours page', () => {
     await waitFor(() =>
       expect(gateway.to('PUT', '/v1/admin/brands/brd_1/business-hours')).toHaveLength(1),
     );
-    expect(gateway.calls[0]?.body).toEqual({ businessHours: null });
+    expect(gateway.to('PUT', '/v1/admin/brands/brd_1/business-hours')[0]?.body).toEqual({
+      businessHours: null,
+    });
   });
 
   it('asks before leaving with times that are not saved, and lets the person stay', async () => {

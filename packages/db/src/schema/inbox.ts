@@ -123,6 +123,8 @@ export const teamAuthorityLinks = pgTable(
 export const TICKET_SOURCES = ['offline_form', 'staff', 'automation', 'email'] as const;
 export const CONVERSATION_PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 
+export const SLA_KINDS = ['first_reply', 'next_reply'] as const;
+
 export const conversationInboxState = pgTable(
   'conversation_inbox_state',
   {
@@ -140,6 +142,19 @@ export const conversationInboxState = pgTable(
     ticketNumber: integer('ticket_number'),
     ticketSource: text('ticket_source', { enum: TICKET_SOURCES }),
     ticketOpenedAt: tstz('ticket_opened_at'),
+    /**
+     * Reply-time targets (H12): the last public reply a person wrote (AI and automation replies do
+     * not count), and the clock for the reply the customer is waiting for. Kept by the gateway
+     * whenever a message, owner, status or priority changes; null when no clock runs.
+     */
+    lastHumanReplyAt: tstz('last_human_reply_at'),
+    slaKind: text('sla_kind', { enum: SLA_KINDS }),
+    slaStartedAt: tstz('sla_started_at'),
+    slaTargetMinutes: integer('sla_target_minutes'),
+    slaPausedAt: tstz('sla_paused_at'),
+    slaPausedMinutes: integer('sla_paused_minutes').notNull().default(0),
+    slaDueAt: tstz('sla_due_at'),
+    slaBreachedAt: tstz('sla_breached_at'),
     updatedAt: updatedAt(),
   },
   (t) => [
@@ -156,6 +171,14 @@ export const conversationInboxState = pgTable(
       'conversation_inbox_state_priority_ck',
       sql`${t.priority} is null or ${t.priority} in ('urgent', 'high', 'medium', 'low')`,
     ),
+    index('conversation_inbox_state_sla_due_idx')
+      .on(t.tenantId, t.slaDueAt)
+      .where(sql`${t.slaDueAt} is not null`),
+    check(
+      'conversation_inbox_state_sla_ck',
+      sql`(${t.slaKind} is null and ${t.slaStartedAt} is null and ${t.slaTargetMinutes} is null) or (${t.slaKind} in ('first_reply', 'next_reply') and ${t.slaStartedAt} is not null and ${t.slaTargetMinutes} > 0)`,
+    ),
+    check('conversation_inbox_state_sla_paused_ck', sql`${t.slaPausedMinutes} >= 0`),
     check(
       'conversation_inbox_state_ticket_ck',
       sql`(${t.ticketNumber} is null and ${t.ticketSource} is null and ${t.ticketOpenedAt} is null) or (${t.ticketNumber} > 0 and ${t.ticketSource} in ('offline_form', 'staff', 'automation', 'email') and ${t.ticketOpenedAt} is not null)`,

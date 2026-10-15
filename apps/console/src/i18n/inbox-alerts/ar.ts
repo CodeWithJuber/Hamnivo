@@ -23,7 +23,7 @@ export const inboxAlertsAr: InboxAlertsTranslation = {
     silent: 'لن يُشغَّل أي صوت أثناء كتم الأصوات أو عندما يكون مستوى الصوت صفرًا.',
     events: {
       title: 'الصوت لكل حدث',
-      newChat: 'محادثة تنتظر شخصًا',
+      newChat: 'محادثة تنتظر شخصًا، أو تجاوزت وقت الرد',
       customerMessage: 'يكتب عميل في محادثتك، أو في محادثة لم يتسلمها أحد',
       assigned: 'إسناد محادثة إليك أو تحويلها إليك',
     },
@@ -64,6 +64,7 @@ export const inboxAlertsAr: InboxAlertsTranslation = {
   },
   alert: {
     chat_waiting: '{{name}} ينتظر شخصًا',
+    sla_overdue: '{{name}} تجاوز هدف وقت الرد',
     customer_message: 'رسالة جديدة من {{name}}',
     assigned: 'أُسندت إليك محادثة',
     assignedBody: '{{name}}: {{preview}}',

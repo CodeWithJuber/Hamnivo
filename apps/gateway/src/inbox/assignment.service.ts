@@ -15,6 +15,7 @@ import { JournalService } from '../authority/journal.service.js';
 import { OutboundMessagesService } from '../authority/outbound.service.js';
 import {
   type ControlRow,
+  currentOwnerOf,
   OwnershipService,
   type OwnerTarget,
   type TransitionOptions,
@@ -177,6 +178,7 @@ export class AssignmentService {
         if (!this.access.can(principal, 'conversations.assign', found.resource)) {
           throw new AppError('OWNERSHIP_CHANGED', {
             detail: 'A colleague is handling this conversation. Ask them to hand it over.',
+            currentOwner: await currentOwnerOf(tx, control),
           });
         }
       }

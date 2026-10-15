@@ -38,6 +38,8 @@ describe('which sound plays', () => {
     expect(soundFor(own, 'chat_waiting')).toBe('bell');
     expect(soundFor(own, 'customer_message')).toBe('drop');
     expect(soundFor(own, 'assigned')).toBe('ping');
+    // A chat past its reply time is as pressing as a new one waiting (H12).
+    expect(soundFor(own, 'sla_overdue')).toBe('bell');
     expect(chooseSound([alert('assigned', 'c1')], own, elsewhere)).toEqual({
       sound: 'ping',
       volume: 60,
@@ -58,6 +60,8 @@ describe('which sound plays', () => {
       alert('chat_waiting', 'c3'),
     ];
     expect(chooseSound(batch, sounds(), elsewhere)?.sound).toBe('chime');
+    const late = [alert('assigned', 'c2'), alert('sla_overdue', 'c4')];
+    expect(chooseSound(late, sounds({ assigned: 'ping' }), elsewhere)?.sound).toBe('chime');
     // With no sound for the first, the next one is heard.
     expect(chooseSound(batch, sounds({ newChat: 'none' }), elsewhere)?.sound).toBe('bell');
   });

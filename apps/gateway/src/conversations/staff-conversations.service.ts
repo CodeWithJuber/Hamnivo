@@ -11,6 +11,7 @@ import { JournalService } from '../authority/journal.service.js';
 import { OutboundMessagesService } from '../authority/outbound.service.js';
 import {
   type ControlRow,
+  currentOwnerOf,
   OwnershipService,
   type OwnerTarget,
 } from '../authority/ownership.service.js';
@@ -108,6 +109,7 @@ export class StaffConversationsService {
           throw new AppError('OWNERSHIP_CHANGED', {
             detail:
               'A colleague is handling this conversation. Ask them to hand it over, or ask a supervisor.',
+            currentOwner: await currentOwnerOf(tx, found.control),
           });
         }
       }
@@ -202,12 +204,14 @@ export class StaffConversationsService {
         if (input.expectedEpoch !== undefined && input.expectedEpoch !== control.ownershipEpoch) {
           throw new AppError('OWNERSHIP_CHANGED', {
             detail: 'Someone else changed who handles this conversation. Nothing was sent.',
+            currentOwner: await currentOwnerOf(tx, control),
           });
         }
         if (ownedByOther(control, principal.staffMemberId)) {
           throw new AppError('OWNERSHIP_CHANGED', {
             detail:
               'A colleague is handling this conversation. Take it over first. Nothing was sent.',
+            currentOwner: await currentOwnerOf(tx, control),
           });
         }
         // A template is what WhatsApp allows once the 24-hour window has closed.

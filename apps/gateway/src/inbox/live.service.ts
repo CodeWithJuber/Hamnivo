@@ -122,6 +122,7 @@ export class InboxLiveService {
         inboxId: c.inboxId,
         workspaceId: schema.brands.workspaceId,
         teamId: schema.conversationInboxState.teamId,
+        slaBreachedAt: schema.conversationInboxState.slaBreachedAt,
       })
       .from(c)
       .leftJoin(schema.brands, eq(schema.brands.id, c.brandId))

@@ -10,6 +10,7 @@ import type {
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, ne } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
+import { recordHumanReply, syncSla } from '../inbox/sla.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { type JournalEntry, JournalService } from './journal.service.js';
 import { type ControlRow, OwnershipService } from './ownership.service.js';
@@ -248,6 +249,12 @@ export class OutboundMessagesService {
           authorityId,
         },
       ]);
+    }
+    // A person's public reply ends the reply-time clock (H12). Recorded where the message is first
+    // journaled: here, or in the processor when Chatwoot's webhook came first.
+    if (entries.length > 0 && input.sender.kind === 'staff' && input.visibility === 'public') {
+      await recordHumanReply(tx, input.tenantId, input.conversationId, now);
+      await syncSla(tx, input.tenantId, input.conversationId, now);
     }
     if (transitioned && input.onCommitted) await input.onCommitted(tx, control, ledgerId);
     const journaledMessage = (entries[0]?.event.data as { message?: Message } | undefined)?.message;

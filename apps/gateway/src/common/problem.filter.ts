@@ -23,7 +23,7 @@ export function toProblem(error: unknown, requestId: string) {
   if (error instanceof InvalidPublicIdError) return problem('NOT_FOUND', requestId);
   const appError = error instanceof AppError ? error : planLimitFromDatabase(error);
   if (appError) {
-    const { detail, fields, retryAfter, retryable, quota, reason } = appError.details;
+    const { detail, fields, retryAfter, retryable, quota, reason, currentOwner } = appError.details;
     return problem(appError.code, requestId, {
       ...(detail ? { detail } : {}),
       ...(fields ? { fields } : {}),
@@ -31,6 +31,7 @@ export function toProblem(error: unknown, requestId: string) {
       ...(retryAfter !== undefined ? { retryAfter } : {}),
       ...(retryable !== undefined ? { retryable } : {}),
       ...(quota ? { quota } : {}),
+      ...(currentOwner ? { currentOwner } : {}),
     });
   }
   const status =

@@ -1,4 +1,4 @@
-import type { ErrorCode, QuotaInfo } from '@hamnivo/contracts';
+import type { ErrorCode, ProblemOwner, QuotaInfo } from '@hamnivo/contracts';
 
 export interface AppErrorDetails {
   detail?: string;
@@ -9,6 +9,8 @@ export interface AppErrorDetails {
   quota?: QuotaInfo;
   /** A finer machine-readable reason (Problem.reason). */
   reason?: string;
+  /** OWNERSHIP_CHANGED: who has the conversation now (Problem.currentOwner). */
+  currentOwner?: ProblemOwner;
   /** Logged for operators, never sent to clients. */
   internal?: unknown;
 }

@@ -91,8 +91,10 @@ import {
   ConversationStatusBadge,
   IdentityBadge,
   languageName,
+  lostClaimText,
   OwnerBadge,
   PriorityBadge,
+  SlaBadge,
   TicketStateBadge,
   useMyStaffId,
 } from './parts';
@@ -912,8 +914,10 @@ function OwnershipBanner({ detail }: { detail: InboxDetail }) {
       {claim.error ? (
         <div className="basis-full">
           {isApiError(claim.error, 'OWNERSHIP_CHANGED') ? (
-            <p role="alert" className="text-sm font-medium text-text">
-              {t('inbox.banner.claimLost')}
+            <p role="alert" className="text-sm font-medium text-text" data-testid="claim-lost">
+              {claim.error.problem?.currentOwner
+                ? lostClaimText(claim.error.problem.currentOwner, t)
+                : t('inbox.banner.claimLost')}
             </p>
           ) : (
             <ActionError error={claim.error} />
@@ -991,6 +995,7 @@ function Header({
             {detail.priority && !detail.ticket ? (
               <PriorityBadge priority={detail.priority} />
             ) : null}
+            {detail.sla ? <SlaBadge sla={detail.sla} /> : null}
             <OwnerBadge conversation={detail} />
             <ChannelIcon channel={detail.channel} />
             {language ? <bdi>{language}</bdi> : null}

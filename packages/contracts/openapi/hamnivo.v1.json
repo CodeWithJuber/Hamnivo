@@ -3137,6 +3137,128 @@
         }
       }
     },
+    "/v1/admin/brands/{brandId}/sla-policy": {
+      "get": {
+        "operationId": "getSlaPolicy",
+        "summary": "The brand’s reply-time targets per priority (inbox.manage)",
+        "tags": [
+          "Administration"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reply-time targets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlaPolicy"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "setSlaPolicy",
+        "summary": "Set how soon a person should give the first and each next reply, per priority, in business hours (inbox.manage)",
+        "tags": [
+          "Administration"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "Brand ID (brd_…)"
+            },
+            "required": true,
+            "description": "Brand ID (brd_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSlaPolicyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reply-time targets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlaPolicy"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/brands/{brandId}/identity-keys": {
       "get": {
         "operationId": "listIdentityKeys",
@@ -9962,6 +10084,7 @@
                 "ai",
                 "team",
                 "tickets",
+                "overdue",
                 "all"
               ]
             }
@@ -10094,6 +10217,71 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InboxPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/urgent": {
+      "get": {
+        "operationId": "listUrgentConversations",
+        "summary": "Urgent conversations waiting for a person, soonest reply deadline first (conversations.read)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "brandId",
+            "schema": {
+              "type": "string",
+              "description": "brand identifier (TypeID with prefix \"brd\")",
+              "example": "brd_01j9zk7w3xq8r4t2v6m5n1p0cd"
+            }
+          },
+          {
+            "in": "query",
+            "name": "teamId",
+            "schema": {
+              "type": "string",
+              "description": "team identifier (TypeID with prefix \"team\")",
+              "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Urgent conversations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UrgentList"
                 }
               }
             }
@@ -27489,6 +27677,77 @@
           "weekly"
         ]
       },
+      "SetSlaPolicyRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "targets": {
+            "$ref": "#/components/schemas/SlaTargets"
+          }
+        },
+        "required": [
+          "enabled",
+          "targets"
+        ]
+      },
+      "SlaTargets": {
+        "type": "object",
+        "properties": {
+          "urgent": {
+            "$ref": "#/components/schemas/SlaTarget"
+          },
+          "high": {
+            "$ref": "#/components/schemas/SlaTarget"
+          },
+          "medium": {
+            "$ref": "#/components/schemas/SlaTarget"
+          },
+          "low": {
+            "$ref": "#/components/schemas/SlaTarget"
+          }
+        },
+        "required": [
+          "urgent",
+          "high",
+          "medium",
+          "low"
+        ]
+      },
+      "SlaTarget": {
+        "type": "object",
+        "properties": {
+          "firstReplyMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10080
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextReplyMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10080
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "firstReplyMinutes",
+          "nextReplyMinutes"
+        ]
+      },
       "CreateIdentityKeyRequest": {
         "oneOf": [
           {
@@ -34618,6 +34877,9 @@
           },
           "quota": {
             "$ref": "#/components/schemas/QuotaInfo"
+          },
+          "currentOwner": {
+            "$ref": "#/components/schemas/ProblemOwner"
           }
         },
         "required": [
@@ -34690,6 +34952,37 @@
           "max",
           "used",
           "resetsAt"
+        ],
+        "additionalProperties": false
+      },
+      "ProblemOwner": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "staff",
+              "ai",
+              "external",
+              "none"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownershipEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "kind",
+          "displayName",
+          "ownershipEpoch"
         ],
         "additionalProperties": false
       },
@@ -39079,6 +39372,36 @@
           "origin",
           "firstSeenAt",
           "lastSeenAt"
+        ],
+        "additionalProperties": false
+      },
+      "SlaPolicy": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "targets": {
+            "$ref": "#/components/schemas/SlaTargetsOutput"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "targets",
+          "updatedAt"
         ],
         "additionalProperties": false
       },
@@ -45626,7 +45949,8 @@
                   "ai_unavailable",
                   "ai_blocked",
                   "ai_escalated",
-                  "channel_ai_off"
+                  "channel_ai_off",
+                  "ai_limit"
                 ]
               },
               {
@@ -45783,6 +46107,16 @@
               }
             ]
           },
+          "sla": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxSla"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unreadCount": {
             "type": "integer",
             "minimum": 0,
@@ -45822,6 +46156,7 @@
           "priority",
           "waitingSince",
           "replyWindowClosesAt",
+          "sla",
           "unreadCount",
           "lastActivityAt",
           "createdAt"
@@ -45982,6 +46317,61 @@
         ],
         "additionalProperties": false
       },
+      "InboxSla": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "first_reply",
+              "next_reply"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "paused",
+              "outside_hours"
+            ]
+          },
+          "dueAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "businessMinutesLeft": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "breached": {
+            "type": "boolean"
+          },
+          "targetMinutes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "kind",
+          "state",
+          "dueAt",
+          "businessMinutesLeft",
+          "breached",
+          "targetMinutes"
+        ],
+        "additionalProperties": false
+      },
       "InboxCounts": {
         "type": "object",
         "properties": {
@@ -46010,6 +46400,11 @@
             "minimum": 0,
             "maximum": 9007199254740991
           },
+          "overdue": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
           "all": {
             "type": "integer",
             "minimum": 0,
@@ -46022,7 +46417,30 @@
           "ai",
           "team",
           "tickets",
+          "overdue",
           "all"
+        ],
+        "additionalProperties": false
+      },
+      "UrgentList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxConversation"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total"
         ],
         "additionalProperties": false
       },
@@ -46216,7 +46634,8 @@
             "enum": [
               "chat_waiting",
               "customer_message",
-              "assigned"
+              "assigned",
+              "sla_overdue"
             ]
           },
           "conversationId": {
@@ -46382,7 +46801,8 @@
                   "ai_unavailable",
                   "ai_blocked",
                   "ai_escalated",
-                  "channel_ai_off"
+                  "channel_ai_off",
+                  "ai_limit"
                 ]
               },
               {
@@ -46539,6 +46959,16 @@
               }
             ]
           },
+          "sla": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxSla"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unreadCount": {
             "type": "integer",
             "minimum": 0,
@@ -46593,6 +47023,7 @@
           "priority",
           "waitingSince",
           "replyWindowClosesAt",
+          "sla",
           "unreadCount",
           "lastActivityAt",
           "createdAt",
@@ -61902,6 +62333,64 @@
           "timezone",
           "weekly",
           "closedDates"
+        ],
+        "additionalProperties": false
+      },
+      "SlaTargetsOutput": {
+        "type": "object",
+        "properties": {
+          "urgent": {
+            "$ref": "#/components/schemas/SlaTargetOutput"
+          },
+          "high": {
+            "$ref": "#/components/schemas/SlaTargetOutput"
+          },
+          "medium": {
+            "$ref": "#/components/schemas/SlaTargetOutput"
+          },
+          "low": {
+            "$ref": "#/components/schemas/SlaTargetOutput"
+          }
+        },
+        "required": [
+          "urgent",
+          "high",
+          "medium",
+          "low"
+        ],
+        "additionalProperties": false
+      },
+      "SlaTargetOutput": {
+        "type": "object",
+        "properties": {
+          "firstReplyMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10080
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextReplyMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10080
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "firstReplyMinutes",
+          "nextReplyMinutes"
         ],
         "additionalProperties": false
       },

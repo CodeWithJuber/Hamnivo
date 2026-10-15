@@ -11,6 +11,8 @@ export interface AlertChat {
   ownerChangedAt: Date | null;
   createdAt: Date;
   customerName: string | null;
+  /** When the chat went past its reply-time target (H12); null while it is within it. */
+  slaBreachedAt?: Date | null;
 }
 
 /** A customer message (the newest one of a chat is enough to alert). */
@@ -62,7 +64,9 @@ export interface AlertDecision {
  * - `chat_waiting`: a chat came to wait for a person (a new chat, a hand-off from the AI, a chat
  *   put back in the queue);
  * - `assigned`: a chat was assigned or transferred to this person by someone else;
- * - `customer_message`: the customer wrote in a chat that is theirs or waiting for a person.
+ * - `customer_message`: the customer wrote in a chat that is theirs or waiting for a person;
+ * - `sla_overdue`: a chat that is theirs or waiting for a person went past its reply-time target
+ *   (H12), once per deadline. It comes first: an overdue chat is the most urgent thing to hear.
  * One chat gets one alert per batch, the most important first: a chat that just started waiting or
  * was just assigned already says a customer is there, so its message adds no second alert.
  * Only open chats alert, and only chats that concern the person. `seen` holds the keys a stream
@@ -94,6 +98,19 @@ export function deriveAlerts(input: {
     const name = chat.customerName?.trim() || 'Visitor';
     const message = latest.get(chat.id);
     if (message) looked.push(messageKey(message));
+    const breachedAt = chat.slaBreachedAt ?? null;
+    const overdueKey = breachedAt ? `${chat.id}:sla:${breachedAt.getTime()}` : null;
+    if (breachedAt && overdueKey && breachedAt.getTime() > since && !seen.has(overdueKey)) {
+      alerts.push({
+        key: overdueKey,
+        kind: 'sla_overdue',
+        conversationId: chat.id,
+        customerName: name,
+        preview: previewOf(message?.text),
+        at: breachedAt,
+      });
+      continue;
+    }
     const changedAt = chat.ownerChangedAt ?? chat.createdAt;
     const waitingKey = `${chat.id}:waiting:${changedAt.getTime()}`;
     if (waiting(chat) && changedAt.getTime() > since && !seen.has(waitingKey)) {

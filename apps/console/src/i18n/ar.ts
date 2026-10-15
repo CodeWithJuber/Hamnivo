@@ -9,6 +9,7 @@ import { decisionsAr } from './decisions';
 import { developerAr } from './developer/ar';
 import type { Translation } from './en';
 import { reportsAr } from './reports/ar';
+import { slaAr } from './sla/ar';
 import { ticketsAr } from './tickets/ar';
 import { toolsAr } from './tools';
 import { chatSettingsAr } from './widget/ar';
@@ -975,12 +976,14 @@ export const ar: Translation = {
       label: 'قوائم الانتظار',
       mine: 'محادثاتي',
       unassigned: 'بانتظار شخص',
+      overdue: 'متأخرة',
       ai: 'يجيب الذكاء الاصطناعي',
       team: 'فرقي',
       tickets: 'التذاكر',
       all: 'الكل',
     },
     tickets: ticketsAr,
+    sla: slaAr,
     blocking: blockingAr,
     keys: {
       plain: 'المفاتيح: ↑ ↓ أو J K للتنقل، و Enter للفتح، و Esc للرجوع.',
@@ -1035,6 +1038,10 @@ export const ar: Translation = {
       unassigned: {
         title: 'لا أحد ينتظر شخصًا',
         description: 'عندما يطلب عميل شخصًا، تنتظر المحادثة هنا.',
+      },
+      overdue: {
+        title: 'لا شيء متأخر',
+        description: 'تظهر هنا المحادثات التي تجاوزت هدف وقت الرد، الأكثر تأخرًا أولًا.',
       },
       ai: {
         title: 'الذكاء الاصطناعي لا يجيب أحدًا الآن',

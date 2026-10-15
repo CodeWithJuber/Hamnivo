@@ -177,6 +177,23 @@ describe('alerts for the staff inbox', () => {
     expect(decision.looked).toEqual(['c1:message:newest']);
   });
 
+  it('tells the owner and people who see a waiting chat that it went past its reply time, once', () => {
+    const late = chat({ slaBreachedAt: at(7) });
+    const alerts = derive([late], [message(3)]);
+    expect(alerts).toMatchObject([
+      { kind: 'sla_overdue', key: `c1:sla:${at(7).getTime()}`, preview: 'Where is my order?' },
+    ]);
+    // The owner hears it; a chat someone else has does not concern this person.
+    const owned = chat({ ownerMode: 'HUMAN_ACTIVE', ownerStaffId: ME, slaBreachedAt: at(7) });
+    expect(derive([owned]).map((a) => a.kind)).toEqual(['sla_overdue']);
+    const theirs = chat({ ownerMode: 'HUMAN_ACTIVE', ownerStaffId: OTHER, slaBreachedAt: at(7) });
+    expect(derive([theirs])).toEqual([]);
+    // Once per deadline: not before the look, and not again once seen.
+    expect(derive([chat({ slaBreachedAt: at(-5) })])).toEqual([]);
+    const key = alerts[0]?.key ?? '';
+    expect(derive([late], [], T0, new Set([key])).map((a) => a.kind)).toEqual([]);
+  });
+
   it('calls a customer without a name a visitor, and cuts a long message to one short line', () => {
     expect(derive([chat({ customerName: null, ownerChangedAt: at(1) })])[0]?.customerName).toBe(
       'Visitor',

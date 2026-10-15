@@ -1,10 +1,11 @@
 import type { InboxConversation, OwnerReason } from '@hamnivo/contracts';
 import { OwnerReason as OwnerReasons, ticketReference } from '@hamnivo/contracts';
 import { schema, type TenantTx, toPublicId } from '@hamnivo/db';
-import { channelNameOf, replyWindowClosesAt } from '@hamnivo/domain';
+import { type BusinessHours, channelNameOf, replyWindowClosesAt } from '@hamnivo/domain';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { customerView } from '../authority/views.js';
 import { ticketStateOf } from '../tickets/tickets.js';
+import { slaOf } from './sla.js';
 
 const c = schema.conversationControls;
 const st = schema.conversationInboxState;
@@ -26,6 +27,14 @@ export const rowColumns = {
   ticketOpenedAt: st.ticketOpenedAt,
   teamId: st.teamId,
   teamName: team.name,
+  slaKind: st.slaKind,
+  slaStartedAt: st.slaStartedAt,
+  slaTargetMinutes: st.slaTargetMinutes,
+  slaPausedAt: st.slaPausedAt,
+  slaPausedMinutes: st.slaPausedMinutes,
+  slaDueAt: st.slaDueAt,
+  slaBreachedAt: st.slaBreachedAt,
+  brandHours: b.businessHours,
   customerName: p.displayName,
   customerHandle: p.channelHandle,
   customerKind: p.kind,
@@ -37,6 +46,10 @@ export const rowColumns = {
   ownerBotName: bot.name,
   /** Exact cursor value (JavaScript dates would drop the microseconds). */
   activityKey: sql<string>`to_char(${c.lastActivityAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+  /** The same for the reply deadline, which orders the Overdue queue (H12). */
+  dueKey: sql<
+    string | null
+  >`to_char(${st.slaDueAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
 };
 
 /** `select … from conversation_controls` with every join an inbox row needs. */
@@ -159,6 +172,8 @@ export function toInboxConversation(
   last: LastMessage | undefined,
   /** Customer messages the caller has not read (0 for chats that are not theirs to handle). */
   unreadCount = 0,
+  /** When the reply-time clock is read (the gateway's clock). */
+  now: Date = new Date(),
 ): InboxConversation {
   const control = row.control;
   const view = customerView(control.ownerMode, control.authorityStatus);
@@ -232,6 +247,19 @@ export function toInboxConversation(
         channelNameOf(row.channelType),
         control.lastCustomerMessageAt,
       )?.toISOString() ?? null,
+    sla: slaOf(
+      {
+        slaKind: row.slaKind,
+        slaStartedAt: row.slaStartedAt,
+        slaTargetMinutes: row.slaTargetMinutes,
+        slaPausedAt: row.slaPausedAt,
+        slaPausedMinutes: row.slaPausedMinutes ?? 0,
+        slaDueAt: row.slaDueAt,
+        slaBreachedAt: row.slaBreachedAt,
+      },
+      (row.brandHours ?? null) as BusinessHours | null,
+      now,
+    ),
     unreadCount,
     lastActivityAt: control.lastActivityAt.toISOString(),
     createdAt: control.createdAt.toISOString(),

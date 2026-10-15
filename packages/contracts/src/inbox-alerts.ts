@@ -97,7 +97,13 @@ export type UnreadSummary = z.infer<typeof UnreadSummary>;
 
 // ------------------------------------------------------------------ signals on the inbox stream
 
-export const InboxAlertKind = z.enum(['chat_waiting', 'customer_message', 'assigned']);
+/** `sla_overdue`: a conversation went past its reply-time target (H12). */
+export const InboxAlertKind = z.enum([
+  'chat_waiting',
+  'customer_message',
+  'assigned',
+  'sla_overdue',
+]);
 export type InboxAlertKind = z.infer<typeof InboxAlertKind>;
 
 /** Something this person should hear about; sent only to people who may see the chat. */
