@@ -9,6 +9,7 @@ import { commerceUr } from './commerce/ur';
 import { decisionsUr } from './decisions';
 import { developerUr } from './developer/ur';
 import type { Translation } from './en';
+import { offersUr } from './offers/ur';
 import { reportsUr } from './reports/ur';
 import { slaUr } from './sla/ur';
 import { ticketsUr } from './tickets/ur';
@@ -1011,6 +1012,7 @@ export const ur: Translation = {
     tickets: ticketsUr,
     sla: slaUr,
     aiDrafts: aiDraftsUr,
+    offers: offersUr,
     blocking: blockingUr,
     keys: {
       plain: 'کلیدیں: حرکت کے لیے ↑ ↓ یا J K، کھولنے کے لیے Enter، واپسی کے لیے Esc۔',

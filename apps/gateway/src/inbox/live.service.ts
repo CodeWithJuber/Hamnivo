@@ -1,7 +1,7 @@
 import { schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { ResourceScope, StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { uuidV5 } from '../authority/uuid.js';
 import type { AppConfig } from '../config.js';
@@ -123,6 +123,13 @@ export class InboxLiveService {
         workspaceId: schema.brands.workspaceId,
         teamId: schema.conversationInboxState.teamId,
         slaBreachedAt: schema.conversationInboxState.slaBreachedAt,
+        ownershipEpoch: c.ownershipEpoch,
+        teamOffers: sql<boolean>`coalesce(${schema.teams.assignmentMode} = 'offer' and ${schema.teams.status} = 'active', false)`,
+        offersEndedAt: schema.conversationInboxState.offersEndedAt,
+        offersEndedEpoch: schema.conversationInboxState.offersEndedEpoch,
+        offerId: schema.conversationOffers.id,
+        offerStaffId: schema.conversationOffers.staffMemberId,
+        offeredAt: schema.conversationOffers.offeredAt,
       })
       .from(c)
       .leftJoin(schema.brands, eq(schema.brands.id, c.brandId))
@@ -131,6 +138,14 @@ export class InboxLiveService {
         eq(schema.conversationInboxState.conversationId, c.id),
       )
       .leftJoin(schema.customerPrincipals, eq(schema.customerPrincipals.id, c.principalId))
+      .leftJoin(schema.teams, eq(schema.teams.id, schema.conversationInboxState.teamId))
+      .leftJoin(
+        schema.conversationOffers,
+        and(
+          eq(schema.conversationOffers.conversationId, c.id),
+          eq(schema.conversationOffers.state, 'pending'),
+        ),
+      )
       .where(and(inArray(c.id, ids), InboxAccess.condition(scope)));
     return rows.map(({ brandId, inboxId, workspaceId, teamId, ...chat }) => ({
       ...chat,

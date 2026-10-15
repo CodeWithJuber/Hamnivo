@@ -194,6 +194,42 @@ describe('alerts for the staff inbox', () => {
     expect(derive([late], [], T0, new Set([key])).map((a) => a.kind)).toEqual([]);
   });
 
+  it('tells only the person offered a chat about it, once per offer (HNV-10-03)', () => {
+    const offered = chat({
+      ownerChangedAt: at(2),
+      ownershipEpoch: 4,
+      teamOffers: true,
+      offerId: 'o1',
+      offerStaffId: ME,
+      offeredAt: at(3),
+    });
+    expect(derive([offered], [message(1)])).toMatchObject([
+      { kind: 'chat_offered', key: 'c1:offer:o1', preview: 'Where is my order?', at: at(3) },
+    ]);
+    expect(derive([offered], [], T0, new Set(['c1:offer:o1']))).toEqual([]);
+    // The rest of the team is not called while the chat is offered to someone.
+    expect(derive([{ ...offered, offerStaffId: OTHER }])).toEqual([]);
+  });
+
+  it('tells the team a chat is waiting once the offers ended without anyone accepting', () => {
+    const ended = chat({
+      ownerChangedAt: at(-30),
+      ownershipEpoch: 4,
+      teamOffers: true,
+      offersEndedAt: at(6),
+      offersEndedEpoch: 4,
+    });
+    expect(derive([ended])).toMatchObject([
+      { kind: 'chat_waiting', key: `c1:waiting:${at(6).getTime()}`, at: at(6) },
+    ]);
+    // Offers that ended for an earlier hand-off do not count: this one is still being offered.
+    expect(derive([{ ...ended, ownerChangedAt: at(5), offersEndedEpoch: 3 }])).toEqual([]);
+    // A team that does not offer chats calls everyone at once, as before.
+    expect(derive([chat({ ownerChangedAt: at(5), teamOffers: false })]).map((a) => a.kind)).toEqual(
+      ['chat_waiting'],
+    );
+  });
+
   it('calls a customer without a name a visitor, and cuts a long message to one short line', () => {
     expect(derive([chat({ customerName: null, ownerChangedAt: at(1) })])[0]?.customerName).toBe(
       'Visitor',

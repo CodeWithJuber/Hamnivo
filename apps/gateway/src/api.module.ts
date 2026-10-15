@@ -67,6 +67,8 @@ import { InboxService } from './inbox/inbox.service.js';
 import { LIBRARY_API_CONTROLLERS, LIBRARY_API_PROVIDERS } from './inbox/library.module.js';
 import { InboxLiveService } from './inbox/live.service.js';
 import { InboxMessagesService } from './inbox/messages.service.js';
+import { OffersController, RoutingProfilesController } from './inbox/offers.controller.js';
+import { OffersService } from './inbox/offers.service.js';
 import { InboxSignals } from './inbox/signals.service.js';
 import { SlaController } from './inbox/sla.controller.js';
 import { SlaService } from './inbox/sla.service.js';
@@ -166,6 +168,8 @@ export class ApiModule {
         BrandsController,
         SlaController,
         AiDraftsController,
+        OffersController,
+        RoutingProfilesController,
         IdentityKeysController,
         ConnectionsController,
         ChannelsController,
@@ -240,6 +244,7 @@ export class ApiModule {
         BrandsService,
         SlaService,
         AiDraftsService,
+        OffersService,
         IdentityKeysService,
         ConnectionsService,
         ChannelInboxesService,

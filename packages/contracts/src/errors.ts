@@ -41,6 +41,7 @@ export const ErrorCode = z.enum([
   'DELETE_WINDOW_CLOSED',
   'CHANNEL_WINDOW_CLOSED',
   'AI_DRAFT_CLOSED',
+  'OFFER_CLOSED',
   'INTERNAL',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
@@ -123,6 +124,11 @@ export const ERROR_DEFAULTS: Record<
     status: 409,
     retryable: false,
     title: 'This channel only allows template messages now',
+  },
+  OFFER_CLOSED: {
+    status: 409,
+    retryable: false,
+    title: 'This offer is no longer open',
   },
   AI_DRAFT_CLOSED: {
     status: 409,

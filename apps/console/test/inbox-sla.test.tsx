@@ -55,6 +55,7 @@ const row = (patch: Partial<InboxConversation> = {}): InboxConversation => ({
   waitingSince: NOW,
   sla: null,
   aiDraftReady: false,
+  offer: null,
   replyWindowClosesAt: null,
   unreadCount: 0,
   lastActivityAt: NOW,

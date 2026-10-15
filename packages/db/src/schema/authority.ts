@@ -341,6 +341,10 @@ export const conversationControls = pgTable(
       t.externalConversationId,
     ),
     index('conversation_controls_principal_idx').on(t.tenantId, t.principalId),
+    /** Each person's open chats, counted when a conversation is offered (HNV-10-03). */
+    index('conversation_controls_owner_staff_idx')
+      .on(t.tenantId, t.ownerStaffId)
+      .where(sql`${t.ownerMode} = 'HUMAN_ACTIVE'`),
     foreignKey({
       name: 'conversation_controls_connection_fk',
       columns: [t.tenantId, t.connectionId],

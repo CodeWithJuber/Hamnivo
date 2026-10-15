@@ -40,6 +40,8 @@ describe('which sound plays', () => {
     expect(soundFor(own, 'assigned')).toBe('ping');
     // A chat past its reply time is as pressing as a new one waiting (H12).
     expect(soundFor(own, 'sla_overdue')).toBe('bell');
+    // A chat offered to the person is theirs to answer, like an assignment (HNV-10-03).
+    expect(soundFor(own, 'chat_offered')).toBe('ping');
     expect(chooseSound([alert('assigned', 'c1')], own, elsewhere)).toEqual({
       sound: 'ping',
       volume: 60,

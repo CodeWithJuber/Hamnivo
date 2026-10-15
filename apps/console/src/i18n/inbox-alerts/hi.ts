@@ -25,7 +25,7 @@ export const inboxAlertsHi: InboxAlertsTranslation = {
       title: 'हर घटना के लिए आवाज़',
       newChat: 'कोई चैट किसी व्यक्ति का इंतज़ार कर रही है, या जवाब का समय निकल गया है',
       customerMessage: 'कोई ग्राहक आपकी चैट में, या ऐसी चैट में लिखता है जिसे किसी ने नहीं लिया',
-      assigned: 'कोई चैट आपको सौंपी या ट्रांसफ़र की गई',
+      assigned: 'कोई चैट आपको पेश, सौंपी या ट्रांसफ़र की गई',
     },
     sounds: {
       chime: 'घंटी की धुन',
@@ -65,6 +65,7 @@ export const inboxAlertsHi: InboxAlertsTranslation = {
   alert: {
     chat_waiting: '{{name}} किसी व्यक्ति का इंतज़ार कर रहे हैं',
     sla_overdue: '{{name}} के जवाब का समय निकल गया है',
+    chat_offered: '{{name}} की चैट आपको पेश की गई है: स्वीकार करें या मना करें',
     customer_message: '{{name}} का नया संदेश',
     assigned: 'आपको एक चैट सौंपी गई',
     assignedBody: '{{name}}: {{preview}}',

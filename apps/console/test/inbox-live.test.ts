@@ -147,6 +147,26 @@ describe('parseAlert', () => {
       expect(parseAlert({ ...ok, [field]: undefined })).toBeNull();
     }
     expect(parseAlert({ ...ok, preview: 3 })).toBeNull();
+    expect(parseAlert({ ...ok, kind: 'something_new' })).toBeNull();
+  });
+
+  it('knows every kind the gateway sends, overdue and offered chats included', () => {
+    const ok = {
+      conversationId: CHAT,
+      customerName: 'Maya',
+      preview: null,
+      at: '2026-10-03T10:00:00.000Z',
+    };
+    for (const kind of [
+      'chat_offered',
+      'sla_overdue',
+      'chat_waiting',
+      'assigned',
+      'customer_message',
+    ]) {
+      expect(parseAlert({ ...ok, kind })).toMatchObject({ kind });
+    }
+    expect(parseAlert({ ...ok, kind: 'toString' })).toBeNull();
   });
 });
 

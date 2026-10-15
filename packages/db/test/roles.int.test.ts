@@ -108,6 +108,7 @@ describe('database roles', () => {
         'app.lapsed_billing(timestamp with time zone,integer)',
         'app.purge_ai_drafts(integer)',
         'app.purge_automation_runs(integer)',
+        'app.purge_conversation_offers(integer)',
         'app.purge_expired(integer)',
         'app.purge_migration_files(integer)',
         'app.purge_visitor_blocks(integer)',

@@ -12,6 +12,7 @@ export * from './human-request.js';
 export * from './inbox.js';
 export * from './language.js';
 export * from './memory/index.js';
+export * from './offers.js';
 export * from './privacy.js';
 export * from './reply-rules.js';
 export * from './routing.js';

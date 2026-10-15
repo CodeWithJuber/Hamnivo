@@ -48,10 +48,12 @@ import { useBrandRefs } from '../../lib/names';
 import { useTenant } from '../../lib/tenant';
 import { BulkBar } from './BulkBar';
 import { DesktopAlertsPrompt, InboxToolbar } from './InboxToolbar';
+import { OffersSection } from './OffersSection';
 import {
   ChannelIcon,
   ConversationStatusBadge,
   languageName,
+  OfferBadge,
   OwnerBadge,
   PriorityBadge,
   SlaBadge,
@@ -187,6 +189,7 @@ function QueueRow({
               </StatusBadge>
             ) : null}
             <OwnerBadge conversation={conversation} />
+            {conversation.offer ? <OfferBadge offer={conversation.offer} /> : null}
             {/* A ticket's state already says whether it waits or is closed. */}
             {!conversation.ticket &&
             (conversation.status === 'snoozed' || conversation.status === 'resolved') ? (
@@ -797,6 +800,7 @@ function QueuePane({ open, selectedId }: { open: boolean; selectedId: string | u
       ) : null}
 
       <div className="min-h-0 flex-1 lg:overflow-y-auto">
+        <OffersSection />
         <UrgentSection />
         {search.q ? (
           <SearchResults q={search.q} />

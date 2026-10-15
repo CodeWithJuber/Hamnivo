@@ -25,7 +25,7 @@ export const inboxAlertsAr: InboxAlertsTranslation = {
       title: 'الصوت لكل حدث',
       newChat: 'محادثة تنتظر شخصًا، أو تجاوزت وقت الرد',
       customerMessage: 'يكتب عميل في محادثتك، أو في محادثة لم يتسلمها أحد',
-      assigned: 'إسناد محادثة إليك أو تحويلها إليك',
+      assigned: 'عرض محادثة عليك أو إسنادها إليك أو تحويلها إليك',
     },
     sounds: {
       chime: 'رنين',
@@ -65,6 +65,7 @@ export const inboxAlertsAr: InboxAlertsTranslation = {
   alert: {
     chat_waiting: '{{name}} ينتظر شخصًا',
     sla_overdue: '{{name}} تجاوز هدف وقت الرد',
+    chat_offered: 'محادثة {{name}} معروضة عليك: اقبلها أو ارفضها',
     customer_message: 'رسالة جديدة من {{name}}',
     assigned: 'أُسندت إليك محادثة',
     assignedBody: '{{name}}: {{preview}}',

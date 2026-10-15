@@ -1,4 +1,4 @@
-import type { CreateTeamRequest, Team } from '@hamnivo/contracts';
+import type { CreateTeamRequest, Team, UpdateTeamRequest } from '@hamnivo/contracts';
 import { appendAudit, fromPublicId, schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { StaffPrincipal } from '@hamnivo/policy';
 import { Injectable } from '@nestjs/common';
@@ -42,6 +42,8 @@ export class TeamsService {
       name: row.name,
       workspaceId: row.workspaceId ? toPublicId('workspace', row.workspaceId) : null,
       status: row.status,
+      assignmentMode: row.assignmentMode,
+      offerTimeoutSeconds: row.offerTimeoutSeconds,
       members: members
         .filter((m) => m.teamId === row.id)
         .map((m) => ({
@@ -105,6 +107,63 @@ export class TeamsService {
       });
       const [team] = await this.view(tx, [row]);
       return team as Team;
+    });
+  }
+
+  /** Renames the team, or changes how conversations reach its people (HNV-10-03). */
+  async update(
+    principal: StaffPrincipal,
+    teamPublicId: string,
+    input: z.output<typeof UpdateTeamRequest>,
+  ): Promise<Team> {
+    const teamId = fromPublicId('team', teamPublicId);
+    return this.access.tx(principal, async (tx) => {
+      const [team] = await tx.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+      if (!team) throw new AppError('NOT_FOUND', { detail: 'Team not found.' });
+      enforce(
+        this.access.decide(
+          principal,
+          'teams.manage',
+          team.workspaceId ? { workspaceId: team.workspaceId, teamId } : { teamId },
+        ),
+      );
+      const changes = {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.assignmentMode !== undefined ? { assignmentMode: input.assignmentMode } : {}),
+        ...(input.offerTimeoutSeconds !== undefined
+          ? { offerTimeoutSeconds: input.offerTimeoutSeconds }
+          : {}),
+      };
+      if (Object.keys(changes).length === 0) {
+        throw new AppError('VALIDATION_FAILED', {
+          fields: [{ path: '(body)', message: 'Send at least one setting to change.' }],
+        });
+      }
+      let row: TeamRow | undefined;
+      try {
+        [row] = await tx.transaction((sp) =>
+          sp.update(schema.teams).set(changes).where(eq(schema.teams.id, teamId)).returning(),
+        );
+      } catch (error) {
+        if (isUniqueViolation(error, 'teams_name_key')) {
+          throw new AppError('VALIDATION_FAILED', {
+            fields: [{ path: 'name', message: 'A team with this name already exists.' }],
+          });
+        }
+        throw error;
+      }
+      if (!row) throw new Error('team update returned nothing');
+      await appendAudit(tx, {
+        actorType: 'staff',
+        actorId: toPublicId('staff', principal.staffMemberId),
+        action: 'team.updated',
+        targetType: 'team',
+        targetId: teamPublicId,
+        outcome: 'success',
+        data: changes,
+      });
+      const [view] = await this.view(tx, [row]);
+      return view as Team;
     });
   }
 

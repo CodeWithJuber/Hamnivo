@@ -13,6 +13,7 @@ import {
   EqualIcon,
   GlobeIcon,
   HandIcon,
+  HandshakeIcon,
   HourglassIcon,
   type LucideIcon,
   MailIcon,
@@ -28,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { InboxConversation, TicketPriority, TicketState } from '../../lib/inbox';
+import { formatCountdown, type InboxOffer, useSecondsLeft } from '../../lib/offers';
 import { type InboxSla, type ProblemOwner, readSla, type SlaReading, useNow } from '../../lib/sla';
 import { useTenant } from '../../lib/tenant';
 
@@ -160,6 +162,27 @@ export function useMyStaffId(): string | null {
 }
 
 /** Who answers the conversation now, in words and with an icon (never colour alone). */
+/**
+ * Who a waiting chat is offered to (HNV-10-03) and the time left, "Offered to Amina · 0:42". It is
+ * still in the queue: anyone may take it meanwhile.
+ */
+export function OfferBadge({ offer }: { offer: InboxOffer }) {
+  const { t } = useTranslation();
+  const me = useMyStaffId();
+  const time = formatCountdown(useSecondsLeft(offer.expiresAt));
+  return (
+    <StatusBadge
+      tone="info"
+      icon={<HandshakeIcon className="size-3.5" aria-hidden="true" />}
+      data-testid="offer-badge"
+    >
+      {offer.staffMemberId === me
+        ? t('inbox.offers.offeredToYou', { time })
+        : t('inbox.offers.offeredTo', { name: offer.displayName, time })}
+    </StatusBadge>
+  );
+}
+
 export function OwnerBadge({ conversation }: { conversation: InboxConversation }) {
   const { t } = useTranslation();
   const me = useMyStaffId();

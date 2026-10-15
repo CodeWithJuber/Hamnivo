@@ -9,6 +9,7 @@ import { commerceHi } from './commerce/hi';
 import { decisionsHi } from './decisions';
 import { developerHi } from './developer/hi';
 import type { Translation } from './en';
+import { offersHi } from './offers/hi';
 import { reportsHi } from './reports/hi';
 import { slaHi } from './sla/hi';
 import { ticketsHi } from './tickets/hi';
@@ -993,6 +994,7 @@ export const hi: Translation = {
     tickets: ticketsHi,
     sla: slaHi,
     aiDrafts: aiDraftsHi,
+    offers: offersHi,
     blocking: blockingHi,
     keys: {
       plain: 'कुंजियाँ: चलने के लिए ↑ ↓ या J K, खोलने के लिए Enter, वापस आने के लिए Esc।',

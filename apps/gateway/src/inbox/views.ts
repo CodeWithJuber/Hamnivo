@@ -3,6 +3,7 @@ import { OwnerReason as OwnerReasons, ticketReference } from '@hamnivo/contracts
 import { schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import { type BusinessHours, channelNameOf, replyWindowClosesAt } from '@hamnivo/domain';
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { customerView } from '../authority/views.js';
 import { ticketStateOf } from '../tickets/tickets.js';
 import { slaOf } from './sla.js';
@@ -15,6 +16,8 @@ const i = schema.authorityInboxes;
 const sm = schema.staffMembers;
 const bot = schema.authorityBots;
 const team = schema.teams;
+const offer = schema.conversationOffers;
+const offeree = alias(schema.staffMembers, 'offeree');
 
 /** Columns of one inbox row (conversation, queue state, customer, brand, owner and team). */
 export const rowColumns = {
@@ -44,6 +47,12 @@ export const rowColumns = {
   channelType: i.channelType,
   ownerStaffName: sm.displayName,
   ownerBotName: bot.name,
+  /** The pending offer (HNV-10-03): who has been offered the conversation, until when. */
+  offerId: offer.id,
+  offerStaffId: offer.staffMemberId,
+  offerStaffName: offeree.displayName,
+  offerExpiresAt: offer.expiresAt,
+  offerRound: offer.round,
   /** Exact cursor value (JavaScript dates would drop the microseconds). */
   activityKey: sql<string>`to_char(${c.lastActivityAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
   /** An AI draft waits for review (HNV-09-05); one pending draft per conversation at most. */
@@ -65,7 +74,9 @@ export function selectRows(tx: TenantTx) {
     .leftJoin(b, eq(b.id, c.brandId))
     .leftJoin(sm, eq(sm.id, c.ownerStaffId))
     .leftJoin(bot, eq(bot.id, c.ownerBotId))
-    .leftJoin(team, eq(team.id, st.teamId));
+    .leftJoin(team, eq(team.id, st.teamId))
+    .leftJoin(offer, and(eq(offer.conversationId, c.id), eq(offer.state, 'pending')))
+    .leftJoin(offeree, eq(offeree.id, offer.staffMemberId));
 }
 
 export type InboxRow = Awaited<ReturnType<ReturnType<typeof selectRows>['execute']>>[number];
@@ -250,6 +261,16 @@ export function toInboxConversation(
         control.lastCustomerMessageAt,
       )?.toISOString() ?? null,
     aiDraftReady: Boolean(row.aiDraftReady),
+    offer:
+      waiting && row.offerId && row.offerStaffId && row.offerExpiresAt && row.offerRound
+        ? {
+            id: toPublicId('offer', row.offerId),
+            staffMemberId: toPublicId('staff', row.offerStaffId),
+            displayName: row.offerStaffName ?? '',
+            expiresAt: row.offerExpiresAt.toISOString(),
+            round: row.offerRound,
+          }
+        : null,
     sla: slaOf(
       {
         slaKind: row.slaKind,

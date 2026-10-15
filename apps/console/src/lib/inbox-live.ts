@@ -62,14 +62,21 @@ const backoff = (attempt: number) => Math.min(30_000, 1000 * 2 ** Math.min(attem
  */
 export const TYPING_LINE_MS = 10_000;
 
-const ALERT_KINDS: readonly C.InboxAlertKind[] = ['chat_waiting', 'customer_message', 'assigned'];
+/** Every kind of alert the gateway sends; a kind added there must be added here (exhaustive). */
+const ALERT_KINDS: Record<C.InboxAlertKind, true> = {
+  chat_offered: true,
+  sla_overdue: true,
+  chat_waiting: true,
+  assigned: true,
+  customer_message: true,
+};
 
 /** An alert event from the stream, or null when it is not one (nothing is guessed). */
 export function parseAlert(payload: Record<string, unknown>): InboxAlert | null {
   const { kind, conversationId, customerName, preview, at } = payload;
   if (
     typeof kind !== 'string' ||
-    !(ALERT_KINDS as readonly string[]).includes(kind) ||
+    !Object.hasOwn(ALERT_KINDS, kind) ||
     typeof conversationId !== 'string' ||
     typeof customerName !== 'string' ||
     typeof at !== 'string' ||

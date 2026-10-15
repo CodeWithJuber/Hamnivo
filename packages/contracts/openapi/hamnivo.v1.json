@@ -12669,6 +12669,358 @@
         }
       }
     },
+    "/v1/admin/teams/{teamId}": {
+      "patch": {
+        "operationId": "updateTeam",
+        "summary": "Rename a team, or choose how conversations reach its people (teams.manage)",
+        "tags": [
+          "Teams"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "teamId",
+            "schema": {
+              "type": "string",
+              "description": "Team ID (team_…)"
+            },
+            "required": true,
+            "description": "Team ID (team_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTeamRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/routing-profiles": {
+      "get": {
+        "operationId": "listRoutingProfiles",
+        "summary": "The languages each person answers in and their open-chat limit (members.read)",
+        "tags": [
+          "Teams"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Routing profiles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingProfileList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/routing-profiles/{staffMemberId}": {
+      "put": {
+        "operationId": "setRoutingProfile",
+        "summary": "Set the languages a person answers in and their open-chat limit (teams.manage)",
+        "tags": [
+          "Teams"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "staffMemberId",
+            "schema": {
+              "type": "string",
+              "description": "Staff ID (stf_…)"
+            },
+            "required": true,
+            "description": "Staff ID (stf_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRoutingProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Routing profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/offers": {
+      "get": {
+        "operationId": "listMyOffers",
+        "summary": "Conversations offered to me now, to accept or decline (conversations.read)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Offers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/offers/{offerId}/accept": {
+      "post": {
+        "operationId": "acceptOffer",
+        "summary": "Accept a conversation offered to me; it becomes mine (conversations.takeover)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "offerId",
+            "schema": {
+              "type": "string",
+              "description": "Offer ID (ofr_…)"
+            },
+            "required": true,
+            "description": "Offer ID (ofr_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferDecisionResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/offers/{offerId}/decline": {
+      "post": {
+        "operationId": "declineOffer",
+        "summary": "Decline a conversation offered to me, with a reason; it goes to the next person",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "offerId",
+            "schema": {
+              "type": "string",
+              "description": "Offer ID (ofr_…)"
+            },
+            "required": true,
+            "description": "Offer ID (ofr_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclineOfferRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Declined",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferDecisionResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/teams/{teamId}/members": {
       "put": {
         "operationId": "setTeamMembers",
@@ -30207,6 +30559,77 @@
           "name"
         ]
       },
+      "UpdateTeamRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "assignmentMode": {
+            "type": "string",
+            "enum": [
+              "queue",
+              "offer"
+            ]
+          },
+          "offerTimeoutSeconds": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 600
+          }
+        }
+      },
+      "SetRoutingProfileRequest": {
+        "type": "object",
+        "properties": {
+          "languages": {
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageSlice"
+            }
+          },
+          "maxOpenChats": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "languages",
+          "maxOpenChats"
+        ]
+      },
+      "DeclineOfferRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "at_capacity",
+              "not_my_area",
+              "going_offline",
+              "other"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
       "SetTeamMembersRequest": {
         "type": "object",
         "properties": {
@@ -35102,6 +35525,7 @@
               "DELETE_WINDOW_CLOSED",
               "CHANNEL_WINDOW_CLOSED",
               "AI_DRAFT_CLOSED",
+              "OFFER_CLOSED",
               "INTERNAL"
             ]
           },
@@ -46240,7 +46664,8 @@
                   "ai_blocked",
                   "ai_escalated",
                   "channel_ai_off",
-                  "ai_limit"
+                  "ai_limit",
+                  "offer_accepted"
                 ]
               },
               {
@@ -46410,6 +46835,16 @@
           "aiDraftReady": {
             "type": "boolean"
           },
+          "offer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxOffer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unreadCount": {
             "type": "integer",
             "minimum": 0,
@@ -46451,6 +46886,7 @@
           "replyWindowClosesAt",
           "sla",
           "aiDraftReady",
+          "offer",
           "unreadCount",
           "lastActivityAt",
           "createdAt"
@@ -46663,6 +47099,43 @@
           "businessMinutesLeft",
           "breached",
           "targetMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "InboxOffer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "offer identifier (TypeID with prefix \"ofr\")",
+            "example": "ofr_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "staffMemberId": {
+            "type": "string",
+            "description": "staff identifier (TypeID with prefix \"stf\")",
+            "example": "stf_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "staffMemberId",
+          "displayName",
+          "expiresAt",
+          "round"
         ],
         "additionalProperties": false
       },
@@ -46929,7 +47402,8 @@
               "chat_waiting",
               "customer_message",
               "assigned",
-              "sla_overdue"
+              "sla_overdue",
+              "chat_offered"
             ]
           },
           "conversationId": {
@@ -47096,7 +47570,8 @@
                   "ai_blocked",
                   "ai_escalated",
                   "channel_ai_off",
-                  "ai_limit"
+                  "ai_limit",
+                  "offer_accepted"
                 ]
               },
               {
@@ -47266,6 +47741,16 @@
           "aiDraftReady": {
             "type": "boolean"
           },
+          "offer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxOffer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unreadCount": {
             "type": "integer",
             "minimum": 0,
@@ -47322,6 +47807,7 @@
           "replyWindowClosesAt",
           "sla",
           "aiDraftReady",
+          "offer",
           "unreadCount",
           "lastActivityAt",
           "createdAt",
@@ -47542,13 +48028,32 @@
                     "away",
                     "offline"
                   ]
+                },
+                "openChats": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "maxOpenChats": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
                 "staffMemberId",
                 "displayName",
                 "current",
-                "status"
+                "status",
+                "openChats",
+                "maxOpenChats"
               ],
               "additionalProperties": false
             }
@@ -48073,6 +48578,7 @@
                   "DELETE_WINDOW_CLOSED",
                   "CHANNEL_WINDOW_CLOSED",
                   "AI_DRAFT_CLOSED",
+                  "OFFER_CLOSED",
                   "INTERNAL"
                 ]
               },
@@ -48576,6 +49082,7 @@
                         "DELETE_WINDOW_CLOSED",
                         "CHANNEL_WINDOW_CLOSED",
                         "AI_DRAFT_CLOSED",
+                        "OFFER_CLOSED",
                         "INTERNAL"
                       ]
                     },
@@ -48691,6 +49198,18 @@
               "additionalProperties": false
             }
           },
+          "assignmentMode": {
+            "type": "string",
+            "enum": [
+              "queue",
+              "offer"
+            ]
+          },
+          "offerTimeoutSeconds": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 600
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -48704,7 +49223,113 @@
           "workspaceId",
           "status",
           "members",
+          "assignmentMode",
+          "offerTimeoutSeconds",
           "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "RoutingProfileList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoutingProfile"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "RoutingProfile": {
+        "type": "object",
+        "properties": {
+          "staffMemberId": {
+            "type": "string",
+            "description": "staff identifier (TypeID with prefix \"stf\")",
+            "example": "stf_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageSlice"
+            }
+          },
+          "maxOpenChats": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "staffMemberId",
+          "displayName",
+          "languages",
+          "maxOpenChats",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "OfferList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxConversation"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "OfferDecisionResult": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "description": "conversation identifier (TypeID with prefix \"conv\")",
+            "example": "conv_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "declined"
+            ]
+          }
+        },
+        "required": [
+          "conversationId",
+          "state"
         ],
         "additionalProperties": false
       },

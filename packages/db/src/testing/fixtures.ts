@@ -1463,6 +1463,37 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
         low: { firstReplyMinutes: null, nextReplyMinutes: null },
       },
     });
+    // Hand-off offers (HNV-10-03): how the owner takes offers, one declined and one pending.
+    await tx.insert(s.staffRoutingProfiles).values({
+      tenantId,
+      staffMemberId: ids.staffMemberId,
+      languages: ['en', 'ur'],
+      maxOpenChats: 5,
+    });
+    const offeredAt = new Date(Date.now() - 120_000);
+    const offer = {
+      tenantId,
+      conversationId: ids.conversationId,
+      teamId: ids.teamId,
+      staffMemberId: ids.staffMemberId,
+      handoffEpoch: 0,
+      offeredAt,
+      expiresAt: new Date(offeredAt.getTime() + 60_000),
+      timeoutSeconds: 60,
+    };
+    await tx.insert(s.conversationOffers).values({
+      ...offer,
+      round: 1,
+      state: 'declined',
+      declineReason: 'at_capacity',
+      decidedAt: new Date(offeredAt.getTime() + 5_000),
+    });
+    await tx.insert(s.conversationOffers).values({
+      ...offer,
+      round: 2,
+      offeredAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000),
+    });
     // AI drafts awaiting review (HNV-09-05): one a person approved, and one still pending.
     const [asked] = await tx
       .insert(s.messageLedger)

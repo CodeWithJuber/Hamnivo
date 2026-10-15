@@ -93,6 +93,7 @@ import {
   IdentityBadge,
   languageName,
   lostClaimText,
+  OfferBadge,
   OwnerBadge,
   PriorityBadge,
   SlaBadge,
@@ -349,6 +350,13 @@ function AssignMenu({ detail }: { detail: InboxDetail }) {
                       <UserRoundIcon aria-hidden="true" />
                       <bdi>{s.displayName}</bdi>
                       <StaffStatus status={s.status} className="ms-auto" />
+                      {s.maxOpenChats !== null || s.openChats > 0 ? (
+                        <span className="text-xs text-text-secondary" data-testid="assignee-load">
+                          {s.maxOpenChats !== null
+                            ? t('inbox.offers.load', { open: s.openChats, max: s.maxOpenChats })
+                            : t('inbox.offers.loadNoLimit', { open: s.openChats })}
+                        </span>
+                      ) : null}
                       {s.current ? (
                         <span className="text-xs text-text-secondary">
                           {t('inbox.assign.current')}
@@ -998,6 +1006,7 @@ function Header({
             ) : null}
             {detail.sla ? <SlaBadge sla={detail.sla} /> : null}
             <OwnerBadge conversation={detail} />
+            {detail.offer ? <OfferBadge offer={detail.offer} /> : null}
             <ChannelIcon channel={detail.channel} />
             {language ? <bdi>{language}</bdi> : null}
             {detail.brand ? <bdi>{detail.brand.name}</bdi> : null}
