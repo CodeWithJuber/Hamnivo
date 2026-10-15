@@ -1,11 +1,13 @@
 import type { ProblemOwner } from '@hamnivo/contracts';
 import { appendAudit, schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { OwnerMode } from '@hamnivo/db/schema';
+import { draftSurvivesOwnerChange } from '@hamnivo/domain';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { actionsInFlightNote, supersedeForOwnerChange } from '../actions/in-flight.js';
 import { inFlightNote } from '../commerce/in-flight.js';
 import { AppError } from '../common/app-error.js';
+import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
 import { syncSla } from '../inbox/sla.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { CLOCK, type Clock } from '../tokens.js';
@@ -193,6 +195,11 @@ export class OwnershipService {
     // AI actions are approved for one epoch (G13): pending approvals end here; anything already
     // sent stays open and is reconciled under the new owner (listed in the note below).
     const superseded = await supersedeForOwnerChange(tx, conversationId, epoch, this.clock());
+    // An AI draft was written for whoever would pick the conversation up from the queue; any other
+    // change of hands makes it stale (HNV-09-05).
+    if (!draftSurvivesOwnerChange(control.ownerMode, mode)) {
+      await supersedeAiDrafts(tx, conversationId, 'owner_changed', this.clock());
+    }
     const updates = [
       ...(before.status !== after.status || before.responder !== after.responder
         ? [{ lane: 'customer' as const, type: 'conversation.updated' as const, data: after }]

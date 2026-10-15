@@ -13,6 +13,7 @@ import { ownedByOther } from '../conversations/staff-conversations.service.js';
 import { enforce } from '../identity/staff.guard.js';
 import { CLOCK, type Clock } from '../tokens.js';
 import { InboxAccess } from './access.js';
+import { supersedeAiDrafts } from './ai-drafts.js';
 import { InboxService } from './inbox.service.js';
 import { InboxMessagesService } from './messages.service.js';
 import { InboxSignals } from './signals.service.js';
@@ -125,8 +126,11 @@ export class StatusService {
             ],
             set: { snoozedUntil, updatedAt: this.clock() },
           });
-        // Snoozing pauses the reply-time clock; resolving ends it (H12).
+        // Snoozing pauses the reply-time clock; resolving ends it (H12) and any AI draft with it.
         await syncSla(tx, principal.tenantId, control.id, this.clock());
+        if (input.status === 'resolved') {
+          await supersedeAiDrafts(tx, control.id, 'resolved', this.clock());
+        }
         await appendAudit(tx, {
           actorType: 'staff',
           actorId: toPublicId('staff', me),

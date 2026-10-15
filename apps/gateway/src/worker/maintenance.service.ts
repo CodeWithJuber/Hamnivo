@@ -2,6 +2,7 @@ import {
   type Db,
   ensureAuditPartitions,
   ensureReconcileCursors,
+  purgeAiDrafts,
   purgeAutomationRuns,
   purgeExpired,
   purgeMigrationFiles,
@@ -65,6 +66,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           automation_runs_removed: await purgeAutomationRuns(this.db),
           // Lifted and expired blocks stay on record for 90 days (H20).
           visitor_blocks_removed: await purgeVisitorBlocks(this.db),
+          ai_drafts_removed: await purgeAiDrafts(this.db),
         };
       }
       case 'reconcile-cursors':

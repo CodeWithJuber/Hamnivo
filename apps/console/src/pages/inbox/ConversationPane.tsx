@@ -82,6 +82,7 @@ import {
 } from '../../lib/inbox';
 import { useMarkReadWhileOpen } from '../../lib/inbox-alerts';
 import { useTenant } from '../../lib/tenant';
+import { AiDraftCard } from './AiDraftCard';
 import { Composer } from './Composer';
 import { ContextPanel } from './ContextPanel';
 import { returnToQueue } from './InboxPage';
@@ -1195,6 +1196,7 @@ export function ConversationPane() {
         />
         <OwnershipBanner detail={data} />
         <Timeline detail={data} messages={chronological(messages.data)} query={messages} />
+        <AiDraftCard key={`draft-${conversationId}`} detail={data} />
         <Composer key={conversationId} detail={data} drafts={drafts} />
       </section>
       {wide && detailsWide ? (

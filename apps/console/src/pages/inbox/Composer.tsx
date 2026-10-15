@@ -53,6 +53,7 @@ import { withReauth } from '../../lib/reauth';
 import { useTenant } from '../../lib/tenant';
 import { ownership } from './ConversationPane';
 import { useMyStaffId } from './parts';
+import { SourceList } from './SourceList';
 import { TemplateDialog } from './TemplateDialog';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'local' | 'conflict';
@@ -277,31 +278,7 @@ function SuggestionPanel({
       <p className="text-sm whitespace-pre-wrap text-text">
         <bdi dir="auto">{suggestion.text}</bdi>
       </p>
-      {suggestion.sources.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          <p className="text-xs font-medium text-text-secondary">{t('inbox.message.sources')}</p>
-          <ol className="flex list-decimal flex-col gap-0.5 ps-5 text-xs">
-            {suggestion.sources.map((source) => (
-              <li key={source.sourceId}>
-                {source.url ? (
-                  <a
-                    href={source.url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-link underline"
-                  >
-                    <bdi>{source.title}</bdi>
-                  </a>
-                ) : (
-                  <bdi>{source.title}</bdi>
-                )}
-              </li>
-            ))}
-          </ol>
-        </div>
-      ) : (
-        <p className="text-xs text-text-secondary">{t('inbox.copilot.noSources')}</p>
-      )}
+      <SourceList sources={suggestion.sources} />
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="secondary" onClick={onUse} data-testid="copilot-use">
           {t('inbox.copilot.use')}
@@ -408,7 +385,10 @@ const isReplyChannel = (channel: string): channel is ReplyChannel => channel in 
  * WhatsApp's reply window (W24) as it stands now, read again every half minute while it is open,
  * so "N minutes" counts down and the composer closes when the window does.
  */
-function useReplyWindow(channel: InboxDetail['channel'], closesAt: string | null): ReplyWindow {
+export function useReplyWindow(
+  channel: InboxDetail['channel'],
+  closesAt: string | null,
+): ReplyWindow {
   const [now, setNow] = useState(() => Date.now());
   const watched = channel === 'whatsapp' && Boolean(closesAt);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new closing time restarts the clock

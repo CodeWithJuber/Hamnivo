@@ -83,6 +83,8 @@ export const ID_PREFIX = {
   automation: 'aut',
   automationRun: 'arun',
   visitorBlock: 'blk',
+  /** An AI reply awaiting review (HNV-09-05); `drf` is a streamed reply draft. */
+  aiDraft: 'aidr',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

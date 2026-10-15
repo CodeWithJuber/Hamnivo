@@ -435,6 +435,20 @@
       "when": 1792069784458,
       "tag": "20261015130944_sla_security",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1792076634301,
+      "tag": "20261015150354_ai_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1792076670304,
+      "tag": "20261015150430_ai_drafts_security",
+      "breakpoints": true
     }
   ]
 }

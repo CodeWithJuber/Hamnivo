@@ -11886,6 +11886,217 @@
         }
       }
     },
+    "/v1/inbox/conversations/{conversationId}/ai-drafts": {
+      "get": {
+        "operationId": "listAiDrafts",
+        "summary": "The AI draft waiting for review, and the one before it (HNV-09-05) (conversations.read)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Drafts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiDraftList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/conversations/{conversationId}/ai-drafts/{draftId}/approve": {
+      "post": {
+        "operationId": "approveAiDraft",
+        "summary": "Send an AI draft as yourself, as written or edited; a retry sends once (conversations.reply)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "path",
+            "name": "draftId",
+            "schema": {
+              "type": "string",
+              "description": "Draft ID (aidr_…)"
+            },
+            "required": true,
+            "description": "Draft ID (aidr_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveAiDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiDraftDecisionResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/conversations/{conversationId}/ai-drafts/{draftId}/reject": {
+      "post": {
+        "operationId": "rejectAiDraft",
+        "summary": "Reject an AI draft with a reason; nothing is sent (conversations.reply)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          },
+          {
+            "in": "path",
+            "name": "draftId",
+            "schema": {
+              "type": "string",
+              "description": "Draft ID (aidr_…)"
+            },
+            "required": true,
+            "description": "Draft ID (aidr_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectAiDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiDraftDecisionResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/inbox/conversations/{conversationId}/messages/{messageId}/translation": {
       "post": {
         "operationId": "translateMessage",
@@ -29734,6 +29945,58 @@
           "clientRequestId"
         ]
       },
+      "ApproveAiDraftRequest": {
+        "type": "object",
+        "properties": {
+          "clientRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "expectedEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "clientRequestId",
+          "expectedEpoch"
+        ]
+      },
+      "RejectAiDraftRequest": {
+        "type": "object",
+        "properties": {
+          "clientRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "inaccurate",
+              "incomplete",
+              "wrong_tone",
+              "not_needed",
+              "other"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "clientRequestId",
+          "reason"
+        ]
+      },
       "TranslateRequest": {
         "type": "object",
         "properties": {
@@ -34838,6 +35101,7 @@
               "SEPARATE_APPROVER_REQUIRED",
               "DELETE_WINDOW_CLOSED",
               "CHANNEL_WINDOW_CLOSED",
+              "AI_DRAFT_CLOSED",
               "INTERNAL"
             ]
           },
@@ -34880,6 +35144,32 @@
           },
           "currentOwner": {
             "$ref": "#/components/schemas/ProblemOwner"
+          },
+          "aiDraft": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "approved",
+                  "edited",
+                  "rejected",
+                  "superseded"
+                ]
+              },
+              "decidedBy": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "decidedBy"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -46117,6 +46407,9 @@
               }
             ]
           },
+          "aiDraftReady": {
+            "type": "boolean"
+          },
           "unreadCount": {
             "type": "integer",
             "minimum": 0,
@@ -46157,6 +46450,7 @@
           "waitingSince",
           "replyWindowClosesAt",
           "sla",
+          "aiDraftReady",
           "unreadCount",
           "lastActivityAt",
           "createdAt"
@@ -46969,6 +47263,9 @@
               }
             ]
           },
+          "aiDraftReady": {
+            "type": "boolean"
+          },
           "unreadCount": {
             "type": "integer",
             "minimum": 0,
@@ -47024,6 +47321,7 @@
           "waitingSince",
           "replyWindowClosesAt",
           "sla",
+          "aiDraftReady",
           "unreadCount",
           "lastActivityAt",
           "createdAt",
@@ -47774,6 +48072,7 @@
                   "SEPARATE_APPROVER_REQUIRED",
                   "DELETE_WINDOW_CLOSED",
                   "CHANNEL_WINDOW_CLOSED",
+                  "AI_DRAFT_CLOSED",
                   "INTERNAL"
                 ]
               },
@@ -47832,6 +48131,187 @@
           "sources",
           "agentName",
           "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "AiDraftList": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "pending",
+          "latest"
+        ],
+        "additionalProperties": false
+      },
+      "AiDraft": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "aiDraft identifier (TypeID with prefix \"aidr\")",
+            "example": "aidr_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "runId": {
+            "type": "string",
+            "description": "run identifier (TypeID with prefix \"run\")",
+            "example": "run_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "edited",
+              "rejected",
+              "superseded"
+            ]
+          },
+          "supersededReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "customer_wrote",
+                  "owner_changed",
+                  "answered",
+                  "replaced",
+                  "resolved"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourcePart"
+            }
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agentName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          },
+          "decidedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "RFC 3339 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decidedBy": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "staffMemberId": {
+                    "type": "string",
+                    "description": "staff identifier (TypeID with prefix \"stf\")",
+                    "example": "stf_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "staffMemberId",
+                  "displayName"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rejectReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "inaccurate",
+                  "incomplete",
+                  "wrong_tone",
+                  "not_needed",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "runId",
+          "state",
+          "supersededReason",
+          "text",
+          "sources",
+          "language",
+          "agentName",
+          "createdAt",
+          "decidedAt",
+          "decidedBy",
+          "rejectReason"
+        ],
+        "additionalProperties": false
+      },
+      "AiDraftDecisionResult": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/AiDraft"
+          },
+          "message": {
+            "$ref": "#/components/schemas/StaffMessageResponse"
+          }
+        },
+        "required": [
+          "draft"
         ],
         "additionalProperties": false
       },
@@ -48095,6 +48575,7 @@
                         "SEPARATE_APPROVER_REQUIRED",
                         "DELETE_WINDOW_CLOSED",
                         "CHANNEL_WINDOW_CLOSED",
+                        "AI_DRAFT_CLOSED",
                         "INTERNAL"
                       ]
                     },

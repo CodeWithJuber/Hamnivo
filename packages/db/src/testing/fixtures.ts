@@ -1463,6 +1463,77 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
         low: { firstReplyMinutes: null, nextReplyMinutes: null },
       },
     });
+    // AI drafts awaiting review (HNV-09-05): one a person approved, and one still pending.
+    const [asked] = await tx
+      .insert(s.messageLedger)
+      .values({
+        tenantId,
+        conversationId: ids.conversationId,
+        senderKind: 'customer',
+        senderId: ids.principalId,
+        clientMessageId: newId(),
+        requestHash: bytes(),
+        sourceKey: `hv1:m:${newId()}`,
+        state: 'committed',
+      })
+      .returning({ id: s.messageLedger.id });
+    if (!asked) throw new Error('ledger insert returned nothing');
+    const draftRuns = [newId(), newId()];
+    for (const [n, runId] of draftRuns.entries()) {
+      await tx.insert(s.runs).values({
+        id: runId,
+        tenantId,
+        conversationId: ids.conversationId,
+        brandId: ids.brandId,
+        agentId: ids.agentId,
+        agentVersionId: ids.agentVersionId,
+        triggerRef: `draft:${suffix}:${n}`,
+        kind: 'draft',
+        state: 'succeeded',
+        outcome: 'drafted',
+        epoch: 0,
+      });
+    }
+    const draft = {
+      tenantId,
+      conversationId: ids.conversationId,
+      agentId: ids.agentId,
+      agentVersionId: ids.agentVersionId,
+      triggerLedgerId: asked.id,
+      ownerEpoch: 0,
+      text: 'Your parcel left our warehouse yesterday.',
+      sources: [
+        {
+          type: 'source' as const,
+          sourceId: 'doc_1',
+          title: 'Shipping and returns',
+          url: null,
+          version: 'v1',
+          excerpt: null,
+          freshness: 'current' as const,
+        },
+      ],
+      language: 'en',
+    };
+    const approvedDraftId = newId();
+    await tx.insert(s.aiDrafts).values({
+      ...draft,
+      id: approvedDraftId,
+      runId: draftRuns[0] as string,
+      state: 'approved',
+      decidedBy: ids.staffMemberId,
+      decidedAt: new Date(),
+    });
+    await tx.insert(s.aiDraftDecisions).values({
+      tenantId,
+      draftId: approvedDraftId,
+      staffMemberId: ids.staffMemberId,
+      clientRequestId: newId(),
+      decision: 'approved',
+      ownerEpoch: 0,
+      clientMessageId: newId(),
+    });
+    await tx.insert(s.aiDrafts).values({ ...draft, runId: draftRuns[1] as string });
     // The chat code was seen on the brand's website.
     await tx.insert(s.brandInstallSightings).values({
       tenantId,

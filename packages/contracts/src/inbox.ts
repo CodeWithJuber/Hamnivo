@@ -133,6 +133,8 @@ export const InboxConversation = z
     replyWindowClosesAt: Timestamp.nullable(),
     /** The reply-time clock (H12) while a customer waits for a person; null when none runs. */
     sla: InboxSla.nullable(),
+    /** An AI draft is waiting for a person to approve, edit or reject it (HNV-09-05). */
+    aiDraftReady: z.boolean(),
     /**
      * Customer messages this person has not read yet, from the read marker the server keeps for
      * them. Only chats that are theirs or waiting for a person count; every other chat shows 0.

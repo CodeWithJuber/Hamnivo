@@ -46,6 +46,8 @@ export const rowColumns = {
   ownerBotName: bot.name,
   /** Exact cursor value (JavaScript dates would drop the microseconds). */
   activityKey: sql<string>`to_char(${c.lastActivityAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+  /** An AI draft waits for review (HNV-09-05); one pending draft per conversation at most. */
+  aiDraftReady: sql<boolean>`exists (select 1 from ai_drafts d where d.tenant_id = ${c.tenantId} and d.conversation_id = ${c.id} and d.state = 'pending')`,
   /** The same for the reply deadline, which orders the Overdue queue (H12). */
   dueKey: sql<
     string | null
@@ -247,6 +249,7 @@ export function toInboxConversation(
         channelNameOf(row.channelType),
         control.lastCustomerMessageAt,
       )?.toISOString() ?? null,
+    aiDraftReady: Boolean(row.aiDraftReady),
     sla: slaOf(
       {
         slaKind: row.slaKind,

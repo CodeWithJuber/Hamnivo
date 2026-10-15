@@ -2380,8 +2380,16 @@ describe('message guard', () => {
           expect(published.status, JSON.stringify(published.body)).toBe(200);
           return () => shop.owner.post(`/v1/admin/agents/${shop.agentId}/publish`, { version });
         };
-        const suggestions = (seen: { notes: string[] }) =>
-          seen.notes.filter((note) => note.startsWith('AI suggestion (not sent to the customer)'));
+        /** The AI drafts written for people to review (HNV-09-05). */
+        const suggestions = (conversationId: string) =>
+          withTenant(slice.app, { tenantId }, (tx) =>
+            tx
+              .select({ id: schema.aiDrafts.id })
+              .from(schema.aiDrafts)
+              .where(
+                eq(schema.aiDrafts.conversationId, fromPublicId('conversation', conversationId)),
+              ),
+          );
 
         it('asks Jev before the suggestion is written, and does both', async () => {
           const restore = await suggesting();
@@ -2394,7 +2402,7 @@ describe('message guard', () => {
             const { conversationId } = await chat(atRisk);
             expect(modelCallsWhenAsked).toEqual([0]);
             const seen = await inspect(conversationId);
-            expect(suggestions(seen)).toHaveLength(1);
+            expect(await suggestions(conversationId)).toHaveLength(1);
             expect(seen.botReplies).toEqual([SAFE_REPLIES.en]);
             expect(urgentNotes(seen)).toHaveLength(1);
           } finally {
@@ -2408,7 +2416,7 @@ describe('message guard', () => {
             jev.state.mode = 'error';
             const { conversationId } = await chat(atRisk);
             const seen = await inspect(conversationId);
-            expect(suggestions(seen)).toHaveLength(1);
+            expect(await suggestions(conversationId)).toHaveLength(1);
             expect(seen.botReplies).toEqual([]);
             expect(seen.notes.join('\n')).not.toContain('URGENT');
             expect(await fallbacks(conversationId)).toEqual([]);
@@ -2442,7 +2450,7 @@ describe('message guard', () => {
             const { conversationId } = await chat(atRisk);
             expect(failing).toHaveBeenCalled();
             const seen = await inspect(conversationId);
-            expect(suggestions(seen)).toHaveLength(1);
+            expect(await suggestions(conversationId)).toHaveLength(1);
             expect(seen.botReplies).toEqual([]);
             expect(seen.notes.join('\n')).not.toContain('URGENT');
             // The run says it failed; the job does not.

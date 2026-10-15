@@ -23,8 +23,8 @@ reminds you when there is something unsaved.
 - The agent's instructions, tone and languages.
 - The model and the model connection the agent is set to (and its fallback models, if the first
   one is busy). The connection's key never leaves the server.
-- The agent's knowledge. A reply to a customer draws only on public sources, so the test does too.
-  Sources that are for the team only are used only when the agent is in assist mode.
+- The agent's knowledge. A reply to a customer, and a draft in assist mode, draws only on public
+  sources, so the test does too. Sources for the team only are never used in answers or drafts.
 - The rules of the tools the agent has been given.
 - The same checks on the reply as in a live chat: the AI never says it is a person, never says a
   payment or a refund is done without a receipt, and never says something was changed or checked

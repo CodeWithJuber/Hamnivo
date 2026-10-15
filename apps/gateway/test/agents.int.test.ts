@@ -389,7 +389,7 @@ describe('model failures', () => {
 });
 
 describe('assist mode', () => {
-  it('writes suggestions for staff as internal notes and never answers customers', async () => {
+  it('writes drafts for people to review and never answers customers', async () => {
     const base = (await alpha.owner.get(`/v1/admin/agents/${alpha.agentId}`)).body.published.config;
     await alpha.owner.put(`/v1/admin/agents/${alpha.agentId}/draft`, {
       config: { ...base, mode: 'assist' },
@@ -399,9 +399,11 @@ describe('assist mode', () => {
     const seen = await inspect(conversationId);
     expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
     expect(seen.botReplies).toEqual([]);
-    expect(seen.notes.some((n) => n.startsWith('AI suggestion (not sent to the customer)'))).toBe(
-      true,
-    );
+    // The draft waits in Studio (HNV-09-05); nothing reaches Chatwoot, not even a note.
+    expect(seen.notes.some((n) => n.includes('AI suggestion'))).toBe(false);
+    const drafts = await alpha.owner.get(`/v1/inbox/conversations/${conversationId}/ai-drafts`);
+    expect(drafts.status, JSON.stringify(drafts.body)).toBe(200);
+    expect(drafts.body.pending).toMatchObject({ state: 'pending' });
     const runs = await runsOf(conversationId);
     expect(runs[0]).toMatchObject({ kind: 'draft', outcome: 'drafted' });
   });

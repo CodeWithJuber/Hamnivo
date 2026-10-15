@@ -51,6 +51,7 @@ import {
 import { claimedLiveData, conversationLiveData } from '../commerce/answer-cache.js';
 import { CLAIM_CORRECTION, checkReplyClaims } from '../commerce/claims.js';
 import { AppError } from '../common/app-error.js';
+import { storeAiDraft } from '../inbox/ai-drafts.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
 import { LanguageService } from '../language/language.service.js';
 import { citeMemories, memoryBlock } from '../memory/prompt.js';
@@ -1683,7 +1684,12 @@ export class RepliesService {
     });
   }
 
-  /** Assist mode (G03): a suggestion for staff as an internal note, never a customer reply. */
+  /**
+   * Assist mode (HNV-09-05, G03): writes a reply for people to review, kept as an AI draft that
+   * Studio shows above the composer. It is never sent on its own and never reaches Chatwoot; a
+   * person approves, edits or rejects it. Outbox handler for `conversation.customer_message`, safe
+   * to run more than once: a retry keeps the draft its run already wrote.
+   */
   private async suggest(
     event: ClaimedOutboxEvent,
     payload: CustomerMessageEvent,
@@ -1693,10 +1699,6 @@ export class RepliesService {
     const { control } = context;
     const agent = context.agent as ActiveAgent;
     const runtime = await this.registry.get(tenantId, control.connectionId);
-    const bot = runtime.primaryBot;
-    if (!bot) return;
-    const ref = String(control.externalConversationId);
-    const key = `hv1:d:${uuidV5(payload.conversationId, `draft:${payload.ledgerId}`)}`;
     const run = await this.tx(tenantId, (tx) =>
       this.runs.start(tx, {
         tenantId,
@@ -1710,10 +1712,8 @@ export class RepliesService {
       }),
     );
     if (run.state !== 'running') return;
-    if (run.attempts > 1 && (await runtime.authority.findByKey(ref, key, run.startedAt))) {
-      await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'drafted' }));
-      return;
-    }
+    // The customer wrote again: that message's own job drafts the reply with everything in view.
+    if (await this.skipIfSuperseded(tenantId, run.id, payload)) return;
     // Suggestions spend tokens too: none once the plan or budget is used up.
     if (!(await this.entitlements.aiAllowance(tenantId)).allowed) {
       await this.tx(tenantId, (tx) =>
@@ -1746,34 +1746,42 @@ export class RepliesService {
       await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'blocked' }));
       return;
     }
-    await runtime.authority.appendMessage({
-      conversationRef: ref,
-      key,
-      author: { kind: 'bot', botRef: String(bot.externalBotId) },
-      visibility: 'private',
-      text: [
-        `AI suggestion (not sent to the customer):\n\n${generated.text}`,
-        ...(generated.sources.length
-          ? [
-              `Sources:\n${generated.sources
-                .map(
-                  (source, i) =>
-                    `[${i + 1}] ${source.title}${source.url ? ` (${source.url})` : ''}`,
-                )
-                .join('\n')}`,
-            ]
-          : []),
-      ].join('\n\n'),
+    const draft = generated;
+    const telemetry = {
+      provider: draft.provider,
+      modelId: draft.modelId,
+      inputTokens: draft.inputTokens,
+      outputTokens: draft.outputTokens,
+      latencyMs: draft.latencyMs,
+    };
+    const kept = await this.tx(tenantId, async (tx) => {
+      const stored = await storeAiDraft(tx, {
+        tenantId,
+        conversationId: control.id,
+        runId: run.id,
+        agentId: agent.profile.id,
+        agentVersionId: agent.version.id,
+        triggerLedgerId: payload.ledgerId,
+        text: draft.text,
+        sources: draft.sources,
+        language: chosen.resolution.language,
+        now: this.clock(),
+      });
+      if (stored === 'not_needed') {
+        // The AI took the conversation back, it was resolved or the customer wrote again.
+        await this.runs.step(tx, tenantId, run.id, {
+          kind: 'decision',
+          name: 'draft_not_needed',
+          status: 'ok',
+        });
+        await this.finishWithUsage(tx, tenantId, run.id, 'skipped', telemetry);
+        await this.runs.finish(tx, run.id, { outcome: 'skipped', state: 'skipped' });
+        return false;
+      }
+      await this.finishWithUsage(tx, tenantId, run.id, 'drafted', telemetry);
+      return stored === 'stored';
     });
-    await this.tx(tenantId, (tx) =>
-      this.finishWithUsage(tx, tenantId, run.id, 'drafted', {
-        provider: generated.provider,
-        modelId: generated.modelId,
-        inputTokens: generated.inputTokens,
-        outputTokens: generated.outputTokens,
-        latencyMs: generated.latencyMs,
-      }),
-    );
+    if (kept) await this.journal.signalInbox(tenantId, control.id);
   }
 
   /** Customer-visible history: the Client API view when the contact is known. */
@@ -2073,7 +2081,9 @@ export class RepliesService {
       this.retrieval.search(tx, {
         brandId,
         sourceIds: config.knowledgeSourceIds.map((id) => fromPublicId('source', id)),
-        audience: config.mode === 'assist' ? 'staff' : 'customer',
+        // Assist drafts are written to be sent as they are (HNV-09-05): public knowledge only, so
+        // every source they cite can be shown to the customer.
+        audience: 'customer',
         query,
         limit: PASSAGES,
       }),

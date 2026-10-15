@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  AiDraftDecisionResult,
+  AiDraftList,
+  ApproveAiDraftRequest,
+  RejectAiDraftRequest,
+} from './ai-drafts.js';
 import { StreamControl } from './events.js';
 import {
   AssigneeOptions,
@@ -348,6 +354,40 @@ export const inboxRoutes = {
     params: conversation,
     body: CopilotRequest,
     success: { status: 200, description: 'Suggestion', schema: CopilotSuggestion },
+  },
+  listAiDrafts: {
+    method: 'get',
+    path: '/v1/inbox/conversations/{conversationId}/ai-drafts',
+    operationId: 'listAiDrafts',
+    summary:
+      'The AI draft waiting for review, and the one before it (HNV-09-05) (conversations.read)',
+    tags: tag,
+    auth: 'staff_session',
+    params: conversation,
+    success: { status: 200, description: 'Drafts', schema: AiDraftList },
+  },
+  approveAiDraft: {
+    method: 'post',
+    path: '/v1/inbox/conversations/{conversationId}/ai-drafts/{draftId}/approve',
+    operationId: 'approveAiDraft',
+    summary:
+      'Send an AI draft as yourself, as written or edited; a retry sends once (conversations.reply)',
+    tags: tag,
+    auth: 'staff_session',
+    params: conversation.extend({ draftId: z.string().meta({ description: 'Draft ID (aidr_…)' }) }),
+    body: ApproveAiDraftRequest,
+    success: { status: 200, description: 'Sent', schema: AiDraftDecisionResult },
+  },
+  rejectAiDraft: {
+    method: 'post',
+    path: '/v1/inbox/conversations/{conversationId}/ai-drafts/{draftId}/reject',
+    operationId: 'rejectAiDraft',
+    summary: 'Reject an AI draft with a reason; nothing is sent (conversations.reply)',
+    tags: tag,
+    auth: 'staff_session',
+    params: conversation.extend({ draftId: z.string().meta({ description: 'Draft ID (aidr_…)' }) }),
+    body: RejectAiDraftRequest,
+    success: { status: 200, description: 'Rejected', schema: AiDraftDecisionResult },
   },
   translateMessage: {
     method: 'post',

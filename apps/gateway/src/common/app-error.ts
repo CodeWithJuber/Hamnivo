@@ -1,4 +1,4 @@
-import type { ErrorCode, ProblemOwner, QuotaInfo } from '@hamnivo/contracts';
+import type { ErrorCode, Problem, ProblemOwner, QuotaInfo } from '@hamnivo/contracts';
 
 export interface AppErrorDetails {
   detail?: string;
@@ -11,6 +11,8 @@ export interface AppErrorDetails {
   reason?: string;
   /** OWNERSHIP_CHANGED: who has the conversation now (Problem.currentOwner). */
   currentOwner?: ProblemOwner;
+  /** AI_DRAFT_CLOSED: how the draft ended and who decided it (Problem.aiDraft). */
+  aiDraft?: NonNullable<Problem['aiDraft']>;
   /** Logged for operators, never sent to clients. */
   internal?: unknown;
 }

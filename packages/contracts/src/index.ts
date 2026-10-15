@@ -2,6 +2,7 @@ export * from './admin.js';
 export * from './admin-routes.js';
 export * from './agent-routes.js';
 export * from './agents.js';
+export * from './ai-drafts.js';
 export * from './ai-power.js';
 export * from './analytics.js';
 export * from './automation-routes.js';
