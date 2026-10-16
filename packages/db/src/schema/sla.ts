@@ -1,6 +1,19 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, foreignKey, jsonb, pgTable, primaryKey, uuid } from 'drizzle-orm/pg-core';
-import { createdAt, tenantIsolation, updatedAt } from './helpers.js';
+import {
+  boolean,
+  check,
+  foreignKey,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import { conversationControls } from './authority.js';
+import { createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { staffMembers } from './identity.js';
 import { brands, tenantId } from './tenancy.js';
 
@@ -37,6 +50,46 @@ export const slaPolicies = pgTable(
       name: 'sla_policies_updated_by_fk',
       columns: [t.tenantId, t.updatedBy],
       foreignColumns: [staffMembers.tenantId, staffMembers.id],
+    }),
+    tenantIsolation(),
+  ],
+);
+
+export const SLA_OUTCOMES = ['met', 'missed', 'stopped'] as const;
+
+/**
+ * How each reply-time clock ended (H12, O04), for reports: one row per clock, written when it ends.
+ * `met` and `missed` mean a person replied before or after the deadline; `stopped` means the clock
+ * ended without a person's reply (the AI took the chat back, or it was resolved). Rows are never
+ * changed; they are removed 13 months after the clock ended.
+ */
+export const slaOutcomes = pgTable(
+  'sla_outcomes',
+  {
+    id: id(),
+    tenantId: tenantId(),
+    conversationId: uuid('conversation_id').notNull(),
+    kind: text('kind', { enum: ['first_reply', 'next_reply'] }).notNull(),
+    priority: text('priority', { enum: ['urgent', 'high', 'medium', 'low'] }).notNull(),
+    targetMinutes: integer('target_minutes').notNull(),
+    startedAt: tstz('started_at').notNull(),
+    endedAt: tstz('ended_at').notNull(),
+    outcome: text('outcome', { enum: SLA_OUTCOMES }).notNull(),
+    /** Working minutes from start to end, without the time spent snoozed. */
+    businessMinutes: integer('business_minutes').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('sla_outcomes_tenant_id_id_key').on(t.tenantId, t.id),
+    index('sla_outcomes_ended_idx').on(t.tenantId, t.endedAt),
+    index('sla_outcomes_conversation_idx').on(t.tenantId, t.conversationId),
+    /** The 13-month purge looks across tenants by end time. */
+    index('sla_outcomes_purge_idx').on(t.endedAt),
+    check('sla_outcomes_minutes_ck', sql`${t.targetMinutes} > 0 and ${t.businessMinutes} >= 0`),
+    foreignKey({
+      name: 'sla_outcomes_conversation_fk',
+      columns: [t.tenantId, t.conversationId],
+      foreignColumns: [conversationControls.tenantId, conversationControls.id],
     }),
     tenantIsolation(),
   ],

@@ -67,8 +67,9 @@ const later = (a: Date, b: Date) => (a.getTime() >= b.getTime() ? a : b);
  *   hand-off starts a first reply again: `resetHumanReply`).
  * - It runs while the customer's last message is newer than the last reply a person wrote: a
  *   first reply when no person has replied yet, otherwise a next reply.
- * - A running clock of the same kind keeps its start; a first reply otherwise starts when the
- *   customer wrote or the conversation came to people, whichever is later.
+ * - A running clock of the same kind keeps its start, unless a person replied since it started; a
+ *   first reply otherwise starts when the customer wrote or the conversation came to people,
+ *   whichever is later.
  * - Snoozing pauses it; the working minutes spent paused move the deadline out.
  */
 export function nextSlaClock(input: {
@@ -94,7 +95,13 @@ export function nextSlaClock(input: {
   if (targetMinutes === null || targetMinutes === undefined) {
     return { clock: null, resetHumanReply: false };
   }
-  const same = clock?.kind === kind ? clock : null;
+  // A clock a person has replied to since it started has ended, even when the customer wrote
+  // again before the reply was recorded: the next wait starts afresh.
+  const answered =
+    clock !== null &&
+    facts.lastHumanReplyAt !== null &&
+    facts.lastHumanReplyAt.getTime() > clock.startedAt.getTime();
+  const same = clock?.kind === kind && !answered ? clock : null;
   const startedAt =
     same?.startedAt ??
     (kind === 'first_reply'
@@ -148,4 +155,36 @@ export function slaView(
       : businessMinutesBetween(hours, now, due)
     : 0;
   return { state, dueAt: due, businessMinutesLeft: Math.round(left), breached };
+}
+
+export type SlaOutcome = 'met' | 'missed' | 'stopped';
+
+/**
+ * How a clock that has just ended turned out (H12, O04), for reports. A person's reply after the
+ * clock started ends it: met, or missed when more working time than the target went by (time
+ * snoozed left out) or it had already gone overdue. Without such a reply it was stopped: the AI
+ * took the chat back, it was resolved, or the targets were turned off.
+ */
+export function slaOutcomeOf(input: {
+  clock: SlaClock;
+  lastHumanReplyAt: Date | null;
+  hours: BusinessHours | null;
+  now: Date;
+}): { outcome: SlaOutcome; endedAt: Date; businessMinutes: number } {
+  const { clock, lastHumanReplyAt, hours, now } = input;
+  const replied =
+    lastHumanReplyAt !== null && lastHumanReplyAt.getTime() > clock.startedAt.getTime();
+  const endedAt = replied && lastHumanReplyAt.getTime() < now.getTime() ? lastHumanReplyAt : now;
+  const paused =
+    clock.pausedMinutes +
+    (clock.pausedAt ? Math.ceil(businessMinutesBetween(hours, clock.pausedAt, endedAt)) : 0);
+  const working = Math.max(0, businessMinutesBetween(hours, clock.startedAt, endedAt) - paused);
+  const overdue =
+    working > clock.targetMinutes ||
+    (clock.breachedAt !== null && clock.breachedAt.getTime() <= endedAt.getTime());
+  return {
+    outcome: replied ? (overdue ? 'missed' : 'met') : 'stopped',
+    endedAt,
+    businessMinutes: Math.round(working),
+  };
 }

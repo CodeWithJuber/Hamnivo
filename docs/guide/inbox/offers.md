@@ -64,5 +64,7 @@ team, the offer ends. If you then try to accept it, Studio tells you who has it 
 
 - Offers and declines, with their reasons, are kept in the audit log. Ended offers are removed
   after 90 days.
+- How many offers were accepted, declined or ran out, and why people declined, is in
+  [Reports](../reports.md) under **Team activity**.
 - If your team uses Chatwoot's own auto-assignment, turn it off for teams that offer chats. An
   assignment made in Chatwoot ends the offer, like any other claim.

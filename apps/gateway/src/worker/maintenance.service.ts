@@ -7,6 +7,7 @@ import {
   purgeConversationOffers,
   purgeExpired,
   purgeMigrationFiles,
+  purgeSlaOutcomes,
   purgeVisitorBlocks,
   purgeVisitors,
   purgeWebhookEvents,
@@ -70,6 +71,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           ai_drafts_removed: await purgeAiDrafts(this.db),
           // Ended offers stay on record for 90 days (HNV-10-03).
           offers_removed: await purgeConversationOffers(this.db),
+          // How reply-time clocks ended is kept 13 months, for reports (H12, O04).
+          sla_outcomes_removed: await purgeSlaOutcomes(this.db),
         };
       }
       case 'reconcile-cursors':

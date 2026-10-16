@@ -4,6 +4,8 @@ import {
   nextSlaClock,
   type SlaClock,
   type SlaTargets,
+  slaOutcomeOf,
+  slaPriorityOf,
   slaView,
 } from '@hamnivo/domain';
 import { and, eq, sql } from 'drizzle-orm';
@@ -177,6 +179,29 @@ export async function syncSla(
       ],
       set: { ...values, updatedAt: now },
     });
+  // The clock that ran has ended, or another took its place: how it went is kept for reports.
+  if (
+    previous &&
+    (clock === null || clock.kind !== previous.kind || !same(clock.startedAt, previous.startedAt))
+  ) {
+    const ended = slaOutcomeOf({
+      clock: previous,
+      lastHumanReplyAt: state?.lastHumanReplyAt ?? null,
+      hours,
+      now,
+    });
+    await tx.insert(schema.slaOutcomes).values({
+      tenantId,
+      conversationId,
+      kind: previous.kind,
+      priority: slaPriorityOf(state?.priority ?? null),
+      targetMinutes: previous.targetMinutes,
+      startedAt: previous.startedAt,
+      endedAt: ended.endedAt,
+      outcome: ended.outcome,
+      businessMinutes: ended.businessMinutes,
+    });
+  }
   // A deadline still ahead gets a check at that time; a stale check finds another deadline and
   // does nothing.
   if (clock?.dueAt && !clock.breachedAt && !same(previous?.dueAt, clock.dueAt)) {

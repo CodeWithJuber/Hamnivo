@@ -70,6 +70,7 @@ const APPEND_ONLY = new Set([
   'chat_consents',
   'automation_versions',
   'ai_draft_decisions',
+  'sla_outcomes',
 ]);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
@@ -264,6 +265,7 @@ describe('two-tenant isolation', () => {
     'brand_appearance',
     'brand_install_sightings',
     'sla_policies',
+    'sla_outcomes',
     'ai_drafts',
     'ai_draft_decisions',
     'staff_routing_profiles',
@@ -473,6 +475,7 @@ describe('two-tenant isolation', () => {
       'brand_appearance',
       'brand_install_sightings',
       'sla_policies',
+      'sla_outcomes',
       'ai_drafts',
       'ai_draft_decisions',
       'staff_routing_profiles',

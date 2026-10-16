@@ -58172,6 +58172,762 @@
             ],
             "additionalProperties": false
           },
+          "replyTargets": {
+            "type": "object",
+            "properties": {
+              "recordingSince": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "RFC 3339 timestamp"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "met": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "missed": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "stopped": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed"
+                ],
+                "additionalProperties": false
+              },
+              "firstReplyMedianMinutes": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample"
+                ],
+                "additionalProperties": false
+              },
+              "byPriority": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "priority": {
+                      "type": "string",
+                      "enum": [
+                        "urgent",
+                        "high",
+                        "medium",
+                        "low"
+                      ]
+                    },
+                    "replies": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "metRate": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "suppressed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "priority",
+                    "replies",
+                    "metRate",
+                    "suppressed"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "daily": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                      "description": "Calendar date (YYYY-MM-DD) in `timezone`"
+                    },
+                    "replies": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "metRate": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "suppressed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "replies",
+                    "metRate",
+                    "suppressed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "recordingSince",
+              "met",
+              "missed",
+              "stopped",
+              "firstReplyMedianMinutes",
+              "byPriority",
+              "daily"
+            ],
+            "additionalProperties": false
+          },
+          "offers": {
+            "type": "object",
+            "properties": {
+              "windowLimited": {
+                "type": "boolean"
+              },
+              "offered": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed"
+                ],
+                "additionalProperties": false
+              },
+              "accepted": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "declined": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "expired": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "acceptMedianSeconds": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample"
+                ],
+                "additionalProperties": false
+              },
+              "leftInQueue": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "declineReasons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "at_capacity",
+                        "not_my_area",
+                        "going_offline",
+                        "other"
+                      ]
+                    },
+                    "count": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "suppressed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "reason",
+                    "count",
+                    "suppressed"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "byTeam": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "teamId": {
+                      "type": "string",
+                      "description": "team identifier (TypeID with prefix \"team\")",
+                      "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "offered": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "acceptRate": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "suppressed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "teamId",
+                    "name",
+                    "offered",
+                    "acceptRate",
+                    "suppressed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "windowLimited",
+              "offered",
+              "accepted",
+              "declined",
+              "expired",
+              "acceptMedianSeconds",
+              "leftInQueue",
+              "declineReasons",
+              "byTeam"
+            ],
+            "additionalProperties": false
+          },
+          "aiDrafts": {
+            "type": "object",
+            "properties": {
+              "windowLimited": {
+                "type": "boolean"
+              },
+              "written": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed"
+                ],
+                "additionalProperties": false
+              },
+              "sent": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "approved": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "edited": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "rejected": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "suppressed": {
+                    "type": "boolean"
+                  },
+                  "sample": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "suppressed",
+                  "sample",
+                  "rate"
+                ],
+                "additionalProperties": false
+              },
+              "rejectReasons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "inaccurate",
+                        "incomplete",
+                        "wrong_tone",
+                        "not_needed",
+                        "other"
+                      ]
+                    },
+                    "count": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "suppressed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "reason",
+                    "count",
+                    "suppressed"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "setAsideReasons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "customer_wrote",
+                        "owner_changed",
+                        "answered",
+                        "replaced",
+                        "resolved"
+                      ]
+                    },
+                    "count": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "suppressed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "reason",
+                    "count",
+                    "suppressed"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "byAgent": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "agentId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "agent identifier (TypeID with prefix \"agt\")",
+                          "example": "agt_01j9zk7w3xq8r4t2v6m5n1p0cd"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "written": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "sentRate": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "suppressed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "agentId",
+                    "name",
+                    "written",
+                    "sentRate",
+                    "suppressed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "windowLimited",
+              "written",
+              "sent",
+              "approved",
+              "edited",
+              "rejected",
+              "rejectReasons",
+              "setAsideReasons",
+              "byAgent"
+            ],
+            "additionalProperties": false
+          },
           "cache": {
             "type": "object",
             "properties": {
@@ -58212,6 +58968,9 @@
           "channels",
           "commerce",
           "ai",
+          "replyTargets",
+          "offers",
+          "aiDrafts",
           "cache"
         ],
         "additionalProperties": false

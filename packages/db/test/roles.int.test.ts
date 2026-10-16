@@ -111,6 +111,7 @@ describe('database roles', () => {
         'app.purge_conversation_offers(integer)',
         'app.purge_expired(integer)',
         'app.purge_migration_files(integer)',
+        'app.purge_sla_outcomes(integer)',
         'app.purge_visitor_blocks(integer)',
         'app.purge_visitors(integer)',
         'app.purge_webhook_events(integer,integer)',

@@ -59,6 +59,9 @@ Some pages are not in the menu:
   [**Saved replies and tags**](guide/inbox/saved-replies.md) (people who manage the inbox) are
   buttons above the list of chats in the inbox. A row of links for them would push the inbox down.
 
+[**Reports**](guide/reports.md) explains each tab, which small numbers are withheld and how far
+back each report goes.
+
 ## What each role sees
 
 A page's permission has not changed: the menu only groups the pages. A **✓** below means the

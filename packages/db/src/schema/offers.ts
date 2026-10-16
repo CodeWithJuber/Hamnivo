@@ -119,6 +119,8 @@ export const conversationOffers = pgTable(
     /** A person's offers: whether they hold one now, and when they were last offered one. */
     index('conversation_offers_staff_idx').on(t.tenantId, t.staffMemberId, t.offeredAt),
     index('conversation_offers_ended_idx').on(t.decidedAt).where(sql`${t.decidedAt} is not null`),
+    /** Reports count offers made in a date range. */
+    index('conversation_offers_offered_idx').on(t.tenantId, t.offeredAt),
     foreignKey({
       name: 'conversation_offers_conversation_fk',
       columns: [t.tenantId, t.conversationId],

@@ -176,6 +176,21 @@ describe('reply-time targets (H12)', () => {
     // Resolving ends it.
     await amina.client.post(inbox(chat.id, '/status'), { status: 'resolved' });
     expect((await row(chat.id)).sla).toBeNull();
+
+    // How each clock ended is kept for reports (O04): the first reply came late, and the next
+    // clock stopped without a reply when the chat was resolved.
+    const ended = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .select()
+        .from(schema.slaOutcomes)
+        .where(eq(schema.slaOutcomes.conversationId, fromPublicId('conversation', chat.id)))
+        .orderBy(schema.slaOutcomes.endedAt),
+    );
+    expect(ended).toMatchObject([
+      { kind: 'first_reply', priority: 'medium', targetMinutes: 10, outcome: 'missed' },
+      { kind: 'next_reply', priority: 'urgent', targetMinutes: 4, outcome: 'stopped' },
+    ]);
+    expect(ended[0]?.businessMinutes).toBeGreaterThanOrEqual(11);
   });
 
   it('waits outside business hours', async () => {

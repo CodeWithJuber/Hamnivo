@@ -12,6 +12,7 @@ export * from './offers.js';
 export * from './operators.js';
 export * from './resolvers.js';
 export * as schema from './schema/index.js';
+export * from './sla.js';
 export * from './tenant.js';
 export * from './uploads.js';
 export * from './visitors.js';

@@ -1,0 +1,1 @@
+CREATE INDEX "sla_outcomes_purge_idx" ON "sla_outcomes" USING btree ("ended_at");

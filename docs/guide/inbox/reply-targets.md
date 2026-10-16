@@ -63,4 +63,6 @@ Hover over the label to see which target applies, for example "First reply targe
 - Targets belong to each brand. Other brands keep their own.
 - Every change to the targets is in the audit log, and so is each conversation that goes overdue.
 - Chatwoot does not show these targets. They live in Hamnivo.
+- How often targets are met, by priority and by day, is in [Reports](../reports.md) under
+  **Service quality**.
 - See also: [business hours](../setup/business-hours.md) and [tickets](tickets.md).
