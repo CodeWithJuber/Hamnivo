@@ -251,6 +251,7 @@ describe('setting reply-time targets on the business hours page', () => {
       medium: { firstReplyMinutes: null, nextReplyMinutes: null },
       low: { firstReplyMinutes: null, nextReplyMinutes: null },
     },
+    overdue: { alertLeads: false, moveAfterMinutes: null, moveTo: { kind: 'queue' } },
     updatedAt: null,
   };
   const brand = {
@@ -303,6 +304,82 @@ describe('setting reply-time targets on the business hours page', () => {
           high: { firstReplyMinutes: null, nextReplyMinutes: null },
           medium: { firstReplyMinutes: 120, nextReplyMinutes: null },
           low: { firstReplyMinutes: null, nextReplyMinutes: null },
+        },
+        overdue: { alertLeads: false, moveAfterMinutes: null, moveTo: { kind: 'queue' } },
+      }),
+    );
+  });
+
+  it('alerts leads and moves an overdue conversation to a team that takes the brand (ADR 0016)', async () => {
+    const team = (id: string, name: string, over: object = {}) => ({
+      id,
+      name,
+      workspaceId: 'wsp_1',
+      status: 'active',
+      members: [],
+      assignmentMode: 'offer',
+      offerTimeoutSeconds: 60,
+      createdAt: NOW,
+      ...over,
+    });
+    const gateway = fakeGateway({
+      'GET /v1/admin/brands': { json: { items: [brand] } },
+      'GET /v1/admin/brands/brd_1/sla-policy': {
+        json: {
+          ...policy,
+          enabled: true,
+          targets: { ...policy.targets, medium: { firstReplyMinutes: 30, nextReplyMinutes: null } },
+        },
+      },
+      'GET /v1/admin/teams': {
+        json: {
+          items: [
+            team('team_care', 'Care'),
+            team('team_old', 'Old', { status: 'archived' }),
+            team('team_far', 'Elsewhere', { workspaceId: 'wsp_2' }),
+            team('team_all', 'Everyone', { workspaceId: null }),
+          ],
+        },
+      },
+      'PUT /v1/admin/brands/brd_1/sla-policy': (call) => ({
+        json: { ...(call.body as object), updatedAt: NOW },
+      }),
+    });
+    await mountStudio({ at: '/hours', permissions: owner, screen: <HoursPage /> });
+    const form = await screen.findByTestId('reply-targets');
+    const user = userEvent.setup();
+    expect(
+      within(form).getByRole('group', { name: 'When a conversation goes past its target' }),
+    ).toBeTruthy();
+    await user.click(within(form).getByLabelText('Alert team leads right away'));
+    await user.click(within(form).getByLabelText('Move it if nobody replies'));
+    const after = within(form).getByLabelText('Move it after') as HTMLInputElement;
+    expect(after.value).toBe('15');
+    // Only teams that can take the brand's conversations are offered.
+    const to = within(form).getByLabelText('Move it to') as HTMLSelectElement;
+    expect([...to.options].map((o) => o.textContent)).toEqual([
+      'The queue (it keeps its team)',
+      'The Care team',
+      'The Everyone team',
+    ]);
+    await user.clear(after);
+    await user.type(after, 'soon');
+    await user.click(within(form).getByRole('button', { name: 'Save targets' }));
+    expect(
+      await within(form).findByText('Move it after: enter a whole number from 1 minute to 7 days.'),
+    ).toBeTruthy();
+    expect(gateway.to('PUT', '/v1/admin/brands/brd_1/sla-policy')).toHaveLength(0);
+    await user.clear(after);
+    await user.type(after, '10');
+    await user.selectOptions(to, 'team_care');
+    await user.click(within(form).getByRole('button', { name: 'Save targets' }));
+    await waitFor(() =>
+      expect(gateway.to('PUT', '/v1/admin/brands/brd_1/sla-policy')[0]?.body).toMatchObject({
+        enabled: true,
+        overdue: {
+          alertLeads: true,
+          moveAfterMinutes: 10,
+          moveTo: { kind: 'team', teamId: 'team_care' },
         },
       }),
     );

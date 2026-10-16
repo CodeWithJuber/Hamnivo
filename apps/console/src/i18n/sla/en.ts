@@ -30,6 +30,7 @@ export const slaEn = {
       ai_limit: 'The AI reached its limit',
       staff_release: 'Put back in the queue',
       channel_ai_off: 'The AI does not answer on this channel',
+      sla_moved: 'Moved: nobody replied in time',
       other: 'Waiting for a person',
     },
   },
@@ -60,6 +61,24 @@ export const slaEn = {
       '{{column}} for {{priority}}: enter a whole number from 1 minute to 7 days, or leave it empty.',
     save: 'Save targets',
     saved: 'Reply-time targets saved for {{name}}.',
+    overdue: {
+      title: 'When a conversation goes past its target',
+      alertLeads: 'Alert team leads right away',
+      alertLeadsHint:
+        'People who can assign the conversation hear it in Studio. Those who are not online get an email, at most one every 15 minutes.',
+      move: 'Move it if nobody replies',
+      moveHint:
+        'It goes back to the queue, or to the team you choose, and is offered to the next person. The customer is not told.',
+      after: 'Move it after',
+      afterUnit: 'Unit for the wait before it is moved',
+      afterHint: 'Counted in business hours after it went past its target.',
+      moveTo: 'Move it to',
+      queue: 'The queue (it keeps its team)',
+      team: 'The {{name}} team',
+      teamGone: 'A team that no longer takes conversations',
+      invalidAfter: 'Move it after: enter a whole number from 1 minute to 7 days.',
+    },
     loading: 'Loading reply-time targets',
   },
+  moved: 'Back in the queue: nobody replied within the reply-time target.',
 } as const;

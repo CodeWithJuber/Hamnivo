@@ -65,6 +65,7 @@ export const inboxAlertsAr: InboxAlertsTranslation = {
   alert: {
     chat_waiting: '{{name}} ينتظر شخصًا',
     sla_overdue: '{{name}} تجاوز هدف وقت الرد',
+    sla_overdue_lead: 'لم يرد أحد على {{name}} في الوقت المحدد',
     chat_offered: 'محادثة {{name}} معروضة عليك: اقبلها أو ارفضها',
     customer_message: 'رسالة جديدة من {{name}}',
     assigned: 'أُسندت إليك محادثة',

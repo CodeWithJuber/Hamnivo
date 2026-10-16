@@ -162,3 +162,41 @@ export function bodyOfTargets(draft: TargetsDraft): SlaTargets {
   }
   return body;
 }
+
+// ------------------------------------------------------------------ overdue conversations
+
+export type SlaOverdue = C.SlaOverdue;
+
+/** What happens to an overdue conversation, as the form shows it (ADR 0016). */
+export interface OverdueDraft {
+  alertLeads: boolean;
+  move: boolean;
+  after: TargetDraft;
+  /** `queue`, or the public id of the team it goes to. */
+  moveTo: string;
+}
+
+/** How long to wait before moving, offered when moving is first turned on. */
+const MOVE_AFTER_DEFAULT = 15;
+
+export function draftOfOverdue(overdue: SlaOverdue): OverdueDraft {
+  return {
+    alertLeads: overdue.alertLeads,
+    move: overdue.moveAfterMinutes !== null,
+    after: draftOfTarget(overdue.moveAfterMinutes ?? MOVE_AFTER_DEFAULT),
+    moveTo: overdue.moveTo.kind === 'team' ? overdue.moveTo.teamId : 'queue',
+  };
+}
+
+/** Moving is on, but the wait is not a whole number from 1 minute to 7 days. */
+export const overdueInvalid = (draft: OverdueDraft) =>
+  draft.move && typeof minutesOfTarget(draft.after) !== 'number';
+
+/** What to save; call only when it is valid. */
+export function bodyOfOverdue(draft: OverdueDraft): SlaOverdue {
+  return {
+    alertLeads: draft.alertLeads,
+    moveAfterMinutes: draft.move ? (minutesOfTarget(draft.after) ?? null) : null,
+    moveTo: draft.moveTo === 'queue' ? { kind: 'queue' } : { kind: 'team', teamId: draft.moveTo },
+  };
+}

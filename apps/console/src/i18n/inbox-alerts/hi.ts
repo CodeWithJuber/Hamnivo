@@ -65,6 +65,7 @@ export const inboxAlertsHi: InboxAlertsTranslation = {
   alert: {
     chat_waiting: '{{name}} किसी व्यक्ति का इंतज़ार कर रहे हैं',
     sla_overdue: '{{name}} के जवाब का समय निकल गया है',
+    sla_overdue_lead: '{{name}} को किसी ने समय पर जवाब नहीं दिया',
     chat_offered: '{{name}} की चैट आपको पेश की गई है: स्वीकार करें या मना करें',
     customer_message: '{{name}} का नया संदेश',
     assigned: 'आपको एक चैट सौंपी गई',

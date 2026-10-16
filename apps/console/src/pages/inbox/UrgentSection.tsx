@@ -29,6 +29,7 @@ const REASONS = new Set([
   'ai_limit',
   'staff_release',
   'channel_ai_off',
+  'sla_moved',
 ]);
 
 function UrgentRow({

@@ -65,6 +65,7 @@ export const inboxAlertsUr: InboxAlertsTranslation = {
   alert: {
     chat_waiting: '{{name}} کسی فرد کا انتظار کر رہے ہیں',
     sla_overdue: '{{name}} کے جواب کا وقت گزر گیا ہے',
+    sla_overdue_lead: '{{name}} کو کسی نے وقت پر جواب نہیں دیا',
     chat_offered: '{{name}} کی چیٹ آپ کو پیش کی گئی ہے: قبول کریں یا انکار کریں',
     customer_message: '{{name}} کا نیا پیغام',
     assigned: 'آپ کو ایک چیٹ سونپی گئی',

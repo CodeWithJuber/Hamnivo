@@ -876,6 +876,8 @@ function OwnershipBanner({ detail }: { detail: InboxDetail }) {
     text = since ? t('inbox.banner.askedSince', { time: since }) : t('inbox.banner.asked');
   } else if (detail.ownerReason === 'staff_release') {
     text = t('inbox.banner.released');
+  } else if (detail.ownerReason === 'sla_moved') {
+    text = t('inbox.sla.moved');
   } else if (detail.ownerReason === 'channel_ai_off') {
     text = t('inbox.banner.channelAiOff');
   } else {
