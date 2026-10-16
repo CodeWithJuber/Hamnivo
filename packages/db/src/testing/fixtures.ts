@@ -670,6 +670,47 @@ async function seedVisitors(
     outcome: 'done',
     actions: ['send_message'],
   });
+  // A customer's data exported, and an erasure's receipt and tombstone (A10).
+  const exportId = newId();
+  await tx.insert(s.privacyRequests).values({
+    id: exportId,
+    tenantId,
+    kind: 'export',
+    brandId: ref.brandId,
+    principalId: ref.principalId,
+    state: 'completed',
+    reason: 'access_request',
+    requestedBy: ref.staffMemberId,
+    counts: { conversations: 1 },
+    completedAt: new Date(),
+  });
+  await tx.insert(s.privacyFiles).values({
+    tenantId,
+    requestId: exportId,
+    raw: Buffer.from('PK'),
+    sha256: '0'.repeat(64),
+    byteSize: 2,
+    purgeAfter: inDays(1),
+  });
+  const erasureId = newId();
+  await tx.insert(s.privacyRequests).values({
+    id: erasureId,
+    tenantId,
+    kind: 'erase',
+    brandId: ref.brandId,
+    principalId: newId(),
+    state: 'completed',
+    reason: 'erasure_request',
+    requestedBy: ref.staffMemberId,
+    completedAt: new Date(),
+  });
+  await tx.insert(s.erasureTombstones).values({
+    tenantId,
+    requestId: erasureId,
+    brandId: ref.brandId,
+    principalId: newId(),
+    fingerprints: ['1:seeded'],
+  });
 }
 
 /**

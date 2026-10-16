@@ -431,6 +431,11 @@ export const customerPrincipals = pgTable(
     channelHandle: citext('channel_handle'),
     createdAt: createdAt(),
     lastSeenAt: tstz('last_seen_at'),
+    /**
+     * Erased on request (A10): what identified the customer is cleared and only this stub is
+     * left, because orders, which are accounting records, still point at it.
+     */
+    erasedAt: tstz('erased_at'),
   },
   (t) => [
     unique('customer_principals_tenant_id_id_key').on(t.tenantId, t.id),

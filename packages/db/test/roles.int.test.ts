@@ -90,6 +90,7 @@ describe('database roles', () => {
     expect(definers.map((r) => r.fn).sort()).toEqual(
       [
         'app.active_plans()',
+        'app.apply_erasure_tombstones()',
         'app.apply_memory_tombstones()',
         'app.billing_account_tenant(text,text,text)',
         'app.claim_commerce_events(integer,integer)',
@@ -101,6 +102,7 @@ describe('database roles', () => {
         'app.claim_webhook_deliveries(integer,integer)',
         'app.due_web_syncs(integer,timestamp with time zone)',
         'app.ensure_audit_partitions(integer)',
+        'app.erase_customer(uuid)',
         'app.ensure_reconcile_cursors()',
         'app.expired_actions(integer,timestamp with time zone)',
         'app.expired_memory_subjects(integer)',
@@ -112,6 +114,7 @@ describe('database roles', () => {
         'app.purge_expired(integer)',
         'app.purge_migration_files(integer)',
         'app.purge_outbox_events(integer)',
+        'app.purge_privacy_files(integer)',
         'app.purge_sla_outcomes(integer)',
         'app.purge_visitor_blocks(integer)',
         'app.purge_visitors(integer)',

@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { SelectField } from '../../components/Fields';
 import { GuideLink } from '../../components/GuideLink';
 import { PageHeader, Section } from '../../components/PageHeader';
+import { CustomerData } from '../../components/privacy/CustomerData';
+import { PrivacyRequests } from '../../components/privacy/PrivacyRequests';
 import { ActionError, Forbidden, QueryState } from '../../components/States';
 import { DOCS } from '../../lib/docs';
 import { formatDate, formatDateTime, formatNumber } from '../../lib/format';
@@ -22,11 +24,16 @@ import {
 import { isCancelled } from '../../lib/reauth';
 import { useTenant } from '../../lib/tenant';
 
-/** Settings → Privacy: how long the workspace keeps conversations (A10). Owners only. */
+/**
+ * Settings → Privacy (A10): how long the workspace keeps conversations (owners), and one
+ * customer's data on request (whoever may export or erase customers).
+ */
 export function PrivacyPage() {
   const { t } = useTranslation();
   const { can } = useTenant();
-  if (!can('privacy.manage')) {
+  const retention = can('privacy.manage');
+  const customers = can('customers.export') || can('customers.erase');
+  if (!retention && !customers) {
     return (
       <div className="flex flex-col gap-6">
         <PageHeader title={t('privacy.title')} />
@@ -37,7 +44,9 @@ export function PrivacyPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={t('privacy.title')} description={t('privacy.description')} />
-      <Retention />
+      {retention ? <Retention /> : null}
+      {customers ? <CustomerData /> : null}
+      {customers ? <PrivacyRequests /> : null}
     </div>
   );
 }

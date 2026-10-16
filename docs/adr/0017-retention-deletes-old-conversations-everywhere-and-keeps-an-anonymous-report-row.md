@@ -73,4 +73,4 @@ Three things make deleting a conversation more than one `DELETE`:
   days of silence, can lose that message.
 - Data already sent elsewhere is out of reach: webhook deliveries to the business's systems and
   transcripts already emailed.
-- Customer export and erasure on request follow in a second step (A10, part 2).
+- Customer export and erasure on request are ADR 0018.

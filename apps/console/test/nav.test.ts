@@ -106,7 +106,8 @@ describe('the menu', () => {
       '/customer-identity': 'widget.identity_keys',
       '/migration': 'migration.review',
       '/settings/billing': ['billing.read', 'settings.manage'],
-      '/settings/privacy': 'privacy.manage',
+      // Retention for owners; one customer's data for whoever may export or erase customers.
+      '/settings/privacy': ['privacy.manage', 'customers.export', 'customers.erase'],
     });
   });
 
@@ -236,11 +237,8 @@ describe('who sees which entry', () => {
     };
     const home = { home: ['/overview'] };
     expect(pagesOf('owner')).toEqual(everything);
-    // How long conversations are kept is the owners' call (A10).
-    expect(pagesOf('admin')).toEqual({
-      ...everything,
-      settings: everything.settings.filter((page) => page !== '/settings/privacy'),
-    });
+    // Administrators reach Privacy for one customer's data; retention stays the owners' (A10).
+    expect(pagesOf('admin')).toEqual(everything);
     expect(pagesOf('supervisor')).toEqual({
       ...everything,
       ai: everything.ai.filter((page) => page !== '/models'),

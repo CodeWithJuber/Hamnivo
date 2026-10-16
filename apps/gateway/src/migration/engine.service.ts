@@ -35,13 +35,27 @@ import {
   writePackage,
 } from '@hamnivo/migration-sdk';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { and, asc, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import {
+  and,
+  arrayOverlaps,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { fileTypeFromBuffer } from 'file-type';
 import { AuthorityRegistry } from '../authority/registry.js';
 import type { AppConfig } from '../config.js';
 import { SCANNER } from '../knowledge/ingestion.service.js';
 import type { Scanner } from '../knowledge/scanner.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
+import { IdentityFingerprints } from '../privacy/identity-fingerprints.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, EGRESS_RESOLVER } from '../tokens.js';
 import { readChatwootHistory } from './chatwoot-source.js';
@@ -134,6 +148,7 @@ export class MigrationEngine {
     @Inject(SCANNER) private readonly scanner: Scanner,
     private readonly registry: AuthorityRegistry,
     private readonly secrets: SecretBroker,
+    private readonly fingerprints: IdentityFingerprints,
     @Optional() @Inject(EGRESS_RESOLVER) private readonly resolver?: Resolver,
   ) {}
 
@@ -1003,6 +1018,32 @@ export class MigrationEngine {
     await this.update(ctx.tenantId, ctx.job.id, { leaseUntil: new Date(now + LEASE_MS) });
   }
 
+  /** Whether an erasure tombstone of the brand recognises this person (A10). */
+  private async erased(ctx: Context, contact: ContactRecord): Promise<boolean> {
+    const fingerprints = this.fingerprints.all(
+      { tenantId: ctx.tenantId, brandId: ctx.job.brandId },
+      {
+        subject: contact.verified?.subject ?? null,
+        email: contact.unverified.email ?? null,
+        phone: contact.unverified.phone ?? null,
+      },
+    );
+    if (fingerprints.length === 0) return false;
+    const [found] = await this.tx(ctx.tenantId, (tx) =>
+      tx
+        .select({ id: schema.erasureTombstones.id })
+        .from(schema.erasureTombstones)
+        .where(
+          and(
+            eq(schema.erasureTombstones.brandId, ctx.job.brandId),
+            arrayOverlaps(schema.erasureTombstones.fingerprints, fingerprints),
+          ),
+        )
+        .limit(1),
+    );
+    return Boolean(found);
+  }
+
   /** The Chatwoot contact for a source contact: reused, looked up after a timeout, or created. */
   private async ensureContact(ctx: Context, contactSourceId: string): Promise<number | null> {
     const { tenantId, job } = ctx;
@@ -1053,6 +1094,12 @@ export class MigrationEngine {
         });
         return Number(mapping.targetRef);
       }
+    }
+
+    // A customer erased on request stays erased: their history is not imported again (A10).
+    if (await this.erased(ctx, contact)) {
+      await this.setItem(tenantId, item.id, { status: 'skipped', reason: 'erased' });
+      return null;
     }
 
     const identifier = importContactIdentifier(ctx.jobKey, key);
