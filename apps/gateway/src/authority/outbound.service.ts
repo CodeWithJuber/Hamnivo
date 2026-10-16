@@ -51,6 +51,8 @@ export interface OutboundInput {
   attachments?: () => OutgoingAttachment[];
   /** Loads (and authorizes) the conversation inside the reservation transaction. */
   load: (tx: TenantTx) => Promise<ControlRow>;
+  /** False for a message that asks for no answer (a customer's reaction, W22). */
+  expectsReply?: boolean;
   /** Runs in the commit transaction, only for the call that committed the message. */
   onCommitted?: (tx: TenantTx, control: ControlRow, ledgerId: string) => Promise<void>;
 }
@@ -119,6 +121,7 @@ export class OutboundMessagesService {
           clientMessageId: input.clientMessageId,
           requestHash: input.requestHash,
           sourceKey: `hv1:${input.visibility === 'private' ? 'n' : 'm'}:${ledgerId}`,
+          expectsReply: input.expectsReply ?? true,
         })
         .onConflictDoNothing()
         .returning();

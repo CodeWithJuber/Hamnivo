@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { LanguageModelV4 } from '@ai-sdk/provider';
 import { createMockModel } from '@hamnivo/adapters/models';
-import { fromPublicId, schema, withTenant } from '@hamnivo/db';
-import { eq } from 'drizzle-orm';
+import { fromPublicId, newId, schema, withTenant } from '@hamnivo/db';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { StaffConversationsService } from '../src/conversations/staff-conversations.service.js';
+import { fitDraftText, newerCustomerMessage } from '../src/inbox/ai-drafts.js';
 import type { Client } from './harness.js';
 import { audits, authority, customerStarts, join, type Shop } from './inbox-support.js';
 import { connectedTenant, type Slice, startSlice, type Visitor } from './slice-harness.js';
@@ -367,5 +369,248 @@ describe('who may decide', () => {
       code: 'AI_DRAFT_CLOSED',
       aiDraft: { state: 'superseded', decidedBy: null },
     });
+  });
+});
+
+describe('races and limits', () => {
+  it('keeps no draft for a message a person answered while it was being written', async () => {
+    answering.state.answer = 'Yes, we ship to Karachi.';
+    const { conversationId: id } = await customerStarts(slice, shop, 'Do you ship to Karachi?');
+    // Amina answers before the drafting job has run.
+    const sent = await amina.client.post(`/v1/conversations/${id}/messages`, {
+      clientMessageId: randomUUID(),
+      text: 'Yes, we do, in three days.',
+      visibility: 'public',
+    });
+    expect(sent.status, JSON.stringify(sent.body)).toBe(202);
+    // The customer's message was processed late, by a clock ahead of Chatwoot's: only Chatwoot's
+    // order of messages says the reply came after it.
+    await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .update(schema.messageLedger)
+        .set({ committedAt: new Date('2031-01-01T00:00:00Z') })
+        .where(
+          and(
+            eq(schema.messageLedger.conversationId, fromPublicId('conversation', id)),
+            eq(schema.messageLedger.senderKind, 'customer'),
+          ),
+        ),
+    );
+    await slice.drain();
+    answering.state.answer = null;
+    expect((await drafts(id)).pending).toBeNull();
+    expect(await publicTexts(id)).toEqual(['Yes, we do, in three days.']);
+  });
+
+  it('still drafts an answer to a question when the customer then reacts to a reply', async () => {
+    const chat = await asks('Hello, anyone there?');
+    const hello = await amina.client.post(`/v1/conversations/${chat.id}/messages`, {
+      clientMessageId: randomUUID(),
+      text: 'Hi, how can I help?',
+      visibility: 'public',
+    });
+    expect(hello.status, JSON.stringify(hello.body)).toBe(202);
+    await slice.drain();
+    const history = await chat.visitor.call(
+      'GET',
+      `/v1/widget/conversations/${chat.id}/messages?limit=100`,
+    );
+    const reply = (history.body.items as { id: string; sender: { kind: string } }[]).find(
+      (m) => m.sender.kind === 'human_agent',
+    );
+    expect(reply).toBeDefined();
+    // A question, then a reaction to the earlier reply, before the question's draft is written.
+    answering.state.answer = 'Yes, by card or cash on delivery.';
+    const asked = await chat.visitor.call('POST', `/v1/widget/conversations/${chat.id}/messages`, {
+      clientMessageId: randomUUID(),
+      parts: [{ type: 'text', text: 'Can I pay by card?' }],
+    });
+    expect(asked.status, JSON.stringify(asked.body)).toBe(202);
+    const reacted = await chat.visitor.call(
+      'POST',
+      `/v1/widget/conversations/${chat.id}/messages/${reply?.id}/reactions`,
+      { clientMessageId: randomUUID(), emoji: '👍' },
+    );
+    expect(reacted.status, JSON.stringify(reacted.body)).toBe(202);
+    answering.state.prompts.length = 0;
+    await slice.drain();
+    answering.state.answer = null;
+    expect((await pending(chat.id)).text).toBe('Yes, by card or cash on delivery.');
+    // The model answered the question: the reaction is not what the customer said last.
+    const prompt = answering.state.prompts.at(-1) ?? '';
+    expect(prompt).toContain('Can I pay by card?');
+    expect(prompt).not.toContain('👍');
+  });
+
+  it('orders customer messages as they were committed, and does not count reactions', async () => {
+    const chat = await asks('First question');
+    const conversationId = fromPublicId('conversation', chat.id);
+    const [principal] = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .select({ id: schema.conversationControls.principalId })
+        .from(schema.conversationControls)
+        .where(eq(schema.conversationControls.id, conversationId)),
+    );
+    const ledger = (createdAt: string, committedAt: string, expectsReply = true) => {
+      const id = newId();
+      return {
+        id,
+        tenantId,
+        conversationId,
+        senderKind: 'customer' as const,
+        senderId: principal?.id ?? 'customer',
+        clientMessageId: randomUUID(),
+        requestHash: createHash('sha256').update(id).digest(),
+        state: 'committed' as const,
+        sourceKey: `hv1:m:${id}`,
+        expectsReply,
+        createdAt: new Date(createdAt),
+        committedAt: new Date(committedAt),
+      };
+    };
+    // Sent first but committed last (retried after a failure), and the other way round.
+    const retried = ledger('2030-01-01T10:00:00Z', '2030-01-01T10:05:00Z');
+    const meanwhile = ledger('2030-01-01T10:01:00Z', '2030-01-01T10:02:00Z');
+    const reaction = ledger('2030-01-01T10:06:00Z', '2030-01-01T10:06:00Z', false);
+    // With Chatwoot ids, Chatwoot's order decides: this one reached Chatwoot first and was only
+    // confirmed late.
+    const lateConfirmed = {
+      ...ledger('2030-01-02T10:00:00Z', '2030-01-02T10:09:00Z'),
+      authorityMessageId: 9_000_001,
+    };
+    const after = {
+      ...ledger('2030-01-02T10:01:00Z', '2030-01-02T10:02:00Z'),
+      authorityMessageId: 9_000_002,
+    };
+    await withTenant(slice.app, { tenantId }, async (tx) => {
+      await tx
+        .insert(schema.messageLedger)
+        .values([retried, meanwhile, reaction, lateConfirmed, after]);
+      expect(await newerCustomerMessage(tx, conversationId, meanwhile.id)).toBe(true);
+      expect(await newerCustomerMessage(tx, conversationId, retried.id)).toBe(true);
+      expect(await newerCustomerMessage(tx, conversationId, lateConfirmed.id)).toBe(true);
+      expect(await newerCustomerMessage(tx, conversationId, after.id)).toBe(false);
+      // Rolled back: these rows exist only for this check.
+      tx.rollback();
+    }).catch((error: unknown) => {
+      if (!String(error).includes('Rollback')) throw error;
+    });
+  });
+
+  it('cuts an over-long reply to fit, at a sentence, rather than losing it', async () => {
+    const sentence = 'Your parcel is safe with us and will arrive soon. ';
+    answering.state.answer = sentence.repeat(260);
+    const chat = await asks('Tell me everything about delivery.');
+    answering.state.answer = null;
+    const draft = await pending(chat.id);
+    expect(draft.text.length).toBeLessThanOrEqual(10_000);
+    expect(draft.text).toMatch(/soon\.…$/);
+    expect(fitDraftText('short')).toBe('short');
+    // Never half an emoji, even with nowhere better to cut.
+    const emoji = fitDraftText('😀'.repeat(6000));
+    expect(emoji.length).toBeLessThanOrEqual(10_000);
+    expect(emoji.endsWith('😀…')).toBe(true);
+  });
+
+  it('records nothing when the reviewer could not take the conversation over to send it', async () => {
+    const roles = await shop.owner.post('/v1/admin/roles', {
+      key: 'replier',
+      name: 'Replier',
+      permissions: ['conversations.read', 'conversations.reply'],
+    });
+    expect(roles.status, JSON.stringify(roles.body)).toBe(201);
+    const replier = await join(slice, shop, 'Rami Replier', 'replier');
+    answering.state.answer = 'We open at nine.';
+    const chat = await asks('When do you open?');
+    answering.state.answer = null;
+    const draft = await pending(chat.id);
+    const refused = await replier.client.post(inbox(chat.id, `/ai-drafts/${draft.id}/approve`), {
+      clientRequestId: randomUUID(),
+      expectedEpoch: await epochOf(chat.id, replier.client),
+    });
+    expect(refused.status).toBe(403);
+    expect((await pending(chat.id)).state).toBe('pending');
+    expect(await publicTexts(chat.id)).toEqual([]);
+    // Someone who may take it over still can.
+    const approved = await amina.client.post(inbox(chat.id, `/ai-drafts/${draft.id}/approve`), {
+      clientRequestId: randomUUID(),
+      expectedEpoch: await epochOf(chat.id),
+    });
+    expect(approved.status, JSON.stringify(approved.body)).toBe(200);
+  });
+
+  it('keeps an approved reply to retry when a colleague takes the conversation before it is sent', async () => {
+    answering.state.answer = 'We are open on Saturdays.';
+    const chat = await asks('Are you open on Saturday?');
+    answering.state.answer = null;
+    const draft = await pending(chat.id);
+    const clientRequestId = randomUUID();
+    // Rayan claims the conversation between the decision and the send.
+    const staff = slice.gw.app.get(StaffConversationsService);
+    const send = staff.send.bind(staff);
+    staff.send = async (...args) => {
+      staff.send = send;
+      const epoch = await epochOf(chat.id, rayan.client);
+      const claimed = await rayan.client.post(inbox(chat.id, '/assign'), {
+        to: { kind: 'me' },
+        expectedEpoch: epoch,
+      });
+      expect(claimed.status, JSON.stringify(claimed.body)).toBe(200);
+      return send(...args);
+    };
+    const refused = await amina.client.post(inbox(chat.id, `/ai-drafts/${draft.id}/approve`), {
+      clientRequestId,
+      expectedEpoch: await epochOf(chat.id),
+    });
+    staff.send = send;
+    expect(refused.status).toBe(409);
+    expect(refused.body.code).toBe('OWNERSHIP_CHANGED');
+    // Not sent, and not lost: it waits with Amina's failed sends.
+    expect(await publicTexts(chat.id)).toEqual([]);
+    const kept = await amina.client.get(inbox(chat.id, '/drafts'));
+    expect(kept.body.outgoing).toEqual([
+      expect.objectContaining({
+        clientMessageId: clientRequestId,
+        text: 'We are open on Saturdays.',
+        state: 'failed',
+        errorCode: 'OWNERSHIP_CHANGED',
+      }),
+    ]);
+  });
+
+  it('keeps an approved reply to retry when the send fails after the decision', async () => {
+    answering.state.answer = 'We close at six on Fridays.';
+    const chat = await asks('When do you close on Friday?');
+    answering.state.answer = null;
+    const draft = await pending(chat.id);
+    const clientRequestId = randomUUID();
+    const request = { clientRequestId, expectedEpoch: await epochOf(chat.id) };
+    slice.fake.setResponseFault((method, url) =>
+      method === 'POST' && /\/conversations\/\d+\/messages$/.test(url) ? 503 : null,
+    );
+    const failed = await amina.client.post(
+      inbox(chat.id, `/ai-drafts/${draft.id}/approve`),
+      request,
+    );
+    slice.fake.setResponseFault(null);
+    expect(failed.status).toBe(503);
+    const kept = await amina.client.get(inbox(chat.id, '/drafts'));
+    expect(kept.body.outgoing).toEqual([
+      expect.objectContaining({
+        clientMessageId: clientRequestId,
+        lane: 'public',
+        text: 'We close at six on Fridays.',
+        state: 'failed',
+      }),
+    ]);
+    // The same request again sends it, once.
+    const retried = await amina.client.post(
+      inbox(chat.id, `/ai-drafts/${draft.id}/approve`),
+      request,
+    );
+    expect(retried.status, JSON.stringify(retried.body)).toBe(200);
+    await slice.drain();
+    expect(await publicTexts(chat.id)).toEqual(['We close at six on Fridays.']);
+    expect((await amina.client.get(inbox(chat.id, '/drafts'))).body.outgoing).toEqual([]);
   });
 });

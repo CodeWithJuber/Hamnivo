@@ -8,7 +8,7 @@ import type {
 } from '@hamnivo/contracts';
 import { appendAudit, fromPublicId, schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import { type AiDraftRefusal, checkAiDraftDecision, draftOutcome } from '@hamnivo/domain';
-import type { StaffPrincipal } from '@hamnivo/policy';
+import type { ResourceScope, StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import type { z } from 'zod';
@@ -18,8 +18,10 @@ import { type ControlRow, currentOwnerOf } from '../authority/ownership.service.
 import type { SourceRef } from '../authority/views.js';
 import { AppError } from '../common/app-error.js';
 import { StaffConversationsService } from '../conversations/staff-conversations.service.js';
+import { enforce } from '../identity/staff.guard.js';
 import { CLOCK, type Clock } from '../tokens.js';
 import { InboxAccess } from './access.js';
+import { DraftsService } from './drafts.service.js';
 
 type DraftRow = typeof schema.aiDrafts.$inferSelect;
 
@@ -29,13 +31,17 @@ const sha256 = (text: string) => createHash('sha256').update(text).digest();
  * Reviewing AI drafts (HNV-09-05): the pending draft of a conversation and how the last one ended;
  * approving (as written or edited) sends it as the reviewer through the normal staff send, with
  * the same rules about who may reply; rejecting records why and sends nothing. A decision is taken
- * once, under the conversation's lock: a second reviewer is told who decided first.
+ * once, under the conversation's lock: a second reviewer is told who decided first. Everything the
+ * send would refuse is checked before the decision is kept, and the reply is kept with the
+ * reviewer's outgoing messages in the same transaction, so a send that fails after it stays to be
+ * retried rather than lost.
  */
 @Injectable()
 export class AiDraftsService {
   constructor(
     private readonly access: InboxAccess,
     private readonly staff: StaffConversationsService,
+    private readonly drafts: DraftsService,
     private readonly journal: JournalService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -71,7 +77,12 @@ export class AiDraftsService {
   ): Promise<AiDraftDecisionResult> {
     const me = principal.staffMemberId;
     const decided = await this.access.tx(principal, async (tx) => {
-      const { control, draft } = await this.lockDraft(tx, principal, conversationId, draftPublicId);
+      const { control, draft, resource } = await this.lockDraft(
+        tx,
+        principal,
+        conversationId,
+        draftPublicId,
+      );
       const prior = await this.priorDecision(tx, input.clientRequestId, draft.id, me);
       if (prior) {
         // The same request again: its text must be the one decided, and it sends once.
@@ -81,7 +92,7 @@ export class AiDraftsService {
             detail: 'This request was already used to send a different text.',
           });
         }
-        return { draft, text: sent, replay: true };
+        return { draft, text: sent, replay: true, conversation: control.id };
       }
       await this.refuseUnlessOpen(tx, control, draft, me);
       if (input.expectedEpoch !== control.ownershipEpoch) {
@@ -91,6 +102,10 @@ export class AiDraftsService {
         });
       }
       await assertReplyWindow(tx, control, this.clock());
+      // A reply from someone who does not have the conversation yet takes it over, as any reply.
+      if (!(control.ownerMode === 'HUMAN_ACTIVE' && control.ownerStaffId === me)) {
+        enforce(this.access.decide(principal, 'conversations.takeover', resource));
+      }
       const outcome = draftOutcome(draft.text, input.text);
       const text = outcome === 'edited' && input.text ? input.text : draft.text;
       await this.record(tx, principal, control, draft, {
@@ -99,20 +114,51 @@ export class AiDraftsService {
         clientMessageId: input.clientRequestId,
         clientRequestId: input.clientRequestId,
       });
-      return { draft, text, replay: false };
+      // Kept with the reviewer's outgoing messages now: whatever happens to the send, the reply
+      // is never lost.
+      await this.drafts.startOutgoing(tx, {
+        tenantId: principal.tenantId,
+        conversationId: control.id,
+        staffMemberId: me,
+        lane: 'public',
+        clientMessageId: input.clientRequestId,
+        text,
+        clearDraft: false,
+      });
+      return { draft, text, replay: false, conversation: control.id };
     });
     // Sent as the reviewer, the way any reply is: a public reply takes the conversation over, and
-    // the request id is the message's, so a retry sends nothing twice. A failure after this point
+    // the request id is the message's, so a retry sends nothing twice. Any failure after this point
     // stays in the reviewer's failed sends, with Retry, like any send that did not go through.
-    const message = await this.staff.send(principal, conversationId, {
-      clientMessageId: input.clientRequestId,
-      text: decided.text,
-      visibility: 'public',
-      clearDraft: false,
-      suggestionId: toPublicId('run', decided.draft.runId),
-      // A retry comes after the first attempt took the conversation over: the epoch moved on.
-      ...(decided.replay ? {} : { expectedEpoch: input.expectedEpoch }),
-    });
+    let message: Awaited<ReturnType<StaffConversationsService['send']>>;
+    try {
+      message = await this.staff.send(
+        principal,
+        conversationId,
+        {
+          clientMessageId: input.clientRequestId,
+          text: decided.text,
+          visibility: 'public',
+          clearDraft: false,
+          suggestionId: toPublicId('run', decided.draft.runId),
+          // A retry comes after the first attempt took the conversation over: the epoch moved on.
+          ...(decided.replay ? {} : { expectedEpoch: input.expectedEpoch }),
+        },
+        { keepFailed: true },
+      );
+    } catch (error) {
+      // Also when the send refused before it started (a colleague took the conversation).
+      await this.drafts
+        .failOutgoing(
+          principal,
+          decided.conversation,
+          input.clientRequestId,
+          error instanceof AppError ? error.code : 'INTERNAL',
+        )
+        .catch(() => undefined);
+      await this.journal.signalInbox(principal.tenantId, decided.draft.conversationId);
+      throw error;
+    }
     await this.journal.signalInbox(principal.tenantId, decided.draft.conversationId);
     return {
       draft: await this.access.tx(principal, (tx) => this.view(tx, decided.draft.id)),
@@ -151,8 +197,8 @@ export class AiDraftsService {
     principal: StaffPrincipal,
     conversationId: string,
     draftPublicId: string,
-  ): Promise<{ control: ControlRow; draft: DraftRow }> {
-    const { control } = await this.access.authorized(
+  ): Promise<{ control: ControlRow; draft: DraftRow; resource: ResourceScope }> {
+    const { control, resource } = await this.access.authorized(
       tx,
       principal,
       conversationId,
@@ -170,7 +216,7 @@ export class AiDraftsService {
       )
       .for('update');
     if (!draft) throw new AppError('NOT_FOUND', { detail: 'Draft not found.' });
-    return { control, draft };
+    return { control, draft, resource };
   }
 
   /** The decision a request already made, when it is repeated; another draft's is a conflict. */

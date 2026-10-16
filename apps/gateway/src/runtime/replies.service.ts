@@ -24,11 +24,12 @@ import {
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { generateText, isStepCount, type ToolSet } from 'ai';
 import canonicalize from 'canonicalize';
-import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { TOOL_DATA_CLASS } from '../actions/answer-cache.js';
 import { ActionApprovals } from '../actions/approvals.service.js';
 import { type RunTools, ToolGateway } from '../actions/gateway.service.js';
 import { HandoffPackets } from '../actions/handoff.service.js';
+import { reactionOf } from '../authority/extended-parts.js';
 import { type JournalEntry, JournalService } from '../authority/journal.service.js';
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
 import { PublicationsService } from '../authority/publications.service.js';
@@ -51,7 +52,7 @@ import {
 import { claimedLiveData, conversationLiveData } from '../commerce/answer-cache.js';
 import { CLAIM_CORRECTION, checkReplyClaims } from '../commerce/claims.js';
 import { AppError } from '../common/app-error.js';
-import { storeAiDraft } from '../inbox/ai-drafts.js';
+import { newerCustomerMessage, storeAiDraft } from '../inbox/ai-drafts.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
 import { LanguageService } from '../language/language.service.js';
 import { citeMemories, memoryBlock } from '../memory/prompt.js';
@@ -371,22 +372,9 @@ export class RepliesService {
     telemetry: Omit<Parameters<RunsService['finish']>[2], 'outcome' | 'state'> = {},
   ): Promise<boolean> {
     return this.tx(tenantId, async (tx) => {
-      const l = schema.messageLedger;
-      // Compared in SQL: timestamps read into JavaScript lose their microseconds.
-      const [newer] = await tx
-        .select({ id: l.id })
-        .from(l)
-        .where(
-          and(
-            eq(l.conversationId, payload.conversationId),
-            eq(l.senderKind, 'customer'),
-            eq(l.state, 'committed'),
-            ne(l.id, payload.ledgerId),
-            sql`${l.createdAt} > (select m.created_at from message_ledger m where m.id = ${payload.ledgerId})`,
-          ),
-        )
-        .limit(1);
-      if (!newer) return false;
+      if (!(await newerCustomerMessage(tx, payload.conversationId, payload.ledgerId))) {
+        return false;
+      }
       await this.runs.step(tx, tenantId, runId, {
         kind: 'decision',
         name: 'superseded',
@@ -1754,33 +1742,44 @@ export class RepliesService {
       outputTokens: draft.outputTokens,
       latencyMs: draft.latencyMs,
     };
-    const kept = await this.tx(tenantId, async (tx) => {
-      const stored = await storeAiDraft(tx, {
-        tenantId,
-        conversationId: control.id,
-        runId: run.id,
-        agentId: agent.profile.id,
-        agentVersionId: agent.version.id,
-        triggerLedgerId: payload.ledgerId,
-        text: draft.text,
-        sources: draft.sources,
-        language: chosen.resolution.language,
-        now: this.clock(),
-      });
-      if (stored === 'not_needed') {
-        // The AI took the conversation back, it was resolved or the customer wrote again.
-        await this.runs.step(tx, tenantId, run.id, {
-          kind: 'decision',
-          name: 'draft_not_needed',
-          status: 'ok',
+    let kept: boolean;
+    try {
+      kept = await this.tx(tenantId, async (tx) => {
+        const stored = await storeAiDraft(tx, {
+          tenantId,
+          conversationId: control.id,
+          runId: run.id,
+          agentId: agent.profile.id,
+          agentVersionId: agent.version.id,
+          triggerLedgerId: payload.ledgerId,
+          text: draft.text,
+          sources: draft.sources,
+          language: chosen.resolution.language,
+          now: this.clock(),
         });
-        await this.finishWithUsage(tx, tenantId, run.id, 'skipped', telemetry);
-        await this.runs.finish(tx, run.id, { outcome: 'skipped', state: 'skipped' });
-        return false;
-      }
-      await this.finishWithUsage(tx, tenantId, run.id, 'drafted', telemetry);
-      return stored === 'stored';
-    });
+        if (stored === 'not_needed') {
+          // The AI took the conversation back, it was resolved or the customer wrote again.
+          await this.runs.step(tx, tenantId, run.id, {
+            kind: 'decision',
+            name: 'draft_not_needed',
+            status: 'ok',
+          });
+          await this.finishWithUsage(tx, tenantId, run.id, 'skipped', telemetry);
+          await this.runs.finish(tx, run.id, { outcome: 'skipped', state: 'skipped' });
+          return false;
+        }
+        await this.finishWithUsage(tx, tenantId, run.id, 'drafted', telemetry);
+        return stored === 'stored';
+      });
+    } catch (error) {
+      // The model was already paid for: the run ends and its tokens are counted even when the
+      // draft cannot be kept, so the job is not retried into another model call.
+      this.logger.warn(`draft for run ${run.id} not kept: ${String(error)}`);
+      await this.tx(tenantId, (tx) =>
+        this.finishWithUsage(tx, tenantId, run.id, 'error', telemetry),
+      );
+      return;
+    }
     if (kept) await this.journal.signalInbox(tenantId, control.id);
   }
 
@@ -1814,12 +1813,12 @@ export class RepliesService {
         contactSourceId: this.contacts.sourceIdOf(tenantId, contact.contact),
         inboxRef: String(contact.inbox.externalInboxId),
       });
-      return { messages, view: 'customer' };
+      return { messages: messages.filter((m) => !reactionOf(m)), view: 'customer' };
     }
     // Conversations from other channels have no Hamnivo contact; private notes are removed here.
     const messages = await runtime.authority.listMessages(ref, { view: 'staff' });
     return {
-      messages: messages.filter((m) => !m.private && m.direction !== 'activity'),
+      messages: messages.filter((m) => !m.private && m.direction !== 'activity' && !reactionOf(m)),
       view: 'staff_filtered',
     };
   }
@@ -2056,8 +2055,8 @@ export class RepliesService {
   }
 
   /**
-   * Passages from the agent's knowledge for the customer's latest words (G05). Customer answers
-   * draw only on public sources; assist mode may use internal ones.
+   * Passages from the agent's knowledge for the customer's latest words (G05). Replies and drafts
+   * alike draw only on public sources: a draft is sent to the customer as written once approved.
    */
   private async retrieve(
     tenantId: string,

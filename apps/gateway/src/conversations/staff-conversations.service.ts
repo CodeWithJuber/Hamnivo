@@ -189,6 +189,8 @@ export class StaffConversationsService {
     principal: StaffPrincipal,
     publicId: string,
     input: z.output<typeof StaffMessageRequest>,
+    /** `keepFailed`: keep every failure to retry, refusals too (an approved AI draft, HNV-09-05). */
+    options: { keepFailed?: boolean } = {},
   ) {
     const internal = input.visibility === 'internal';
     const permission: Permission = internal ? 'conversations.note' : 'conversations.reply';
@@ -307,7 +309,7 @@ export class StaffConversationsService {
     } catch (error) {
       const code = error instanceof AppError ? error.code : 'INTERNAL';
       // A failed template is not kept to retry as text: the picker resends it, with the same id.
-      if (KEPT.has(code) && !prepared) {
+      if ((KEPT.has(code) || options.keepFailed) && !prepared) {
         await this.drafts
           .failOutgoing(principal, control.id, input.clientMessageId, code)
           .catch(() => undefined);

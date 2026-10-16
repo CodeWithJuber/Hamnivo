@@ -463,6 +463,13 @@
       "when": 1792081075034,
       "tag": "20261015161755_offers_security",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1792086290862,
+      "tag": "20261015174450_ledger_expects_reply",
+      "breakpoints": true
     }
   ]
 }

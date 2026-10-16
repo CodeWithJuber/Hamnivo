@@ -19,7 +19,7 @@ import {
   useAiDrafts,
 } from '../../lib/ai-drafts';
 import { isApiError } from '../../lib/api';
-import { type InboxDetail, newClientId, useConversationChange } from '../../lib/inbox';
+import { type InboxDetail, newClientId, useConversationChange, useDrafts } from '../../lib/inbox';
 import { isCancelled } from '../../lib/reauth';
 import { useReplyWindow } from './Composer';
 import { ownership } from './ConversationPane';
@@ -109,7 +109,8 @@ function RejectDialog({
             missing
               ? [
                   {
-                    fieldId: 'reject-reason',
+                    // The first radio: ChoiceField gives each one the id `${id}-${value}`.
+                    fieldId: `reject-reason-${REJECT_REASONS[0]}`,
                     message: t('inbox.aiDrafts.rejectDialog.reasonMissing'),
                   },
                 ]
@@ -160,8 +161,31 @@ function RejectDialog({
   );
 }
 
+/**
+ * A send from the pending card: under way while `failure` is null, then failed. `requestId` is the
+ * approve's clientRequestId, which is also the reply's clientMessageId in the reviewer's outgoing
+ * messages (the reply box's failed sends).
+ */
+interface Send {
+  draft: AiDraft;
+  requestId: string;
+  failure: unknown;
+}
+
 /** The pending draft: its words and sources, and what the reviewer can do with it. */
-function PendingDraft({ detail, draft }: { detail: InboxDetail; draft: AiDraft }) {
+function PendingDraft({
+  detail,
+  draft,
+  sending,
+  onSend,
+}: {
+  detail: InboxDetail;
+  draft: AiDraft;
+  /** The reply is still being sent though this card's request has ended: shown as under way. */
+  sending: boolean;
+  /** Where the latest send stands; null once it went, or failed without deciding anything. */
+  onSend: (send: Send | null) => void;
+}) {
   const { t } = useTranslation();
   const announce = useAnnouncer();
   const me = useMyStaffId();
@@ -176,39 +200,55 @@ function PendingDraft({ detail, draft }: { detail: InboxDetail; draft: AiDraft }
   const request = useRef({ id: newClientId(), text: '' });
   const approve = useConversationChange(
     detail.id,
-    (edited: string | undefined, tenantId) => {
-      const sent = edited ?? draft.text;
-      if (request.current.text !== sent) request.current = { id: newClientId(), text: sent };
-      return approveAiDraft(tenantId, detail.id, draft.id, {
-        clientRequestId: request.current.id,
+    ({ requestId, edited }: { requestId: string; edited: string | undefined }, tenantId) =>
+      approveAiDraft(tenantId, detail.id, draft.id, {
+        clientRequestId: requestId,
         expectedEpoch: detail.ownershipEpoch,
         ...(edited !== undefined ? { text: edited } : {}),
-      });
-    },
+      }),
     REFRESH,
   );
+  const busy = approve.isPending || sending;
+  // While the reply is still being sent, the request's own error says nothing yet.
+  const error = sending ? null : approve.error;
 
   const closesAt = detail.replyWindowClosesAt ?? null;
   const replyWindow = useReplyWindow(detail.channel, closesAt);
-  const blocked = !detail.permissions.reply
+  // Rejecting sends nothing, so WhatsApp's reply window never holds it back; sending does.
+  const rejectBlocked = !detail.permissions.reply
     ? t('inbox.composer.noReply')
     : byOther
       ? t('inbox.composer.ownedByOther', {
           name:
             detail.owner.kind === 'staff' ? detail.owner.displayName : t('inbox.owner.external'),
         })
-      : detail.channel === 'whatsapp' && replyWindow.state === 'closed'
-        ? t('channels.reply.closed')
-        : null;
+      : null;
+  const blocked =
+    rejectBlocked ??
+    (detail.channel === 'whatsapp' && replyWindow.state === 'closed'
+      ? t('channels.reply.closed')
+      : null);
 
   const send = async (edited?: string) => {
+    const sent = edited ?? draft.text;
+    if (request.current.text !== sent) request.current = { id: newClientId(), text: sent };
+    const requestId = request.current.id;
+    onSend({ draft, requestId, failure: null });
     try {
-      const result = await approve.mutateAsync(edited);
+      const result = await approve.mutateAsync({ requestId, edited });
+      onSend(null);
       announce(
         result.draft.state === 'edited' ? t('inbox.aiDrafts.editedSent') : t('inbox.aiDrafts.sent'),
       );
-    } catch {
-      // Shown below.
+    } catch (error) {
+      // Shown below while the draft waits. A cancelled sign-in sent nothing, and a draft someone
+      // decided first was never this send's; any other failure may come after the decision was
+      // recorded, so the card keeps it.
+      onSend(
+        isCancelled(error) || isApiError(error, 'AI_DRAFT_CLOSED')
+          ? null
+          : { draft, requestId, failure: error },
+      );
     }
   };
   const sendEdited = () => {
@@ -219,7 +259,7 @@ function PendingDraft({ detail, draft }: { detail: InboxDetail; draft: AiDraft }
     }
     void send(text.trim());
   };
-  const refusal = approve.error ? refusalText(approve.error, t) : null;
+  const refusal = error ? refusalText(error, t) : null;
 
   return (
     <section
@@ -283,18 +323,13 @@ function PendingDraft({ detail, draft }: { detail: InboxDetail; draft: AiDraft }
           {refusal}
         </p>
       ) : (
-        <ActionError error={isCancelled(approve.error) ? null : approve.error} />
+        <ActionError error={isCancelled(error) ? null : error} />
       )}
       <div className="flex flex-wrap gap-2">
         {editing ? (
           <>
             <ReasonedAction reason={blocked}>
-              <Button
-                size="sm"
-                busy={approve.isPending}
-                onClick={sendEdited}
-                data-testid="ai-draft-send-edited"
-              >
+              <Button size="sm" busy={busy} onClick={sendEdited} data-testid="ai-draft-send-edited">
                 <SendIcon className="rtl:-scale-x-100" aria-hidden="true" />
                 {t('inbox.aiDrafts.sendEdited')}
               </Button>
@@ -302,7 +337,7 @@ function PendingDraft({ detail, draft }: { detail: InboxDetail; draft: AiDraft }
             <Button
               size="sm"
               variant="secondary"
-              disabled={approve.isPending}
+              disabled={busy}
               onClick={() => {
                 setEditing(false);
                 setText(draft.text);
@@ -318,7 +353,7 @@ function PendingDraft({ detail, draft }: { detail: InboxDetail; draft: AiDraft }
             <ReasonedAction reason={blocked}>
               <Button
                 size="sm"
-                busy={approve.isPending}
+                busy={busy}
                 onClick={() => void send()}
                 data-testid="ai-draft-approve"
               >
@@ -340,7 +375,7 @@ function PendingDraft({ detail, draft }: { detail: InboxDetail; draft: AiDraft }
                 {t('inbox.aiDrafts.edit')}
               </Button>
             </ReasonedAction>
-            <ReasonedAction reason={blocked}>
+            <ReasonedAction reason={rejectBlocked}>
               <Button
                 size="sm"
                 variant="ghost"
@@ -367,7 +402,9 @@ function PendingDraft({ detail, draft }: { detail: InboxDetail; draft: AiDraft }
 /** How the draft this person was looking at ended, said once. */
 function EndedDraft({ draft, onDismiss }: { draft: AiDraft; onDismiss: () => void }) {
   const { t } = useTranslation();
-  const name = draft.decidedBy?.displayName ?? '';
+  // Only the name keeps its own direction (U+2068 … U+2069): a Latin name leaves an Urdu or
+  // Arabic sentence right to left.
+  const name = `\u2068${draft.decidedBy?.displayName ?? ''}\u2069`;
   const text =
     draft.state === 'superseded'
       ? t(`inbox.aiDrafts.ended.${draft.supersededReason ?? 'replaced'}`)
@@ -385,12 +422,55 @@ function EndedDraft({ draft, onDismiss }: { draft: AiDraft; onDismiss: () => voi
       data-state={draft.state}
     >
       <SparklesIcon className="size-4 shrink-0" aria-hidden="true" />
-      <p className="min-w-0 flex-1">
-        <bdi>{text}</bdi>
-      </p>
+      <p className="min-w-0 flex-1">{text}</p>
       <Button variant="ghost" size="sm" onClick={onDismiss}>
         {t('inbox.aiDrafts.ended.dismiss')}
       </Button>
+    </div>
+  );
+}
+
+/**
+ * A draft recorded as this person's decision whose send request then failed: the error and, while
+ * the reply waits in their failed sends (`kept`), that it was not sent and where to send it again.
+ * Without `kept` their failed sends could not be read, so it claims neither way.
+ */
+function UnsentDraft({
+  error,
+  kept,
+  onDismiss,
+}: {
+  error: unknown;
+  kept: boolean;
+  onDismiss: () => void;
+}) {
+  const { t } = useTranslation();
+  const refusal = refusalText(error, t);
+  const dismiss = (
+    <Button variant="ghost" size="sm" onClick={onDismiss}>
+      {t('inbox.aiDrafts.ended.dismiss')}
+    </Button>
+  );
+  return (
+    <div className="mx-4 mb-2 flex flex-col gap-2" data-testid="ai-draft-unsent">
+      {refusal ? (
+        <p role="alert" className="text-sm font-medium text-text" data-testid="ai-draft-refused">
+          {refusal}
+        </p>
+      ) : (
+        <ActionError error={error} />
+      )}
+      {kept ? (
+        <div className="flex items-center gap-2 rounded-md border border-border bg-surface-sunken px-3 py-2 text-sm text-text">
+          <SparklesIcon className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
+          <p role="alert" className="min-w-0 flex-1 font-medium" data-testid="ai-draft-not-sent">
+            {t('inbox.aiDrafts.notSent')}
+          </p>
+          {dismiss}
+        </div>
+      ) : (
+        <div className="flex justify-end">{dismiss}</div>
+      )}
     </div>
   );
 }
@@ -401,17 +481,60 @@ function EndedDraft({ draft, onDismiss }: { draft: AiDraft; onDismiss: () => voi
  * colleague, replaced because the customer wrote again, and so on).
  */
 export function AiDraftCard({ detail }: { detail: InboxDetail }) {
+  const me = useMyStaffId();
   const [watched, setWatched] = useState<string | null>(null);
+  // The latest send, kept above the pending card: the refresh after a send brings the draft back
+  // decided before the send's own answer, and only that answer (or, when it failed, the reviewer's
+  // outgoing messages) says whether the reply went.
+  const [send, setSend] = useState<Send | null>(null);
   // Asked for only when the conversation says a draft is ready, or one shown here just ended.
   const drafts = useAiDrafts(detail.id, detail.aiDraftReady || watched !== null);
+  // This person's sends not yet confirmed, as the reply box lists them (the same query, refreshed
+  // by the send's own change and by live updates). An approved draft's reply stays there until it
+  // goes, or is sent again or discarded from the reply box.
+  const outgoing = useDrafts(detail.id);
   const pending = drafts.data?.pending ?? null;
   const latest = drafts.data?.latest ?? null;
   useEffect(() => {
     if (pending) setWatched(pending.id);
   }, [pending]);
-  if (pending) return <PendingDraft key={pending.id} detail={detail} draft={pending} />;
+  // A failed request alone never says whether the reply went (the answer can be lost after it
+  // did); only the reply's place in the outgoing messages does. Unknown while those cannot be read.
+  const failed = send && send.failure !== null ? send : null;
+  const view = outgoing.isError ? undefined : outgoing.data;
+  const reply = failed
+    ? view?.outgoing.find((item) => item.clientMessageId === failed.requestId)
+    : undefined;
+  const sending = reply?.state === 'sending';
+  // While a send is under way the draft stays as it was, never "sent" from its state alone; so it
+  // does while its reply is still being sent after the request itself failed.
+  const shown = pending ?? (send && (send.failure === null || sending) ? send.draft : null);
+  if (shown) {
+    return (
+      <PendingDraft
+        key={shown.id}
+        detail={detail}
+        draft={shown}
+        sending={sending && shown.id === send?.draft.id}
+        onSend={setSend}
+      />
+    );
+  }
   if (latest && latest.id === watched) {
-    return <EndedDraft draft={latest} onDismiss={() => setWatched(null)} />;
+    const dismiss = () => {
+      setWatched(null);
+      setSend(null);
+    };
+    // Decided by this person, but the request failed: not sent only while the reply waits in their
+    // failed sends; gone from there, it went (or was sent again from the reply box).
+    const decidedByMe =
+      failed?.draft.id === latest.id &&
+      latest.decidedBy?.staffMemberId === me &&
+      (latest.state === 'approved' || latest.state === 'edited');
+    if (decidedByMe && (view === undefined || reply?.state === 'failed')) {
+      return <UnsentDraft error={failed.failure} kept={view !== undefined} onDismiss={dismiss} />;
+    }
+    return <EndedDraft draft={latest} onDismiss={dismiss} />;
   }
   return null;
 }
