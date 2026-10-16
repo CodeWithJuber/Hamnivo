@@ -59,6 +59,8 @@ Studio says why, when:
 
 - Drafts are kept for 90 days after they were sent, rejected or set aside, then removed. What was
   decided, by whom and why is in the audit log.
+- How many drafts were sent, edited, rejected or set aside, and why, is in
+  [Reports](../reports.md) under **AI usage**.
 - If a draft was edited, Hamnivo keeps a fingerprint of the text that was sent, not a second copy.
 - A very long draft is cut at the last full sentence that fits (10,000 characters) and ends with
   "…". Edit it before sending if something is missing.

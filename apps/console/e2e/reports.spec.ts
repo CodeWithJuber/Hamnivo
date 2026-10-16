@@ -102,6 +102,89 @@ async function startConversation(widgetId: string): Promise<Response> {
   });
 }
 
+/**
+ * How the inbox work queue went, written straight to the database as the gateway would: reply-time
+ * clocks that ended (five met, one missed), offers (five accepted, two declined as not their area)
+ * and AI drafts (five sent, one rejected), on the workspace's own conversations.
+ */
+async function seedWorkQueue(tenantId: string, conversationIds: string[]) {
+  const db = createDb(settings().databaseUrl, { max: 1 });
+  const client = await db.$client.connect();
+  const ids = conversationIds.map((id) => fromPublicId('conversation', id));
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [
+      fromPublicId('tenant', tenantId),
+    ]);
+    const staff = await client.query<{ id: string }>('SELECT id FROM staff_members LIMIT 1');
+    const staffId = staff.rows[0]?.id;
+    const team = await client.query<{ id: string }>(
+      `INSERT INTO teams (id, tenant_id, name) VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid, 'Returns') RETURNING id`,
+    );
+    const teamId = team.rows[0]?.id;
+    for (const [n, conversationId] of ids.entries()) {
+      await client.query(
+        `INSERT INTO sla_outcomes (id, tenant_id, conversation_id, kind, priority, target_minutes,
+           started_at, ended_at, outcome, business_minutes)
+         VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid, $1, 'first_reply',
+           'medium', 15, now() - interval '20 minutes', now(), $2, $3)`,
+        [conversationId, n === 0 ? 'missed' : 'met', n === 0 ? 20 : 5 + n],
+      );
+      const declined = n === 0 ? 2 : 0;
+      for (let round = 1; round <= declined + 1; round += 1) {
+        const state = round <= declined ? 'declined' : n === 5 ? 'expired' : 'accepted';
+        await client.query(
+          `INSERT INTO conversation_offers (id, tenant_id, conversation_id, team_id, staff_member_id,
+             handoff_epoch, round, state, decline_reason, offered_at, expires_at, decided_at,
+             timeout_seconds)
+           VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid, $1, $2, $3, 1, $4, $5,
+             $6, now() - interval '5 minutes', now() - interval '3 minutes',
+             now() - interval '4 minutes', 120)`,
+          [
+            conversationId,
+            teamId,
+            staffId,
+            round,
+            state,
+            state === 'declined' ? 'not_my_area' : null,
+          ],
+        );
+      }
+      const run = await client.query<{ id: string }>(
+        `INSERT INTO runs (id, tenant_id, conversation_id, trigger_ref, kind, state, outcome, epoch)
+         VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid, $1, $2, 'draft',
+           'succeeded', 'drafted', 1) RETURNING id`,
+        [conversationId, `draft:e2e:${n}`],
+      );
+      const asked = await client.query<{ id: string }>(
+        `SELECT id FROM message_ledger WHERE conversation_id = $1 AND sender_kind = 'customer' LIMIT 1`,
+        [conversationId],
+      );
+      const state = n === 0 ? 'rejected' : 'approved';
+      const draft = await client.query<{ id: string }>(
+        `INSERT INTO ai_drafts (id, tenant_id, conversation_id, run_id, trigger_ledger_id,
+           owner_epoch, text, state, decided_by, decided_at)
+         VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid, $1, $2, $3, 1,
+           'Your parcel is on its way.', $4, $5, now()) RETURNING id`,
+        [conversationId, run.rows[0]?.id, asked.rows[0]?.id, state, staffId],
+      );
+      if (state === 'rejected') {
+        await client.query(
+          `INSERT INTO ai_draft_decisions (id, tenant_id, draft_id, staff_member_id,
+             client_request_id, decision, reason, owner_epoch)
+           VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid, $1, $2,
+             gen_random_uuid(), 'rejected', 'inaccurate', 1)`,
+          [draft.rows[0]?.id, staffId],
+        );
+      }
+    }
+    await client.query('COMMIT');
+  } finally {
+    client.release();
+    await db.$client.end();
+  }
+}
+
 async function overflow(page: Page): Promise<number> {
   return page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -258,6 +341,87 @@ test('HNV-23-01 HNV-23-02 O04 · reports withhold small groups, then show the da
       if (extra > 1) overflowing.push(`${tab} at ${width}px: ${extra}px too wide`);
     }
   }
+  expect(overflowing).toEqual([]);
+  expect(violations).toEqual([]);
+});
+
+test('H12 HNV-10-06 HNV-09-05 · reports on reply-time targets, offers and AI drafts', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(180_000);
+  const workspace = await seedWorkspace({ connect: true, publish: true });
+  const { staff } = workspace;
+  const conversations: string[] = [];
+  for (const question of [
+    'Where is my order?',
+    'Do you ship to Lahore?',
+    'What are your opening hours?',
+    'Can I change my delivery address?',
+    'Do you have gift cards?',
+    'Is the blue scarf in stock?',
+  ]) {
+    conversations.push((await customerAsks(workspace.brand.widgetId, question)).id);
+  }
+  await expect
+    .poll(async () => (await overview(staff)).totals.conversations.value, { timeout: 60_000 })
+    .toBe(6);
+  await seedWorkQueue(staff.tenantId, conversations);
+
+  await staff.signIn(context);
+  await page.goto('/reports');
+  const targets = page.getByTestId('reply-targets-report');
+  await expect(page.getByRole('heading', { name: 'Reply-time targets' })).toBeVisible();
+  // Five of six replies in time; one miss is too few to show.
+  await expect(page.getByTestId('tile-targets-met')).toContainText('83%');
+  await expect(page.getByTestId('tile-targets-met')).toContainText('Of 6 replies from a person');
+  await expect(page.getByTestId('tile-targets-missed')).toContainText('Small sample');
+  await expect(page.getByTestId('reply-targets-by-priority')).toContainText('Medium6');
+  await expect(targets).toContainText('Reply-time targets have been recorded since');
+  const violations = await audit(page, 'reports reply-time targets (en)');
+
+  await page.getByRole('tab', { name: 'Team activity' }).click();
+  await expect(page.getByRole('heading', { name: /Chats offered/ })).toBeVisible();
+  // Five accepted, two declined and one ran out: 5 of 8.
+  await expect(page.getByTestId('tile-offers-accepted')).toContainText('63%');
+  await expect(page.getByTestId('offers-decline-reasons')).toContainText(
+    'Not their areaSmall sample',
+  );
+  await expect(page.getByTestId('offers-by-team')).toContainText('Returns8');
+  violations.push(...(await audit(page, 'reports offers (en)')));
+
+  await page.getByRole('tab', { name: 'AI usage' }).click();
+  await expect(page.getByRole('heading', { name: 'AI drafts for review' })).toBeVisible();
+  await expect(page.getByTestId('tile-drafts-sent')).toContainText('83%');
+  await expect(page.getByTestId('drafts-reject-reasons')).toContainText('It was wrongSmall sample');
+  violations.push(...(await audit(page, 'reports AI drafts (en)')));
+
+  const download = page.waitForEvent('download');
+  await page.getByTestId('export-csv').click();
+  const csv = readFileSync((await (await download).path()) ?? '', 'utf8');
+  expect(csv).toContain('reply_targets,met,5,0.8333,false,6');
+  expect(csv).toContain('offers,accepted,5,0.625,false,8');
+  expect(csv).toContain('ai_drafts,sent,5,0.8333,false,6');
+
+  // Arabic on a phone: every new section reads right to left and fits.
+  const overflowing: string[] = [];
+  for (const [tab, section] of [
+    ['quality', 'reply-targets-report'],
+    ['teams', 'offers-report'],
+    ['ai', 'ai-drafts-report'],
+  ] as const) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/reports?tab=${tab}&lang=ar`);
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await expect(page.getByTestId(section)).toBeVisible();
+    violations.push(...(await audit(page, `reports ${tab} work queue (ar, 390)`)));
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      const extra = await overflow(page);
+      if (extra > 1) overflowing.push(`${tab} at ${width}px: ${extra}px too wide`);
+    }
+  }
+  await expect(page.getByTestId('tile-drafts-sent')).toContainText('أُرسلت');
   expect(overflowing).toEqual([]);
   expect(violations).toEqual([]);
 });

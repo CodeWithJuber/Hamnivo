@@ -1359,9 +1359,12 @@
       "apps/console/test/inbox-ai-drafts.test.tsx",
       "apps/console/e2e/ai-drafts.spec.ts",
       "apps/console/e2e/inbox.spec.ts",
-      "docs/guide/inbox/ai-drafts.md"
+      "docs/guide/inbox/ai-drafts.md",
+      "apps/gateway/test/analytics.int.test.ts",
+      "apps/console/src/pages/reports/WorkQueueReports.tsx",
+      "docs/guide/reports.md"
     ],
-    "note": "On-demand suggestions (edit, dismiss or send as me), and drafts an assist-mode agent writes on its own: shown above the composer with their public sources, approved, edited in place or rejected with a reason; sent as the reviewer through the ownership-checked send, once; set aside when the customer writes again, the conversation changes hands (a claim from the queue keeps it), a person answers by hand or it is resolved."
+    "note": "On-demand suggestions (edit, dismiss or send as me), and drafts an assist-mode agent writes on its own: shown above the composer with their public sources, approved, edited in place or rejected with a reason; sent as the reviewer through the ownership-checked send, once; set aside when the customer writes again, the conversation changes hands (a claim from the queue keeps it), a person answers by hand or it is resolved. Reports show drafts sent as written or edited, rejected and set aside, with the reasons, per AI agent."
   },
   "HNV-09-06": {
     "status": "implemented",
@@ -2474,9 +2477,13 @@
       "apps/console/src/pages/reports/ReportsPage.tsx",
       "apps/console/src/pages/reports/ConversationsChart.tsx",
       "apps/console/e2e/reports.spec.ts",
-      "apps/console/src/lib/reports.ts"
+      "apps/console/src/lib/reports.ts",
+      "apps/console/src/pages/reports/WorkQueueReports.tsx",
+      "apps/console/test/reports-work-queue.test.tsx",
+      "packages/db/src/schema/sla.ts",
+      "docs/guide/reports.md"
     ],
-    "note": "Workspace reports from aggregates only, per date range and time zone, with team and channel filters: conversations per day against the previous period, AI-resolved and handed-off rates, median first response and resolution time, CSAT, handoff reasons, team and channel breakdowns, orders and refunds per currency, AI replies and tokens, and the answer-cache hit rate. Numbers on fewer conversations or responses than ANALYTICS_MIN_GROUP_SIZE are withheld, with complementary suppression; the CSV export follows the same rules. Reopen rate, SLA attainment and cost per resolved case are not built. Also missed chats (no answer within an hour), contact form messages and reopen rate, and a Tickets report: created, closed, open now, median time to close, by priority and by source, with the same withholding of small groups."
+    "note": "Workspace reports from aggregates only, per date range and time zone, with team and channel filters: conversations per day against the previous period, AI-resolved and handed-off rates, median first response and resolution time, CSAT, handoff reasons, team and channel breakdowns, orders and refunds per currency, AI replies and tokens, and the answer-cache hit rate. Numbers on fewer conversations or responses than ANALYTICS_MIN_GROUP_SIZE are withheld, with complementary suppression; the CSV export follows the same rules. Cost per resolved case is not built. Also missed chats (no answer within an hour), contact form messages and reopen rate, and a Tickets report: created, closed, open now, median time to close, by priority and by source, with the same withholding of small groups. Reports on the inbox work queue: reply-time targets met and missed (from a record of how each reply clock ended, kept 13 months), chats offered one person at a time (accepted, declined, run out, decline reasons, hand-offs left in the queue, by team) and AI drafts for review (sent, edited, rejected and set aside, with the reasons, by agent); offers and drafts look back 90 days at most and say so."
   },
   "HNV-19-01": {
     "status": "implemented",
@@ -2555,9 +2562,10 @@
       "apps/console/src/pages/reports/ReportsPage.tsx",
       "apps/gateway/src/analytics/analytics.controller.ts",
       "apps/gateway/test/analytics.int.test.ts",
-      "apps/console/e2e/reports.spec.ts"
+      "apps/console/e2e/reports.spec.ts",
+      "apps/console/src/pages/reports/WorkQueueReports.tsx"
     ],
-    "note": "Team and channel filters, visible denominators and a CSV export under the same permissions and withholding. Opening the matching conversations from a number, and language or agent filters, are not built."
+    "note": "Team and channel filters, visible denominators and a CSV export under the same permissions and withholding. Opening the matching conversations from a number, and language or agent filters, are not built. The reply-time target, offer and AI draft reports follow the same filters, withholding and export."
   },
   "HNV-23-03": {
     "status": "planned",
@@ -3375,9 +3383,12 @@
       "apps/console/test/inbox-sla.test.tsx",
       "apps/console/e2e/sla.spec.ts",
       "docs/adr/0014-reply-time-targets-are-business-time-clocks-hamnivo-keeps.md",
-      "docs/guide/inbox/reply-targets.md"
+      "docs/guide/inbox/reply-targets.md",
+      "apps/gateway/test/analytics.int.test.ts",
+      "apps/console/src/pages/reports/WorkQueueReports.tsx",
+      "docs/guide/reports.md"
     ],
-    "note": "Per-brand first and next reply targets by priority, counted in business hours (ADR 0014); the clock pauses while snoozed and ends with a person's reply or a hand-back to the AI. Overdue queue and count, audit and an alert when a conversation goes overdue. Escalation (reassigning overdue work) and reports on targets met are still to come."
+    "note": "Per-brand first and next reply targets by priority, counted in business hours (ADR 0014); the clock pauses while snoozed and ends with a person's reply or a hand-back to the AI. Overdue queue and count, audit and an alert when a conversation goes overdue. How each clock ended (met, missed, or stopped without a person’s reply) is recorded, and Reports show the share met by priority and by day and the median time to a first reply. Escalation (reassigning overdue work) is still to come."
   },
   "HNV-08-06": {
     "status": "partial",
@@ -3416,8 +3427,11 @@
       "apps/console/test/inbox-offers.test.tsx",
       "apps/console/e2e/offers.spec.ts",
       "docs/adr/0015-an-offer-is-not-ownership.md",
-      "docs/guide/inbox/offers.md"
+      "docs/guide/inbox/offers.md",
+      "apps/gateway/test/analytics.int.test.ts",
+      "apps/console/src/pages/reports/WorkQueueReports.tsx",
+      "docs/guide/reports.md"
     ],
-    "note": "An offer that is not answered in the team's time (15 to 600 seconds), or is declined, goes to the next person; after three people, or when nobody can take it, the chat waits in the team's queue and the team is alerted. A claim, a hand-back, resolving, snoozing or a team change cancels the pending offer; a late accept is refused and says who has the chat. Every step is audited."
+    "note": "An offer that is not answered in the team's time (15 to 600 seconds), or is declined, goes to the next person; after three people, or when nobody can take it, the chat waits in the team's queue and the team is alerted. A claim, a hand-back, resolving, snoozing or a team change cancels the pending offer; a late accept is refused and says who has the chat. Every step is audited. Reports show offers accepted, declined and run out, why people declined, hand-offs left in the queue and each team’s share accepted."
   }
 }
