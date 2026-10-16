@@ -3440,7 +3440,7 @@
     "note": "An offer that is not answered in the team's time (15 to 600 seconds), or is declined, goes to the next person; after three people, or when nobody can take it, the chat waits in the team's queue and the team is alerted. A claim, a hand-back, resolving, snoozing or a team change cancels the pending offer; a late accept is refused and says who has the chat. Every step is audited. Reports show offers accepted, declined and run out, why people declined, hand-offs left in the queue and each team’s share accepted."
   },
   "A10": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "packages/domain/src/retention.ts",
       "packages/domain/test/retention.test.ts",
@@ -3454,8 +3454,17 @@
       "apps/console/src/pages/settings/PrivacyPage.tsx",
       "apps/console/test/privacy-page.test.tsx",
       "docs/adr/0017-retention-deletes-old-conversations-everywhere-and-keeps-an-anonymous-report-row.md",
-      "docs/guide/setup/privacy.md"
+      "docs/guide/setup/privacy.md",
+      "packages/db/migrations/20261016203837_customer_privacy_security.sql",
+      "packages/db/test/customer-privacy.int.test.ts",
+      "apps/gateway/src/privacy/customer-privacy.service.ts",
+      "apps/gateway/src/privacy/privacy-worker.service.ts",
+      "apps/gateway/src/privacy/identity-fingerprints.ts",
+      "apps/gateway/test/customer-privacy.int.test.ts",
+      "apps/console/src/components/privacy/CustomerData.tsx",
+      "apps/console/src/components/privacy/PrivacyRequests.tsx",
+      "docs/adr/0018-erasing-a-customer-deletes-in-chatwoot-first-keeps-orders-anonymous-and-replays-after-restores.md"
     ],
-    "note": "Owners choose how long resolved conversations are kept (3 months to 7 years, or until deleted by hand; off by default), after a recent sign-in with two-step verification. Deleting sooner waits a week and can be undone; every owner is emailed. Every 10 minutes the worker deletes old resolved conversations in Chatwoot and then in Hamnivo, checking each again under its lock and in Chatwoot, through database functions that remove exactly a conversation's records; a Chatwoot user who may not delete stops it before anything goes. Hourly it also deletes old history only Chatwoot has and removes customers left with nothing (their contact and memory first). Reports keep their numbers: each deleted conversation leaves an anonymous report row with its team, priority, ticket and ratings, and orders, payments and the audit log stay. Handled outbox events are deleted after 30 days. Exporting and erasing one customer on request is not built yet."
+    "note": "Owners choose how long resolved conversations are kept (3 months to 7 years, or until deleted by hand; off by default), after a recent sign-in with two-step verification. Deleting sooner waits a week and can be undone; every owner is emailed. Every 10 minutes the worker deletes old resolved conversations in Chatwoot and then in Hamnivo, checking each again under its lock and in Chatwoot, through database functions that remove exactly a conversation's records; a Chatwoot user who may not delete stops it before anything goes. Hourly it also deletes old history only Chatwoot has and removes customers left with nothing (their contact and memory first). Reports keep their numbers: each deleted conversation leaves an anonymous report row with its team, priority, ticket and ratings, and orders, payments and the audit log stay. Handled outbox events are deleted after 30 days. Owners and administrators can also find one customer and download everything about them as one ZIP (what they saw: profile, conversations without internal notes, files within limits, consents, memory, orders, feedback, preferences, with a checksum manifest), kept 24 hours with each download audited; or erase them after typing their ID, with two-step verification: Chatwoot conversations and contact first (a 401/403 stops it before anything is deleted in Hamnivo), then memory with a receipt, then every Hamnivo record through a database function. A customer with orders stays as an anonymous stub. An append-only tombstone with keyed fingerprints erases them again after a restore, in Chatwoot only while the fingerprint still matches, and makes imports skip them."
   }
 }

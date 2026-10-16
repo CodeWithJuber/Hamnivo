@@ -2368,6 +2368,7 @@ export const hi: Translation = {
     settings: 'वर्कस्पेस सेटिंग',
     security: 'सुरक्षा',
     privacy: 'निजता',
+    customers: 'ग्राहक डेटा',
     support: 'सहायता एक्सेस',
   },
   permissions: {
@@ -2464,6 +2465,10 @@ export const hi: Translation = {
     settings: { manage: 'वर्कस्पेस सेटिंग बदलें' },
     security: { manage: 'साइन-इन, सिंगल साइन-ऑन और सेशन के नियम सेट करें' },
     privacy: { manage: 'तय करें कि बातचीत मिटाए जाने से पहले कितने समय तक रखी जाए' },
+    customers: {
+      export: 'किसी एक ग्राहक की सारी जानकारी डाउनलोड करें, डेटा देखने के अनुरोध के लिए',
+      erase: 'किसी एक ग्राहक को हर जगह से मिटाएँ, Chatwoot समेत, मिटाने के अनुरोध के लिए',
+    },
     support: { grant: 'Hamnivo सहायता को इस वर्कस्पेस का एक्सेस दें' },
   },
 };

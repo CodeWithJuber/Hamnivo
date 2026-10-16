@@ -625,16 +625,18 @@ A restore:
 
 1. checks the checksums;
 2. stops the applications;
-3. saves customers' memory consent and memory deletions from the current database;
+3. saves customers' memory consent, memory deletions and erasures from the current database;
 4. restores the Hamnivo database beside the current one and runs pending migrations, so a backup
    from an older version works with newer code;
-5. adds the consent and deletions saved in step 3, and deletes again any memory they cover;
+5. adds the consent, deletions and erasures saved in step 3, and deletes again any memory and
+   customers they cover;
 6. only then replaces the current database, so a restore that fails leaves it as it was;
 7. replaces the Chatwoot database and the files, and starts everything again.
 
 Customers' privacy choices are the one thing a restore does not take back. Someone who withdrew
-consent or had their memory deleted after the backup keeps that choice, and the memory stays
-deleted. Deletions that were still running finish once the worker starts.
+consent, had their memory deleted or was erased after the backup keeps that choice: the memory stays
+deleted, and an erased customer the backup brings back is erased again, in Hamnivo and in Chatwoot.
+Deletions, exports and erasures that were still running finish once the worker starts.
 
 It refuses a backup made with other secrets, unless you move your `.env` away first. While it
 runs, it needs free disk space for a second copy of the Hamnivo database. If it fails before step 6,

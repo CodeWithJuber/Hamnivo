@@ -1,4 +1,5 @@
 import {
+  applyErasureTombstones,
   type Db,
   ensureAuditPartitions,
   ensureReconcileCursors,
@@ -8,6 +9,7 @@ import {
   purgeExpired,
   purgeMigrationFiles,
   purgeOutboxEvents,
+  purgePrivacyFiles,
   purgeSlaOutcomes,
   purgeVisitorBlocks,
   purgeVisitors,
@@ -79,6 +81,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           sla_outcomes_removed: await purgeSlaOutcomes(this.db),
           // Handled outbox events, some carrying message text, are kept 30 days (A10).
           outbox_events_removed: await purgeOutboxEvents(this.db),
+          // A customer's exported data is kept 24 hours (A10).
+          privacy_files_cleared: await purgePrivacyFiles(this.db),
         };
       }
       case 'reconcile-cursors':
@@ -86,7 +90,11 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       case 'memory-retention':
         return { deleted: await this.memory.purgeExpired() };
       case 'memory-tombstones':
-        return { removed: await this.memory.replayTombstones() };
+        // Memory first: an erased customer whom a restore brought back loses it, then the rest.
+        return {
+          removed: await this.memory.replayTombstones(),
+          customers_erased_again: await applyErasureTombstones(this.db),
+        };
       case 'privacy-retention':
         return this.retention.run();
       case 'webhook-retention':

@@ -2410,6 +2410,7 @@ export const ur: Translation = {
     settings: 'ورک اسپیس کی ترتیبات',
     security: 'سیکیورٹی',
     privacy: 'رازداری',
+    customers: 'گاہکوں کا ڈیٹا',
     support: 'سپورٹ کی رسائی',
   },
   permissions: {
@@ -2506,6 +2507,10 @@ export const ur: Translation = {
     settings: { manage: 'ورک اسپیس کی ترتیبات بدلیں' },
     security: { manage: 'سائن اِن، سنگل سائن آن اور سیشن کے اصول سیٹ کریں' },
     privacy: { manage: 'طے کریں کہ گفتگو مٹائے جانے سے پہلے کتنی دیر رکھی جائے' },
+    customers: {
+      export: 'کسی ایک گاہک کی ساری معلومات ڈاؤن لوڈ کریں، ڈیٹا دیکھنے کی درخواست کے لیے',
+      erase: 'کسی ایک گاہک کو ہر جگہ سے مٹائیں، Chatwoot سمیت، مٹانے کی درخواست کے لیے',
+    },
     support: { grant: 'Hamnivo سپورٹ کو اس ورک اسپیس تک رسائی دیں' },
   },
 };

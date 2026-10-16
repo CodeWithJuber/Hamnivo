@@ -512,6 +512,20 @@
       "when": 1792179136772,
       "tag": "20261016193216_retention_security",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1792183114237,
+      "tag": "20261016203834_customer_privacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1792183117402,
+      "tag": "20261016203837_customer_privacy_security",
+      "breakpoints": true
     }
   ]
 }

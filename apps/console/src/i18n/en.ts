@@ -2387,6 +2387,7 @@ export const en = {
     settings: 'Workspace settings',
     security: 'Security',
     privacy: 'Privacy',
+    customers: 'Customer data',
     support: 'Support access',
   },
   permissions: {
@@ -2482,6 +2483,10 @@ export const en = {
     settings: { manage: 'Edit workspace settings' },
     security: { manage: 'Configure sign-in, single sign-on and session rules' },
     privacy: { manage: 'Choose how long conversations are kept before they are deleted' },
+    customers: {
+      export: 'Download everything about one customer, for an access request',
+      erase: 'Erase one customer everywhere, Chatwoot included, for an erasure request',
+    },
     support: { grant: 'Allow Hamnivo support to access this workspace' },
   },
 } as const;

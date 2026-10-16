@@ -36,6 +36,7 @@ export const ROLE_PRESETS = [
       'tools.*',
       'decisions.*',
       'memory.*',
+      'customers.*',
       'commerce.*',
       'analytics.*',
       'api_keys.*',

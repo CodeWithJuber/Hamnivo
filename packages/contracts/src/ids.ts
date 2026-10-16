@@ -87,6 +87,8 @@ export const ID_PREFIX = {
   aiDraft: 'aidr',
   /** A conversation offered to one person (HNV-10-03). */
   offer: 'ofr',
+  /** A request to export or erase one customer's data (A10). */
+  privacyRequest: 'prq',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

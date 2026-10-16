@@ -2363,6 +2363,7 @@ export const ar: Translation = {
     settings: 'إعدادات مساحة العمل',
     security: 'الأمان',
     privacy: 'الخصوصية',
+    customers: 'بيانات العملاء',
     support: 'وصول الدعم',
   },
   permissions: {
@@ -2459,6 +2460,10 @@ export const ar: Translation = {
     settings: { manage: 'تعديل إعدادات مساحة العمل' },
     security: { manage: 'إعداد تسجيل الدخول والدخول الموحّد وقواعد الجلسات' },
     privacy: { manage: 'اختيار مدة الاحتفاظ بالمحادثات قبل حذفها' },
+    customers: {
+      export: 'تنزيل كل ما يخص عميلًا واحدًا، لطلب الاطلاع على البيانات',
+      erase: 'محو عميل واحد من كل مكان، بما في ذلك Chatwoot، لطلب المحو',
+    },
     support: { grant: 'السماح لدعم Hamnivo بالوصول إلى مساحة العمل هذه' },
   },
 };

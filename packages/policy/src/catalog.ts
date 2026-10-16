@@ -141,6 +141,18 @@ export const PERMISSIONS = {
     stepUp: true,
     stepUpReads: true,
   },
+  'customers.export': {
+    description: 'Download everything about a customer, for their request to see their data',
+    scopes: BRAND,
+    stepUp: true,
+    stepUpReads: true,
+  },
+  'customers.erase': {
+    description: 'Erase a customer everywhere, for their request to be forgotten',
+    scopes: BRAND,
+    stepUp: true,
+    mfa: true,
+  },
   'commerce.read': {
     description: 'See carts, quotes, orders, payments and refunds',
     scopes: ALL,

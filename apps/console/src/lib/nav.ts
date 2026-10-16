@@ -100,7 +100,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/customer-identity', permission: 'widget.identity_keys' },
       { to: '/migration', permission: 'migration.review' },
       { to: '/settings/billing', anyOf: ['billing.read', 'settings.manage'] },
-      { to: '/settings/privacy', permission: 'privacy.manage' },
+      {
+        to: '/settings/privacy',
+        anyOf: ['privacy.manage', 'customers.export', 'customers.erase'],
+      },
     ],
   },
 ];

@@ -55,6 +55,9 @@ import { MigrationExporter } from './migration/export.service.js';
 import { OUTBOX_HANDLERS, type OutboxHandler, OutboxRelay } from './outbox/relay.service.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
 import { SAAS_WORKER_PROVIDERS, saasOutboxHandlers } from './platform/saas.module.js';
+import { PRIVACY_ERASE_TOPIC, PRIVACY_EXPORT_TOPIC } from './privacy/customer-privacy.service.js';
+import { IdentityFingerprints } from './privacy/identity-fingerprints.js';
+import { PRIVACY_REPLAY_TOPIC, PrivacyWorker } from './privacy/privacy-worker.service.js';
 import { RetentionSweep } from './privacy/retention-sweep.service.js';
 import { AgentsService } from './runtime/agents.service.js';
 import { KillSwitchesService } from './runtime/kill-switches.service.js';
@@ -180,6 +183,7 @@ export class WorkerModule {
             SlaService,
             OffersService,
             SlaEscalationService,
+            PrivacyWorker,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -204,6 +208,7 @@ export class WorkerModule {
             sla: SlaService,
             offers: OffersService,
             escalation: SlaEscalationService,
+            privacy: PrivacyWorker,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -269,17 +274,23 @@ export class WorkerModule {
               [SLA_RESYNC_TOPIC, (event) => sla.onResync(event)],
               [SLA_ALERT_TOPIC, (event) => escalation.onAlert(event)],
               [SLA_MOVE_TOPIC, (event) => escalation.onMove(event)],
+              [PRIVACY_EXPORT_TOPIC, (event) => privacy.onExport(event)],
+              [PRIVACY_ERASE_TOPIC, (event) => privacy.onErase(event)],
+              [PRIVACY_REPLAY_TOPIC, (event) => privacy.onReplay(event)],
               ...saasOutboxHandlers(provisioning, notices),
             ]),
         },
         OutboxRelay,
         RetentionSweep,
+        IdentityFingerprints,
+        PrivacyWorker,
         MaintenanceService,
       ],
       exports: [
         OutboxRelay,
         MaintenanceService,
         RetentionSweep,
+        PrivacyWorker,
         InboxProcessor,
         ReconcilerService,
         ChannelPollService,

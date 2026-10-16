@@ -81,3 +81,39 @@ export async function purgeOutboxEvents(db: Db, batch = 5000): Promise<number> {
   );
   return Number(rows[0]?.removed ?? 0);
 }
+
+/** What an erasure did to the customer: gone, kept as an anonymous stub, or not yet. */
+export type ErasedCustomer = 'deleted' | 'anonymised' | 'missing' | 'memory_left';
+
+/**
+ * Erases the customer of a running erase request of the transaction's tenant: their
+ * conversations and records go, and they are deleted, or kept as an anonymous stub when orders
+ * point at them. Their memory must be deleted first (`memory_left` until then).
+ */
+export async function eraseCustomer(
+  tx: TenantTx,
+  requestId: string,
+): Promise<{ conversations: number; customer: ErasedCustomer }> {
+  const { rows } = await tx.execute<{
+    result: { conversations: number; customer: ErasedCustomer };
+  }>(sql`select app.erase_customer(${requestId}::uuid) as result`);
+  const result = rows[0]?.result;
+  if (!result) throw new Error('erase_customer returned nothing');
+  return result;
+}
+
+/** Erases again every customer an erasure removed whom a restore brought back, across tenants. */
+export async function applyErasureTombstones(db: Db): Promise<number> {
+  const { rows } = await db.execute<{ erased: string }>(
+    sql`select app.apply_erasure_tombstones() as erased`,
+  );
+  return Number(rows[0]?.erased ?? 0);
+}
+
+/** Clears the bytes of export files older than 24 hours, across tenants. */
+export async function purgePrivacyFiles(db: Db, batch = 100): Promise<number> {
+  const { rows } = await db.execute<{ cleared: string }>(
+    sql`select app.purge_privacy_files(${batch}::int) as cleared`,
+  );
+  return Number(rows[0]?.cleared ?? 0);
+}

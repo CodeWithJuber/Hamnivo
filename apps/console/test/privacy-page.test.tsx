@@ -4,7 +4,12 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { initI18n } from '../src/i18n';
-import type { RetentionPolicy } from '../src/lib/privacy';
+import type {
+  PrivacyCustomer,
+  PrivacyCustomerSummary,
+  PrivacyRequest,
+  RetentionPolicy,
+} from '../src/lib/privacy';
 import { PrivacyPage } from '../src/pages/settings/PrivacyPage';
 import { fakeGateway, mountStudio } from './dom';
 
@@ -26,15 +31,162 @@ const policy = (patch: Partial<RetentionPolicy> = {}): RetentionPolicy => ({
   ...patch,
 });
 
+const customer: PrivacyCustomer = {
+  id: 'cus_01abc',
+  brand: { id: 'brd_1', name: 'Noor Shop' },
+  kind: 'verified',
+  name: 'Fatima Noor',
+  email: 'fatima@example.com',
+  externalId: 'u-42',
+  channel: null,
+  lastSeenAt: inDays(-2),
+  erasedAt: null,
+};
+
+const summary = (patch: Partial<PrivacyCustomerSummary> = {}): PrivacyCustomerSummary => ({
+  customer,
+  conversations: 3,
+  orders: 1,
+  memories: 2,
+  sharedContact: false,
+  requests: [],
+  ...patch,
+});
+
+const request = (patch: Partial<PrivacyRequest> = {}): PrivacyRequest => ({
+  id: 'prq_1',
+  kind: 'export',
+  customerId: customer.id,
+  brand: customer.brand,
+  state: 'queued',
+  reason: 'access_request',
+  reference: null,
+  requestedBy: { id: 'staff_me', name: 'Ali' },
+  counts: {},
+  problem: null,
+  file: null,
+  createdAt: inDays(0),
+  completedAt: null,
+  ...patch,
+});
+
 describe('Settings → Privacy (A10)', () => {
-  it('is for owners: an administrator sees that it is not theirs', async () => {
+  it('is not for agents', async () => {
     fakeGateway({});
+    await mountStudio({
+      at: '/settings/privacy',
+      permissions: presetPermissions('agent'),
+      screen: <PrivacyPage />,
+    });
+    expect(await screen.findByTestId('forbidden')).toBeTruthy();
+  });
+
+  it('gives administrators one customer’s data, and leaves retention to owners', async () => {
+    fakeGateway({ 'GET /v1/admin/privacy/requests': { json: { items: [] } } });
     await mountStudio({
       at: '/settings/privacy',
       permissions: presetPermissions('admin'),
       screen: <PrivacyPage />,
     });
-    expect(await screen.findByTestId('forbidden')).toBeTruthy();
+    expect(await screen.findByText('A customer’s data')).toBeTruthy();
+    expect(await screen.findByText('No exports or erasures yet.')).toBeTruthy();
+    expect(screen.queryByText('How long conversations are kept')).toBeNull();
+  });
+
+  it('finds a customer, prepares their file and erases them after their ID is typed', async () => {
+    const gateway = fakeGateway({
+      'GET /v1/admin/privacy/retention': { json: policy() },
+      'GET /v1/admin/privacy/requests': { json: { items: [] } },
+      'GET /v1/admin/privacy/customers': { json: { items: [customer] } },
+      [`GET /v1/admin/privacy/customers/${customer.id}`]: { json: summary() },
+      [`POST /v1/admin/privacy/customers/${customer.id}/export`]: {
+        status: 202,
+        json: request(),
+      },
+      [`POST /v1/admin/privacy/customers/${customer.id}/erase`]: {
+        status: 202,
+        json: request({ id: 'prq_2', kind: 'erase', reason: 'erasure_request' }),
+      },
+    });
+    await mountStudio({ at: '/settings/privacy', permissions: owner, screen: <PrivacyPage /> });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Find a customer'), 'fatima');
+    await user.click(screen.getByTestId('privacy-find'));
+    expect(gateway.to('GET', '/v1/admin/privacy/customers')[0]?.query).toEqual({
+      query: 'fatima',
+    });
+    await user.click(await screen.findByTestId('privacy-customer'));
+    const card = await screen.findByTestId('privacy-customer-card');
+    expect(card.textContent).toContain(customer.id);
+    expect(screen.getByTestId('privacy-orders-kept')).toBeTruthy();
+
+    await user.click(screen.getByTestId('privacy-export'));
+    await user.type(await screen.findByLabelText('Reference (optional)'), 'Ticket 42');
+    await user.click(screen.getByTestId('privacy-export-dialog-submit'));
+    await waitFor(() =>
+      expect(
+        gateway.to('POST', `/v1/admin/privacy/customers/${customer.id}/export`)[0]?.body,
+      ).toEqual({ reason: 'access_request', reference: 'Ticket 42' }),
+    );
+    expect(
+      gateway.to('POST', `/v1/admin/privacy/customers/${customer.id}/export`)[0]?.headers[
+        'idempotency-key'
+      ],
+    ).toBeTruthy();
+    expect((await screen.findByTestId('privacy-started')).textContent).toContain(
+      'Preparing the file',
+    );
+
+    await user.click(screen.getByTestId('privacy-erase'));
+    const confirm = await screen.findByLabelText(`Type the customer ID to confirm: ${customer.id}`);
+    await user.type(confirm, 'cus_wrong');
+    await user.click(screen.getByTestId('privacy-erase-dialog-submit'));
+    expect(await screen.findByText('Type the customer ID exactly as shown.')).toBeTruthy();
+    expect(gateway.to('POST', `/v1/admin/privacy/customers/${customer.id}/erase`)).toEqual([]);
+    await user.clear(confirm);
+    await user.type(confirm, customer.id.toUpperCase());
+    await user.click(screen.getByTestId('privacy-erase-dialog-submit'));
+    await waitFor(() =>
+      expect(
+        gateway.to('POST', `/v1/admin/privacy/customers/${customer.id}/erase`)[0]?.body,
+      ).toEqual({ reason: 'erasure_request', confirm: customer.id.toUpperCase() }),
+    );
+    expect((await screen.findByTestId('privacy-started')).textContent).toContain(
+      'Erasing has started',
+    );
+  });
+
+  it('lists requests with their file, a deleted file and why one stopped', async () => {
+    fakeGateway({
+      'GET /v1/admin/privacy/retention': { json: policy() },
+      'GET /v1/admin/privacy/requests': {
+        json: {
+          items: [
+            request({
+              id: 'prq_3',
+              state: 'completed',
+              counts: { conversations: 3, files: 2 },
+              file: { byteSize: 2048, expiresAt: inDays(1) },
+              completedAt: inDays(0),
+            }),
+            request({ id: 'prq_4', state: 'completed', completedAt: inDays(-2) }),
+            request({
+              id: 'prq_5',
+              kind: 'erase',
+              state: 'blocked',
+              problem: 'authority_not_admin',
+            }),
+          ],
+        },
+      },
+    });
+    await mountStudio({ at: '/settings/privacy', permissions: owner, screen: <PrivacyPage /> });
+    const rows = await screen.findAllByTestId('privacy-request');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]?.textContent).toContain('Conversations: 3 · Files: 2');
+    expect(screen.getAllByTestId('privacy-download')).toHaveLength(1);
+    expect(rows[1]?.textContent).toContain('Deleted after 24 hours');
+    expect(rows[2]?.textContent).toContain('must be an administrator');
   });
 
   it('turns retention on after showing what goes and when, then can undo it', async () => {

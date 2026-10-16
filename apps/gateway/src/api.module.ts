@@ -109,6 +109,8 @@ import type { Mailer } from './platform/mailer.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
 import { SAAS_API_CONTROLLERS, SAAS_API_PROVIDERS } from './platform/saas.module.js';
 import { SignupPolicy } from './platform/signup.js';
+import { CustomerPrivacyController } from './privacy/customer-privacy.controller.js';
+import { CustomerPrivacyService } from './privacy/customer-privacy.service.js';
 import { RetentionController } from './privacy/retention.controller.js';
 import { RetentionService } from './privacy/retention.service.js';
 import { AgentsController } from './runtime/agents.controller.js';
@@ -170,6 +172,7 @@ export class ApiModule {
         BrandsController,
         SlaController,
         RetentionController,
+        CustomerPrivacyController,
         AiDraftsController,
         OffersController,
         RoutingProfilesController,
@@ -247,6 +250,7 @@ export class ApiModule {
         BrandsService,
         SlaService,
         RetentionService,
+        CustomerPrivacyService,
         AiDraftsService,
         OffersService,
         IdentityKeysService,
