@@ -181,6 +181,20 @@ async function overflow(page: Page): Promise<number> {
   );
 }
 
+/**
+ * How far the page is too wide once its layout has settled after a resize: the day chart takes
+ * its new width on the next resize callback, which can come a moment later on a busy machine.
+ */
+async function settledOverflow(page: Page): Promise<number> {
+  const until = Date.now() + 2000;
+  let extra = await overflow(page);
+  while (extra > 1 && Date.now() < until) {
+    await page.waitForTimeout(100);
+    extra = await overflow(page);
+  }
+  return extra;
+}
+
 test('HNV-23-01 HNV-23-02 O04 · reports withhold small groups, then show the day chart, its table and the export', async ({
   page,
   context,
@@ -327,7 +341,7 @@ test('HNV-23-01 HNV-23-02 O04 · reports withhold small groups, then show the da
     violations.push(...(await audit(page, `reports ${tab} (ar, 390)`)));
     for (const width of [320, 390]) {
       await page.setViewportSize({ width, height: 844 });
-      const extra = await overflow(page);
+      const extra = await settledOverflow(page);
       if (extra > 1) overflowing.push(`${tab} at ${width}px: ${extra}px too wide`);
     }
   }
@@ -407,7 +421,7 @@ test('H12 HNV-10-06 HNV-09-05 · reports on reply-time targets, offers and AI dr
     violations.push(...(await audit(page, `reports ${tab} work queue (ar, 390)`)));
     for (const width of [320, 390]) {
       await page.setViewportSize({ width, height: 844 });
-      const extra = await overflow(page);
+      const extra = await settledOverflow(page);
       if (extra > 1) overflowing.push(`${tab} at ${width}px: ${extra}px too wide`);
     }
   }

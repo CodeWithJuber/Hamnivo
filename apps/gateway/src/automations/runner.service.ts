@@ -30,6 +30,7 @@ import { AuthorityRegistry, type ConnectionRuntime } from '../authority/registry
 import { uuidV5 } from '../authority/uuid.js';
 import { AvailabilityService } from '../inbox/availability.service.js';
 import { syncSla } from '../inbox/sla.js';
+import { putInTeam } from '../inbox/team-queue.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { makeTicket } from '../tickets/tickets.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
@@ -489,22 +490,7 @@ export class AutomationRunner {
       .from(schema.conversationInboxState)
       .where(eq(schema.conversationInboxState.conversationId, conversationId));
     if (current?.teamId === teamId) return;
-    await tx
-      .insert(schema.conversationInboxState)
-      .values({ tenantId, conversationId, teamId })
-      .onConflictDoUpdate({
-        target: [
-          schema.conversationInboxState.tenantId,
-          schema.conversationInboxState.conversationId,
-        ],
-        set: { teamId, updatedAt: this.clock() },
-      });
-    await enqueueOutbox(tx, tenantId, {
-      topic: 'conversation.team_changed',
-      aggregateType: 'conversation',
-      aggregateId: conversationId,
-      payload: { conversationId, teamId, actorStaffMemberId: null },
-    });
+    await putInTeam(tx, tenantId, conversationId, teamId, this.clock());
     await this.audit(tx, rule, conversationId, 'conversation.routed', {
       from: current?.teamId ? toPublicId('team', current.teamId) : null,
       team: teamPublicId,

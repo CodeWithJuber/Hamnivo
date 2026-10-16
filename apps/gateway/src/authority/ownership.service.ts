@@ -46,7 +46,8 @@ export interface TransitionOptions {
     | 'ai_limit'
     | 'ai_escalated'
     | 'channel_ai_off'
-    | 'offer_accepted';
+    | 'offer_accepted'
+    | 'sla_moved';
   /** Audit actor (`stf_…`, `cus_…`, `authority`). */
   actor: { type: 'staff' | 'customer' | 'system'; id: string };
   /** The epoch the caller saw; a different current epoch fails with OWNERSHIP_CHANGED. */
@@ -55,6 +56,12 @@ export interface TransitionOptions {
   handoffNote?: string;
   /** The staff member who made the change, so Chatwoot records it as theirs. */
   actorStaffMemberId?: string;
+  /**
+   * A conversation already waiting goes to the queue again as a new hand-off (a new epoch), so the
+   * people of its new team are offered it (ADR 0016). Its AI draft stays: it was written for
+   * whoever picks the conversation up from the queue.
+   */
+  requeue?: boolean;
 }
 
 export interface TransitionResult {
@@ -160,7 +167,9 @@ export class OwnershipService {
         currentOwner: await currentOwnerOf(tx, control),
       });
     }
-    if (sameOwner(control, target)) return { changed: false, control, journal: [] };
+    if (sameOwner(control, target) && !(options.requeue && target.kind === 'queue')) {
+      return { changed: false, control, journal: [] };
+    }
 
     const epoch = control.ownershipEpoch + 1;
     const mode = modeOf(target);
@@ -201,7 +210,7 @@ export class OwnershipService {
     const superseded = await supersedeForOwnerChange(tx, conversationId, epoch, this.clock());
     // An AI draft was written for whoever would pick the conversation up from the queue; any other
     // change of hands makes it stale (HNV-09-05).
-    if (!draftSurvivesOwnerChange(control.ownerMode, mode)) {
+    if (!options.requeue && !draftSurvivesOwnerChange(control.ownerMode, mode)) {
       await supersedeAiDrafts(tx, conversationId, 'owner_changed', this.clock());
     }
     const updates = [

@@ -160,6 +160,7 @@ describe('parseAlert', () => {
     for (const kind of [
       'chat_offered',
       'sla_overdue',
+      'sla_overdue_lead',
       'chat_waiting',
       'assigned',
       'customer_message',

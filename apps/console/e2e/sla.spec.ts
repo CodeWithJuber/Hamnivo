@@ -1,6 +1,7 @@
 /**
  * Reply-time targets (H12), urgent conversations nobody has taken (HNV-08-02) and a claim that
- * lost (HNV-08-06) in a real browser: targets set on the Business hours page, the due badge, the
+ * lost (HNV-08-06) in a real browser: targets set on the Business hours page with what happens to
+ * an overdue conversation (leads alerted, moved to a team; ADR 0016), the due badge, the
  * urgent list above the queue with its Claim button, and a claim a colleague won first, which
  * names them. English and Arabic, a 390 px phone, with axe audits.
  */
@@ -11,6 +12,7 @@ import { audit, SHOP, type Staff, seedWorkspace, stack, type Workspace } from '.
 
 let workspace: Workspace;
 let colleague: Staff;
+let teamId: string;
 
 /** A customer starts a chat and asks for a person, as the widget's "Talk to a person" does. */
 async function waitsForPerson(widgetId: string, text: string) {
@@ -55,6 +57,15 @@ test.beforeAll(async () => {
   test.setTimeout(120_000);
   workspace = await seedWorkspace({ connect: true, publish: true });
   colleague = await memberOf(workspace.staff, 'Rayan Lead', 'sla-colleague', 'agent');
+  const workspaces = await workspace.staff.call<{ items: Array<{ id: string }> }>(
+    'GET',
+    '/v1/admin/workspaces',
+  );
+  const team = await workspace.staff.call<{ id: string }>('POST', '/v1/admin/teams', {
+    name: 'Escalations',
+    workspaceId: workspaces.items[0]?.id ?? null,
+  });
+  teamId = team.id;
 });
 
 test('H12 · set reply-time targets for a brand on the Business hours page', async ({
@@ -73,15 +84,28 @@ test('H12 · set reply-time targets for a brand on the Business hours page', asy
   await form
     .getByRole('combobox', { name: 'Unit for First reply within, Medium' })
     .selectOption('hours');
+  // An overdue conversation: its leads are alerted, and it moves to a team after 10 minutes.
+  const overdue = form.getByRole('group', { name: 'When a conversation goes past its target' });
+  await overdue.getByRole('checkbox', { name: 'Alert team leads right away' }).click();
+  await overdue.getByRole('checkbox', { name: 'Move it if nobody replies' }).click();
+  await overdue.getByRole('textbox', { name: 'Move it after' }).fill('10');
+  await overdue.getByRole('combobox', { name: 'Move it to' }).selectOption(teamId);
+  expect(await audit(page, 'overdue settings (en)')).toEqual([]);
   await form.getByRole('button', { name: 'Save targets' }).click();
   await expect(form.getByRole('button', { name: 'Save targets' })).toBeDisabled();
   const saved = await workspace.staff.call<{
     enabled: boolean;
     targets: Record<string, { firstReplyMinutes: number | null }>;
+    overdue: unknown;
   }>('GET', `/v1/admin/brands/${workspace.brand.id}/sla-policy`);
   expect(saved.enabled).toBe(true);
   expect(saved.targets.urgent?.firstReplyMinutes).toBe(5);
   expect(saved.targets.medium?.firstReplyMinutes).toBe(60);
+  expect(saved.overdue).toEqual({
+    alertLeads: true,
+    moveAfterMinutes: 10,
+    moveTo: { kind: 'team', teamId },
+  });
 
   expect(await audit(page, 'reply-time targets (en)')).toEqual([]);
   await open(page, `/hours?brand=${workspace.brand.id}&lang=ar`);

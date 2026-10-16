@@ -58,6 +58,25 @@ Hover over the label to see which target applies, for example "First reply targe
   has taken, everyone who can see it does. It uses the sound you chose for "A chat is waiting for
   a person, or is past its reply time" in [sounds and notifications](sounds-and-notifications.md).
 
+## When a conversation goes overdue
+
+Under **When a conversation goes past its target**, below the targets, choose what else happens:
+
+- **Alert team leads right away.** Everyone whose role can assign the conversation (owners,
+  administrators and supervisors, for the brand or team they cover) hears it in Studio. Those who
+  are not online get an email with a link to it, at most one every 15 minutes.
+- **Move it if nobody replies.** After the wait you set (counted in business hours after it went
+  overdue), Hamnivo takes the conversation from the person who has it and puts it back in the
+  queue, or in the team you choose, where it is offered to the next person. A note in the
+  conversation says why, and the inbox shows "Back in the queue: nobody replied within the
+  reply-time target." A conversation nobody had moves only when you chose a team.
+
+It is not moved if, before the wait is over, someone replies, snoozes or resolves it, takes it,
+or gives it to someone else. The customer is not told anything; they keep waiting for a person.
+
+Changing the targets does not alert about or move conversations that the change itself makes
+overdue.
+
 ## Good to know
 
 - Targets belong to each brand. Other brands keep their own.

@@ -42,6 +42,7 @@ so a clock can be kept next to the rows it sorts and filters.
 
 - The clock is as fresh as the last event Hamnivo processed; a Chatwoot reply arrives with the
   next webhook or reconciliation.
-- Escalation (reassigning an overdue conversation, a supervisor alert) and reports on targets met
-  are not part of this decision; they can build on the stored clocks and the audit trail.
+- Escalation (a supervisor alert, reassigning an overdue conversation) builds on the stored
+  clocks: see ADR 0016. Reports on targets met keep a record of how each clock ended
+  (`sla_outcomes`).
 - Chatwoot does not show the targets. A team working only in Chatwoot does not see them.

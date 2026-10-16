@@ -67,6 +67,7 @@ export const inboxAlertsEn = {
   alert: {
     chat_waiting: '{{name}} is waiting for a person',
     sla_overdue: '{{name}} is past the reply-time target',
+    sla_overdue_lead: 'Nobody has replied to {{name}} in time',
     chat_offered: '{{name}} is offered to you: accept or decline',
     customer_message: 'New message from {{name}}',
     assigned: 'A chat was assigned to you',

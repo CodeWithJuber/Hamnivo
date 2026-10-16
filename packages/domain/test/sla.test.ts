@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { BusinessHours } from '../src/business-hours.js';
 import {
+  decideSlaMove,
   nextSlaClock,
   type SlaClock,
   type SlaFacts,
   type SlaTargets,
+  slaMoveAt,
   slaOutcomeOf,
   slaView,
 } from '../src/sla.js';
@@ -246,5 +248,117 @@ describe('how a reply-time clock ended (H12, O04)', () => {
     });
     // A reply from before this clock started does not end it.
     expect(outcome(clock(), t('09:50:00'), t('10:40:00')).outcome).toBe('stopped');
+  });
+});
+
+describe('moving an overdue conversation (H12, ADR 0016)', () => {
+  const overdueAt = t('10:30:00');
+  const clock: SlaClock = {
+    kind: 'first_reply',
+    startedAt: t('10:00:00'),
+    targetMinutes: 30,
+    pausedAt: null,
+    pausedMinutes: 0,
+    dueAt: overdueAt,
+    breachedAt: overdueAt,
+  };
+  const queued = { breachedAt: overdueAt, epoch: 4, teamId: 'team-a' };
+  const owned = {
+    status: 'open' as const,
+    ownerMode: 'HUMAN_ACTIVE' as const,
+    epoch: 4,
+    teamId: 'team-a',
+    clock,
+  };
+  const move = { afterMinutes: 10, teamId: null, teamUsable: false };
+  const decide = (over: Partial<Parameters<typeof decideSlaMove>[0]> = {}) =>
+    decideSlaMove({ queued, current: owned, move, hours: null, now: t('10:40:00'), ...over });
+  const weekday: BusinessHours = {
+    timezone: 'UTC',
+    weekly: {
+      sun: [],
+      mon: [{ open: '09:00', close: '10:35' }],
+      tue: [{ open: '09:00', close: '17:00' }],
+      wed: [],
+      thu: [],
+      fri: [],
+      sat: [],
+    },
+    closedDates: [],
+  };
+
+  it('waits working minutes after it went overdue', () => {
+    expect(slaMoveAt(null, overdueAt, 10)).toEqual(t('10:40:00'));
+    // Monday closes at 10:35: five minutes then, five more when Tuesday opens.
+    expect(slaMoveAt(weekday, overdueAt, 10)).toEqual(new Date('2026-10-13T09:05:00Z'));
+    const never = { ...weekday, weekly: { ...weekday.weekly, mon: [], tue: [] } };
+    expect(slaMoveAt(never, overdueAt, 10)).toBeNull();
+    expect(decide({ hours: never })).toEqual({ kind: 'skip', why: 'never_opens' });
+  });
+
+  it('moves a conversation someone has back to the queue, or to the chosen team', () => {
+    expect(decide()).toEqual({ kind: 'move', requeue: false, teamId: null });
+    expect(decide({ move: { afterMinutes: 10, teamId: 'team-b', teamUsable: true } })).toEqual({
+      kind: 'move',
+      requeue: false,
+      teamId: 'team-b',
+    });
+    // The team it already has is no change of team.
+    expect(decide({ move: { afterMinutes: 10, teamId: 'team-a', teamUsable: true } })).toEqual({
+      kind: 'move',
+      requeue: false,
+      teamId: null,
+    });
+    // A team that can no longer take the brand's conversations means the queue.
+    expect(decide({ move: { afterMinutes: 10, teamId: 'team-b', teamUsable: false } })).toEqual({
+      kind: 'move',
+      requeue: false,
+      teamId: null,
+    });
+  });
+
+  it('moves a waiting conversation only to another team, as a new hand-off', () => {
+    const waiting = { ...owned, ownerMode: 'WAITING_HUMAN' as const };
+    expect(decide({ current: waiting })).toEqual({ kind: 'skip', why: 'in_queue' });
+    expect(
+      decide({ current: waiting, move: { afterMinutes: 10, teamId: 'team-b', teamUsable: true } }),
+    ).toEqual({ kind: 'move', requeue: true, teamId: 'team-b' });
+    const paused = { ...owned, ownerMode: 'PAUSED' as const };
+    expect(
+      decide({ current: paused, move: { afterMinutes: 10, teamId: 'team-b', teamUsable: true } }),
+    ).toEqual({ kind: 'move', requeue: false, teamId: 'team-b' });
+  });
+
+  it('waits again when the brand lengthened the wait', () => {
+    expect(decide({ move: { ...move, afterMinutes: 20 } })).toEqual({
+      kind: 'wait',
+      until: t('10:50:00'),
+    });
+  });
+
+  it('leaves it when someone acted, the clock ended or the setting is off', () => {
+    expect(decide({ move: null })).toEqual({ kind: 'skip', why: 'policy_off' });
+    expect(decide({ current: { ...owned, clock: null } })).toEqual({
+      kind: 'skip',
+      why: 'clock_ended',
+    });
+    expect(decide({ current: { ...owned, status: 'resolved' } })).toEqual({
+      kind: 'skip',
+      why: 'clock_ended',
+    });
+    // Overdue again later: another clock, moved by its own check.
+    const later = { ...clock, breachedAt: t('11:30:00') };
+    expect(decide({ current: { ...owned, clock: later } })).toEqual({
+      kind: 'skip',
+      why: 'clock_ended',
+    });
+    expect(decide({ current: { ...owned, clock: { ...clock, pausedAt: t('10:35:00') } } })).toEqual(
+      { kind: 'skip', why: 'paused' },
+    );
+    expect(decide({ current: { ...owned, epoch: 5 } })).toEqual({ kind: 'skip', why: 'handled' });
+    expect(decide({ current: { ...owned, teamId: 'team-c' } })).toEqual({
+      kind: 'skip',
+      why: 'handled',
+    });
   });
 });

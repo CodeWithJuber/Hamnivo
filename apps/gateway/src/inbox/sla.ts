@@ -3,7 +3,9 @@ import {
   type BusinessHours,
   nextSlaClock,
   type SlaClock,
+  type SlaKind,
   type SlaTargets,
+  slaMoveAt,
   slaOutcomeOf,
   slaPriorityOf,
   slaView,
@@ -15,10 +17,23 @@ import { enqueueOutbox } from '../outbox/outbox.js';
 export const SLA_DUE_TOPIC = 'conversation.sla_due';
 /** Outbox topic that recomputes a brand's running clocks after its targets or hours changed. */
 export const SLA_RESYNC_TOPIC = 'brand.sla_resync';
+/** Outbox topic that alerts the people who can assign an overdue conversation (ADR 0016). */
+export const SLA_ALERT_TOPIC = 'conversation.sla_alert';
+/** Outbox topic that moves an overdue conversation nobody replied to, when its time comes. */
+export const SLA_MOVE_TOPIC = 'conversation.sla_move';
+
+/** What went overdue, as it was then: the steps after it check it is still the same. */
+export interface OverdueStep {
+  conversationId: string;
+  kind: SlaKind;
+  breachedAt: string;
+  epoch: number;
+  teamId: string | null;
+}
 
 type InboxStateRow = typeof schema.conversationInboxState.$inferSelect;
 
-function clockOf(row: InboxStateRow | undefined): SlaClock | null {
+export function clockOf(row: InboxStateRow | undefined): SlaClock | null {
   if (!row?.slaKind || !row.slaStartedAt || !row.slaTargetMinutes) return null;
   return {
     kind: row.slaKind,
@@ -106,10 +121,17 @@ export async function syncSla(
         ownerChangedAt: schema.conversationControls.ownerChangedAt,
         createdAt: schema.conversationControls.createdAt,
         brandId: schema.conversationControls.brandId,
+        epoch: schema.conversationControls.ownershipEpoch,
       },
       state: schema.conversationInboxState,
       hours: schema.brands.businessHours,
-      policy: { enabled: schema.slaPolicies.enabled, targets: schema.slaPolicies.targets },
+      policy: {
+        enabled: schema.slaPolicies.enabled,
+        targets: schema.slaPolicies.targets,
+        updatedAt: schema.slaPolicies.updatedAt,
+        alertLeads: schema.slaPolicies.overdueAlertLeads,
+        moveAfterMinutes: schema.slaPolicies.overdueMoveAfterMinutes,
+      },
     })
     .from(schema.conversationControls)
     .leftJoin(
@@ -224,6 +246,57 @@ export async function syncSla(
       outcome: 'success',
       data: { kind: clock.kind, targetMinutes: clock.targetMinutes },
     });
+    if (row.policy) {
+      await queueOverdueSteps(tx, tenantId, {
+        clock,
+        step: {
+          conversationId,
+          kind: clock.kind,
+          breachedAt: (clock.breachedAt as Date).toISOString(),
+          epoch: row.control.epoch,
+          teamId: state?.teamId ?? null,
+        },
+        policy: row.policy,
+        hours,
+      });
+    }
   }
   return { breached };
+}
+
+/**
+ * What happens next to a conversation that has just gone overdue (ADR 0016), queued in the same
+ * transaction so no path that moves the clock can miss it: the people who can assign it are
+ * alerted now, and it is moved when the brand's extra working minutes have passed. A deadline that
+ * had already passed when the brand changed its settings is not escalated, so shortening a target
+ * does not alert about or move the whole backlog at once.
+ */
+async function queueOverdueSteps(
+  tx: TenantTx,
+  tenantId: string,
+  input: {
+    clock: SlaClock;
+    step: OverdueStep;
+    policy: {
+      enabled: boolean;
+      updatedAt: Date;
+      alertLeads: boolean;
+      moveAfterMinutes: number | null;
+    };
+    hours: BusinessHours | null;
+  },
+): Promise<void> {
+  const { clock, step, policy, hours } = input;
+  if (!policy.enabled || !clock.breachedAt || !clock.dueAt) return;
+  if (clock.dueAt.getTime() < policy.updatedAt.getTime()) return;
+  const base = {
+    aggregateType: 'conversation',
+    aggregateId: step.conversationId,
+    payload: { ...step },
+  } as const;
+  if (policy.alertLeads) await enqueueOutbox(tx, tenantId, { topic: SLA_ALERT_TOPIC, ...base });
+  if (policy.moveAfterMinutes !== null) {
+    const at = slaMoveAt(hours, clock.breachedAt, policy.moveAfterMinutes);
+    if (at) await enqueueOutbox(tx, tenantId, { topic: SLA_MOVE_TOPIC, ...base, availableAt: at });
+  }
 }

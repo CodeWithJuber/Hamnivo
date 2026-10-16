@@ -13,6 +13,7 @@ your team keeps their own.
 | Someone assigns or transfers a chat to you | A sound and a desktop alert |
 | A chat is [offered to you](offers.md) to accept or decline | The "assigned" sound and a desktop alert |
 | A chat goes past its [reply-time target](reply-targets.md) | The "waiting" sound and a desktop alert |
+| A colleague's chat goes past its target, and you can assign it (when the brand [alerts team leads](reply-targets.md#when-a-conversation-goes-overdue)) | The "waiting" sound and a desktop alert, or an email when you are not online |
 
 You only hear about chats you can answer. A chat the AI is handling does not make a sound until a
 person is needed. In a team that offers chats to one person at a time, the rest of the team hears

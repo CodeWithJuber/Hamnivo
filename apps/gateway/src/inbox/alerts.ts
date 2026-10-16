@@ -24,6 +24,13 @@ export interface AlertChat {
   offerId?: string | null;
   offerStaffId?: string | null;
   offeredAt?: Date | null;
+  /** The person may answer the chat; left out: they may (only they hear the chat's alerts). */
+  canReply?: boolean;
+  /**
+   * The person may assign the chat and its brand alerts leads (ADR 0016): they hear when it goes
+   * overdue even when it is not theirs.
+   */
+  leadAlert?: boolean;
 }
 
 /** A customer message (the newest one of a chat is enough to alert). */
@@ -79,7 +86,9 @@ export interface AlertDecision {
  * - `assigned`: a chat was assigned or transferred to this person by someone else;
  * - `customer_message`: the customer wrote in a chat that is theirs or waiting for a person;
  * - `sla_overdue`: a chat that is theirs or waiting for a person went past its reply-time target
- *   (H12), once per deadline. It comes first: an overdue chat is the most urgent thing to hear.
+ *   (H12), once per deadline. It comes first: an overdue chat is the most urgent thing to hear;
+ * - `sla_overdue_lead`: the same, for a lead (someone who may assign the chat) whom the chat does
+ *   not otherwise concern, when the brand alerts leads (ADR 0016). Leads hear nothing else of it.
  * One chat gets one alert per batch, the most important first: a chat that just started waiting or
  * was just assigned already says a customer is there, so its message adds no second alert.
  * Only open chats alert, and only chats that concern the person. `seen` holds the keys a stream
@@ -107,16 +116,17 @@ export function deriveAlerts(input: {
   const looked: string[] = [];
   for (const chat of input.chats) {
     if (chat.authorityStatus !== 'open' && chat.authorityStatus !== 'pending') continue;
-    if (!concernsStaff(chat, input.me)) continue;
+    const concerned = chat.canReply !== false && concernsStaff(chat, input.me);
+    if (!concerned && !chat.leadAlert) continue;
     const name = chat.customerName?.trim() || 'Visitor';
     const message = latest.get(chat.id);
-    if (message) looked.push(messageKey(message));
+    if (concerned && message) looked.push(messageKey(message));
     const breachedAt = chat.slaBreachedAt ?? null;
     const overdueKey = breachedAt ? `${chat.id}:sla:${breachedAt.getTime()}` : null;
     if (breachedAt && overdueKey && breachedAt.getTime() > since && !seen.has(overdueKey)) {
       alerts.push({
         key: overdueKey,
-        kind: 'sla_overdue',
+        kind: concerned ? 'sla_overdue' : 'sla_overdue_lead',
         conversationId: chat.id,
         customerName: name,
         preview: previewOf(message?.text),
@@ -124,6 +134,7 @@ export function deriveAlerts(input: {
       });
       continue;
     }
+    if (!concerned) continue;
     const offerKey = chat.offerId ? `${chat.id}:offer:${chat.offerId}` : null;
     if (
       waiting(chat) &&

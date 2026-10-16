@@ -3369,7 +3369,7 @@
     "note": "Connect a WhatsApp Business number (Meta Cloud API) or a Telegram bot from Settings → Channels: Chatwoot checks the token with Meta or Telegram and keeps it; Hamnivo stores none. For WhatsApp, Studio shows the callback URL on Chatwoot's public host and Chatwoot's verify token for Meta's webhook set-up. Their conversations are adopted like email (ADR 0013), with the AI off until the owner turns it on, and Telegram is its own channel in the inbox. Tested end to end against the fake; creating WhatsApp and Telegram inboxes against a real Chatwoot needs Meta and Telegram, so the contract suite runs those cases on the fake only. Past the 24-hour window, staff send Meta-approved templates from the composer: Chatwoot's synced list is read live, values are checked and the rendered text is what the customer reads; sent once through the message ledger. Templates with a media header and one-time-code templates are not sent from Hamnivo."
   },
   "H12": {
-    "status": "in-progress",
+    "status": "implemented",
     "evidence": [
       "packages/domain/src/sla.ts",
       "packages/domain/src/business-hours.ts",
@@ -3386,9 +3386,12 @@
       "docs/guide/inbox/reply-targets.md",
       "apps/gateway/test/analytics.int.test.ts",
       "apps/console/src/pages/reports/WorkQueueReports.tsx",
-      "docs/guide/reports.md"
+      "docs/guide/reports.md",
+      "apps/gateway/src/inbox/sla-escalation.service.ts",
+      "apps/gateway/test/sla-escalation.int.test.ts",
+      "docs/adr/0016-overdue-conversations-escalate-to-the-people-who-can-assign-them.md"
     ],
-    "note": "Per-brand first and next reply targets by priority, counted in business hours (ADR 0014); the clock pauses while snoozed and ends with a person's reply or a hand-back to the AI. Overdue queue and count, audit and an alert when a conversation goes overdue. How each clock ended (met, missed, or stopped without a person’s reply) is recorded, and Reports show the share met by priority and by day and the median time to a first reply. Escalation (reassigning overdue work) is still to come."
+    "note": "Per-brand first and next reply targets by priority, counted in business hours (ADR 0014); the clock pauses while snoozed and ends with a person's reply or a hand-back to the AI. Overdue queue and count, audit and an alert when a conversation goes overdue. How each clock ended (met, missed, or stopped without a person’s reply) is recorded, and Reports show the share met by priority and by day and the median time to a first reply. Escalation per brand (ADR 0016): the people who can assign an overdue conversation are alerted in Studio, and by email when not online; after more working minutes without a reply it goes back to the queue or to a chosen team as a new hand-off, unless someone replied, snoozed, resolved, took or reassigned it. Tested in the gateway (settings, lead alert and email, moves, the cases that stop a move, no backlog storm) and in Studio."
   },
   "HNV-08-06": {
     "status": "partial",
@@ -3398,9 +3401,11 @@
       "apps/gateway/test/sla.int.test.ts",
       "apps/gateway/test/inbox-alerts.test.ts",
       "apps/console/src/pages/inbox/parts.tsx",
-      "apps/console/test/inbox-sla.test.tsx"
+      "apps/console/test/inbox-sla.test.tsx",
+      "apps/gateway/src/inbox/sla-escalation.service.ts",
+      "apps/gateway/test/sla-escalation.int.test.ts"
     ],
-    "note": "An SLA breach shows as Overdue (badge, queue and count), is audited and alerts the owner or everyone who sees the waiting conversation. A backlog spike is not detected yet."
+    "note": "An SLA breach shows as Overdue (badge, queue and count), is audited and alerts the owner or everyone who sees the waiting conversation; the brand can alert the people who can assign it (by email when not online) and move it when nobody replies (ADR 0016). A backlog spike is not detected yet."
   },
   "HNV-10-02": {
     "status": "implemented",

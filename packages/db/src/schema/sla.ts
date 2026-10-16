@@ -15,6 +15,7 @@ import {
 import { conversationControls } from './authority.js';
 import { createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { staffMembers } from './identity.js';
+import { teams } from './inbox.js';
 import { brands, tenantId } from './tenancy.js';
 
 /** Minutes for the first and the next reply, per priority (the `SlaTargets` contract). */
@@ -25,7 +26,9 @@ export type SlaTargetsJson = Record<
 
 /**
  * A brand's reply-time targets (H12): how soon a person should give the first and each next reply,
- * per priority, counted in the brand's business hours. A brand with no row has no targets.
+ * per priority, counted in the brand's business hours. A brand with no row has no targets. When a
+ * conversation goes past its target, the people who can assign it may be alerted, and it may be
+ * moved back to the queue or to another team after more working minutes (ADR 0016).
  */
 export const slaPolicies = pgTable(
   'sla_policies',
@@ -34,6 +37,12 @@ export const slaPolicies = pgTable(
     brandId: uuid('brand_id').notNull(),
     enabled: boolean('enabled').notNull().default(true),
     targets: jsonb('targets').$type<SlaTargetsJson>().notNull(),
+    /** Alert the people who can assign an overdue conversation (ADR 0016). */
+    overdueAlertLeads: boolean('overdue_alert_leads').notNull().default(false),
+    /** Working minutes after it went overdue before it is moved; null: never moved. */
+    overdueMoveAfterMinutes: integer('overdue_move_after_minutes'),
+    /** The team it is moved to; null: back to the queue, keeping its team. */
+    overdueMoveTeamId: uuid('overdue_move_team_id'),
     updatedBy: uuid('updated_by'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -41,6 +50,15 @@ export const slaPolicies = pgTable(
   (t) => [
     primaryKey({ name: 'sla_policies_pkey', columns: [t.tenantId, t.brandId] }),
     check('sla_policies_targets_ck', sql`jsonb_typeof(${t.targets}) = 'object'`),
+    check(
+      'sla_policies_overdue_move_ck',
+      sql`${t.overdueMoveAfterMinutes} is null or ${t.overdueMoveAfterMinutes} between 1 and 10080`,
+    ),
+    foreignKey({
+      name: 'sla_policies_overdue_team_fk',
+      columns: [t.tenantId, t.overdueMoveTeamId],
+      foreignColumns: [teams.tenantId, teams.id],
+    }),
     foreignKey({
       name: 'sla_policies_brand_fk',
       columns: [t.tenantId, t.brandId],

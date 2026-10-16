@@ -230,6 +230,35 @@ describe('alerts for the staff inbox', () => {
     );
   });
 
+  it('tells a lead when a colleague’s chat goes overdue, once, and nothing else of it (ADR 0016)', () => {
+    // A chat a colleague has: it concerns the lead only as someone who may assign it.
+    const owned = chat({
+      ownerMode: 'HUMAN_ACTIVE',
+      ownerStaffId: OTHER,
+      ownerReason: 'staff_assign',
+      ownerChangedAt: at(2),
+      slaBreachedAt: at(5),
+      leadAlert: true,
+    });
+    const [alert] = derive([owned], [message(4)]);
+    expect(alert).toMatchObject({ kind: 'sla_overdue_lead', preview: 'Where is my order?' });
+    expect(derive([owned], [message(4)], T0, new Set([alert?.key ?? '']))).toEqual([]);
+    // Within its target, a lead hears nothing: not the assignment, not the customer's message.
+    expect(derive([{ ...owned, slaBreachedAt: null }], [message(6)])).toEqual([]);
+    // A brand that does not alert leads: nothing.
+    expect(derive([{ ...owned, leadAlert: false }], [message(4)])).toEqual([]);
+  });
+
+  it('tells a lead who could answer the chat the usual overdue alert', () => {
+    const waiting = chat({ slaBreachedAt: at(5), leadAlert: true });
+    expect(derive([waiting]).map((a) => a.kind)).toEqual(['sla_overdue']);
+    // Someone who may not answer it, and is no lead, hears nothing.
+    expect(derive([{ ...waiting, canReply: false, leadAlert: false }])).toEqual([]);
+    expect(derive([{ ...waiting, canReply: false }]).map((a) => a.kind)).toEqual([
+      'sla_overdue_lead',
+    ]);
+  });
+
   it('calls a customer without a name a visitor, and cuts a long message to one short line', () => {
     expect(derive([chat({ customerName: null, ownerChangedAt: at(1) })])[0]?.customerName).toBe(
       'Visitor',

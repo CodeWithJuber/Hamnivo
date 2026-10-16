@@ -66,6 +66,7 @@ export const TYPING_LINE_MS = 10_000;
 const ALERT_KINDS: Record<C.InboxAlertKind, true> = {
   chat_offered: true,
   sla_overdue: true,
+  sla_overdue_lead: true,
   chat_waiting: true,
   assigned: true,
   customer_message: true,

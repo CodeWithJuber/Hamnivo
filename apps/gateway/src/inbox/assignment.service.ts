@@ -23,7 +23,6 @@ import {
 import { AppError } from '../common/app-error.js';
 import { ownedByOther } from '../conversations/staff-conversations.service.js';
 import { enforce } from '../identity/staff.guard.js';
-import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
 import { CLOCK, type Clock } from '../tokens.js';
@@ -33,6 +32,7 @@ import { eligibleStaffAt } from './eligible.js';
 import { InboxService } from './inbox.service.js';
 import { InboxMessagesService } from './messages.service.js';
 import { InboxSignals } from './signals.service.js';
+import { putInTeam, teamTakesBrand } from './team-queue.js';
 
 type Target = z.output<typeof AssignRequest>['to'];
 
@@ -268,36 +268,21 @@ export class AssignmentService {
       if (teamPublicId) {
         teamId = fromPublicId('team', teamPublicId);
         const [team] = await tx.select().from(schema.teams).where(eq(schema.teams.id, teamId));
-        const fits =
-          team?.status === 'active' &&
-          (team.workspaceId === null || team.workspaceId === found.workspaceId);
-        if (!fits) {
+        if (!teamTakesBrand(team, found.workspaceId)) {
           throw new AppError('VALIDATION_FAILED', {
             fields: [{ path: 'teamId', message: 'This team cannot take conversations here.' }],
           });
         }
       }
       if ((found.teamId ?? null) === teamId) return found.control.id;
-      await tx
-        .insert(schema.conversationInboxState)
-        .values({ tenantId: principal.tenantId, conversationId: found.control.id, teamId })
-        .onConflictDoUpdate({
-          target: [
-            schema.conversationInboxState.tenantId,
-            schema.conversationInboxState.conversationId,
-          ],
-          set: { teamId, updatedAt: this.clock() },
-        });
-      await enqueueOutbox(tx, principal.tenantId, {
-        topic: 'conversation.team_changed',
-        aggregateType: 'conversation',
-        aggregateId: found.control.id,
-        payload: {
-          conversationId: found.control.id,
-          teamId,
-          actorStaffMemberId: principal.staffMemberId,
-        },
-      });
+      await putInTeam(
+        tx,
+        principal.tenantId,
+        found.control.id,
+        teamId,
+        this.clock(),
+        principal.staffMemberId,
+      );
       await appendAudit(tx, {
         actorType: 'staff',
         actorId: toPublicId('staff', principal.staffMemberId),

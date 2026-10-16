@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Timestamp } from './common.js';
+import { typeId } from './ids.js';
 
 /**
  * Reply-time targets (H12): per brand and priority, how soon a person should give the first reply
@@ -20,10 +21,34 @@ export const SlaTargets = z
   .meta({ id: 'SlaTargets' });
 export type SlaTargets = z.infer<typeof SlaTargets>;
 
+/** Where an overdue conversation is moved: back to the queue (it keeps its team), or to a team. */
+export const SlaMoveTo = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('queue') }),
+    z.object({ kind: z.literal('team'), teamId: typeId('team') }),
+  ])
+  .meta({ id: 'SlaMoveTo' });
+export type SlaMoveTo = z.infer<typeof SlaMoveTo>;
+
+/**
+ * What happens when a conversation goes past its target (ADR 0016): the people who can assign it
+ * are alerted, and after `moveAfterMinutes` more working minutes without a reply it is moved.
+ */
+export const SlaOverdue = z
+  .object({
+    alertLeads: z.boolean(),
+    /** Working minutes after it went overdue; null: it is never moved. */
+    moveAfterMinutes: SlaMinutes,
+    moveTo: SlaMoveTo,
+  })
+  .meta({ id: 'SlaOverdue' });
+export type SlaOverdue = z.infer<typeof SlaOverdue>;
+
 export const SlaPolicy = z
   .object({
     enabled: z.boolean(),
     targets: SlaTargets,
+    overdue: SlaOverdue,
     /** Null until someone saves targets for the brand. */
     updatedAt: Timestamp.nullable(),
   })
@@ -31,7 +56,12 @@ export const SlaPolicy = z
 export type SlaPolicy = z.infer<typeof SlaPolicy>;
 
 export const SetSlaPolicyRequest = z
-  .object({ enabled: z.boolean(), targets: SlaTargets })
+  .object({
+    enabled: z.boolean(),
+    targets: SlaTargets,
+    /** Left out: what happens to overdue conversations stays as it is. */
+    overdue: SlaOverdue.optional(),
+  })
   .meta({ id: 'SetSlaPolicyRequest' });
 export type SetSlaPolicyRequest = z.infer<typeof SetSlaPolicyRequest>;
 
