@@ -29,6 +29,8 @@ export interface OverdueStep {
   breachedAt: string;
   epoch: number;
   teamId: string | null;
+  /** Working minutes it had been snoozed by then: a snooze since is someone acting on it. */
+  pausedMinutes: number;
 }
 
 type InboxStateRow = typeof schema.conversationInboxState.$inferSelect;
@@ -104,13 +106,16 @@ export async function recordHumanReply(
  * after anything that can move it: a customer message, a person's reply, an owner, status or
  * priority change, and when a deadline comes. When the deadline moves, a check is queued for the
  * new time; when it has just passed, that is audited (and the inbox alerts the team).
- * Returns whether the conversation has just gone overdue.
+ * Returns whether the conversation has just gone overdue. `escalateFrom`: when the brand's targets
+ * or hours changed, only deadlines from then on are escalated (ADR 0016), so a change does not
+ * email about or move the backlog it makes overdue.
  */
 export async function syncSla(
   tx: TenantTx,
   tenantId: string,
   conversationId: string,
   now: Date,
+  options: { escalateFrom?: Date } = {},
 ): Promise<{ breached: boolean }> {
   const [row] = await tx
     .select({
@@ -128,7 +133,6 @@ export async function syncSla(
       policy: {
         enabled: schema.slaPolicies.enabled,
         targets: schema.slaPolicies.targets,
-        updatedAt: schema.slaPolicies.updatedAt,
         alertLeads: schema.slaPolicies.overdueAlertLeads,
         moveAfterMinutes: schema.slaPolicies.overdueMoveAfterMinutes,
       },
@@ -255,9 +259,11 @@ export async function syncSla(
           breachedAt: (clock.breachedAt as Date).toISOString(),
           epoch: row.control.epoch,
           teamId: state?.teamId ?? null,
+          pausedMinutes: clock.pausedMinutes,
         },
         policy: row.policy,
         hours,
+        escalateFrom: options.escalateFrom ?? null,
       });
     }
   }
@@ -268,8 +274,8 @@ export async function syncSla(
  * What happens next to a conversation that has just gone overdue (ADR 0016), queued in the same
  * transaction so no path that moves the clock can miss it: the people who can assign it are
  * alerted now, and it is moved when the brand's extra working minutes have passed. A deadline that
- * had already passed when the brand changed its settings is not escalated, so shortening a target
- * does not alert about or move the whole backlog at once.
+ * had already passed when the brand changed its targets or hours (`escalateFrom`) is not escalated,
+ * so shortening a target does not email about or move the whole backlog at once.
  */
 async function queueOverdueSteps(
   tx: TenantTx,
@@ -277,18 +283,14 @@ async function queueOverdueSteps(
   input: {
     clock: SlaClock;
     step: OverdueStep;
-    policy: {
-      enabled: boolean;
-      updatedAt: Date;
-      alertLeads: boolean;
-      moveAfterMinutes: number | null;
-    };
+    policy: { enabled: boolean; alertLeads: boolean; moveAfterMinutes: number | null };
     hours: BusinessHours | null;
+    escalateFrom: Date | null;
   },
 ): Promise<void> {
-  const { clock, step, policy, hours } = input;
+  const { clock, step, policy, hours, escalateFrom } = input;
   if (!policy.enabled || !clock.breachedAt || !clock.dueAt) return;
-  if (clock.dueAt.getTime() < policy.updatedAt.getTime()) return;
+  if (escalateFrom && clock.dueAt.getTime() < escalateFrom.getTime()) return;
   const base = {
     aggregateType: 'conversation',
     aggregateId: step.conversationId,

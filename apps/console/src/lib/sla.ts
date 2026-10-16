@@ -192,11 +192,17 @@ export function draftOfOverdue(overdue: SlaOverdue): OverdueDraft {
 export const overdueInvalid = (draft: OverdueDraft) =>
   draft.move && typeof minutesOfTarget(draft.after) !== 'number';
 
-/** What to save; call only when it is valid. */
+/**
+ * What to save; call only when it is valid. Without the move there is no team to keep: one kept
+ * hidden could later stop the targets from being saved, once the team no longer takes chats.
+ */
 export function bodyOfOverdue(draft: OverdueDraft): SlaOverdue {
   return {
     alertLeads: draft.alertLeads,
     moveAfterMinutes: draft.move ? (minutesOfTarget(draft.after) ?? null) : null,
-    moveTo: draft.moveTo === 'queue' ? { kind: 'queue' } : { kind: 'team', teamId: draft.moveTo },
+    moveTo:
+      draft.move && draft.moveTo !== 'queue'
+        ? { kind: 'team', teamId: draft.moveTo }
+        : { kind: 'queue' },
   };
 }

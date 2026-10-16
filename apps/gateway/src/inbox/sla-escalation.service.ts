@@ -9,7 +9,7 @@ import {
 } from '@hamnivo/db';
 import { type BusinessHours, decideSlaMove } from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, count, eq, inArray, lte } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { JournalService } from '../authority/journal.service.js';
 import { OwnershipService } from '../authority/ownership.service.js';
 import { uuidV5 } from '../authority/uuid.js';
@@ -24,8 +24,9 @@ import { leadsAt } from './eligible.js';
 import { clockOf, type OverdueStep, SLA_ALERT_TOPIC, SLA_MOVE_TOPIC, syncSla } from './sla.js';
 import { putInTeam, teamTakesBrand } from './team-queue.js';
 
-/** At most one overdue email per lead and brand in this window, however many go overdue at once. */
+/** At most one overdue email per lead and brand in this time, however many go overdue at once. */
 const MAIL_WINDOW_MS = 15 * 60_000;
+const LEAD_MAIL = 'sla.lead_mail';
 
 const KIND_NAMES = { first_reply: 'first reply', next_reply: 'next reply' } as const;
 
@@ -106,20 +107,13 @@ export class SlaEscalationService {
           event.tenantId,
           leads.map((lead) => lead.staffMemberId),
         );
-        const window = Math.floor(now.getTime() / MAIL_WINDOW_MS);
         const recipients: string[] = [];
         for (const lead of leads) {
           if (statuses.get(lead.staffMemberId) === 'online') continue;
-          const [first] = await tx
-            .insert(schema.processedEvents)
-            .values({
-              tenantId: event.tenantId,
-              consumer: 'sla.lead_mail',
-              eventId: uuidV5(brand.id, `${lead.staffMemberId}:${window}`),
-            })
-            .onConflictDoNothing()
-            .returning({ eventId: schema.processedEvents.eventId });
-          if (first) recipients.push(lead.email);
+          if (await this.mailedRecently(tx, event.tenantId, brand.id, lead.staffMemberId, now)) {
+            continue;
+          }
+          recipients.push(lead.email);
         }
         if (recipients.length === 0) return null;
         const [owner] = control.ownerStaffId
@@ -130,34 +124,31 @@ export class SlaEscalationService {
           : [];
         const [team] = policy.overdueMoveTeamId
           ? await tx
-              .select({ name: schema.teams.name })
+              .select()
               .from(schema.teams)
               .where(eq(schema.teams.id, policy.overdueMoveTeamId))
           : [];
-        const [overdue] = await tx
-          .select({ n: count() })
-          .from(schema.conversationInboxState)
-          .innerJoin(
-            schema.conversationControls,
-            eq(schema.conversationControls.id, schema.conversationInboxState.conversationId),
-          )
-          .where(
-            and(
-              eq(schema.conversationControls.brandId, brand.id),
-              inArray(schema.conversationControls.authorityStatus, ['open', 'pending']),
-              lte(schema.conversationInboxState.slaDueAt, now),
-            ),
-          );
+        // What the move will do, by the same rules as the move itself: a conversation someone has
+        // goes back to the queue or to the chosen team; one already waiting only to another team.
+        const toTeam =
+          team && teamTakesBrand(team, brand.workspaceId) && team.id !== state.teamId ? team : null;
+        const where =
+          policy.overdueMoveAfterMinutes === null
+            ? null
+            : toTeam
+              ? `to the ${toTeam.name} team`
+              : control.ownerMode === 'HUMAN_ACTIVE'
+                ? 'back to the queue'
+                : null;
         return {
           brand: brand.name,
           recipients,
           target: state.slaTargetMinutes,
           owner: owner?.name ?? null,
           move:
-            policy.overdueMoveAfterMinutes === null
-              ? null
-              : { minutes: policy.overdueMoveAfterMinutes, team: team?.name ?? null },
-          overdue: Number(overdue?.n ?? 1),
+            where && policy.overdueMoveAfterMinutes !== null
+              ? { minutes: policy.overdueMoveAfterMinutes, where }
+              : null,
         };
       },
     );
@@ -169,17 +160,14 @@ export class SlaEscalationService {
       mail.owner ? `${mail.owner} has it but has not replied yet.` : 'Nobody has taken it yet.',
       ...(mail.move
         ? [
-            `If nobody replies within ${mail.move.minutes} more working minutes, Hamnivo moves it ${mail.move.team ? `to the ${mail.move.team} team` : 'back to the queue'}.`,
+            `If nobody replies within ${mail.move.minutes} more working minutes, Hamnivo moves it ${mail.move.where}.`,
           ]
         : []),
-      mail.overdue > 1
-        ? `${mail.overdue} conversations of ${mail.brand} are past their target now.`
-        : '',
       '',
       `Open the conversation:\n${link}`,
       '',
       `All overdue conversations:\n${origin}/inbox?queue=overdue`,
-    ].filter((line, index, all) => line !== '' || all[index - 1] !== '');
+    ];
     for (const to of mail.recipients) {
       await this.mailer
         .send({
@@ -190,6 +178,38 @@ export class SlaEscalationService {
         })
         .catch((error: unknown) => this.logger.warn(`overdue email failed: ${String(error)}`));
     }
+  }
+
+  /**
+   * Whether this lead was emailed about the brand's overdue conversations in the last 15 minutes;
+   * if not, it is recorded that they are now. The record is kept per 15-minute window, and the
+   * window before is checked too, so two emails never go out minutes apart across a boundary.
+   */
+  private async mailedRecently(
+    tx: TenantTx,
+    tenantId: string,
+    brandId: string,
+    staffMemberId: string,
+    now: Date,
+  ): Promise<boolean> {
+    const window = Math.floor(now.getTime() / MAIL_WINDOW_MS);
+    const key = (n: number) => uuidV5(brandId, `${staffMemberId}:${n}`);
+    const [earlier] = await tx
+      .select({ at: schema.processedEvents.processedAt })
+      .from(schema.processedEvents)
+      .where(
+        and(
+          eq(schema.processedEvents.consumer, LEAD_MAIL),
+          eq(schema.processedEvents.eventId, key(window - 1)),
+        ),
+      );
+    if (earlier && now.getTime() - earlier.at.getTime() < MAIL_WINDOW_MS) return true;
+    const [first] = await tx
+      .insert(schema.processedEvents)
+      .values({ tenantId, consumer: LEAD_MAIL, eventId: key(window), processedAt: now })
+      .onConflictDoNothing()
+      .returning({ eventId: schema.processedEvents.eventId });
+    return !first;
   }
 
   /**
@@ -229,6 +249,8 @@ export class SlaEscalationService {
               breachedAt: new Date(step.breachedAt),
               epoch: step.epoch,
               teamId: step.teamId,
+              // Queued before snoozes were part of a step: the clock as it is now.
+              pausedMinutes: step.pausedMinutes ?? clock?.pausedMinutes ?? 0,
             },
             current: {
               status: control.authorityStatus,

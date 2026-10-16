@@ -280,6 +280,11 @@ describe('an overdue conversation (H12, ADR 0016)', () => {
     });
     expect(snooze.status, JSON.stringify(snooze.body)).toBe(200);
     await slice.drain();
+    // Open again before the move: snoozing for a while was still someone acting on it.
+    later(2);
+    const reopened = await amina.client.post(inbox(snoozed, '/status'), { status: 'open' });
+    expect(reopened.status, JSON.stringify(reopened.body)).toBe(200);
+    await slice.drain();
     later(5);
     await movesCome();
     expect(await row(replied)).toMatchObject({ ownerMode: 'HUMAN_ACTIVE' });
@@ -299,6 +304,10 @@ describe('an overdue conversation (H12, ADR 0016)', () => {
     const epoch = (await row(queued)).ownershipEpoch;
     later(11);
     await deadlinesCome();
+    // It is in the queue already, so the email promises no move.
+    const told = overdueMails().findLast((m) => m.text.includes(`/inbox/${queued}`));
+    expect(told?.text).toContain('Nobody has taken it yet.');
+    expect(told?.text).not.toContain('moves it');
     later(5);
     await movesCome();
     expect(await row(queued)).toMatchObject({ ownerMode: 'WAITING_HUMAN', ownershipEpoch: epoch });
@@ -344,6 +353,20 @@ describe('an overdue conversation (H12, ADR 0016)', () => {
     expect(await pending(SLA_ALERT_TOPIC, quiet)).toEqual([]);
     expect(await pending(SLA_MOVE_TOPIC, quiet)).toEqual([]);
     await shop.owner.post(inbox(quiet, '/status'), { status: 'resolved' });
+  });
+
+  it('escalates a breach the settings did not cause, even one before they were saved', async () => {
+    const id = await claimed(amina, 'Is the shop open on Friday?');
+    later(3);
+    await setPolicy({ alertLeads: false, moveAfterMinutes: 5, moveTo: { kind: 'queue' } });
+    later(2);
+    // Urgent gets 2 minutes: overdue at once, with a deadline from before the settings were saved.
+    const urgent = await amina.client.post(inbox(id, '/priority'), { priority: 'urgent' });
+    expect(urgent.status, JSON.stringify(urgent.body)).toBe(200);
+    await slice.drain();
+    expect((await row(id)).sla).toMatchObject({ breached: true });
+    expect(await pending(SLA_MOVE_TOPIC, id)).toHaveLength(1);
+    await shop.owner.post(inbox(id, '/status'), { status: 'resolved' });
   });
 
   it('does not escalate the backlog when a target is shortened', async () => {
