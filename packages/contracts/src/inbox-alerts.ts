@@ -98,8 +98,10 @@ export type UnreadSummary = z.infer<typeof UnreadSummary>;
 // ------------------------------------------------------------------ signals on the inbox stream
 
 /**
- * `sla_overdue`: a conversation went past its reply-time target (H12). `chat_offered`: a
- * conversation is offered to this person to accept or decline (HNV-10-03).
+ * `sla_overdue`: a conversation went past its reply-time target (H12). `sla_overdue_lead`: the
+ * same, told to someone who can assign the conversation but does not have it, when the brand alerts
+ * leads (ADR 0016). `chat_offered`: a conversation is offered to this person to accept or decline
+ * (HNV-10-03).
  */
 export const InboxAlertKind = z.enum([
   'chat_waiting',
@@ -107,6 +109,7 @@ export const InboxAlertKind = z.enum([
   'assigned',
   'sla_overdue',
   'chat_offered',
+  'sla_overdue_lead',
 ]);
 export type InboxAlertKind = z.infer<typeof InboxAlertKind>;
 

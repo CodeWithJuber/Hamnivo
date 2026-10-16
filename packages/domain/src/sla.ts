@@ -188,3 +188,74 @@ export function slaOutcomeOf(input: {
     businessMinutes: Math.round(working),
   };
 }
+
+/**
+ * When an overdue conversation is moved (ADR 0016): `afterMinutes` working minutes after it went
+ * overdue. Null when the schedule never opens again, so it is never moved.
+ */
+export function slaMoveAt(
+  hours: BusinessHours | null,
+  breachedAt: Date,
+  afterMinutes: number,
+): Date | null {
+  return addBusinessMinutes(hours, breachedAt, afterMinutes);
+}
+
+export type SlaMoveDecision =
+  | {
+      kind: 'skip';
+      why: 'policy_off' | 'clock_ended' | 'paused' | 'handled' | 'in_queue' | 'never_opens';
+    }
+  | { kind: 'wait'; until: Date }
+  /** `requeue`: a waiting conversation becomes a new hand-off; `teamId`: the team it goes to. */
+  | { kind: 'move'; requeue: boolean; teamId: string | null };
+
+/**
+ * Whether an overdue conversation is moved now (ADR 0016). Only the same overdue clock is moved,
+ * and only while nobody has acted on it since it went overdue: a reply, the AI taking it back or
+ * resolving ends the clock; snoozing pauses it; claiming, reassigning or another team changes its
+ * owner (epoch) or team. A conversation someone has goes back to the queue (and to the team when
+ * one is set); one already waiting moves only to another team, as a new hand-off, so the next
+ * person is offered it. A team that can no longer take the brand's conversations means the queue.
+ */
+export function decideSlaMove(input: {
+  /** As it was when it went overdue. */
+  queued: { breachedAt: Date; epoch: number; teamId: string | null };
+  current: {
+    status: SlaStatus;
+    ownerMode: SlaOwnerMode;
+    epoch: number;
+    teamId: string | null;
+    clock: SlaClock | null;
+  };
+  /** The brand's setting now; null when the targets or the move are off. */
+  move: { afterMinutes: number; teamId: string | null; teamUsable: boolean } | null;
+  hours: BusinessHours | null;
+  now: Date;
+}): SlaMoveDecision {
+  const { queued, current, move, hours, now } = input;
+  if (!move) return { kind: 'skip', why: 'policy_off' };
+  const clock = current.clock;
+  if (
+    (current.status !== 'open' && current.status !== 'pending') ||
+    !clock?.breachedAt ||
+    clock.breachedAt.getTime() !== queued.breachedAt.getTime()
+  ) {
+    return { kind: 'skip', why: 'clock_ended' };
+  }
+  if (clock.pausedAt) return { kind: 'skip', why: 'paused' };
+  if (current.epoch !== queued.epoch || current.teamId !== queued.teamId) {
+    return { kind: 'skip', why: 'handled' };
+  }
+  const at = slaMoveAt(hours, queued.breachedAt, move.afterMinutes);
+  if (!at) return { kind: 'skip', why: 'never_opens' };
+  if (at.getTime() > now.getTime()) return { kind: 'wait', until: at };
+  const destination = move.teamId && move.teamUsable ? move.teamId : null;
+  const otherTeam = destination !== null && destination !== current.teamId ? destination : null;
+  if (current.ownerMode === 'HUMAN_ACTIVE') {
+    return { kind: 'move', requeue: false, teamId: otherTeam };
+  }
+  if (current.ownerMode === 'AI_ACTIVE') return { kind: 'skip', why: 'clock_ended' };
+  if (!otherTeam) return { kind: 'skip', why: 'in_queue' };
+  return { kind: 'move', requeue: current.ownerMode === 'WAITING_HUMAN', teamId: otherTeam };
+}

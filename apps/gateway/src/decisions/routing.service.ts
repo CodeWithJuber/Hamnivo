@@ -35,8 +35,8 @@ import { JournalService } from '../authority/journal.service.js';
 import { AuthorityRegistry } from '../authority/registry.js';
 import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
+import { putInTeam } from '../inbox/team-queue.js';
 import { LanguageService } from '../language/language.service.js';
-import { enqueueOutbox } from '../outbox/outbox.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
 import { authorizedBrand, type BrandRow } from './access.js';
@@ -503,23 +503,8 @@ export class RoutingService {
         .set({ applied: true, appliedAt: this.clock() })
         .where(eq(schema.decisionRecords.id, record.id));
       if (currentTeam === teamId) return false;
-      await tx
-        .insert(schema.conversationInboxState)
-        .values({ tenantId, conversationId: control.id, teamId })
-        .onConflictDoUpdate({
-          target: [
-            schema.conversationInboxState.tenantId,
-            schema.conversationInboxState.conversationId,
-          ],
-          set: { teamId, updatedAt: this.clock() },
-        });
       // The inbox's own path: the sync sets the Chatwoot team (created on first use).
-      await enqueueOutbox(tx, tenantId, {
-        topic: 'conversation.team_changed',
-        aggregateType: 'conversation',
-        aggregateId: control.id,
-        payload: { conversationId: control.id, teamId, actorStaffMemberId: null },
-      });
+      await putInTeam(tx, tenantId, control.id, teamId, this.clock());
       await appendAudit(tx, {
         actorType: 'system',
         actorId: 'routing',

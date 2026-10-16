@@ -28248,6 +28248,9 @@
           },
           "targets": {
             "$ref": "#/components/schemas/SlaTargets"
+          },
+          "overdue": {
+            "$ref": "#/components/schemas/SlaOverdue"
           }
         },
         "required": [
@@ -28310,6 +28313,69 @@
           "firstReplyMinutes",
           "nextReplyMinutes"
         ]
+      },
+      "SlaOverdue": {
+        "type": "object",
+        "properties": {
+          "alertLeads": {
+            "type": "boolean"
+          },
+          "moveAfterMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10080
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "moveTo": {
+            "$ref": "#/components/schemas/SlaMoveTo"
+          }
+        },
+        "required": [
+          "alertLeads",
+          "moveAfterMinutes",
+          "moveTo"
+        ]
+      },
+      "SlaMoveTo": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "queue"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "team"
+              },
+              "teamId": {
+                "type": "string",
+                "description": "team identifier (TypeID with prefix \"team\")",
+                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              }
+            },
+            "required": [
+              "kind",
+              "teamId"
+            ]
+          }
+        ],
+        "type": "object"
       },
       "CreateIdentityKeyRequest": {
         "oneOf": [
@@ -40098,6 +40164,9 @@
           "targets": {
             "$ref": "#/components/schemas/SlaTargetsOutput"
           },
+          "overdue": {
+            "$ref": "#/components/schemas/SlaOverdueOutput"
+          },
           "updatedAt": {
             "anyOf": [
               {
@@ -40115,6 +40184,7 @@
         "required": [
           "enabled",
           "targets",
+          "overdue",
           "updatedAt"
         ],
         "additionalProperties": false
@@ -46665,7 +46735,8 @@
                   "ai_escalated",
                   "channel_ai_off",
                   "ai_limit",
-                  "offer_accepted"
+                  "offer_accepted",
+                  "sla_moved"
                 ]
               },
               {
@@ -47403,7 +47474,8 @@
               "customer_message",
               "assigned",
               "sla_overdue",
-              "chat_offered"
+              "chat_offered",
+              "sla_overdue_lead"
             ]
           },
           "conversationId": {
@@ -47571,7 +47643,8 @@
                   "ai_escalated",
                   "channel_ai_off",
                   "ai_limit",
-                  "offer_accepted"
+                  "offer_accepted",
+                  "sla_moved"
                 ]
               },
               {
@@ -64258,6 +64331,72 @@
           "nextReplyMinutes"
         ],
         "additionalProperties": false
+      },
+      "SlaOverdueOutput": {
+        "type": "object",
+        "properties": {
+          "alertLeads": {
+            "type": "boolean"
+          },
+          "moveAfterMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10080
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "moveTo": {
+            "$ref": "#/components/schemas/SlaMoveToOutput"
+          }
+        },
+        "required": [
+          "alertLeads",
+          "moveAfterMinutes",
+          "moveTo"
+        ],
+        "additionalProperties": false
+      },
+      "SlaMoveToOutput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "queue"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "team"
+              },
+              "teamId": {
+                "type": "string",
+                "description": "team identifier (TypeID with prefix \"team\")",
+                "example": "team_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              }
+            },
+            "required": [
+              "kind",
+              "teamId"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "type": "object"
       },
       "AgentConfigOutput": {
         "type": "object",

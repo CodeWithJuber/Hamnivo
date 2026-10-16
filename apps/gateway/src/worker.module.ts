@@ -34,8 +34,9 @@ import { InboxAccess } from './inbox/access.js';
 import { AvailabilityService } from './inbox/availability.service.js';
 import { OFFER_NEXT_TOPIC, OFFER_TIMEOUT_TOPIC } from './inbox/offers.js';
 import { OffersService } from './inbox/offers.service.js';
-import { SLA_DUE_TOPIC, SLA_RESYNC_TOPIC } from './inbox/sla.js';
+import { SLA_ALERT_TOPIC, SLA_DUE_TOPIC, SLA_MOVE_TOPIC, SLA_RESYNC_TOPIC } from './inbox/sla.js';
 import { SlaService } from './inbox/sla.service.js';
+import { SlaEscalationService } from './inbox/sla-escalation.service.js';
 import { EmbeddingFactory } from './knowledge/embeddings.js';
 import { IngestionService, SCANNER } from './knowledge/ingestion.service.js';
 import { RetrievalService } from './knowledge/retrieval.service.js';
@@ -115,6 +116,7 @@ export class WorkerModule {
         ChannelAdoption,
         ChannelHealthNotices,
         SlaService,
+        SlaEscalationService,
         OffersService,
         InboxProcessor,
         ReconcilerService,
@@ -176,6 +178,7 @@ export class WorkerModule {
             ChannelHealthNotices,
             SlaService,
             OffersService,
+            SlaEscalationService,
           ],
           useFactory: (
             sync: AuthoritySyncService,
@@ -199,6 +202,7 @@ export class WorkerModule {
             channelHealth: ChannelHealthNotices,
             sla: SlaService,
             offers: OffersService,
+            escalation: SlaEscalationService,
           ) =>
             overrides.handlers ??
             new Map<string, OutboxHandler>([
@@ -262,6 +266,8 @@ export class WorkerModule {
               [CHANNEL_HEALTH_TOPIC, (event) => channelHealth.onEvent(event)],
               [SLA_DUE_TOPIC, (event) => sla.onDue(event)],
               [SLA_RESYNC_TOPIC, (event) => sla.onResync(event)],
+              [SLA_ALERT_TOPIC, (event) => escalation.onAlert(event)],
+              [SLA_MOVE_TOPIC, (event) => escalation.onMove(event)],
               ...saasOutboxHandlers(provisioning, notices),
             ]),
         },

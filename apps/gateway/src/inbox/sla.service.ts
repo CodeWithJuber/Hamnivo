@@ -1,4 +1,4 @@
-import type { SetSlaPolicyRequest, SlaPolicy } from '@hamnivo/contracts';
+import type { SetSlaPolicyRequest, SlaOverdue, SlaPolicy } from '@hamnivo/contracts';
 import {
   appendAudit,
   type ClaimedOutboxEvent,
@@ -19,6 +19,7 @@ import { enforce } from '../identity/staff.guard.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { SLA_RESYNC_TOPIC, syncSla } from './sla.js';
+import { teamTakesBrand } from './team-queue.js';
 
 const NO_TARGETS: SlaPolicy['targets'] = {
   urgent: { firstReplyMinutes: null, nextReplyMinutes: null },
@@ -26,6 +27,29 @@ const NO_TARGETS: SlaPolicy['targets'] = {
   medium: { firstReplyMinutes: null, nextReplyMinutes: null },
   low: { firstReplyMinutes: null, nextReplyMinutes: null },
 };
+
+const NO_ESCALATION: SlaOverdue = {
+  alertLeads: false,
+  moveAfterMinutes: null,
+  moveTo: { kind: 'queue' },
+};
+
+type PolicyRow = typeof schema.slaPolicies.$inferSelect;
+
+function policyOf(row: PolicyRow): SlaPolicy {
+  return {
+    enabled: row.enabled,
+    targets: row.targets,
+    overdue: {
+      alertLeads: row.overdueAlertLeads,
+      moveAfterMinutes: row.overdueMoveAfterMinutes,
+      moveTo: row.overdueMoveTeamId
+        ? { kind: 'team', teamId: toPublicId('team', row.overdueMoveTeamId) }
+        : { kind: 'queue' },
+    },
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
 
 const RESYNC_BATCH = 200;
 
@@ -92,8 +116,8 @@ export class SlaService {
         .from(schema.slaPolicies)
         .where(eq(schema.slaPolicies.brandId, brand.id));
       return row
-        ? { enabled: row.enabled, targets: row.targets, updatedAt: row.updatedAt.toISOString() }
-        : { enabled: false, targets: NO_TARGETS, updatedAt: null };
+        ? policyOf(row)
+        : { enabled: false, targets: NO_TARGETS, overdue: NO_ESCALATION, updatedAt: null };
     });
   }
 
@@ -108,6 +132,7 @@ export class SlaService {
       const values = {
         enabled: input.enabled,
         targets: input.targets,
+        ...(input.overdue ? await this.overdueColumns(tx, brand, input.overdue) : {}),
         updatedBy: principal.staffMemberId,
         updatedAt: now,
       };
@@ -127,11 +152,45 @@ export class SlaService {
         targetType: 'brand',
         targetId: toPublicId('brand', brand.id),
         outcome: 'success',
-        data: { enabled: input.enabled, targets: input.targets },
+        data: {
+          enabled: input.enabled,
+          targets: input.targets,
+          ...(input.overdue ? { overdue: input.overdue } : {}),
+        },
       });
       await queueSlaResync(tx, principal.tenantId, brand.id);
-      return { enabled: row.enabled, targets: row.targets, updatedAt: row.updatedAt.toISOString() };
+      return policyOf(row);
     });
+  }
+
+  /**
+   * What happens to overdue conversations, as stored (ADR 0016). The team they are moved to must
+   * be able to take the brand's conversations, as when a person puts one in a team's queue.
+   */
+  private async overdueColumns(tx: TenantTx, brand: { workspaceId: string }, overdue: SlaOverdue) {
+    let teamId: string | null = null;
+    if (overdue.moveTo.kind === 'team') {
+      const unusable = new AppError('VALIDATION_FAILED', {
+        fields: [
+          {
+            path: 'overdue.moveTo.teamId',
+            message: 'This team cannot take conversations of this brand.',
+          },
+        ],
+      });
+      try {
+        teamId = fromPublicId('team', overdue.moveTo.teamId);
+      } catch {
+        throw unusable;
+      }
+      const [team] = await tx.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+      if (!teamTakesBrand(team, brand.workspaceId)) throw unusable;
+    }
+    return {
+      overdueAlertLeads: overdue.alertLeads,
+      overdueMoveAfterMinutes: overdue.moveAfterMinutes,
+      overdueMoveTeamId: teamId,
+    };
   }
 
   /** A deadline came: recompute under the conversation's lock; a moved deadline does nothing. */

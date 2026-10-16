@@ -143,7 +143,10 @@ export class InboxAlertsService {
     /** Keys the caller's stream has already handled. */
     seen: ReadonlySet<string>,
   ): Promise<AlertDecision> {
-    const concerning = chats.filter((chat) => concernsStaff(chat, principal.staffMemberId));
+    const concerning = chats.filter(
+      (chat) =>
+        (chat.canReply !== false && concernsStaff(chat, principal.staffMemberId)) || chat.leadAlert,
+    );
     if (concerning.length === 0) return { alerts: [], looked: [] };
     const j = schema.conversationJournal;
     // The newest customer message of each chat, whatever its age: an alert says what they wrote.

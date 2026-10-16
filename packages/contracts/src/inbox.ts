@@ -65,6 +65,8 @@ export const OwnerReason = z.enum([
   'channel_ai_off',
   'ai_limit',
   'offer_accepted',
+  /** Nobody replied in time, so Hamnivo moved it back to the queue or to another team (H12). */
+  'sla_moved',
 ]);
 export type OwnerReason = z.infer<typeof OwnerReason>;
 
