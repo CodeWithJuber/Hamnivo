@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { AiDraftRejectReason, AiDraftSupersededReason } from './ai-drafts.js';
 import { MinorUnits, Timestamp } from './common.js';
 import { typeId } from './ids.js';
+import { OfferDeclineReason } from './offers.js';
 import { TicketSource } from './tickets.js';
 
 /**
@@ -33,6 +35,11 @@ export const AnalyticsMetric = z.object({
   /** How many conversations or responses the value stands on. */
   sample: z.int().nonnegative(),
 });
+
+/** A count with its share of `sample`; both withheld when the count is a small group. */
+const Share = AnalyticsMetric.extend({ rate: Held });
+
+const SlaPriority = z.enum(['urgent', 'high', 'medium', 'low']);
 
 export const AnalyticsOverview = z
   .object({
@@ -126,6 +133,91 @@ export const AnalyticsOverview = z
       tokensOutput: z.int().nonnegative(),
       /** Conversations handed to people because a plan limit or budget stopped the AI. */
       limitHandoffs: Held,
+    }),
+    /**
+     * Reply-time targets (H12): the clocks that ended in the range. A person's reply ends one as
+     * met or missed; `stopped` ended without one (the AI took the chat back, or it was resolved).
+     * `rate` is the share of replies (met and missed), so stopped clocks do not count against it.
+     */
+    replyTargets: z.object({
+      /** When the first clock's end was recorded; earlier clocks were not kept. */
+      recordingSince: Timestamp.nullable(),
+      met: Share,
+      missed: Share,
+      stopped: AnalyticsMetric,
+      /** Working minutes to a first reply a person gave, time snoozed left out. */
+      firstReplyMedianMinutes: AnalyticsMetric,
+      byPriority: z.array(
+        z.object({
+          priority: SlaPriority,
+          replies: Held,
+          metRate: Held,
+          suppressed: z.boolean(),
+        }),
+      ),
+      daily: z.array(
+        z.object({ date: IsoDate, replies: Held, metRate: Held, suppressed: z.boolean() }),
+      ),
+    }),
+    /**
+     * Chats offered to one person at a time (HNV-10-03, HNV-10-06): the offers made in the range.
+     * `rate` of accepted, declined and expired is their share of the offers someone answered or
+     * let run out; offers cancelled because the chat moved on, and those still open, are left out.
+     */
+    offers: z.object({
+      /** Ended offers are kept 90 days, so a range that starts earlier misses some. */
+      windowLimited: z.boolean(),
+      offered: AnalyticsMetric,
+      accepted: Share,
+      declined: Share,
+      expired: Share,
+      cancelled: AnalyticsMetric,
+      acceptMedianSeconds: AnalyticsMetric,
+      /** Hand-offs whose offers all ended unanswered or declined, so the chat waited in the queue. */
+      leftInQueue: Share,
+      declineReasons: z.array(
+        z.object({ reason: OfferDeclineReason, count: Held, suppressed: z.boolean() }),
+      ),
+      byTeam: z.array(
+        z.object({
+          teamId: typeId('team'),
+          name: z.string(),
+          offered: Held,
+          acceptRate: Held,
+          suppressed: z.boolean(),
+        }),
+      ),
+    }),
+    /**
+     * AI drafts for review (HNV-09-05): the drafts written in the range and how they ended. `rate`
+     * of sent, approved, edited and rejected is their share of the drafts a person decided on.
+     */
+    aiDrafts: z.object({
+      /** Ended drafts are kept 90 days, so a range that starts earlier misses some. */
+      windowLimited: z.boolean(),
+      written: AnalyticsMetric,
+      /** Approved as written or edited: sent to the customer. */
+      sent: Share,
+      approved: Share,
+      edited: Share,
+      rejected: Share,
+      /** Set aside without a decision: the customer wrote again, someone answered, and so on. */
+      setAside: AnalyticsMetric,
+      rejectReasons: z.array(
+        z.object({ reason: AiDraftRejectReason, count: Held, suppressed: z.boolean() }),
+      ),
+      setAsideReasons: z.array(
+        z.object({ reason: AiDraftSupersededReason, count: Held, suppressed: z.boolean() }),
+      ),
+      byAgent: z.array(
+        z.object({
+          agentId: typeId('agent').nullable(),
+          name: z.string().nullable(),
+          written: Held,
+          sentRate: Held,
+          suppressed: z.boolean(),
+        }),
+      ),
     }),
     cache: z.object({
       /**

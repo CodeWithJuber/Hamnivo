@@ -1463,6 +1463,18 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
         low: { firstReplyMinutes: null, nextReplyMinutes: null },
       },
     });
+    // How a reply-time clock ended (H12): a first reply given in time.
+    await tx.insert(s.slaOutcomes).values({
+      tenantId,
+      conversationId: ids.conversationId,
+      kind: 'first_reply',
+      priority: 'medium',
+      targetMinutes: 60,
+      startedAt: new Date(Date.now() - 20 * 60_000),
+      endedAt: new Date(),
+      outcome: 'met',
+      businessMinutes: 20,
+    });
     // Hand-off offers (HNV-10-03): how the owner takes offers, one declined and one pending.
     await tx.insert(s.staffRoutingProfiles).values({
       tenantId,

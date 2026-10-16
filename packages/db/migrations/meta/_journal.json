@@ -470,6 +470,20 @@
       "when": 1792086290862,
       "tag": "20261015174450_ledger_expects_reply",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1792146263123,
+      "tag": "20261016102423_sla_outcomes",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1792146265867,
+      "tag": "20261016102425_sla_outcomes_security",
+      "breakpoints": true
     }
   ]
 }

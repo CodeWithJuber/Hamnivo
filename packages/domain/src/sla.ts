@@ -149,3 +149,35 @@ export function slaView(
     : 0;
   return { state, dueAt: due, businessMinutesLeft: Math.round(left), breached };
 }
+
+export type SlaOutcome = 'met' | 'missed' | 'stopped';
+
+/**
+ * How a clock that has just ended turned out (H12, O04), for reports. A person's reply after the
+ * clock started ends it: met, or missed when more working time than the target went by (time
+ * snoozed left out) or it had already gone overdue. Without such a reply it was stopped: the AI
+ * took the chat back, it was resolved, or the targets were turned off.
+ */
+export function slaOutcomeOf(input: {
+  clock: SlaClock;
+  lastHumanReplyAt: Date | null;
+  hours: BusinessHours | null;
+  now: Date;
+}): { outcome: SlaOutcome; endedAt: Date; businessMinutes: number } {
+  const { clock, lastHumanReplyAt, hours, now } = input;
+  const replied =
+    lastHumanReplyAt !== null && lastHumanReplyAt.getTime() > clock.startedAt.getTime();
+  const endedAt = replied && lastHumanReplyAt.getTime() < now.getTime() ? lastHumanReplyAt : now;
+  const paused =
+    clock.pausedMinutes +
+    (clock.pausedAt ? Math.ceil(businessMinutesBetween(hours, clock.pausedAt, endedAt)) : 0);
+  const working = Math.max(0, businessMinutesBetween(hours, clock.startedAt, endedAt) - paused);
+  const overdue =
+    working > clock.targetMinutes ||
+    (clock.breachedAt !== null && clock.breachedAt.getTime() <= endedAt.getTime());
+  return {
+    outcome: replied ? (overdue ? 'missed' : 'met') : 'stopped',
+    endedAt,
+    businessMinutes: Math.round(working),
+  };
+}

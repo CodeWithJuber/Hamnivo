@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { BusinessHours } from '../src/business-hours.js';
-import { nextSlaClock, type SlaFacts, type SlaTargets, slaView } from '../src/sla.js';
+import {
+  nextSlaClock,
+  type SlaClock,
+  type SlaFacts,
+  type SlaTargets,
+  slaOutcomeOf,
+  slaView,
+} from '../src/sla.js';
 
 const policy: SlaTargets = {
   urgent: { firstReplyMinutes: 5, nextReplyMinutes: 10 },
@@ -130,5 +137,87 @@ describe('reply-time clock (H12)', () => {
       breached: true,
       businessMinutesLeft: -10,
     });
+  });
+});
+
+describe('how a reply-time clock ended (H12, O04)', () => {
+  const clock = (over: Partial<SlaClock> = {}): SlaClock => ({
+    kind: 'first_reply',
+    startedAt: t('10:00:00'),
+    targetMinutes: 30,
+    pausedAt: null,
+    pausedMinutes: 0,
+    dueAt: t('10:30:00'),
+    breachedAt: null,
+    ...over,
+  });
+  const outcome = (c: SlaClock, reply: Date | null, now: Date, hours: BusinessHours | null = null) =>
+    slaOutcomeOf({ clock: c, lastHumanReplyAt: reply, hours, now });
+
+  it("is met by a person's reply in time, and missed by one too late", () => {
+    expect(outcome(clock(), t('10:20:00'), t('10:20:01'))).toEqual({
+      outcome: 'met',
+      endedAt: t('10:20:00'),
+      businessMinutes: 20,
+    });
+    expect(outcome(clock(), t('10:30:00'), t('10:30:00')).outcome).toBe('met');
+    expect(outcome(clock(), t('10:45:00'), t('10:45:00'))).toEqual({
+      outcome: 'missed',
+      endedAt: t('10:45:00'),
+      businessMinutes: 45,
+    });
+  });
+
+  it('is missed once it went overdue, even if the target was raised since', () => {
+    const late = clock({ targetMinutes: 120, breachedAt: t('10:30:00') });
+    expect(outcome(late, t('10:40:00'), t('10:40:00')).outcome).toBe('missed');
+  });
+
+  it('leaves the time snoozed out', () => {
+    // 50 minutes went by, 25 of them snoozed: 25 working minutes, in time.
+    expect(outcome(clock({ pausedMinutes: 25 }), t('10:50:00'), t('10:50:00'))).toMatchObject({
+      outcome: 'met',
+      businessMinutes: 25,
+    });
+    // Still snoozed when the person replied: the pause so far counts out too.
+    const snoozed = clock({ pausedAt: t('10:10:00'), dueAt: null });
+    expect(outcome(snoozed, t('11:00:00'), t('11:00:00'))).toMatchObject({
+      outcome: 'met',
+      businessMinutes: 10,
+    });
+  });
+
+  it('counts only working time', () => {
+    const hours: BusinessHours = {
+      timezone: 'UTC',
+      weekly: {
+        sun: [],
+        mon: [
+          { open: '09:00', close: '10:00' },
+          { open: '11:00', close: '17:00' },
+        ],
+        tue: [],
+        wed: [],
+        thu: [],
+        fri: [],
+        sat: [],
+      },
+      closedDates: [],
+    };
+    // 10:00 to 11:10 is an hour closed and ten working minutes.
+    expect(outcome(clock(), t('11:10:00'), t('11:10:00'), hours)).toMatchObject({
+      outcome: 'met',
+      businessMinutes: 10,
+    });
+  });
+
+  it('was stopped when it ended without a reply from a person', () => {
+    expect(outcome(clock(), null, t('10:40:00'))).toEqual({
+      outcome: 'stopped',
+      endedAt: t('10:40:00'),
+      businessMinutes: 40,
+    });
+    // A reply from before this clock started does not end it.
+    expect(outcome(clock(), t('09:50:00'), t('10:40:00')).outcome).toBe('stopped');
   });
 });

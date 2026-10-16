@@ -84,6 +84,8 @@ export const aiDrafts = pgTable(
       .where(sql`${t.state} = 'pending'`),
     index('ai_drafts_conversation_idx').on(t.tenantId, t.conversationId, t.createdAt),
     index('ai_drafts_ended_idx').on(t.decidedAt).where(sql`${t.decidedAt} is not null`),
+    /** Reports count drafts written in a date range. */
+    index('ai_drafts_created_idx').on(t.tenantId, t.createdAt),
     foreignKey({
       name: 'ai_drafts_conversation_fk',
       columns: [t.tenantId, t.conversationId],
