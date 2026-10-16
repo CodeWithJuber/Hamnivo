@@ -215,8 +215,6 @@ export const reportsEn = {
     sentNote: 'Approved as written or edited, of {{count}} drafts people decided on',
     edited: 'Edited before sending',
     rejected: 'Rejected',
-    setAside: 'Set aside',
-    setAsideNote: 'Ended without a decision, of {{count}} drafts written',
     rejectReasons: 'Why drafts were rejected',
     setAsideReasons: 'Why drafts were set aside',
     reason: 'Reason',

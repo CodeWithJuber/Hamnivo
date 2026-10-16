@@ -58263,17 +58263,11 @@
                   },
                   "suppressed": {
                     "type": "boolean"
-                  },
-                  "sample": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
                   }
                 },
                 "required": [
                   "value",
-                  "suppressed",
-                  "sample"
+                  "suppressed"
                 ],
                 "additionalProperties": false
               },
@@ -58406,17 +58400,11 @@
                   },
                   "suppressed": {
                     "type": "boolean"
-                  },
-                  "sample": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
                   }
                 },
                 "required": [
                   "value",
-                  "suppressed",
-                  "sample"
+                  "suppressed"
                 ],
                 "additionalProperties": false
               },
@@ -58513,31 +58501,6 @@
                   "suppressed",
                   "sample",
                   "rate"
-                ],
-                "additionalProperties": false
-              },
-              "cancelled": {
-                "type": "object",
-                "properties": {
-                  "value": {
-                    "type": [
-                      "number",
-                      "null"
-                    ]
-                  },
-                  "suppressed": {
-                    "type": "boolean"
-                  },
-                  "sample": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  }
-                },
-                "required": [
-                  "value",
-                  "suppressed",
-                  "sample"
                 ],
                 "additionalProperties": false
               },
@@ -58676,7 +58639,6 @@
               "accepted",
               "declined",
               "expired",
-              "cancelled",
               "acceptMedianSeconds",
               "leftInQueue",
               "declineReasons",
@@ -58701,17 +58663,11 @@
                   },
                   "suppressed": {
                     "type": "boolean"
-                  },
-                  "sample": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
                   }
                 },
                 "required": [
                   "value",
-                  "suppressed",
-                  "sample"
+                  "suppressed"
                 ],
                 "additionalProperties": false
               },
@@ -58843,31 +58799,6 @@
                 ],
                 "additionalProperties": false
               },
-              "setAside": {
-                "type": "object",
-                "properties": {
-                  "value": {
-                    "type": [
-                      "number",
-                      "null"
-                    ]
-                  },
-                  "suppressed": {
-                    "type": "boolean"
-                  },
-                  "sample": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  }
-                },
-                "required": [
-                  "value",
-                  "suppressed",
-                  "sample"
-                ],
-                "additionalProperties": false
-              },
               "rejectReasons": {
                 "type": "array",
                 "items": {
@@ -58991,7 +58922,6 @@
               "approved",
               "edited",
               "rejected",
-              "setAside",
               "rejectReasons",
               "setAsideReasons",
               "byAgent"

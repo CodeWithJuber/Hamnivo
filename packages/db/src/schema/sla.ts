@@ -83,6 +83,8 @@ export const slaOutcomes = pgTable(
     unique('sla_outcomes_tenant_id_id_key').on(t.tenantId, t.id),
     index('sla_outcomes_ended_idx').on(t.tenantId, t.endedAt),
     index('sla_outcomes_conversation_idx').on(t.tenantId, t.conversationId),
+    /** The 13-month purge looks across tenants by end time. */
+    index('sla_outcomes_purge_idx').on(t.endedAt),
     check('sla_outcomes_minutes_ck', sql`${t.targetMinutes} > 0 and ${t.businessMinutes} >= 0`),
     foreignKey({
       name: 'sla_outcomes_conversation_fk',

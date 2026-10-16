@@ -57,16 +57,15 @@ For agents that [write drafts for a person to check](inbox/ai-drafts.md):
 
 - **Sent**: the share of drafts people approved, as written or edited, out of those they decided on.
 - **Edited before sending** and **Rejected**: how many, and their share.
-- **Set aside**: drafts that ended without a decision, for example because the customer wrote
-  again.
-- **Why drafts were rejected**, **why they were set aside**, and each AI agent's drafts and share
-  sent.
+- **Why drafts were rejected**, **why they were set aside** without a decision (for example, the
+  customer wrote again), and each AI agent's drafts and share sent.
 
 ## Small numbers are withheld
 
 To protect privacy, a number that stands on fewer than 5 conversations, responses, offers or
 drafts shows **Small sample** instead. Where a total is shown, the next smallest number is
-withheld too, so the hidden one cannot be worked out. The CSV leaves those cells empty. Your
+withheld too, so the hidden one cannot be worked out. For example, when only 2 replies missed
+their target, the number met is withheld as well, because the total of replies is shown. The CSV leaves those cells empty. Your
 server administrator can change the 5 (`ANALYTICS_MIN_GROUP_SIZE`).
 
 ## How far back reports go

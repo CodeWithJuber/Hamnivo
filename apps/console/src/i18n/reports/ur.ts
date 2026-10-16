@@ -218,8 +218,6 @@ export const reportsUr: ReportsTranslation = {
     sentNote: 'جیسے لکھے تھے ویسے یا ترمیم کے بعد منظور، {{count}} طے شدہ مسودوں میں سے',
     edited: 'بھیجنے سے پہلے ترمیم شدہ',
     rejected: 'رد کیے گئے',
-    setAside: 'ایک طرف رکھے گئے',
-    setAsideNote: 'فیصلے کے بغیر ختم، لکھے گئے {{count}} مسودوں میں سے',
     rejectReasons: 'مسودے کیوں رد کیے گئے',
     setAsideReasons: 'مسودے کیوں ایک طرف رکھے گئے',
     reason: 'وجہ',

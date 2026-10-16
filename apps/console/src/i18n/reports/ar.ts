@@ -216,8 +216,6 @@ export const reportsAr: ReportsTranslation = {
     sentNote: 'اعتُمدت كما هي أو بعد التعديل، من {{count}} مسودة قرر فيها الموظفون',
     edited: 'عُدّلت قبل الإرسال',
     rejected: 'رُفضت',
-    setAside: 'نُحّيت جانبًا',
-    setAsideNote: 'انتهت دون قرار، من {{count}} مسودة مكتوبة',
     rejectReasons: 'لماذا رُفضت المسودات',
     setAsideReasons: 'لماذا نُحّيت المسودات',
     reason: 'السبب',

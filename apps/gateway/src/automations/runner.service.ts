@@ -344,6 +344,12 @@ export class AutomationRunner {
         case 'set_priority':
           await runtime.authority.setPriority(ref, action.priority, INTEGRATION);
           await this.tx(tenantId, async (tx) => {
+            // The conversation first, as every change to it is ordered (its reply-time clock).
+            await tx
+              .select({ id: schema.conversationControls.id })
+              .from(schema.conversationControls)
+              .where(eq(schema.conversationControls.id, control.id))
+              .for('update');
             await tx
               .insert(schema.conversationInboxState)
               .values({ tenantId, conversationId: control.id, priority: action.priority })

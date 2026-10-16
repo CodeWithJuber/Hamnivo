@@ -26,6 +26,18 @@ type ControlRow = typeof schema.conversationControls.$inferSelect;
  * ticket gives it the tenant's next number; the priority is Chatwoot's own, set there first as the
  * staff member and then in Hamnivo's queue. Every change is audited.
  */
+/**
+ * Locks the conversation first, as every change to it is ordered, so changes that cross cannot
+ * end its reply-time clock twice (H12).
+ */
+async function lockConversation(tx: TenantTx, conversationId: string): Promise<void> {
+  await tx
+    .select({ id: schema.conversationControls.id })
+    .from(schema.conversationControls)
+    .where(eq(schema.conversationControls.id, conversationId))
+    .for('update');
+}
+
 @Injectable()
 export class TicketsService {
   constructor(
@@ -61,6 +73,7 @@ export class TicketsService {
     const control = await this.load(principal, publicId, input.expectedEpoch);
     if (input.priority) await this.inChatwoot(principal, control, input.priority);
     await this.access.tx(principal, async (tx) => {
+      await lockConversation(tx, control.id);
       const { number, created } = await makeTicket(
         tx,
         principal.tenantId,
@@ -92,9 +105,10 @@ export class TicketsService {
   ): Promise<InboxConversationDetail> {
     const control = await this.load(principal, publicId, input.expectedEpoch);
     await this.inChatwoot(principal, control, input.priority);
-    await this.access.tx(principal, (tx) =>
-      this.store(tx, principal, control, publicId, input.priority),
-    );
+    await this.access.tx(principal, async (tx) => {
+      await lockConversation(tx, control.id);
+      await this.store(tx, principal, control, publicId, input.priority);
+    });
     await this.signals.changed(principal.tenantId, [control.id]);
     return this.inbox.detail(principal, publicId);
   }

@@ -38,6 +38,8 @@ export const AnalyticsMetric = z.object({
 
 /** A count with its share of `sample`; both withheld when the count is a small group. */
 const Share = AnalyticsMetric.extend({ rate: Held });
+/** A count shown without what it stands on, which would give a withheld count away. */
+const HeldCount = z.object({ value: Held, suppressed: z.boolean() });
 
 const SlaPriority = z.enum(['urgent', 'high', 'medium', 'low']);
 
@@ -138,13 +140,14 @@ export const AnalyticsOverview = z
      * Reply-time targets (H12): the clocks that ended in the range. A person's reply ends one as
      * met or missed; `stopped` ended without one (the AI took the chat back, or it was resolved).
      * `rate` is the share of replies (met and missed), so stopped clocks do not count against it.
+     * Met and missed split the replies shown, so one withheld withholds the other.
      */
     replyTargets: z.object({
       /** When the first clock's end was recorded; earlier clocks were not kept. */
       recordingSince: Timestamp.nullable(),
       met: Share,
       missed: Share,
-      stopped: AnalyticsMetric,
+      stopped: HeldCount,
       /** Working minutes to a first reply a person gave, time snoozed left out. */
       firstReplyMedianMinutes: AnalyticsMetric,
       byPriority: z.array(
@@ -163,15 +166,15 @@ export const AnalyticsOverview = z
      * Chats offered to one person at a time (HNV-10-03, HNV-10-06): the offers made in the range.
      * `rate` of accepted, declined and expired is their share of the offers someone answered or
      * let run out; offers cancelled because the chat moved on, and those still open, are left out.
+     * The three split the offers answered, so one withheld withholds the next smallest.
      */
     offers: z.object({
       /** Ended offers are kept 90 days, so a range that starts earlier misses some. */
       windowLimited: z.boolean(),
-      offered: AnalyticsMetric,
+      offered: HeldCount,
       accepted: Share,
       declined: Share,
       expired: Share,
-      cancelled: AnalyticsMetric,
       acceptMedianSeconds: AnalyticsMetric,
       /** Hand-offs whose offers all ended unanswered or declined, so the chat waited in the queue. */
       leftInQueue: Share,
@@ -190,22 +193,22 @@ export const AnalyticsOverview = z
     }),
     /**
      * AI drafts for review (HNV-09-05): the drafts written in the range and how they ended. `rate`
-     * of sent, approved, edited and rejected is their share of the drafts a person decided on.
+     * of sent, approved, edited and rejected is their share of the drafts a person decided on;
+     * approved, edited and rejected split them, so one withheld withholds the next smallest.
      */
     aiDrafts: z.object({
       /** Ended drafts are kept 90 days, so a range that starts earlier misses some. */
       windowLimited: z.boolean(),
-      written: AnalyticsMetric,
-      /** Approved as written or edited: sent to the customer. */
+      written: HeldCount,
+      /** Approved as written or edited: sent to the customer. Withheld when either is. */
       sent: Share,
       approved: Share,
       edited: Share,
       rejected: Share,
-      /** Set aside without a decision: the customer wrote again, someone answered, and so on. */
-      setAside: AnalyticsMetric,
       rejectReasons: z.array(
         z.object({ reason: AiDraftRejectReason, count: Held, suppressed: z.boolean() }),
       ),
+      /** Why drafts were set aside without a decision: the customer wrote again, and so on. */
       setAsideReasons: z.array(
         z.object({ reason: AiDraftSupersededReason, count: Held, suppressed: z.boolean() }),
       ),

@@ -29,7 +29,7 @@ const workQueue = (
       recordingSince: '2026-09-01T09:00:00.000Z',
       met: { value: 18, suppressed: false, sample: 20, rate: 0.9 },
       missed: { ...held, sample: 20 },
-      stopped: { value: 6, suppressed: false, sample: 26 },
+      stopped: { value: 6, suppressed: false },
       firstReplyMedianMinutes: { value: 12, suppressed: false, sample: 15 },
       byPriority: [
         { priority: 'urgent', replies: null, metRate: null, suppressed: true },
@@ -45,11 +45,10 @@ const workQueue = (
     },
     offers: {
       windowLimited: false,
-      offered: { value: 40, suppressed: false, sample: 40 },
+      offered: { value: 40, suppressed: false },
       accepted: { value: 30, suppressed: false, sample: 38, rate: 0.79 },
       declined: { value: 6, suppressed: false, sample: 38, rate: 0.16 },
       expired: { ...held, sample: 38 },
-      cancelled: { ...held, sample: 40 },
       acceptMedianSeconds: { value: 42, suppressed: false, sample: 30 },
       leftInQueue: { ...held, sample: 34 },
       declineReasons: [
@@ -62,12 +61,11 @@ const workQueue = (
     },
     aiDrafts: {
       windowLimited: false,
-      written: { value: 50, suppressed: false, sample: 50 },
+      written: { value: 50, suppressed: false },
       sent: { value: 35, suppressed: false, sample: 42, rate: 0.83 },
       approved: { value: 28, suppressed: false, sample: 42, rate: 0.67 },
       edited: { value: 7, suppressed: false, sample: 42, rate: 0.17 },
       rejected: { value: 7, suppressed: false, sample: 42, rate: 0.17 },
-      setAside: { value: 8, suppressed: false, sample: 50 },
       rejectReasons: [{ reason: 'inaccurate', count: 7, suppressed: false }],
       setAsideReasons: [{ reason: 'customer_wrote', count: 8, suppressed: false }],
       byAgent: [{ agentId: 'agt_1', name: 'Noor', written: 50, sentRate: 0.83, suppressed: false }],
@@ -125,7 +123,7 @@ describe('offers in reports (HNV-10-06)', () => {
       offers: {
         ...workQueue().offers,
         windowLimited: true,
-        offered: { value: 0, suppressed: false, sample: 0 },
+        offered: { value: 0, suppressed: false },
       },
     });
     const text = textOf(await render(<OffersReport overview={none} />));
@@ -150,7 +148,7 @@ describe('AI drafts in reports (HNV-09-05)', () => {
       aiDrafts: {
         ...workQueue().aiDrafts,
         windowLimited: true,
-        written: { value: 0, suppressed: false, sample: 0 },
+        written: { value: 0, suppressed: false },
       },
     });
     const text = textOf(await render(<AiDraftsReport overview={none} />));

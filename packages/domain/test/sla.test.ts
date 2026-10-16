@@ -140,6 +140,29 @@ describe('reply-time clock (H12)', () => {
   });
 });
 
+describe('a reply recorded late (H12)', () => {
+  it('ends the clock it answered, even after the customer wrote again', () => {
+    const running = run(facts({ lastHumanReplyAt: t('09:00:00') }), t('10:01:00')).clock;
+    expect(running).toMatchObject({ kind: 'next_reply', startedAt: t('10:00:00') });
+    // A person replied at 10:05; the customer wrote again at 10:06, before that reply was seen.
+    const next = run(
+      facts({ lastHumanReplyAt: t('10:05:00'), lastCustomerMessageAt: t('10:06:00') }),
+      t('10:07:00'),
+      running,
+    ).clock;
+    expect(next).toMatchObject({ kind: 'next_reply', startedAt: t('10:06:00') });
+    if (!running) throw new Error('no clock');
+    expect(
+      slaOutcomeOf({
+        clock: running,
+        lastHumanReplyAt: t('10:05:00'),
+        hours: null,
+        now: t('10:07:00'),
+      }),
+    ).toMatchObject({ outcome: 'met', businessMinutes: 5 });
+  });
+});
+
 describe('how a reply-time clock ended (H12, O04)', () => {
   const clock = (over: Partial<SlaClock> = {}): SlaClock => ({
     kind: 'first_reply',

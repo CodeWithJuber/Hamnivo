@@ -288,7 +288,7 @@ export function OffersReport({ overview }: { overview: AnalyticsOverview }) {
 
 /**
  * AI drafts for review (HNV-09-05, G03): how many were sent as written or edited, rejected and
- * why, set aside and why, per AI agent.
+ * why, why the others were set aside, per AI agent.
  */
 export function AiDraftsReport({ overview }: { overview: AnalyticsOverview }) {
   const { t } = useTranslation();
@@ -313,7 +313,7 @@ export function AiDraftsReport({ overview }: { overview: AnalyticsOverview }) {
           <p className="text-sm text-text-secondary">{t('reports.aiDrafts.none')}</p>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <Tile
                 testId="tile-drafts-sent"
                 label={t('reports.aiDrafts.sent')}
@@ -335,12 +335,6 @@ export function AiDraftsReport({ overview }: { overview: AnalyticsOverview }) {
                 label={t('reports.aiDrafts.rejected')}
                 value={count(drafts.rejected)}
                 note={share(drafts.rejected)}
-              />
-              <Tile
-                testId="tile-drafts-set-aside"
-                label={t('reports.aiDrafts.setAside')}
-                value={count(drafts.setAside)}
-                note={t('reports.aiDrafts.setAsideNote', { count: drafts.written.sample })}
               />
             </div>
             <div className="grid gap-6 lg:grid-cols-2">

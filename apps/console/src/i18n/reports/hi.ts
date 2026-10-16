@@ -215,8 +215,6 @@ export const reportsHi: ReportsTranslation = {
     sentNote: 'जैसे लिखे थे वैसे या संपादित करके मंज़ूर, {{count}} तय किए गए ड्राफ़्ट में से',
     edited: 'भेजने से पहले संपादित',
     rejected: 'अस्वीकार किए गए',
-    setAside: 'अलग रखे गए',
-    setAsideNote: 'बिना फ़ैसले के खत्म, लिखे गए {{count}} ड्राफ़्ट में से',
     rejectReasons: 'ड्राफ़्ट क्यों अस्वीकार किए गए',
     setAsideReasons: 'ड्राफ़्ट क्यों अलग रखे गए',
     reason: 'कारण',

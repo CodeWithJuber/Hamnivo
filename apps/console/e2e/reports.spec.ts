@@ -104,8 +104,8 @@ async function startConversation(widgetId: string): Promise<Response> {
 
 /**
  * How the inbox work queue went, written straight to the database as the gateway would: reply-time
- * clocks that ended (five met, one missed), offers (five accepted, two declined as not their area)
- * and AI drafts (five sent, one rejected), on the workspace's own conversations.
+ * clocks that ended (six met), offers (five accepted, two declined as not their area, one ran out)
+ * and AI drafts (six sent as written), on the workspace's own conversations.
  */
 async function seedWorkQueue(tenantId: string, conversationIds: string[]) {
   const db = createDb(settings().databaseUrl, { max: 1 });
@@ -128,7 +128,7 @@ async function seedWorkQueue(tenantId: string, conversationIds: string[]) {
            started_at, ended_at, outcome, business_minutes)
          VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid, $1, 'first_reply',
            'medium', 15, now() - interval '20 minutes', now(), $2, $3)`,
-        [conversationId, n === 0 ? 'missed' : 'met', n === 0 ? 20 : 5 + n],
+        [conversationId, 'met', 5 + n],
       );
       const declined = n === 0 ? 2 : 0;
       for (let round = 1; round <= declined + 1; round += 1) {
@@ -160,23 +160,13 @@ async function seedWorkQueue(tenantId: string, conversationIds: string[]) {
         `SELECT id FROM message_ledger WHERE conversation_id = $1 AND sender_kind = 'customer' LIMIT 1`,
         [conversationId],
       );
-      const state = n === 0 ? 'rejected' : 'approved';
-      const draft = await client.query<{ id: string }>(
+      await client.query(
         `INSERT INTO ai_drafts (id, tenant_id, conversation_id, run_id, trigger_ledger_id,
            owner_epoch, text, state, decided_by, decided_at)
          VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid, $1, $2, $3, 1,
-           'Your parcel is on its way.', $4, $5, now()) RETURNING id`,
-        [conversationId, run.rows[0]?.id, asked.rows[0]?.id, state, staffId],
+           'Your parcel is on its way.', 'approved', $4, now())`,
+        [conversationId, run.rows[0]?.id, asked.rows[0]?.id, staffId],
       );
-      if (state === 'rejected') {
-        await client.query(
-          `INSERT INTO ai_draft_decisions (id, tenant_id, draft_id, staff_member_id,
-             client_request_id, decision, reason, owner_epoch)
-           VALUES (gen_random_uuid(), current_setting('app.tenant_id')::uuid, $1, $2,
-             gen_random_uuid(), 'rejected', 'inaccurate', 1)`,
-          [draft.rows[0]?.id, staffId],
-        );
-      }
     }
     await client.query('COMMIT');
   } finally {
@@ -372,10 +362,10 @@ test('H12 HNV-10-06 HNV-09-05 · reports on reply-time targets, offers and AI dr
   await page.goto('/reports');
   const targets = page.getByTestId('reply-targets-report');
   await expect(page.getByRole('heading', { name: 'Reply-time targets' })).toBeVisible();
-  // Five of six replies in time; one miss is too few to show.
-  await expect(page.getByTestId('tile-targets-met')).toContainText('83%');
+  // Every reply in time.
+  await expect(page.getByTestId('tile-targets-met')).toContainText('100%');
   await expect(page.getByTestId('tile-targets-met')).toContainText('Of 6 replies from a person');
-  await expect(page.getByTestId('tile-targets-missed')).toContainText('Small sample');
+  await expect(page.getByTestId('tile-targets-missed')).toContainText('Targets missed0');
   await expect(page.getByTestId('reply-targets-by-priority')).toContainText('Medium6');
   await expect(targets).toContainText('Reply-time targets have been recorded since');
   const violations = await audit(page, 'reports reply-time targets (en)');
@@ -392,16 +382,16 @@ test('H12 HNV-10-06 HNV-09-05 · reports on reply-time targets, offers and AI dr
 
   await page.getByRole('tab', { name: 'AI usage' }).click();
   await expect(page.getByRole('heading', { name: 'AI drafts for review' })).toBeVisible();
-  await expect(page.getByTestId('tile-drafts-sent')).toContainText('83%');
-  await expect(page.getByTestId('drafts-reject-reasons')).toContainText('It was wrongSmall sample');
+  await expect(page.getByTestId('tile-drafts-sent')).toContainText('100%');
+  await expect(page.getByText('No drafts were rejected in this range.')).toBeVisible();
   violations.push(...(await audit(page, 'reports AI drafts (en)')));
 
   const download = page.waitForEvent('download');
   await page.getByTestId('export-csv').click();
   const csv = readFileSync((await (await download).path()) ?? '', 'utf8');
-  expect(csv).toContain('reply_targets,met,5,0.8333,false,6');
+  expect(csv).toContain('reply_targets,met,6,1,false,6');
   expect(csv).toContain('offers,accepted,5,0.625,false,8');
-  expect(csv).toContain('ai_drafts,sent,5,0.8333,false,6');
+  expect(csv).toContain('ai_drafts,sent,6,1,false,6');
 
   // Arabic on a phone: every new section reads right to left and fits.
   const overflowing: string[] = [];

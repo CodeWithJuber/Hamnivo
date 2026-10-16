@@ -94,6 +94,26 @@ function conditions(scope: AnalyticsScope, filters: Filters, channel: SQL): SQL 
   return parts.length ? sql.join(parts, sql` and `) : sql`true`;
 }
 
+/**
+ * Which teams' offers a caller sees by team (HNV-10-06): an offer belongs to the team it was made
+ * for, which may not be the conversation's team now, so the team filter and a reach limited to
+ * some teams apply to that team as well.
+ */
+function offerTeams(scope: AnalyticsScope, filters: Filters): SQL {
+  const parts: SQL[] = [];
+  if (!scope.all) {
+    const any: SQL[] = [];
+    if (scope.workspaceIds.length)
+      any.push(sql`b.workspace_id in (${uuidList(scope.workspaceIds)})`);
+    if (scope.brandIds.length) any.push(sql`m.brand_id in (${uuidList(scope.brandIds)})`);
+    if (scope.inboxIds.length) any.push(sql`m.inbox_id in (${uuidList(scope.inboxIds)})`);
+    if (scope.teamIds.length) any.push(sql`o.team_id in (${uuidList(scope.teamIds)})`);
+    parts.push(sql`(${sql.join(any, sql` or `)})`);
+  }
+  if (filters.teamId) parts.push(sql`o.team_id = ${filters.teamId}::uuid`);
+  return parts.length ? sql.join(parts, sql` and `) : sql`true`;
+}
+
 interface Filters {
   brandId: string | null;
   teamId: string | null;
@@ -409,6 +429,8 @@ export class AnalyticsService {
       const workQueue = await this.workQueue(tx, {
         from: controlsFrom,
         where: controlsWhere,
+        scope,
+        filters: parsed.filters,
         range,
         timezone: tz,
         now,
@@ -626,18 +648,60 @@ export class AnalyticsService {
    */
   private async workQueue(
     tx: TenantTx,
-    q: { from: SQL; where: SQL; range: Range; timezone: string; now: Date; k: number },
+    q: {
+      from: SQL;
+      where: SQL;
+      scope: AnalyticsScope;
+      filters: Filters;
+      range: Range;
+      timezone: string;
+      now: Date;
+      k: number;
+    },
   ): Promise<Pick<Overview, 'replyTargets' | 'offers' | 'aiDrafts'>> {
     const { from, where, range, k } = q;
-    const count = (value: number, sample: number) => ({
+    /** A count shown on its own, without what it stands on (that would give it away). */
+    const held = (value: number) => ({
       value: protectCount(value, k),
       suppressed: protectCount(value, k) === null,
-      sample,
     });
+    /** A count and its share of a total that is not otherwise split up. */
     const share = (value: number, sample: number) => ({
-      ...count(value, sample),
+      ...held(value),
+      sample,
       rate: round(heldRate(value, sample, k)),
     });
+    type Share = ReturnType<typeof share>;
+    /**
+     * Counts that split one total, which is shown: one withheld is withheld with the next
+     * smallest, so it cannot be worked out by subtracting the others from the total.
+     */
+    const shares = <K extends string>(parts: Record<K, number>): Record<K, Share> => {
+      const keys = Object.keys(parts) as K[];
+      const total = keys.reduce((sum, key) => sum + parts[key], 0);
+      const rows = protectBreakdown(
+        keys.map((key) => ({ key, count: parts[key] })),
+        { k, totalShown: true },
+      );
+      return Object.fromEntries(
+        rows.map((row) => [
+          row.key,
+          {
+            value: row.suppressed ? null : row.count,
+            suppressed: row.suppressed,
+            sample: total,
+            rate: row.suppressed ? null : round(protectedRate(row.count, total, k)),
+          },
+        ]),
+      ) as Record<K, Share>;
+    };
+    /** A row's share of its own total, withheld when a count it is made of is (see `shares`). */
+    const rowRate = <K extends string>(parts: Record<K, number>, of: NoInfer<K>[]) => {
+      const split = shares(parts);
+      if (of.some((key) => split[key].suppressed)) return null;
+      const part = of.reduce((sum, key) => sum + parts[key], 0);
+      return round(protectedRate(part, split[of[0] as K].sample, k));
+    };
     const median = (sample: number, value: unknown, digits: number) => ({
       value: sample >= k ? round(numOrNull(value), digits) : null,
       suppressed: sample > 0 && sample < k,
@@ -700,14 +764,14 @@ export class AnalyticsService {
       order by days.day`,
     );
     const st = slaRows[0] ?? {};
-    const met = num(st.met);
-    const replies = met + num(st.missed);
     const byPriority = new Map(slaPriorityRows.map((row) => [row.priority, row]));
     const rated = <T extends { count: number; met: number }>(rows: T[]) =>
       protectBreakdown(rows, { k, totalShown: true }).map((row) => ({
         ...row,
         replies: row.suppressed ? null : row.count,
-        metRate: row.suppressed ? null : round(heldRate(row.met, row.count, k)),
+        metRate: row.suppressed
+          ? null
+          : rowRate({ met: row.met, missed: row.count - row.met }, ['met']),
       }));
 
     // Offers: one row per person offered a chat.
@@ -719,18 +783,24 @@ export class AnalyticsService {
         count(*) filter (where o.state = 'accepted') as accepted,
         count(*) filter (where o.state = 'declined') as declined,
         count(*) filter (where o.state = 'expired') as expired,
-        count(*) filter (where o.state = 'cancelled') as cancelled,
         percentile_cont(0.5) within group (order by extract(epoch from o.decided_at - o.offered_at))
           filter (where o.state = 'accepted') as accept_median
       from ${offers}
       where ${where} and ${offered}`);
-    // A hand-off ended in the queue when its last offer was declined or ran out.
+    // A hand-off ended in the queue when its last offer, made in the range or after it, was
+    // declined or ran out.
     const { rows: handoffRows } = await tx.execute<{ handoffs: string; queued: string }>(sql`
-      with last_offer as (
-        select distinct on (o.conversation_id, o.handoff_epoch) o.state
+      with handoffs as (
+        select distinct o.tenant_id, o.conversation_id, o.handoff_epoch
         from ${offers}
         where ${where} and ${offered}
-        order by o.conversation_id, o.handoff_epoch, o.round desc
+      ),
+      last_offer as (
+        select distinct on (x.conversation_id, x.handoff_epoch) x.state
+        from handoffs h
+        join conversation_offers x on x.tenant_id = h.tenant_id
+          and x.conversation_id = h.conversation_id and x.handoff_epoch = h.handoff_epoch
+        order by x.conversation_id, x.handoff_epoch, x.round desc
       )
       select count(*) as handoffs,
         count(*) filter (where state in ('declined', 'expired')) as queued
@@ -743,13 +813,18 @@ export class AnalyticsService {
     const { rows: offerTeamRows } = await tx.execute<Record<string, unknown>>(sql`
       select o.team_id as team_id, tm.name as name, count(*) as offered,
         count(*) filter (where o.state = 'accepted') as accepted,
-        count(*) filter (where o.state in ('accepted', 'declined', 'expired')) as answered
+        count(*) filter (where o.state = 'declined') as declined,
+        count(*) filter (where o.state = 'expired') as expired
       from ${offers}
       join teams tm on tm.tenant_id = o.tenant_id and tm.id = o.team_id
-      where ${where} and ${offered}
+      where ${where} and ${offered} and ${offerTeams(q.scope, q.filters)}
       group by 1, 2 order by 3 desc, 2`);
     const of = offerRows[0] ?? {};
-    const answered = num(of.accepted) + num(of.declined) + num(of.expired);
+    const answers = shares({
+      accepted: num(of.accepted),
+      declined: num(of.declined),
+      expired: num(of.expired),
+    });
     const handoffs = num(handoffRows[0]?.handoffs);
 
     // AI drafts: one row per draft, with the person's decision beside it.
@@ -760,8 +835,7 @@ export class AnalyticsService {
       select count(*) as written,
         count(*) filter (where d.state = 'approved') as approved,
         count(*) filter (where d.state = 'edited') as edited,
-        count(*) filter (where d.state = 'rejected') as rejected,
-        count(*) filter (where d.state = 'superseded') as set_aside
+        count(*) filter (where d.state = 'rejected') as rejected
       from ${drafts}
       where ${where} and ${written}`);
     const { rows: rejectRows } = await tx.execute<{ reason: string; n: string }>(sql`
@@ -777,23 +851,39 @@ export class AnalyticsService {
       group by 1 order by 2 desc, 1`);
     const { rows: agentRows } = await tx.execute<Record<string, unknown>>(sql`
       select d.agent_id as agent_id, a.name as name, count(*) as written,
-        count(*) filter (where d.state in ('approved', 'edited')) as sent,
-        count(*) filter (where d.state in ('approved', 'edited', 'rejected')) as reviewed
+        count(*) filter (where d.state = 'approved') as approved,
+        count(*) filter (where d.state = 'edited') as edited,
+        count(*) filter (where d.state = 'rejected') as rejected
       from ${drafts}
       left join agent_profiles a on a.tenant_id = d.tenant_id and a.id = d.agent_id
       where ${where} and ${written}
       group by 1, 2 order by 3 desc, 2`);
     const dr = draftRows[0] ?? {};
-    const sent = num(dr.approved) + num(dr.edited);
-    const reviewed = sent + num(dr.rejected);
-    const draftsWritten = num(dr.written);
+    const decisions = shares({
+      approved: num(dr.approved),
+      edited: num(dr.edited),
+      rejected: num(dr.rejected),
+    });
+    // Sent is approved and edited together: shown only when both are, so neither is given away.
+    const sent: Share =
+      decisions.approved.suppressed || decisions.edited.suppressed
+        ? { value: null, suppressed: true, sample: decisions.approved.sample, rate: null }
+        : {
+            value: num(dr.approved) + num(dr.edited),
+            suppressed: false,
+            sample: decisions.approved.sample,
+            rate: round(
+              protectedRate(num(dr.approved) + num(dr.edited), decisions.approved.sample, k),
+            ),
+          };
+    const replyShares = shares({ met: num(st.met), missed: num(st.missed) });
 
     return {
       replyTargets: {
         recordingSince: st.since ? new Date(st.since as string).toISOString() : null,
-        met: share(met, replies),
-        missed: share(num(st.missed), replies),
-        stopped: count(num(st.stopped), num(st.stopped) + replies),
+        met: replyShares.met,
+        missed: replyShares.missed,
+        stopped: held(num(st.stopped)),
         firstReplyMedianMinutes: median(num(st.first_n), st.first_median, 1),
         byPriority: rated(
           SLA_PRIORITIES.map((priority) => ({
@@ -822,11 +912,10 @@ export class AnalyticsService {
       },
       offers: {
         windowLimited,
-        offered: count(num(of.offered), num(of.offered)),
-        accepted: share(num(of.accepted), answered),
-        declined: share(num(of.declined), answered),
-        expired: share(num(of.expired), answered),
-        cancelled: count(num(of.cancelled), num(of.offered)),
+        offered: held(num(of.offered)),
+        accepted: answers.accepted,
+        declined: answers.declined,
+        expired: answers.expired,
         acceptMedianSeconds: median(num(of.accepted), of.accept_median, 1),
         leftInQueue: share(num(handoffRows[0]?.queued), handoffs),
         declineReasons:
@@ -838,18 +927,26 @@ export class AnalyticsService {
           teamId: toPublicId('team', String(row.team_id)),
           name: String(row.name),
           offered: suppressed ? null : n,
-          acceptRate: suppressed ? null : round(heldRate(num(row.accepted), num(row.answered), k)),
+          acceptRate: suppressed
+            ? null
+            : rowRate(
+                {
+                  accepted: num(row.accepted),
+                  declined: num(row.declined),
+                  expired: num(row.expired),
+                },
+                ['accepted'],
+              ),
           suppressed,
         })),
       },
       aiDrafts: {
         windowLimited,
-        written: count(draftsWritten, draftsWritten),
-        sent: share(sent, reviewed),
-        approved: share(num(dr.approved), reviewed),
-        edited: share(num(dr.edited), reviewed),
-        rejected: share(num(dr.rejected), reviewed),
-        setAside: count(num(dr.set_aside), draftsWritten),
+        written: held(num(dr.written)),
+        sent,
+        approved: decisions.approved,
+        edited: decisions.edited,
+        rejected: decisions.rejected,
         rejectReasons: reasons<Overview['aiDrafts']['rejectReasons'][number]['reason']>(rejectRows),
         setAsideReasons:
           reasons<Overview['aiDrafts']['setAsideReasons'][number]['reason']>(setAsideRows),
@@ -860,7 +957,16 @@ export class AnalyticsService {
           agentId: row.agent_id ? toPublicId('agent', String(row.agent_id)) : null,
           name: (row.name as string | null) ?? null,
           written: suppressed ? null : n,
-          sentRate: suppressed ? null : round(heldRate(num(row.sent), num(row.reviewed), k)),
+          sentRate: suppressed
+            ? null
+            : rowRate(
+                {
+                  approved: num(row.approved),
+                  edited: num(row.edited),
+                  rejected: num(row.rejected),
+                },
+                ['approved', 'edited'],
+              ),
           suppressed,
         })),
       },
@@ -1040,7 +1146,7 @@ export class AnalyticsService {
     const r = o.replyTargets;
     share('reply_targets', 'met', r.met);
     share('reply_targets', 'missed', r.missed);
-    share('reply_targets', 'stopped', r.stopped);
+    lines.push(['reply_targets', 'stopped', r.stopped.value, '', r.stopped.suppressed, '']);
     share('reply_targets', 'first_reply_median_minutes', r.firstReplyMedianMinutes);
     for (const row of r.byPriority) {
       lines.push([
@@ -1056,11 +1162,10 @@ export class AnalyticsService {
       lines.push(['reply_targets_daily', day.date, day.replies, day.metRate, day.suppressed, '']);
     }
     const f = o.offers;
-    share('offers', 'offered', f.offered);
+    lines.push(['offers', 'offered', f.offered.value, '', f.offered.suppressed, '']);
     share('offers', 'accepted', f.accepted);
     share('offers', 'declined', f.declined);
     share('offers', 'expired', f.expired);
-    share('offers', 'cancelled', f.cancelled);
     share('offers', 'accept_median_seconds', f.acceptMedianSeconds);
     share('offers', 'left_in_queue', f.leftInQueue);
     for (const row of f.declineReasons) {
@@ -1070,12 +1175,11 @@ export class AnalyticsService {
       lines.push(['offer_team', row.name, row.offered, row.acceptRate, row.suppressed, '']);
     }
     const d = o.aiDrafts;
-    share('ai_drafts', 'written', d.written);
+    lines.push(['ai_drafts', 'written', d.written.value, '', d.written.suppressed, '']);
     share('ai_drafts', 'sent', d.sent);
     share('ai_drafts', 'approved', d.approved);
     share('ai_drafts', 'edited', d.edited);
     share('ai_drafts', 'rejected', d.rejected);
-    share('ai_drafts', 'set_aside', d.setAside);
     for (const row of d.rejectReasons) {
       lines.push(['ai_draft_reject_reason', row.reason, row.count, '', row.suppressed, '']);
     }
