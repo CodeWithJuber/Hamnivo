@@ -55,6 +55,7 @@ import { MigrationExporter } from './migration/export.service.js';
 import { OUTBOX_HANDLERS, type OutboxHandler, OutboxRelay } from './outbox/relay.service.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
 import { SAAS_WORKER_PROVIDERS, saasOutboxHandlers } from './platform/saas.module.js';
+import { RetentionSweep } from './privacy/retention-sweep.service.js';
 import { AgentsService } from './runtime/agents.service.js';
 import { KillSwitchesService } from './runtime/kill-switches.service.js';
 import { LANGUAGE_MODEL, ModelFactory } from './runtime/models.js';
@@ -272,11 +273,13 @@ export class WorkerModule {
             ]),
         },
         OutboxRelay,
+        RetentionSweep,
         MaintenanceService,
       ],
       exports: [
         OutboxRelay,
         MaintenanceService,
+        RetentionSweep,
         InboxProcessor,
         ReconcilerService,
         ChannelPollService,

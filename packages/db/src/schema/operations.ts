@@ -12,7 +12,6 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { conversationControls } from './authority.js';
 import { bytea, createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { tenantId } from './tenancy.js';
 
@@ -81,11 +80,6 @@ export const operations = pgTable(
       .on(t.tenantId, t.conversationId)
       .where(sql`${t.conversationId} is not null`),
     index('operations_resource_idx').on(t.tenantId, t.resourceType, t.resourceId),
-    foreignKey({
-      name: 'operations_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
-    }),
     check(
       'operations_state_ck',
       sql`${t.state} in ('pending', 'dispatched', 'succeeded', 'failed', 'unknown', 'cancelled')`,

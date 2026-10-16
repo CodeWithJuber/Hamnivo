@@ -341,6 +341,10 @@ export const conversationControls = pgTable(
       t.externalConversationId,
     ),
     index('conversation_controls_principal_idx').on(t.tenantId, t.principalId),
+    /** Resolved conversations by their last activity, which retention deletes oldest first (A10). */
+    index('conversation_controls_resolved_activity_idx')
+      .on(t.tenantId, t.lastActivityAt)
+      .where(sql`${t.authorityStatus} = 'resolved'`),
     /** Each person's open chats, counted when a conversation is offered (HNV-10-03). */
     index('conversation_controls_owner_staff_idx')
       .on(t.tenantId, t.ownerStaffId)

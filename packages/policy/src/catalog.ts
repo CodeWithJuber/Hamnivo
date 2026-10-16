@@ -245,6 +245,12 @@ export const PERMISSIONS = {
     stepUp: true,
     mfa: true,
   },
+  'privacy.manage': {
+    description: 'Choose how long conversations are kept before they are deleted everywhere',
+    scopes: TENANT,
+    stepUp: true,
+    mfa: true,
+  },
   'support.grant': {
     description: 'Allow platform support to access this workspace',
     scopes: TENANT,

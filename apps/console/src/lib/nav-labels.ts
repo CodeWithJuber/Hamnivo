@@ -51,6 +51,7 @@ export function navLabels(t: TFunction): NavLabels {
       '/customer-identity': t('setup.identity.nav'),
       '/migration': t('migration.nav'),
       '/settings/billing': t('billing.nav'),
+      '/settings/privacy': t('privacy.nav'),
     },
     extras: {
       '/onboarding': t('setup.home.guided'),

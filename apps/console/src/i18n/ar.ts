@@ -10,6 +10,7 @@ import { decisionsAr } from './decisions';
 import { developerAr } from './developer/ar';
 import type { Translation } from './en';
 import { offersAr } from './offers/ar';
+import { privacyAr } from './privacy/ar';
 import { reportsAr } from './reports/ar';
 import { slaAr } from './sla/ar';
 import { ticketsAr } from './tickets/ar';
@@ -1404,6 +1405,7 @@ export const ar: Translation = {
   commerce: commerceAr,
   developer: developerAr,
   reports: reportsAr,
+  privacy: privacyAr,
   chatSettings: chatSettingsAr,
   chatWidget: chatWidgetAr,
   channels: channelsAr,
@@ -2360,6 +2362,7 @@ export const ar: Translation = {
     migration: 'الاستيراد',
     settings: 'إعدادات مساحة العمل',
     security: 'الأمان',
+    privacy: 'الخصوصية',
     support: 'وصول الدعم',
   },
   permissions: {
@@ -2455,6 +2458,7 @@ export const ar: Translation = {
     },
     settings: { manage: 'تعديل إعدادات مساحة العمل' },
     security: { manage: 'إعداد تسجيل الدخول والدخول الموحّد وقواعد الجلسات' },
+    privacy: { manage: 'اختيار مدة الاحتفاظ بالمحادثات قبل حذفها' },
     support: { grant: 'السماح لدعم Hamnivo بالوصول إلى مساحة العمل هذه' },
   },
 };

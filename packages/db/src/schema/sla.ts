@@ -12,7 +12,6 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { conversationControls } from './authority.js';
 import { createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { staffMembers } from './identity.js';
 import { teams } from './inbox.js';
@@ -104,11 +103,6 @@ export const slaOutcomes = pgTable(
     /** The 13-month purge looks across tenants by end time. */
     index('sla_outcomes_purge_idx').on(t.endedAt),
     check('sla_outcomes_minutes_ck', sql`${t.targetMinutes} > 0 and ${t.businessMinutes} >= 0`),
-    foreignKey({
-      name: 'sla_outcomes_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
-    }),
     tenantIsolation(),
   ],
 );

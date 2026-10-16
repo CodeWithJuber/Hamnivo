@@ -35,3 +35,5 @@ Good to know:
 - Hamnivo keeps which version a customer agreed to and when, never their country.
 - Customers who do not agree can still search your help articles.
 - Turning consent on affects new chats; conversations already open go on.
+- To delete old conversations after a time you choose, see
+  [How long conversations are kept](privacy.md).

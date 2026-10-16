@@ -520,6 +520,8 @@ async function seedDeveloperPlatform(
     hosts: [{ pattern: 'hooks.example.com', note: null, createdAt: new Date().toISOString() }],
     updatedBy: ref.staffMemberId,
   });
+  // Retention (A10): every conversation kept, as a workspace starts.
+  await tx.insert(s.retentionPolicies).values({ tenantId, updatedBy: ref.staffMemberId });
   // Last, so the seeded rows above are not held to the plan's limits.
   await tx.insert(s.tenantEntitlements).values({
     tenantId,

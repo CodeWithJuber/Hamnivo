@@ -13,7 +13,6 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { conversationControls } from './authority.js';
 import { bytea, createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { customerPrincipals, secrets, staffMembers } from './identity.js';
 import { operations } from './operations.js';
@@ -136,11 +135,6 @@ export const catalogSnapshots = pgTable(
       columns: [t.tenantId, t.merchantConnectionId],
       foreignColumns: [merchantConnections.tenantId, merchantConnections.id],
     }),
-    foreignKey({
-      name: 'catalog_snapshots_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
-    }),
     tenantIsolation(),
   ],
 );
@@ -177,11 +171,6 @@ export const carts = pgTable(
     uniqueIndex('carts_one_active_key')
       .on(t.tenantId, t.conversationId, t.principalId)
       .where(sql`${t.status} in ('open', 'locked')`),
-    foreignKey({
-      name: 'carts_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
-    }),
     foreignKey({
       name: 'carts_principal_fk',
       columns: [t.tenantId, t.principalId],
@@ -248,11 +237,6 @@ export const quotes = pgTable(
       name: 'quotes_cart_fk',
       columns: [t.tenantId, t.cartId],
       foreignColumns: [carts.tenantId, carts.id],
-    }),
-    foreignKey({
-      name: 'quotes_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
     }),
     foreignKey({
       name: 'quotes_principal_fk',
@@ -323,11 +307,6 @@ export const purchaseIntents = pgTable(
     uniqueIndex('purchase_intents_nonce_key')
       .on(t.tenantId, t.approvalNonce)
       .where(sql`${t.approvalNonce} is not null`),
-    foreignKey({
-      name: 'purchase_intents_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
-    }),
     foreignKey({
       name: 'purchase_intents_principal_fk',
       columns: [t.tenantId, t.principalId],
@@ -467,11 +446,6 @@ export const orders = pgTable(
     uniqueIndex('orders_intent_key').on(t.tenantId, t.purchaseIntentId),
     index('orders_placed_idx').on(t.tenantId, t.placedAt),
     index('orders_conversation_idx').on(t.tenantId, t.conversationId),
-    foreignKey({
-      name: 'orders_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
-    }),
     foreignKey({
       name: 'orders_principal_fk',
       columns: [t.tenantId, t.principalId],

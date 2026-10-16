@@ -25,6 +25,7 @@ export * from './offers.js';
 export * from './operations.js';
 export * from './operators.js';
 export * from './platform.js';
+export * from './privacy.js';
 export * from './runtime.js';
 export * from './saas.js';
 export * from './setup.js';

@@ -65,6 +65,7 @@ describe('the menu', () => {
         '/customer-identity',
         '/migration',
         '/settings/billing',
+        '/settings/privacy',
       ],
     });
   });
@@ -105,6 +106,7 @@ describe('the menu', () => {
       '/customer-identity': 'widget.identity_keys',
       '/migration': 'migration.review',
       '/settings/billing': ['billing.read', 'settings.manage'],
+      '/settings/privacy': 'privacy.manage',
     });
   });
 
@@ -229,11 +231,16 @@ describe('who sees which entry', () => {
         '/customer-identity',
         '/migration',
         '/settings/billing',
+        '/settings/privacy',
       ],
     };
     const home = { home: ['/overview'] };
     expect(pagesOf('owner')).toEqual(everything);
-    expect(pagesOf('admin')).toEqual(everything);
+    // How long conversations are kept is the owners' call (A10).
+    expect(pagesOf('admin')).toEqual({
+      ...everything,
+      settings: everything.settings.filter((page) => page !== '/settings/privacy'),
+    });
     expect(pagesOf('supervisor')).toEqual({
       ...everything,
       ai: everything.ai.filter((page) => page !== '/models'),
@@ -303,6 +310,7 @@ describe('where the person is', () => {
       '/brands': 'settings',
       '/migration': 'settings',
       '/settings/billing': 'settings',
+      '/settings/privacy': 'settings',
       '/stop-ai': undefined,
       '/account': undefined,
       '/platform': undefined,

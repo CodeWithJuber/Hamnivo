@@ -9,6 +9,7 @@ import { commerceEn } from './commerce/en';
 import { decisionsEn } from './decisions';
 import { developerEn } from './developer/en';
 import { offersEn } from './offers/en';
+import { privacyEn } from './privacy/en';
 import { reportsEn } from './reports/en';
 import { slaEn } from './sla/en';
 import { ticketsEn } from './tickets/en';
@@ -1418,6 +1419,7 @@ export const en = {
   commerce: commerceEn,
   developer: developerEn,
   reports: reportsEn,
+  privacy: privacyEn,
   chatSettings: chatSettingsEn,
   chatWidget: chatWidgetEn,
   channels: channelsEn,
@@ -2384,6 +2386,7 @@ export const en = {
     migration: 'Imports',
     settings: 'Workspace settings',
     security: 'Security',
+    privacy: 'Privacy',
     support: 'Support access',
   },
   permissions: {
@@ -2478,6 +2481,7 @@ export const en = {
     },
     settings: { manage: 'Edit workspace settings' },
     security: { manage: 'Configure sign-in, single sign-on and session rules' },
+    privacy: { manage: 'Choose how long conversations are kept before they are deleted' },
     support: { grant: 'Allow Hamnivo support to access this workspace' },
   },
 } as const;

@@ -38,6 +38,7 @@ export type NavPath =
   | '/developer'
   | '/migration'
   | '/settings/billing'
+  | '/settings/privacy'
   | '/customer-identity';
 
 export type NavGroupId = 'home' | 'inbox' | 'ai' | 'sales' | 'reports' | 'settings';
@@ -99,6 +100,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/customer-identity', permission: 'widget.identity_keys' },
       { to: '/migration', permission: 'migration.review' },
       { to: '/settings/billing', anyOf: ['billing.read', 'settings.manage'] },
+      { to: '/settings/privacy', permission: 'privacy.manage' },
     ],
   },
 ];

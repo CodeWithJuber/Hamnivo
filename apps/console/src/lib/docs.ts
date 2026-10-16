@@ -34,6 +34,8 @@ export const DOCS = {
     whatsappChannel: guide('setup', 'whatsapp'),
     /** Connecting a Telegram bot made with @BotFather (D14). */
     telegramChannel: guide('setup', 'telegram'),
+    /** How long conversations are kept before they are deleted (A10). */
+    privacy: guide('setup', 'privacy'),
   },
   /** Rules that act on their own: website prompts and chat automations. */
   automation: {

@@ -7,6 +7,7 @@ import {
   purgeConversationOffers,
   purgeExpired,
   purgeMigrationFiles,
+  purgeOutboxEvents,
   purgeSlaOutcomes,
   purgeVisitorBlocks,
   purgeVisitors,
@@ -24,6 +25,7 @@ import { Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 import type { AppConfig } from '../config.js';
 import { MemoryDeletionService } from '../memory/deletion.service.js';
+import { RetentionSweep } from '../privacy/retention-sweep.service.js';
 import { APP_DB, CONFIG, REDIS } from '../tokens.js';
 
 const QUEUE = 'hamnivo-maintenance';
@@ -32,7 +34,8 @@ const QUEUE = 'hamnivo-maintenance';
  * Scheduled upkeep through BullMQ job schedulers: audit partitions daily; expiry purge and
  * reconciler cursors every ten minutes; memory past its retention hourly; memory tombstones
  * replayed daily (a safety net after restores); webhook event bodies past their retention cleared,
- * and the delivery log past WEBHOOK_LOG_DAYS deleted, hourly.
+ * and the delivery log past WEBHOOK_LOG_DAYS deleted, hourly; workspaces' own retention periods
+ * every ten minutes.
  */
 @Injectable()
 export class MaintenanceService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -45,6 +48,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(CONFIG) private readonly config: AppConfig,
     private readonly memory: MemoryDeletionService,
+    private readonly retention: RetentionSweep,
   ) {}
 
   async run(job: string): Promise<unknown> {
@@ -73,6 +77,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           offers_removed: await purgeConversationOffers(this.db),
           // How reply-time clocks ended is kept 13 months, for reports (H12, O04).
           sla_outcomes_removed: await purgeSlaOutcomes(this.db),
+          // Handled outbox events, some carrying message text, are kept 30 days (A10).
+          outbox_events_removed: await purgeOutboxEvents(this.db),
         };
       }
       case 'reconcile-cursors':
@@ -81,6 +87,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         return { deleted: await this.memory.purgeExpired() };
       case 'memory-tombstones':
         return { removed: await this.memory.replayTombstones() };
+      case 'privacy-retention':
+        return this.retention.run();
       case 'webhook-retention':
         return purgeWebhookEvents(this.db, { keepDays: this.config.WEBHOOK_LOG_DAYS });
       default:
@@ -115,6 +123,12 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       'memory-tombstones',
       { every: 24 * 60 * 60 * 1000 },
       { name: 'memory-tombstones' },
+    );
+    // Workspaces' own retention periods: old resolved conversations and customers (A10).
+    await this.queue.upsertJobScheduler(
+      'privacy-retention',
+      { every: 10 * 60 * 1000 },
+      { name: 'privacy-retention' },
     );
     await this.queue.upsertJobScheduler(
       'webhook-retention',

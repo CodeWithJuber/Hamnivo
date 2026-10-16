@@ -41,6 +41,7 @@ import { adminMemoryRoutes, widgetMemoryRoutes } from './memory-routes.js';
 import { migrationRoutes } from './migration-routes.js';
 import { AttachmentPart } from './parts.js';
 import { platformRoutes } from './platform-routes.js';
+import { privacyRoutes } from './privacy-routes.js';
 import { saasRoutes } from './saas.js';
 import { securityRoutes } from './security-routes.js';
 import { setupRoutes } from './setup-routes.js';
@@ -435,6 +436,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...inboxLibraryRoutes,
   ...visitorWidgetRoutes,
   ...visitorStaffRoutes,
+  ...privacyRoutes,
   ...securityRoutes,
   ...platformRoutes,
   ...commerceAdminRoutes,
