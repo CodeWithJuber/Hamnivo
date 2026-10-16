@@ -650,6 +650,18 @@ fresh backup on the old one just before.
 Test a restore now and then on a spare server. `scripts/ci/production-smoke.sh` runs a backup and
 restore drill in its checks.
 
+### Retention and backups
+
+A workspace can choose how long resolved conversations are kept (Studio, **Settings** → **Privacy**;
+[guide](guide/setup/privacy.md)). The worker then deletes old conversations in Chatwoot and in
+Hamnivo, about 150 per workspace an hour (`RETENTION_BATCH`, `RETENTION_PER_WORKSPACE`). Chatwoot
+removes the files of a deleted conversation in its background jobs, a little later.
+
+Deleted conversations stay in backups until those are rotated out (the newest 14 are kept). A
+restore brings them back, and the worker deletes them again on its next run, as long as the
+workspace still keeps conversations for less time than their age. Handled outbox events, some of
+which carry message text, are deleted after 30 days.
+
 ### Updates
 
 ```bash

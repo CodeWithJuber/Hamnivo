@@ -253,7 +253,8 @@ export const customerNotifications = pgTable(
 
 /**
  * A customer agreed to a brand's consent words before chatting (W27). Append-only: the version
- * of the words and the time, never the country that made the question appear.
+ * of the words and the time, never the country that made the question appear. The record of the
+ * agreement outlives the customer when retention removes them (A10), so it has no foreign key.
  */
 export const chatConsents = pgTable(
   'chat_consents',
@@ -272,11 +273,6 @@ export const chatConsents = pgTable(
       name: 'chat_consents_brand_fk',
       columns: [t.tenantId, t.brandId],
       foreignColumns: [brands.tenantId, brands.id],
-    }),
-    foreignKey({
-      name: 'chat_consents_principal_fk',
-      columns: [t.tenantId, t.principalId],
-      foreignColumns: [customerPrincipals.tenantId, customerPrincipals.id],
     }),
     check('chat_consents_version_ck', sql`${t.noticeVersion} >= 0`),
     tenantIsolation(),

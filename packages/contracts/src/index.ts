@@ -50,6 +50,8 @@ export * from './participants.js';
 export * from './parts.js';
 export * from './platform.js';
 export * from './platform-routes.js';
+export * from './privacy.js';
+export * from './privacy-routes.js';
 export * from './routes.js';
 export * from './saas.js';
 export * from './security.js';

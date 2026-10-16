@@ -78,6 +78,7 @@ const PATHS = [
   '/agents',
   '/agents/$agentId',
   '/settings/billing',
+  '/settings/privacy',
   '/visitors',
 ];
 

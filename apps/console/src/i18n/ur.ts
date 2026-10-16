@@ -10,6 +10,7 @@ import { decisionsUr } from './decisions';
 import { developerUr } from './developer/ur';
 import type { Translation } from './en';
 import { offersUr } from './offers/ur';
+import { privacyUr } from './privacy/ur';
 import { reportsUr } from './reports/ur';
 import { slaUr } from './sla/ur';
 import { ticketsUr } from './tickets/ur';
@@ -1432,6 +1433,7 @@ export const ur: Translation = {
   commerce: commerceUr,
   developer: developerUr,
   reports: reportsUr,
+  privacy: privacyUr,
   chatSettings: chatSettingsUr,
   chatWidget: chatWidgetUr,
   channels: channelsUr,
@@ -2407,6 +2409,7 @@ export const ur: Translation = {
     migration: 'درآمد',
     settings: 'ورک اسپیس کی ترتیبات',
     security: 'سیکیورٹی',
+    privacy: 'رازداری',
     support: 'سپورٹ کی رسائی',
   },
   permissions: {
@@ -2502,6 +2505,7 @@ export const ur: Translation = {
     },
     settings: { manage: 'ورک اسپیس کی ترتیبات بدلیں' },
     security: { manage: 'سائن اِن، سنگل سائن آن اور سیشن کے اصول سیٹ کریں' },
+    privacy: { manage: 'طے کریں کہ گفتگو مٹائے جانے سے پہلے کتنی دیر رکھی جائے' },
     support: { grant: 'Hamnivo سپورٹ کو اس ورک اسپیس تک رسائی دیں' },
   },
 };

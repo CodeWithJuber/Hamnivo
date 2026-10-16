@@ -13,7 +13,6 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { conversationControls } from './authority.js';
 import { createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { staffMembers } from './identity.js';
 import { teams } from './inbox.js';
@@ -121,11 +120,6 @@ export const conversationOffers = pgTable(
     index('conversation_offers_ended_idx').on(t.decidedAt).where(sql`${t.decidedAt} is not null`),
     /** Reports count offers made in a date range. */
     index('conversation_offers_offered_idx').on(t.tenantId, t.offeredAt),
-    foreignKey({
-      name: 'conversation_offers_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
-    }),
     foreignKey({
       name: 'conversation_offers_team_fk',
       columns: [t.tenantId, t.teamId],

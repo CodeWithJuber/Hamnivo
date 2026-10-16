@@ -227,6 +227,12 @@ const EnvSchema = z.object({
     .default(72),
   /** Webhook requests sent at the same time by one worker. */
   WEBHOOK_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(8),
+  /**
+   * Retention (A10): old resolved conversations deleted per run of the worker's sweep (every 10
+   * minutes), across workspaces, and at most this many of one workspace per run.
+   */
+  RETENTION_BATCH: z.coerce.number().int().min(1).max(1000).default(100),
+  RETENTION_PER_WORKSPACE: z.coerce.number().int().min(1).max(1000).default(25),
   /** Analytics withhold values computed from fewer conversations or responses than this. */
   ANALYTICS_MIN_GROUP_SIZE: z.coerce.number().int().min(2).max(50).default(5),
   /** Days between issuing a platform invoice and its due date. */

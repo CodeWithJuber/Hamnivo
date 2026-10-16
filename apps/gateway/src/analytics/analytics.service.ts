@@ -71,6 +71,36 @@ const uuidList = (ids: string[]) =>
   );
 
 /**
+ * Retention (A10) deletes old conversations but keeps their report row (conversation_metrics,
+ * `retired_at` set) with copies of what reports read from the conversation's other records. These
+ * relations put the live records and the copies side by side, so reports do not change when
+ * conversations are deleted.
+ */
+/** Every conversation: live ones, and those retention deleted. */
+const CONVERSATIONS = sql`(
+  select tenant_id, id, brand_id, inbox_id from conversation_controls
+  union all
+  select tenant_id, id, brand_id, inbox_id from conversation_metrics where retired_at is not null
+)`;
+/** Each conversation's team, priority and ticket. */
+const INBOX_STATE = sql`(
+  select tenant_id, conversation_id, team_id, priority, ticket_number, ticket_source,
+         ticket_opened_at
+  from conversation_inbox_state
+  union all
+  select tenant_id, id, team_id, priority, ticket_number, ticket_source, ticket_opened_at
+  from conversation_metrics where retired_at is not null
+)`;
+/** Each conversation's customer ratings: how many, and their sum. */
+const RATINGS = sql`(
+  select tenant_id, conversation_id, count(*)::bigint as n, sum(rating)::bigint as total
+  from conversation_feedback group by tenant_id, conversation_id
+  union all
+  select tenant_id, id, rating_count::bigint, rating_sum::bigint
+  from conversation_metrics where retired_at is not null and rating_count > 0
+)`;
+
+/**
  * The scope and filter condition over a conversation relation aliased `m` (brand_id, inbox_id),
  * joined with `b` (brands) and `s` (conversation_inbox_state), plus the channel expression.
  */
@@ -262,7 +292,7 @@ export class AnalyticsService {
       const where = conditions(scope, parsed.filters, sql`m.channel`);
       const metricsFrom = sql`conversation_metrics m
         left join brands b on b.tenant_id = m.tenant_id and b.id = m.brand_id
-        left join conversation_inbox_state s on s.tenant_id = m.tenant_id and s.conversation_id = m.id`;
+        left join ${INBOX_STATE} s on s.tenant_id = m.tenant_id and s.conversation_id = m.id`;
       const inRange = sql`m.created_at >= ${range.start} and m.created_at < ${range.end}`;
       // A customer still waiting less than an hour is not missed yet.
       const hourAgo = new Date(now.getTime() - 3_600_000);
@@ -294,9 +324,9 @@ export class AnalyticsService {
       const t = totalsRows[0] ?? {};
 
       const { rows: csatRows } = await tx.execute<{ n: string; avg: string | null }>(sql`
-        select count(*) as n, avg(f.rating)::float8 as avg
+        select coalesce(sum(f.n), 0) as n, (sum(f.total)::numeric / nullif(sum(f.n), 0))::float8 as avg
         from ${metricsFrom}
-        join conversation_feedback f on f.tenant_id = m.tenant_id and f.conversation_id = m.id
+        join ${RATINGS} f on f.tenant_id = m.tenant_id and f.conversation_id = m.id
         where ${where} and ${inRange}`);
       const csatSample = num(csatRows[0]?.n);
 
@@ -340,10 +370,7 @@ export class AnalyticsService {
           sum(fb.total)::float8 / nullif(sum(fb.n), 0) as csat_avg
         from ${metricsFrom}
         left join teams tm on tm.tenant_id = m.tenant_id and tm.id = s.team_id
-        left join (
-          select f.conversation_id, count(*) as n, sum(f.rating) as total
-          from conversation_feedback f group by f.conversation_id
-        ) fb on fb.conversation_id = m.id
+        left join ${RATINGS} fb on fb.tenant_id = m.tenant_id and fb.conversation_id = m.id
         where ${where} and ${inRange}
         group by s.team_id, tm.name
         order by 3 desc, 2`);
@@ -357,18 +384,20 @@ export class AnalyticsService {
         group by 1 order by 2 desc`);
 
       // Tickets (H19): opened in the range, and open now whenever they were opened.
+      // A conversation retention deleted was resolved.
       const ticketsFrom = sql`${metricsFrom}
-        join conversation_controls c on c.tenant_id = m.tenant_id and c.id = m.id`;
+        left join conversation_controls c on c.tenant_id = m.tenant_id and c.id = m.id`;
+      const status = sql`coalesce(c.authority_status, 'resolved')`;
       const opened = sql`s.ticket_opened_at >= ${range.start} and s.ticket_opened_at < ${range.end}`;
       const { rows: ticketRows } = await tx.execute<Record<string, unknown>>(sql`
         select
           count(*) filter (where ${opened}) as created,
-          count(*) filter (where ${opened} and c.authority_status = 'resolved') as closed,
-          count(*) filter (where c.authority_status <> 'resolved') as open_now,
-          count(*) filter (where ${opened} and c.authority_status = 'resolved'
+          count(*) filter (where ${opened} and ${status} = 'resolved') as closed,
+          count(*) filter (where ${status} <> 'resolved') as open_now,
+          count(*) filter (where ${opened} and ${status} = 'resolved'
             and m.last_resolved_at >= s.ticket_opened_at) as close_sample,
           percentile_cont(0.5) within group (order by extract(epoch from m.last_resolved_at - s.ticket_opened_at))
-            filter (where ${opened} and c.authority_status = 'resolved'
+            filter (where ${opened} and ${status} = 'resolved'
               and m.last_resolved_at >= s.ticket_opened_at) as close_median
         from ${ticketsFrom}
         where ${where} and s.ticket_number is not null`);
@@ -387,9 +416,9 @@ export class AnalyticsService {
         group by 1 order by 2 desc, 1`);
 
       // Commerce and AI runs reach conversations recorded before analytics began, too.
-      const controlsFrom = sql`conversation_controls m
+      const controlsFrom = sql`${CONVERSATIONS} m
         left join brands b on b.tenant_id = m.tenant_id and b.id = m.brand_id
-        left join conversation_inbox_state s on s.tenant_id = m.tenant_id and s.conversation_id = m.id
+        left join ${INBOX_STATE} s on s.tenant_id = m.tenant_id and s.conversation_id = m.id
         left join authority_inboxes i on i.tenant_id = m.tenant_id and i.id = m.inbox_id`;
       const controlsWhere = conditions(scope, parsed.filters, sql`i.channel_type`);
       const { rows: commerceRows } = await tx.execute<Record<string, unknown>>(sql`

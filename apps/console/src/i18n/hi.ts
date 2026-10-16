@@ -10,6 +10,7 @@ import { decisionsHi } from './decisions';
 import { developerHi } from './developer/hi';
 import type { Translation } from './en';
 import { offersHi } from './offers/hi';
+import { privacyHi } from './privacy/hi';
 import { reportsHi } from './reports/hi';
 import { slaHi } from './sla/hi';
 import { ticketsHi } from './tickets/hi';
@@ -1409,6 +1410,7 @@ export const hi: Translation = {
   commerce: commerceHi,
   developer: developerHi,
   reports: reportsHi,
+  privacy: privacyHi,
   chatSettings: chatSettingsHi,
   chatWidget: chatWidgetHi,
   channels: channelsHi,
@@ -2365,6 +2367,7 @@ export const hi: Translation = {
     migration: 'इंपोर्ट',
     settings: 'वर्कस्पेस सेटिंग',
     security: 'सुरक्षा',
+    privacy: 'निजता',
     support: 'सहायता एक्सेस',
   },
   permissions: {
@@ -2460,6 +2463,7 @@ export const hi: Translation = {
     },
     settings: { manage: 'वर्कस्पेस सेटिंग बदलें' },
     security: { manage: 'साइन-इन, सिंगल साइन-ऑन और सेशन के नियम सेट करें' },
+    privacy: { manage: 'तय करें कि बातचीत मिटाए जाने से पहले कितने समय तक रखी जाए' },
     support: { grant: 'Hamnivo सहायता को इस वर्कस्पेस का एक्सेस दें' },
   },
 };
