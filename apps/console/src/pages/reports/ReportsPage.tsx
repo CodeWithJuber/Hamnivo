@@ -11,7 +11,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@hamnivo/ui/components/tabs';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { BarChart3Icon, DownloadIcon, InfoIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SelectField, TextField } from '../../components/Fields';
 import { PageHeader, Section } from '../../components/PageHeader';
@@ -31,6 +31,8 @@ import { useTenant } from '../../lib/tenant';
 import type { ReportRange, ReportsSearch, ReportsTab } from '../../routes/_studio/reports';
 import { BillingTab } from './BillingTab';
 import { ConversationsChart } from './ConversationsChart';
+import { CountTable, count, Tile, useLocaleFormat } from './parts';
+import { AiDraftsReport, OffersReport, ReplyTargetsReport } from './WorkQueueReports';
 
 const TAB = 'text-text-secondary hover:text-text data-[state=active]:text-text';
 /** Why conversations went from the AI to people (the ownership reasons the gateway records). */
@@ -81,77 +83,6 @@ function addDays(day: string, days: number): string {
 
 const isDate = (value: string | undefined): value is string =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
-
-export function useLocaleFormat() {
-  const { i18n } = useTranslation();
-  const locale = i18n.resolvedLanguage ?? 'en';
-  return {
-    percent: (value: number | null) =>
-      value === null
-        ? null
-        : new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 }).format(
-            value,
-          ),
-    /** Seconds as "45 sec", "6.5 min" or "2.1 hr". */
-    seconds: (value: number | null) => {
-      if (value === null) return null;
-      const [amount, unit] =
-        value < 60
-          ? [value, 'second']
-          : value < 3600
-            ? [value / 60, 'minute']
-            : [value / 3600, 'hour'];
-      return new Intl.NumberFormat(locale, {
-        style: 'unit',
-        unit,
-        unitDisplay: 'short',
-        maximumFractionDigits: amount < 10 ? 1 : 0,
-      }).format(amount);
-    },
-    rating: (value: number | null) =>
-      value === null
-        ? null
-        : new Intl.NumberFormat(locale, {
-            maximumFractionDigits: 1,
-            minimumFractionDigits: 1,
-          }).format(value),
-  };
-}
-
-/** A count as the page writes it, or null (shown as withheld) when too few stand behind it. */
-const count = (metric: { value: number | null }) =>
-  metric.value === null ? null : formatNumber(metric.value);
-
-/** One headline number with what it stands on; withheld values say why, in neutral text. */
-function Tile({
-  label,
-  value,
-  note,
-  testId,
-}: {
-  label: string;
-  value: string | null;
-  note?: ReactNode;
-  testId: string;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div
-      className="flex min-w-0 flex-col gap-1 rounded-lg border border-border bg-surface p-4"
-      data-testid={testId}
-    >
-      <p className="text-sm text-text-secondary">{label}</p>
-      <p className="text-2xl font-semibold text-text">
-        {value ?? (
-          <span className="text-base font-medium text-text-secondary">
-            {t('reports.smallSample')}
-          </span>
-        )}
-      </p>
-      {note ? <p className="text-xs text-text-secondary">{note}</p> : null}
-    </div>
-  );
-}
 
 function Filters({
   search,
@@ -349,6 +280,7 @@ function QualityTab({ overview }: { overview: AnalyticsOverview }) {
           />
         </div>
       </Section>
+      <ReplyTargetsReport overview={overview} />
       <Section id="per-day" title={t('reports.chart.title')}>
         <ConversationsChart
           days={overview.daily}
@@ -539,44 +471,7 @@ function TeamsTab({ overview }: { overview: AnalyticsOverview }) {
           </Table>
         </div>
       </Section>
-    </div>
-  );
-}
-
-/** A short table of counts by name, with withheld counts said in words, like the reasons above. */
-function CountTable({
-  testId,
-  head,
-  rows,
-}: {
-  testId: string;
-  head: string;
-  rows: Array<{ key: string; name: string; count: number | null }>;
-}) {
-  const { t } = useTranslation();
-  if (rows.length === 0) {
-    return <p className="text-sm text-text-secondary">{t('reports.tickets.emptyList')}</p>;
-  }
-  return (
-    <div className="overflow-x-auto">
-      <Table data-testid={testId}>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="whitespace-normal">{head}</TableHead>
-            <TableHead className="whitespace-normal">{t('reports.tickets.count')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.key} data-key={row.key}>
-              <TableCell className="whitespace-normal">{row.name}</TableCell>
-              <TableCell className="whitespace-normal tabular-nums">
-                {row.count === null ? t('reports.smallSample') : formatNumber(row.count)}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <OffersReport overview={overview} />
     </div>
   );
 }
@@ -687,6 +582,7 @@ function AiTab({ overview }: { overview: AnalyticsOverview }) {
           }
         />
       </div>
+      <AiDraftsReport overview={overview} />
     </div>
   );
 }

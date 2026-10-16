@@ -652,8 +652,7 @@ export class AnalyticsService {
         count: row.suppressed ? null : row.count,
         suppressed: row.suppressed,
       }));
-    const windowLimited =
-      range.start.getTime() < q.now.getTime() - WORK_QUEUE_KEEP_DAYS * DAY;
+    const windowLimited = range.start.getTime() < q.now.getTime() - WORK_QUEUE_KEEP_DAYS * DAY;
 
     // Reply-time targets: rows are written when a clock ends.
     const sla = sql`${from}
@@ -830,9 +829,8 @@ export class AnalyticsService {
         cancelled: count(num(of.cancelled), num(of.offered)),
         acceptMedianSeconds: median(num(of.accepted), of.accept_median, 1),
         leftInQueue: share(num(handoffRows[0]?.queued), handoffs),
-        declineReasons: reasons<Overview['offers']['declineReasons'][number]['reason']>(
-          declineRows,
-        ),
+        declineReasons:
+          reasons<Overview['offers']['declineReasons'][number]['reason']>(declineRows),
         byTeam: protectBreakdown(
           offerTeamRows.map((row) => ({ row, count: num(row.offered) })),
           { k, totalShown: true },
@@ -840,9 +838,7 @@ export class AnalyticsService {
           teamId: toPublicId('team', String(row.team_id)),
           name: String(row.name),
           offered: suppressed ? null : n,
-          acceptRate: suppressed
-            ? null
-            : round(heldRate(num(row.accepted), num(row.answered), k)),
+          acceptRate: suppressed ? null : round(heldRate(num(row.accepted), num(row.answered), k)),
           suppressed,
         })),
       },
@@ -854,12 +850,9 @@ export class AnalyticsService {
         edited: share(num(dr.edited), reviewed),
         rejected: share(num(dr.rejected), reviewed),
         setAside: count(num(dr.set_aside), draftsWritten),
-        rejectReasons: reasons<Overview['aiDrafts']['rejectReasons'][number]['reason']>(
-          rejectRows,
-        ),
-        setAsideReasons: reasons<Overview['aiDrafts']['setAsideReasons'][number]['reason']>(
-          setAsideRows,
-        ),
+        rejectReasons: reasons<Overview['aiDrafts']['rejectReasons'][number]['reason']>(rejectRows),
+        setAsideReasons:
+          reasons<Overview['aiDrafts']['setAsideReasons'][number]['reason']>(setAsideRows),
         byAgent: protectBreakdown(
           agentRows.map((row) => ({ row, count: num(row.written) })),
           { k, totalShown: true },
@@ -1050,7 +1043,14 @@ export class AnalyticsService {
     share('reply_targets', 'stopped', r.stopped);
     share('reply_targets', 'first_reply_median_minutes', r.firstReplyMedianMinutes);
     for (const row of r.byPriority) {
-      lines.push(['reply_targets_priority', row.priority, row.replies, row.metRate, row.suppressed, '']);
+      lines.push([
+        'reply_targets_priority',
+        row.priority,
+        row.replies,
+        row.metRate,
+        row.suppressed,
+        '',
+      ]);
     }
     for (const day of r.daily) {
       lines.push(['reply_targets_daily', day.date, day.replies, day.metRate, day.suppressed, '']);

@@ -151,8 +151,12 @@ describe('how a reply-time clock ended (H12, O04)', () => {
     breachedAt: null,
     ...over,
   });
-  const outcome = (c: SlaClock, reply: Date | null, now: Date, hours: BusinessHours | null = null) =>
-    slaOutcomeOf({ clock: c, lastHumanReplyAt: reply, hours, now });
+  const outcome = (
+    c: SlaClock,
+    reply: Date | null,
+    now: Date,
+    hours: BusinessHours | null = null,
+  ) => slaOutcomeOf({ clock: c, lastHumanReplyAt: reply, hours, now });
 
   it("is met by a person's reply in time, and missed by one too late", () => {
     expect(outcome(clock(), t('10:20:00'), t('10:20:01'))).toEqual({

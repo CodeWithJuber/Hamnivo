@@ -559,22 +559,20 @@ describe('the inbox work queue: reply-time targets, offers and AI drafts (H12, H
         outcome,
         businessMinutes: minutes,
       });
-      await tx
-        .insert(schema.slaOutcomes)
-        .values([
-          clock(1, '2026-09-10T09:00:00Z', 'met', 10),
-          clock(2, '2026-09-10T09:00:00Z', 'met', 20),
-          clock(3, '2026-09-10T09:00:00Z', 'met', 30),
-          clock(4, '2026-09-11T09:00:00Z', 'met', 40),
-          clock(5, '2026-09-11T09:00:00Z', 'missed', 90, { priority: 'high' }),
-          clock(6, '2026-09-11T09:00:00Z', 'missed', 70, {
-            kind: 'next_reply',
-            priority: 'urgent',
-          }),
-          clock(1, '2026-09-12T09:00:00Z', 'stopped', 5, { kind: 'next_reply' }),
-          // Before the week: not counted.
-          clock(2, '2026-09-09T09:00:00Z', 'missed', 300),
-        ]);
+      await tx.insert(schema.slaOutcomes).values([
+        clock(1, '2026-09-10T09:00:00Z', 'met', 10),
+        clock(2, '2026-09-10T09:00:00Z', 'met', 20),
+        clock(3, '2026-09-10T09:00:00Z', 'met', 30),
+        clock(4, '2026-09-11T09:00:00Z', 'met', 40),
+        clock(5, '2026-09-11T09:00:00Z', 'missed', 90, { priority: 'high' }),
+        clock(6, '2026-09-11T09:00:00Z', 'missed', 70, {
+          kind: 'next_reply',
+          priority: 'urgent',
+        }),
+        clock(1, '2026-09-12T09:00:00Z', 'stopped', 5, { kind: 'next_reply' }),
+        // Before the week: not counted.
+        clock(2, '2026-09-09T09:00:00Z', 'missed', 300),
+      ]);
 
       // Offers: three accepted, a hand-off declined twice and offline once before running out,
       // one declined three times, and one cancelled when someone took the chat.
@@ -757,9 +755,7 @@ describe('the inbox work queue: reply-time targets, offers and AI drafts (H12, H
     expect(aiDrafts.edited).toEqual({ value: null, suppressed: true, sample: 7, rate: null });
     expect(aiDrafts.rejected).toMatchObject({ value: 3, sample: 7 });
     expect(aiDrafts.setAside).toMatchObject({ value: null, suppressed: true, sample: 10 });
-    expect(aiDrafts.rejectReasons).toEqual([
-      { reason: 'inaccurate', count: 3, suppressed: false },
-    ]);
+    expect(aiDrafts.rejectReasons).toEqual([{ reason: 'inaccurate', count: 3, suppressed: false }]);
     expect(aiDrafts.setAsideReasons).toEqual([
       { reason: 'customer_wrote', count: null, suppressed: true },
     ]);
@@ -776,9 +772,8 @@ describe('the inbox work queue: reply-time targets, offers and AI drafts (H12, H
     expect(elsewhere.offers.offered.value).toBe(0);
     expect(elsewhere.aiDrafts.written.value).toBe(0);
 
-    const old = (
-      await shop.owner.get(`/v1/admin/analytics/overview?from=2026-01-01&to=2026-01-07`)
-    ).body;
+    const old = (await shop.owner.get(`/v1/admin/analytics/overview?from=2026-01-01&to=2026-01-07`))
+      .body;
     expect(old.offers.windowLimited).toBe(true);
     expect(old.aiDrafts.windowLimited).toBe(true);
 
