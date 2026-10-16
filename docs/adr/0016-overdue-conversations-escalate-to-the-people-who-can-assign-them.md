@@ -36,11 +36,13 @@ answer (H12). Chatwoot Community Edition has neither.
   conversation.
 - **Email when a lead is not online.** The alert step emails leads whose status is not online
   (ADR 0015's availability), except the conversation's owner, who already hears it. One email per
-  lead and brand per 15 minutes, however many go overdue at once.
+  lead and brand per 15 minutes, however many go overdue at once. It says what will happen next
+  by the same rules as the move, and nothing about other teams' conversations.
 - **The move is fenced.** Under the conversation's lock, after recomputing the clock, the
   conversation moves only if it is still the same overdue clock (same `breachedAt`), with the same
   owner epoch and team as when it went overdue, not snoozed, and the brand still asks for it. A
-  reply, the AI taking it back, resolving, snoozing, a claim or a reassignment all stop it.
+  reply, the AI taking it back, resolving, snoozing (even briefly, since it went overdue), a claim
+  or a reassignment all stop it.
   - A conversation someone has goes back to the queue (reason `sla_moved`, actor `sla`), with the
     chosen team set first, and a private note in Chatwoot says why.
   - A conversation already waiting moves only to another team. `OwnershipService.transition`
@@ -48,15 +50,16 @@ answer (H12). Chatwoot Community Edition has neither.
     (ADR 0015), and its AI draft is kept.
   - The clock stays overdue after a move: no second breach, no second alert, and the reply-time
     record (`sla_outcomes`) is written when someone finally replies.
-- **No storm from settings.** A deadline that had already passed when the brand saved its
-  targets is not escalated, so shortening a target does not email about or move the backlog.
+- **No storm from settings.** When a change of targets or business hours recomputes the brand's
+  clocks, a deadline that had already passed at the change is not escalated, so shortening a
+  target does not email about or move the backlog. Studio still shows those as overdue. A breach
+  found any other way (a deadline coming, a priority raised) escalates as usual.
 
 ## Consequences
 
 - An overdue conversation reaches someone who can act on it even when its owner is away, and
   moving it never takes it from someone who acted.
 - The customer sees only that they are waiting for a person again; no message is sent.
-- A change to business hours can still make conversations overdue at once and escalate them.
 - Leads are notified by permission, not by name. A brand that wants one named lead gives that
   person the assign permission on the team and nobody else.
 - Chatwoot shows the move as an unassignment, with the private note.

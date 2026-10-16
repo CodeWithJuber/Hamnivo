@@ -263,7 +263,15 @@ export class AssignmentService {
     teamPublicId: string | null,
   ): Promise<InboxConversationDetail> {
     const conversationId = await this.access.tx(principal, async (tx) => {
-      const found = await this.access.authorized(tx, principal, publicId, 'conversations.assign');
+      // Locked, as every change of who handles it: a move of an overdue conversation (ADR 0016)
+      // sees this change, or this change waits for it.
+      const found = await this.access.authorized(
+        tx,
+        principal,
+        publicId,
+        'conversations.assign',
+        true,
+      );
       let teamId: string | null = null;
       if (teamPublicId) {
         teamId = fromPublicId('team', teamPublicId);

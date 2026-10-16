@@ -262,7 +262,7 @@ describe('moving an overdue conversation (H12, ADR 0016)', () => {
     dueAt: overdueAt,
     breachedAt: overdueAt,
   };
-  const queued = { breachedAt: overdueAt, epoch: 4, teamId: 'team-a' };
+  const queued = { breachedAt: overdueAt, epoch: 4, teamId: 'team-a', pausedMinutes: 0 };
   const owned = {
     status: 'open' as const,
     ownerMode: 'HUMAN_ACTIVE' as const,
@@ -355,6 +355,11 @@ describe('moving an overdue conversation (H12, ADR 0016)', () => {
     expect(decide({ current: { ...owned, clock: { ...clock, pausedAt: t('10:35:00') } } })).toEqual(
       { kind: 'skip', why: 'paused' },
     );
+    // Snoozed for a while since it went overdue, and open again: someone acted on it.
+    expect(decide({ current: { ...owned, clock: { ...clock, pausedMinutes: 10 } } })).toEqual({
+      kind: 'skip',
+      why: 'paused',
+    });
     expect(decide({ current: { ...owned, epoch: 5 } })).toEqual({ kind: 'skip', why: 'handled' });
     expect(decide({ current: { ...owned, teamId: 'team-c' } })).toEqual({
       kind: 'skip',

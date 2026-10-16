@@ -285,7 +285,7 @@ export class BrandsService {
         data: { timezone: businessHours?.timezone ?? null },
       });
       // Reply-time clocks count business hours (H12): the open conversations recompute theirs.
-      await queueSlaResync(tx, principal.tenantId, brand.id);
+      await queueSlaResync(tx, principal.tenantId, brand.id, this.clock());
       return brandView(row);
     });
   }

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bodyOfOverdue,
   bodyOfTargets,
+  draftOfOverdue,
   draftOfTarget,
   draftOfTargets,
   type InboxSla,
   minutesOfTarget,
+  overdueInvalid,
   problemsOfTargets,
   readSla,
   type SlaTargets,
@@ -79,5 +82,47 @@ describe('the reply-time targets form', () => {
       { priority: 'high', column: 'nextReplyMinutes' },
       { priority: 'low', column: 'firstReplyMinutes' },
     ]);
+  });
+});
+
+describe('what happens to overdue conversations, in the form (ADR 0016)', () => {
+  const saved = {
+    alertLeads: true,
+    moveAfterMinutes: 90,
+    moveTo: { kind: 'team' as const, teamId: 'team_care' },
+  };
+
+  it('shows what is stored, and saves it back unchanged', () => {
+    const draft = draftOfOverdue(saved);
+    expect(draft).toEqual({
+      alertLeads: true,
+      move: true,
+      after: { amount: '90', unit: 'minutes' },
+      moveTo: 'team_care',
+    });
+    expect(bodyOfOverdue(draft)).toEqual(saved);
+    // Off, it offers 15 minutes to start from.
+    expect(
+      draftOfOverdue({ alertLeads: false, moveAfterMinutes: null, moveTo: { kind: 'queue' } })
+        .after,
+    ).toEqual({ amount: '15', unit: 'minutes' });
+  });
+
+  it('keeps no team when conversations are not moved', () => {
+    const off = { ...draftOfOverdue(saved), move: false };
+    expect(bodyOfOverdue(off)).toEqual({
+      alertLeads: true,
+      moveAfterMinutes: null,
+      moveTo: { kind: 'queue' },
+    });
+  });
+
+  it('needs a wait from 1 minute to 7 days only when moving', () => {
+    const draft = draftOfOverdue(saved);
+    expect(overdueInvalid({ ...draft, after: { amount: '0', unit: 'minutes' } })).toBe(true);
+    expect(overdueInvalid({ ...draft, after: { amount: '', unit: 'minutes' } })).toBe(true);
+    expect(overdueInvalid({ ...draft, move: false, after: { amount: '', unit: 'minutes' } })).toBe(
+      false,
+    );
   });
 });

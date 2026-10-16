@@ -213,14 +213,14 @@ export type SlaMoveDecision =
 /**
  * Whether an overdue conversation is moved now (ADR 0016). Only the same overdue clock is moved,
  * and only while nobody has acted on it since it went overdue: a reply, the AI taking it back or
- * resolving ends the clock; snoozing pauses it; claiming, reassigning or another team changes its
+ * resolving ends the clock; snoozing pauses it (or did, since); claiming, reassigning or another team changes its
  * owner (epoch) or team. A conversation someone has goes back to the queue (and to the team when
  * one is set); one already waiting moves only to another team, as a new hand-off, so the next
  * person is offered it. A team that can no longer take the brand's conversations means the queue.
  */
 export function decideSlaMove(input: {
   /** As it was when it went overdue. */
-  queued: { breachedAt: Date; epoch: number; teamId: string | null };
+  queued: { breachedAt: Date; epoch: number; teamId: string | null; pausedMinutes: number };
   current: {
     status: SlaStatus;
     ownerMode: SlaOwnerMode;
@@ -243,7 +243,10 @@ export function decideSlaMove(input: {
   ) {
     return { kind: 'skip', why: 'clock_ended' };
   }
-  if (clock.pausedAt) return { kind: 'skip', why: 'paused' };
+  // Snoozed now, or snoozed since it went overdue: someone acted on it.
+  if (clock.pausedAt || clock.pausedMinutes !== queued.pausedMinutes) {
+    return { kind: 'skip', why: 'paused' };
+  }
   if (current.epoch !== queued.epoch || current.teamId !== queued.teamId) {
     return { kind: 'skip', why: 'handled' };
   }

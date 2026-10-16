@@ -74,8 +74,8 @@ Under **When a conversation goes past its target**, below the targets, choose wh
 It is not moved if, before the wait is over, someone replies, snoozes or resolves it, takes it,
 or gives it to someone else. The customer is not told anything; they keep waiting for a person.
 
-Changing the targets does not alert about or move conversations that the change itself makes
-overdue.
+Changing the targets or business hours does not email about or move conversations that the
+change itself makes overdue. They still show as overdue in Studio.
 
 ## Good to know
 

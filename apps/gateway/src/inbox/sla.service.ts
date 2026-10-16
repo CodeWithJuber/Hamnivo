@@ -53,13 +53,21 @@ function policyOf(row: PolicyRow): SlaPolicy {
 
 const RESYNC_BATCH = 200;
 
-/** Asks the brand's open conversations to recompute their reply-time clocks (H12). */
-export async function queueSlaResync(tx: TenantTx, tenantId: string, brandId: string) {
+/**
+ * Asks the brand's open conversations to recompute their reply-time clocks (H12), after its targets
+ * or hours changed at `changedAt`.
+ */
+export async function queueSlaResync(
+  tx: TenantTx,
+  tenantId: string,
+  brandId: string,
+  changedAt: Date,
+) {
   await enqueueOutbox(tx, tenantId, {
     topic: SLA_RESYNC_TOPIC,
     aggregateType: 'brand',
     aggregateId: brandId,
-    payload: { brandId },
+    payload: { brandId, changedAt: changedAt.toISOString() },
   });
 }
 
@@ -158,7 +166,7 @@ export class SlaService {
           ...(input.overdue ? { overdue: input.overdue } : {}),
         },
       });
-      await queueSlaResync(tx, principal.tenantId, brand.id);
+      await queueSlaResync(tx, principal.tenantId, brand.id, now);
       return policyOf(row);
     });
   }
@@ -169,7 +177,8 @@ export class SlaService {
    */
   private async overdueColumns(tx: TenantTx, brand: { workspaceId: string }, overdue: SlaOverdue) {
     let teamId: string | null = null;
-    if (overdue.moveTo.kind === 'team') {
+    // A team only matters when conversations are moved; without the move none is kept.
+    if (overdue.moveTo.kind === 'team' && overdue.moveAfterMinutes !== null) {
       const unusable = new AppError('VALIDATION_FAILED', {
         fields: [
           {
@@ -214,7 +223,8 @@ export class SlaService {
 
   /** The brand's targets or hours changed: every open conversation recomputes its clock. */
   async onResync(event: ClaimedOutboxEvent): Promise<void> {
-    const { brandId } = event.payload as { brandId: string };
+    const { brandId, changedAt } = event.payload as { brandId: string; changedAt?: string };
+    const escalateFrom = changedAt ? new Date(changedAt) : event.createdAt;
     let after: string | null = null;
     for (;;) {
       const cursor: string | null = after;
@@ -249,7 +259,8 @@ export class SlaService {
               .from(schema.conversationControls)
               .where(eq(schema.conversationControls.id, id))
               .for('update');
-            return (await syncSla(tx, event.tenantId, id, this.clock())).breached;
+            // Deadlines the change itself put behind the conversation are not escalated.
+            return (await syncSla(tx, event.tenantId, id, this.clock(), { escalateFrom })).breached;
           },
         );
         if (breached) await this.journal.signalInbox(event.tenantId, id);
