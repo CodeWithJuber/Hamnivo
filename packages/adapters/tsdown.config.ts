@@ -2,6 +2,9 @@ import { defineConfig } from 'tsdown';
 
 export default defineConfig({
   entry: {
+    'a2a/index': 'src/a2a/index.ts',
+    'whmcs/index': 'src/whmcs/index.ts',
+
     'models/index': 'src/models/index.ts',
     'jev/index': 'src/jev/index.ts',
     'cache/index': 'src/cache/index.ts',

@@ -134,13 +134,14 @@ export function SelectField({
   hint,
   error,
   labelNote,
-  options,
+  options = [],
+  children,
   placeholder,
   className,
   ...select
 }: FieldChrome &
   Omit<React.ComponentProps<'select'>, 'id' | 'size'> & {
-    options: Option[];
+    options?: Option[];
     placeholder?: string;
   }) {
   return (
@@ -161,6 +162,7 @@ export function SelectField({
         {placeholder !== undefined ? (
           <NativeSelectOption value="">{placeholder}</NativeSelectOption>
         ) : null}
+        {children}
         {options.map((option) => (
           <NativeSelectOption key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}

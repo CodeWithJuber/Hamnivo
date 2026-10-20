@@ -207,6 +207,9 @@ describe('the test chat address', () => {
 // ------------------------------------------------------------------ how the chat looks
 
 const saved = {
+  fontFamily: 'system' as const,
+  launcherLabel: null,
+  showBranding: true,
   primaryColor: '#d17b00',
   logoUrl: 'https://noor.example/logo.png',
   radius: 8,
@@ -223,6 +226,9 @@ const draft = (patch: Partial<AppearanceDraft> = {}): AppearanceDraft => ({
 describe('the look editor’s working copy', () => {
   it('holds what is saved, one text per language', () => {
     expect(draftOf(saved)).toEqual({
+      fontFamily: 'system',
+      launcher: { en: '', ar: '', hi: '', ur: '' },
+      showBranding: true,
       colour: '#D17B00',
       logoUrl: 'https://noor.example/logo.png',
       radius: 8,
@@ -235,6 +241,9 @@ describe('the look editor’s working copy', () => {
 
   it('saves what was typed, leaving out the languages and addresses that are empty', () => {
     expect(bodyOf(draftOf(saved))).toEqual({
+      fontFamily: 'system' as const,
+      launcherLabel: null,
+      showBranding: true,
       primaryColor: '#D17B00',
       logoUrl: 'https://noor.example/logo.png',
       radius: 8,
@@ -245,6 +254,9 @@ describe('the look editor’s working copy', () => {
     });
     expect(bodyOf(draft({ logoUrl: '  ', colour: ' #d17b00 ' }))).toMatchObject({
       logoUrl: null,
+      fontFamily: 'system' as const,
+      launcherLabel: null,
+      showBranding: true,
       primaryColor: '#D17B00',
     });
   });

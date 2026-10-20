@@ -130,6 +130,16 @@ describe('retention (A10)', () => {
     const outcomes = await count(a, 'sla_outcomes');
     const runs = await count(a, 'runs');
     expect(orders).toBeGreaterThan(0);
+    await inTenant(a, async (tx) => {
+      const [action] = await tx.select().from(schema.actions);
+      expect(action).toBeDefined();
+      await tx.update(schema.workflowRunSteps).set({
+        actionId: action!.id,
+        summary: 'Customer email and delegated answer',
+        result: { customerEmail: 'private@example.com' },
+      });
+      await tx.update(schema.workflowRuns).set({ facts: { privateContext: 'customer details' } });
+    });
 
     expect(await inTenant(a, (tx) => retireConversation(tx, a.conversationId))).toBe(true);
 
@@ -156,9 +166,20 @@ describe('retention (A10)', () => {
       'conversation_read_state',
       'customer_notifications',
       'ticket_followups',
+      'workflow_runs',
+      'connector_quotes',
     ]) {
       expect(await count(a, table), table).toBe(0);
     }
+    expect(await inTenant(a, (tx) => tx.select().from(schema.workflowRunSteps))).toEqual([]);
+    // Published workflow definitions are shared configuration, not customer execution data.
+    expect(await inTenant(a, (tx) => tx.select().from(schema.workflowVersions))).toHaveLength(1);
+    // Retiring a chat does not destroy a remote-write fence or the customer's identity binding.
+    expect(await inTenant(a, (tx) => tx.select().from(schema.connectorDispatches))).toHaveLength(1);
+    expect(
+      await inTenant(a, (tx) => tx.select().from(schema.connectorIdentityBindings)),
+    ).toHaveLength(1);
+    expect(await inTenant(b, (tx) => tx.select().from(schema.workflowRunSteps))).toHaveLength(1);
     // Business records and what reports count stay.
     expect(await count(a, 'orders')).toBe(orders);
     expect(await count(a, 'sla_outcomes')).toBe(outcomes);
@@ -197,6 +218,28 @@ describe('retention (A10)', () => {
         lastSeenAt: new Date(Date.now() - 400 * 86_400_000),
       }),
     );
+    const dispatchId = newId();
+    await inTenant(a, async (tx) => {
+      const [connection] = await tx.select().from(schema.connectorConnections);
+      await tx.insert(schema.connectorIdentityBindings).values({
+        tenantId: a.tenantId,
+        brandId: a.brandId,
+        connectionId: connection!.id,
+        principalId: lonely,
+        userId: 901,
+        clientId: 902,
+        expiresAt: new Date(0),
+      });
+      await tx.insert(schema.connectorDispatches).values({
+        id: dispatchId,
+        tenantId: a.tenantId,
+        connectionId: connection!.id,
+        principalId: lonely,
+        fingerprint: 'opaque-retention-fence',
+        idempotencyKey: 'retention-unknown-write',
+        state: 'dispatched',
+      });
+    });
     const orphans = await inTenant(a, (tx) => retentionOrphans(tx));
     expect(orphans.map((o) => o.principalId)).toContain(lonely);
     // The seeded customer has an order, which keeps them.
@@ -216,6 +259,25 @@ describe('retention (A10)', () => {
         ),
     );
     expect(left).toEqual([]);
+    const [fence] = await inTenant(a, (tx) =>
+      tx
+        .select()
+        .from(schema.connectorDispatches)
+        .where(eq(schema.connectorDispatches.id, dispatchId)),
+    );
+    expect(fence).toMatchObject({
+      principalId: null,
+      state: 'dispatched',
+      fingerprint: 'opaque-retention-fence',
+    });
+    expect(
+      await inTenant(a, (tx) =>
+        tx
+          .select()
+          .from(schema.connectorIdentityBindings)
+          .where(eq(schema.connectorIdentityBindings.principalId, lonely)),
+      ),
+    ).toEqual([]);
   });
 
   it('removes handled outbox events after 30 days', async () => {

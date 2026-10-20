@@ -76,6 +76,8 @@ export class WidgetAppearanceService {
       return {
         brandId: brandPublicId,
         appearance: parseAppearance(row?.appearance),
+        draftAppearance: row?.draftAppearance ? parseAppearance(row.draftAppearance) : null,
+        draftRevision: row?.draftRevision ?? 0,
         configVersion: brand.configVersion,
         updatedAt: row?.updatedAt.toISOString() ?? null,
       };
@@ -87,26 +89,71 @@ export class WidgetAppearanceService {
     brandPublicId: string,
     input: WidgetAppearance,
   ): Promise<WidgetAppearanceView> {
-    // Checked before anything is locked: a colour nobody can read is refused, with the reason.
-    const issue = colourIssues(input.primaryColor)[0];
-    if (issue) {
-      throw new AppError('VALIDATION_FAILED', {
-        fields: [{ path: 'primaryColor', message: colourProblem(issue) }],
-      });
-    }
-    const appearance: WidgetAppearance = {
-      ...input,
-      primaryColor: input.primaryColor.toUpperCase(),
-    };
+    return this.write(principal, brandPublicId, { mode: 'legacy', appearance: input });
+  }
+
+  async saveDraft(
+    principal: StaffPrincipal,
+    brandPublicId: string,
+    appearance: WidgetAppearance,
+    expectedRevision: number,
+  ): Promise<WidgetAppearanceView> {
+    return this.write(principal, brandPublicId, { mode: 'draft', appearance, expectedRevision });
+  }
+
+  async publish(
+    principal: StaffPrincipal,
+    brandPublicId: string,
+    expectedRevision: number,
+  ): Promise<WidgetAppearanceView> {
+    return this.write(principal, brandPublicId, { mode: 'publish', expectedRevision });
+  }
+
+  private async write(
+    principal: StaffPrincipal,
+    brandPublicId: string,
+    change:
+      | { mode: 'legacy'; appearance: WidgetAppearance }
+      | { mode: 'draft'; appearance: WidgetAppearance; expectedRevision: number }
+      | { mode: 'publish'; expectedRevision: number },
+  ): Promise<WidgetAppearanceView> {
     return this.tx(principal, async (tx) => {
       const brand = await this.brand(tx, principal, brandPublicId, true);
       const [existing] = await tx
         .select()
         .from(schema.brandAppearance)
         .where(eq(schema.brandAppearance.brandId, brand.id));
+      const revision = existing?.draftRevision ?? 0;
+      if (change.mode !== 'legacy' && change.expectedRevision !== revision) {
+        throw new AppError('VERSION_CONFLICT', {
+          detail: 'The appearance changed. Reload before saving or publishing.',
+        });
+      }
+      if (change.mode === 'publish' && !existing?.draftAppearance) {
+        throw new AppError('VERSION_CONFLICT', {
+          detail: 'Save an appearance draft before publishing.',
+        });
+      }
+      const input =
+        change.mode === 'publish' ? parseAppearance(existing?.draftAppearance) : change.appearance;
+      const issue = colourIssues(input.primaryColor)[0];
+      if (issue)
+        throw new AppError('VALIDATION_FAILED', {
+          fields: [{ path: 'primaryColor', message: colourProblem(issue) }],
+        });
+      const next: WidgetAppearance = { ...input, primaryColor: input.primaryColor.toUpperCase() };
       const before = parseAppearance(existing?.appearance);
+      const appearance = change.mode === 'draft' ? before : next;
+      const draftAppearance = change.mode === 'draft' ? next : null;
+      const draftRevision = revision + 1;
       const now = this.clock();
-      const values = { appearance, updatedBy: principal.staffMemberId, updatedAt: now };
+      const values = {
+        appearance,
+        draftAppearance,
+        draftRevision,
+        updatedBy: principal.staffMemberId,
+        updatedAt: now,
+      };
       await tx
         .insert(schema.brandAppearance)
         .values({ tenantId: brand.tenantId, brandId: brand.id, ...values })
@@ -114,23 +161,28 @@ export class WidgetAppearanceService {
           target: [schema.brandAppearance.tenantId, schema.brandAppearance.brandId],
           set: values,
         });
-      const configVersion = brand.configVersion + 1;
-      await tx
-        .update(schema.brands)
-        .set({ configVersion, updatedAt: now })
-        .where(eq(schema.brands.id, brand.id));
+      const configVersion = change.mode === 'draft' ? brand.configVersion : brand.configVersion + 1;
+      if (change.mode !== 'draft') {
+        await tx
+          .update(schema.brands)
+          .set({ configVersion, updatedAt: now })
+          .where(eq(schema.brands.id, brand.id));
+      }
       await appendAudit(tx, {
         actorType: 'staff',
         actorId: toPublicId('staff', principal.staffMemberId),
-        action: 'brand.appearance.updated',
+        action:
+          change.mode === 'draft' ? 'brand.appearance.draft_saved' : 'brand.appearance.updated',
         targetType: 'brand',
         targetId: brandPublicId,
         outcome: 'success',
-        data: { before, after: appearance },
+        data: { before, after: next, draftRevision, published: change.mode !== 'draft' },
       });
       return {
         brandId: brandPublicId,
         appearance,
+        draftAppearance,
+        draftRevision,
         configVersion,
         updatedAt: now.toISOString(),
       };

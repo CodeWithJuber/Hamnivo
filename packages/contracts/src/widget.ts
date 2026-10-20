@@ -21,6 +21,8 @@ export const WidgetConfig = z
       onAccent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
       radius: z.int().min(0).max(24),
       launcherPosition: LauncherPosition,
+      fontFamily: z.enum(['system', 'dm-sans', 'noto-sans']).optional(),
+      showBranding: z.boolean().optional(),
     }),
     locales: z.object({ default: SupportedLocale, available: z.array(SupportedLocale).min(1) }),
     /** Per-locale copy authored by the tenant. */
@@ -28,6 +30,7 @@ export const WidgetConfig = z
       SupportedLocale,
       z.object({
         greeting: z.string().max(300),
+        launcherLabel: z.string().max(80).optional(),
         aiDisclosure: z.string().max(300),
         offlineMessage: z.string().max(300),
         privacyNotice: z.string().max(500).nullable(),

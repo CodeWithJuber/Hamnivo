@@ -1,6 +1,6 @@
 /**
- * Studio's menu: six entries, each a group of pages that already exist. No page, URL or
- * permission changes here; this only decides what the menu shows.
+ * Studio's menu: seven sections with advanced pages available through a disclosure.
+ * Existing resources keep their permission checks as the menu is regrouped.
  *
  * - An entry shows when the person can see at least one of its pages, and opens the first page
  *   they can see.
@@ -13,6 +13,9 @@
 
 /** Every page that has a place in the menu. `/stop-ai`, `/account` and `/onboarding` live elsewhere. */
 export type NavPath =
+  | '/branding'
+  | '/connectors'
+  | '/workflows'
   | '/overview'
   | '/inbox'
   | '/agents'
@@ -41,7 +44,14 @@ export type NavPath =
   | '/settings/privacy'
   | '/customer-identity';
 
-export type NavGroupId = 'home' | 'inbox' | 'ai' | 'sales' | 'reports' | 'settings';
+export type NavGroupId =
+  | 'home'
+  | 'inbox'
+  | 'ai'
+  | 'workflows'
+  | 'connectors'
+  | 'reports'
+  | 'settings';
 
 export interface NavRoute {
   to: NavPath;
@@ -49,6 +59,7 @@ export interface NavRoute {
   permission?: string;
   /** Shown when the person holds any of these. */
   anyOf?: readonly string[];
+  advanced?: boolean;
 }
 
 export interface NavGroup {
@@ -69,19 +80,26 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/agents', permission: 'agents.read' },
       { to: '/knowledge', permission: 'knowledge.read' },
       { to: '/memory', permission: 'memory.read' },
-      { to: '/tools', permission: 'tools.read' },
-      { to: '/checks', permission: 'decisions.read' },
-      { to: '/decisions', permission: 'decisions.read' },
-      { to: '/runs', permission: 'analytics.read' },
-      { to: '/caching', permission: 'knowledge.read' },
-      { to: '/models', permission: 'integrations.manage' },
+      { to: '/checks', advanced: true, permission: 'decisions.read' },
+      { to: '/decisions', advanced: true, permission: 'decisions.read' },
+      { to: '/runs', advanced: true, permission: 'analytics.read' },
+      { to: '/caching', advanced: true, permission: 'knowledge.read' },
     ],
   },
   {
-    id: 'sales',
+    id: 'workflows',
     routes: [
-      { to: '/orders', permission: 'commerce.read' },
-      { to: '/finance', permission: 'commerce.read' },
+      { to: '/workflows', permission: 'automations.read' },
+      { to: '/automations', permission: 'automations.read', advanced: true },
+    ],
+  },
+  {
+    id: 'connectors',
+    routes: [
+      { to: '/connectors', anyOf: ['integrations.manage', 'tools.read', 'automations.read'] },
+      { to: '/channels', permission: 'integrations.manage' },
+      { to: '/tools', permission: 'tools.read', advanced: true },
+      { to: '/models', permission: 'integrations.manage', advanced: true },
     ],
   },
   { id: 'reports', routes: [{ to: '/reports', anyOf: ['analytics.read', 'billing.read'] }] },
@@ -89,16 +107,21 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     id: 'settings',
     routes: [
       { to: '/brands', permission: 'brands.manage' },
+      { to: '/branding', permission: 'branding.read' },
       { to: '/chat-widget', permission: 'widget.configure' },
-      { to: '/channels', permission: 'integrations.manage' },
-      { to: '/automations', permission: 'automations.read' },
+      { to: '/orders', permission: 'commerce.read', advanced: true },
+      { to: '/finance', permission: 'commerce.read', advanced: true },
       { to: '/hours', permission: 'brands.manage' },
       { to: '/team', permission: 'members.read' },
-      { to: '/support-teams', permission: 'members.read' },
-      { to: '/security', anyOf: ['security.manage', 'support.grant'] },
-      { to: '/developer', anyOf: ['api_keys.read', 'webhooks.read', 'network.manage'] },
-      { to: '/customer-identity', permission: 'widget.identity_keys' },
-      { to: '/migration', permission: 'migration.review' },
+      { to: '/support-teams', advanced: true, permission: 'members.read' },
+      { to: '/security', advanced: true, anyOf: ['security.manage', 'support.grant'] },
+      {
+        to: '/developer',
+        advanced: true,
+        anyOf: ['api_keys.read', 'webhooks.read', 'network.manage'],
+      },
+      { to: '/customer-identity', advanced: true, permission: 'widget.identity_keys' },
+      { to: '/migration', advanced: true, permission: 'migration.review' },
       { to: '/settings/billing', anyOf: ['billing.read', 'settings.manage'] },
       {
         to: '/settings/privacy',

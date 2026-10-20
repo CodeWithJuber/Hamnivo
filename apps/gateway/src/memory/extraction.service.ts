@@ -13,6 +13,7 @@ import { generateText, Output } from 'ai';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { authorityMessageUuid } from '../authority/uuid.js';
+import { reservationSize } from '../billing/ai-credits.service.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { ModelFactory } from '../runtime/models.js';
@@ -178,7 +179,7 @@ export class MemoryExtractionService {
 
     let proposals: z.infer<typeof Proposals>['memories'];
     try {
-      proposals = await this.ask(tenantId, agent.config, earlier, message);
+      proposals = await this.ask(tenantId, agent.config, earlier, message, `memory:${ledgerId}`);
     } catch (error) {
       const failure = classifyModelError(error);
       if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
@@ -247,19 +248,29 @@ export class MemoryExtractionService {
     config: AgentConfig,
     earlier: CustomerMessage[],
     message: CustomerMessage,
+    attemptKey: string,
   ): Promise<z.infer<typeof Proposals>['memories']> {
-    const resolved = await this.models.resolve(tenantId, config.model);
     const json = (m: CustomerMessage) => ({ ref: m.ref, text: m.text, at: m.at.toISOString() });
     const input: ExtractionInput = { context: earlier.map(json), messages: [json(message)] };
-    const result = await generateText({
-      model: resolved.model,
-      instructions: instructions(),
-      messages: [{ role: 'user', content: JSON.stringify(input) }],
-      output: Output.object({ schema: Proposals }),
-      maxOutputTokens: 800,
-      maxRetries: 0,
-      abortSignal: AbortSignal.timeout(Math.min(config.limits.timeoutMs, 30_000)),
-    });
+    const result = await this.models.executeAttempt(
+      tenantId,
+      config.model,
+      {
+        key: attemptKey,
+        reserveTokens: reservationSize(instructions(), input, 800, 1),
+        timeoutMs: Math.min(config.limits.timeoutMs, 30_000),
+      },
+      async (resolved) =>
+        generateText({
+          model: resolved.model,
+          instructions: instructions(),
+          messages: [{ role: 'user', content: JSON.stringify(input) }],
+          output: Output.object({ schema: Proposals }),
+          maxOutputTokens: 800,
+          maxRetries: 0,
+          abortSignal: AbortSignal.timeout(Math.min(config.limits.timeoutMs, 30_000)),
+        }),
+    );
     return result.output.memories;
   }
 }

@@ -68,3 +68,14 @@ html[data-motion="reduce"] *::after {
   /* biome-ignore lint/complexity/noImportantStyles: must override animation utilities */
   scroll-behavior: auto !important;
 }
+
+/* Brand typography keeps script-specific fallbacks for every supported locale. */
+body {
+  font-family: var(--hv-brand-font, var(--font-sans, sans-serif));
+}
+:where([dir="rtl"]) body {
+  font-family: "Noto Sans Arabic", var(--hv-brand-font, var(--font-sans, sans-serif));
+}
+:where(html[lang="ur"]) body {
+  font-family: "Noto Nastaliq Urdu", "Noto Sans Arabic", var(--hv-brand-font, sans-serif);
+}

@@ -536,8 +536,10 @@ describe('corrections (L03)', () => {
     expect(models.state.replySystem).not.toContain('Preferred language: Urdu');
 
     // Replaying the first message's job does not reopen what the customer settled.
+    const beforeReplay = models.state.extractions;
     const counts = await slice.worker.get(MemoryExtractionService).onExtract(first);
-    expect(counts).toMatchObject({ write: 0, review: 0, refuse: 1 });
+    expect(counts).toBeNull();
+    expect(models.state.extractions).toBe(beforeReplay);
     expect((await farah.memory()).items.map((i) => [i.value, i.status])).toEqual([
       ['English', 'active'],
     ]);
@@ -606,8 +608,10 @@ describe('deletion (L05, K09)', () => {
     await slice.drain();
 
     // The same job again, as after a retry.
+    const beforeReplay = models.state.extractions;
     const counts = await slice.worker.get(MemoryExtractionService).onExtract(job);
-    expect(counts).toMatchObject({ write: 0, review: 0, refuse: 1 });
+    expect(counts).toBeNull();
+    expect(models.state.extractions).toBe(beforeReplay);
     // And again through the outbox, as after a replay.
     await withTenant(slice.app, { tenantId }, (tx) =>
       tx

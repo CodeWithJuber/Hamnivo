@@ -284,6 +284,19 @@ test('asks WHMCS 8 who the client is when it can, and takes no more than that', 
     \WHMCS\Authentication\CurrentUser::$client = null;
 });
 
+test('native identity separates the signed-in user and selected client and rejects impersonation', function () {
+    \WHMCS\Authentication\CurrentUser::$user = (object) ['id' => 5];
+    \WHMCS\Authentication\CurrentUser::$client = (object) ['id' => 42];
+    same(['userId' => 5, 'clientId' => 42], CurrentClient::identity([]));
+    same(null, CurrentClient::identity(['adminid' => 1]));
+    \WHMCS\Authentication\CurrentUser::$client = (object) ['id' => 77];
+    same(['userId' => 5, 'clientId' => 77], CurrentClient::identity([]));
+    \WHMCS\Authentication\CurrentUser::$user = null;
+    same(null, CurrentClient::identity([]));
+    \WHMCS\Authentication\CurrentUser::$user = (object) ['id' => 5];
+    \WHMCS\Authentication\CurrentUser::$client = (object) ['id' => 42];
+});
+
 // ---------------------------------------------------------------- the customer
 
 test('builds the customer from the client record: id, name, and no email unless WHMCS confirms emails', function () {
@@ -340,7 +353,7 @@ test('signs an HS256 assertion for the client that verifies with the secret', fu
     same(['alg' => 'HS256', 'kid' => 'shop-2026', 'typ' => 'JWT'], $parts['header']);
     same(hash_hmac('sha256', $parts['input'], SECRET, true), $parts['raw'], 'the signature');
     $claims = $parts['payload'];
-    same('42', $claims['sub']);
+    same('whmcs:u:5:c:42', $claims['sub']);
     same(WIDGET, $claims['aud']);
     same('Ayesha Khan', $claims['name']);
     same('ayesha@example.com', $claims['email']);
@@ -358,7 +371,7 @@ test('does not sign when it is not ready, and signs without an email Hamnivo ref
     $client['email'] = 'not-an-email';
     $claims = jwt((string) Identity::assertionFor($client, new Settings(ready(['trust_emails' => 'on']))))['payload'];
     truthy(!isset($claims['email']) && !isset($claims['email_verified']), 'the email was dropped');
-    same('42', $claims['sub']);
+    same('whmcs:u:5:c:42', $claims['sub']);
     same(null, Identity::assertionFor(store()->client(42), new Settings(ready(['identity_secret' => 'has a space']))), 'a key the SDK refuses');
 });
 
@@ -429,7 +442,7 @@ test('answers a signed-in client with a fresh assertion, and never lets a cache 
     same('nosniff', $answer['headers']['X-Content-Type-Options']);
     $body = json_decode($answer['body'], true);
     same(['assertion'], array_keys($body));
-    same('42', jwt($body['assertion'])['payload']['sub']);
+    same('whmcs:u:5:c:42', jwt($body['assertion'])['payload']['sub']);
     truthy(respond()['body'] !== $answer['body'], 'a new assertion every time');
 });
 
@@ -475,7 +488,7 @@ test('takes the client from the session, never from the request', function () us
     $claims = jwt(json_decode(respond('GET', XHR, 42)['body'], true)['assertion'])['payload'];
     $_GET = [];
     $_POST = [];
-    same('42', $claims['sub']);
+    same('whmcs:u:5:c:42', $claims['sub']);
 });
 
 test('adds the product names to the answer only when the admin turned that on', function () use ($php81) {
@@ -710,6 +723,15 @@ test('lets the key come from a constant in configuration.php, and the constant w
     same('the-saved-secret', Settings::load($store)->secret(), 'before the constant');
     define('HAMNIVO_IDENTITY_SECRET', ' ' . SECRET . ' ');
     same(SECRET, Settings::load($store)->secret());
+});
+
+
+
+test('does not sign an identity for another client or during admin impersonation', function () {
+    same(null, Identity::assertionFor(store()->client(43), new Settings(ready())));
+    $_SESSION['adminid'] = 8;
+    same(null, Identity::assertionFor(store()->client(42), new Settings(ready())));
+    unset($_SESSION['adminid']);
 });
 
 finish();

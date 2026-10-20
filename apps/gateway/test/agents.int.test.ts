@@ -358,14 +358,17 @@ describe('model failures', () => {
       },
     });
     await publish();
-    scripted.script.push(unavailable());
+    // The provider explicitly reports zero usage: a known failed attempt can fall back.
+    scripted.script.push(
+      Object.assign(unavailable(), { usage: { inputTokens: 0, outputTokens: 0 } }),
+    );
     const { conversationId } = await chat('Do you ship to Lahore?');
     expect((await inspect(conversationId)).botReplies).toHaveLength(1);
     const [run] = await runsOf(conversationId);
     expect(run).toMatchObject({ outcome: 'replied', modelId: 'hamnivo-mock-backup' });
   });
 
-  it('are retried, then the conversation goes to people with an honest note', async () => {
+  it('do not blindly retry an unknown provider outcome and hand over with an honest note', async () => {
     scripted.script.push(...Array.from({ length: 6 }, unavailable));
     const { conversationId } = await chat('Can I change my address?');
     // The outbox retries with backoff; make the pending retries due instead of waiting.
@@ -383,7 +386,12 @@ describe('model failures', () => {
     expect(seen.control.ownerMode).toBe('WAITING_HUMAN');
     expect(seen.notes.some((n) => n.includes('model was unavailable'))).toBe(true);
     const [run] = await runsOf(conversationId);
-    expect(run).toMatchObject({ outcome: 'handoff', state: 'failed', errorKind: 'unavailable' });
+    expect(run).toMatchObject({
+      outcome: 'handoff',
+      state: 'failed',
+      errorKind: 'usage_unresolved',
+    });
+    expect(scripted.script).toHaveLength(5);
     scripted.script.length = 0;
   });
 });

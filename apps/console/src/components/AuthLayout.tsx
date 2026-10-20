@@ -1,8 +1,8 @@
-import { HamnivoMark } from '@hamnivo/ui/components/hamnivo-mark';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSelect, TranslationNote } from './LanguageSelect';
 import { useDocumentTitle } from './PageHeader';
+import { PortalBrand } from './PortalBrand';
 
 /** Board 02: one calm card for signing in, signing up and recovering an account. */
 export function AuthLayout({
@@ -27,11 +27,7 @@ export function AuthLayout({
         {t('app.skipToContent')}
       </a>
       <header className="flex items-center justify-between gap-4 px-4 py-4 sm:px-8">
-        <span className="flex items-center gap-2">
-          <HamnivoMark className="size-7" />
-          <span className="text-lg font-semibold text-text">Hamnivo</span>
-          <span className="text-sm text-text-secondary">Studio</span>
-        </span>
+        <PortalBrand />
         <LanguageSelect id="auth-language" />
       </header>
       <main

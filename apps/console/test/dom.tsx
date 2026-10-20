@@ -60,6 +60,10 @@ const tenant = {
 } as TenantSummary;
 
 const PATHS = [
+  '/agency',
+  '/branding',
+  '/connectors',
+  '/workflows',
   '/overview',
   '/inbox',
   '/inbox/$conversationId',

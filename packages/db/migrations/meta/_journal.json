@@ -526,6 +526,55 @@
       "when": 1792183117402,
       "tag": "20261016203837_customer_privacy_security",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1792490460000,
+      "tag": "20261020100100_agency",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1792490520000,
+      "tag": "20261020100200_connectors",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1792490580000,
+      "tag": "20261020100300_workflows",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1792490640000,
+      "tag": "20261020100400_ai_credits",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1792490700000,
+      "tag": "20261020100500_branding",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1792490760000,
+      "tag": "20261020100600_appearance_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1792490820000,
+      "tag": "20261020100700_agentic_retention",
+      "breakpoints": true
     }
   ]
 }

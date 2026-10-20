@@ -2,6 +2,9 @@ import { defineConfig } from 'tsdown';
 
 export default defineConfig({
   entry: {
+    'workflows/index': 'src/workflows/index.ts',
+    'connectors/index': 'src/connectors/index.ts',
+
     index: 'src/index.ts',
     'commerce/index': 'src/commerce/index.ts',
     'billing/index': 'src/billing/index.ts',

@@ -4,6 +4,9 @@ Hamnivo Chat shows a chat button in the corner of your website. Your visitors ta
 to your AI assistant in one conversation. How you add the button depends on what your website is
 made with. Find yours in the table, and open the guide.
 
+To connect WHMCS business data, external specialist agents, or MCP services to your agents, use
+[Connect business systems and specialist agents](connectors.md).
+
 | Your website is made with | Guide | What you do |
 |---|---|---|
 | WordPress, with or without WooCommerce | [WordPress](wordpress.md) | Upload a plugin, paste one code |

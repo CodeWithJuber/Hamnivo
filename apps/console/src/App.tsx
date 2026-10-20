@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { Direction } from 'radix-ui';
 import { useTranslation } from 'react-i18next';
+import { PortalTheme } from './components/PortalBrand';
 import { ReauthDialog } from './components/ReauthDialog';
 import { directionOf, isLocale } from './i18n';
 import { queryClient } from './lib/query-client';
@@ -14,6 +15,7 @@ export function App() {
   const dir = directionOf(isLocale(i18n.language) ? i18n.language : 'en');
   return (
     <QueryClientProvider client={queryClient}>
+      <PortalTheme />
       <Direction.Provider dir={dir}>
         <AnnouncerProvider>
           <RouterProvider router={router} />

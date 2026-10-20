@@ -30,6 +30,14 @@
     "./automations": {
       "types": "./dist/automations/index.d.ts",
       "import": "./dist/automations/index.js"
+    },
+    "./workflows": {
+      "types": "./dist/workflows/index.d.ts",
+      "import": "./dist/workflows/index.js"
+    },
+    "./connectors": {
+      "types": "./dist/connectors/index.d.ts",
+      "import": "./dist/connectors/index.js"
     }
   },
   "files": [

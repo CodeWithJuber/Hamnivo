@@ -2380,6 +2380,8 @@ export const ur: Translation = {
     },
   },
   permissionAreas: {
+    agency: 'ایجنسی',
+    branding: 'برانڈنگ',
     conversations: 'گفتگو',
     visitors: 'وزیٹر',
     inbox: 'ان باکس اور روٹنگ',
@@ -2414,6 +2416,14 @@ export const ur: Translation = {
     support: 'سپورٹ کی رسائی',
   },
   permissions: {
+    agency: {
+      read: 'ایجنسی ترتیبات اور کلائنٹ فہرست دیکھیں',
+      manage: 'ایجنسی ترتیبات اور آزاد کلائنٹ لنک کا نظم کریں',
+    },
+    branding: {
+      read: 'پورٹل برانڈنگ اور مخصوص ڈومین دیکھیں',
+      manage: 'پورٹل برانڈنگ اور تصدیق شدہ مخصوص ڈومین کا نظم کریں',
+    },
     conversations: {
       read: 'گفتگو اور کسٹمر کی تاریخ پڑھیں',
       reply: 'کسٹمرز کو جواب دیں',

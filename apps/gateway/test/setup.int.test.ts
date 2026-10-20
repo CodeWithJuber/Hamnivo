@@ -646,7 +646,13 @@ describe('the setup wizard’s progress', () => {
   it('starts empty, remembers steps and the brand, and can be finished and taken back', async () => {
     const empty = await shop.owner.get('/v1/admin/onboarding');
     expect(empty.status, JSON.stringify(empty.body)).toBe(200);
-    expect(empty.body).toEqual({ steps: {}, brandId: null, finishedAt: null, updatedAt: null });
+    expect(empty.body).toEqual({
+      steps: {},
+      brandId: null,
+      finishedAt: null,
+      updatedAt: null,
+      useCase: null,
+    });
 
     const first = await shop.owner.put('/v1/admin/onboarding', {
       steps: { workspace: 'done', brand: 'done', team: 'skipped' },
@@ -695,5 +701,50 @@ describe('the setup wizard’s progress', () => {
     const agent = await join(slice, shop, 'Chitra Agent', 'agent');
     expect((await agent.client.get('/v1/admin/onboarding')).status).toBe(403);
     expect((await agent.client.put('/v1/admin/onboarding', { finished: true })).status).toBe(403);
+  });
+});
+
+describe('reviewing appearance before publication', () => {
+  it('keeps drafts private, rejects stale editors and publishes one reviewed revision', async () => {
+    const path = `/v1/admin/brands/${shop.brand.id}/appearance`;
+    const initial = await shop.owner.get(path);
+    const revision = initial.body.draftRevision;
+    const before = initial.body.configVersion;
+    const appearance = {
+      ...initial.body.appearance,
+      showBranding: false,
+      launcherLabel: { en: 'Ask our team' },
+    };
+    const concurrent = await Promise.all([
+      shop.owner.put(`${path}/draft`, { appearance, expectedRevision: revision }),
+      shop.owner.put(`${path}/draft`, { appearance, expectedRevision: revision }),
+    ]);
+    expect(concurrent.map((r) => r.status).sort()).toEqual([200, 409]);
+    const saved = concurrent.find((r) => r.status === 200);
+    expect(saved?.body.configVersion).toBe(before);
+    expect(saved?.body.draftAppearance.launcherLabel.en).toBe('Ask our team');
+    const preview = await new Visitor(slice.baseUrl, shop.brand.widgetId, shop.hostOrigin).open();
+    expect(preview.config.version).toBe(before);
+    expect(preview.config.brand.showBranding).toBe(initial.body.appearance.showBranding);
+    expect((await shop.owner.post(`${path}/publish`, { expectedRevision: revision })).status).toBe(
+      409,
+    );
+    const published = await shop.owner.post(`${path}/publish`, {
+      expectedRevision: saved?.body.draftRevision,
+    });
+    expect(published.status, JSON.stringify(published.body)).toBe(200);
+    expect(published.body.draftAppearance).toBeNull();
+    expect(published.body.configVersion).toBe(before + 1);
+    const live = await new Visitor(slice.baseUrl, shop.brand.widgetId, shop.hostOrigin).open();
+    expect(live.config.brand.showBranding).toBe(false);
+    expect(live.config.copy.en.launcherLabel).toBe('Ask our team');
+  });
+
+  it('persists use case independently from readiness steps', async () => {
+    const saved = await shop.owner.put('/v1/admin/onboarding', { useCase: 'billing' });
+    expect(saved.status).toBe(200);
+    expect(saved.body.useCase).toBe('billing');
+    expect((await shop.owner.get('/v1/admin/onboarding')).body.useCase).toBe('billing');
+    expect(saved.body.steps).not.toHaveProperty('useCase');
   });
 });

@@ -19,17 +19,21 @@ import { StaffLinksService } from './authority/staff-links.service.js';
 import { AuthoritySyncService } from './authority/sync.service.js';
 import { AUTOMATION_TOPIC } from './automations/events.js';
 import { AutomationRunner } from './automations/runner.service.js';
+import { AiCreditsService } from './billing/ai-credits.service.js';
 import { BillingNotices } from './billing/notices.js';
+import { BrandingService } from './branding/branding.service.js';
 import { cacheProviders } from './cache/cache.providers.js';
 import { CARD_TOPIC, CommerceCardsService } from './commerce/card-publisher.service.js';
 import { COMMERCE_WORKER_PROVIDERS } from './commerce/commerce.module.js';
 import { CommerceWorker } from './commerce/worker.service.js';
 import type { AppConfig } from './config.js';
+import { WhmcsTools } from './connectors/whmcs-tools.service.js';
 import { decisionProviders } from './decisions/decisions.providers.js';
 import { RoutingService } from './decisions/routing.service.js';
 import { type DeveloperOverrides, developerWorkerProviders } from './developer/developer.module.js';
 import { WebhookDispatcher } from './developer/webhooks/dispatcher.service.js';
 import { WEBHOOK_SOURCE_TOPIC, WebhookFanout } from './developer/webhooks/fanout.service.js';
+import { DNS_RESOLVER, systemDnsResolver } from './identity/sso/dns.js';
 import { InboxAccess } from './inbox/access.js';
 import { AvailabilityService } from './inbox/availability.service.js';
 import { OFFER_NEXT_TOPIC, OFFER_TIMEOUT_TOPIC } from './inbox/offers.js';
@@ -76,6 +80,9 @@ import { TICKET_CONFIRM_TOPIC } from './widget/offline-messages.service.js';
 import { WIDGET_SURFACE_WORKER_PROVIDERS } from './widget/surface.module.js';
 import { TicketEmailsService } from './widget/ticket-emails.service.js';
 import { MaintenanceService } from './worker/maintenance.service.js';
+import { WorkflowRunner } from './workflows/runner.service.js';
+import { WORKFLOW_EVENT_TOPIC, WORKFLOW_TOPIC } from './workflows/workflow-events.js';
+import { WORKFLOWS_WORKER_PROVIDERS } from './workflows/workflows.module.js';
 
 /** Outbox topics with a consumer that needs no other service. */
 export function defaultOutboxHandlers(): Map<string, OutboxHandler> {
@@ -128,6 +135,10 @@ export class WorkerModule {
         ChannelPollService,
         ...(overrides.model ? [{ provide: LANGUAGE_MODEL, useValue: overrides.model }] : []),
         ModelFactory,
+        AiCreditsService,
+        WhmcsTools,
+        BrandingService,
+        { provide: DNS_RESOLVER, useValue: systemDnsResolver(config.SSO_DNS_SERVERS) },
         KillSwitchesService,
         AgentsService,
         RunsService,
@@ -158,6 +169,7 @@ export class WorkerModule {
         ...ACTIONS_WORKER_PROVIDERS,
         ...SAAS_WORKER_PROVIDERS,
         ...KNOWLEDGE_WEB_WORKER_PROVIDERS,
+        ...WORKFLOWS_WORKER_PROVIDERS,
         {
           provide: OUTBOX_HANDLERS,
           inject: [
@@ -179,6 +191,7 @@ export class WorkerModule {
             ChatwootProvisioning,
             BillingNotices,
             AutomationRunner,
+            WorkflowRunner,
             ChannelHealthNotices,
             SlaService,
             OffersService,
@@ -204,6 +217,7 @@ export class WorkerModule {
             provisioning: ChatwootProvisioning,
             notices: BillingNotices,
             automations: AutomationRunner,
+            workflows: WorkflowRunner,
             channelHealth: ChannelHealthNotices,
             sla: SlaService,
             offers: OffersService,
@@ -230,8 +244,9 @@ export class WorkerModule {
               ['conversation.close_blocked', (event) => sync.applyBlockedClose(event)],
               [
                 'conversation.customer_message',
-                // The reply comes first; memory extraction is queued after it, never before.
+                // Private workflow evidence precedes the coordinator reply; memory extraction follows it.
                 async (event) => {
+                  if (await workflows.prepareReply(event)) return;
                   await replies.onCustomerMessage(event);
                   await extraction.afterCustomerMessage(event);
                 },
@@ -269,6 +284,8 @@ export class WorkerModule {
               [ACTION_EXECUTE_TOPIC, (event) => executor.onExecute(event)],
               [ACTION_RECONCILE_TOPIC, (event) => actions.onReconcile(event)],
               [AUTOMATION_TOPIC, (event) => automations.onEvent(event)],
+              [WORKFLOW_TOPIC, (event) => workflows.onEvent(event)],
+              [WORKFLOW_EVENT_TOPIC, (event) => workflows.onTrigger(event)],
               [CHANNEL_HEALTH_TOPIC, (event) => channelHealth.onEvent(event)],
               [SLA_DUE_TOPIC, (event) => sla.onDue(event)],
               [SLA_RESYNC_TOPIC, (event) => sla.onResync(event)],

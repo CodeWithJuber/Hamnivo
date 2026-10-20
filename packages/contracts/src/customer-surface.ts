@@ -151,6 +151,8 @@ export const LauncherConfig = z
       accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
       onAccent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
       openLabel: z.string().max(80),
+      label: z.string().max(80).nullable().optional(),
+      fontFamily: z.enum(['system', 'dm-sans', 'noto-sans']).optional(),
       closeLabel: z.string().max(80),
       title: z.string().max(80),
       dismissLabel: z.string().max(80),

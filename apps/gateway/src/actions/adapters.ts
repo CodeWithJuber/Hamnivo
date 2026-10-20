@@ -25,6 +25,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { moneyText } from '../commerce/common.js';
 import type { AppConfig } from '../config.js';
+import { ToolCallFailure } from '../connectors/tool-call-failure.js';
+import { WhmcsTools } from '../connectors/whmcs-tools.service.js';
 import { EgressService } from '../developer/egress.service.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CONFIG } from '../tokens.js';
@@ -153,16 +155,7 @@ export type ToolOutcome =
   | { status: 'failed'; reason: string; summary: string };
 
 /** A tool call that did not answer; `mayHaveApplied` decides between failed and unknown. */
-export class ToolCallFailure extends Error {
-  override readonly name = 'ToolCallFailure';
-  constructor(
-    readonly kind: string,
-    message: string,
-    readonly mayHaveApplied: boolean,
-  ) {
-    super(message);
-  }
-}
+export { ToolCallFailure } from '../connectors/tool-call-failure.js';
 
 type Args = Record<string, unknown>;
 
@@ -202,6 +195,7 @@ export class ToolAdapters {
     private readonly egress: EgressService,
     private readonly credentials: McpCredentials,
     private readonly secrets: SecretBroker,
+    private readonly whmcs: WhmcsTools,
   ) {}
 
   /** Demo tools are offered outside production, or where demos are switched on. */
@@ -230,6 +224,7 @@ export class ToolAdapters {
 
   /** The action as it would be proposed: its resource, revision, changes and amount. */
   async prepare(tx: TenantTx, tool: ToolRow, args: Args, scope: ToolScope): Promise<Prepared> {
+    if (tool.source === 'native') return this.whmcs.prepare(tx, tool, args, scope);
     if (tool.source === 'http') return this.prepareHttp(tx, tool, args);
     if (tool.source === 'mcp') {
       return {
@@ -441,6 +436,7 @@ export class ToolAdapters {
     scope: ToolScope,
     options: { idempotencyKey: string; signal: AbortSignal },
   ): Promise<ToolOutcome> {
+    if (tool.source === 'native') return this.whmcs.execute(tool, args, scope, options);
     if (tool.source === 'http') return this.executeHttp(tool, args, scope, options);
     if (tool.source === 'mcp') {
       const { serverId, endpoint } = await this.mcpEndpoint(tool, scope);

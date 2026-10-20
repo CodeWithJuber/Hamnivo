@@ -5,6 +5,7 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { Redis } from 'ioredis';
 import { ApiModule, type ApiOverrides } from './api.module.js';
+import { BrandingService } from './branding/branding.service.js';
 import { ProblemFilter } from './common/problem.filter.js';
 import { requestIdFrom } from './common/request-id.js';
 import type { AppConfig } from './config.js';
@@ -126,7 +127,13 @@ export async function createApiApp(
       );
     }
   });
-  registerAuthRoutes(fastify, app.get<Auth>(AUTH), app.get(SsoRuntime));
+  registerAuthRoutes(
+    fastify,
+    app.get<Auth>(AUTH),
+    app.get(SsoRuntime),
+    app.get(BrandingService),
+    config,
+  );
   registerMetrics(fastify, config.METRICS_TOKEN);
   await registerApiDocs(fastify, config.API_DOCS);
   await app.init();

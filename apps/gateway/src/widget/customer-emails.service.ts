@@ -12,6 +12,7 @@ import { and, desc, eq, gt, isNotNull, ne } from 'drizzle-orm';
 import { AuthorityRegistry } from '../authority/registry.js';
 import { authorityMessageUuid } from '../authority/uuid.js';
 import { contractMessage, publicationFacts } from '../authority/views.js';
+import { sendBrandedCustomerMail } from '../branding/customer-email.js';
 import type { AppConfig } from '../config.js';
 import type { Mailer } from '../platform/mailer.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, MAILER } from '../tokens.js';
@@ -229,7 +230,7 @@ export class CustomerEmailsService {
       )
       .map((m) => transcriptLine(m, copy, format.format(new Date(m.createdAt))));
     const unsubscribe = this.unsubscribeUrl(tenantId, who.principal.id, 'transcript');
-    await this.mailer.send({
+    await sendBrandedCustomerMail(this.db, this.mailer, tenantId, who.brand.name, {
       to: who.email,
       subject: copy.transcriptSubject(who.brand.name),
       text: [
@@ -343,7 +344,7 @@ export class CustomerEmailsService {
     const copy = NOTIFY_COPY[lang];
     const unsubscribe = this.unsubscribeUrl(tenantId, who.principal.id, 'reply_waiting');
     const site = 'site' in context ? context.site : null;
-    await this.mailer.send({
+    await sendBrandedCustomerMail(this.db, this.mailer, tenantId, who.brand.name, {
       to: who.email,
       subject: copy.replySubject(who.brand.name),
       text: [
@@ -488,7 +489,7 @@ export class CustomerEmailsService {
       new Date(mail.message.createdAt),
     );
     const unsubscribe = this.unsubscribeUrl(tenantId, followup.principalId, 'all');
-    await this.mailer.send({
+    await sendBrandedCustomerMail(this.db, this.mailer, tenantId, mail.brand.name, {
       to: followup.email,
       subject: copy.replySubject(mail.brand.name, reference),
       text: [

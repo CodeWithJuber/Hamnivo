@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   appendPlatformAudit,
+  newId,
   OperatorAccountMissingError,
   platformOperatorCommand,
   resolveSsoDomain,
@@ -27,6 +28,8 @@ interface CatalogTable {
 let h: Harness;
 let a: SeededTenant;
 let b: SeededTenant;
+let fundedChildA: string;
+let fundedChildB: string;
 let tables: CatalogTable[];
 
 const tenantColumn = (table: string) => (table === 'tenants' ? 'id' : 'tenant_id');
@@ -37,6 +40,8 @@ const tenantColumn = (table: string) => (table === 'tenants' ? 'id' : 'tenant_id
  * the platform role only what the security migration grants. Adding a table here needs a reason.
  */
 const GLOBAL_TABLES: Record<string, string> = {
+  ai_credit_rates:
+    'Global model credit price catalog: the app may read rates, while only the platform may change them',
   platform_operators:
     'Hamnivo staff allowed into the platform console; named by the server administrator',
   platform_audit_events:
@@ -55,6 +60,7 @@ const GLOBAL_TABLES: Record<string, string> = {
 
 /** Tables the application role may only insert into. */
 const APPEND_ONLY = new Set([
+  'workflow_versions',
   'audit_events',
   'erasure_tombstones',
   'operation_receipts',
@@ -73,6 +79,8 @@ const APPEND_ONLY = new Set([
   'ai_draft_decisions',
   'sla_outcomes',
 ]);
+/** Immutable relationships may be removed but never changed in place. */
+const NO_UPDATE = new Set(['agency_clients', 'agency_client_funding']);
 /** Tables whose rows the application role never deletes. */
 const NEVER_DELETED = new Set([
   'kill_switches',
@@ -140,6 +148,24 @@ beforeAll(async () => {
   h = await openHarness();
   a = await seedTenant(h.app, 'alpha');
   b = await seedTenant(h.app, 'beta');
+  async function fundedClient(agency: SeededTenant): Promise<string> {
+    const child = newId();
+    await withTenant(h.app, { tenantId: child }, async (tx) => {
+      await tx.execute(sql`insert into tenants (id, slug, name)
+        values (${child}::uuid, ${`rls-client-${agency.slug}`}, 'RLS client')`);
+    });
+    await withTenant(h.app, { tenantId: agency.tenantId }, async (tx) => {
+      await tx.execute(
+        sql`update agency_configs set enabled = true where tenant_id = ${agency.tenantId}::uuid`,
+      );
+      await tx.execute(sql`insert into agency_clients (tenant_id, client_tenant_id, created_by)
+        values (${agency.tenantId}::uuid, ${child}::uuid, ${agency.staffMemberId}::uuid)`);
+      await tx.execute(sql`select app.fund_agency_client(${child}::uuid)`);
+    });
+    return child;
+  }
+  fundedChildA = await fundedClient(a);
+  fundedChildB = await fundedClient(b);
   const { rows } = await h.owner.execute<{
     name: string;
     has_tenant_id: boolean;
@@ -204,6 +230,25 @@ describe('catalog', () => {
     );
     expect(rows.map((r) => r.name).sort()).toEqual(Object.keys(GLOBAL_TABLES).sort());
     for (const row of rows) {
+      if (row.name === 'ai_credit_rates') {
+        expect(row.privileges).toBe(true);
+        expect(row.policy).toBe('app_read');
+        const rates = await h.app.execute(
+          sql`select provider, model_id, version from ai_credit_rates`,
+        );
+        expect(rates.rows.length).toBeGreaterThan(0);
+        expect((await h.app.execute(sql`delete from ai_credit_rates`)).rowCount).toBe(0);
+        expect((await h.app.execute(sql`update ai_credit_rates set active = false`)).rowCount).toBe(
+          0,
+        );
+        await expectPgError(
+          h.app.execute(sql`insert into ai_credit_rates
+          (id, provider, model_id, version, input_milli_credits, output_milli_credits)
+          values (gen_random_uuid(), 'unauthorized', '*', 1, 1, 1)`),
+          '42501',
+        );
+        continue;
+      }
       expect(row, row.name).toMatchObject({ privileges: false, policy: '' });
       await expectPgError(h.app.execute(sql`select * from ${sql.identifier(row.name)}`), '42501');
     }
@@ -232,8 +277,16 @@ describe('catalog', () => {
     for (const tenant of [a, b]) {
       await withTenant(h.app, { tenantId: tenant.tenantId }, async (tx) => {
         for (const table of tenantTables()) {
+          // Funding belongs to the child, while a directory link belongs to its agency.
+          // A tenant cannot be both, so these two rows use the paired funded children below.
+          if (table.name === 'agency_client_funding') continue;
           expect(await count(tx, table.name), `${table.name} is not seeded`).toBeGreaterThan(0);
         }
+      });
+    }
+    for (const childId of [fundedChildA, fundedChildB]) {
+      await withTenant(h.app, { tenantId: childId }, async (tx) => {
+        expect(await count(tx, 'agency_client_funding')).toBe(1);
       });
     }
   });
@@ -242,6 +295,22 @@ describe('catalog', () => {
 describe('two-tenant isolation', () => {
   it.each([
     'tenants',
+    'agency_configs',
+    'agency_clients',
+    'agency_client_funding',
+    'tenant_branding',
+    'branding_domains',
+    'connector_connections',
+    'connector_tool_grants',
+    'connector_identity_bindings',
+    'connector_quotes',
+    'connector_dispatches',
+    'workflows',
+    'workflow_versions',
+    'a2a_connections',
+    'workflow_runs',
+    'workflow_run_steps',
+    'ai_credit_attempts',
     'workspaces',
     'brands',
     'secrets',
@@ -388,32 +457,35 @@ describe('two-tenant isolation', () => {
     'audit_events',
   ])('%s: reads, writes and moves stay inside the tenant', async (table) => {
     expect(tenantTables().map((t) => t.name)).toContain(table);
+    const leftId = table === 'agency_client_funding' ? fundedChildA : a.tenantId;
+    const rightId = table === 'agency_client_funding' ? fundedChildB : b.tenantId;
     const column = sql.identifier(tenantColumn(table));
     const t = sql.identifier(table);
 
     // Reads: tenant A sees only its own rows.
-    await withTenant(h.app, { tenantId: a.tenantId }, async (tx) => {
-      expect(await count(tx, table, sql`${column} = ${b.tenantId}::uuid`)).toBe(0);
-      expect(await count(tx, table)).toBe(
-        await count(tx, table, sql`${column} = ${a.tenantId}::uuid`),
-      );
+    await withTenant(h.app, { tenantId: leftId }, async (tx) => {
+      expect(await count(tx, table, sql`${column} = ${rightId}::uuid`)).toBe(0);
+      expect(await count(tx, table)).toBe(await count(tx, table, sql`${column} = ${leftId}::uuid`));
     });
 
     // The audit log, operation receipts, decision checks, consent decisions and deletion
     // tombstones are append-only; kill switches are cleared, deletion receipts completed, decision
     // records reviewed and financial records change state, but none of them is ever deleted.
-    const updatable = !APPEND_ONLY.has(table);
-    const deletable = updatable && !NEVER_DELETED.has(table);
-    if (updatable) {
+    const updatable = !APPEND_ONLY.has(table) && !NO_UPDATE.has(table);
+    const deletable =
+      !APPEND_ONLY.has(table) && !NEVER_DELETED.has(table) && table !== 'agency_client_funding';
+    if (updatable || deletable) {
       // Updates and deletes aimed at tenant B affect nothing.
-      await withTenant(h.app, { tenantId: a.tenantId }, async (tx) => {
-        const updated = await tx.execute(
-          sql`update ${t} set ${column} = ${column} where ${column} = ${b.tenantId}::uuid`,
-        );
-        expect(updated.rowCount).toBe(0);
+      await withTenant(h.app, { tenantId: leftId }, async (tx) => {
+        if (updatable) {
+          const updated = await tx.execute(
+            sql`update ${t} set ${column} = ${column} where ${column} = ${rightId}::uuid`,
+          );
+          expect(updated.rowCount).toBe(0);
+        }
         if (deletable) {
           const deleted = await tx.execute(
-            sql`delete from ${t} where ${column} = ${b.tenantId}::uuid`,
+            sql`delete from ${t} where ${column} = ${rightId}::uuid`,
           );
           expect(deleted.rowCount).toBe(0);
         }
@@ -421,7 +493,7 @@ describe('two-tenant isolation', () => {
     }
 
     // Inserting a copy of one of B's rows while acting as A violates the policy.
-    const sample = await withTenant(h.app, { tenantId: b.tenantId }, async (tx) => {
+    const sample = await withTenant(h.app, { tenantId: rightId }, async (tx) => {
       const { rows } = await tx.execute<{ row: Record<string, unknown> }>(
         sql`select row_to_json(x) as row from ${t} x limit 1`,
       );
@@ -430,7 +502,7 @@ describe('two-tenant isolation', () => {
     expect(sample).toBeDefined();
     const copy = await copyStatement(table, sample);
     await expectPgError(
-      withTenant(h.app, { tenantId: a.tenantId }, (tx) => tx.execute(copy)),
+      withTenant(h.app, { tenantId: leftId }, (tx) => tx.execute(copy)),
       '42501',
     );
 
@@ -438,12 +510,12 @@ describe('two-tenant isolation', () => {
     // versions are immutable before RLS is even consulted, so the draft is the row moved.
     const movable = table === 'agent_versions' ? sql` and state = 'draft'` : sql``;
     await expectPgError(
-      withTenant(h.app, { tenantId: a.tenantId }, (tx) =>
+      withTenant(h.app, { tenantId: leftId }, (tx) =>
         tx.execute(
-          sql`update ${t} set ${column} = ${b.tenantId}::uuid where ${column} = ${a.tenantId}::uuid${movable}`,
+          sql`update ${t} set ${column} = ${rightId}::uuid where ${column} = ${leftId}::uuid${movable}`,
         ),
       ),
-      '42501',
+      table === 'workflow_versions' ? 'P0001' : '42501',
     );
 
     // Without a tenant, nothing is visible and nothing can be written.
@@ -456,6 +528,22 @@ describe('two-tenant isolation', () => {
     // Guard: adding a table without adding it to the list above (and to seedTenant) fails here.
     const listed = new Set([
       'tenants',
+      'agency_configs',
+      'agency_clients',
+      'agency_client_funding',
+      'tenant_branding',
+      'branding_domains',
+      'connector_connections',
+      'connector_tool_grants',
+      'connector_identity_bindings',
+      'connector_quotes',
+      'connector_dispatches',
+      'workflows',
+      'workflow_versions',
+      'a2a_connections',
+      'workflow_runs',
+      'workflow_run_steps',
+      'ai_credit_attempts',
       'workspaces',
       'brands',
       'secrets',

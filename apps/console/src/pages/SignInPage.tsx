@@ -10,6 +10,7 @@ import { AuthLayout } from '../components/AuthLayout';
 import { TextField } from '../components/Fields';
 import { EMAIL, PasskeyButton, SignInFlow } from '../components/SignIn';
 import { passkeysAvailable } from '../lib/auth-client';
+import { usePublicBranding } from '../lib/branding';
 import { ssoErrorKey, startSso } from '../lib/sso';
 
 /** "Continue with single sign-on": the work address decides which identity provider opens. */
@@ -86,6 +87,7 @@ function SsoForm({
 
 /** Sign in (board 02: HNV-02-01 default, HNV-02-02 submitting, HNV-02-03/04 verification). */
 export function SignInPage() {
+  const branding = usePublicBranding();
   const { t } = useTranslation();
   const search = useSearch({ from: '/sign-in' });
   const client = useQueryClient();
@@ -124,6 +126,9 @@ export function SignInPage() {
             {t(`sso.errors.${ssoErrorKey(search.error)}`)}
           </p>
         ) : null}
+        {branding.data?.customDomain ? (
+          <p className="text-sm text-text-secondary">{t('agentic.customAuth')}</p>
+        ) : null}
         <SignInFlow
           idPrefix="sign-in"
           submitLabel={t('auth.signIn.submit')}
@@ -141,7 +146,7 @@ export function SignInPage() {
             </Link>
           }
         />
-        {step === 'password' ? (
+        {step === 'password' && !branding.data?.customDomain ? (
           <>
             <div className="flex items-center gap-3 text-sm text-text-muted">
               <Separator className="flex-1" />

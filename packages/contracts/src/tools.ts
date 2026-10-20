@@ -53,7 +53,7 @@ export const ToolDefinition = z
     description: z.string(),
     /** What the MCP server said about the tool: untrusted, shown quoted, never sent as is. */
     remoteDescription: z.string().nullable(),
-    source: z.enum(['builtin', 'mcp', 'http']),
+    source: z.enum(['builtin', 'mcp', 'http', 'native']),
     builtin: BuiltinToolKey.nullable(),
     mcpServerId: typeId('mcpServer').nullable(),
     inputSchema: ToolSchema,

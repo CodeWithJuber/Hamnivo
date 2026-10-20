@@ -9,6 +9,8 @@ namespace WHMCS\Authentication {
     {
         /** @var object|null The client the stand-in user is acting for. */
         public static $client = null;
+        public static $user = null;
+        public function user() { return self::$user; }
 
         public function client()
         {

@@ -2333,6 +2333,8 @@ export const ar: Translation = {
     },
   },
   permissionAreas: {
+    agency: 'الوكالة',
+    branding: 'العلامة التجارية',
     conversations: 'المحادثات',
     visitors: 'الزوار',
     inbox: 'صناديق الوارد والتوجيه',
@@ -2367,6 +2369,14 @@ export const ar: Translation = {
     support: 'وصول الدعم',
   },
   permissions: {
+    agency: {
+      read: 'عرض إعدادات الوكالة ودليل العملاء',
+      manage: 'إدارة إعدادات الوكالة وروابط العملاء المستقلين',
+    },
+    branding: {
+      read: 'عرض علامة البوابة والنطاقات المخصصة',
+      manage: 'إدارة علامة البوابة والنطاقات المخصصة الموثقة',
+    },
     conversations: {
       read: 'قراءة المحادثات وسجل العميل',
       reply: 'الرد على العملاء',

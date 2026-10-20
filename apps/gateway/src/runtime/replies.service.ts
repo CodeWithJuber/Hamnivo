@@ -41,6 +41,8 @@ import {
   type PublicationFacts,
   type SourceRef,
 } from '../authority/views.js';
+import { AiAttemptUncertainError } from '../billing/ai-credits.model.js';
+import { reservationSize } from '../billing/ai-credits.service.js';
 import { EntitlementsService } from '../billing/entitlements.service.js';
 import { AnswerCache, type AnswerLookup } from '../cache/answers.js';
 import type { SourceRefRow } from '../cache/cache.service.js';
@@ -60,6 +62,7 @@ import { MemoryRecallService, type RecalledMemory } from '../memory/recall.servi
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
+import { WorkflowContextReader } from '../workflows/context-reader.service.js';
 import { type ActiveAgent, AgentsService } from './agents.service.js';
 import {
   type AiHandoffReason,
@@ -113,7 +116,12 @@ interface Generated {
  * Prompt options, why the reply language was chosen (recorded with the model step), and the
  * checks that run around this reply (none for staff suggestions).
  */
-type GenerateOptions = PromptOptions & { languageSource?: string; checks?: RunChecks | null };
+type GenerateOptions = PromptOptions & {
+  languageSource?: string;
+  checks?: RunChecks | null;
+  workflowContext?: { text: string; untrusted: true } | null;
+  workflowLedgerId?: string;
+};
 
 /** Why `generate` returned no reply, and whether the reply it returned may be cached. */
 interface GenerateOutcome {
@@ -294,6 +302,12 @@ class EmptyReplyError extends Error {
 
 /** Failure of a model call, without prompt text or credentials. */
 export function classifyModelError(error: unknown): { kind: string; retryable: boolean } {
+  if (error instanceof AiAttemptUncertainError)
+    return { kind: 'usage_unresolved', retryable: false };
+  if (error instanceof AppError && ['QUOTA_EXCEEDED', 'PLAN_LIMIT_REACHED'].includes(error.code))
+    return { kind: 'ai_allowance', retryable: false };
+  if (error instanceof AppError && error.code === 'IDEMPOTENCY_CONFLICT')
+    return { kind: 'ai_attempt_already_started', retryable: false };
   if (error instanceof ModelUnavailableError) return { kind: error.reason, retryable: false };
   if (error instanceof EmptyReplyError) return { kind: 'empty_reply', retryable: false };
   const normalized = normalizeModelError(error);
@@ -348,6 +362,7 @@ export class RepliesService {
     private readonly approvals: ActionApprovals,
     private readonly handoffs: HandoffPackets,
     private readonly checks: ReplyChecksService,
+    private readonly workflowContext: WorkflowContextReader,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -546,7 +561,14 @@ export class RepliesService {
 
     // Plan limits and the workspace's own AI budget (A08) limit what costs tokens: the model's
     // replies, here. They never limit safety: Hamnivo's wording for someone at risk is fixed text.
-    const allowance = await this.entitlements.aiAllowance(tenantId);
+    const checkedAllowance = await this.entitlements.aiAllowance(tenantId);
+    // Token admission is atomic at each provider attempt, and BYOK has no managed token charge.
+    const allowance =
+      !checkedAllowance.allowed &&
+      checkedAllowance.reason !== 'plan_replies' &&
+      agent.config.model.connectionId
+        ? { allowed: true as const }
+        : checkedAllowance;
 
     // Checks around this reply, as the brand set them (shadow records, live acts).
     const checks = await this.checks.forRun({
@@ -638,6 +660,12 @@ export class RepliesService {
     // Commerce data the conversation holds (K06): a reply built from it is never cached. Nor is
     // the reply of an agent that may call tools (G15): it may rest on a tool's answer.
     const liveData = await this.tx(tenantId, (tx) => conversationLiveData(tx, control.id));
+    options.workflowContext = await this.workflowContext.context(tenantId, {
+      conversationId: control.id,
+      epoch: payload.epoch,
+      agentId: agent.profile.id,
+      ledgerId: payload.ledgerId,
+    });
     const cached: AnswerLookup = await this.cachedAnswer(
       tenantId,
       run.id,
@@ -647,7 +675,7 @@ export class RepliesService {
       question,
       options,
       personalContext,
-      options.tools ? [...liveData, TOOL_DATA_CLASS] : liveData,
+      options.tools || options.workflowContext ? [...liveData, TOOL_DATA_CLASS] : liveData,
     );
 
     let generated: Generated | null;
@@ -707,7 +735,7 @@ export class RepliesService {
           control,
           run.id,
           payload.epoch,
-          'ai_unavailable',
+          failure.kind === 'ai_allowance' ? 'ai_limit' : 'ai_unavailable',
           failure.kind,
           handoffContext,
         );
@@ -1703,7 +1731,11 @@ export class RepliesService {
     // The customer wrote again: that message's own job drafts the reply with everything in view.
     if (await this.skipIfSuperseded(tenantId, run.id, payload)) return;
     // Suggestions spend tokens too: none once the plan or budget is used up.
-    if (!(await this.entitlements.aiAllowance(tenantId)).allowed) {
+    const allowance = await this.entitlements.aiAllowance(tenantId);
+    if (
+      !allowance.allowed &&
+      (allowance.reason === 'plan_replies' || !agent.config.model.connectionId)
+    ) {
       await this.tx(tenantId, (tx) =>
         this.runs.finish(tx, run.id, { outcome: 'skipped', state: 'skipped' }),
       );
@@ -1721,6 +1753,7 @@ export class RepliesService {
         language: chosen.resolution.language,
         style: chosen.style,
         languageSource: chosen.resolution.source,
+        workflowLedgerId: payload.ledgerId,
       });
     } catch (error) {
       const failure = classifyModelError(error);
@@ -1922,8 +1955,22 @@ export class RepliesService {
         config,
         history,
       }));
+    const workflow =
+      options.workflowContext === undefined
+        ? await this.workflowContext.context(tenantId, {
+            conversationId: context.control.id,
+            epoch: context.control.ownershipEpoch,
+            agentId: agent.profile.id,
+            ledgerId: options.workflowLedgerId,
+          })
+        : options.workflowContext;
+    if (workflow) {
+      if (tools) tools.untrusted = true;
+      if (outcome) outcome.cacheable = false;
+    }
     const base =
       systemPrompt(config, context.brandName, passages, options) +
+      (workflow ? `\n\n${workflow.text}` : '') +
       (memories.length ? `\n\n${memoryBlock(memories)}` : '') +
       (assist
         ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
@@ -1945,6 +1992,7 @@ export class RepliesService {
         },
         tools,
         deadlineAt,
+        attempt,
       );
       const cited = applyCitations(generated.text, passages, (p) => p.documentId);
       const remembered = citeMemories(cited.text, memories);
@@ -2048,8 +2096,11 @@ export class RepliesService {
         if (outcome) outcome.blocked = { note: checked.note };
         return null;
       }
-      if (outcome && checked) outcome.cacheable = checked.cacheable;
-      return { ...result, liveData: claimedLiveData(claims.claimed) };
+      if (outcome && checked) outcome.cacheable = checked.cacheable && !workflow;
+      return {
+        ...result,
+        liveData: [...claimedLiveData(claims.claimed), ...(workflow ? [TOOL_DATA_CLASS] : [])],
+      };
     }
     return null;
   }
@@ -2113,35 +2164,50 @@ export class RepliesService {
     tools?: RunTools | null,
     /** A draft written again after a check must still finish within the run's time limit. */
     deadlineAt?: number,
+    generationAttempt = 0,
   ): Promise<Generated> {
     const choices: ModelChoice[] = [config.model, ...config.fallbackModels];
     const inputHash = sha256(canonicalize({ system, messages }) ?? '');
     let lastError: unknown;
     for (const [index, choice] of choices.entries()) {
+      // A BYOK agent never silently falls back to a platform-funded credential.
+      if (config.model.connectionId && !choice.connectionId) continue;
       const started = Date.now();
       try {
-        const resolved = await this.models.resolve(tenantId, choice);
         const timeout = AbortSignal.timeout(
           deadlineAt === undefined
             ? config.limits.timeoutMs
             : Math.max(1, Math.min(config.limits.timeoutMs, deadlineAt - Date.now())),
         );
-        const result = await generateText({
-          model: resolved.model,
-          instructions: system,
-          messages,
-          ...(tools ? { tools: tools.tools as ToolSet } : {}),
-          maxOutputTokens: config.limits.maxOutputTokens,
-          stopWhen: isStepCount(config.limits.maxSteps),
-          maxRetries: 0,
-          abortSignal: tools ? AbortSignal.any([timeout, tools.signal]) : timeout,
-        });
+        const { result, resolved } = await this.models.executeAttempt(
+          tenantId,
+          choice,
+          {
+            key: `run:${runId}:generate:${generationAttempt}:model:${index}`,
+            reserveTokens: reservationSize(system, messages, config.limits.maxOutputTokens, 1),
+            timeoutMs: config.limits.timeoutMs,
+            attribution: { runId },
+          },
+          async (resolved) => ({
+            resolved,
+            result: await generateText({
+              model: resolved.model,
+              instructions: system,
+              messages,
+              ...(tools ? { tools: tools.tools as ToolSet } : {}),
+              maxOutputTokens: config.limits.maxOutputTokens,
+              stopWhen: isStepCount(config.limits.maxSteps),
+              maxRetries: 0,
+              abortSignal: tools ? AbortSignal.any([timeout, tools.signal]) : timeout,
+            }),
+          }),
+        );
         const generated: Generated = {
           text: result.text.trim(),
           provider: resolved.provider,
           modelId: resolved.modelId,
-          inputTokens: result.usage.inputTokens ?? null,
-          outputTokens: result.usage.outputTokens ?? null,
+          inputTokens: result.totalUsage.inputTokens ?? null,
+          outputTokens: result.totalUsage.outputTokens ?? null,
           latencyMs: Date.now() - started,
           sources: [],
           refs: [],
@@ -2205,8 +2271,6 @@ export class RepliesService {
     await this.runs.finish(tx, runId, { outcome, ...telemetry });
     const now = this.clock();
     const entries = [
-      ['ai.tokens.input', telemetry.inputTokens, 'token'],
-      ['ai.tokens.output', telemetry.outputTokens, 'token'],
       // Each reply the customer received counts against the plan's AI replies (A08).
       ['ai.replies', outcome === 'replied' ? 1 : null, 'reply'],
     ] as const;
