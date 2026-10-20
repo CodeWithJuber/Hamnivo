@@ -159,10 +159,16 @@ final class Identity
         if ($key === null) {
             return null;
         }
+        $identity = CurrentClient::identity();
+        if ($identity === null || $identity['clientId'] !== (int) $client['id']) {
+            return null;
+        }
+        $customer = self::customerFor($client, $settings);
+        $customer['id'] = 'whmcs:u:' . $identity['userId'] . ':c:' . $identity['clientId'];
         $options = [
             'widgetId' => $settings->widgetId(),
             'key' => $key,
-            'customer' => self::customerFor($client, $settings),
+            'customer' => $customer,
         ];
         try {
             return \Hamnivo\createIdentityAssertion($options);

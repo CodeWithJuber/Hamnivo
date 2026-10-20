@@ -29,6 +29,8 @@ export const ROLE_PRESETS = [
       'grants.*',
       'audit.*',
       'brands.*',
+      'agency.*',
+      'branding.*',
       'widget.*',
       'agents.*',
       'automations.*',

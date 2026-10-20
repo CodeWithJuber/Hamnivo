@@ -15,7 +15,10 @@ export type ModelProbeResult = C.ModelProbeResult;
 export type ModelProbeKind = C.ModelProbeKind;
 export type ModelConnectionTest = C.ModelConnectionTest;
 export type WidgetAppearance = C.WidgetAppearance;
-export type WidgetAppearanceView = C.WidgetAppearanceView;
+export type WidgetAppearanceView = C.WidgetAppearanceView & {
+  draftAppearance?: WidgetAppearance | null;
+  draftRevision?: number;
+};
 export type OnboardingProgress = C.OnboardingProgress;
 export type OnboardingStep = C.OnboardingStep;
 export type KeyedProvider = C.KeyedProvider;
@@ -76,11 +79,22 @@ export function useAppearance(brandId: string, enabled = true) {
 /** Saves how a brand's chat looks. The gateway checks the colour again and says what is wrong. */
 export function useSaveAppearance(brandId: string) {
   return useStudioMutation(
-    (body: WidgetAppearance, tenant) =>
-      api<WidgetAppearanceView>(`/v1/admin/brands/${brandId}/appearance`, {
+    (body: { appearance: WidgetAppearance; expectedRevision: number }, tenant) =>
+      api<WidgetAppearanceView>(`/v1/admin/brands/${brandId}/appearance/draft`, {
         method: 'PUT',
         tenant,
         body,
+      }),
+    [setupKeys.appearance(brandId)],
+  );
+}
+export function usePublishAppearance(brandId: string) {
+  return useStudioMutation(
+    (expectedRevision: number, tenant) =>
+      api<WidgetAppearanceView>(`/v1/admin/brands/${brandId}/appearance/publish`, {
+        method: 'POST',
+        tenant,
+        body: { expectedRevision },
       }),
     [setupKeys.appearance(brandId)],
   );

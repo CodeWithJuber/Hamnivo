@@ -1051,7 +1051,9 @@ describe('the guided setup', () => {
 
     it('offers every platform and links the guide for the one chosen', async () => {
       const html = await install();
-      const options = [...html.matchAll(/<option[^>]*value="([^"]+)"/g)].map((m) => m[1]);
+      const start = html.indexOf('id="onb-platform"');
+      const picker = html.slice(start, html.indexOf('</select>', start));
+      const options = [...picker.matchAll(/<option[^>]*value="([^"]+)"/g)].map((m) => m[1]);
       expect(options).toEqual([
         'html',
         'wordpress',

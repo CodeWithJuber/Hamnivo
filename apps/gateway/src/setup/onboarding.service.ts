@@ -2,6 +2,7 @@ import {
   ONBOARDING_STEPS,
   type OnboardingProgress,
   type OnboardingStep,
+  OnboardingUseCase,
   type UpdateOnboardingRequest,
 } from '@hamnivo/contracts';
 import {
@@ -38,6 +39,7 @@ function stepsOf(row: Row | undefined): Steps {
 function view(row: Row | undefined): OnboardingProgress {
   return {
     steps: stepsOf(row),
+    useCase: OnboardingUseCase.safeParse(row?.steps.useCase).data ?? null,
     brandId: row?.brandId ? toPublicId('brand', row.brandId) : null,
     finishedAt: row?.finishedAt?.toISOString() ?? null,
     updatedAt: row?.updatedAt.toISOString() ?? null,
@@ -111,6 +113,8 @@ export class OnboardingService {
       }
       const [existing] = await tx.select().from(schema.onboardingProgress).for('update');
       const steps: Record<string, string> = { ...stepsOf(existing) };
+      const useCase = input.useCase === undefined ? existing?.steps.useCase : input.useCase;
+      if (useCase && OnboardingUseCase.safeParse(useCase).success) steps.useCase = useCase;
       for (const [step, state] of Object.entries(input.steps ?? {}) as [
         OnboardingStep,
         'done' | 'skipped' | null,
@@ -144,7 +148,11 @@ export class OnboardingService {
         targetType: 'tenant',
         targetId: toPublicId('tenant', principal.tenantId),
         outcome: 'success',
-        data: { steps: input.steps ?? {}, finished: input.finished ?? null },
+        data: {
+          steps: input.steps ?? {},
+          finished: input.finished ?? null,
+          useCase: input.useCase ?? null,
+        },
       });
       return view(row);
     });

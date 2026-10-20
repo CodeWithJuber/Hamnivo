@@ -14,7 +14,7 @@ import {
   toPublicId,
   withTenant,
 } from '@hamnivo/db';
-import { ROLE_PRESETS } from '@hamnivo/policy';
+import { authorize, ROLE_PRESETS, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import type { z } from 'zod';
@@ -29,6 +29,7 @@ import { type Mailer, sendTemplate } from '../platform/mailer.js';
 import { SignupPolicy } from '../platform/signup.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, MAILER } from '../tokens.js';
 import type { AuthSession } from './auth.factory.js';
+import { enforce } from './staff.guard.js';
 
 type MembershipView = z.infer<typeof Membership>;
 type OperatorAccountInput = z.output<typeof OperatorCreateAccountRequest>;
@@ -177,6 +178,52 @@ export class TenantsService {
     input: z.output<typeof CreateTenantRequest>,
     idempotencyKey: string | undefined,
   ): Promise<{ membership: MembershipView; replayed: boolean }> {
+    return this.createInternal(session, input, idempotencyKey);
+  }
+
+  /** An agency administrator may create a separate client tenant while public signup is closed. */
+  async createForAgency(
+    principal: StaffPrincipal,
+    session: AuthSession,
+    input: z.output<typeof CreateTenantRequest>,
+    idempotencyKey: string | undefined,
+  ): Promise<{ membership: MembershipView; replayed: boolean }> {
+    enforce(
+      authorize(
+        principal,
+        'agency.manage',
+        {},
+        {
+          now: this.clock(),
+          stepUpMaxAgeMs: this.config.STEP_UP_MAX_AGE_MINUTES * 60_000,
+        },
+      ),
+    );
+    const enabled = await withTenant(
+      this.db,
+      { tenantId: principal.tenantId, actorId: principal.staffMemberId },
+      async (tx) => {
+        const result = await tx.execute<{ enabled: boolean }>(
+          sql`select enabled from agency_configs where tenant_id = ${principal.tenantId}`,
+        );
+        return result.rows[0]?.enabled === true;
+      },
+    );
+    if (!enabled) throw new AppError('FEATURE_DISABLED', { reason: 'agency_disabled' });
+    return this.createInternal(
+      session,
+      input,
+      idempotencyKey ? `agency:${principal.tenantId}:${idempotencyKey}` : undefined,
+      principal,
+    );
+  }
+
+  private async createInternal(
+    session: AuthSession,
+    input: z.output<typeof CreateTenantRequest>,
+    idempotencyKey: string | undefined,
+    agency?: StaffPrincipal,
+  ): Promise<{ membership: MembershipView; replayed: boolean }> {
     const tenantId = idempotencyKey
       ? deterministicUuid(`tenant:${session.user.id}:${idempotencyKey}`)
       : newId();
@@ -184,7 +231,7 @@ export class TenantsService {
       const existing = await this.membership(session.user.id, tenantId);
       if (existing) return { membership: existing, replayed: true };
     }
-    await this.signup.assertMayCreateTenant(session);
+    if (!agency) await this.signup.assertMayCreateTenant(session);
     try {
       await withTenant(this.db, { tenantId, actorId: session.user.id }, async (tx) => {
         const { ownerRoleId } = await this.seed(tx, tenantId, input);
@@ -221,6 +268,26 @@ export class TenantsService {
           aggregateId: tenantId,
           payload: { tenantId, slug: input.slug, ownerStaffMemberId: staffMemberId, plan },
         });
+        if (agency) {
+          // One transaction owns both creation and the directory link. If linking fails (limit,
+          // concurrent claim, or disabled mode), the independent tenant creation also rolls back.
+          await tx.execute(sql`select set_config('app.tenant_id', ${agency.tenantId}, true)`);
+          await tx.insert(schema.agencyClients).values({
+            tenantId: agency.tenantId,
+            clientTenantId: tenantId,
+            createdBy: agency.staffMemberId,
+          });
+          await tx.execute(sql`select app.fund_agency_client(${tenantId})`);
+          await appendAudit(tx, {
+            actorType: 'staff',
+            actorId: toPublicId('staff', agency.staffMemberId),
+            action: 'agency.client_linked',
+            targetType: 'tenant',
+            targetId: toPublicId('tenant', tenantId),
+            outcome: 'success',
+            data: { existing: false },
+          });
+        }
       });
     } catch (error) {
       if (isUniqueViolation(error, 'tenants_pkey')) {

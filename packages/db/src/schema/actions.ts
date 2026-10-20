@@ -114,7 +114,7 @@ export const toolDefinitions = pgTable(
     description: text('description').notNull(),
     /** What the MCP server or the imported API description said (untrusted, never sent as is). */
     remoteDescription: text('remote_description'),
-    source: text('source', { enum: ['builtin', 'mcp', 'http'] }).notNull(),
+    source: text('source', { enum: ['builtin', 'mcp', 'http', 'native'] }).notNull(),
     builtin: text('builtin', { enum: BUILTIN_TOOLS }),
     mcpServerId: uuid('mcp_server_id'),
     /** The tool's name on the MCP server. */
@@ -184,7 +184,8 @@ export const toolDefinitions = pgTable(
       'tool_definitions_source_ck',
       sql`(${t.source} = 'builtin' and ${t.builtin} is not null and ${t.mcpServerId} is null)
         or (${t.source} = 'mcp' and ${t.mcpServerId} is not null and ${t.remoteName} is not null)
-        or (${t.source} = 'http' and ${t.builtin} is null and ${t.mcpServerId} is null)`,
+        or (${t.source} = 'http' and ${t.builtin} is null and ${t.mcpServerId} is null)
+        or (${t.source} = 'native' and ${t.builtin} is null and ${t.mcpServerId} is null and ${t.remoteName} is not null)`,
     ),
     // Money and irreversible actions: staff approve, never autopilot (also checked in code).
     check(

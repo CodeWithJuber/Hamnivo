@@ -102,3 +102,21 @@ development licence before you roll it out to clients.
 The addon calls the SDK in `integrations/php-sdk` (`Hamnivo\createIdentityAssertion`), which is
 tested against `@hamnivo/server` byte for byte. The SDK needs PHP 8.1, so the addon loads it only
 when the PHP can run it.
+
+### Native WHMCS tools and signed account identity
+
+The native connector is configured in Hamnivo Studio → Connectors for a single brand. Use the public HTTPS root of the WHMCS installation, a restricted WHMCS API identifier/secret, and the same identity signing **kid** configured in this addon. API credentials stay encrypted in Hamnivo; they never enter the widget. The addon does not need WHMCS API credentials.
+
+On WHMCS 8+, the addon signs `whmcs:u:{userId}:c:{selectedClientId}` using `CurrentUser::user()` and `CurrentUser::client()`. Switching the selected client or signed-in user creates a different Hamnivo identity. Admin “Login as Client” sessions do not receive an assertion. Earlier numeric client subjects remain separate chat identities; their history is not merged or promoted to connector access. WHMCS versions without the user/client API can still show anonymous chat.
+
+Hamnivo binds a connector identity only after verifying the JWT signature, audience, nonce and expiry with the configured brand key. Native actions need an unexpired assertion and recheck `GetUserPermissions(user_id, client_id)` live. WHMCS installations returning an incomplete permissions response are denied, even when `result` says `success`; permissions are never inferred from success or a claimed owner flag. Products, invoices and tickets are checked against the selected client before they can be used. Only explicitly allowed public fields are returned, never passwords, ticket access codes, custom fields or staff notes.
+
+Grant only the capabilities the agent needs. Ticket creation/replies and invoice payment links require customer confirmation. Upgrades require a live quote with a five-minute expiry, the service, target product, billing cycle and payment method, followed by staff approval. A changed service or quote invalidates approval, and a quote is consumed before dispatch. Cancellations require staff approval and submit a WHMCS cancellation request. Refund tools prepare a manual review packet; they never invoke a refund API or claim that funds were returned.
+
+Every remote write uses Hamnivo’s approval and operation ledger. WHMCS does not supply generic idempotency for these API actions, so a lost response leaves the action unknown and blocks a matching retry, including from another run. Staff must verify the outcome in WHMCS and record the result using Hamnivo’s existing manual reconciliation flow. Chat messages and receipts continue through the existing Chatwoot transcript integration.
+
+Restricted API roles need `GetUserPermissions` plus only the enabled capability actions: `GetInvoices`, `GetInvoice`, `GetClientsProducts`, `GetClientsDomains`, `GetTickets`, `GetTicket`, `OpenTicket`, `AddTicketReply`, `UpgradeProduct`, and `AddCancelRequest`. Connection tests use `GetCurrencies`. No private-note, credential-decryption, module-termination or refund API is allowed.
+
+WHMCS references: [user permissions](https://developers.whmcs.com/api-reference/getuserpermissions/), [permission names](https://developers.whmcs.com/api-reference/getpermissionslist/), and [upgrade calculation](https://developers.whmcs.com/api-reference/upgradeproduct/).
+
+Studio also supports a read-only permission preview for an actual WHMCS user ID and selected client ID. It runs `GetUserPermissions` and shows each capability’s configured grant, required WHMCS permission, and allowed/denied reason. This is separate from the credential health test: it does not create a widget identity, authorize an action, or return customer records. Preview access requires fresh staff authentication and permission to manage tools for the connector’s brand; results are audited.

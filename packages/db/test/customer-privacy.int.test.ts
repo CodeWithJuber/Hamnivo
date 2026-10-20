@@ -151,15 +151,87 @@ describe('erasing one customer (A10)', () => {
         .where(eq(schema.widgetSessions.principalId, a.principalId)),
     );
     expect(sessions).toEqual([]);
+    expect(await inTenant(a, (tx) => tx.select().from(schema.workflowRuns))).toEqual([]);
+    expect(await inTenant(a, (tx) => tx.select().from(schema.workflowRunSteps))).toEqual([]);
+    expect(await inTenant(a, (tx) => tx.select().from(schema.connectorQuotes))).toEqual([]);
+    expect(await inTenant(a, (tx) => tx.select().from(schema.connectorIdentityBindings))).toEqual(
+      [],
+    );
+    const [fence] = await inTenant(a, (tx) => tx.select().from(schema.connectorDispatches));
+    expect(fence).toMatchObject({
+      principalId: null,
+      state: 'confirmed',
+      idempotencyKey: expect.stringMatching(/^dispatch-/),
+    });
+    expect(
+      await inTenant(b, (tx) => tx.select().from(schema.connectorIdentityBindings)),
+    ).toHaveLength(1);
+    expect(await inTenant(b, (tx) => tx.select().from(schema.workflowRuns))).toHaveLength(1);
     // The other tenant's customer is untouched.
     expect((await customer(b, b.principalId))?.displayName).not.toBeNull();
   });
 
   it('deletes a customer who bought nothing', async () => {
     const id = await visitorOnly(a);
+    const dispatchId = newId();
+    await inTenant(a, async (tx) => {
+      const [connection] = await tx.select().from(schema.connectorConnections);
+      await tx.insert(schema.connectorIdentityBindings).values({
+        tenantId: a.tenantId,
+        brandId: a.brandId,
+        connectionId: connection!.id,
+        principalId: id,
+        userId: 701,
+        clientId: 702,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      await tx.insert(schema.connectorQuotes).values({
+        tenantId: a.tenantId,
+        connectionId: connection!.id,
+        principalId: id,
+        conversationId: newId(),
+        fingerprint: 'private-quote',
+        price: '15.00',
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      await tx.insert(schema.connectorDispatches).values({
+        id: dispatchId,
+        tenantId: a.tenantId,
+        connectionId: connection!.id,
+        principalId: id,
+        fingerprint: 'opaque-unknown-fence',
+        idempotencyKey: 'erased-unknown-write',
+        state: 'dispatched',
+      });
+    });
     const result = await inTenant(a, async (tx) => eraseCustomer(tx, await request(a, id)));
     expect(result).toEqual({ conversations: 0, customer: 'deleted' });
     expect(await customer(a, id)).toBeUndefined();
+    expect(await inTenant(a, (tx) => tx.select().from(schema.connectorQuotes))).toEqual([]);
+    expect(await inTenant(a, (tx) => tx.select().from(schema.connectorIdentityBindings))).toEqual(
+      [],
+    );
+    const [fence] = await inTenant(a, (tx) =>
+      tx
+        .select()
+        .from(schema.connectorDispatches)
+        .where(eq(schema.connectorDispatches.id, dispatchId)),
+    );
+    expect(fence).toMatchObject({
+      principalId: null,
+      state: 'dispatched',
+      fingerprint: 'opaque-unknown-fence',
+    });
+    // A retained idempotency key still rejects re-insertion after customer erasure.
+    await expectPgError(
+      inTenant(a, (tx) =>
+        tx.insert(schema.connectorDispatches).values({
+          ...fence!,
+          id: newId(),
+        }),
+      ),
+      '23505',
+    );
   });
 
   it('erases again a customer a restore brought back, once their erasure finished', async () => {

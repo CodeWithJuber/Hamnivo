@@ -15,6 +15,7 @@ import {
   toPublicId,
   withTenant,
 } from '@hamnivo/db';
+import { whmcsSubject } from '@hamnivo/domain/connectors';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import { decodeProtectedHeader, importJWK, type JWK, jwtVerify } from 'jose';
@@ -518,6 +519,47 @@ export class WidgetSessionsService {
           .returning();
       }
       if (!principal) throw new Error('principal upsert returned nothing');
+      // Only this already-verified assertion can create a connector binding. A namespace or
+      // recent chat activity is never proof, and the selected connection must trust this key.
+      const whmcs = whmcsSubject(payload.sub);
+      if (whmcs && payload.exp * 1000 > now.getTime()) {
+        const connections = await tx
+          .select()
+          .from(schema.connectorConnections)
+          .where(
+            and(
+              eq(schema.connectorConnections.brandId, claims.brandId),
+              eq(schema.connectorConnections.identityKeyId, key.id),
+              eq(schema.connectorConnections.status, 'active'),
+            ),
+          );
+        for (const connection of connections)
+          await tx
+            .insert(schema.connectorIdentityBindings)
+            .values({
+              tenantId: claims.tenantId,
+              brandId: claims.brandId,
+              connectionId: connection.id,
+              principalId: principal.id,
+              userId: whmcs.userId,
+              clientId: whmcs.clientId,
+              expiresAt: new Date(payload.exp * 1000),
+            })
+            .onConflictDoUpdate({
+              target: [
+                schema.connectorIdentityBindings.tenantId,
+                schema.connectorIdentityBindings.connectionId,
+                schema.connectorIdentityBindings.principalId,
+              ],
+              set: {
+                userId: whmcs.userId,
+                clientId: whmcs.clientId,
+                expiresAt: new Date(payload.exp * 1000),
+                updatedAt: now,
+              },
+            });
+      }
+
       const [current] = await tx
         .select()
         .from(schema.widgetSessions)

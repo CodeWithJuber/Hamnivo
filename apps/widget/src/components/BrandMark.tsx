@@ -6,8 +6,8 @@ import { useState } from 'react';
  * would have been if it cannot be loaded.
  */
 export function BrandMark({ url }: { url: string | null }) {
-  const [failed, setFailed] = useState(false);
-  if (!url || failed) return null;
+  const [failed, setFailed] = useState<string | null>(null);
+  if (!url || failed === url) return null;
   return (
     <img
       src={url}
@@ -15,7 +15,7 @@ export function BrandMark({ url }: { url: string | null }) {
       width={36}
       height={36}
       referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
+      onError={() => setFailed(url)}
       className="size-9 shrink-0 rounded-md object-contain"
       data-testid="brand-logo"
     />

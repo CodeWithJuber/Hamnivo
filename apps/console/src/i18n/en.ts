@@ -2357,6 +2357,8 @@ export const en = {
     },
   },
   permissionAreas: {
+    agency: 'Agency',
+    branding: 'Branding',
     conversations: 'Conversations',
     visitors: 'Visitors',
     inbox: 'Inboxes and routing',
@@ -2391,6 +2393,14 @@ export const en = {
     support: 'Support access',
   },
   permissions: {
+    agency: {
+      read: 'View agency settings and the client directory',
+      manage: 'Manage agency settings and independent client links',
+    },
+    branding: {
+      read: 'View portal branding and custom domains',
+      manage: 'Manage portal branding and verified custom domains',
+    },
     conversations: {
       read: 'Read conversations and customer history',
       reply: 'Reply to customers',

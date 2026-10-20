@@ -24,7 +24,10 @@ export default defineConfig({
         },
         {
           label: 'For your team',
-          items: [{ label: 'Team and roles', slug: 'team' }],
+          items: [
+            { label: 'Team and roles', slug: 'team' },
+            { label: 'Agency clients', slug: 'agency' },
+          ],
         },
         {
           label: 'Self-hosting',

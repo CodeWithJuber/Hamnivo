@@ -15,6 +15,7 @@ import { and, eq } from 'drizzle-orm';
 import { authorityUnavailable } from '../authority/outbound.service.js';
 import type { ControlRow } from '../authority/ownership.service.js';
 import { AuthorityRegistry } from '../authority/registry.js';
+import { reservationSize } from '../billing/ai-credits.service.js';
 import { AppError } from '../common/app-error.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
 import { type ActiveAgent, AgentsService } from '../runtime/agents.service.js';
@@ -152,17 +153,30 @@ export class AssistService {
     const inputHash = sha256(canonicalize({ system, messages }) ?? '');
     let lastError: unknown;
     for (const [index, choice] of choices.entries()) {
+      if (choices[0]?.connectionId && !choice.connectionId) continue;
       const started = Date.now();
       try {
-        const resolved = await this.models.resolve(tenantId, choice);
-        const result = await generateText({
-          model: resolved.model,
-          instructions: system,
-          messages,
-          maxOutputTokens: limits.maxOutputTokens,
-          maxRetries: 0,
-          abortSignal: AbortSignal.timeout(limits.timeoutMs),
-        });
+        const { resolved, result } = await this.models.executeAttempt(
+          tenantId,
+          choice,
+          {
+            key: `assist:${runId}:model:${index}`,
+            reserveTokens: reservationSize(system, messages, limits.maxOutputTokens, 1),
+            timeoutMs: limits.timeoutMs,
+            attribution: { runId },
+          },
+          async (resolved) => ({
+            resolved,
+            result: await generateText({
+              model: resolved.model,
+              instructions: system,
+              messages,
+              maxOutputTokens: limits.maxOutputTokens,
+              maxRetries: 0,
+              abortSignal: AbortSignal.timeout(limits.timeoutMs),
+            }),
+          }),
+        );
         const output = {
           text: result.text.trim(),
           provider: resolved.provider,
@@ -218,33 +232,6 @@ export class AssistService {
       detail: 'The AI could not answer right now. Try again in a moment.',
       internal: lastError,
     });
-  }
-
-  private async usage(
-    tx: TenantTx,
-    tenantId: string,
-    runId: string,
-    tokens: { inputTokens: number | null; outputTokens: number | null },
-  ) {
-    const entries = [
-      ['ai.tokens.input', tokens.inputTokens],
-      ['ai.tokens.output', tokens.outputTokens],
-    ] as const;
-    for (const [meter, quantity] of entries) {
-      if (quantity === null) continue;
-      await tx
-        .insert(schema.usageEntries)
-        .values({
-          tenantId,
-          meter,
-          quantity,
-          unit: 'token',
-          occurredAt: this.clock(),
-          dedupeKey: `run:${runId}:${meter}`,
-          sourceRef: toPublicId('run', runId),
-        })
-        .onConflictDoNothing();
-    }
   }
 
   /** A suggested reply with the sources it used (H11). It is returned, never sent. */
@@ -336,7 +323,6 @@ export class AssistService {
         outputTokens: generated.outputTokens,
         latencyMs: generated.latencyMs,
       });
-      await this.usage(tx, tenantId, run.id, generated);
     });
     return {
       id: toPublicId('run', run.id),
@@ -408,7 +394,6 @@ export class AssistService {
         outputTokens: generated.outputTokens,
         latencyMs: generated.latencyMs,
       });
-      await this.usage(tx, tenantId, run.id, generated);
     });
     return {
       messageId,

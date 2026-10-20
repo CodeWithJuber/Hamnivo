@@ -50,6 +50,14 @@
     "./tools": {
       "types": "./dist/tools/index.d.ts",
       "import": "./dist/tools/index.js"
+    },
+    "./a2a": {
+      "types": "./dist/a2a/index.d.ts",
+      "import": "./dist/a2a/index.js"
+    },
+    "./whmcs": {
+      "types": "./dist/whmcs/index.d.ts",
+      "import": "./dist/whmcs/index.js"
     }
   },
   "files": [

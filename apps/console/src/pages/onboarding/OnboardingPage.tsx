@@ -29,6 +29,7 @@ import { WidgetPreview } from '../settings/WidgetPreview';
 import { AiKeyStep } from './AiKeyStep';
 import { BrandStep } from './BrandStep';
 import { EngineStep } from './EngineStep';
+import { GuidedChecklist } from './GuidedChecklist';
 import { InstallStep } from './InstallStep';
 import { Rail } from './Rail';
 import { StepFrame } from './StepFrame';
@@ -250,33 +251,36 @@ export function OnboardingPage() {
         permitted={can('brands.manage')}
       >
         {(data) => (
-          <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)_18rem]">
-            <Rail progress={data} current={step} />
-            <div className="flex min-w-0 flex-col gap-4">
-              <ActionError error={isCancelled(update.error) ? null : update.error} />
-              {content}
+          <div className="flex flex-col gap-6">
+            <GuidedChecklist progress={data} brandId={brand?.id} />
+            <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)_18rem]">
+              <Rail progress={data} current={step} />
+              <div className="flex min-w-0 flex-col gap-4">
+                <ActionError error={isCancelled(update.error) ? null : update.error} />
+                {content}
+              </div>
+              <aside
+                aria-label={t('setup.appearance.previewTitle')}
+                className="hidden min-w-0 lg:block"
+                data-testid="onboarding-preview"
+              >
+                <WidgetPreview
+                  look={{
+                    name: brand?.name ?? tenant.name,
+                    colour: DEFAULT_PRIMARY_COLOR,
+                    on: '#FFFFFF',
+                    radius: DEFAULT_RADIUS,
+                    logoUrl: null,
+                    greeting: DEFAULT_WIDGET_TEXT.greeting[lang],
+                    away: '',
+                    showAway: false,
+                    csat: false,
+                    privacyUrl: null,
+                    lang,
+                  }}
+                />
+              </aside>
             </div>
-            <aside
-              aria-label={t('setup.appearance.previewTitle')}
-              className="hidden min-w-0 lg:block"
-              data-testid="onboarding-preview"
-            >
-              <WidgetPreview
-                look={{
-                  name: brand?.name ?? tenant.name,
-                  colour: DEFAULT_PRIMARY_COLOR,
-                  on: '#FFFFFF',
-                  radius: DEFAULT_RADIUS,
-                  logoUrl: null,
-                  greeting: DEFAULT_WIDGET_TEXT.greeting[lang],
-                  away: '',
-                  showAway: false,
-                  csat: false,
-                  privacyUrl: null,
-                  lang,
-                }}
-              />
-            </aside>
           </div>
         )}
       </QueryState>

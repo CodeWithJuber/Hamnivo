@@ -1,4 +1,4 @@
-import { isTypeId } from '@hamnivo/contracts';
+import { ID_PREFIX, type IdKind, isTypeId } from '@hamnivo/contracts';
 import { describe, expect, it } from 'vitest';
 import { fromPublicId, InvalidPublicIdError, newId, newPublicId, toPublicId } from '../src/ids.js';
 
@@ -11,10 +11,12 @@ describe('identifiers', () => {
   });
 
   it('round-trips between UUIDs and TypeIDs of the right kind', () => {
-    const { id, publicId } = newPublicId('conversation');
-    expect(isTypeId(publicId, 'conv')).toBe(true);
-    expect(fromPublicId('conversation', publicId)).toBe(id);
-    expect(toPublicId('message', id).startsWith('msg_')).toBe(true);
+    for (const kind of Object.keys(ID_PREFIX) as IdKind[]) {
+      const { id, publicId } = newPublicId(kind);
+      expect(isTypeId(publicId, ID_PREFIX[kind])).toBe(true);
+      expect(fromPublicId(kind, publicId)).toBe(id);
+      expect(toPublicId(kind, id)).toBe(publicId);
+    }
   });
 
   it('rejects IDs of another kind or malformed IDs', () => {

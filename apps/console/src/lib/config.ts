@@ -4,7 +4,7 @@
  */
 function setting(name: string, built: string | undefined): string | undefined {
   const meta = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
-  return meta ? meta.content : built;
+  return meta ? (meta.content === 'self' ? window.location.origin : meta.content) : built;
 }
 
 const trim = (value: string) => value.trim().replace(/\/+$/, '');

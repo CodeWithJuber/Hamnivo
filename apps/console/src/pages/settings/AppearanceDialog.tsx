@@ -25,6 +25,7 @@ import {
   checkColour,
   onColour,
   setupKeys,
+  usePublishAppearance,
   useSaveAppearance,
   type WidgetAppearanceView,
 } from '../../lib/setup';
@@ -36,6 +37,7 @@ import {
 import { useTenant } from '../../lib/tenant';
 import type { Brand } from '../../lib/types';
 import { LocalizedFields } from '../BrandChatSettings';
+import { LiveWidgetPreview } from './LiveWidgetPreview';
 import { firstPreviewLanguage } from './PreviewColumn';
 import { previewAway, previewText, WidgetPreview } from './WidgetPreview';
 
@@ -48,7 +50,7 @@ const pickerValue = (colour: string) =>
 /**
  * How a brand's chat looks and what it says (W03, board 04): the main colour, logo, corners,
  * greeting, offline text, rating and privacy link, with a live picture of the chat beside the
- * fields. Nothing reaches customers until it is saved.
+ * fields. A saved draft reaches customers only after publishing.
  *
  * It sits on the Look tab of the Chat widget page (`layout="page"`: Save stays put after saving,
  * and the page asks before leaving with changes), and in a dialog (`layout="dialog"`, with Cancel,
@@ -62,7 +64,7 @@ export function AppearanceForm({
   onCancel,
   onSaved,
 }: {
-  brand: Pick<Brand, 'id' | 'name'>;
+  brand: Pick<Brand, 'id' | 'name'> & { widgetId?: string };
   view: WidgetAppearanceView;
   layout?: 'dialog' | 'page';
   onDirtyChange?: (dirty: boolean) => void;
@@ -73,9 +75,12 @@ export function AppearanceForm({
   const { t, i18n } = useTranslation();
   const { can, tenantId } = useTenant();
   const client = useQueryClient();
+  const widgetId = brand.widgetId;
+  const [live, setLive] = useState(false);
   const announce = useAnnouncer();
   const save = useSaveAppearance(brand.id);
-  const saved = draftOf(view.appearance);
+  const saved = draftOf(view.draftAppearance ?? view.appearance);
+  const publish = usePublishAppearance(brand.id);
   const [draft, setDraft] = useState<AppearanceDraft>(saved);
   const [attempted, setAttempted] = useState(false);
   const [server, setServer] = useState<Record<string, string>>({});
@@ -113,6 +118,7 @@ export function AppearanceForm({
     privacy: urlError(problems.privacyUrl) ?? server.privacyUrl,
     greeting: englishError(problems.greeting) ?? server.greeting,
     offline: englishError(problems.offline) ?? server.offlineText,
+    launcher: englishError(problems.launcher) ?? server.launcherLabel,
   };
   const fieldIds: Record<string, string> = {
     colour: 'look-colour',
@@ -120,6 +126,7 @@ export function AppearanceForm({
     privacy: 'look-privacy',
     greeting: 'look-greeting-en',
     offline: 'look-offline-en',
+    launcher: 'look-launcher-en',
   };
   const summary = attempted
     ? Object.entries(errors).flatMap(([field, message]) =>
@@ -132,17 +139,20 @@ export function AppearanceForm({
     setAttempted(true);
     if (Object.values(errors).some(Boolean)) return;
     try {
-      const result = await save.mutateAsync(bodyOf(draft));
+      const result = await save.mutateAsync({
+        appearance: bodyOf(draft),
+        expectedRevision: view.draftRevision ?? 0,
+      });
       // What was saved is the new starting point at once, without waiting for a reload.
       client.setQueryData([tenantId, ...setupKeys.appearance(brand.id)], result);
-      announce(t('setup.appearance.saved', { name: brand.name }));
+      announce(t('agentic.appearanceDraftSaved'));
       onDirtyChange?.(false);
       onSaved?.();
     } catch (error) {
       if (isApiError(error, 'VALIDATION_FAILED')) {
         const fields: Record<string, string> = {};
         for (const field of error.fields) {
-          const key = field.path.split('.')[0] ?? field.path;
+          const key = field.path.replace(/^appearance\./, '').split('.')[0] ?? field.path;
           fields[key] = field.message;
         }
         setServer(fields);
@@ -245,6 +255,33 @@ export function AppearanceForm({
           {t('setup.appearance.radius.hint')}
         </p>
       </div>
+      <SelectField
+        id="look-font"
+        label={t('agentic.font')}
+        value={draft.fontFamily}
+        onChange={(event) =>
+          set({ fontFamily: event.target.value as AppearanceDraft['fontFamily'] })
+        }
+        options={[
+          { value: 'system', label: 'System' },
+          { value: 'dm-sans', label: 'DM Sans' },
+          { value: 'noto-sans', label: 'Noto Sans' },
+        ]}
+      />
+      <LocalizedFields
+        id="look-launcher"
+        legend={t('agentic.launcher')}
+        value={draft.launcher}
+        maxLength={80}
+        error={errors.launcher}
+        onChange={(launcher) => set({ launcher })}
+      />
+      <CheckboxField
+        id="look-branding"
+        label={t('agentic.showBranding')}
+        checked={draft.showBranding}
+        onCheckedChange={(showBranding) => set({ showBranding })}
+      />
       <LocalizedFields
         id="look-greeting"
         legend={t('setup.appearance.greeting.label')}
@@ -283,7 +320,7 @@ export function AppearanceForm({
         onChange={(event) => set({ privacyUrl: event.target.value })}
         error={errors.privacy}
       />
-      <ActionError error={isCancelled(save.error) ? null : save.error} />
+      <ActionError error={isCancelled(save.error) ? null : (save.error ?? publish.error)} />
       {isCancelled(save.error) ? (
         <p role="status" className="text-sm text-text-secondary">
           {t('app.cancelled')}
@@ -293,7 +330,25 @@ export function AppearanceForm({
         <div className="flex flex-wrap items-center gap-3">
           <ReasonedAction reason={editable ? null : t('chatWidget.noPermission')}>
             <Button type="submit" busy={save.isPending} disabled={!dirty}>
-              {t('setup.appearance.save')}
+              {t('agentic.save')}
+            </Button>
+          </ReasonedAction>
+          <ReasonedAction reason={dirty ? t('agentic.unsaved') : null}>
+            <Button
+              type="button"
+              variant="secondary"
+              busy={publish.isPending}
+              disabled={dirty || !view.draftAppearance || !editable}
+              onClick={() =>
+                publish.mutate(view.draftRevision ?? 0, {
+                  onSuccess: (result) => {
+                    client.setQueryData([tenantId, ...setupKeys.appearance(brand.id)], result);
+                    announce(t('agentic.appearancePublished'));
+                  },
+                })
+              }
+            >
+              {t('agentic.publish')}
             </Button>
           </ReasonedAction>
           <Button type="button" variant="ghost" disabled={!dirty || save.isPending} onClick={reset}>
@@ -321,7 +376,7 @@ export function AppearanceForm({
             </Button>
           ) : null}
           <Button type="submit" busy={save.isPending}>
-            {t('setup.appearance.save')}
+            {t('agentic.save')}
           </Button>
         </DialogFooter>
       )}
@@ -358,7 +413,9 @@ export function AppearanceForm({
         )}
       >
         <h3 className="text-sm font-semibold text-text">{t('setup.appearance.previewTitle')}</h3>
-        <p className="text-sm text-text-secondary">{t('setup.appearance.previewNote')}</p>
+        <p className="text-sm text-text-secondary">
+          {t(live ? 'agentic.livePreviewNote' : 'setup.appearance.previewNote')}
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <SelectField
             id="look-preview-lang"
@@ -370,37 +427,63 @@ export function AppearanceForm({
               label: LANGUAGE_NAMES[code],
             }))}
           />
-          <SelectField
-            id="look-preview-state"
-            label={t('setup.appearance.previewState')}
-            value={away ? 'away' : 'online'}
-            onChange={(event) => setAway(event.target.value === 'away')}
-            options={[
-              { value: 'online', label: t('setup.appearance.stateOnline') },
-              { value: 'away', label: t('setup.appearance.stateAway') },
-            ]}
-          />
+          {live ? null : (
+            <SelectField
+              id="look-preview-state"
+              label={t('setup.appearance.previewState')}
+              value={away ? 'away' : 'online'}
+              onChange={(event) => setAway(event.target.value === 'away')}
+              options={[
+                { value: 'online', label: t('setup.appearance.stateOnline') },
+                { value: 'away', label: t('setup.appearance.stateAway') },
+              ]}
+            />
+          )}
         </div>
-        <WidgetPreview
-          look={{
-            name: brand.name,
-            colour,
-            on,
-            radius: draft.radius,
-            logoUrl: logo,
-            greeting: previewText(
-              draft.greeting,
+        {widgetId ? (
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setLive((value) => !value)}
+              aria-expanded={live}
+            >
+              {t(live ? 'agentic.closeLivePreview' : 'agentic.livePreview')}
+            </Button>
+            {live ? (
+              <LiveWidgetPreview
+                widgetId={widgetId}
+                name={brand.name}
+                appearance={bodyOf(draft)}
+                locale={lang}
+              />
+            ) : null}
+          </>
+        ) : null}
+        {live ? null : (
+          <WidgetPreview
+            look={{
+              fontFamily: draft.fontFamily,
+              showBranding: draft.showBranding,
+              name: brand.name,
+              colour,
+              on,
+              radius: draft.radius,
+              logoUrl: logo,
+              greeting: previewText(
+                draft.greeting,
+                lang,
+                // Hamnivo's own greeting is shown until the brand writes one.
+                DEFAULT_WIDGET_TEXT.greeting[lang],
+              ),
+              away: previewAway(draft.offline, lang),
+              showAway: away,
+              csat: draft.csat,
+              privacyUrl: draft.privacyUrl.trim() && !problems.privacyUrl ? draft.privacyUrl : null,
               lang,
-              // Hamnivo's own greeting is shown until the brand writes one.
-              DEFAULT_WIDGET_TEXT.greeting[lang],
-            ),
-            away: previewAway(draft.offline, lang),
-            showAway: away,
-            csat: draft.csat,
-            privacyUrl: draft.privacyUrl.trim() && !problems.privacyUrl ? draft.privacyUrl : null,
-            lang,
-          }}
-        />
+            }}
+          />
+        )}
       </div>
     </form>
   );

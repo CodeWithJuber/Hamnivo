@@ -90,6 +90,14 @@ describe('database roles', () => {
     expect(definers.map((r) => r.fn).sort()).toEqual(
       [
         'app.active_plans()',
+        'app.agency_client_guard()',
+        'app.agency_client_metadata()',
+        'app.agency_config_guard()',
+        'app.ai_payer_allows(bigint,timestamp with time zone,timestamp with time zone,text)',
+        'app.ai_payer_tenant()',
+        'app.fund_agency_client(uuid)',
+        'app.lock_ai_payer()',
+        'app.resolve_portal_branding(text)',
         'app.apply_erasure_tombstones()',
         'app.apply_memory_tombstones()',
         'app.billing_account_tenant(text,text,text)',
@@ -145,10 +153,24 @@ describe('database roles', () => {
       );
       expect(fn.public_exec, `${fn.fn} must not be executable by PUBLIC`).toBe(false);
       expect(fn.platform_exec, `${fn.fn} must not be executable by the platform role`).toBe(false);
-      expect(fn.app_exec).toBe(true);
+      // Trigger functions execute only via their table triggers, never as app entry points.
+      expect(fn.app_exec, `${fn.fn} application EXECUTE`).toBe(
+        !['app.agency_client_guard()', 'app.agency_config_guard()'].includes(fn.fn),
+      );
       expect(fn.owner).toBe(
         fn.fn.startsWith('app.ensure_audit_partitions') ? 'hamnivo_owner' : 'hamnivo_resolver',
       );
+    }
+    for (const name of ['app.remove_conversation(uuid,uuid)', 'app.erase_principal(uuid,uuid)']) {
+      const helper = rows.find((r) => r.fn === name);
+      expect(helper, name).toMatchObject({
+        owner: 'hamnivo_resolver',
+        secdef: false,
+        public_exec: false,
+        app_exec: false,
+        platform_exec: false,
+      });
+      expect(helper?.config).toContain('search_path=pg_catalog, public');
     }
     const harden = rows.find((r) => r.fn === 'app.harden_tenant_tables()');
     expect(harden?.app_exec).toBe(false);

@@ -122,6 +122,7 @@ RUN mkdir -p /out/chat /out/site /out/studio /out/docs \
  && cp -R apps/site/dist/. /out/site/ \
  && cp -R apps/console/dist/. /out/studio/ \
  && cp -R apps/docs/dist/. /out/docs/
+RUN node scripts/portal-domain.mjs --index /out/studio/index.html /out/portal/index.html
 
 # ---- Deploy webhook receiver (hamnivo.sh autodeploy) --------------------------------------------
 # adnanh/webhook from Debian. It checks GitHub's signature and drops a file for the host's deploy
@@ -141,6 +142,7 @@ FROM caddy:${CADDY_VERSION}-alpine AS edge
 COPY --from=web-build /out/chat /srv/chat
 COPY --from=web-build /out/site /srv/site
 COPY --from=web-build /out/studio /srv/studio
+COPY --from=web-build /out/portal /srv/portal
 COPY --from=web-build /out/docs /srv/docs
 COPY deploy/production/Caddyfile /etc/caddy/Caddyfile
 ARG HAMNIVO_RELEASE=unknown

@@ -2338,6 +2338,8 @@ export const hi: Translation = {
     },
   },
   permissionAreas: {
+    agency: 'एजेंसी',
+    branding: 'ब्रांडिंग',
     conversations: 'बातचीत',
     visitors: 'विज़िटर',
     inbox: 'इनबॉक्स और रूटिंग',
@@ -2372,6 +2374,14 @@ export const hi: Translation = {
     support: 'सहायता एक्सेस',
   },
   permissions: {
+    agency: {
+      read: 'एजेंसी सेटिंग और क्लाइंट निर्देशिका देखें',
+      manage: 'एजेंसी सेटिंग और स्वतंत्र क्लाइंट लिंक प्रबंधित करें',
+    },
+    branding: {
+      read: 'पोर्टल ब्रांडिंग और कस्टम डोमेन देखें',
+      manage: 'पोर्टल ब्रांडिंग और सत्यापित कस्टम डोमेन प्रबंधित करें',
+    },
     conversations: {
       read: 'बातचीत और ग्राहक का इतिहास पढ़ें',
       reply: 'ग्राहकों को जवाब दें',

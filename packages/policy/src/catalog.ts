@@ -33,6 +33,18 @@ const WORKSPACE: readonly ScopeType[] = ['tenant', 'workspace'];
 const BRAND: readonly ScopeType[] = ['tenant', 'workspace', 'brand'];
 
 export const PERMISSIONS = {
+  'agency.read': { description: 'View agency settings and the client directory', scopes: TENANT },
+  'agency.manage': {
+    description: 'Manage agency settings and client links',
+    scopes: TENANT,
+    stepUp: true,
+  },
+  'branding.read': { description: 'View portal branding and custom domains', scopes: TENANT },
+  'branding.manage': {
+    description: 'Manage portal branding and verified custom domains',
+    scopes: TENANT,
+    stepUp: true,
+  },
   'conversations.read': { description: 'Read conversations and customer history', scopes: ALL },
   'conversations.reply': { description: 'Reply to customers', scopes: ALL },
   'conversations.note': { description: 'Write internal notes', scopes: ALL },

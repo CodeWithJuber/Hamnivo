@@ -19,15 +19,17 @@ import {
   LogOutIcon,
   MenuIcon,
   OctagonPauseIcon,
+  PlugIcon,
   ServerCogIcon,
   SettingsIcon,
   ShieldCheckIcon,
-  ShoppingBagIcon,
+  WorkflowIcon,
   XIcon,
 } from 'lucide-react';
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { directionOf, isLocale } from '../i18n';
+import { useAgency } from '../lib/agency';
 import { api } from '../lib/api';
 import { authClient } from '../lib/auth-client';
 import { returnFocus, useOpener } from '../lib/focus';
@@ -48,6 +50,7 @@ import { chooseTenant, useTenant } from '../lib/tenant';
 import type { PlatformOperator } from '../lib/types';
 import { CommandPalette } from './CommandPalette';
 import { LanguageSelect, TranslationNote } from './LanguageSelect';
+import { PortalBrand } from './PortalBrand';
 import { type SectionTab, SectionTabs } from './SectionTabs';
 import { SuspendedNotice } from './SuspendedNotice';
 import { WorkspaceNotices } from './WorkspaceNotices';
@@ -58,7 +61,8 @@ const GROUP_ICONS: Record<NavGroupId, NavIcon> = {
   home: HouseIcon,
   inbox: InboxIcon,
   ai: BotIcon,
-  sales: ShoppingBagIcon,
+  workflows: WorkflowIcon,
+  connectors: PlugIcon,
   reports: BarChart3Icon,
   settings: SettingsIcon,
 };
@@ -79,7 +83,7 @@ interface MenuSection {
 }
 
 /**
- * The menu for this person (see lib/nav.ts): up to six entries, and for the group being shown the
+ * The menu for this person (see lib/nav.ts): up to seven entries, and for the group being shown the
  * pages they can open, as a row of links above the page.
  */
 function useMenu(pathname: string): { entries: MenuEntry[]; section: MenuSection | null } {
@@ -103,6 +107,7 @@ function useMenu(pathname: string): { entries: MenuEntry[]; section: MenuSection
         label: t('nav.sections', { name: groupLabels[group.id] }),
         tabs: group.routes.map((route) => ({
           to: route.to,
+          advanced: route.advanced,
           label: pageLabels[route.to],
           current: route.to === current,
         })),
@@ -220,14 +225,27 @@ function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function Brand() {
+function AgencyContext() {
+  const { t } = useTranslation();
+  const agency = useAgency();
+  if (!agency.data?.enabled) return null;
   return (
-    <span className="flex items-center gap-2">
-      <HamnivoMark className="size-7" />
-      <span className="text-lg font-semibold text-text">Hamnivo</span>
-      <span className="text-sm text-text-secondary">Studio</span>
-    </span>
+    <Link
+      to="/agency"
+      className="min-w-0 rounded-md border border-border px-3 py-2 text-sm text-link"
+      data-testid="agency-context"
+    >
+      {agency.data.branding.displayName ? (
+        <bdi>{agency.data.branding.displayName}</bdi>
+      ) : (
+        t('agentic.clients')
+      )}
+    </Link>
   );
+}
+
+function Brand() {
+  return <PortalBrand />;
 }
 
 /** Active stops, prominent on every page, with where, why and since when (X08). */
@@ -274,7 +292,7 @@ function KillSwitchBanner() {
 }
 
 /**
- * Studio frame (board 03): a menu of six entries, a header with the always-visible Stop AI
+ * Studio frame (board 03): a menu of seven entries, a header with the always-visible Stop AI
  * button, the active-stop banner and the page, with the pages of the current entry as a row of
  * links above it. On narrow screens the menu becomes a sheet.
  */
@@ -341,6 +359,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="lg:hidden">
             <HamnivoMark className="size-7" title="Hamnivo" />
           </span>
+          <AgencyContext />
           {/* One row on a phone too (320 px, every language): there, Stop AI shows only its icon
               (its name stays "Stop AI replies"), the language is chosen in the menu sheet, and
               the "AI stopped" badge gives way to the banner right below the header. */}

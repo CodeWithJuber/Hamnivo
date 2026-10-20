@@ -1570,6 +1570,14 @@ export function Chat(props: {
               </>
             )}
             <PrivacyLink url={config.privacyPolicyUrl} />
+            {config.brand.showBranding !== false ? (
+              <p
+                className="pt-2 text-center text-[10px] text-text-muted"
+                data-testid="widget-branding"
+              >
+                Hamnivo
+              </p>
+            ) : null}
           </div>
         </ThreadPrimitive.Root>
       </section>

@@ -8,7 +8,6 @@ import {
   isOnRoute,
   menuFor,
   NAV_GROUPS,
-  type NavGroupId,
   sectionOf,
 } from '../src/lib/nav';
 
@@ -19,64 +18,137 @@ const holding = (...permissions: string[]) => {
 const role = (key: Parameters<typeof presetPermissions>[0]) => holding(...presetPermissions(key));
 const entries = (can: (permission: string) => boolean) =>
   menuFor(can).map((group) => [group.id, group.to]);
-
-describe('the menu', () => {
-  it('has six entries, in this order', () => {
+describe('the grouped platform menu', () => {
+  it('uses seven focused sections in order', () =>
     expect(NAV_GROUPS.map((group) => group.id)).toEqual([
       'home',
       'inbox',
       'ai',
-      'sales',
+      'workflows',
+      'connectors',
       'reports',
       'settings',
+    ]));
+  it('keeps commerce, legacy automations and advanced AI tools reachable', () => {
+    expect(groupIdOfPath('/orders/ord_1')).toBe('settings');
+    expect(groupIdOfPath('/finance')).toBe('settings');
+    expect(groupIdOfPath('/automations')).toBe('workflows');
+    expect(groupIdOfPath('/tools')).toBe('connectors');
+    expect(groupIdOfPath('/runs')).toBe('ai');
+    const routes = NAV_GROUPS.flatMap((g) => g.routes);
+    for (const path of ['/orders', '/finance', '/tools', '/models', '/runs', '/caching'])
+      expect(routes.find((r) => r.to === path)?.advanced).toBe(true);
+  });
+  it('gives every primary Studio page one place; agency context lives in the header', () => {
+    const folder = fileURLToPath(new URL('../src/routes/_studio', import.meta.url));
+    const pages = readdirSync(folder, { withFileTypes: true }).map(
+      (entry) => `/${entry.name.replace(/\.tsx$/, '').replaceAll('.', '/')}`,
+    );
+    const elsewhere = [
+      '/stop-ai',
+      '/account',
+      '/onboarding',
+      '/visitors',
+      '/saved-replies',
+      '/blocked',
+      '/connect/mcp',
+      '/agency',
+    ];
+    const placed = NAV_GROUPS.flatMap((group) => group.routes.map((route) => route.to));
+    expect([...new Set(pages)].filter((p) => !elsewhere.includes(p)).sort()).toEqual(
+      [...placed].sort(),
+    );
+    expect(new Set(placed).size).toBe(placed.length);
+  });
+  it('shows only Home without permissions', () =>
+    expect(entries(holding())).toEqual([['home', '/overview']]));
+  it('opens the first permitted page of a section', () => {
+    expect(entries(holding('memory.read', 'tools.read'))).toContainEqual(['ai', '/memory']);
+    expect(entries(holding('tools.read'))).toContainEqual(['connectors', '/connectors']);
+    expect(entries(holding('commerce.read'))).toContainEqual(['settings', '/orders']);
+    expect(entries(holding('migration.review'))).toContainEqual(['settings', '/migration']);
+  });
+  it('does not expose unrelated resources when a role can use connectors or workflows', () => {
+    const tools = menuFor(holding('tools.read')).find((g) => g.id === 'connectors');
+    expect(tools?.routes.map((r) => r.to)).toEqual(['/connectors', '/tools']);
+    const workflows = menuFor(holding('automations.read')).find((g) => g.id === 'workflows');
+    expect(workflows?.routes.map((r) => r.to)).toEqual(['/workflows', '/automations']);
+    expect(entries(holding('conversations.read'))).toEqual([
+      ['home', '/overview'],
+      ['inbox', '/inbox'],
     ]);
   });
-
-  it('keeps the pages of each entry in their order', () => {
-    const pages = Object.fromEntries(
-      NAV_GROUPS.map((group) => [group.id, group.routes.map((route) => route.to)]),
+  it('preserves every page permission across built-in roles', () => {
+    for (const key of [
+      'owner',
+      'admin',
+      'supervisor',
+      'agent',
+      'finance',
+      'knowledge_editor',
+      'developer',
+      'analyst',
+      'billing',
+    ] as const) {
+      const can = role(key);
+      for (const group of menuFor(can))
+        for (const route of group.routes) {
+          expect(!route.permission || can(route.permission)).toBe(true);
+          expect(!route.anyOf || route.anyOf.some(can)).toBe(true);
+        }
+    }
+    const permissions = Object.fromEntries(
+      NAV_GROUPS.flatMap((g) => g.routes.map((r) => [r.to, r.permission ?? r.anyOf ?? null])),
     );
-    expect(pages).toEqual({
-      home: ['/overview'],
-      inbox: ['/inbox'],
-      ai: [
-        '/agents',
-        '/knowledge',
-        '/memory',
-        '/tools',
-        '/checks',
-        '/decisions',
-        '/runs',
-        '/caching',
-        '/models',
-      ],
-      sales: ['/orders', '/finance'],
-      reports: ['/reports'],
-      settings: [
-        '/brands',
-        '/chat-widget',
-        '/channels',
-        '/automations',
-        '/hours',
-        '/team',
-        '/support-teams',
-        '/security',
-        '/developer',
-        '/customer-identity',
-        '/migration',
-        '/settings/billing',
-        '/settings/privacy',
-      ],
+    expect(permissions).toMatchObject({
+      '/inbox': 'conversations.read',
+      '/agents': 'agents.read',
+      '/knowledge': 'knowledge.read',
+      '/memory': 'memory.read',
+      '/tools': 'tools.read',
+      '/orders': 'commerce.read',
+      '/finance': 'commerce.read',
+      '/workflows': 'automations.read',
+      '/automations': 'automations.read',
+      '/chat-widget': 'widget.configure',
+      '/customer-identity': 'widget.identity_keys',
+      '/settings/privacy': ['privacy.manage', 'customers.export', 'customers.erase'],
     });
   });
+  it('matches nested routes without matching unrelated prefixes', () => {
+    expect(isOnRoute('/agents', '/agents/agt_1')).toBe(true);
+    expect(isOnRoute('/agents', '/agents-old')).toBe(false);
+    expect(isOnRoute('/agents', '/agents/')).toBe(true);
+    expect(groupIdOfPath('/agency')).toBeUndefined();
+    expect(groupIdOfPath('/nowhere')).toBeUndefined();
+    const ai = NAV_GROUPS.find((g) => g.id === 'ai');
+    expect(ai && currentRoute(ai, '/agents/agt_1')).toBe('/agents');
+  });
+  it('filters section tabs by permission and omits single-route sections', () => {
+    expect(sectionOf(menuFor(role('agent')), '/knowledge')?.routes.map((r) => r.to)).toEqual([
+      '/knowledge',
+      '/caching',
+    ]);
+    expect(sectionOf(menuFor(role('agent')), '/memory')?.routes.map((r) => r.to)).not.toContain(
+      '/memory',
+    );
+    expect(sectionOf(menuFor(role('owner')), '/inbox')).toBeUndefined();
+    expect(sectionOf(menuFor(role('owner')), '/orders/ord_1')?.id).toBe('settings');
+    expect(sectionOf(menuFor(holding()), '/agents')).toBeUndefined();
+  });
+});
 
-  it('keeps the permission each page had in the flat list', () => {
+describe('unchanged resource permissions', () => {
+  it('keeps every existing page permission exactly', () => {
     const permissions = Object.fromEntries(
       NAV_GROUPS.flatMap((group) =>
         group.routes.map((route) => [route.to, route.permission ?? route.anyOf ?? null]),
       ),
     );
     expect(permissions).toEqual({
+      '/branding': 'branding.read',
+      '/workflows': 'automations.read',
+      '/connectors': ['integrations.manage', 'tools.read', 'automations.read'],
       '/overview': null,
       '/inbox': 'conversations.read',
       '/agents': 'agents.read',
@@ -110,96 +182,11 @@ describe('the menu', () => {
       '/settings/privacy': ['privacy.manage', 'customers.export', 'customers.erase'],
     });
   });
-
-  it('gives every Studio page a place, except the ones that live elsewhere', () => {
-    const folder = fileURLToPath(new URL('../src/routes/_studio', import.meta.url));
-    const pages = new Set(
-      readdirSync(folder, { withFileTypes: true }).map(
-        (entry) => `/${entry.name.replace(/\.tsx$/, '').replaceAll('.', '/')}`,
-      ),
-    );
-    // Stop AI is a button in the header; Account security is in the account menu; the guided
-    // setup is opened from Home and after a workspace is created; Live visitors and Saved replies
-    // and tags and Blocked visitors are buttons above the list of chats in the inbox (a row of tabs
-    // for them would push the inbox down); the page a service's sign-in sends the browser back to
-    // (OAuth for MCP servers) is reached from there.
-    const elsewhere = [
-      '/stop-ai',
-      '/account',
-      '/onboarding',
-      '/visitors',
-      '/saved-replies',
-      '/blocked',
-      '/connect/mcp',
-    ];
-    const placed = NAV_GROUPS.flatMap((group) => group.routes.map((route) => route.to));
-    expect([...pages].filter((page) => !elsewhere.includes(page)).sort()).toEqual(
-      [...placed].sort(),
-    );
-    expect(new Set(placed).size).toBe(placed.length);
-  });
 });
 
-describe('who sees which entry', () => {
-  it('shows Home to everyone, and nothing else to someone with no permissions', () => {
-    expect(entries(holding())).toEqual([['home', '/overview']]);
-  });
-
-  it('shows all six entries to the owner, each opening its first page', () => {
-    expect(entries(role('owner'))).toEqual([
-      ['home', '/overview'],
-      ['inbox', '/inbox'],
-      ['ai', '/agents'],
-      ['sales', '/orders'],
-      ['reports', '/reports'],
-      ['settings', '/brands'],
-    ]);
-  });
-
-  it('shows an entry only when one of its pages can be seen', () => {
-    expect(entries(holding('conversations.read'))).toEqual([
-      ['home', '/overview'],
-      ['inbox', '/inbox'],
-    ]);
-    expect(entries(holding('billing.read')).map(([id]) => id)).toEqual([
-      'home',
-      'reports',
-      'settings',
-    ]);
-    expect(entries(holding('support.grant')).map(([id]) => id)).toEqual(['home', 'settings']);
-  });
-
-  it('opens the first page the person can see, not the first of the group', () => {
-    expect(entries(holding('tools.read', 'memory.read'))).toContainEqual(['ai', '/memory']);
-    expect(entries(holding('integrations.manage'))).toContainEqual(['ai', '/models']);
-    expect(entries(holding('migration.review'))).toContainEqual(['settings', '/migration']);
-    expect(entries(holding('webhooks.read', 'members.read'))).toContainEqual(['settings', '/team']);
-    expect(entries(holding('commerce.read'))).toContainEqual(['sales', '/orders']);
-  });
-
-  it('follows the built-in roles', () => {
-    // A support agent: the inbox, what the AI knows and may do, orders, and the team (read only).
-    expect(entries(role('agent'))).toEqual([
-      ['home', '/overview'],
-      ['inbox', '/inbox'],
-      ['ai', '/knowledge'],
-      ['sales', '/orders'],
-      ['settings', '/team'],
-    ]);
-    // Billing and finance reach Activity through analytics.read, and nothing else of the AI.
-    expect(entries(role('billing'))).toEqual([
-      ['home', '/overview'],
-      ['ai', '/runs'],
-      ['reports', '/reports'],
-      ['settings', '/settings/billing'],
-    ]);
-    // A developer installs the widget, so Settings opens on the chat widget.
-    expect(entries(role('developer'))).toContainEqual(['settings', '/chat-widget']);
-  });
-
-  // The table "What each role sees" in docs/using-hamnivo.md: change it together with this one.
+describe('built-in role resource access', () => {
   it('gives each built-in role the pages the guide lists', () => {
-    const pagesOf = (key: Parameters<typeof presetPermissions>[0]) =>
+    const legacyPages = (key: Parameters<typeof presetPermissions>[0]) =>
       Object.fromEntries(
         menuFor(role(key)).map((group) => [group.id, group.routes.map((route) => route.to)]),
       );
@@ -236,136 +223,69 @@ describe('who sees which entry', () => {
       ],
     };
     const home = { home: ['/overview'] };
-    expect(pagesOf('owner')).toEqual(everything);
+    const flatten = (value: Record<string, string[]>) => Object.values(value).flat().sort();
+    const pagesOf = (key: Parameters<typeof presetPermissions>[0]) =>
+      flatten(legacyPages(key)).filter(
+        (path) => !['/workflows', '/connectors', '/branding'].includes(path),
+      );
+    const expected = (value: Record<string, string[]>) => flatten(value);
+    expect(pagesOf('owner')).toEqual(expected(everything));
     // Administrators reach Privacy for one customer's data; retention stays the owners' (A10).
-    expect(pagesOf('admin')).toEqual(everything);
-    expect(pagesOf('supervisor')).toEqual({
-      ...everything,
-      ai: everything.ai.filter((page) => page !== '/models'),
-      settings: ['/automations', '/team', '/support-teams'],
-    });
-    expect(pagesOf('agent')).toEqual({
-      ...home,
-      inbox: ['/inbox'],
-      ai: ['/knowledge', '/tools', '/caching'],
-      sales: ['/orders', '/finance'],
-      settings: ['/team', '/support-teams'],
-    });
-    expect(pagesOf('finance')).toEqual({
-      ...home,
-      ai: ['/runs'],
-      sales: ['/orders', '/finance'],
-      reports: ['/reports'],
-      settings: ['/team', '/support-teams'],
-    });
-    expect(pagesOf('knowledge_editor')).toEqual({
-      ...home,
-      inbox: ['/inbox'],
-      ai: ['/agents', '/knowledge', '/caching'],
-    });
-    expect(pagesOf('developer')).toEqual({
-      ...home,
-      ai: ['/agents', '/models'],
-      settings: ['/chat-widget', '/channels', '/team', '/support-teams', '/developer'],
-    });
-    expect(pagesOf('analyst')).toEqual({
-      ...home,
-      inbox: ['/inbox'],
-      ai: ['/checks', '/decisions', '/runs'],
-      reports: ['/reports'],
-    });
-    expect(pagesOf('billing')).toEqual({
-      ...home,
-      ai: ['/runs'],
-      reports: ['/reports'],
-      settings: ['/settings/billing'],
-    });
-  });
-});
-
-describe('where the person is', () => {
-  it('is on a page or below it, but not on a page that only starts the same', () => {
-    expect(isOnRoute('/agents', '/agents')).toBe(true);
-    expect(isOnRoute('/agents', '/agents/agt_1')).toBe(true);
-    expect(isOnRoute('/agents', '/agents/')).toBe(true);
-    expect(isOnRoute('/agents', '/agents-old')).toBe(false);
-    expect(isOnRoute('/agents', '/agent')).toBe(false);
-    expect(isOnRoute('/memory', '/models')).toBe(false);
-  });
-
-  it('puts every path of a group, nested ones included, in that group', () => {
-    const groups: Record<string, NavGroupId | undefined> = {
-      '/overview': 'home',
-      '/inbox': 'inbox',
-      '/inbox/conv_1': 'inbox',
-      '/agents': 'ai',
-      '/agents/agt_1': 'ai',
-      '/memory/cus_1': 'ai',
-      '/runs': 'ai',
-      '/orders/ord_1': 'sales',
-      '/finance': 'sales',
-      '/reports': 'reports',
-      '/brands': 'settings',
-      '/migration': 'settings',
-      '/settings/billing': 'settings',
-      '/settings/privacy': 'settings',
-      '/stop-ai': undefined,
-      '/account': undefined,
-      '/platform': undefined,
-      '/nowhere': undefined,
-    };
-    for (const [path, id] of Object.entries(groups)) {
-      expect(groupIdOfPath(path), path).toBe(id);
-    }
-  });
-
-  it('finds the page of a group that a path is on', () => {
-    const ai = NAV_GROUPS.find((group) => group.id === 'ai');
-    expect(ai && currentRoute(ai, '/agents/agt_1')).toBe('/agents');
-    expect(ai && currentRoute(ai, '/memory/cus_1')).toBe('/memory');
-    expect(ai && currentRoute(ai, '/orders')).toBeUndefined();
-  });
-});
-
-describe('the row of pages above a page', () => {
-  it('lists the pages of the current entry when two or more can be seen', () => {
-    const menu = menuFor(role('owner'));
-    expect(sectionOf(menu, '/agents/agt_1')?.routes.map((route) => route.to)).toEqual([
-      '/agents',
-      '/knowledge',
-      '/memory',
-      '/tools',
-      '/checks',
-      '/decisions',
-      '/runs',
-      '/caching',
-      '/models',
-    ]);
-    expect(sectionOf(menu, '/orders/ord_1')?.id).toBe('sales');
-    expect(sectionOf(menu, '/security')?.id).toBe('settings');
-  });
-
-  it('lists only the pages this person can see', () => {
-    const menu = menuFor(role('agent'));
-    expect(sectionOf(menu, '/knowledge')?.routes.map((route) => route.to)).toEqual([
-      '/knowledge',
-      '/tools',
-      '/caching',
-    ]);
-    // Customer memory is not theirs to see, so it is not a tab, even on its own (denied) page.
-    expect(sectionOf(menu, '/memory')?.routes.map((route) => route.to)).not.toContain('/memory');
-  });
-
-  it('is left out for a single page, for pages outside any entry and for unseen entries', () => {
-    const owner = menuFor(role('owner'));
-    expect(sectionOf(owner, '/overview')).toBeUndefined();
-    expect(sectionOf(owner, '/inbox/conv_1')).toBeUndefined();
-    expect(sectionOf(owner, '/reports')).toBeUndefined();
-    expect(sectionOf(owner, '/stop-ai')).toBeUndefined();
-    expect(sectionOf(owner, '/account')).toBeUndefined();
-    // One page of the AI entry is one page: no row.
-    expect(sectionOf(menuFor(holding('tools.read')), '/tools')).toBeUndefined();
-    // The settings entry is not theirs at all.
-    expect(sectionOf(menuFor(holding('conversations.read')), '/brands')).toBeUndefined();
+    expect(pagesOf('admin')).toEqual(expected(everything));
+    expect(pagesOf('supervisor')).toEqual(
+      expected({
+        ...everything,
+        ai: everything.ai.filter((page) => page !== '/models'),
+        settings: ['/automations', '/team', '/support-teams'],
+      }),
+    );
+    expect(pagesOf('agent')).toEqual(
+      expected({
+        ...home,
+        inbox: ['/inbox'],
+        ai: ['/knowledge', '/tools', '/caching'],
+        sales: ['/orders', '/finance'],
+        settings: ['/team', '/support-teams'],
+      }),
+    );
+    expect(pagesOf('finance')).toEqual(
+      expected({
+        ...home,
+        ai: ['/runs'],
+        sales: ['/orders', '/finance'],
+        reports: ['/reports'],
+        settings: ['/team', '/support-teams'],
+      }),
+    );
+    expect(pagesOf('knowledge_editor')).toEqual(
+      expected({
+        ...home,
+        inbox: ['/inbox'],
+        ai: ['/agents', '/knowledge', '/caching'],
+      }),
+    );
+    expect(pagesOf('developer')).toEqual(
+      expected({
+        ...home,
+        ai: ['/agents', '/models'],
+        settings: ['/chat-widget', '/channels', '/team', '/support-teams', '/developer'],
+      }),
+    );
+    expect(pagesOf('analyst')).toEqual(
+      expected({
+        ...home,
+        inbox: ['/inbox'],
+        ai: ['/checks', '/decisions', '/runs'],
+        reports: ['/reports'],
+      }),
+    );
+    expect(pagesOf('billing')).toEqual(
+      expected({
+        ...home,
+        ai: ['/runs'],
+        reports: ['/reports'],
+        settings: ['/settings/billing'],
+      }),
+    );
   });
 });

@@ -6,6 +6,7 @@ import { newId, toPublicId } from '../ids.js';
 import * as s from '../schema/index.js';
 import { type TenantTx, withTenant } from '../tenant.js';
 import { seedAiPower } from './ai-power-fixtures.js';
+import { seedNewPlatformTables } from './new-platform-fixtures.js';
 import { seedSaas } from './saas-fixtures.js';
 
 export interface SeededTenant {
@@ -1676,6 +1677,18 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       staffMemberId: ids.staffMemberId,
       knowledgeSourceId: ids.knowledgeSourceId,
       documentId: ids.documentId,
+    });
+    await tx.insert(s.agencyConfigs).values({ tenantId, enabled: false });
+    await seedNewPlatformTables(tx, tenantId, suffix, {
+      workspaceId: ids.workspaceId,
+      brandId: ids.brandId,
+      secretId: ids.secretId,
+      staffMemberId: ids.staffMemberId,
+      principalId: ids.principalId,
+      conversationId: ids.conversationId,
+      agentId: ids.agentId,
+      agentVersionId: ids.agentVersionId,
+      runId: ids.runId,
     });
     // Last: the plan's limits it sets would hold any row seeded after it.
     await seedDeveloperPlatform(tx, tenantId, {

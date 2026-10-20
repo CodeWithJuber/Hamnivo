@@ -33,6 +33,7 @@ import {
   useSubscription,
 } from '../../lib/saas';
 import { useTenant } from '../../lib/tenant';
+import { AiUsageCard } from './AiUsageCard';
 
 const STATUS_TONE: Record<BillingSubscription['status'], StatusTone> = {
   none: 'neutral',
@@ -519,6 +520,7 @@ export function BillingPage() {
               <PlanSummary subscription={data} />
               <Plans subscription={data} />
               <Usage />
+              <AiUsageCard />
               <Section id="invoices" title={t('billing.invoices.title')}>
                 {data.provider === 'stripe' ? (
                   <ProviderInvoices />
