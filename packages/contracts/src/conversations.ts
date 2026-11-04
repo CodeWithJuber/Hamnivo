@@ -56,6 +56,12 @@ export const CustomerConversation = z
     latestSequence: z.int().nonnegative(),
     /** Set when the conversation is a ticket (H19): its reference and where it stands. */
     ticket: z.object({ reference: z.string(), state: TicketState }).nullable(),
+    /**
+     * The customer asked for a person and nobody has taken the chat yet, so they may go back to
+     * the assistant (HNV-10-02). False when people took it for another reason, such as an
+     * escalation: then only people answer.
+     */
+    canReturnToAssistant: z.boolean(),
   })
   .meta({ id: 'CustomerConversation' });
 export type CustomerConversation = z.infer<typeof CustomerConversation>;
@@ -149,6 +155,21 @@ export const HandoffResponse = z
   })
   .meta({ id: 'HandoffResponse' });
 export type HandoffResponse = z.infer<typeof HandoffResponse>;
+
+/**
+ * The customer withdrew their request for a person (HNV-10-02, HNV-10-05). `with_assistant`:
+ * the assistant answers again. `person_joined`: someone took the chat first. `with_people`: the
+ * chat stays with people (they took it for another reason, or the assistant cannot answer now).
+ */
+export const CancelHandoffResponse = z
+  .object({
+    outcome: z.enum(['with_assistant', 'person_joined', 'with_people']),
+    /** Localized, factual message for the customer. */
+    message: z.string(),
+    conversation: CustomerConversation,
+  })
+  .meta({ id: 'CancelHandoffResponse' });
+export type CancelHandoffResponse = z.infer<typeof CancelHandoffResponse>;
 
 export const FeedbackRequest = z
   .object({

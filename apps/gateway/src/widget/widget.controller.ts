@@ -181,6 +181,18 @@ export class WidgetController {
     );
   }
 
+  @Post('conversations/:conversationId/handoff/cancel')
+  @WidgetRoute()
+  @HttpCode(200)
+  cancelHandoff(
+    @CurrentWidget() claims: WidgetClaims,
+    @Param('conversationId') conversationId: string,
+    @Req() request: FastifyRequest,
+  ) {
+    const language = request.headers['accept-language']?.split(',')[0]?.split('-')[0];
+    return this.conversations.cancelHandoff(claims, conversationId, language);
+  }
+
   @Post('conversations/:conversationId/reopen')
   @WidgetRoute()
   @HttpCode(200)

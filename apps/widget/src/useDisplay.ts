@@ -9,9 +9,11 @@ const SCALE: Record<TextSize, string> = { normal: '100%', large: '112.5%', large
 interface DisplayPrefs {
   textSize: TextSize;
   reduceMotion: boolean;
+  /** A short sound when a reply arrives while the chat is closed or the tab is in the background. */
+  sound: boolean;
 }
 
-const DEFAULTS: DisplayPrefs = { textSize: 'normal', reduceMotion: false };
+const DEFAULTS: DisplayPrefs = { textSize: 'normal', reduceMotion: false, sound: true };
 
 function read(key: string): DisplayPrefs {
   try {
@@ -21,6 +23,7 @@ function read(key: string): DisplayPrefs {
         ? (stored.textSize as TextSize)
         : DEFAULTS.textSize,
       reduceMotion: stored.reduceMotion === true,
+      sound: stored.sound !== false,
     };
   } catch {
     return DEFAULTS;
@@ -32,7 +35,8 @@ function systemReducesMotion(): boolean {
 }
 
 /**
- * The visitor's display choices (W14): a larger text size and less motion, kept on this device.
+ * The visitor's display choices (W14): a larger text size, less motion and the new-reply sound,
+ * kept on this device.
  * The device's own settings come first: its text size scales everything, and when it asks for
  * less motion the chat moves less whatever the choice here.
  */
@@ -69,7 +73,8 @@ export function useDisplay(widgetId: string) {
     (reduceMotion: boolean) => setPrefs((p) => ({ ...p, reduceMotion })),
     [],
   );
-  return { prefs, system, reduced, setTextSize, setReduceMotion };
+  const setSound = useCallback((sound: boolean) => setPrefs((p) => ({ ...p, sound })), []);
+  return { prefs, system, reduced, setTextSize, setReduceMotion, setSound };
 }
 
 export type DisplayControls = ReturnType<typeof useDisplay>;

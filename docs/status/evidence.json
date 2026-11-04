@@ -2588,9 +2588,12 @@
       "apps/widget/e2e/surface.spec.ts",
       "apps/console/src/pages/BrandChatSettings.tsx",
       "apps/console/e2e/chat-settings.spec.ts",
-      "packages/widget-loader/src/loader.ts"
+      "packages/widget-loader/src/loader.ts",
+      "packages/widget-loader/src/placement.ts",
+      "packages/widget-loader/test/placement.test.ts",
+      "apps/widget/e2e/layout-audit.ts"
     ],
-    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens narrower than 480 px the button and the panel open full screen, sized to the visible area. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic."
+    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens up to 480 px wide or 520 px tall (phones, phones held sideways, 200 % zoom) the button and the panel open full screen, sized to the visible area, with the page behind held still; elsewhere the floating chat stays inside the window. A layout audit (e2e/layout-audit.ts) checks 20 screen sizes from a 280 px Fold to 2560 px in all four layouts, with no database. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic."
   },
   "W09": {
     "status": "implemented",

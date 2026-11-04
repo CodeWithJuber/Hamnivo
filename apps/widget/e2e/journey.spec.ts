@@ -120,6 +120,49 @@ test.describe('Hamnivo Chat on a customer website', () => {
     await expect(page.locator('[data-hamnivo-launcher]')).toHaveAttribute('aria-expanded', 'false');
   });
 
+  test('HNV-10-02 · after asking for a person, the customer can go back to the assistant', async ({
+    page,
+  }) => {
+    const frame = await openWidget(page);
+    await ask(frame, 'Assalamu alaikum, I have a question about a refund');
+    await expect(frame.locator('[data-sender="ai_primary"]').last()).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await frame.getByRole('button', { name: 'Talk to a person' }).click();
+    const banner = frame.getByTestId('status-banner');
+    await expect(banner).toBeVisible();
+    const back = frame.getByRole('button', { name: 'Back to the assistant' });
+    await expect(back).toBeVisible();
+    const shots = process.env.E2E_SCREENSHOTS;
+    if (shots) await page.screenshot({ path: `${shots}/handoff-waiting.png` });
+    const results = await new AxeBuilder({ page })
+      .include('iframe[data-hamnivo-frame]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+      .analyze();
+    expect(results.violations.map((v) => v.id)).toEqual([]);
+
+    // They changed their mind before anyone took the chat: the assistant answers again.
+    await back.click();
+    await expect(banner).toHaveText(
+      'You’re chatting with the assistant again. You can ask for a person at any time.',
+    );
+    await expect(back).toHaveCount(0);
+    if (shots) await page.screenshot({ path: `${shots}/handoff-back.png` });
+    await ask(frame, 'Can I return a book after 30 days?');
+    await expect(frame.locator('[data-sender="ai_primary"]')).toHaveCount(2, { timeout: 20_000 });
+
+    // Asking again works as before, and once a person has the chat there is no way back.
+    await frame.getByRole('button', { name: 'Talk to a person' }).click();
+    await expect(back).toBeVisible();
+    const conversationId = await frame
+      .locator('section[data-conversation-id]')
+      .getAttribute('data-conversation-id');
+    await staff('POST', `/v1/conversations/${conversationId}/takeover`, {});
+    await expect(banner).toContainText('chatting with a person', { timeout: 15_000 });
+    await expect(back).toHaveCount(0);
+  });
+
   test('W12 · a signed-in customer sees their own chat, and signing out on the website clears it', async ({
     page,
   }) => {

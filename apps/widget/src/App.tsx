@@ -1,12 +1,13 @@
 import { defaultStorage, HamnivoClient, prefixedStorage } from '@hamnivo/client';
 import type { WidgetLayoutMode } from '@hamnivo/contracts';
 import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActionsContext, useActions } from './actions/useActions.js';
 import type { HostBridge } from './bridge.js';
 import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
+import { type ChatSnapshot, eventsBetween, snapshotOf } from './hostEvents.js';
 import { applyLocale, type Locale } from './i18n.js';
 import { applyTheme } from './theme.js';
 import { CHAT_OFFLINE, useChat } from './useChat.js';
@@ -89,11 +90,37 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
-  // The launcher shows how many replies wait while the chat is closed (W05).
+  // The launcher shows how many replies wait while the chat is closed (W05), and over the closed
+  // chat who sent the newest one, never what they wrote. The visitor chooses whether it sounds.
   const { unread } = chat.state;
+  const replyFrom =
+    chat.state.messages.findLast((m) => m.sender.kind !== 'customer' && m.sender.kind !== 'system')
+      ?.sender.displayName ?? '';
+  const sound = display.prefs.sound;
   useEffect(() => {
-    bridge.post({ type: 'event', event: 'unread', payload: { count: unread } });
-  }, [bridge, unread]);
+    const label =
+      unread > 0 && replyFrom ? t('surface.alerts.newReply', { name: replyFrom }) : null;
+    bridge.post({ type: 'event', event: 'unread', payload: { count: unread, label, sound } });
+  }, [bridge, unread, replyFrom, sound, t]);
+
+  // What happened in the chat, for the website's Hamnivo.on(...) listeners (see hostEvents.ts).
+  const { conversation, messages, phase, error, conversations } = chat.state;
+  const sessionConversations = chat.state.session?.conversations;
+  const seen = useRef<{ snapshot: ChatSnapshot; known: Set<string> } | null>(null);
+  useEffect(() => {
+    const now = snapshotOf({ conversation, messages, phase, error });
+    const before = seen.current;
+    const known = new Set([...conversations, ...(sessionConversations ?? [])].map((c) => c.id));
+    seen.current = { snapshot: now, known };
+    // The first look is where the chat starts from, not something that happened.
+    if (!before) return;
+    for (const { event, payload } of eventsBetween(before.snapshot, now, before.known)) {
+      bridge.post({ type: 'event', event, payload });
+    }
+  }, [bridge, conversation, messages, phase, error, conversations, sessionConversations]);
+
+  /** Words the website typed into the message box (Hamnivo.prefill); the visitor sends them. */
+  const [prefill, setPrefill] = useState<{ text: string; at: number } | null>(null);
 
   useEffect(() => {
     applyLocale(locale);
@@ -121,6 +148,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       if (message.type === 'open') setOpen(true);
       if (message.type === 'close') setOpen(false);
       if (message.type === 'proactive') setTrigger(message.triggerId);
+      if (message.type === 'prefill') setPrefill({ text: message.text, at: Date.now() });
       if (message.type === 'visitor') setVisitorKey(message.key);
       if (message.type === 'set-locale')
         setLocale((message.locale.split('-')[0] as Locale) ?? 'en');
@@ -196,6 +224,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           visible={open && pageShown}
           display={display}
           prompt={prompt}
+          prefill={prefill}
           staffTyping={staffTyping}
           visitorNotice={visitor.state.notice}
           onLocale={(next) => {
@@ -207,6 +236,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           onRemove={chat.remove}
           onFlush={chat.flush}
           onHandoff={chat.handoff}
+          onCancelHandoff={chat.cancelHandoff}
           onLoadOlder={chat.loadOlder}
           onSeen={chat.markSeen}
           onDelete={chat.deleteMessage}

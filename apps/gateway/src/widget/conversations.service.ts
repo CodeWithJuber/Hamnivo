@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type {
+  CancelHandoffResponse,
   CustomerConversation,
   FeedbackRequest,
   FormAnswers,
@@ -48,7 +49,7 @@ import { parseAppearance } from './appearance.js';
 import { WidgetAttachmentsService } from './attachments.service.js';
 import { assertConsent } from './consent.js';
 import { AuthorityContactsService } from './contacts.service.js';
-import { handoffOutcome } from './copy.js';
+import { handoffOutcome, returnToAssistantMessage } from './copy.js';
 import { type AcceptedAnswers, acceptAnswers, answersNote } from './forms.js';
 import { isStudioOrigin } from './origins.js';
 import {
@@ -59,7 +60,13 @@ import {
 } from './read-state.js';
 import { brandSurface } from './settings.service.js';
 import { sha256, type WidgetClaims } from './tokens.service.js';
-import { customerConversation, lastPreview, principalConversations, ticketFacts } from './views.js';
+import {
+  canReturnToAssistant,
+  customerConversation,
+  lastPreview,
+  principalConversations,
+  ticketFacts,
+} from './views.js';
 
 /**
  * The customer side of a conversation (W05–W07, W12): start, send (exactly once through the
@@ -663,6 +670,60 @@ export class WidgetConversationsService {
     });
     await this.journal.notify(claims.tenantId, conversationId, entries);
     return { handoffId, ...outcome };
+  }
+
+  /**
+   * The customer no longer needs a person (HNV-10-02, HNV-10-05). Under the conversation's lock:
+   * only while they asked for one themselves and nobody has taken the chat, and only when the
+   * assistant may answer, does the chat go back to it (audited as theirs, with a private note for
+   * staff). Otherwise it says what is true: a person already joined, or the chat stays with people.
+   */
+  async cancelHandoff(
+    claims: WidgetClaims,
+    publicId: string,
+    locale?: string,
+  ): Promise<CancelHandoffResponse> {
+    const conversationId = this.conversationId(publicId);
+    const before = await this.tx(claims, (tx) => this.own(tx, claims, conversationId));
+    const runtime = await this.registry.get(claims.tenantId, before.connectionId);
+    let outcome: CancelHandoffResponse['outcome'] = 'with_people';
+    const entries = await this.tx(claims, async (tx) => {
+      const control = await this.own(tx, claims, conversationId, true);
+      if (control.ownerMode === 'HUMAN_ACTIVE') {
+        outcome = 'person_joined';
+        return [];
+      }
+      if (control.ownerMode === 'AI_ACTIVE' && control.authorityStatus !== 'resolved') {
+        // Already back (a second tap, or another tab): nothing to change.
+        outcome = 'with_assistant';
+        return [];
+      }
+      if (!canReturnToAssistant(control)) return [];
+      const bot = runtime.primaryBot;
+      const decision = control.brandId ? await this.agents.answering(tx, control.brandId) : null;
+      if (!bot || !decision?.answering) return [];
+      const result = await this.ownership.transition(
+        tx,
+        claims.tenantId,
+        conversationId,
+        { kind: 'ai', botId: bot.id },
+        {
+          origin: 'hamnivo',
+          reason: 'return_to_ai',
+          actor: { type: 'customer', id: toPublicId('customer', claims.principalId) },
+          handoffNote:
+            'The customer no longer needs a person: they went back to the assistant before anyone took the chat.',
+        },
+      );
+      outcome = 'with_assistant';
+      return result.journal;
+    });
+    await this.journal.notify(claims.tenantId, conversationId, entries);
+    return {
+      outcome,
+      message: returnToAssistantMessage(outcome, locale),
+      conversation: await this.get(claims, publicId),
+    };
   }
 
   /**

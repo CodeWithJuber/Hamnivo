@@ -36,6 +36,12 @@ export const HostToFrame = z.discriminatedUnion('type', [
   }),
   z.object({ ...base, type: z.literal('set-locale'), locale: z.string().max(35) }),
   /**
+   * Words the website puts in the message box (`Hamnivo.prefill`), for example "About order
+   * #1042". They are only typed in: the visitor reads them and chooses to send, and the brand's
+   * pre-chat form and consent still come first.
+   */
+  z.object({ ...base, type: z.literal('prefill'), text: z.string().min(1).max(2000) }),
+  /**
    * The visitor opened the chat from a proactive prompt (W19). Only the trigger's id travels: the
    * widget shows the brand's own words from its configuration, never text from the page.
    */
@@ -58,6 +64,10 @@ export const PublicWidgetEvent = z.enum([
   'conversation.started',
   'conversation.resolved',
   'handoff.requested',
+  /** A person took the conversation (payload: conversationId). */
+  'handoff.accepted',
+  /** A reply arrived (payload: conversationId, from: ai | person | system); never its words. */
+  'message',
   'identity.changed',
   /** The customer must sign in on the website to approve an AI action (payload: actionId). */
   'identity.required',

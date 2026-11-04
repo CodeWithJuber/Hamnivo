@@ -20,7 +20,7 @@ export function PrivacyLink({ url }: { url: string | null }) {
         href={href}
         target="_blank"
         rel="noopener noreferrer nofollow"
-        className="text-link underline underline-offset-2"
+        className="text-text-muted underline underline-offset-2 hover:text-text"
         data-testid="privacy-link"
       >
         {t('appearance.privacy')}

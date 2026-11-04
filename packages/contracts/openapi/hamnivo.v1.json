@@ -616,6 +616,54 @@
         }
       }
     },
+    "/v1/widget/conversations/{conversationId}/handoff/cancel": {
+      "post": {
+        "operationId": "cancelHandoff",
+        "summary": "Withdraw a request for a person while nobody has taken the chat; the assistant answers again when it may",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What happened",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelHandoffResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/widget/conversations/{conversationId}/reopen": {
       "post": {
         "operationId": "reopenConversation",
@@ -34506,6 +34554,9 @@
                 "type": "null"
               }
             ]
+          },
+          "canReturnToAssistant": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -34517,7 +34568,8 @@
           "unreadCount",
           "lastMessagePreview",
           "latestSequence",
-          "ticket"
+          "ticket",
+          "canReturnToAssistant"
         ],
         "additionalProperties": false
       },
@@ -36351,6 +36403,31 @@
           "availability",
           "message",
           "followUp"
+        ],
+        "additionalProperties": false
+      },
+      "CancelHandoffResponse": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "with_assistant",
+              "person_joined",
+              "with_people"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/CustomerConversation"
+          }
+        },
+        "required": [
+          "outcome",
+          "message",
+          "conversation"
         ],
         "additionalProperties": false
       },

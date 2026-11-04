@@ -14,6 +14,7 @@ import {
   commerceWidgetRoutes,
 } from './commerce-routes.js';
 import {
+  CancelHandoffResponse,
   CustomerConversation,
   FeedbackRequest,
   HandoffRequest,
@@ -243,6 +244,17 @@ export const widgetRoutes = {
     params: conversationParams,
     body: HandoffRequest,
     success: { status: 200, description: 'Handoff created', schema: HandoffResponse },
+  },
+  cancelHandoff: {
+    method: 'post',
+    path: '/v1/widget/conversations/{conversationId}/handoff/cancel',
+    operationId: 'cancelHandoff',
+    summary:
+      'Withdraw a request for a person while nobody has taken the chat; the assistant answers again when it may',
+    tags: ['Widget'],
+    auth: 'widget_session',
+    params: conversationParams,
+    success: { status: 200, description: 'What happened', schema: CancelHandoffResponse },
   },
   reopen: {
     method: 'post',

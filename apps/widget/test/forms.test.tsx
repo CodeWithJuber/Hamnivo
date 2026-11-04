@@ -509,6 +509,7 @@ describe('tickets (H19)', () => {
       lastMessagePreview: 'Can I change my order?',
       latestSequence: 3,
       ticket,
+      canReturnToAssistant: false,
     });
     const html = renderToString(
       <Conversations
