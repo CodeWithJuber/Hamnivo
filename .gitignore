@@ -22,6 +22,10 @@ docs/design/.originals/
 # Agent worktrees (parallel work lanes)
 .claude/worktrees/
 
+# Agent tooling state (forge ledger, atlas, provenance), per machine
+.forge/
+**/.forge/
+
 # Production settings and backups on a server (deploy/production)
 deploy/production/chatwoot.env
 deploy/production/backups/

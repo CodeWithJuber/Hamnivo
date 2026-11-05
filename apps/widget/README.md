@@ -7,8 +7,10 @@ external-store runtime and the Hamnivo design tokens.
 ## What it does today
 
 - **Layouts** (W02). The loader places the chat as a floating button, a side panel, inline in
-  the page or on the whole page (`mode` in the URL); on narrow screens the first two open full
-  screen. Inline and full-page chats have no close button.
+  the page or on the whole page (`mode` in the URL). On screens 480 px wide or 520 px tall and
+  under (phones, phones held sideways, a laptop at 200 % zoom), the floating and side-panel chats
+  open full screen, and an inline chat is never taller than the screen. Inline and full-page
+  chats have no close button.
 - **Home before a conversation** (W17). The brand's greeting, its suggested questions (each starts
   the conversation) and a search of its public help articles. A proactive prompt the visitor
   opened shows in the brand's own words (W19).

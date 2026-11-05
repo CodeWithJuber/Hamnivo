@@ -2,6 +2,7 @@ import { HamnivoApiError } from '@hamnivo/client';
 import { REACTIONS, type ReactionEmoji } from '@hamnivo/contracts';
 import { Button } from '@hamnivo/ui/components/button';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
+import { SmilePlusIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -48,7 +49,7 @@ export function DeleteMessage({ onDelete }: { onDelete: () => Promise<void> }) {
     return (
       <Button
         variant="link"
-        className="h-auto px-0 text-xs text-text-muted"
+        className="h-auto min-h-6 px-0 text-xs text-text-muted"
         aria-label={t('surface.actions.deleteLabel')}
         onClick={() => setAsking(true)}
       >
@@ -101,13 +102,15 @@ export function Reactions({ onReact }: { onReact: (emoji: ReactionEmoji) => Prom
   return (
     <div className="flex flex-col items-start gap-1 text-xs">
       <Button
-        variant="link"
-        className="h-auto px-0 text-xs text-text-muted"
+        variant="ghost"
+        size="icon-sm"
+        className="size-8 text-text-muted"
         aria-expanded={open}
         aria-label={t('surface.actions.reactTo')}
+        title={t('surface.actions.react')}
         onClick={() => setOpen((value) => !value)}
       >
-        {t('surface.actions.react')}
+        <SmilePlusIcon className="size-4" aria-hidden="true" />
       </Button>
       {open ? (
         <ul className="flex flex-wrap gap-1" data-testid="reactions">

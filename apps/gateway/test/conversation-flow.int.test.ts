@@ -252,3 +252,100 @@ describe('honest availability (W11)', () => {
     }
   });
 });
+
+describe('going back to the assistant (HNV-10-02, HNV-10-05)', () => {
+  const start = async (who: Visitor, text: string) => {
+    const started = await who.call('POST', '/v1/widget/conversations', {
+      clientMessageId: randomUUID(),
+      firstMessage: text,
+    });
+    await slice.drain();
+    return started.body.id as string;
+  };
+  const askForPerson = (who: Visitor, id: string) =>
+    who.call('POST', `/v1/widget/conversations/${id}/handoff`, { clientRequestId: randomUUID() });
+  const cancel = (who: Visitor, id: string) =>
+    who.call('POST', `/v1/widget/conversations/${id}/handoff/cancel`);
+  const inbox = (id: string, rest = '') => `/v1/inbox/conversations/${id}${rest}`;
+
+  it('returns the chat to the assistant while nobody has taken it, and tells staff', async () => {
+    const id = await start(visitor, 'Where is my parcel?');
+    expect((await askForPerson(visitor, id)).status).toBe(200);
+    const waiting = await visitor.call('GET', `/v1/widget/conversations/${id}`);
+    expect(waiting.body).toMatchObject({
+      status: 'waiting_for_person',
+      canReturnToAssistant: true,
+    });
+
+    const back = await cancel(visitor, id);
+    expect(back.status, JSON.stringify(back.body)).toBe(200);
+    expect(back.body).toMatchObject({
+      outcome: 'with_assistant',
+      message: 'You’re chatting with the assistant again. You can ask for a person at any time.',
+      conversation: { status: 'open', responder: 'ai', canReturnToAssistant: false },
+    });
+    // Staff see why the chat left their queue.
+    await slice.drain();
+    const notes = (await authorityMessages(id)).filter((m) => m.private).map((m) => m.text);
+    expect(notes).toContainEqual(
+      expect.stringContaining(
+        'The customer no longer needs a person: they went back to the assistant',
+      ),
+    );
+    const detail = await shop.owner.get(inbox(id));
+    expect(detail.body).toMatchObject({ ownerMode: 'AI_ACTIVE', ownerReason: 'return_to_ai' });
+
+    // A second tap (or another tab) changes nothing.
+    expect((await cancel(visitor, id)).body.outcome).toBe('with_assistant');
+  });
+
+  it('says so when a person took the chat first', async () => {
+    const id = await start(visitor, 'I need help with an invoice');
+    await askForPerson(visitor, id);
+    const claimed = await shop.owner.post(inbox(id, '/assign'), { to: { kind: 'me' } });
+    expect(claimed.status, JSON.stringify(claimed.body)).toBe(200);
+    expect((await visitor.call('GET', `/v1/widget/conversations/${id}`)).body).toMatchObject({
+      status: 'with_person',
+      canReturnToAssistant: false,
+    });
+    const late = await cancel(visitor, id);
+    expect(late.body).toMatchObject({
+      outcome: 'person_joined',
+      message: 'A person from our team has already joined this chat.',
+      conversation: { status: 'with_person' },
+    });
+    expect((await shop.owner.get(inbox(id))).body.ownerMode).toBe('HUMAN_ACTIVE');
+  });
+
+  it('keeps the chat with people when they, not the customer, put it in the queue', async () => {
+    const id = await start(visitor, 'Hello');
+    const queued = await shop.owner.post(inbox(id, '/assign'), { to: { kind: 'queue' } });
+    expect(queued.status, JSON.stringify(queued.body)).toBe(200);
+    expect((await visitor.call('GET', `/v1/widget/conversations/${id}`)).body).toMatchObject({
+      status: 'waiting_for_person',
+      canReturnToAssistant: false,
+    });
+    const refused = await cancel(visitor, id);
+    expect(refused.body).toMatchObject({
+      outcome: 'with_people',
+      message: 'This chat stays with our team. A person will answer you here.',
+      conversation: { status: 'waiting_for_person' },
+    });
+    expect((await shop.owner.get(inbox(id))).body.ownerMode).toBe('WAITING_HUMAN');
+  });
+
+  it('answers in the customer’s language, and only for their own chat', async () => {
+    const id = await start(visitor, 'مرحبا');
+    await askForPerson(visitor, id);
+    const stranger = new Visitor(slice.baseUrl, shop.brand.widgetId, shop.hostOrigin);
+    await stranger.open();
+    expect((await cancel(stranger, id)).status).toBe(404);
+    const arabic = await visitor.call(
+      'POST',
+      `/v1/widget/conversations/${id}/handoff/cancel`,
+      undefined,
+      { 'accept-language': 'ar' },
+    );
+    expect(arabic.body.message).toBe('أنت تتحدث مع المساعد مرة أخرى. يمكنك طلب شخص في أي وقت.');
+  });
+});

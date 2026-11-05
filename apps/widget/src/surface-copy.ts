@@ -7,6 +7,7 @@ export const SURFACE_COPY = {
   en: {
     more: 'More',
     moreLabel: 'More options',
+    alerts: { newReply: 'New reply from {{name}}' },
     home: {
       title: 'How can we help?',
       suggestions: 'Popular questions',
@@ -120,6 +121,7 @@ export const SURFACE_COPY = {
       sizes: { normal: 'Normal', large: 'Large', larger: 'Larger' },
       motion: 'Reduce motion',
       motionSystem: 'Your device asks for less motion, so it’s reduced already.',
+      sound: 'Play a sound for new replies',
       emails: 'Emails',
       emailsTo: 'Sent to {{email}}.',
       transcript: 'Send me a copy when a conversation closes',
@@ -189,6 +191,7 @@ export const SURFACE_COPY = {
   ar: {
     more: 'المزيد',
     moreLabel: 'خيارات أخرى',
+    alerts: { newReply: 'رد جديد من {{name}}' },
     home: {
       title: 'كيف يمكننا مساعدتك؟',
       suggestions: 'أسئلة شائعة',
@@ -302,6 +305,7 @@ export const SURFACE_COPY = {
       sizes: { normal: 'عادي', large: 'كبير', larger: 'أكبر' },
       motion: 'تقليل الحركة',
       motionSystem: 'جهازك يطلب حركة أقل، لذا فهي مخفّضة بالفعل.',
+      sound: 'تشغيل صوت عند وصول ردود جديدة',
       emails: 'رسائل البريد',
       emailsTo: 'تُرسل إلى {{email}}.',
       transcript: 'أرسل لي نسخة عند إغلاق المحادثة',
@@ -370,6 +374,7 @@ export const SURFACE_COPY = {
   hi: {
     more: 'और',
     moreLabel: 'और विकल्प',
+    alerts: { newReply: '{{name}} का नया जवाब' },
     home: {
       title: 'हम आपकी क्या मदद कर सकते हैं?',
       suggestions: 'आम सवाल',
@@ -483,6 +488,7 @@ export const SURFACE_COPY = {
       sizes: { normal: 'सामान्य', large: 'बड़ा', larger: 'और बड़ा' },
       motion: 'हलचल कम करें',
       motionSystem: 'आपका डिवाइस कम हलचल चाहता है, इसलिए यह पहले से कम है।',
+      sound: 'नए जवाब आने पर आवाज़ चलाएँ',
       emails: 'ईमेल',
       emailsTo: '{{email}} पर भेजे जाते हैं।',
       transcript: 'बातचीत बंद होने पर मुझे उसकी कॉपी भेजें',
@@ -552,6 +558,7 @@ export const SURFACE_COPY = {
   ur: {
     more: 'مزید',
     moreLabel: 'مزید اختیارات',
+    alerts: { newReply: '{{name}} کا نیا جواب' },
     home: {
       title: 'ہم آپ کی کیا مدد کر سکتے ہیں؟',
       suggestions: 'عام سوالات',
@@ -666,6 +673,7 @@ export const SURFACE_COPY = {
       sizes: { normal: 'عام', large: 'بڑا', larger: 'مزید بڑا' },
       motion: 'حرکت کم کریں',
       motionSystem: 'آپ کا آلہ کم حرکت چاہتا ہے، اس لیے یہ پہلے سے کم ہے۔',
+      sound: 'نئے جواب آنے پر آواز چلائیں',
       emails: 'ای میلز',
       emailsTo: '{{email}} پر بھیجی جاتی ہیں۔',
       transcript: 'گفتگو بند ہونے پر مجھے اس کی نقل بھیجیں',

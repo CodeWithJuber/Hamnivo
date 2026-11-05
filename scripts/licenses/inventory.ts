@@ -96,9 +96,23 @@ const lines = [
 const markdown = `${lines.join('\n')}\n`;
 const target = join(root, 'docs/licenses.md');
 
+/**
+ * Native builds of one package for one system, such as @esbuild/linux-x64 or fsevents: which ones
+ * are installed depends on the machine, so the staleness check leaves them and the package count
+ * out. Their licences are still classified, and one needing review still fails below.
+ */
+const PLATFORM_BUILD =
+  /(?:^|[-/])(?:linux|darwin|win32|freebsd|openbsd|netbsd|sunos|aix|android)(?:-|$)|^fsevents$/;
+const machineNeutral = (doc: string) =>
+  doc
+    .split('\n')
+    .filter((line) => !line.startsWith('Packages: '))
+    .filter((line) => !PLATFORM_BUILD.test(line.match(/^\| (\S+) \|/)?.[1] ?? ''))
+    .join('\n');
+
 if (process.argv.includes('--check')) {
   const current = existsSync(target) ? readFileSync(target, 'utf8') : '';
-  if (current !== markdown) {
+  if (machineNeutral(current) !== machineNeutral(markdown)) {
     console.error('docs/licenses.md is stale; run scripts/licenses/inventory.ts');
     process.exit(1);
   }

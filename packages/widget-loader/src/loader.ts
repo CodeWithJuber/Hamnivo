@@ -8,8 +8,11 @@
  * overrides the brand's choice. Launcher modes create the chat iframe only when the visitor opens
  * it, so nothing else loads before then. Messages to and from the iframe are checked for origin,
  * window and instance. It shows the unread count on the launcher and the brand's proactive prompts
- * (W19), and exposes `window.Hamnivo` for open, close, identify, reset and events.
+ * (W19), says when a reply arrives while the chat is closed (a preview over the launcher, the tab's
+ * title and, when the visitor keeps it on, a short sound), and exposes `window.Hamnivo`: open,
+ * close, toggle, show, hide, isOpen, getState, setLocale, prefill, identify, reset and events.
  */
+import { isFullScreen, type Mode, placement, type Viewport } from './placement.js';
 import {
   dismissed,
   eligible,
@@ -23,7 +26,6 @@ import {
 import { track } from './visitor.js';
 
 type Listener = (payload: Record<string, unknown>) => void;
-type Mode = 'bubble' | 'panel' | 'inline' | 'fullpage';
 
 /** How long identify() and reset() wait for the chat before rejecting with Error('timeout'). */
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -53,6 +55,15 @@ interface HamnivoApi {
   open(): void;
   close(): void;
   toggle(): void;
+  /** Shows or hides the launcher (and the chat with it); `data-hidden="true"` starts hidden. */
+  show(): void;
+  hide(): void;
+  isOpen(): boolean;
+  getState(): { open: boolean; hidden: boolean; unread: number; mode: Mode };
+  /** The chat's language, from now on: en, ar, hi or ur. */
+  setLocale(locale: string): void;
+  /** Types words in the message box and opens the chat; the visitor chooses to send them. */
+  prefill(text: string): void;
   identify(assertion: string): Promise<void>;
   reset(): Promise<void>;
   on(event: string, listener: Listener): () => void;
@@ -85,7 +96,7 @@ declare global {
   }
   const widgetOrigin = new URL(data.widgetOrigin ?? script.src, location.href).origin;
   const instanceId = Math.random().toString(36).slice(2, 12);
-  const locale = data.locale ?? document.documentElement.lang;
+  let locale = data.locale ?? document.documentElement.lang;
   const listeners = new Map<string, Set<Listener>>();
   const waiting = new Map<string, { resolve: () => void; reject: (e: Error) => void }>();
   let queue: Record<string, unknown>[] = [];
@@ -95,6 +106,7 @@ declare global {
   let mode: Mode = 'bubble';
   let side = 'right';
   let unread = 0;
+  let hidden = data.hidden === 'true';
   let config: LauncherConfig | null = null;
   let onMounted: () => void = () => undefined;
   /** The chat is placed once the brand's layout is known; requests made before then wait. */
@@ -126,44 +138,36 @@ declare global {
     else queue.push(full);
   };
 
-  /** Full screen on small screens, sized to the visible area so the keyboard hides nothing. */
-  const fit = () => {
-    if (!frame) return;
-    const viewport = window.visualViewport;
-    const full =
-      mode === 'fullpage' || (launcherMode() && matchMedia('(max-width: 480px)').matches);
-    if (mode === 'inline') return;
-    if (full) {
-      style(frame, {
-        top: `${viewport?.offsetTop ?? 0}px`,
-        left: '0',
-        right: 'auto',
-        bottom: 'auto',
-        width: '100%',
-        height: `${viewport?.height ?? innerHeight}px`,
-        'border-radius': '0',
-      });
-    } else if (mode === 'panel') {
-      style(frame, {
-        top: '0',
-        bottom: 'auto',
-        left: side === 'left' ? '0' : 'auto',
-        right: side === 'right' ? '0' : 'auto',
-        width: 'min(420px, 100%)',
-        height: `${viewport?.height ?? innerHeight}px`,
-        'border-radius': '0',
-      });
-    } else {
-      style(frame, {
-        top: 'auto',
-        bottom: '88px',
-        left: side === 'left' ? '20px' : 'auto',
-        right: side === 'right' ? '20px' : 'auto',
-        width: 'min(400px, calc(100vw - 32px))',
-        height: 'min(640px, calc(100vh - 112px))',
-        'border-radius': '16px',
-      });
+  /** The page's own overflow while a full-screen chat holds it still; null when not held. */
+  let heldOverflow: string | null = null;
+  const holdPage = (hold: boolean) => {
+    const root = document.documentElement.style;
+    if (hold && heldOverflow === null) {
+      heldOverflow = root.overflow;
+      root.overflow = 'hidden';
+    } else if (!hold && heldOverflow !== null) {
+      root.overflow = heldOverflow;
+      heldOverflow = null;
     }
+  };
+
+  /**
+   * Places the frame for the screen (see placement.ts): full screen on phones, sideways phones and
+   * zoomed windows, sized to the visible area so the keyboard hides nothing. While it covers the
+   * page, the page behind it does not scroll.
+   */
+  const fit = () => {
+    if (!frame || mode === 'inline') return;
+    const visual = window.visualViewport;
+    const viewport: Viewport = {
+      width: innerWidth,
+      height: innerHeight,
+      visibleHeight: visual?.height ?? innerHeight,
+      visibleTop: visual?.offsetTop ?? 0,
+    };
+    const css = placement(mode, viewport, side === 'left' ? 'left' : 'right');
+    if (css) style(frame, css);
+    holdPage(open && isFullScreen(mode, viewport));
   };
 
   const ensureFrame = (): HTMLIFrameElement => {
@@ -186,7 +190,8 @@ declare global {
         display: 'block',
         width: '100%',
         height: data.height ?? '600px',
-        'max-height': '100%',
+        // Never taller than a phone's screen, so the message box stays in view.
+        'max-height': data.height ? '100%' : 'calc(100dvh - 24px)',
         'border-radius': '12px',
         border: '1px solid rgba(0,0,0,.12)',
       });
@@ -206,7 +211,47 @@ declare global {
     return frame;
   };
 
+  /** "(2) Page title" while replies wait, unless the site turns it off (data-title-alert="off"). */
+  let written: string | null = null;
+  const showTitle = () => {
+    if (data.titleAlert === 'off') return;
+    // Only the count this loader wrote comes off: a title the page set since then stays whole.
+    const ours = written !== null && document.title === written;
+    const base = ours ? document.title.replace(/^\(\d+\+?\) /, '') : document.title;
+    const title = unread > 0 ? `(${unread > 9 ? '9+' : unread}) ${base}` : base;
+    written = unread > 0 ? title : null;
+    if (document.title !== title) document.title = title;
+  };
+
+  /** A short two-note sound. Browsers allow it only after a tap, such as opening the chat. */
+  let audio: AudioContext | undefined;
+  const prepareSound = () => {
+    try {
+      audio ??= new AudioContext();
+      void audio.resume();
+    } catch {
+      // No Web Audio here: replies are still shown and counted.
+    }
+  };
+  const chime = () => {
+    if (audio?.state !== 'running' || data.sound === 'off') return;
+    const start = audio.currentTime;
+    for (const [index, pitch] of [660, 880].entries()) {
+      const at = start + index * 0.12;
+      const tone = audio.createOscillator();
+      const gain = audio.createGain();
+      tone.frequency.value = pitch;
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.08, at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.2);
+      tone.connect(gain).connect(audio.destination);
+      tone.start(at);
+      tone.stop(at + 0.22);
+    }
+  };
+
   const showBadge = () => {
+    showTitle();
     const count = open ? 0 : unread;
     badge.textContent = count > 9 ? '9+' : String(count);
     badge.style.display = count > 0 ? 'flex' : 'none';
@@ -248,14 +293,17 @@ declare global {
     prompt = null;
   };
   const dismissPrompt = () => {
+    // A reply's preview is not one of the brand's prompts: closing it changes no prompt limits.
+    const reply = prompt?.hasAttribute('data-hamnivo-reply');
     hidePrompt();
-    memory = dismissed(memory, Date.now(), config?.proactive.dismissHours ?? 24);
-    remember(memory);
+    if (!reply) {
+      memory = dismissed(memory, Date.now(), config?.proactive.dismissHours ?? 24);
+      remember(memory);
+    }
     button.focus();
   };
   /** The speech bubble next to the launcher; `opened` runs when the visitor chooses it. */
-  const bubble = (text: string, opened: () => void) => {
-    if (!config) return;
+  const bubble = (text: string, opened: () => void): HTMLDivElement => {
     prompt = document.createElement('div');
     prompt.setAttribute('data-hamnivo-prompt', '');
     prompt.setAttribute('role', 'status');
@@ -291,6 +339,7 @@ declare global {
       'min-height': '44px',
     });
     message.addEventListener('click', () => {
+      prepareSound();
       hidePrompt();
       opened();
       setOpen(true);
@@ -298,7 +347,7 @@ declare global {
     const close = document.createElement('button');
     close.type = 'button';
     close.textContent = '×';
-    close.setAttribute('aria-label', config.launcher.dismissLabel);
+    close.setAttribute('aria-label', config?.launcher.dismissLabel ?? 'Dismiss');
     style(close, {
       background: 'none',
       border: '0',
@@ -312,6 +361,7 @@ declare global {
     close.addEventListener('click', dismissPrompt);
     prompt.append(message, close);
     document.body.appendChild(prompt);
+    return prompt;
   };
   const page = (): Page => ({
     path: location.pathname + location.search,
@@ -323,6 +373,7 @@ declare global {
     if (
       prompted ||
       open ||
+      hidden ||
       !config ||
       !eligible(config.proactive, memory, Date.now(), page()).includes(rule)
     )
@@ -334,7 +385,7 @@ declare global {
   };
   /** Staff invited this visitor to chat: shown like a prompt, but not counted against the limits. */
   const showInvite = (message: string) => {
-    if (open || !launcherMode() || prompt) return;
+    if (open || hidden || !launcherMode() || prompt) return;
     bubble(message, () => undefined);
   };
   const schedulePrompts = () => {
@@ -401,8 +452,19 @@ declare global {
     } else if (m.type === 'event' && typeof m.event === 'string') {
       const payload = (m.payload as Record<string, unknown>) ?? {};
       if (m.event === 'unread') {
-        unread = Math.max(0, Math.min(999, Math.trunc(Number(payload.count) || 0)));
+        const count = Math.max(0, Math.min(999, Math.trunc(Number(payload.count) || 0)));
+        const grew = count > unread;
+        unread = count;
         showBadge();
+        // A new reply while the chat is closed or the tab is in the background: say so.
+        if (grew) {
+          if (payload.sound === true) chime();
+          const label = typeof payload.label === 'string' ? payload.label.slice(0, 160) : '';
+          if (!open && !hidden && label && launcherMode()) {
+            if (prompt?.hasAttribute('data-hamnivo-reply')) hidePrompt();
+            if (!prompt) bubble(label, () => undefined).setAttribute('data-hamnivo-reply', '');
+          }
+        }
       }
       emit(m.event, payload);
     } else if (m.type === 'result' && typeof m.requestId === 'string') {
@@ -430,6 +492,7 @@ declare global {
     if (!launcherMode()) {
       ensureFrame().style.display = 'block';
       open = true;
+      fit();
       onMounted();
       return;
     }
@@ -501,7 +564,11 @@ declare global {
       'justify-content': 'center',
     });
     button.appendChild(badge);
-    button.addEventListener('click', () => setOpen(!open));
+    button.addEventListener('click', () => {
+      prepareSound();
+      setOpen(!open);
+    });
+    if (hidden) button.style.display = 'none';
     showBadge();
     document.body.appendChild(button);
     onMounted();
@@ -594,11 +661,48 @@ declare global {
   if (document.body) start();
   else document.addEventListener('DOMContentLoaded', start, { once: true });
 
+  /** Launcher and chat out of sight, or back (launcher modes; inline and full page stay). */
+  const setHidden = (next: boolean) => {
+    if (!launcherMode()) return;
+    hidden = next;
+    if (next) {
+      setOpen(false);
+      hidePrompt();
+    }
+    button.style.display = next ? 'none' : 'flex';
+  };
+
   window.Hamnivo = {
     loaded: true,
-    open: () => setOpen(true),
+    open: () => {
+      if (!hidden) setOpen(true);
+    },
     close: () => setOpen(false),
-    toggle: () => setOpen(!open),
+    toggle: () => {
+      if (!hidden) setOpen(!open);
+    },
+    show: () => void mounted.then(() => setHidden(false)),
+    hide: () => void mounted.then(() => setHidden(true)),
+    isOpen: () => open,
+    getState: () => ({ open, hidden, unread, mode }),
+    setLocale: (next) => {
+      const short = String(next).slice(0, 2).toLowerCase();
+      if (!['en', 'ar', 'hi', 'ur'].includes(short)) return;
+      // Before the chat loads it is only remembered: nothing loads early for it.
+      locale = short;
+      if (frame) send({ type: 'set-locale', locale: short });
+    },
+    prefill: (text) => {
+      const words = String(text ?? '')
+        .trim()
+        .slice(0, 2000);
+      if (!words) return;
+      void mounted.then(() => {
+        ensureFrame();
+        send({ type: 'prefill', text: words });
+        if (!hidden) setOpen(true);
+      });
+    },
     identify: (assertion) => request({ type: 'identify', assertion }),
     reset: () => request({ type: 'reset' }),
     on(event, listener) {

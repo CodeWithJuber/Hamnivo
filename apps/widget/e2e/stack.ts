@@ -149,6 +149,9 @@ try {
     PORT: String(ports.api),
     LOG_LEVEL: process.env.E2E_LOG_LEVEL ?? 'warn',
     DATABASE_URL: database.app,
+    // The throwaway database for platform settings too, as Studio's stack does: otherwise the
+    // gateway reads .env.local's development database, which may be empty or out of date.
+    DATABASE_PLATFORM_URL: database.platform,
     REDIS_URL: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
     HAMNIVO_KEK_BASE64: randomBytes(32).toString('base64'),
     BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),

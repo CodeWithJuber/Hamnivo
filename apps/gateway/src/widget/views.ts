@@ -87,7 +87,23 @@ export function customerConversation(
     lastMessagePreview: preview,
     latestSequence: row.journalSeq,
     ticket: customerTicket(facts.number, row.authorityStatus, facts.snoozedUntil),
+    canReturnToAssistant: canReturnToAssistant(row),
   };
+}
+
+/**
+ * Whether the customer may withdraw their request for a person (HNV-10-02): they asked for one
+ * themselves and nobody has taken the chat yet. Not after an escalation, a limit or a stop: then
+ * people decided, and only people answer.
+ */
+export function canReturnToAssistant(
+  row: Pick<ControlRow, 'ownerMode' | 'ownerReason' | 'authorityStatus'>,
+): boolean {
+  return (
+    row.ownerMode === 'WAITING_HUMAN' &&
+    row.ownerReason === 'customer_request' &&
+    row.authorityStatus !== 'resolved'
+  );
 }
 
 /**

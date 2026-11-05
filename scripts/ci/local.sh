@@ -51,7 +51,8 @@ remove_chatwoot() {
 }
 cleanup() {
   ((${#containers[@]})) && docker rm -f -v "${containers[@]}" >/dev/null 2>&1
-  for project in "${compose_projects[@]}"; do remove_chatwoot "$project"; done
+  # The ${a[@]+...} form: macOS bash 3.2 treats an empty array as unbound under set -u.
+  for project in ${compose_projects[@]+"${compose_projects[@]}"}; do remove_chatwoot "$project"; done
   true
 }
 trap cleanup EXIT
@@ -233,7 +234,18 @@ step "Lint and format (Biome)" pnpm lint
 step "Typecheck" pnpm typecheck
 step "Unit tests" unit_tests
 step "Shell scripts (shellcheck)" shell_scripts
-step "Deploy scripts: doctor and HTTPS rules (stand-ins, no Docker)" bash scripts/ci/deploy-https-test.sh
+# The deploy scripts run on Linux servers and use flock and GNU touch, which macOS lacks; elsewhere
+# the same test runs in a Debian container (safe.directory: the mount belongs to another user).
+deploy_scripts() {
+  if [[ "$(uname -s)" == Linux ]]; then
+    bash scripts/ci/deploy-https-test.sh
+    return
+  fi
+  docker run --rm -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e 'GIT_CONFIG_VALUE_0=*' \
+    -v "$root:/repo:ro" -w /repo debian:bookworm-slim bash -c \
+    'apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends git curl ca-certificates util-linux procps >/dev/null && bash scripts/ci/deploy-https-test.sh'
+}
+step "Deploy scripts: doctor and HTTPS rules (stand-ins; in Linux)" deploy_scripts
 step "Feature status matrix is current" pnpm exec tsx scripts/feature-status/generate.ts --check
 step "Licence inventory is current and reviewed" pnpm exec tsx scripts/licenses/inventory.ts --check
 

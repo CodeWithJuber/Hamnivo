@@ -40,6 +40,8 @@ export interface ChatState {
   error: string | null;
   /** The server's answer to "talk to a person", such as when people are back (W11). */
   handoffNotice: string | null;
+  /** The server's answer after the customer went back to the assistant (HNV-10-02). */
+  assistantNotice: string | null;
   /** Where older history continues (W05); null when everything is shown. */
   olderCursor: string | null;
   loadingOlder: boolean;
@@ -121,6 +123,7 @@ const EMPTY: ChatState = {
   connection: 'idle',
   error: null,
   handoffNotice: null,
+  assistantNotice: null,
   olderCursor: null,
   loadingOlder: false,
   latestSequence: 0,
@@ -714,11 +717,47 @@ export function useChat(client: HamnivoClient) {
         ? {
             ...s,
             handoffNotice: outcome.message,
-            conversation: { ...s.conversation, status: 'waiting_for_person', responder: 'none' },
+            assistantNotice: null,
+            // They asked themselves, so they may change their mind while nobody has the chat.
+            conversation: {
+              ...s.conversation,
+              status: 'waiting_for_person',
+              responder: 'none',
+              canReturnToAssistant: true,
+            },
           }
         : s,
     );
   }, [client, startFor, state.conversation, unavailableBy]);
+
+  /**
+   * The customer no longer needs a person (HNV-10-02): the gateway says whether the assistant
+   * answers again, a person already joined, or the chat stays with people, and the screen shows
+   * the conversation as it now is with that message.
+   */
+  const cancelHandoff = useCallback(async () => {
+    const current = generation.current;
+    const id = state.conversation?.id;
+    if (!id) return;
+    let result: Awaited<ReturnType<HamnivoClient['cancelHandoff']>>;
+    try {
+      result = await client.cancelHandoff(id);
+    } catch (error) {
+      unavailableBy(error);
+      throw error;
+    }
+    if (current !== generation.current) return;
+    setState((s) =>
+      s.conversation?.id === result.conversation.id
+        ? {
+            ...s,
+            conversation: { ...s.conversation, ...result.conversation },
+            handoffNotice: result.outcome === 'with_assistant' ? null : result.message,
+            assistantNotice: result.outcome === 'with_assistant' ? result.message : null,
+          }
+        : s,
+    );
+  }, [client, state.conversation?.id, unavailableBy]);
 
   /** Opens the closed conversation on screen again, with its history (W15). */
   const reopen = useCallback(async () => {
@@ -773,6 +812,7 @@ export function useChat(client: HamnivoClient) {
     remove,
     flush,
     handoff,
+    cancelHandoff,
     identify,
     reset,
     onEvent,

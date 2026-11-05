@@ -878,9 +878,17 @@
     "note": "Agent drafts are edited and saved by keyboard alone, and a draft someone else changed is shown as a conflict instead of being overwritten (tested)."
   },
   "HNV-11-06": {
-    "status": "in-progress",
-    "evidence": ["apps/console/src/pages/AgentEditorPage.tsx", "apps/console/e2e/journeys.spec.ts"],
-    "note": "Publishing asks for a fresh sign-in and then shows the live version (tested); rollback in Studio comes later."
+    "status": "implemented",
+    "evidence": [
+      "apps/console/src/pages/AgentEditorPage.tsx",
+      "apps/console/src/components/AgentVersions.tsx",
+      "apps/gateway/src/runtime/agents.service.ts",
+      "apps/gateway/test/agents.int.test.ts",
+      "apps/console/test/agent-versions.test.tsx",
+      "apps/console/e2e/journeys.spec.ts",
+      "apps/console/e2e/agent-rollback.spec.ts"
+    ],
+    "note": "Publishing asks for a fresh sign-in and then shows the live version (tested). The versions panel says since when the live version is live and when each other version was retired, marks the version live before this one and makes rolling back to it the primary choice; the dialog says customers get that version from their next message, the live one stops answering, the draft is kept, the sign-in is confirmed and the audit log records it. Rolling back publishes the earlier version exactly as it was (same hash), audited as agent.published with rollback: true, and the version rolled back from can be restored the same way. A link stops the agent's replies at once (Stop AI). Tested in the gateway, as rendered HTML and in Chromium with a stale sign-in."
   },
   "HNV-13-06": {
     "status": "implemented",
@@ -2615,9 +2623,12 @@
       "apps/widget/e2e/surface.spec.ts",
       "apps/console/src/pages/BrandChatSettings.tsx",
       "apps/console/e2e/chat-settings.spec.ts",
-      "packages/widget-loader/src/loader.ts"
+      "packages/widget-loader/src/loader.ts",
+      "packages/widget-loader/src/placement.ts",
+      "packages/widget-loader/test/placement.test.ts",
+      "apps/widget/e2e/layout-audit.ts"
     ],
-    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens narrower than 480 px the button and the panel open full screen, sized to the visible area. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic."
+    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens up to 480 px wide or 520 px tall (phones, phones held sideways, 200 % zoom) the button and the panel open full screen, sized to the visible area, with the page behind held still; elsewhere the floating chat stays inside the window. A layout audit (e2e/layout-audit.ts) checks 20 screen sizes from a 280 px Fold to 2560 px in all four layouts, with no database. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic."
   },
   "W09": {
     "status": "implemented",

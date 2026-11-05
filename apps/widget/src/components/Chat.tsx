@@ -30,7 +30,15 @@ import type {
 import { Button } from '@hamnivo/ui/components/button';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { ParticipantBadge, type ParticipantKind } from '@hamnivo/ui/components/participant-badge';
-import { PaperclipIcon, SendHorizontalIcon, XIcon } from 'lucide-react';
+import {
+  BrainIcon,
+  EllipsisVerticalIcon,
+  GlobeIcon,
+  PaperclipIcon,
+  SendHorizontalIcon,
+  UserRoundIcon,
+  XIcon,
+} from 'lucide-react';
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -253,6 +261,27 @@ function causeOf(
   if (code === 'VALIDATION_FAILED' || code === 'IDEMPOTENCY_CONFLICT') return 'invalid';
   if (code === 'NOT_FOUND' || code === 'CONVERSATION_CLOSED') return 'closed';
   return 'other';
+}
+
+/**
+ * When a message was sent, in the visitor's own time zone: the time today, the day and time
+ * before. Nothing for a message not confirmed yet.
+ */
+function SentAt({ at, locale }: { at: string | undefined; locale: string }) {
+  const date = at ? new Date(at) : null;
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const today = date.toDateString() === new Date().toDateString();
+  const label = new Intl.DateTimeFormat(
+    locale,
+    today
+      ? { timeStyle: 'short' }
+      : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' },
+  ).format(date);
+  return (
+    <time dateTime={date.toISOString()} data-testid="sent-at">
+      {label}
+    </time>
+  );
 }
 
 /** "Waiting", "Sending…", "Not sent" with what to do, or "Sent" and "Read" (W06). */
@@ -511,10 +540,24 @@ function Bubble({ message, ctx }: { message: ThreadMessageLike; ctx: BubbleConte
             </Button>
           </p>
         ) : null}
-        {mine ? <Delivery custom={custom} ctx={ctx} /> : null}
+        {mine ? (
+          <div className="flex flex-wrap items-center justify-end gap-x-2 text-xs text-text-muted">
+            {custom.state === 'accepted' ? (
+              <SentAt at={custom.createdAt} locale={ctx.locale} />
+            ) : null}
+            <Delivery custom={custom} ctx={ctx} />
+          </div>
+        ) : null}
         {canDelete && messageId ? <DeleteMessage onDelete={() => ctx.onDelete(messageId)} /> : null}
-        {canReact && messageId ? (
-          <Reactions onReact={(emoji) => ctx.onReact(messageId, emoji)} />
+        {!mine && custom.kind !== 'system' ? (
+          <div className="flex items-start gap-1 text-xs text-text-muted">
+            <span className="leading-8">
+              <SentAt at={custom.createdAt} locale={ctx.locale} />
+            </span>
+            {canReact && messageId ? (
+              <Reactions onReact={(emoji) => ctx.onReact(messageId, emoji)} />
+            ) : null}
+          </div>
         ) : null}
       </li>
     </>
@@ -602,12 +645,12 @@ export interface Chip {
   reason?: string;
 }
 
-/** "Send" with an arrow; on very narrow screens (or large text) only the arrow shows. */
+/** "Send" with an arrow; on phones under 352 px (or with large text) only the arrow shows. */
 function SendLabel({ text }: { text: string }) {
   return (
     <>
       <SendHorizontalIcon className="size-4 rtl:-scale-x-100" aria-hidden="true" />
-      <span className="max-[15rem]:sr-only">{text}</span>
+      <span className="max-[22rem]:sr-only">{text}</span>
     </>
   );
 }
@@ -632,6 +675,9 @@ function Composer(props: {
   onRemoveChip: (id: string) => void;
   onSendFiles: () => void;
   locale: string;
+  prefill: { text: string; at: number } | null;
+  /** Called once the words are in the box, so a remounted box does not type them again. */
+  onPrefilled: (at: number) => void;
 }) {
   const { t } = useTranslation();
   const aui = useAui();
@@ -660,6 +706,13 @@ function Composer(props: {
     const timer = setTimeout(() => drafts.set(scope, text), 300);
     return () => clearTimeout(timer);
   }, [drafts, scope, text]);
+  // The website's words go in the box only; the visitor reads them and chooses to send.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per prefill
+  useEffect(() => {
+    if (!props.prefill) return;
+    aui.composer().setText(props.prefill.text);
+    props.onPrefilled(props.prefill.at);
+  }, [props.prefill]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== 'Enter' || event.shiftKey) return;
@@ -762,6 +815,8 @@ function Composer(props: {
           maxLength={10_000}
           dir={directionOf(text)}
           rows={1}
+          // A long message scrolls in the box instead of pushing the conversation off a phone.
+          maxRows={5}
           submitMode="none"
           onKeyDown={onKeyDown}
           onCompositionStart={() => {
@@ -823,6 +878,75 @@ type View = 'chat' | 'memory' | 'settings' | 'conversations' | 'contact';
  * What the visitor did before the first conversation, kept while the chat asks its pre-chat form
  * or for consent (W26, W27): a message, "talk to a person", or files to attach.
  */
+/**
+ * "Back to the assistant" while a request for a person waits (HNV-10-02, HNV-10-05). It can be
+ * pressed once at a time; the answer replaces the banner, and focus moves to the composer when
+ * the assistant answers again.
+ */
+function BackToAssistant({ onCancel }: { onCancel: () => Promise<void> }) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  return (
+    <div>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        disabled={busy}
+        aria-busy={busy || undefined}
+        data-testid="back-to-assistant"
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onCancel();
+          } catch {
+            // The banner stays as it was; the reason, if any, is shown by the chat.
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {t('backToAssistant')}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * The chat's language (W13), small enough for one header row: the native list over a globe and
+ * the language's short name, so phones still open their own picker and screen readers hear
+ * "Language, combo box". The ring follows the keyboard.
+ */
+function LanguagePicker(props: { locale: Locale; onLocale: (next: Locale) => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="relative">
+      <label className="sr-only" htmlFor="hv-locale">
+        {t('language')}
+      </label>
+      <select
+        id="hv-locale"
+        className="peer absolute inset-0 size-full cursor-pointer appearance-none opacity-0"
+        value={props.locale}
+        onChange={(e) => props.onLocale(e.target.value as Locale)}
+      >
+        {LOCALES.map((l) => (
+          <option key={l} value={l} lang={l}>
+            {LANGUAGE_NAMES[l]}
+          </option>
+        ))}
+      </select>
+      <span
+        aria-hidden="true"
+        className="flex h-10 items-center gap-1 rounded-md px-2 text-sm font-medium text-text peer-hover:bg-surface-sunken peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
+      >
+        <GlobeIcon className="size-4" />
+        {props.locale.toUpperCase()}
+      </span>
+    </div>
+  );
+}
+
 type Intent = { kind: 'send'; text: string } | { kind: 'handoff' } | { kind: 'files' };
 
 /** Puts focus back in the message box, after it comes back. */
@@ -844,6 +968,8 @@ export function Chat(props: {
   display: DisplayControls;
   /** The proactive prompt the visitor opened the chat from (W19). */
   prompt: string | null;
+  /** Words the website put in the message box (Hamnivo.prefill); `at` tells repeats apart. */
+  prefill: { text: string; at: number } | null;
   /** The name of the person typing a reply ('' when unnamed), or null when nobody is. */
   staffTyping: string | null;
   /** Says the website notes which pages are viewed (from the gateway), or null. */
@@ -854,6 +980,8 @@ export function Chat(props: {
   onRemove: (clientMessageId: string) => OutgoingMessage | null;
   onFlush: () => void;
   onHandoff: () => Promise<void>;
+  /** Withdraws the request for a person while nobody has the chat (HNV-10-02). */
+  onCancelHandoff: () => Promise<void>;
   onLoadOlder: () => Promise<void>;
   onSeen: () => void;
   onDelete: (messageId: string) => Promise<void>;
@@ -962,6 +1090,8 @@ export function Chat(props: {
   /** Answers given in this visit, so a second try starts from them; never stored. */
   const prechatAnswers = useRef<FieldValues>({});
   const contactAnswers = useRef<FieldValues>({});
+  /** When the website's words last went in the box (Hamnivo.prefill). */
+  const prefillUsed = useRef(0);
   const newScope = `${session.principal.id}:new`;
 
   const releaseFiles = (conversationId: string | null) => {
@@ -1223,11 +1353,21 @@ export function Chat(props: {
         ? t('withPerson')
         : conversation?.status === 'resolved'
           ? t('resolved')
-          : null;
+          : conversation?.responder === 'ai'
+            ? state.assistantNotice
+            : null;
+  // Waiting because they asked, and nobody has the chat yet: they may change their mind.
+  const canGoBack =
+    conversation?.status === 'waiting_for_person' &&
+    conversation.canReturnToAssistant &&
+    available &&
+    !offline;
   const lastSync = state.lastSync
     ? new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(state.lastSync))
     : null;
   const proactive = props.prompt ? { brand: config.brand.name, text: props.prompt } : null;
+  // The website's words go in once: the box coming back (after a form) keeps what the visitor typed.
+  const prefill = props.prefill && props.prefill.at > prefillUsed.current ? props.prefill : null;
   const allowFiles = config.features.attachments;
   // A message left while nobody could answer is listed even before a chat is on screen.
   const hasOthers = state.conversations.some((c) => c.id !== conversation?.id);
@@ -1251,68 +1391,65 @@ export function Chat(props: {
         data-conversation-id={conversation?.id ?? ''}
         data-mode={props.mode}
       >
-        <header className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b border-border bg-surface px-4 py-3">
+        {/* One row of name and icons, then the AI notice: compact on a phone held sideways. */}
+        <header className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border bg-surface px-3 py-2 [@media(max-height:26rem)]:py-0.5">
           <BrandMark url={config.brand.logoUrl} />
-          <div className="min-w-0 flex-1 basis-40">
+          <div className="min-w-0 flex-1 basis-24 ps-1">
             <h1 className="truncate text-base font-semibold text-text">{config.brand.name}</h1>
-            <p className="text-sm text-text-muted" data-testid="ai-disclosure">
-              {copy.aiDisclosure}
-            </p>
             {conversation?.ticket ? (
-              <p className="mt-1 text-xs text-text-muted" data-testid="header-ticket">
+              <p className="text-xs text-text-muted" data-testid="header-ticket">
                 <TicketLine ticket={conversation.ticket} />
               </p>
             ) : null}
             {statusInHeader ? (
-              <div className="mt-1">
-                <StatusLine availability={config.availability} locale={locale} compact />
-              </div>
+              <StatusLine availability={config.availability} locale={locale} compact />
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center">
+            <LanguagePicker locale={locale} onLocale={props.onLocale} />
             {memoryShown ? (
               <Button
                 id="hv-memory-open"
                 variant="ghost"
-                className="h-10 px-2 text-sm"
+                size="icon"
+                title={t('memory.open')}
+                aria-label={t('memory.open')}
                 aria-pressed={view === 'memory'}
                 onClick={() => (view === 'memory' ? back('hv-memory-open') : show('memory'))}
               >
-                {t('memory.open')}
+                <BrainIcon className="size-5" aria-hidden="true" />
               </Button>
             ) : null}
             <Button
               id="hv-more"
               variant="ghost"
-              className="h-10 px-2 text-sm"
+              size="icon"
+              title={t('surface.more')}
               aria-expanded={more}
               aria-controls={moreId}
               aria-label={t('surface.moreLabel')}
               onClick={() => setMore((open) => !open)}
             >
-              {t('surface.more')}
+              <EllipsisVerticalIcon className="size-5" aria-hidden="true" />
             </Button>
-            <label className="sr-only" htmlFor="hv-locale">
-              {t('language')}
-            </label>
-            <select
-              id="hv-locale"
-              className="h-10 max-w-full rounded-md border border-input bg-surface px-2 text-sm"
-              value={locale}
-              onChange={(e) => props.onLocale(e.target.value as Locale)}
-            >
-              {LOCALES.map((l) => (
-                <option key={l} value={l}>
-                  {LANGUAGE_NAMES[l]}
-                </option>
-              ))}
-            </select>
             {props.onClose ? (
-              <Button variant="ghost" size="icon" aria-label={t('close')} onClick={props.onClose}>
-                ×
+              <Button
+                variant="ghost"
+                size="icon"
+                title={t('close')}
+                aria-label={t('close')}
+                onClick={props.onClose}
+              >
+                <XIcon className="size-5" aria-hidden="true" />
               </Button>
             ) : null}
           </div>
+          <p
+            className="w-full text-xs leading-snug text-text-muted [@media(max-height:26rem)]:line-clamp-1"
+            data-testid="ai-disclosure"
+          >
+            {copy.aiDisclosure}
+          </p>
           {more ? (
             <ul id={moreId} className="flex w-full flex-wrap gap-2" data-testid="more-menu">
               {hasOthers ? (
@@ -1347,6 +1484,7 @@ export function Chat(props: {
             </p>
             {/* Without a rating to ask, the banner is where to open the conversation again. */}
             {resolved && !config.features.csat && available ? <Reopen onReopen={reopen} /> : null}
+            {canGoBack ? <BackToAssistant onCancel={props.onCancelHandoff} /> : null}
           </div>
         ) : null}
         {config.features.csat && conversation && resolved && available ? (
@@ -1516,7 +1654,7 @@ export function Chat(props: {
               </div>
             ) : null}
           </ThreadPrimitive.Viewport>
-          <div className="border-t border-border bg-surface px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="border-t border-border bg-surface px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] [@media(max-height:26rem)]:pt-1 [@media(max-height:26rem)]:pb-[max(0.25rem,env(safe-area-inset-bottom))]">
             {available ? <ShopBar commerce={props.commerce} locale={locale} /> : null}
             {/* While the chat asks before starting, its card is the one thing to answer. */}
             {!available ? (
@@ -1535,10 +1673,12 @@ export function Chat(props: {
               <>
                 {canAskPerson ? (
                   <Button
-                    variant="link"
-                    className="mb-1 h-auto text-sm"
+                    variant="outline"
+                    size="sm"
+                    className="mb-2 h-auto min-h-9 whitespace-normal py-1.5 text-start [@media(max-height:26rem)]:mb-1 [@media(max-height:26rem)]:min-h-8 [@media(max-height:26rem)]:py-1"
                     onClick={() => void handoff()}
                   >
+                    <UserRoundIcon className="size-4" aria-hidden="true" />
                     {t('talkToPerson')}
                   </Button>
                 ) : null}
@@ -1566,6 +1706,10 @@ export function Chat(props: {
                   onRemoveChip={(id) => setChips((current) => current.filter((c) => c.id !== id))}
                   onSendFiles={sendFiles}
                   locale={locale}
+                  prefill={prefill}
+                  onPrefilled={(at) => {
+                    prefillUsed.current = at;
+                  }}
                 />
               </>
             )}

@@ -1,4 +1,5 @@
 import type {
+  CancelHandoffResponse,
   CustomerConversation,
   CustomerMemory,
   FormAnswers,
@@ -467,6 +468,18 @@ export class HamnivoClient {
       clientRequestId,
       ...(note ? { note } : {}),
     });
+  }
+
+  /**
+   * Withdraw a request for a person while nobody has taken the chat (HNV-10-02). The answer says
+   * whether the assistant answers again, a person already joined, or the chat stays with people,
+   * with a message to show and the conversation as it now is.
+   */
+  cancelHandoff(id: string): Promise<CancelHandoffResponse> {
+    return this.request(
+      'POST',
+      `/v1/widget/conversations/${encodeURIComponent(id)}/handoff/cancel`,
+    );
   }
 
   /** The customer's language settings (U01): interface locale, reply language, open question. */

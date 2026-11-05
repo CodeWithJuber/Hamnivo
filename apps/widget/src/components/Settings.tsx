@@ -90,7 +90,7 @@ function Emails({ client, person }: { client: HamnivoClient; person: string }) {
   );
 }
 
-/** Text size, motion and emails, in one panel of the chat (W14, W25). */
+/** Text size, motion, the new-reply sound and emails, in one panel of the chat (W14, W25). */
 export function Settings(props: {
   client: HamnivoClient;
   person: string;
@@ -151,6 +151,16 @@ export function Settings(props: {
           <p className="ps-7 text-xs text-text-muted">{t('surface.settings.motionSystem')}</p>
         ) : null}
       </div>
+      <label htmlFor={`${id}-sound`} className="flex items-start gap-2 text-sm">
+        <input
+          id={`${id}-sound`}
+          type="checkbox"
+          className="mt-0.5 size-5 shrink-0 accent-primary"
+          checked={display.prefs.sound}
+          onChange={(e) => display.setSound(e.target.checked)}
+        />
+        <span>{t('surface.settings.sound')}</span>
+      </label>
       {props.emails ? <Emails client={props.client} person={props.person} /> : null}
     </section>
   );

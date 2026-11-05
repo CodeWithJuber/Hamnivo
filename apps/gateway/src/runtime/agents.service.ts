@@ -60,6 +60,7 @@ function versionView(row: VersionRow): AgentVersion {
     createdAt: row.createdAt.toISOString(),
     publishedAt: iso(row.publishedAt),
     publishedBy: row.publishedBy ? toPublicId('staff', row.publishedBy) : null,
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 

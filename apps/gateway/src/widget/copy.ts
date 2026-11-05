@@ -65,6 +65,42 @@ const PERSON_ONLINE: Record<Locale, string> = {
   ur: 'ہماری ٹیم کا ایک فرد آن لائن ہے اور جلد اس چیٹ میں شامل ہوگا۔',
 };
 
+/** What the customer is told after withdrawing a request for a person (HNV-10-02, HNV-10-05). */
+const RETURN_TO_ASSISTANT: Record<
+  Locale,
+  Record<'with_assistant' | 'person_joined' | 'with_people', string>
+> = {
+  en: {
+    with_assistant:
+      'You’re chatting with the assistant again. You can ask for a person at any time.',
+    person_joined: 'A person from our team has already joined this chat.',
+    with_people: 'This chat stays with our team. A person will answer you here.',
+  },
+  ar: {
+    with_assistant: 'أنت تتحدث مع المساعد مرة أخرى. يمكنك طلب شخص في أي وقت.',
+    person_joined: 'انضم أحد أفراد فريقنا إلى هذه المحادثة بالفعل.',
+    with_people: 'تبقى هذه المحادثة مع فريقنا. سيرد عليك شخص هنا.',
+  },
+  hi: {
+    with_assistant: 'आप फिर से सहायक से बात कर रहे हैं। आप कभी भी किसी व्यक्ति से बात करने को कह सकते हैं।',
+    person_joined: 'हमारी टीम का एक व्यक्ति इस चैट में पहले ही जुड़ चुका है।',
+    with_people: 'यह चैट हमारी टीम के पास रहेगी। कोई व्यक्ति आपको यहीं जवाब देगा।',
+  },
+  ur: {
+    with_assistant:
+      'آپ دوبارہ معاون سے بات کر رہے ہیں۔ آپ کسی بھی وقت کسی فرد سے بات کرنے کو کہہ سکتے ہیں۔',
+    person_joined: 'ہماری ٹیم کا ایک فرد اس چیٹ میں پہلے ہی شامل ہو چکا ہے۔',
+    with_people: 'یہ چیٹ ہماری ٹیم کے پاس رہے گی۔ کوئی فرد آپ کو یہیں جواب دے گا۔',
+  },
+};
+
+export function returnToAssistantMessage(
+  outcome: 'with_assistant' | 'person_joined' | 'with_people',
+  locale: string | null | undefined,
+): string {
+  return RETURN_TO_ASSISTANT[localeOf(locale)][outcome];
+}
+
 const localeOf = (locale: string | null | undefined): Locale =>
   (['en', 'ar', 'hi', 'ur'] as const).find((l) => l === locale) ?? 'en';
 
