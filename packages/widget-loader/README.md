@@ -118,7 +118,8 @@ website on the brand's allowed list.
 
 ```bash
 pnpm --filter @hamnivo/widget-loader build   # dist/loader.js (IIFE)
-pnpm --filter @hamnivo/widget-loader test    # builds, checks the gzipped size and the prompt rules
+pnpm turbo run test --filter=@hamnivo/widget-loader  # builds first, then checks the gzipped size,
+                                                     # the placement for each screen and the prompt rules
 ```
 
 Serve `dist/loader.js` next to the widget app (`apps/widget/dist`) from the same origin.

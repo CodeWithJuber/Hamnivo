@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "test": "tsdown && vitest run"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@hamnivo/domain": "workspace:*",
