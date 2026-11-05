@@ -748,7 +748,12 @@ describe('migration permissions', () => {
 
 describe('step-up on reads', () => {
   const admin = grant({
-    permissions: ['integrations.manage', 'audit.export', 'conversations.export'],
+    permissions: [
+      'integrations.manage',
+      'audit.export',
+      'conversations.export',
+      'customers.export',
+    ],
     scope: { type: 'tenant' },
   });
   const old = { authenticatedAt: minutesAgo(60) };
@@ -765,7 +770,11 @@ describe('step-up on reads', () => {
   });
 
   it('still asks for a recent sign-in to read an export', () => {
-    for (const permission of ['audit.export', 'conversations.export'] as const) {
+    for (const permission of [
+      'audit.export',
+      'conversations.export',
+      'customers.export',
+    ] as const) {
       expect(permissionSpec(permission)).toMatchObject({ stepUp: true, stepUpReads: true });
       expect(
         authorize(staff([admin], { ...old, reading: true }), permission, {}, { now }),

@@ -29,6 +29,10 @@ const tenant = {
 
 /** Every address a screen links to or sits on; the pages themselves are not rendered. */
 const PATHS = [
+  '/agency',
+  '/branding',
+  '/connectors',
+  '/workflows',
   '/overview',
   '/inbox',
   '/inbox/$conversationId',

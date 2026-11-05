@@ -10,6 +10,8 @@ import { BrandsController } from './admin/brands.controller.js';
 import { BrandsService } from './admin/brands.service.js';
 import { IdentityKeysController } from './admin/identity-keys.controller.js';
 import { IdentityKeysService } from './admin/identity-keys.service.js';
+import { AgencyController } from './agency/agency.controller.js';
+import { AgencyService } from './agency/agency.service.js';
 import { AuditController } from './audit/audit.controller.js';
 import { ChannelInboxesService } from './authority/channel-inboxes.service.js';
 import { ChannelsController } from './authority/channels.controller.js';
@@ -24,12 +26,19 @@ import { AuthorityRegistry } from './authority/registry.js';
 import { StaffLinksService } from './authority/staff-links.service.js';
 import { AutomationsController } from './automations/automations.controller.js';
 import { AutomationsService } from './automations/automations.service.js';
+import { AiCreditsController } from './billing/ai-credits.controller.js';
+import { AiCreditsService } from './billing/ai-credits.service.js';
+import { BrandingController, PublicBrandingController } from './branding/branding.controller.js';
+import { BrandingService } from './branding/branding.service.js';
 import { CacheController } from './cache/cache.controller.js';
 import { cacheAdminProviders, cacheProviders } from './cache/cache.providers.js';
 import { ChecksController } from './checks/checks.controller.js';
 import { COMMERCE_API_CONTROLLERS, COMMERCE_API_PROVIDERS } from './commerce/commerce.module.js';
 import { IdempotencyService } from './common/idempotency.service.js';
 import type { AppConfig } from './config.js';
+import { ConnectorsController } from './connectors/connectors.controller.js';
+import { ConnectorsService } from './connectors/connectors.service.js';
+import { WhmcsTools } from './connectors/whmcs-tools.service.js';
 import { StaffConversationsController } from './conversations/staff-conversations.controller.js';
 import { StaffConversationsService } from './conversations/staff-conversations.service.js';
 import { WhatsappTemplatesService } from './conversations/whatsapp-templates.service.js';
@@ -50,6 +59,8 @@ import { SsoRuntime } from './identity/sso/sso-runtime.js';
 import { StaffGuard } from './identity/staff.guard.js';
 import { TenantsService } from './identity/tenants.service.js';
 import { InboxAccess } from './inbox/access.js';
+import { AiDraftsController } from './inbox/ai-drafts.controller.js';
+import { AiDraftsService } from './inbox/ai-drafts.service.js';
 import { InboxAlertsController } from './inbox/alerts.controller.js';
 import { InboxAlertsService } from './inbox/alerts.service.js';
 import { AnnotationsService } from './inbox/annotations.service.js';
@@ -65,7 +76,11 @@ import { InboxService } from './inbox/inbox.service.js';
 import { LIBRARY_API_CONTROLLERS, LIBRARY_API_PROVIDERS } from './inbox/library.module.js';
 import { InboxLiveService } from './inbox/live.service.js';
 import { InboxMessagesService } from './inbox/messages.service.js';
+import { OffersController, RoutingProfilesController } from './inbox/offers.controller.js';
+import { OffersService } from './inbox/offers.service.js';
 import { InboxSignals } from './inbox/signals.service.js';
+import { SlaController } from './inbox/sla.controller.js';
+import { SlaService } from './inbox/sla.service.js';
 import { StatusService } from './inbox/status.service.js';
 import { TeamsService } from './inbox/teams.service.js';
 import { TicketsService } from './inbox/tickets.service.js';
@@ -103,6 +118,10 @@ import type { Mailer } from './platform/mailer.js';
 import { PlatformModule, type PlatformOverrides } from './platform/platform.module.js';
 import { SAAS_API_CONTROLLERS, SAAS_API_PROVIDERS } from './platform/saas.module.js';
 import { SignupPolicy } from './platform/signup.js';
+import { CustomerPrivacyController } from './privacy/customer-privacy.controller.js';
+import { CustomerPrivacyService } from './privacy/customer-privacy.service.js';
+import { RetentionController } from './privacy/retention.controller.js';
+import { RetentionService } from './privacy/retention.service.js';
 import { AgentsController } from './runtime/agents.controller.js';
 import { AgentsService } from './runtime/agents.service.js';
 import { KillSwitchesController } from './runtime/kill-switches.controller.js';
@@ -135,6 +154,10 @@ import { WidgetTokens } from './widget/tokens.service.js';
 import { WidgetTypingController } from './widget/typing.controller.js';
 import { WidgetController } from './widget/widget.controller.js';
 import { WidgetGuard } from './widget/widget.guard.js';
+import {
+  WORKFLOWS_API_CONTROLLERS,
+  WORKFLOWS_API_PROVIDERS,
+} from './workflows/workflows.module.js';
 
 export interface ApiOverrides extends PlatformOverrides, DeveloperOverrides {
   /** Replaces every agent's model (tests); agents otherwise use their configured model. */
@@ -155,11 +178,22 @@ export class ApiModule {
       controllers: [
         HealthController,
         AutomationsController,
+        AgencyController,
+        AiCreditsController,
+        ConnectorsController,
+        BrandingController,
+        PublicBrandingController,
         IdentityController,
         AdminController,
         SecretsController,
         AuditController,
         BrandsController,
+        SlaController,
+        RetentionController,
+        CustomerPrivacyController,
+        AiDraftsController,
+        OffersController,
+        RoutingProfilesController,
         IdentityKeysController,
         ConnectionsController,
         ChannelsController,
@@ -196,6 +230,7 @@ export class ApiModule {
         ...MCP_SERVER_API_CONTROLLERS,
         ...KNOWLEDGE_WEB_API_CONTROLLERS,
         ...PLAYGROUND_API_CONTROLLERS,
+        ...WORKFLOWS_API_CONTROLLERS,
       ],
       providers: [
         {
@@ -232,6 +267,11 @@ export class ApiModule {
         IdempotencyService,
         SecretBroker,
         BrandsService,
+        SlaService,
+        RetentionService,
+        CustomerPrivacyService,
+        AiDraftsService,
+        OffersService,
         IdentityKeysService,
         ConnectionsService,
         ChannelInboxesService,
@@ -256,6 +296,11 @@ export class ApiModule {
         StatusService,
         TicketsService,
         AutomationsService,
+        AgencyService,
+        ConnectorsService,
+        WhmcsTools,
+        BrandingService,
+        AiCreditsService,
         AnnotationsService,
         AssistService,
         CollaborationService,
@@ -298,6 +343,7 @@ export class ApiModule {
         ...MCP_SERVER_API_PROVIDERS,
         ...KNOWLEDGE_WEB_API_PROVIDERS,
         ...PLAYGROUND_API_PROVIDERS,
+        ...WORKFLOWS_API_PROVIDERS,
         { provide: APP_GUARD, useClass: StaffGuard },
         { provide: APP_GUARD, useClass: WidgetGuard },
       ],

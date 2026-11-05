@@ -1,11 +1,12 @@
 import type { Provider } from '@nestjs/common';
-import { QUERY_VECTOR_CACHE } from '../knowledge/retrieval.service.js';
+import { QUERY_VECTOR_CACHE, RETRIEVAL_CACHE } from '../knowledge/retrieval.service.js';
 import { MemoryCache } from '../memory/cache.js';
 import type { PlatformOverrides } from '../platform/platform.module.js';
 import { CONFIG } from '../tokens.js';
 import { CacheAdminService } from './admin.service.js';
 import { AnswerCache } from './answers.js';
 import { CacheService } from './cache.service.js';
+import { RetrievedPassages } from './retrieval.js';
 import {
   CACHE_PERSONAL_STORE,
   CACHE_STORE,
@@ -58,6 +59,8 @@ export function cacheProviders(overrides: PlatformOverrides): Provider[] {
     AnswerCache,
     QueryVectors,
     { provide: QUERY_VECTOR_CACHE, useExisting: QueryVectors },
+    RetrievedPassages,
+    { provide: RETRIEVAL_CACHE, useExisting: RetrievedPassages },
   ];
 }
 

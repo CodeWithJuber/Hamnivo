@@ -1,3 +1,4 @@
+import { aiDraftsAr } from './ai-drafts/ar';
 import { automationsAr } from './automations/ar';
 import { blockingAr } from './blocking/ar';
 import { cachingAr } from './caching';
@@ -8,7 +9,10 @@ import { commerceAr } from './commerce/ar';
 import { decisionsAr } from './decisions';
 import { developerAr } from './developer/ar';
 import type { Translation } from './en';
+import { offersAr } from './offers/ar';
+import { privacyAr } from './privacy/ar';
 import { reportsAr } from './reports/ar';
+import { slaAr } from './sla/ar';
 import { ticketsAr } from './tickets/ar';
 import { toolsAr } from './tools';
 import { chatSettingsAr } from './widget/ar';
@@ -533,7 +537,8 @@ export const ar: Translation = {
       answer: 'الرد على العملاء',
       answerHint: 'يرد في المحادثة.',
       assist: 'مساعدة الموظفين',
-      assistHint: 'يكتب اقتراحات كملاحظات داخلية. لا يرد على العملاء أبدًا.',
+      assistHint:
+        'يكتب مسودة رد ليوافق عليها فريقك أو يعدّلها أو يرفضها. لا يرد على العملاء من تلقاء نفسه أبدًا.',
     },
     provider: 'المزوّد',
     providers: {
@@ -713,7 +718,8 @@ export const ar: Translation = {
       public: 'إجابات عامة',
       internal: 'للفريق فقط',
       publicHint: 'يمكن أن تستند إليه الإجابات المقدمة للعملاء.',
-      internalHint: 'للموظفين ووضع المساعدة فقط. لا يُستخدم أبدًا في إجابات العملاء.',
+      internalHint:
+        'لفريقك فقط، كما في البحث في المعرفة. لا يُستخدم أبدًا في الإجابات أو المسودات للعملاء.',
     },
     sourceStatus: { active: 'نشط', paused: 'متوقف مؤقتًا', retired: 'مُستبعد' },
     sourceForm: {
@@ -981,12 +987,16 @@ export const ar: Translation = {
       label: 'قوائم الانتظار',
       mine: 'محادثاتي',
       unassigned: 'بانتظار شخص',
+      overdue: 'متأخرة',
       ai: 'يجيب الذكاء الاصطناعي',
       team: 'فرقي',
       tickets: 'التذاكر',
       all: 'الكل',
     },
     tickets: ticketsAr,
+    sla: slaAr,
+    aiDrafts: aiDraftsAr,
+    offers: offersAr,
     blocking: blockingAr,
     keys: {
       plain: 'المفاتيح: ↑ ↓ أو J K للتنقل، و Enter للفتح، و Esc للرجوع.',
@@ -1041,6 +1051,10 @@ export const ar: Translation = {
       unassigned: {
         title: 'لا أحد ينتظر شخصًا',
         description: 'عندما يطلب عميل شخصًا، تنتظر المحادثة هنا.',
+      },
+      overdue: {
+        title: 'لا شيء متأخر',
+        description: 'تظهر هنا المحادثات التي تجاوزت هدف وقت الرد، الأكثر تأخرًا أولًا.',
       },
       ai: {
         title: 'الذكاء الاصطناعي لا يجيب أحدًا الآن',
@@ -1397,6 +1411,7 @@ export const ar: Translation = {
   commerce: commerceAr,
   developer: developerAr,
   reports: reportsAr,
+  privacy: privacyAr,
   chatSettings: chatSettingsAr,
   chatWidget: chatWidgetAr,
   channels: channelsAr,
@@ -2324,6 +2339,8 @@ export const ar: Translation = {
     },
   },
   permissionAreas: {
+    agency: 'الوكالة',
+    branding: 'العلامة التجارية',
     conversations: 'المحادثات',
     visitors: 'الزوار',
     inbox: 'صناديق الوارد والتوجيه',
@@ -2353,9 +2370,19 @@ export const ar: Translation = {
     migration: 'الاستيراد',
     settings: 'إعدادات مساحة العمل',
     security: 'الأمان',
+    privacy: 'الخصوصية',
+    customers: 'بيانات العملاء',
     support: 'وصول الدعم',
   },
   permissions: {
+    agency: {
+      read: 'عرض إعدادات الوكالة ودليل العملاء',
+      manage: 'إدارة إعدادات الوكالة وروابط العملاء المستقلين',
+    },
+    branding: {
+      read: 'عرض علامة البوابة والنطاقات المخصصة',
+      manage: 'إدارة علامة البوابة والنطاقات المخصصة الموثقة',
+    },
     conversations: {
       read: 'قراءة المحادثات وسجل العميل',
       reply: 'الرد على العملاء',
@@ -2448,6 +2475,11 @@ export const ar: Translation = {
     },
     settings: { manage: 'تعديل إعدادات مساحة العمل' },
     security: { manage: 'إعداد تسجيل الدخول والدخول الموحّد وقواعد الجلسات' },
+    privacy: { manage: 'اختيار مدة الاحتفاظ بالمحادثات قبل حذفها' },
+    customers: {
+      export: 'تنزيل كل ما يخص عميلًا واحدًا، لطلب الاطلاع على البيانات',
+      erase: 'محو عميل واحد من كل مكان، بما في ذلك Chatwoot، لطلب المحو',
+    },
     support: { grant: 'السماح لدعم Hamnivo بالوصول إلى مساحة العمل هذه' },
   },
 };

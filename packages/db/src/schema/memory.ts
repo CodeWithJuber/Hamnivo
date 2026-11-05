@@ -13,7 +13,6 @@ import {
   uuid,
   vector,
 } from 'drizzle-orm/pg-core';
-import { conversationControls } from './authority.js';
 import { bytea, createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { customerPrincipals } from './identity.js';
 import { EMBEDDING_DIMENSIONS } from './knowledge.js';
@@ -37,7 +36,8 @@ export const CONSENT_SCOPES = [
 /**
  * Consent decisions, one row per decision (append-only: the application can neither change nor
  * delete them). The latest row per customer and scope is the current choice. Personal memory is
- * one scope; learning and training are separate scopes and are never bundled with it.
+ * one scope; learning and training are separate scopes and are never bundled with it. A decision
+ * outlives the customer when retention removes them (A10), so it has no foreign key to them.
  */
 export const learningConsents = pgTable(
   'learning_consents',
@@ -61,11 +61,6 @@ export const learningConsents = pgTable(
       name: 'learning_consents_brand_fk',
       columns: [t.tenantId, t.brandId],
       foreignColumns: [brands.tenantId, brands.id],
-    }),
-    foreignKey({
-      name: 'learning_consents_subject_fk',
-      columns: [t.tenantId, t.subjectId],
-      foreignColumns: [customerPrincipals.tenantId, customerPrincipals.id],
     }),
     check(
       'learning_consents_scope_ck',
@@ -201,11 +196,6 @@ export const memoryRecords = pgTable(
       name: 'memory_records_subject_fk',
       columns: [t.tenantId, t.subjectId],
       foreignColumns: [customerPrincipals.tenantId, customerPrincipals.id],
-    }),
-    foreignKey({
-      name: 'memory_records_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
     }),
     check(
       'memory_records_status_ck',

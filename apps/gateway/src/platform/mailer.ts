@@ -10,6 +10,8 @@ export interface MailMessage {
   html?: string;
   /** The display name of the sender, such as a workspace's own; the address stays MAIL_FROM's. */
   senderName?: string;
+  /** Customer reply destination; never changes the authorized sending address. */
+  replyTo?: string;
   /** Stable identifier of the template, e.g. `auth.verify-email`. */
   template: string;
   /** Extra headers, such as List-Unsubscribe for customer emails. */
@@ -65,6 +67,7 @@ export class SmtpMailer implements Mailer {
     await this.transport.sendMail({
       // nodemailer quotes and encodes the name; the address is always the server's own.
       from: name ? { name, address: addressOf(this.from) } : this.from,
+      ...(message.replyTo ? { replyTo: message.replyTo } : {}),
       to: message.to,
       subject: message.subject,
       text: message.text,

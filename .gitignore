@@ -38,4 +38,5 @@ apps/docs/src/content/docs/automation/*.md
 apps/docs/src/content/docs/ai/*.md
 apps/docs/src/content/docs/integrations/*.md
 apps/docs/src/content/docs/saas/*.md
+apps/docs/src/content/docs/agency.md
 apps/docs/public/favicon.svg

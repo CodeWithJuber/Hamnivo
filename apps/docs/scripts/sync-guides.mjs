@@ -63,6 +63,26 @@ for (const area of areas) {
   }
 }
 
+// Agency is a single guide rather than an area. Keep it at /docs/agency/ beside the static
+// team guide, while using the same heading-to-front-matter behavior as area guides.
+try {
+  const file = 'agency.md';
+  let text = readFileSync(join(source, file), 'utf8');
+  if (!text.startsWith('---')) {
+    const heading = text.match(/^#\s+(.+)$/m);
+    const title = heading ? heading[1].trim() : 'Agency clients';
+    if (heading) text = text.replace(heading[0], '').replace(/^\s+/, '');
+    text = `---\ntitle: ${JSON.stringify(title)}\n---\n\n${text}`;
+  }
+  writeFileSync(join(target, file), siteLinks(text, '.'));
+  copied += 1;
+} catch (error) {
+  // The docs app still builds before agency mode is included in a release. Other copy failures
+  // must remain visible instead of silently publishing stale content.
+  if (error?.code !== 'ENOENT') throw error;
+  rmSync(join(target, 'agency.md'), { force: true });
+}
+
 // Starlight looks for the tab icon at /docs/favicon.svg.
 mkdirSync(join(here, '../public'), { recursive: true });
 copyFileSync(

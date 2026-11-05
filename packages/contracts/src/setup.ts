@@ -234,6 +234,9 @@ export const WidgetAppearance = z
     logoUrl: HttpsUrl.nullable().default(null),
     /** How round the corners are, 0 to 24 pixels. */
     radius: z.int().min(0).max(24).default(DEFAULT_RADIUS),
+    fontFamily: z.enum(['system', 'dm-sans', 'noto-sans']).default('system'),
+    launcherLabel: LocalizedText(80).nullable().default(null),
+    showBranding: z.boolean().default(true),
     greeting: LocalizedText(300).nullable().default(null),
     /** What customers read when nobody on the team is online. `{when}` becomes the time people are back. */
     offlineText: LocalizedText(300).nullable().default(null),
@@ -248,10 +251,18 @@ export const UpdateWidgetAppearanceRequest = WidgetAppearance.meta({
   id: 'UpdateWidgetAppearanceRequest',
 });
 
+export const SaveWidgetAppearanceDraftRequest = z.object({
+  appearance: WidgetAppearance,
+  expectedRevision: z.int().nonnegative(),
+});
+export const PublishWidgetAppearanceRequest = z.object({ expectedRevision: z.int().nonnegative() });
+
 export const WidgetAppearanceView = z
   .object({
     brandId: typeId('brand'),
     appearance: WidgetAppearance,
+    draftAppearance: WidgetAppearance.nullable().optional(),
+    draftRevision: z.int().nonnegative().optional(),
     /** The configuration version the widget sees after this save. */
     configVersion: z.int().positive(),
     updatedAt: Timestamp.nullable(),
@@ -274,12 +285,22 @@ export const ONBOARDING_STEPS = [
 export const OnboardingStep = z.enum(ONBOARDING_STEPS).meta({ id: 'OnboardingStep' });
 export type OnboardingStep = z.infer<typeof OnboardingStep>;
 
+export const OnboardingUseCase = z.enum([
+  'support',
+  'lead',
+  'billing',
+  'service',
+  'afterhours',
+  'handoff',
+]);
+
 export const OnboardingStepState = z.enum(['done', 'skipped']).meta({ id: 'OnboardingStepState' });
 
 /** Where the owner is in setup. A step that is not listed has not been dealt with yet. */
 export const OnboardingProgress = z
   .object({
     steps: z.partialRecord(OnboardingStep, OnboardingStepState),
+    useCase: OnboardingUseCase.nullable().optional(),
     /** The brand the wizard is working on, once there is one. */
     brandId: typeId('brand').nullable(),
     finishedAt: Timestamp.nullable(),
@@ -294,10 +315,14 @@ export const UpdateOnboardingRequest = z
     steps: z.partialRecord(OnboardingStep, OnboardingStepState.nullable()).optional(),
     brandId: typeId('brand').nullable().optional(),
     finished: z.boolean().optional(),
+    useCase: OnboardingUseCase.nullable().optional(),
   })
   .refine(
     (value) =>
-      value.steps !== undefined || value.brandId !== undefined || value.finished !== undefined,
+      value.steps !== undefined ||
+      value.brandId !== undefined ||
+      value.finished !== undefined ||
+      value.useCase !== undefined,
     { message: 'Send steps, a brand or finished' },
   )
   .meta({ id: 'UpdateOnboardingRequest' });

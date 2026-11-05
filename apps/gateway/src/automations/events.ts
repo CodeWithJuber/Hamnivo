@@ -1,6 +1,7 @@
 import { schema, type TenantTx } from '@hamnivo/db';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { enqueueOutbox } from '../outbox/outbox.js';
+import { queueWorkflowEvent } from '../workflows/workflow-events.js';
 
 /** Outbox topic for chat automations (G21), handled by `AutomationRunner`. */
 export const AUTOMATION_TOPIC = 'automation.event';
@@ -54,7 +55,11 @@ export async function queueAutomationEvent(
   payload: AutomationEventPayload,
   availableAt?: Date,
 ): Promise<void> {
-  if (!brandId || !(await hasChatRules(tx, brandId))) return;
+  if (!brandId) return;
+  if (payload.event !== 'customer_waiting') {
+    await queueWorkflowEvent(tx, tenantId, payload);
+  }
+  if (!(await hasChatRules(tx, brandId))) return;
   await enqueueOutbox(tx, tenantId, {
     topic: AUTOMATION_TOPIC,
     aggregateType: 'conversation',

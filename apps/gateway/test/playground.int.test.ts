@@ -306,6 +306,27 @@ describe('trying an agent', () => {
     expect(system(seen[0])).not.toContain('hush-hush-77');
   });
 
+  it('drafts for review from the same public knowledge as a live assist draft', async () => {
+    await saveDraft({ mode: 'assist' });
+    try {
+      turns.push({ text: 'Here is what our policy says [1]. The Noor team.' });
+      const result = await tryOnce('What is the staff discount code?');
+      expect(result.steps).toContainEqual(
+        expect.objectContaining({ kind: 'guard', name: 'assist_mode', status: 'ok' }),
+      );
+      const retrieval = result.steps.find((step: Record<string, any>) => step.kind === 'retrieval');
+      expect(retrieval).toMatchObject({ detail: { audience: 'customer' } });
+      // An approved draft is sent as it is: the team-only source is neither given nor cited.
+      expect(system(seen[0])).toContain('suggested reply for a support agent');
+      expect(system(seen[0])).not.toContain('hush-hush-77');
+      expect(result.sources.map((source: Record<string, any>) => source.title)).not.toContain(
+        'Discounts',
+      );
+    } finally {
+      await saveDraft({ mode: 'answer' });
+    }
+  });
+
   it('drops citations that match nothing, as a live reply does', async () => {
     turns.push({ text: 'Returns take thirty days [7]. The Noor team.' });
     const result = await tryOnce('How do I return something?');
@@ -516,21 +537,43 @@ describe('tools', () => {
 describe('when the model does not answer', () => {
   beforeAll(newMinute);
 
-  it('tries the agent’s fallback model when the main one is overloaded', async () => {
-    await saveDraft({
-      fallbackModels: [{ provider: 'mock', modelId: 'hamnivo-mock' }],
-    });
-    turns.push({ status: 529, error: 'Overloaded', type: 'overloaded_error' });
+  it('never silently falls back from BYOK to platform credentials', async () => {
+    await saveDraft({ fallbackModels: [{ provider: 'mock', modelId: 'hamnivo-mock' }] });
+    turns.push({ status: 429, error: 'Rate limited', type: 'rate_limit_error' });
     const result = await tryOnce('Hello');
-    expect(result).toMatchObject({ outcome: 'replied', model: { provider: 'mock' } });
+    expect(result).toMatchObject({ outcome: 'error', errorKind: 'rate_limited', model: null });
     expect(
       result.steps
         .filter((s: Record<string, any>) => s.kind === 'model')
         .map((s: Record<string, any>) => [s.status, s.detail.index, s.detail.errorKind]),
-    ).toEqual([
-      ['error', 0, 'overloaded'],
-      ['ok', 1, undefined],
-    ]);
+    ).toEqual([['error', 0, 'rate_limited']]);
+    expect(seen).toHaveLength(1);
+    await saveDraft({ fallbackModels: [] });
+  });
+
+  it('uses an explicitly configured BYOK fallback after a definite rejected request', async () => {
+    await saveDraft({
+      fallbackModels: [{ provider: 'openai-compatible', modelId: 'test-backup', connectionId }],
+    });
+    turns.push({ status: 429, error: 'Rate limited', type: 'rate_limit_error' });
+    const result = await tryOnce('Hello');
+    expect(result).toMatchObject({
+      outcome: 'replied',
+      model: { provider: 'openai-compatible', modelId: 'test-backup' },
+    });
+    expect(seen.map((call) => call.body.model)).toEqual(['test-model', 'test-backup']);
+    expect(seen.every((call) => call.authorization === `Bearer ${CONNECTION_KEY}`)).toBe(true);
+    await saveDraft({ fallbackModels: [] });
+  });
+
+  it('keeps an unknown provider outcome held without trying the fallback', async () => {
+    await saveDraft({
+      fallbackModels: [{ provider: 'openai-compatible', modelId: 'test-backup', connectionId }],
+    });
+    turns.push({ status: 529, error: 'Overloaded', type: 'overloaded_error' });
+    const result = await tryOnce('Hello');
+    expect(result).toMatchObject({ outcome: 'error', errorKind: 'usage_unresolved', model: null });
+    expect(seen).toHaveLength(1);
     await saveDraft({ fallbackModels: [] });
   });
 
@@ -665,7 +708,7 @@ describe('who may try it, and how often', () => {
 });
 
 describe('the record', () => {
-  it('counts the tokens like any run, and audits counts without what was typed', async () => {
+  it('records managed and BYOK tokens separately, and audits counts without what was typed', async () => {
     const usage = await withTenant(slice.app, { tenantId }, (tx) =>
       tx
         .select({
@@ -673,12 +716,31 @@ describe('the record', () => {
           total: sql<number>`sum(${schema.usageEntries.quantity})`,
         })
         .from(schema.usageEntries)
-        .where(sql`${schema.usageEntries.dedupeKey} like 'playground:%'`)
+        .where(sql`${schema.usageEntries.dedupeKey} like 'ai:playground:%'`)
         .groupBy(schema.usageEntries.meter),
     );
     const byMeter = Object.fromEntries(usage.map((row) => [row.meter, Number(row.total)]));
-    expect(byMeter['ai.tokens.input']).toBeGreaterThan(0);
-    expect(byMeter['ai.tokens.output']).toBeGreaterThan(0);
+    const attempts = await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .select()
+        .from(schema.aiCreditAttempts)
+        .where(sql`${schema.aiCreditAttempts.attemptKey} like 'playground:%'`),
+    );
+    const managed = attempts.filter((attempt) => attempt.source === 'managed');
+    const byok = attempts.filter((attempt) => attempt.source === 'byok');
+    expect(managed.length).toBeGreaterThan(0);
+    expect(byok.length).toBeGreaterThan(0);
+    expect(
+      byok.every((attempt) => attempt.creditsMilli === 0 && attempt.reservedTokens === 0),
+    ).toBe(true);
+    expect(byMeter['ai.tokens.input']).toBe(
+      managed.reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0),
+    );
+    expect(byMeter['ai.tokens.output']).toBe(
+      managed.reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0),
+    );
+    expect(byok.reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0)).toBeGreaterThan(0);
+    expect(byok.reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0)).toBeGreaterThan(0);
     // No test is an AI reply a customer received.
     expect(await replyMeter()).toBe(0);
 
@@ -765,12 +827,17 @@ describe('plans and budgets', () => {
     });
 
   it('stops when the plan’s tokens are used, and not because its replies are', async () => {
-    await operations.setPlan(plan('few-tokens', 1));
+    await operations.setPlan(plan('few-tokens', 1000000));
     const small = await connectedTenant(slice, 'play4');
     await operations.assignPlan(small.tenantId, 'few-tokens');
     // The plan allows no AI replies at all, yet a test is no reply: it runs while tokens are left.
     const first = await tryLive(small.owner, small.agentId);
     expect(first.status, JSON.stringify(first.body)).toBe(200);
+    // Set the ceiling to the measured usage; atomic admission never allows an oversized first call.
+    const used = first.body.inputTokens + first.body.outputTokens;
+    expect(used).toBeGreaterThan(0);
+    await operations.setPlan(plan('few-tokens', used));
+    await operations.assignPlan(small.tenantId, 'few-tokens');
     const second = await tryLive(small.owner, small.agentId);
     expect(second.status).toBe(402);
     expect(second.body.code).toBe('PLAN_LIMIT_REACHED');
@@ -782,11 +849,22 @@ describe('plans and budgets', () => {
     const budgeted = await connectedTenant(slice, 'play5');
     await operations.assignPlan(budgeted.tenantId, 'many-tokens');
     const set = await budgeted.owner.put('/v1/admin/billing/budget', {
-      aiTokens: 1,
+      aiTokens: 1000000,
       alertThresholds: [],
     });
     expect(set.status, JSON.stringify(set.body)).toBe(200);
-    expect((await tryLive(budgeted.owner, budgeted.agentId)).status).toBe(200);
+    const first = await tryLive(budgeted.owner, budgeted.agentId);
+    expect(first.status).toBe(200);
+    const used = first.body.inputTokens + first.body.outputTokens;
+    expect(used).toBeGreaterThan(0);
+    expect(
+      (
+        await budgeted.owner.put('/v1/admin/billing/budget', {
+          aiTokens: used,
+          alertThresholds: [],
+        })
+      ).status,
+    ).toBe(200);
     const refused = await tryLive(budgeted.owner, budgeted.agentId);
     expect(refused.status).toBe(429);
     expect(refused.body).toMatchObject({

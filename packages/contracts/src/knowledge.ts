@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { LanguageTag, Timestamp } from './common.js';
 import { typeId } from './ids.js';
 
-/** `public`: may ground answers to customers. `internal`: staff and assist mode only. */
+/** `public`: may ground answers and AI drafts for customers. `internal`: staff search only. */
 export const KnowledgeVisibility = z.enum(['public', 'internal']);
 
 /** An approved knowledge source with an owner and a review cycle (G04). */

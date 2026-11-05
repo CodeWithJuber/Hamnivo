@@ -1,5 +1,5 @@
 import { defaultStorage, HamnivoClient, prefixedStorage } from '@hamnivo/client';
-import type { WidgetLayoutMode } from '@hamnivo/contracts';
+import type { WidgetAppearance, WidgetLayoutMode } from '@hamnivo/contracts';
 import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,7 @@ import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
 import { type ChatSnapshot, eventsBetween, snapshotOf } from './hostEvents.js';
 import { applyLocale, type Locale } from './i18n.js';
+import { previewConfig, previewTextColour, readPreview } from './preview.js';
 import { applyTheme } from './theme.js';
 import { CHAT_OFFLINE, useChat } from './useChat.js';
 import { useDisplay } from './useDisplay.js';
@@ -50,6 +51,20 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     [params],
   );
   const chat = useChat(client);
+  const [preview, setPreview] = useState<WidgetAppearance | null>(null);
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      const next = readPreview(event, window.parent, params.hostOrigin, params.test === true);
+      if (next) setPreview(next);
+    };
+    if (!params.test) return;
+    window.addEventListener('message', receive);
+    window.parent.postMessage(
+      { source: 'hamnivo-widget-preview', ready: true },
+      params.hostOrigin ?? window.location.origin,
+    );
+    return () => window.removeEventListener('message', receive);
+  }, [params.test, params.hostOrigin]);
   // On its own page the chat is the page: the tab says whose chat it is.
   const brandName = chat.state.session?.config.brand.name;
   useEffect(() => {
@@ -68,14 +83,17 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const visitor = useVisitor(client, chat.state.session?.principal.id ?? null, locale);
   const display = useDisplay(params.widgetId);
   // The brand's colour and corners (W03); Hamnivo's own look stays as it is.
-  const accent = chat.state.session?.config.brand.accent;
-  const onAccent = chat.state.session?.config.brand.onAccent;
-  const radius = chat.state.session?.config.brand.radius;
+  const accent = preview?.primaryColor ?? chat.state.session?.config.brand.accent;
+  const onAccent = preview
+    ? previewTextColour(preview.primaryColor)
+    : chat.state.session?.config.brand.onAccent;
+  const radius = preview?.radius ?? chat.state.session?.config.brand.radius;
+  const fontFamily = preview?.fontFamily ?? chat.state.session?.config.brand.fontFamily;
   useEffect(() => {
     if (accent !== undefined && onAccent !== undefined && radius !== undefined) {
-      applyTheme(document.documentElement, { accent, onAccent, radius });
+      applyTheme(document.documentElement, { accent, onAccent, radius, fontFamily });
     }
-  }, [accent, onAccent, radius]);
+  }, [accent, onAccent, radius, fontFamily]);
   // Embedded, the chat is on screen only while the loader shows it; on its own page, always.
   const [open, setOpen] = useState(
     !params.hostOrigin || params.mode === 'inline' || params.mode === 'fullpage',
@@ -200,7 +218,9 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       </p>
     );
   }
-  const session = chat.state.session;
+  const session = preview
+    ? { ...chat.state.session, config: previewConfig(chat.state.session.config, preview) }
+    : chat.state.session;
   const mode = params.mode ?? session.config.layout?.mode ?? 'bubble';
   // Only the brand's own words, from its configuration (the page sends nothing but the id), or a
   // message the team left for this visitor, which comes from the gateway, not from the page.

@@ -1,3 +1,4 @@
+import { aiDraftsUr } from './ai-drafts/ur';
 import { automationsUr } from './automations/ur';
 import { blockingUr } from './blocking/ur';
 import { cachingUr } from './caching';
@@ -8,7 +9,10 @@ import { commerceUr } from './commerce/ur';
 import { decisionsUr } from './decisions';
 import { developerUr } from './developer/ur';
 import type { Translation } from './en';
+import { offersUr } from './offers/ur';
+import { privacyUr } from './privacy/ur';
 import { reportsUr } from './reports/ur';
+import { slaUr } from './sla/ur';
 import { ticketsUr } from './tickets/ur';
 import { toolsUr } from './tools';
 import { chatSettingsUr } from './widget/ur';
@@ -545,7 +549,8 @@ export const ur: Translation = {
       answer: 'گاہکوں کو جواب دیں',
       answerHint: 'چیٹ میں جواب دیتا ہے۔',
       assist: 'عملے کی مدد کریں',
-      assistHint: 'تجاویز اندرونی نوٹس کے طور پر لکھتا ہے۔ گاہکوں کو کبھی جواب نہیں دیتا۔',
+      assistHint:
+        'آپ کی ٹیم کے لیے جواب کا مسودہ لکھتا ہے، جسے وہ منظور کریں، ترمیم کریں یا مسترد کریں۔ گاہکوں کو خود کبھی جواب نہیں دیتا۔',
     },
     provider: 'فراہم کنندہ',
     providers: {
@@ -730,7 +735,8 @@ export const ur: Translation = {
       public: 'عوامی جوابات',
       internal: 'صرف ٹیم',
       publicHint: 'گاہکوں کے جوابات کی بنیاد بن سکتا ہے۔',
-      internalHint: 'صرف عملے اور مدد کے موڈ کے لیے۔ گاہکوں کے جوابات میں کبھی استعمال نہیں ہوتا۔',
+      internalHint:
+        'صرف آپ کی ٹیم کے لیے، جیسے معلومات کی تلاش میں۔ گاہکوں کے جوابات یا مسودوں میں کبھی استعمال نہیں ہوتا۔',
     },
     sourceStatus: { active: 'فعال', paused: 'موقوف', retired: 'استعمال بند' },
     sourceForm: {
@@ -1003,12 +1009,16 @@ export const ur: Translation = {
       label: 'قطاریں',
       mine: 'میری',
       unassigned: 'کسی شخص کا انتظار',
+      overdue: 'تاخیر والی',
       ai: 'AI جواب دے رہا ہے',
       team: 'میری ٹیمیں',
       tickets: 'ٹکٹ',
       all: 'سب',
     },
     tickets: ticketsUr,
+    sla: slaUr,
+    aiDrafts: aiDraftsUr,
+    offers: offersUr,
     blocking: blockingUr,
     keys: {
       plain: 'کلیدیں: حرکت کے لیے ↑ ↓ یا J K، کھولنے کے لیے Enter، واپسی کے لیے Esc۔',
@@ -1064,6 +1074,11 @@ export const ur: Translation = {
       unassigned: {
         title: 'کوئی کسی شخص کا انتظار نہیں کر رہا',
         description: 'جب کوئی صارف کسی شخص سے بات کرنا چاہے تو گفتگو یہاں انتظار کرتی ہے۔',
+      },
+      overdue: {
+        title: 'کچھ بھی تاخیر میں نہیں',
+        description:
+          'جواب کے وقت کا ہدف پار کر چکی گفتگو یہاں نظر آتی ہیں، سب سے زیادہ تاخیر والی پہلے۔',
       },
       ai: {
         title: 'AI اس وقت کسی کو جواب نہیں دے رہا',
@@ -1423,6 +1438,7 @@ export const ur: Translation = {
   commerce: commerceUr,
   developer: developerUr,
   reports: reportsUr,
+  privacy: privacyUr,
   chatSettings: chatSettingsUr,
   chatWidget: chatWidgetUr,
   channels: channelsUr,
@@ -2369,6 +2385,8 @@ export const ur: Translation = {
     },
   },
   permissionAreas: {
+    agency: 'ایجنسی',
+    branding: 'برانڈنگ',
     conversations: 'گفتگو',
     visitors: 'وزیٹر',
     inbox: 'ان باکس اور روٹنگ',
@@ -2398,9 +2416,19 @@ export const ur: Translation = {
     migration: 'درآمد',
     settings: 'ورک اسپیس کی ترتیبات',
     security: 'سیکیورٹی',
+    privacy: 'رازداری',
+    customers: 'گاہکوں کا ڈیٹا',
     support: 'سپورٹ کی رسائی',
   },
   permissions: {
+    agency: {
+      read: 'ایجنسی ترتیبات اور کلائنٹ فہرست دیکھیں',
+      manage: 'ایجنسی ترتیبات اور آزاد کلائنٹ لنک کا نظم کریں',
+    },
+    branding: {
+      read: 'پورٹل برانڈنگ اور مخصوص ڈومین دیکھیں',
+      manage: 'پورٹل برانڈنگ اور تصدیق شدہ مخصوص ڈومین کا نظم کریں',
+    },
     conversations: {
       read: 'گفتگو اور کسٹمر کی تاریخ پڑھیں',
       reply: 'کسٹمرز کو جواب دیں',
@@ -2493,6 +2521,11 @@ export const ur: Translation = {
     },
     settings: { manage: 'ورک اسپیس کی ترتیبات بدلیں' },
     security: { manage: 'سائن اِن، سنگل سائن آن اور سیشن کے اصول سیٹ کریں' },
+    privacy: { manage: 'طے کریں کہ گفتگو مٹائے جانے سے پہلے کتنی دیر رکھی جائے' },
+    customers: {
+      export: 'کسی ایک گاہک کی ساری معلومات ڈاؤن لوڈ کریں، ڈیٹا دیکھنے کی درخواست کے لیے',
+      erase: 'کسی ایک گاہک کو ہر جگہ سے مٹائیں، Chatwoot سمیت، مٹانے کی درخواست کے لیے',
+    },
     support: { grant: 'Hamnivo سپورٹ کو اس ورک اسپیس تک رسائی دیں' },
   },
 };

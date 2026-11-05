@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  AiDraftDecisionResult,
+  AiDraftList,
+  ApproveAiDraftRequest,
+  RejectAiDraftRequest,
+} from './ai-drafts.js';
 import { StreamControl } from './events.js';
 import {
   AssigneeOptions,
@@ -44,7 +50,18 @@ import {
   TeamAssignRequest,
   TransferRequest,
   TranslateRequest,
+  UpdateTeamRequest,
+  UrgentList,
+  UrgentQuery,
 } from './inbox.js';
+import {
+  DeclineOfferRequest,
+  OfferDecisionResult,
+  OfferList,
+  RoutingProfile,
+  RoutingProfileList,
+  SetRoutingProfileRequest,
+} from './offers.js';
 import type { RouteDef } from './routes.js';
 
 const conversation = z.object({
@@ -67,6 +84,17 @@ export const inboxRoutes = {
     auth: 'staff_session',
     query: InboxListQuery,
     success: { status: 200, description: 'A page of conversations', schema: InboxPage },
+  },
+  listUrgentConversations: {
+    method: 'get',
+    path: '/v1/inbox/urgent',
+    operationId: 'listUrgentConversations',
+    summary:
+      'Urgent conversations waiting for a person, soonest reply deadline first (conversations.read)',
+    tags: tag,
+    auth: 'staff_session',
+    query: UrgentQuery,
+    success: { status: 200, description: 'Urgent conversations', schema: UrgentList },
   },
   searchInbox: {
     method: 'get',
@@ -336,6 +364,40 @@ export const inboxRoutes = {
     body: CopilotRequest,
     success: { status: 200, description: 'Suggestion', schema: CopilotSuggestion },
   },
+  listAiDrafts: {
+    method: 'get',
+    path: '/v1/inbox/conversations/{conversationId}/ai-drafts',
+    operationId: 'listAiDrafts',
+    summary:
+      'The AI draft waiting for review, and the one before it (HNV-09-05) (conversations.read)',
+    tags: tag,
+    auth: 'staff_session',
+    params: conversation,
+    success: { status: 200, description: 'Drafts', schema: AiDraftList },
+  },
+  approveAiDraft: {
+    method: 'post',
+    path: '/v1/inbox/conversations/{conversationId}/ai-drafts/{draftId}/approve',
+    operationId: 'approveAiDraft',
+    summary:
+      'Send an AI draft as yourself, as written or edited; a retry sends once (conversations.reply)',
+    tags: tag,
+    auth: 'staff_session',
+    params: conversation.extend({ draftId: z.string().meta({ description: 'Draft ID (aidr_…)' }) }),
+    body: ApproveAiDraftRequest,
+    success: { status: 200, description: 'Sent', schema: AiDraftDecisionResult },
+  },
+  rejectAiDraft: {
+    method: 'post',
+    path: '/v1/inbox/conversations/{conversationId}/ai-drafts/{draftId}/reject',
+    operationId: 'rejectAiDraft',
+    summary: 'Reject an AI draft with a reason; nothing is sent (conversations.reply)',
+    tags: tag,
+    auth: 'staff_session',
+    params: conversation.extend({ draftId: z.string().meta({ description: 'Draft ID (aidr_…)' }) }),
+    body: RejectAiDraftRequest,
+    success: { status: 200, description: 'Rejected', schema: AiDraftDecisionResult },
+  },
   translateMessage: {
     method: 'post',
     path: '/v1/inbox/conversations/{conversationId}/messages/{messageId}/translation',
@@ -436,6 +498,67 @@ export const inboxRoutes = {
     auth: 'staff_session',
     body: CreateTeamRequest,
     success: { status: 201, description: 'Team', schema: Team },
+  },
+  updateTeam: {
+    method: 'patch',
+    path: '/v1/admin/teams/{teamId}',
+    operationId: 'updateTeam',
+    summary: 'Rename a team, or choose how conversations reach its people (teams.manage)',
+    tags: ['Teams'],
+    auth: 'staff_session',
+    params: z.object({ teamId: z.string().meta({ description: 'Team ID (team_…)' }) }),
+    body: UpdateTeamRequest,
+    success: { status: 200, description: 'Team', schema: Team },
+  },
+  listRoutingProfiles: {
+    method: 'get',
+    path: '/v1/admin/routing-profiles',
+    operationId: 'listRoutingProfiles',
+    summary: 'The languages each person answers in and their open-chat limit (members.read)',
+    tags: ['Teams'],
+    auth: 'staff_session',
+    success: { status: 200, description: 'Routing profiles', schema: RoutingProfileList },
+  },
+  setRoutingProfile: {
+    method: 'put',
+    path: '/v1/admin/routing-profiles/{staffMemberId}',
+    operationId: 'setRoutingProfile',
+    summary: 'Set the languages a person answers in and their open-chat limit (teams.manage)',
+    tags: ['Teams'],
+    auth: 'staff_session',
+    params: z.object({ staffMemberId: z.string().meta({ description: 'Staff ID (stf_…)' }) }),
+    body: SetRoutingProfileRequest,
+    success: { status: 200, description: 'Routing profile', schema: RoutingProfile },
+  },
+  listMyOffers: {
+    method: 'get',
+    path: '/v1/inbox/offers',
+    operationId: 'listMyOffers',
+    summary: 'Conversations offered to me now, to accept or decline (conversations.read)',
+    tags: tag,
+    auth: 'staff_session',
+    success: { status: 200, description: 'Offers', schema: OfferList },
+  },
+  acceptOffer: {
+    method: 'post',
+    path: '/v1/inbox/offers/{offerId}/accept',
+    operationId: 'acceptOffer',
+    summary: 'Accept a conversation offered to me; it becomes mine (conversations.takeover)',
+    tags: tag,
+    auth: 'staff_session',
+    params: z.object({ offerId: z.string().meta({ description: 'Offer ID (ofr_…)' }) }),
+    success: { status: 200, description: 'Accepted', schema: OfferDecisionResult },
+  },
+  declineOffer: {
+    method: 'post',
+    path: '/v1/inbox/offers/{offerId}/decline',
+    operationId: 'declineOffer',
+    summary: 'Decline a conversation offered to me, with a reason; it goes to the next person',
+    tags: tag,
+    auth: 'staff_session',
+    params: z.object({ offerId: z.string().meta({ description: 'Offer ID (ofr_…)' }) }),
+    body: DeclineOfferRequest,
+    success: { status: 200, description: 'Declined', schema: OfferDecisionResult },
   },
   setTeamMembers: {
     method: 'put',

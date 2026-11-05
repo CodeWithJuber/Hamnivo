@@ -5,20 +5,24 @@ import type {
   InboxListQuery,
   InboxSearchQuery,
   InboxSearchResult,
+  UrgentQuery,
 } from '@hamnivo/contracts';
 import { fromPublicId, InvalidPublicIdError, schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { AuthorityMessage } from '@hamnivo/domain';
 import type { StaffPrincipal } from '@hamnivo/policy';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   and,
+  asc,
   desc,
   eq,
+  gt,
   ilike,
   inArray,
   isNotNull,
   isNull,
   lt,
+  lte,
   ne,
   or,
   type SQL,
@@ -32,6 +36,7 @@ import { authorityMessageUuid } from '../authority/uuid.js';
 import { senderOf } from '../authority/views.js';
 import { AppError } from '../common/app-error.js';
 import { AgentsService } from '../runtime/agents.service.js';
+import { CLOCK, type Clock } from '../tokens.js';
 import { type ConversationAccess, InboxAccess, resourceOf, type VisibleScope } from './access.js';
 import { InboxSignals } from './signals.service.js';
 import { TypingSignals } from './typing.service.js';
@@ -98,6 +103,7 @@ function queueCondition(
   queue: z.output<typeof InboxListQuery>['queue'],
   staffMemberId: string,
   teamIds: string[],
+  now: Date,
 ): SQL | undefined {
   switch (queue) {
     case 'mine':
@@ -110,6 +116,8 @@ function queueCondition(
       return teamIds.length ? inArray(st.teamId, teamIds) : sql`false`;
     case 'tickets':
       return isNotNull(st.ticketNumber);
+    case 'overdue':
+      return lte(st.slaDueAt, now);
     case 'all':
       return undefined;
   }
@@ -153,6 +161,7 @@ export class InboxService {
     private readonly signals: InboxSignals,
     private readonly typing: TypingSignals,
     private readonly agents: AgentsService,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   private scopeOrNotFound(principal: StaffPrincipal): VisibleScope {
@@ -179,6 +188,7 @@ export class InboxService {
   async list(principal: StaffPrincipal, query: z.output<typeof InboxListQuery>) {
     const scope = this.scopeOrNotFound(principal);
     const cursor = decodeCursor(query.cursor);
+    const now = this.clock();
     return this.access.tx(principal, async (tx) => {
       const teams = await this.myTeams(tx, principal.staffMemberId);
       const filters = and(
@@ -196,20 +206,27 @@ export class InboxService {
         query.label ? sql`${st.labels} @> array[${query.label.toLowerCase()}]::text[]` : undefined,
         query.teamId ? eq(st.teamId, fromPublicId('team', query.teamId)) : undefined,
       );
+      // The Overdue queue lists the longest overdue first (H12); every other queue the latest
+      // activity first.
+      const overdue = query.queue === 'overdue';
+      const after = cursor
+        ? overdue
+          ? or(
+              gt(st.slaDueAt, sql`${cursor.t}::timestamptz`),
+              and(eq(st.slaDueAt, sql`${cursor.t}::timestamptz`), gt(c.id, cursor.id)),
+            )
+          : or(
+              lt(c.lastActivityAt, sql`${cursor.t}::timestamptz`),
+              and(eq(c.lastActivityAt, sql`${cursor.t}::timestamptz`), lt(c.id, cursor.id)),
+            )
+        : undefined;
       const rows = await selectRows(tx)
         .where(
-          and(
-            filters,
-            queueCondition(query.queue, principal.staffMemberId, teams),
-            cursor
-              ? or(
-                  lt(c.lastActivityAt, sql`${cursor.t}::timestamptz`),
-                  and(eq(c.lastActivityAt, sql`${cursor.t}::timestamptz`), lt(c.id, cursor.id)),
-                )
-              : undefined,
-          ),
+          and(filters, queueCondition(query.queue, principal.staffMemberId, teams, now), after),
         )
-        .orderBy(desc(c.lastActivityAt), desc(c.id))
+        .orderBy(
+          ...(overdue ? [asc(st.slaDueAt), asc(c.id)] : [desc(c.lastActivityAt), desc(c.id)]),
+        )
         .limit(query.limit + 1);
       const page = rows.slice(0, query.limit);
       const last = await lastMessages(
@@ -235,6 +252,7 @@ export class InboxService {
           tickets: sql<number>`count(*) filter (where ${st.ticketNumber} is not null)`.mapWith(
             Number,
           ),
+          overdue: sql<number>`count(*) filter (where ${lte(st.slaDueAt, now)})`.mapWith(Number),
           all: sql<number>`count(*)`.mapWith(Number),
         })
         .from(c)
@@ -252,13 +270,71 @@ export class InboxService {
         );
       return {
         items: page.map((row) =>
-          toInboxConversation(row, last.get(row.control.id), unread.get(row.control.id) ?? 0),
+          toInboxConversation(row, last.get(row.control.id), unread.get(row.control.id) ?? 0, now),
         ),
         nextCursor:
           rows.length > query.limit && tail
-            ? encodeCursor({ t: tail.activityKey, id: tail.control.id })
+            ? encodeCursor({
+                t: overdue ? (tail.dueKey ?? tail.activityKey) : tail.activityKey,
+                id: tail.control.id,
+              })
             : null,
-        counts: counts ?? { mine: 0, unassigned: 0, ai: 0, team: 0, tickets: 0, all: 0 },
+        counts: counts ?? {
+          mine: 0,
+          unassigned: 0,
+          ai: 0,
+          team: 0,
+          tickets: 0,
+          overdue: 0,
+          all: 0,
+        },
+      };
+    });
+  }
+
+  /**
+   * Urgent conversations waiting for a person (HNV-08-02): the soonest reply deadline first, then
+   * the longest wait. The section at the top of the queue shows the first ten; `total` counts all.
+   */
+  async urgent(principal: StaffPrincipal, query: z.output<typeof UrgentQuery>) {
+    const scope = this.scopeOrNotFound(principal);
+    const now = this.clock();
+    return this.access.tx(principal, async (tx) => {
+      const where = and(
+        InboxAccess.condition(scope),
+        inArray(c.ownerMode, ['WAITING_HUMAN', 'PAUSED']),
+        inArray(c.authorityStatus, ['open', 'pending']),
+        eq(st.priority, 'urgent'),
+        query.brandId ? eq(c.brandId, fromPublicId('brand', query.brandId)) : undefined,
+        query.teamId ? eq(st.teamId, fromPublicId('team', query.teamId)) : undefined,
+        sql`not exists (select 1 from ${schema.testConversations} tc where tc.tenant_id = ${c.tenantId} and tc.conversation_id = ${c.id})`,
+      );
+      const rows = await selectRows(tx)
+        .where(where)
+        .orderBy(
+          sql`${st.slaDueAt} asc nulls last`,
+          sql`coalesce(${c.ownerChangedAt}, ${c.lastCustomerMessageAt}, ${c.createdAt}) asc`,
+          c.id,
+        )
+        .limit(10);
+      const [count] = await tx
+        .select({ total: sql<number>`count(*)`.mapWith(Number) })
+        .from(c)
+        .innerJoin(schema.authorityInboxes, eq(schema.authorityInboxes.id, c.inboxId))
+        .leftJoin(st, eq(st.conversationId, c.id))
+        .leftJoin(p, eq(p.id, c.principalId))
+        .leftJoin(schema.brands, eq(schema.brands.id, c.brandId))
+        .where(where);
+      const last = await lastMessages(
+        tx,
+        rows.map((r) => r.control.id),
+      );
+      const unread = await this.unreadFor(tx, principal, rows);
+      return {
+        items: rows.map((row) =>
+          toInboxConversation(row, last.get(row.control.id), unread.get(row.control.id) ?? 0, now),
+        ),
+        total: count?.total ?? 0,
       };
     });
   }
@@ -306,6 +382,7 @@ export class InboxService {
       row as InboxRow,
       last.get(conversationId),
       unread.get(conversationId),
+      this.clock(),
     );
   }
 
@@ -503,7 +580,12 @@ export class InboxService {
         .where(InboxAccess.condition(scope));
       return {
         conversations: rows.map((row) =>
-          toInboxConversation(row, last.get(row.control.id), unread.get(row.control.id) ?? 0),
+          toInboxConversation(
+            row,
+            last.get(row.control.id),
+            unread.get(row.control.id) ?? 0,
+            this.clock(),
+          ),
         ),
         connections: connections.map((row) => row.id),
       };

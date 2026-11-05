@@ -35,6 +35,7 @@ x-gateway: &gateway
     PUBLIC_API_ORIGIN: ${HAMNIVO_API_ORIGIN:?run hamnivo.sh setup}
     PUBLIC_CONSOLE_ORIGIN: ${HAMNIVO_APP_ORIGIN:?run hamnivo.sh setup}
     PUBLIC_WIDGET_ORIGIN: ${HAMNIVO_CHAT_ORIGIN:?run hamnivo.sh setup}
+    PORTAL_CUSTOM_HOSTS: ${PORTAL_CUSTOM_HOSTS:-}
     REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
     STEP_UP_MAX_AGE_MINUTES: ${STEP_UP_MAX_AGE_MINUTES:-10}
     SSO_TRUSTED_IDP_ORIGINS: ${SSO_TRUSTED_IDP_ORIGINS:-}
@@ -263,6 +264,8 @@ services:
       # Certificates and the ACME account: keep this volume (backups include it).
       - caddy-data:/data
       - caddy-config:/config
+      # Operator-generated explicit custom portal routes (empty by default).
+      - ./sites:/etc/caddy/sites:ro
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:2020/health']
       interval: 10s

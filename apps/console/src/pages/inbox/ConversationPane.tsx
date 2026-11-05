@@ -82,6 +82,7 @@ import {
 } from '../../lib/inbox';
 import { useMarkReadWhileOpen } from '../../lib/inbox-alerts';
 import { useTenant } from '../../lib/tenant';
+import { AiDraftCard } from './AiDraftCard';
 import { Composer } from './Composer';
 import { ContextPanel } from './ContextPanel';
 import { returnToQueue } from './InboxPage';
@@ -91,8 +92,11 @@ import {
   ConversationStatusBadge,
   IdentityBadge,
   languageName,
+  lostClaimText,
+  OfferBadge,
   OwnerBadge,
   PriorityBadge,
+  SlaBadge,
   TicketStateBadge,
   useMyStaffId,
 } from './parts';
@@ -346,6 +350,13 @@ function AssignMenu({ detail }: { detail: InboxDetail }) {
                       <UserRoundIcon aria-hidden="true" />
                       <bdi>{s.displayName}</bdi>
                       <StaffStatus status={s.status} className="ms-auto" />
+                      {s.maxOpenChats !== null || s.openChats > 0 ? (
+                        <span className="text-xs text-text-secondary" data-testid="assignee-load">
+                          {s.maxOpenChats !== null
+                            ? t('inbox.offers.load', { open: s.openChats, max: s.maxOpenChats })
+                            : t('inbox.offers.loadNoLimit', { open: s.openChats })}
+                        </span>
+                      ) : null}
                       {s.current ? (
                         <span className="text-xs text-text-secondary">
                           {t('inbox.assign.current')}
@@ -865,6 +876,8 @@ function OwnershipBanner({ detail }: { detail: InboxDetail }) {
     text = since ? t('inbox.banner.askedSince', { time: since }) : t('inbox.banner.asked');
   } else if (detail.ownerReason === 'staff_release') {
     text = t('inbox.banner.released');
+  } else if (detail.ownerReason === 'sla_moved') {
+    text = t('inbox.sla.moved');
   } else if (detail.ownerReason === 'channel_ai_off') {
     text = t('inbox.banner.channelAiOff');
   } else {
@@ -912,8 +925,10 @@ function OwnershipBanner({ detail }: { detail: InboxDetail }) {
       {claim.error ? (
         <div className="basis-full">
           {isApiError(claim.error, 'OWNERSHIP_CHANGED') ? (
-            <p role="alert" className="text-sm font-medium text-text">
-              {t('inbox.banner.claimLost')}
+            <p role="alert" className="text-sm font-medium text-text" data-testid="claim-lost">
+              {claim.error.problem?.currentOwner
+                ? lostClaimText(claim.error.problem.currentOwner, t)
+                : t('inbox.banner.claimLost')}
             </p>
           ) : (
             <ActionError error={claim.error} />
@@ -991,7 +1006,9 @@ function Header({
             {detail.priority && !detail.ticket ? (
               <PriorityBadge priority={detail.priority} />
             ) : null}
+            {detail.sla ? <SlaBadge sla={detail.sla} /> : null}
             <OwnerBadge conversation={detail} />
+            {detail.offer ? <OfferBadge offer={detail.offer} /> : null}
             <ChannelIcon channel={detail.channel} />
             {language ? <bdi>{language}</bdi> : null}
             {detail.brand ? <bdi>{detail.brand.name}</bdi> : null}
@@ -1190,6 +1207,7 @@ export function ConversationPane() {
         />
         <OwnershipBanner detail={data} />
         <Timeline detail={data} messages={chronological(messages.data)} query={messages} />
+        <AiDraftCard key={`draft-${conversationId}`} detail={data} />
         <Composer key={conversationId} detail={data} drafts={drafts} />
       </section>
       {wide && detailsWide ? (

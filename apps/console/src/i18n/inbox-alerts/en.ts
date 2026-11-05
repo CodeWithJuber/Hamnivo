@@ -25,9 +25,9 @@ export const inboxAlertsEn = {
     silent: 'No sound will play while sounds are muted or the volume is at 0.',
     events: {
       title: 'Sound for each event',
-      newChat: 'A chat is waiting for a person',
+      newChat: 'A chat is waiting for a person, or is past its reply time',
       customerMessage: 'A customer writes in your chat, or in a chat nobody has taken',
-      assigned: 'A chat is assigned or transferred to you',
+      assigned: 'A chat is offered, assigned or transferred to you',
     },
     sounds: {
       chime: 'Chime',
@@ -66,6 +66,9 @@ export const inboxAlertsEn = {
   },
   alert: {
     chat_waiting: '{{name}} is waiting for a person',
+    sla_overdue: '{{name}} is past the reply-time target',
+    sla_overdue_lead: 'Nobody has replied to {{name}} in time',
+    chat_offered: '{{name}} is offered to you: accept or decline',
     customer_message: 'New message from {{name}}',
     assigned: 'A chat was assigned to you',
     assignedBody: '{{name}}: {{preview}}',

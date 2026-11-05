@@ -9,12 +9,13 @@ import { appendAudit, fromPublicId, schema, type TenantTx, toPublicId } from '@h
 import { type Permission, type ResourceScope, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
 import canonicalize from 'canonicalize';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { JournalService } from '../authority/journal.service.js';
 import { OutboundMessagesService } from '../authority/outbound.service.js';
 import {
   type ControlRow,
+  currentOwnerOf,
   OwnershipService,
   type OwnerTarget,
   type TransitionOptions,
@@ -22,7 +23,6 @@ import {
 import { AppError } from '../common/app-error.js';
 import { ownedByOther } from '../conversations/staff-conversations.service.js';
 import { enforce } from '../identity/staff.guard.js';
-import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
 import { CLOCK, type Clock } from '../tokens.js';
@@ -32,6 +32,7 @@ import { eligibleStaffAt } from './eligible.js';
 import { InboxService } from './inbox.service.js';
 import { InboxMessagesService } from './messages.service.js';
 import { InboxSignals } from './signals.service.js';
+import { putInTeam, teamTakesBrand } from './team-queue.js';
 
 type Target = z.output<typeof AssignRequest>['to'];
 
@@ -84,11 +85,32 @@ export class AssignmentService {
     return this.access.tx(principal, async (tx) => {
       const found = await this.access.authorized(tx, principal, publicId, 'conversations.read');
       const staff = await this.eligibleStaff(tx, found.resource);
-      const statuses = await this.availability.statuses(
-        tx,
-        principal.tenantId,
-        staff.map((s) => s.staffMemberId),
-      );
+      const ids = staff.map((s) => s.staffMemberId);
+      const statuses = await this.availability.statuses(tx, principal.tenantId, ids);
+      // How busy each person is, and their limit (HNV-10-03): "3 of 5 chats".
+      const c = schema.conversationControls;
+      const open = ids.length
+        ? await tx
+            .select({ staffMemberId: c.ownerStaffId, count: sql<number>`count(*)::int` })
+            .from(c)
+            .where(
+              and(
+                eq(c.ownerMode, 'HUMAN_ACTIVE'),
+                inArray(c.ownerStaffId, ids),
+                inArray(c.authorityStatus, ['open', 'pending']),
+              ),
+            )
+            .groupBy(c.ownerStaffId)
+        : [];
+      const limits = ids.length
+        ? await tx
+            .select({
+              staffMemberId: schema.staffRoutingProfiles.staffMemberId,
+              maxOpenChats: schema.staffRoutingProfiles.maxOpenChats,
+            })
+            .from(schema.staffRoutingProfiles)
+            .where(inArray(schema.staffRoutingProfiles.staffMemberId, ids))
+        : [];
       const teams = await tx
         .select({ id: schema.teams.id, name: schema.teams.name })
         .from(schema.teams)
@@ -116,6 +138,9 @@ export class AssignmentService {
             found.control.ownerMode === 'HUMAN_ACTIVE' &&
             found.control.ownerStaffId === s.staffMemberId,
           status: statuses.get(s.staffMemberId) ?? 'offline',
+          openChats: Number(open.find((row) => row.staffMemberId === s.staffMemberId)?.count ?? 0),
+          maxOpenChats:
+            limits.find((row) => row.staffMemberId === s.staffMemberId)?.maxOpenChats ?? null,
         })),
         teams: teams.map((t) => ({ id: toPublicId('team', t.id), name: t.name })),
         ai: { available: Boolean(bot) && answering.answering, displayName: bot?.name ?? null },
@@ -177,6 +202,7 @@ export class AssignmentService {
         if (!this.access.can(principal, 'conversations.assign', found.resource)) {
           throw new AppError('OWNERSHIP_CHANGED', {
             detail: 'A colleague is handling this conversation. Ask them to hand it over.',
+            currentOwner: await currentOwnerOf(tx, control),
           });
         }
       }
@@ -237,41 +263,34 @@ export class AssignmentService {
     teamPublicId: string | null,
   ): Promise<InboxConversationDetail> {
     const conversationId = await this.access.tx(principal, async (tx) => {
-      const found = await this.access.authorized(tx, principal, publicId, 'conversations.assign');
+      // Locked, as every change of who handles it: a move of an overdue conversation (ADR 0016)
+      // sees this change, or this change waits for it.
+      const found = await this.access.authorized(
+        tx,
+        principal,
+        publicId,
+        'conversations.assign',
+        true,
+      );
       let teamId: string | null = null;
       if (teamPublicId) {
         teamId = fromPublicId('team', teamPublicId);
         const [team] = await tx.select().from(schema.teams).where(eq(schema.teams.id, teamId));
-        const fits =
-          team?.status === 'active' &&
-          (team.workspaceId === null || team.workspaceId === found.workspaceId);
-        if (!fits) {
+        if (!teamTakesBrand(team, found.workspaceId)) {
           throw new AppError('VALIDATION_FAILED', {
             fields: [{ path: 'teamId', message: 'This team cannot take conversations here.' }],
           });
         }
       }
       if ((found.teamId ?? null) === teamId) return found.control.id;
-      await tx
-        .insert(schema.conversationInboxState)
-        .values({ tenantId: principal.tenantId, conversationId: found.control.id, teamId })
-        .onConflictDoUpdate({
-          target: [
-            schema.conversationInboxState.tenantId,
-            schema.conversationInboxState.conversationId,
-          ],
-          set: { teamId, updatedAt: this.clock() },
-        });
-      await enqueueOutbox(tx, principal.tenantId, {
-        topic: 'conversation.team_changed',
-        aggregateType: 'conversation',
-        aggregateId: found.control.id,
-        payload: {
-          conversationId: found.control.id,
-          teamId,
-          actorStaffMemberId: principal.staffMemberId,
-        },
-      });
+      await putInTeam(
+        tx,
+        principal.tenantId,
+        found.control.id,
+        teamId,
+        this.clock(),
+        principal.staffMemberId,
+      );
       await appendAudit(tx, {
         actorType: 'staff',
         actorId: toPublicId('staff', principal.staffMemberId),

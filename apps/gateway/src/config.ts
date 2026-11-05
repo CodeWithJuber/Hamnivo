@@ -24,6 +24,35 @@ const EnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32),
   PUBLIC_API_ORIGIN: z.url().default('http://localhost:4000'),
   PUBLIC_CONSOLE_ORIGIN: z.url().default('http://localhost:5173'),
+  /** Exact custom portal hosts whose explicit edge route and public TLS were verified by the operator. */
+  PORTAL_CUSTOM_HOSTS: z
+    .string()
+    .default('')
+    .transform((value, ctx) => {
+      const hosts = [
+        ...new Set(
+          value
+            .split(',')
+            .map((host) => host.trim().toLowerCase())
+            .filter(Boolean),
+        ),
+      ];
+      for (const host of hosts) {
+        if (
+          !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(
+            host,
+          ) ||
+          host.length > 253
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            message:
+              'PORTAL_CUSTOM_HOSTS requires exact DNS hostnames, without wildcards, ports or schemes',
+          });
+        }
+      }
+      return hosts;
+    }),
   REQUIRE_EMAIL_VERIFICATION: bool.default(true),
   /** Minutes a sign-in stays "fresh" for step-up actions. */
   STEP_UP_MAX_AGE_MINUTES: z.coerce.number().int().min(1).max(120).default(10),
@@ -227,6 +256,12 @@ const EnvSchema = z.object({
     .default(72),
   /** Webhook requests sent at the same time by one worker. */
   WEBHOOK_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(8),
+  /**
+   * Retention (A10): old resolved conversations deleted per run of the worker's sweep (every 10
+   * minutes), across workspaces, and at most this many of one workspace per run.
+   */
+  RETENTION_BATCH: z.coerce.number().int().min(1).max(1000).default(100),
+  RETENTION_PER_WORKSPACE: z.coerce.number().int().min(1).max(1000).default(25),
   /** Analytics withhold values computed from fewer conversations or responses than this. */
   ANALYTICS_MIN_GROUP_SIZE: z.coerce.number().int().min(2).max(50).default(5),
   /** Days between issuing a platform invoice and its due date. */

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   check,
   foreignKey,
   index,
@@ -23,6 +24,8 @@ import { tenantId, workspaces } from './tenancy.js';
  * a small projection for queue filters, staff drafts, links between cases and quality reviews.
  */
 
+export const TEAM_ASSIGNMENT_MODES = ['queue', 'offer'] as const;
+
 /** A group of staff that conversations can be assigned to; also a grant scope (`team`). */
 export const teams = pgTable(
   'teams',
@@ -35,6 +38,15 @@ export const teams = pgTable(
     status: text('status', { enum: ['active', 'archived'] })
       .notNull()
       .default('active'),
+    /**
+     * How a conversation handed to the team reaches a person (H02): `queue`, everyone in the team
+     * sees it and anyone claims it; `offer`, it is offered to one person at a time (HNV-10-03).
+     */
+    assignmentMode: text('assignment_mode', { enum: TEAM_ASSIGNMENT_MODES })
+      .notNull()
+      .default('queue'),
+    /** How long one person has to accept an offer before it goes to the next. */
+    offerTimeoutSeconds: integer('offer_timeout_seconds').notNull().default(60),
     createdBy: uuid('created_by'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -52,6 +64,7 @@ export const teams = pgTable(
       columns: [t.tenantId, t.createdBy],
       foreignColumns: [staffMembers.tenantId, staffMembers.id],
     }),
+    check('teams_offer_timeout_ck', sql`${t.offerTimeoutSeconds} between 15 and 600`),
     tenantIsolation(),
   ],
 );
@@ -123,6 +136,8 @@ export const teamAuthorityLinks = pgTable(
 export const TICKET_SOURCES = ['offline_form', 'staff', 'automation', 'email'] as const;
 export const CONVERSATION_PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 
+export const SLA_KINDS = ['first_reply', 'next_reply'] as const;
+
 export const conversationInboxState = pgTable(
   'conversation_inbox_state',
   {
@@ -140,6 +155,26 @@ export const conversationInboxState = pgTable(
     ticketNumber: integer('ticket_number'),
     ticketSource: text('ticket_source', { enum: TICKET_SOURCES }),
     ticketOpenedAt: tstz('ticket_opened_at'),
+    /**
+     * Reply-time targets (H12): the last public reply a person wrote (AI and automation replies do
+     * not count), and the clock for the reply the customer is waiting for. Kept by the gateway
+     * whenever a message, owner, status or priority changes; null when no clock runs.
+     */
+    lastHumanReplyAt: tstz('last_human_reply_at'),
+    slaKind: text('sla_kind', { enum: SLA_KINDS }),
+    slaStartedAt: tstz('sla_started_at'),
+    slaTargetMinutes: integer('sla_target_minutes'),
+    slaPausedAt: tstz('sla_paused_at'),
+    slaPausedMinutes: integer('sla_paused_minutes').notNull().default(0),
+    slaDueAt: tstz('sla_due_at'),
+    slaBreachedAt: tstz('sla_breached_at'),
+    /**
+     * When offering the conversation to one person at a time ended without anyone accepting
+     * (HNV-10-03): it waits in the team's queue from then on, and the team is told.
+     */
+    offersEndedAt: tstz('offers_ended_at'),
+    /** The ownership epoch of the hand-off whose offers ended (`offers_ended_at`). */
+    offersEndedEpoch: bigint('offers_ended_epoch', { mode: 'number' }),
     updatedAt: updatedAt(),
   },
   (t) => [
@@ -156,6 +191,14 @@ export const conversationInboxState = pgTable(
       'conversation_inbox_state_priority_ck',
       sql`${t.priority} is null or ${t.priority} in ('urgent', 'high', 'medium', 'low')`,
     ),
+    index('conversation_inbox_state_sla_due_idx')
+      .on(t.tenantId, t.slaDueAt)
+      .where(sql`${t.slaDueAt} is not null`),
+    check(
+      'conversation_inbox_state_sla_ck',
+      sql`(${t.slaKind} is null and ${t.slaStartedAt} is null and ${t.slaTargetMinutes} is null) or (${t.slaKind} in ('first_reply', 'next_reply') and ${t.slaStartedAt} is not null and ${t.slaTargetMinutes} > 0)`,
+    ),
+    check('conversation_inbox_state_sla_paused_ck', sql`${t.slaPausedMinutes} >= 0`),
     check(
       'conversation_inbox_state_ticket_ck',
       sql`(${t.ticketNumber} is null and ${t.ticketSource} is null and ${t.ticketOpenedAt} is null) or (${t.ticketNumber} > 0 and ${t.ticketSource} in ('offline_form', 'staff', 'automation', 'email') and ${t.ticketOpenedAt} is not null)`,

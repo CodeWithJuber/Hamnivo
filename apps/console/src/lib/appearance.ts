@@ -40,9 +40,15 @@ export interface AppearanceDraft {
   offline: ChatTexts;
   csat: boolean;
   privacyUrl: string;
+  fontFamily: WidgetAppearance['fontFamily'];
+  launcher: ChatTexts;
+  showBranding: boolean;
 }
 
 export const draftOf = (appearance: WidgetAppearance): AppearanceDraft => ({
+  fontFamily: appearance.fontFamily ?? 'system',
+  launcher: textsOf(appearance.launcherLabel),
+  showBranding: appearance.showBranding ?? true,
   colour: appearance.primaryColor.toUpperCase(),
   logoUrl: appearance.logoUrl ?? '',
   radius: appearance.radius,
@@ -54,6 +60,9 @@ export const draftOf = (appearance: WidgetAppearance): AppearanceDraft => ({
 
 /** What is saved for a draft. */
 export const bodyOf = (draft: AppearanceDraft): WidgetAppearance => ({
+  fontFamily: draft.fontFamily,
+  launcherLabel: localizedOf(draft.launcher),
+  showBranding: draft.showBranding,
   primaryColor: draft.colour.trim().toUpperCase(),
   logoUrl: draft.logoUrl.trim() || null,
   radius: draft.radius,
@@ -86,6 +95,7 @@ export interface AppearanceProblems {
   privacyUrl?: AppearanceProblem;
   greeting?: AppearanceProblem;
   offline?: AppearanceProblem;
+  launcher?: AppearanceProblem;
 }
 
 /** What would be refused, field by field; nothing is listed for a field that is fine. */
@@ -102,6 +112,7 @@ export function problemsOf(draft: AppearanceDraft): AppearanceProblems {
   // Other languages fall back to English, so there has to be an English text to fall back to.
   const needsEnglish = (texts: ChatTexts) =>
     !texts.en.trim() && CHAT_LANGUAGES.some((lang) => texts[lang].trim());
+  if (needsEnglish(draft.launcher)) out.launcher = 'english';
   if (needsEnglish(draft.greeting)) out.greeting = 'english';
   if (needsEnglish(draft.offline)) out.offline = 'english';
   return out;

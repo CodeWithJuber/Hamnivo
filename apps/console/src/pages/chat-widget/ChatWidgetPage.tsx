@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { Forbidden, QueryState } from '../../components/States';
 import { DOCS } from '../../lib/docs';
 import type { BrandRef } from '../../lib/names';
+import { useBrands } from '../../lib/queries';
 import { useAppearance } from '../../lib/setup';
 import { useTenant } from '../../lib/tenant';
 import {
@@ -30,6 +31,7 @@ const TAB = 'text-text-secondary hover:text-text data-[state=active]:text-text';
 function LookTab({ brand }: { brand: BrandRef }) {
   const { t } = useTranslation();
   const appearance = useAppearance(brand.id);
+  const brands = useBrands();
   const [dirty, setDirty] = useState(false);
   return (
     <div className="flex flex-col gap-4" data-testid="look-tab">
@@ -40,8 +42,11 @@ function LookTab({ brand }: { brand: BrandRef }) {
       <QueryState query={appearance} label={t('setup.appearance.loading')}>
         {(view) => (
           <AppearanceForm
-            key={`${brand.id}-${view.configVersion}`}
-            brand={brand}
+            key={`${brand.id}-${view.configVersion}-${view.draftRevision ?? 0}`}
+            brand={{
+              ...brand,
+              widgetId: brands.data?.items.find((item) => item.id === brand.id)?.widgetId,
+            }}
             view={view}
             layout="page"
             onDirtyChange={setDirty}

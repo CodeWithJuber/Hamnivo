@@ -90,6 +90,15 @@ describe('database roles', () => {
     expect(definers.map((r) => r.fn).sort()).toEqual(
       [
         'app.active_plans()',
+        'app.agency_client_guard()',
+        'app.agency_client_metadata()',
+        'app.agency_config_guard()',
+        'app.ai_payer_allows(bigint,timestamp with time zone,timestamp with time zone,text)',
+        'app.ai_payer_tenant()',
+        'app.fund_agency_client(uuid)',
+        'app.lock_ai_payer()',
+        'app.resolve_portal_branding(text)',
+        'app.apply_erasure_tombstones()',
         'app.apply_memory_tombstones()',
         'app.billing_account_tenant(text,text,text)',
         'app.claim_commerce_events(integer,integer)',
@@ -101,14 +110,20 @@ describe('database roles', () => {
         'app.claim_webhook_deliveries(integer,integer)',
         'app.due_web_syncs(integer,timestamp with time zone)',
         'app.ensure_audit_partitions(integer)',
+        'app.erase_customer(uuid)',
         'app.ensure_reconcile_cursors()',
         'app.expired_actions(integer,timestamp with time zone)',
         'app.expired_memory_subjects(integer)',
         'app.invitation_pending_for(text)',
         'app.lapsed_billing(timestamp with time zone,integer)',
+        'app.purge_ai_drafts(integer)',
         'app.purge_automation_runs(integer)',
+        'app.purge_conversation_offers(integer)',
         'app.purge_expired(integer)',
         'app.purge_migration_files(integer)',
+        'app.purge_outbox_events(integer)',
+        'app.purge_privacy_files(integer)',
+        'app.purge_sla_outcomes(integer)',
         'app.purge_visitor_blocks(integer)',
         'app.purge_visitors(integer)',
         'app.purge_webhook_events(integer,integer)',
@@ -123,6 +138,11 @@ describe('database roles', () => {
         'app.resolve_tenant_slug(text)',
         'app.resolve_widget(text)',
         'app.resolve_widget_session(uuid)',
+        'app.retention_due(integer,integer)',
+        'app.retention_orphans(integer)',
+        'app.retention_tenants()',
+        'app.retire_conversation(uuid)',
+        'app.retire_customer(uuid)',
         'app.tenant_invoices(uuid)',
         'app.tenants_exist()',
       ].sort(),
@@ -133,10 +153,24 @@ describe('database roles', () => {
       );
       expect(fn.public_exec, `${fn.fn} must not be executable by PUBLIC`).toBe(false);
       expect(fn.platform_exec, `${fn.fn} must not be executable by the platform role`).toBe(false);
-      expect(fn.app_exec).toBe(true);
+      // Trigger functions execute only via their table triggers, never as app entry points.
+      expect(fn.app_exec, `${fn.fn} application EXECUTE`).toBe(
+        !['app.agency_client_guard()', 'app.agency_config_guard()'].includes(fn.fn),
+      );
       expect(fn.owner).toBe(
         fn.fn.startsWith('app.ensure_audit_partitions') ? 'hamnivo_owner' : 'hamnivo_resolver',
       );
+    }
+    for (const name of ['app.remove_conversation(uuid,uuid)', 'app.erase_principal(uuid,uuid)']) {
+      const helper = rows.find((r) => r.fn === name);
+      expect(helper, name).toMatchObject({
+        owner: 'hamnivo_resolver',
+        secdef: false,
+        public_exec: false,
+        app_exec: false,
+        platform_exec: false,
+      });
+      expect(helper?.config).toContain('search_path=pg_catalog, public');
     }
     const harden = rows.find((r) => r.fn === 'app.harden_tenant_tables()');
     expect(harden?.app_exec).toBe(false);

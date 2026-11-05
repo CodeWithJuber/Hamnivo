@@ -80,9 +80,20 @@ export const ID_PREFIX = {
   simulation: 'sim',
   simulationRun: 'simr',
   visitor: 'vis',
+  workflow: 'wfl',
+  workflowVersion: 'wfv',
+  workflowRun: 'wfr',
+  a2aConnection: 'aac',
+  brandingDomain: 'bdom',
   automation: 'aut',
   automationRun: 'arun',
   visitorBlock: 'blk',
+  /** An AI reply awaiting review (HNV-09-05); `drf` is a streamed reply draft. */
+  aiDraft: 'aidr',
+  /** A conversation offered to one person (HNV-10-03). */
+  offer: 'ofr',
+  /** A request to export or erase one customer's data (A10). */
+  privacyRequest: 'prq',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIX;

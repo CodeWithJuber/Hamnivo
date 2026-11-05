@@ -501,3 +501,344 @@ describe('missed chats, contact form messages, reopens and tickets (O04, H19)', 
     expect(lines).toContain('tickets,created,4,,false,');
   });
 });
+
+describe('the inbox work queue: reply-time targets, offers and AI drafts (H12, HNV-10-06, HNV-09-05)', () => {
+  const WEEK = 'from=2026-09-10&to=2026-09-16';
+  let brand4Public: string;
+
+  beforeAll(async () => {
+    const fourth = await shop.owner.post('/v1/admin/brands', {
+      workspaceId: shop.workspaceId,
+      name: 'Stats Queue',
+      allowedOrigins: ['https://queue.example'],
+    });
+    expect(fourth.status, JSON.stringify(fourth.body)).toBe(201);
+    brand4Public = fourth.body.id;
+    const brand4 = fromPublicId('brand', brand4Public);
+    const connectionId = fromPublicId('connection', shop.connection.id);
+    await withTenant(slice.app, { tenantId }, async (tx) => {
+      const [inbox] = await tx
+        .select({ id: schema.authorityInboxes.id })
+        .from(schema.authorityInboxes)
+        .where(eq(schema.authorityInboxes.brandId, brand1));
+      const [staff] = await tx.select({ id: schema.staffMembers.id }).from(schema.staffMembers);
+      if (!inbox || !staff) throw new Error('no inbox or staff');
+      const conversations: string[] = [];
+      for (let n = 1; n <= 6; n += 1) {
+        const id = newId();
+        conversations.push(id);
+        await tx.insert(schema.conversationControls).values({
+          id,
+          tenantId,
+          connectionId,
+          inboxId: inbox.id,
+          brandId: brand4,
+          externalConversationId: 97_000 + n,
+          ownerMode: 'WAITING_HUMAN',
+          authorityStatus: 'open',
+          createdAt: new Date('2026-09-10T08:00:00Z'),
+        });
+      }
+      const conversation = (n: number) => conversations[n - 1] as string;
+
+      // Reply-time clocks: four met, three missed, one stopped without a reply.
+      const clock = (
+        n: number,
+        endedAt: string,
+        outcome: 'met' | 'missed' | 'stopped',
+        minutes: number,
+        more: { kind?: 'first_reply' | 'next_reply'; priority?: 'urgent' | 'high' } = {},
+      ) => ({
+        tenantId,
+        conversationId: conversation(n),
+        kind: more.kind ?? ('first_reply' as const),
+        priority: more.priority ?? ('medium' as const),
+        targetMinutes: 60,
+        startedAt: new Date(Date.parse(endedAt) - minutes * 60_000),
+        endedAt: new Date(endedAt),
+        outcome,
+        businessMinutes: minutes,
+      });
+      await tx.insert(schema.slaOutcomes).values([
+        clock(1, '2026-09-10T09:00:00Z', 'met', 10),
+        clock(2, '2026-09-10T09:00:00Z', 'met', 20),
+        clock(3, '2026-09-10T09:00:00Z', 'met', 30),
+        clock(4, '2026-09-11T09:00:00Z', 'met', 40),
+        clock(5, '2026-09-11T09:00:00Z', 'missed', 90, { priority: 'high' }),
+        clock(6, '2026-09-11T09:00:00Z', 'missed', 70, {
+          kind: 'next_reply',
+          priority: 'urgent',
+        }),
+        clock(3, '2026-09-11T09:00:00Z', 'missed', 50, { kind: 'next_reply', priority: 'high' }),
+        clock(1, '2026-09-12T09:00:00Z', 'stopped', 5, { kind: 'next_reply' }),
+        // Before the week: not counted.
+        clock(2, '2026-09-09T09:00:00Z', 'missed', 300),
+      ]);
+
+      // Offers: three accepted, a hand-off declined twice and offline once before running out,
+      // one declined three times, one cancelled when someone took the chat, and one declined at
+      // the end of the week and accepted just after it.
+      const offeredAt = Date.parse('2026-09-12T10:00:00Z');
+      const offer = (
+        n: number,
+        round: number,
+        state: 'accepted' | 'declined' | 'expired' | 'cancelled',
+        seconds: number,
+        reason?: 'at_capacity' | 'not_my_area' | 'going_offline',
+      ) => ({
+        tenantId,
+        conversationId: conversation(n),
+        teamId: teamA,
+        staffMemberId: staff.id,
+        handoffEpoch: 1,
+        round,
+        state,
+        declineReason: reason ?? null,
+        cancelReason: state === 'cancelled' ? ('owner_changed' as const) : null,
+        offeredAt: new Date(offeredAt + round * 1000),
+        expiresAt: new Date(offeredAt + round * 1000 + 120_000),
+        decidedAt: new Date(offeredAt + round * 1000 + seconds * 1000),
+        timeoutSeconds: 120,
+      });
+      await tx.insert(schema.conversationOffers).values([
+        offer(1, 1, 'accepted', 30),
+        offer(2, 1, 'accepted', 60),
+        offer(3, 1, 'accepted', 90),
+        offer(4, 1, 'declined', 5, 'not_my_area'),
+        offer(4, 2, 'declined', 5, 'not_my_area'),
+        offer(4, 3, 'declined', 5, 'going_offline'),
+        offer(4, 4, 'expired', 120),
+        offer(5, 1, 'declined', 5, 'at_capacity'),
+        offer(5, 2, 'declined', 5, 'at_capacity'),
+        offer(5, 3, 'declined', 5, 'at_capacity'),
+        offer(6, 1, 'cancelled', 10),
+        {
+          ...offer(1, 1, 'declined', 5, 'at_capacity'),
+          handoffEpoch: 2,
+          offeredAt: new Date('2026-09-16T23:59:00Z'),
+          expiresAt: new Date('2026-09-17T00:01:00Z'),
+          decidedAt: new Date('2026-09-16T23:59:30Z'),
+        },
+        {
+          ...offer(1, 2, 'accepted', 20),
+          handoffEpoch: 2,
+          offeredAt: new Date('2026-09-17T00:01:00Z'),
+          expiresAt: new Date('2026-09-17T00:03:00Z'),
+          decidedAt: new Date('2026-09-17T00:01:20Z'),
+        },
+      ]);
+
+      // AI drafts: four sent as written, three edited, three rejected as inaccurate, two set aside
+      // when the customer wrote again, one still waiting.
+      const [asked] = await tx
+        .insert(schema.messageLedger)
+        .values({
+          tenantId,
+          conversationId: conversation(1),
+          senderKind: 'customer',
+          senderId: 'customer',
+          clientMessageId: newId(),
+          requestHash: Buffer.alloc(32),
+          sourceKey: `hv1:m:${newId()}`,
+          state: 'committed',
+        })
+        .returning({ id: schema.messageLedger.id });
+      if (!asked) throw new Error('no ledger row');
+      const states = [
+        'approved',
+        'approved',
+        'approved',
+        'approved',
+        'edited',
+        'edited',
+        'edited',
+        'rejected',
+        'rejected',
+        'rejected',
+        'superseded',
+        'superseded',
+        'pending',
+      ] as const;
+      for (const [index, state] of states.entries()) {
+        const runId = newId();
+        const conversationId = conversation((index % 6) + 1);
+        await tx.insert(schema.runs).values({
+          id: runId,
+          tenantId,
+          conversationId,
+          brandId: brand4,
+          triggerRef: `draft:stats:${index}`,
+          kind: 'draft',
+          state: 'succeeded',
+          outcome: 'drafted',
+          epoch: 1,
+        });
+        const decided = state === 'approved' || state === 'edited' || state === 'rejected';
+        const draftId = newId();
+        await tx.insert(schema.aiDrafts).values({
+          id: draftId,
+          tenantId,
+          conversationId,
+          runId,
+          triggerLedgerId: asked.id,
+          ownerEpoch: 1,
+          text: 'Your parcel is on its way.',
+          state,
+          supersededReason: state === 'superseded' ? 'customer_wrote' : null,
+          decidedBy: decided ? staff.id : null,
+          decidedAt: state === 'pending' ? null : new Date('2026-09-13T10:05:00Z'),
+          createdAt: new Date('2026-09-13T10:00:00Z'),
+        });
+        if (state === 'rejected') {
+          await tx.insert(schema.aiDraftDecisions).values({
+            tenantId,
+            draftId,
+            staffMemberId: staff.id,
+            clientRequestId: newId(),
+            decision: 'rejected',
+            reason: 'inaccurate',
+            ownerEpoch: 1,
+          });
+        }
+      }
+    });
+  });
+
+  it('reports how often reply-time targets were met, from the clocks that ended', async () => {
+    const res = await shop.owner.get(
+      `/v1/admin/analytics/overview?${WEEK}&brandId=${brand4Public}`,
+    );
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const r = res.body.replyTargets;
+    expect(r.recordingSince).toBe('2026-09-09T09:00:00.000Z');
+    expect(r.met).toMatchObject({ value: 4, sample: 7, suppressed: false });
+    expect(r.met.rate).toBeCloseTo(4 / 7, 3);
+    expect(r.missed).toMatchObject({ value: 3, sample: 7, suppressed: false });
+    // One clock stopped without a reply: withheld, and nothing shown gives it away.
+    expect(r.stopped).toEqual({ value: null, suppressed: true });
+    expect(r.firstReplyMedianMinutes).toEqual({ value: 30, suppressed: false, sample: 5 });
+    expect(r.byPriority).toEqual([
+      { priority: 'urgent', replies: null, metRate: null, suppressed: true },
+      { priority: 'high', replies: null, metRate: null, suppressed: true },
+      { priority: 'medium', replies: 4, metRate: 1, suppressed: false },
+      { priority: 'low', replies: 0, metRate: null, suppressed: false },
+    ]);
+    // 11 September: four replies, but only one met, so its rate is withheld.
+    expect(r.daily.slice(0, 3)).toEqual([
+      { date: '2026-09-10', replies: 3, metRate: 1, suppressed: false },
+      { date: '2026-09-11', replies: 4, metRate: null, suppressed: false },
+      { date: '2026-09-12', replies: 0, metRate: null, suppressed: false },
+    ]);
+    expect(r.daily).toHaveLength(7);
+  });
+
+  it('reports offers declined and run out, withholding a share the others would give away', async () => {
+    const { offers } = (
+      await shop.owner.get(`/v1/admin/analytics/overview?${WEEK}&brandId=${brand4Public}`)
+    ).body;
+    expect(offers.windowLimited).toBe(false);
+    expect(offers.offered).toEqual({ value: 12, suppressed: false });
+    // One ran out of eleven answered: withheld, and so is the next smallest (three accepted), or
+    // the declined count beside the total would give it away.
+    expect(offers.expired).toEqual({ value: null, suppressed: true, sample: 11, rate: null });
+    expect(offers.accepted).toEqual({ value: null, suppressed: true, sample: 11, rate: null });
+    expect(offers.declined).toMatchObject({ value: 7, suppressed: false, sample: 11 });
+    expect(offers.declined.rate).toBeCloseTo(7 / 11, 3);
+    expect(offers.acceptMedianSeconds).toEqual({ value: 60, suppressed: false, sample: 3 });
+    // Two of seven hand-offs ended in the queue; the one accepted just after the week did not.
+    expect(offers.leftInQueue).toEqual({ value: null, suppressed: true, sample: 7, rate: null });
+    expect(offers.declineReasons).toEqual([
+      { reason: 'at_capacity', count: 4, suppressed: false },
+      { reason: 'not_my_area', count: null, suppressed: true },
+      { reason: 'going_offline', count: null, suppressed: true },
+    ]);
+    // The team's accept rate would give the withheld count away too.
+    expect(offers.byTeam).toEqual([
+      {
+        teamId: toPublicId('team', teamA),
+        name: '=SUM(1+1)',
+        offered: 12,
+        acceptRate: null,
+        suppressed: false,
+      },
+    ]);
+  });
+
+  it('reports AI drafts sent, edited and rejected, with the reasons', async () => {
+    const { aiDrafts } = (
+      await shop.owner.get(`/v1/admin/analytics/overview?${WEEK}&brandId=${brand4Public}`)
+    ).body;
+    expect(aiDrafts.windowLimited).toBe(false);
+    expect(aiDrafts.written).toEqual({ value: 13, suppressed: false });
+    expect(aiDrafts.sent).toEqual({ value: 7, suppressed: false, sample: 10, rate: 0.7 });
+    expect(aiDrafts.approved).toEqual({ value: 4, suppressed: false, sample: 10, rate: 0.4 });
+    expect(aiDrafts.edited).toEqual({ value: 3, suppressed: false, sample: 10, rate: 0.3 });
+    expect(aiDrafts.rejected).toEqual({ value: 3, suppressed: false, sample: 10, rate: 0.3 });
+    expect(aiDrafts.rejectReasons).toEqual([{ reason: 'inaccurate', count: 3, suppressed: false }]);
+    expect(aiDrafts.setAsideReasons).toEqual([
+      { reason: 'customer_wrote', count: null, suppressed: true },
+    ]);
+    expect(aiDrafts.byAgent).toEqual([
+      { agentId: null, name: null, written: 13, sentRate: 0.7, suppressed: false },
+    ]);
+  });
+
+  it('shows offers by team only for the teams a person may see', async () => {
+    // The cancelled chat now sits with Returns; its offers were made for the first team.
+    const returns = await withTenant(slice.app, { tenantId }, async (tx) => {
+      const [team] = await tx
+        .select({ id: schema.teams.id })
+        .from(schema.teams)
+        .where(eq(schema.teams.name, 'Returns'));
+      const [moved] = await tx
+        .select({ id: schema.conversationOffers.conversationId })
+        .from(schema.conversationOffers)
+        .where(eq(schema.conversationOffers.state, 'cancelled'));
+      if (!team || !moved) throw new Error('no team or offer');
+      await tx
+        .insert(schema.conversationInboxState)
+        .values({ tenantId, conversationId: moved.id, teamId: team.id });
+      return toPublicId('team', team.id);
+    });
+    const lead = await join(slice, shop, 'Queue Lead', 'analyst', { type: 'team', id: returns });
+    const theirs = await lead.client.get(`/v1/admin/analytics/overview?${WEEK}`);
+    expect(theirs.status, JSON.stringify(theirs.body)).toBe(200);
+    expect(theirs.body.offers.offered).toEqual({ value: null, suppressed: true });
+    expect(theirs.body.offers.byTeam).toEqual([]);
+    const filtered = await shop.owner.get(`/v1/admin/analytics/overview?${WEEK}&teamId=${returns}`);
+    expect(filtered.body.offers.byTeam).toEqual([]);
+  });
+
+  it('follows the brand filter, says when offers and drafts are past keeping, and exports', async () => {
+    const elsewhere = (
+      await shop.owner.get(`/v1/admin/analytics/overview?${WEEK}&brandId=${shop.brand.id}`)
+    ).body;
+    expect(elsewhere.replyTargets.met.value).toBe(0);
+    expect(elsewhere.offers.offered.value).toBe(0);
+    expect(elsewhere.aiDrafts.written.value).toBe(0);
+
+    const old = (await shop.owner.get(`/v1/admin/analytics/overview?from=2026-01-01&to=2026-01-07`))
+      .body;
+    expect(old.offers.windowLimited).toBe(true);
+    expect(old.aiDrafts.windowLimited).toBe(true);
+
+    const other = await connectedTenant(slice, 'stats-queue-other');
+    const theirs = (await other.owner.get(`/v1/admin/analytics/overview?${WEEK}`)).body;
+    expect(theirs.replyTargets.met.value).toBe(0);
+    expect(theirs.replyTargets.recordingSince).toBeNull();
+    expect(theirs.offers.offered.value).toBe(0);
+
+    const csv = await shop.owner.get(`/v1/admin/analytics/export?${WEEK}&brandId=${brand4Public}`);
+    const lines = String(csv.body).trim().split('\r\n');
+    expect(lines).toContain('reply_targets,met,4,0.5714,false,7');
+    expect(lines).toContain('reply_targets,stopped,,,true,');
+    expect(lines).toContain('reply_targets_priority,medium,4,1,false,');
+    expect(lines).toContain('offers,offered,12,,false,');
+    expect(lines).toContain('offers,accepted,,,true,11');
+    expect(lines).toContain('offers,declined,7,0.6364,false,11');
+    expect(lines).toContain('offer_decline_reason,at_capacity,4,,false,');
+    expect(lines).toContain("offer_team,'=SUM(1+1),12,,false,");
+    expect(lines).toContain('ai_drafts,rejected,3,0.3,false,10');
+    expect(lines).toContain('ai_draft_reject_reason,inaccurate,3,,false,');
+  });
+});

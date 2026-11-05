@@ -45,6 +45,9 @@ const row = (patch: Partial<InboxConversation> = {}): InboxConversation => ({
   ticket: null,
   priority: null,
   waitingSince: null,
+  sla: null,
+  aiDraftReady: false,
+  offer: null,
   replyWindowClosesAt: null,
   unreadCount: 0,
   lastActivityAt: NOW,
@@ -248,7 +251,7 @@ describe('Telegram in the inbox list', () => {
             }),
           ],
           nextCursor: null,
-          counts: { mine: 1, unassigned: 0, ai: 0, team: 0, tickets: 0, all: 1 },
+          counts: { mine: 1, unassigned: 0, overdue: 0, ai: 0, team: 0, tickets: 0, all: 1 },
         },
       },
     });

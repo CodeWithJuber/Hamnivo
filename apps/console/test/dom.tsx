@@ -60,6 +60,10 @@ const tenant = {
 } as TenantSummary;
 
 const PATHS = [
+  '/agency',
+  '/branding',
+  '/connectors',
+  '/workflows',
   '/overview',
   '/inbox',
   '/inbox/$conversationId',
@@ -78,6 +82,7 @@ const PATHS = [
   '/agents',
   '/agents/$agentId',
   '/settings/billing',
+  '/settings/privacy',
   '/visitors',
 ];
 
@@ -157,7 +162,15 @@ export interface Call {
 /** What a fake answers: JSON for success, or a problem the way the gateway sends one. */
 export type Answer =
   | { status?: number; json?: unknown }
-  | { problem: { status: number; code: string; fields?: { path: string; message: string }[] } };
+  | {
+      problem: {
+        status: number;
+        code: string;
+        fields?: { path: string; message: string }[];
+        /** Anything else the problem carries, such as who owns a conversation now. */
+        [extra: string]: unknown;
+      };
+    };
 
 /**
  * Stands in for the gateway. Routes are `"POST /v1/admin/brands"` (the path without the query);

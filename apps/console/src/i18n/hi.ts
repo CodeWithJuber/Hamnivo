@@ -1,3 +1,4 @@
+import { aiDraftsHi } from './ai-drafts/hi';
 import { automationsHi } from './automations/hi';
 import { blockingHi } from './blocking/hi';
 import { cachingHi } from './caching';
@@ -8,7 +9,10 @@ import { commerceHi } from './commerce/hi';
 import { decisionsHi } from './decisions';
 import { developerHi } from './developer/hi';
 import type { Translation } from './en';
+import { offersHi } from './offers/hi';
+import { privacyHi } from './privacy/hi';
 import { reportsHi } from './reports/hi';
+import { slaHi } from './sla/hi';
 import { ticketsHi } from './tickets/hi';
 import { toolsHi } from './tools';
 import { chatSettingsHi } from './widget/hi';
@@ -534,7 +538,8 @@ export const hi: Translation = {
       answer: 'ग्राहकों को जवाब दें',
       answerHint: 'चैट में जवाब देता है।',
       assist: 'स्टाफ़ की मदद करें',
-      assistHint: 'सुझाव अंदरूनी नोट के रूप में लिखता है। ग्राहकों को कभी जवाब नहीं देता।',
+      assistHint:
+        'आपकी टीम के लिए जवाब का ड्राफ़्ट लिखता है, जिसे वे मंज़ूर करें, बदलें या अस्वीकार करें। ग्राहकों को ख़ुद कभी जवाब नहीं देता।',
     },
     provider: 'प्रोवाइडर',
     providers: {
@@ -715,7 +720,8 @@ export const hi: Translation = {
       public: 'सार्वजनिक जवाब',
       internal: 'सिर्फ़ टीम',
       publicHint: 'ग्राहकों के जवाबों का आधार बन सकता है।',
-      internalHint: 'सिर्फ़ स्टाफ़ और मदद मोड के लिए। ग्राहकों के जवाबों में कभी इस्तेमाल नहीं होता।',
+      internalHint:
+        'सिर्फ़ आपकी टीम के लिए, जैसे जानकारी खोजने में। ग्राहकों के जवाबों या ड्राफ़्ट में कभी इस्तेमाल नहीं होता।',
     },
     sourceStatus: { active: 'सक्रिय', paused: 'रुका हुआ', retired: 'इस्तेमाल बंद' },
     sourceForm: {
@@ -985,12 +991,16 @@ export const hi: Translation = {
       label: 'कतारें',
       mine: 'मेरी',
       unassigned: 'किसी व्यक्ति का इंतज़ार',
+      overdue: 'देरी वाली',
       ai: 'AI जवाब दे रहा है',
       team: 'मेरी टीमें',
       tickets: 'टिकट',
       all: 'सभी',
     },
     tickets: ticketsHi,
+    sla: slaHi,
+    aiDrafts: aiDraftsHi,
+    offers: offersHi,
     blocking: blockingHi,
     keys: {
       plain: 'कुंजियाँ: चलने के लिए ↑ ↓ या J K, खोलने के लिए Enter, वापस आने के लिए Esc।',
@@ -1045,6 +1055,10 @@ export const hi: Translation = {
       unassigned: {
         title: 'कोई किसी व्यक्ति का इंतज़ार नहीं कर रहा',
         description: 'जब कोई ग्राहक किसी व्यक्ति से बात करना चाहता है, तो बातचीत यहाँ इंतज़ार करती है।',
+      },
+      overdue: {
+        title: 'कुछ भी देर से नहीं है',
+        description: 'जवाब के समय का लक्ष्य पार कर चुकी बातचीत यहाँ दिखती हैं, सबसे ज़्यादा देरी वाली पहले।',
       },
       ai: {
         title: 'AI अभी किसी को जवाब नहीं दे रहा',
@@ -1401,6 +1415,7 @@ export const hi: Translation = {
   commerce: commerceHi,
   developer: developerHi,
   reports: reportsHi,
+  privacy: privacyHi,
   chatSettings: chatSettingsHi,
   chatWidget: chatWidgetHi,
   channels: channelsHi,
@@ -2328,6 +2343,8 @@ export const hi: Translation = {
     },
   },
   permissionAreas: {
+    agency: 'एजेंसी',
+    branding: 'ब्रांडिंग',
     conversations: 'बातचीत',
     visitors: 'विज़िटर',
     inbox: 'इनबॉक्स और रूटिंग',
@@ -2357,9 +2374,19 @@ export const hi: Translation = {
     migration: 'इंपोर्ट',
     settings: 'वर्कस्पेस सेटिंग',
     security: 'सुरक्षा',
+    privacy: 'निजता',
+    customers: 'ग्राहक डेटा',
     support: 'सहायता एक्सेस',
   },
   permissions: {
+    agency: {
+      read: 'एजेंसी सेटिंग और क्लाइंट निर्देशिका देखें',
+      manage: 'एजेंसी सेटिंग और स्वतंत्र क्लाइंट लिंक प्रबंधित करें',
+    },
+    branding: {
+      read: 'पोर्टल ब्रांडिंग और कस्टम डोमेन देखें',
+      manage: 'पोर्टल ब्रांडिंग और सत्यापित कस्टम डोमेन प्रबंधित करें',
+    },
     conversations: {
       read: 'बातचीत और ग्राहक का इतिहास पढ़ें',
       reply: 'ग्राहकों को जवाब दें',
@@ -2452,6 +2479,11 @@ export const hi: Translation = {
     },
     settings: { manage: 'वर्कस्पेस सेटिंग बदलें' },
     security: { manage: 'साइन-इन, सिंगल साइन-ऑन और सेशन के नियम सेट करें' },
+    privacy: { manage: 'तय करें कि बातचीत मिटाए जाने से पहले कितने समय तक रखी जाए' },
+    customers: {
+      export: 'किसी एक ग्राहक की सारी जानकारी डाउनलोड करें, डेटा देखने के अनुरोध के लिए',
+      erase: 'किसी एक ग्राहक को हर जगह से मिटाएँ, Chatwoot समेत, मिटाने के अनुरोध के लिए',
+    },
     support: { grant: 'Hamnivo सहायता को इस वर्कस्पेस का एक्सेस दें' },
   },
 };

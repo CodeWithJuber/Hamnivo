@@ -16,6 +16,10 @@ at any time.
 For everything about a customer, including their choice history, exporting what is remembered and
 erasing it all, choose **Open memory** there, or open **Memory** in the menu.
 
+When a customer asks for all their data, or to be erased everywhere and not only from memory, use
+**Settings → Privacy** instead: see [Download a customer's data](../setup/privacy.md#download-a-customers-data)
+and [Erase a customer](../setup/privacy.md#erase-a-customer).
+
 ## What you see
 
 - **Their choice**: *Memory on*, *Declined*, *Memory off* or *Not asked yet*, with the day they

@@ -21,7 +21,7 @@ custom fields. Saved replies and tags are set up in Studio, from the inbox (see
 
 ## The menu in Studio
 
-The menu has six entries. An entry appears only when you can open at least one page in it, and it
+The menu has seven entries. An entry appears only when you can open at least one page in it, and it
 opens the first page you can open. When you can open two or more pages of an entry, they are shown
 as a row of links above the page, so each one is a click away.
 
@@ -29,10 +29,15 @@ as a row of links above the page, so each one is a click away.
 |---|---|
 | **Home** | Home: your chats or your setup steps, then your brands, AI stops and the latest runs |
 | **Inbox** | The inbox |
-| **AI assistant** | AI agents, Knowledge, Customer memory, Tools and permissions, Safety checks, Decision rules, Activity, Answer caching, Model connections |
-| **Sales** | Orders, Finance exceptions |
+| **AI assistant** | AI agents, Knowledge, Customer memory; advanced: Safety checks, Decision rules, Activity, Answer caching |
+| **Workflows** | Workflows; advanced: Automations |
+| **Connectors** | Connectors, Channels; advanced: Tools and permissions, Model connections |
 | **Reports** | Reports |
-| **Settings** | Brands and install, Chat widget, Channels, Automations, Business hours, Team and access, Support teams, Security, Developer, Customer sign-in, Import history |
+| **Settings** | Brands and install, Portal branding, Chat widget, Business hours, Team and access, Plan and billing, Privacy; advanced: Orders, Finance exceptions, Support teams, Security, Developer, Customer sign-in, Import history |
+
+See [Build agent workflows](guide/ai/workflows.md) and
+[Connect business systems and specialist agents](guide/integrations/connectors.md) for the new
+workflow and connector pages.
 
 ### Find any page with Search
 
@@ -59,22 +64,28 @@ Some pages are not in the menu:
   [**Saved replies and tags**](guide/inbox/saved-replies.md) (people who manage the inbox) are
   buttons above the list of chats in the inbox. A row of links for them would push the inbox down.
 
+[**Reports**](guide/reports.md) explains each tab, which small numbers are withheld and how far
+back each report goes.
+
 ## What each role sees
 
 A page's permission has not changed: the menu only groups the pages. A **✓** below means the
 entry is there, and a list names the pages you can open in it.
 
-| Role | Home | Inbox | AI assistant | Sales | Reports | Settings |
-|---|---|---|---|---|---|---|
-| Owner | ✓ | ✓ | all nine pages | both pages | ✓ | all twelve pages |
-| Administrator | ✓ | ✓ | all nine pages | both pages | ✓ | all twelve pages (Plan and billing shows only the email sender name) |
-| Supervisor | ✓ | ✓ | all but Model connections | both pages | ✓ | Automations (read only), Team and access, Support teams |
-| Support agent | ✓ | ✓ | Knowledge, Tools and permissions, Answer caching | both pages | | Team and access, Support teams (both read only) |
-| Finance | ✓ | | Activity | both pages | ✓ | Team and access, Support teams |
-| Knowledge editor | ✓ | ✓ | AI agents, Knowledge, Answer caching | | | |
-| Developer | ✓ | | AI agents, Model connections | | | Chat widget, Channels, Team and access, Support teams, Developer |
-| Analyst | ✓ | ✓ | Safety checks, Decision rules, Activity | | ✓ | |
-| Billing manager | ✓ | | Activity | | ✓ | Plan and billing |
+| Role | Home | Inbox | AI assistant | Workflows | Connectors | Reports | Settings |
+|---|---|---|---|---|---|---|---|
+| Owner | ✓ | ✓ | all pages | both pages | all pages | ✓ | all pages |
+| Administrator | ✓ | ✓ | all pages | both pages | all pages | ✓ | all pages (Plan and billing shows only the email sender name) |
+| Supervisor | ✓ | ✓ | all pages | both pages | Connectors, Tools and permissions | ✓ | Orders, Finance exceptions, Team and access, Support teams |
+| Support agent | ✓ | ✓ | Knowledge, Answer caching | | Connectors, Tools and permissions | | Orders, Finance exceptions, Team and access, Support teams |
+| Finance | ✓ | | Activity | | | ✓ | Orders, Finance exceptions, Team and access, Support teams |
+| Knowledge editor | ✓ | ✓ | AI agents, Knowledge, Answer caching | | | | |
+| Developer | ✓ | | AI agents | | Connectors, Channels, Model connections | | Chat widget, Team and access, Support teams, Developer |
+| Analyst | ✓ | ✓ | Safety checks, Decision rules, Activity | | | ✓ | |
+| Billing manager | ✓ | | Activity | | | ✓ | Plan and billing |
+
+When agency mode is enabled, people with agency access also see an **Agency clients** link in the
+workspace header. It is separate from the seven menu entries because it changes workspace context.
 
 A custom role works the same way: the entry is there when one of its pages is allowed, and the row
 lists only the allowed pages. The gateway checks every request again, so typing the address of a

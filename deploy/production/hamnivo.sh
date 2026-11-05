@@ -397,14 +397,15 @@ cmd_backup() {
 }
 
 # --- restores keep customers' newer privacy decisions --------------------------------------------
-# Consent to memory, memory deletion receipts and their tombstones are never removed, so the
-# current database has every such row a backup has, plus those made since. A restore saves them
-# before it replaces the database, adds them to the restored one and replays the tombstones before
-# anything starts: restoring an older backup never brings back memory a customer asked to forget,
-# nor consent they withdrew. Saved rows wait in state/restore/ until the databases are switched,
+# Consent to memory, memory deletion receipts and their tombstones, and customers' export and
+# erasure requests with the erasures' tombstones (A10), are never removed, so the current database
+# has every such row a backup has, plus those made since. A restore saves them before it replaces
+# the database, adds them to the restored one and replays the tombstones before anything starts:
+# restoring an older backup never brings back memory a customer asked to forget, consent they
+# withdrew, nor a customer who was erased. Saved rows wait in state/restore/ until the databases are switched,
 # so an interrupted restore picks them up again. A table added here must never lose rows, and gets
 # its parents' check in carry_privacy.
-privacy_tables='learning_consents memory_deletions deletion_tombstones'
+privacy_tables='learning_consents memory_deletions deletion_tombstones privacy_requests erasure_tombstones'
 
 db_psql() { # db_psql DATABASE [PSQL_ARGS...]: psql in the Hamnivo database server, as superuser
   "${compose[@]}" exec -T hamnivo-db psql -X -q -v ON_ERROR_STOP=1 -U postgres -d "$@"
@@ -456,7 +457,9 @@ begin
     ('learning_consents', 'exists (select from public.brands as b where b.tenant_id = r.tenant_id and b.id = r.brand_id)
        and exists (select from public.customer_principals as p where p.tenant_id = r.tenant_id and p.id = r.subject_id)'),
     ('memory_deletions', 'exists (select from public.brands as b where b.tenant_id = r.tenant_id and b.id = r.brand_id)'),
-    ('deletion_tombstones', 'exists (select from public.memory_deletions as d where d.tenant_id = r.tenant_id and d.id = r.deletion_id)')
+    ('deletion_tombstones', 'exists (select from public.memory_deletions as d where d.tenant_id = r.tenant_id and d.id = r.deletion_id)'),
+    ('privacy_requests', 'exists (select from public.brands as b where b.tenant_id = r.tenant_id and b.id = r.brand_id)'),
+    ('erasure_tombstones', 'exists (select from public.privacy_requests as q where q.tenant_id = r.tenant_id and q.id = r.request_id)')
   ) as v (t, p) loop
     continue when to_regclass('public.' || target) is null;
     -- The columns the saved rows have: a column added since takes its default.
@@ -488,6 +491,21 @@ begin
   if to_regprocedure('app.apply_memory_tombstones()') is not null then
     n := app.apply_memory_tombstones();
     raise notice '% deleted memory records removed again', n;
+  end if;
+  if to_regclass('public.privacy_requests') is not null then
+    -- Exports and erasures that had not finished go on once the worker starts.
+    insert into public.outbox_events (id, tenant_id, topic, aggregate_type, aggregate_id, payload)
+    select gen_random_uuid(), q.tenant_id, 'privacy.' || q.kind, 'privacy_request', q.id::text,
+      jsonb_build_object('requestId', q.id)
+    from public.privacy_requests as q
+    where q.state in ('queued', 'running')
+      and not exists (select from public.outbox_events as o where o.tenant_id = q.tenant_id
+        and o.topic = 'privacy.' || q.kind and o.aggregate_id = q.id::text and o.processed_at is null);
+  end if;
+  if to_regprocedure('app.apply_erasure_tombstones()') is not null then
+    -- Customers erased since the backup are erased again; the worker checks Chatwoot for them.
+    n := app.apply_erasure_tombstones();
+    raise notice '% erased customers erased again', n;
   end if;
 end
 $carry$;

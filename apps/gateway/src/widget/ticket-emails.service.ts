@@ -3,6 +3,7 @@ import { ticketReference } from '@hamnivo/contracts';
 import { type ClaimedOutboxEvent, type Db, schema, type TenantTx, withTenant } from '@hamnivo/db';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq, isNotNull, ne } from 'drizzle-orm';
+import { sendBrandedCustomerMail } from '../branding/customer-email.js';
 import type { AppConfig } from '../config.js';
 import type { Mailer } from '../platform/mailer.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, MAILER } from '../tokens.js';
@@ -155,7 +156,7 @@ export class TicketEmailsService {
     });
     const copy = TICKET_COPY[notifyLocale(found.locale)];
     const reference = ticketReference(found.number);
-    await this.mailer.send({
+    await sendBrandedCustomerMail(this.db, this.mailer, tenantId, found.brand.name, {
       to: found.followup.email,
       subject: copy.confirmSubject(found.brand.name, reference),
       text: [

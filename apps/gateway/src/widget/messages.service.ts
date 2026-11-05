@@ -208,6 +208,7 @@ export class WidgetMessagesService {
         in_reply_to: target.authorityId,
         hv: { v: 1, reaction: { emoji: input.emoji, messageId: messagePublicId } },
       },
+      expectsReply: false,
       load: (tx) => this.own(tx, claims, conversationId),
     });
   }

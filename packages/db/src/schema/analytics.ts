@@ -1,16 +1,5 @@
 import { sql } from 'drizzle-orm';
-import {
-  boolean,
-  check,
-  foreignKey,
-  index,
-  integer,
-  pgTable,
-  text,
-  unique,
-  uuid,
-} from 'drizzle-orm/pg-core';
-import { conversationControls } from './authority.js';
+import { boolean, check, index, integer, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 import { tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { tenantId } from './tenancy.js';
 
@@ -18,7 +7,8 @@ import { tenantId } from './tenancy.js';
  * Product analytics projection (O04): one row per conversation with the moments that reports
  * need, kept by triggers on conversation_controls and the customer lane of the journal (see the
  * developer_platform security migration). Timestamps and categories only, never content, so
- * reports outlive the short-lived journal without keeping a second transcript.
+ * reports outlive the short-lived journal without keeping a second transcript. There is no
+ * foreign key to the conversation: the row outlives it when retention deletes it (A10).
  */
 export const conversationMetrics = pgTable(
   'conversation_metrics',
@@ -47,16 +37,24 @@ export const conversationMetrics = pgTable(
     resolvedBy: text('resolved_by', { enum: ['ai', 'person'] }),
     resolutionCount: integer('resolution_count').notNull().default(0),
     reopenCount: integer('reopen_count').notNull().default(0),
+    /**
+     * Set when retention deleted the conversation (A10). The row is then all that is left of it:
+     * the inbox state and ratings that reports read, copied here first, and nothing about the
+     * customer or what was said.
+     */
+    retiredAt: tstz('retired_at'),
+    teamId: uuid('team_id'),
+    priority: text('priority'),
+    ticketNumber: integer('ticket_number'),
+    ticketSource: text('ticket_source'),
+    ticketOpenedAt: tstz('ticket_opened_at'),
+    ratingCount: integer('rating_count').notNull().default(0),
+    ratingSum: integer('rating_sum').notNull().default(0),
     updatedAt: updatedAt(),
   },
   (t) => [
     unique('conversation_metrics_tenant_id_id_key').on(t.tenantId, t.id),
     index('conversation_metrics_created_idx').on(t.tenantId, t.createdAt),
-    foreignKey({
-      name: 'conversation_metrics_conversation_fk',
-      columns: [t.tenantId, t.id],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
-    }).onDelete('cascade'),
     check(
       'conversation_metrics_counts_ck',
       sql`${t.resolutionCount} >= 0 and ${t.reopenCount} >= 0`,

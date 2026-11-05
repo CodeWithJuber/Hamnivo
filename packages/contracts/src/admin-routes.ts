@@ -43,6 +43,7 @@ import {
   UpdateBrandRequest,
 } from './brands.js';
 import type { RouteDef } from './routes.js';
+import { SetSlaPolicyRequest, SlaPolicy } from './sla.js';
 
 const idParam = (description: string) => z.object({ id: z.string().meta({ description }) });
 const brandParams = z.object({ brandId: z.string().meta({ description: 'Brand ID (brd_…)' }) });
@@ -427,6 +428,28 @@ export const adminRoutes = {
     params: brandParams,
     body: SetBusinessHoursRequest,
     success: { status: 200, description: 'Brand', schema: Brand },
+  },
+  getSlaPolicy: {
+    method: 'get',
+    path: '/v1/admin/brands/{brandId}/sla-policy',
+    operationId: 'getSlaPolicy',
+    summary: 'The brand’s reply-time targets per priority (inbox.manage)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    params: brandParams,
+    success: { status: 200, description: 'Reply-time targets', schema: SlaPolicy },
+  },
+  setSlaPolicy: {
+    method: 'put',
+    path: '/v1/admin/brands/{brandId}/sla-policy',
+    operationId: 'setSlaPolicy',
+    summary:
+      'Set how soon a person should give the first and each next reply, per priority, in business hours (inbox.manage)',
+    tags: ['Administration'],
+    auth: 'staff_session',
+    params: brandParams,
+    body: SetSlaPolicyRequest,
+    success: { status: 200, description: 'Reply-time targets', schema: SlaPolicy },
   },
   listIdentityKeys: {
     method: 'get',

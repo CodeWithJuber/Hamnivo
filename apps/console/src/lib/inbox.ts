@@ -49,7 +49,7 @@ export type InboxTicket = C.InboxTicket;
 export type TicketState = C.TicketState;
 export type TicketPriority = C.TicketPriority;
 
-export const QUEUES = ['mine', 'unassigned', 'ai', 'team', 'tickets', 'all'] as const;
+export const QUEUES = ['mine', 'unassigned', 'overdue', 'ai', 'team', 'tickets', 'all'] as const;
 export const STATUSES = ['active', 'snoozed', 'resolved', 'all'] as const;
 export const CHANNELS = ['chat', 'email', 'whatsapp', 'telegram', 'sms', 'other'] as const;
 /** Where a ticket stands (H19), in the order the inbox offers them. */

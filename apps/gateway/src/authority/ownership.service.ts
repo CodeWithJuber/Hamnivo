@@ -1,10 +1,15 @@
+import type { ProblemOwner } from '@hamnivo/contracts';
 import { appendAudit, schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { OwnerMode } from '@hamnivo/db/schema';
+import { draftSurvivesOwnerChange } from '@hamnivo/domain';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { actionsInFlightNote, supersedeForOwnerChange } from '../actions/in-flight.js';
 import { inFlightNote } from '../commerce/in-flight.js';
 import { AppError } from '../common/app-error.js';
+import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
+import { settleOffer } from '../inbox/offers.js';
+import { syncSla } from '../inbox/sla.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { CLOCK, type Clock } from '../tokens.js';
 import { type JournalEntry, JournalService } from './journal.service.js';
@@ -40,7 +45,9 @@ export interface TransitionOptions {
     | 'ai_blocked'
     | 'ai_limit'
     | 'ai_escalated'
-    | 'channel_ai_off';
+    | 'channel_ai_off'
+    | 'offer_accepted'
+    | 'sla_moved';
   /** Audit actor (`stf_…`, `cus_…`, `authority`). */
   actor: { type: 'staff' | 'customer' | 'system'; id: string };
   /** The epoch the caller saw; a different current epoch fails with OWNERSHIP_CHANGED. */
@@ -49,6 +56,12 @@ export interface TransitionOptions {
   handoffNote?: string;
   /** The staff member who made the change, so Chatwoot records it as theirs. */
   actorStaffMemberId?: string;
+  /**
+   * A conversation already waiting goes to the queue again as a new hand-off (a new epoch), so the
+   * people of its new team are offered it (ADR 0016). Its AI draft stays: it was written for
+   * whoever picks the conversation up from the queue.
+   */
+  requeue?: boolean;
 }
 
 export interface TransitionResult {
@@ -86,6 +99,38 @@ function sameOwner(control: ControlRow, target: OwnerTarget): boolean {
 }
 
 /**
+ * Who has a conversation now, for an OWNERSHIP_CHANGED answer (HNV-08-02): a claim that lost says
+ * who won. Only ever returned to people who may read the conversation.
+ */
+export async function currentOwnerOf(
+  tx: TenantTx,
+  control: Pick<ControlRow, 'ownerMode' | 'ownerStaffId' | 'ownerBotId' | 'ownershipEpoch'>,
+): Promise<ProblemOwner> {
+  const epoch = control.ownershipEpoch;
+  if (control.ownerMode === 'AI_ACTIVE') {
+    const [bot] = control.ownerBotId
+      ? await tx
+          .select({ name: schema.authorityBots.name })
+          .from(schema.authorityBots)
+          .where(eq(schema.authorityBots.id, control.ownerBotId))
+      : [];
+    return { kind: 'ai', displayName: bot?.name ?? null, ownershipEpoch: epoch };
+  }
+  if (control.ownerMode === 'HUMAN_ACTIVE') {
+    const [staff] = control.ownerStaffId
+      ? await tx
+          .select({ name: schema.staffMembers.displayName })
+          .from(schema.staffMembers)
+          .where(eq(schema.staffMembers.id, control.ownerStaffId))
+      : [];
+    return staff
+      ? { kind: 'staff', displayName: staff.name, ownershipEpoch: epoch }
+      : { kind: 'external', displayName: null, ownershipEpoch: epoch };
+  }
+  return { kind: 'none', displayName: null, ownershipEpoch: epoch };
+}
+
+/**
  * Ownership and fencing (ADR 0003). Every change of who may speak is one transaction on the
  * locked control row: the epoch increases, the customer-visible change is journaled and, for
  * changes Hamnivo starts, an outbox event applies it in Chatwoot. AI publications carry the epoch
@@ -119,9 +164,12 @@ export class OwnershipService {
     if (options.expectedEpoch !== undefined && options.expectedEpoch !== control.ownershipEpoch) {
       throw new AppError('OWNERSHIP_CHANGED', {
         detail: 'Someone else changed who handles this conversation. Reload and try again.',
+        currentOwner: await currentOwnerOf(tx, control),
       });
     }
-    if (sameOwner(control, target)) return { changed: false, control, journal: [] };
+    if (sameOwner(control, target) && !(options.requeue && target.kind === 'queue')) {
+      return { changed: false, control, journal: [] };
+    }
 
     const epoch = control.ownershipEpoch + 1;
     const mode = modeOf(target);
@@ -149,11 +197,22 @@ export class OwnershipService {
       .returning();
     if (!updated) throw new Error('control update returned nothing');
 
+    // The reply-time clock follows the owner (H12): it runs while people have the conversation and
+    // a customer waits, and ends when the AI takes it back.
+    await syncSla(tx, tenantId, conversationId, this.clock());
+    // An offer was for this hand-off (HNV-10-03): someone else taking it ends the offer.
+    await settleOffer(tx, conversationId, this.clock());
+
     const before = customerView(control.ownerMode, control.authorityStatus);
     const after = customerView(mode, control.authorityStatus);
     // AI actions are approved for one epoch (G13): pending approvals end here; anything already
     // sent stays open and is reconciled under the new owner (listed in the note below).
     const superseded = await supersedeForOwnerChange(tx, conversationId, epoch, this.clock());
+    // An AI draft was written for whoever would pick the conversation up from the queue; any other
+    // change of hands makes it stale (HNV-09-05).
+    if (!options.requeue && !draftSurvivesOwnerChange(control.ownerMode, mode)) {
+      await supersedeAiDrafts(tx, conversationId, 'owner_changed', this.clock());
+    }
     const updates = [
       ...(before.status !== after.status || before.responder !== after.responder
         ? [{ lane: 'customer' as const, type: 'conversation.updated' as const, data: after }]

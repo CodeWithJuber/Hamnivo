@@ -1,3 +1,4 @@
+import { aiDraftsEn } from './ai-drafts/en';
 import { automationsEn } from './automations/en';
 import { blockingEn } from './blocking/en';
 import { cachingEn } from './caching';
@@ -7,7 +8,10 @@ import { checksEn } from './checks';
 import { commerceEn } from './commerce/en';
 import { decisionsEn } from './decisions';
 import { developerEn } from './developer/en';
+import { offersEn } from './offers/en';
+import { privacyEn } from './privacy/en';
 import { reportsEn } from './reports/en';
+import { slaEn } from './sla/en';
 import { ticketsEn } from './tickets/en';
 import { toolsEn } from './tools';
 import { chatSettingsEn } from './widget/en';
@@ -540,7 +544,8 @@ export const en = {
       answer: 'Answer customers',
       answerHint: 'Replies in the chat.',
       assist: 'Assist staff',
-      assistHint: 'Writes suggestions as internal notes. Never replies to customers.',
+      assistHint:
+        'Writes a draft reply for your team to approve, edit or reject. Never replies to customers on its own.',
     },
     provider: 'Provider',
     providers: {
@@ -722,7 +727,8 @@ export const en = {
       public: 'Public answers',
       internal: 'Team only',
       publicHint: 'Can ground answers to customers.',
-      internalHint: 'Only for staff and assist mode. Never used in customer answers.',
+      internalHint:
+        'Only for your team, such as in knowledge search. Never used in answers or drafts for customers.',
     },
     sourceStatus: { active: 'Active', paused: 'Paused', retired: 'Retired' },
     sourceForm: {
@@ -991,12 +997,16 @@ export const en = {
       label: 'Queues',
       mine: 'Mine',
       unassigned: 'Waiting for a person',
+      overdue: 'Overdue',
       ai: 'AI answering',
       team: 'My teams',
       tickets: 'Tickets',
       all: 'All',
     },
     tickets: ticketsEn,
+    sla: slaEn,
+    aiDrafts: aiDraftsEn,
+    offers: offersEn,
     blocking: blockingEn,
     keys: {
       plain: 'Keys: ↑ ↓ or J K to move, Enter to open, Esc to come back.',
@@ -1051,6 +1061,11 @@ export const en = {
       unassigned: {
         title: 'Nobody is waiting for a person',
         description: 'When a customer asks for a person, the conversation waits here.',
+      },
+      overdue: {
+        title: 'Nothing is overdue',
+        description:
+          'Conversations past their reply-time target show up here, the most overdue first.',
       },
       ai: {
         title: 'The AI isn’t answering anyone right now',
@@ -1409,6 +1424,7 @@ export const en = {
   commerce: commerceEn,
   developer: developerEn,
   reports: reportsEn,
+  privacy: privacyEn,
   chatSettings: chatSettingsEn,
   chatWidget: chatWidgetEn,
   channels: channelsEn,
@@ -2346,6 +2362,8 @@ export const en = {
     },
   },
   permissionAreas: {
+    agency: 'Agency',
+    branding: 'Branding',
     conversations: 'Conversations',
     visitors: 'Visitors',
     inbox: 'Inboxes and routing',
@@ -2375,9 +2393,19 @@ export const en = {
     migration: 'Imports',
     settings: 'Workspace settings',
     security: 'Security',
+    privacy: 'Privacy',
+    customers: 'Customer data',
     support: 'Support access',
   },
   permissions: {
+    agency: {
+      read: 'View agency settings and the client directory',
+      manage: 'Manage agency settings and independent client links',
+    },
+    branding: {
+      read: 'View portal branding and custom domains',
+      manage: 'Manage portal branding and verified custom domains',
+    },
     conversations: {
       read: 'Read conversations and customer history',
       reply: 'Reply to customers',
@@ -2469,6 +2497,11 @@ export const en = {
     },
     settings: { manage: 'Edit workspace settings' },
     security: { manage: 'Configure sign-in, single sign-on and session rules' },
+    privacy: { manage: 'Choose how long conversations are kept before they are deleted' },
+    customers: {
+      export: 'Download everything about one customer, for an access request',
+      erase: 'Erase one customer everywhere, Chatwoot included, for an erasure request',
+    },
     support: { grant: 'Allow Hamnivo support to access this workspace' },
   },
 } as const;

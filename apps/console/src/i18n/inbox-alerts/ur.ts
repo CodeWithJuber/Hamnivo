@@ -23,9 +23,9 @@ export const inboxAlertsUr: InboxAlertsTranslation = {
     silent: 'آوازیں خاموش ہونے پر یا آواز کی سطح 0 ہونے پر کوئی آواز نہیں بجے گی۔',
     events: {
       title: 'ہر واقعے کے لیے آواز',
-      newChat: 'کوئی چیٹ کسی فرد کا انتظار کر رہی ہے',
+      newChat: 'کوئی چیٹ کسی فرد کا انتظار کر رہی ہے، یا جواب کا وقت گزر گیا ہے',
       customerMessage: 'کوئی صارف آپ کی چیٹ میں، یا ایسی چیٹ میں لکھتا ہے جسے کسی نے نہیں لیا',
-      assigned: 'کوئی چیٹ آپ کو سونپی یا منتقل کی گئی',
+      assigned: 'کوئی چیٹ آپ کو پیش، سونپی یا منتقل کی گئی',
     },
     sounds: {
       chime: 'گھنٹی کی دھن',
@@ -64,6 +64,9 @@ export const inboxAlertsUr: InboxAlertsTranslation = {
   },
   alert: {
     chat_waiting: '{{name}} کسی فرد کا انتظار کر رہے ہیں',
+    sla_overdue: '{{name}} کے جواب کا وقت گزر گیا ہے',
+    sla_overdue_lead: '{{name}} کو کسی نے وقت پر جواب نہیں دیا',
+    chat_offered: '{{name}} کی چیٹ آپ کو پیش کی گئی ہے: قبول کریں یا انکار کریں',
     customer_message: '{{name}} کا نیا پیغام',
     assigned: 'آپ کو ایک چیٹ سونپی گئی',
     assignedBody: '{{name}}: {{preview}}',

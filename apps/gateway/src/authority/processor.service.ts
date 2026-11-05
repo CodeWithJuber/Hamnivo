@@ -8,7 +8,12 @@ import {
   toPublicId,
   withTenant,
 } from '@hamnivo/db';
-import type { AuthorityConversationState, AuthorityEvent, AuthorityMessage } from '@hamnivo/domain';
+import {
+  type AuthorityConversationState,
+  type AuthorityEvent,
+  type AuthorityMessage,
+  MESSAGE_KEY_PREFIX,
+} from '@hamnivo/domain';
 import {
   Inject,
   Injectable,
@@ -16,12 +21,15 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
 import { queueAutomationEvent } from '../automations/events.js';
 import { confirmCardPublication } from '../commerce/card-publisher.service.js';
 import type { AppConfig } from '../config.js';
+import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
+import { settleOffer } from '../inbox/offers.js';
 import { projectInboxState } from '../inbox/projection.js';
+import { recordHumanReply, syncSla } from '../inbox/sla.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { retryDelayMs } from '../outbox/relay.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, REDIS } from '../tokens.js';
@@ -253,6 +261,8 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
         // Whichever commits the message starts the AI job, so it runs exactly once. A reaction
         // (W22) is not a question: nobody is asked to answer it.
         if (ledger.senderKind === 'customer' && !reactionOf(message)) {
+          // A pending AI draft answered what they said before (HNV-09-05).
+          await supersedeAiDrafts(tx, control.id, 'customer_wrote', now);
           await enqueueOutbox(tx, tenantId, {
             topic: 'conversation.customer_message',
             aggregateType: 'conversation',
@@ -340,8 +350,26 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     if (message.direction === 'incoming') {
       await tx
         .update(schema.conversationControls)
-        .set({ lastCustomerMessageAt: message.createdAt })
+        // Never backwards: Chatwoot's times have whole seconds, and the widget already recorded
+        // the exact time of its own messages.
+        .set({
+          lastCustomerMessageAt: sql`greatest(${schema.conversationControls.lastCustomerMessageAt}, ${message.createdAt.toISOString()}::timestamptz)`,
+        })
         .where(eq(schema.conversationControls.id, control.id));
+    }
+
+    // A public reply a person wrote (in Chatwoot, or in Studio when this webhook beat the send's
+    // own record) ends the reply-time clock (H12); automation and imported messages do not.
+    const humanReply =
+      fresh &&
+      lane === 'customer' &&
+      message.direction === 'outgoing' &&
+      message.sender.kind === 'user' &&
+      (message.key === null || message.key.startsWith(MESSAGE_KEY_PREFIX.message));
+    if (humanReply) {
+      await recordHumanReply(tx, tenantId, control.id, message.createdAt);
+      // A person answered by hand: a pending AI draft is no longer needed (HNV-09-05).
+      await supersedeAiDrafts(tx, control.id, 'answered', now);
     }
 
     // A person replying publicly in Chatwoot takes the conversation over from the AI.
@@ -365,6 +393,9 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
         { origin: 'authority', reason: 'human_reply', actor: { type: 'system', id: 'authority' } },
       );
       entries.push(...result.journal);
+    }
+    if (humanReply || (type === 'message.created' && message.direction === 'incoming')) {
+      await syncSla(tx, tenantId, control.id, this.clock());
     }
     return entries.length ? [{ tenantId, conversationId: control.id, entries }] : [];
   }
@@ -458,8 +489,14 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
       })
       .where(eq(schema.conversationControls.id, control.id));
     await projectInboxState(tx, tenantId, control.id, connectionId, state);
+    // Status, snooze and priority from Chatwoot move the reply-time clock (H12); resolving or
+    // snoozing ends a pending offer (HNV-10-03).
+    await syncSla(tx, tenantId, control.id, this.clock());
+    await settleOffer(tx, control.id, this.clock());
     const wasResolved = control.authorityStatus === 'resolved';
     if (!wasResolved && state.status === 'resolved') {
+      // Resolved in Chatwoot: a pending AI draft is no longer needed (HNV-09-05).
+      await supersedeAiDrafts(tx, control.id, 'resolved', this.clock());
       const resolved = await this.journal.append(tx, tenantId, control.id, [
         { lane: 'customer', type: 'conversation.resolved', data: { canReopen: true } },
       ]);

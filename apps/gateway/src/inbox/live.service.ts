@@ -1,7 +1,7 @@
 import { schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { ResourceScope, StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { uuidV5 } from '../authority/uuid.js';
 import type { AppConfig } from '../config.js';
@@ -104,7 +104,7 @@ export class InboxLiveService {
     principal: StaffPrincipal,
     tx: TenantTx,
     ids: string[],
-  ): Promise<(AlertChat & { resource: ResourceScope })[]> {
+  ): Promise<(AlertChat & { resource: ResourceScope; alertLeads: boolean })[]> {
     const scope = this.access.scope(principal);
     if (!scope || ids.length === 0) return [];
     const c = schema.conversationControls;
@@ -122,6 +122,15 @@ export class InboxLiveService {
         inboxId: c.inboxId,
         workspaceId: schema.brands.workspaceId,
         teamId: schema.conversationInboxState.teamId,
+        slaBreachedAt: schema.conversationInboxState.slaBreachedAt,
+        ownershipEpoch: c.ownershipEpoch,
+        teamOffers: sql<boolean>`coalesce(${schema.teams.assignmentMode} = 'offer' and ${schema.teams.status} = 'active', false)`,
+        offersEndedAt: schema.conversationInboxState.offersEndedAt,
+        offersEndedEpoch: schema.conversationInboxState.offersEndedEpoch,
+        offerId: schema.conversationOffers.id,
+        offerStaffId: schema.conversationOffers.staffMemberId,
+        offeredAt: schema.conversationOffers.offeredAt,
+        alertLeads: sql<boolean>`coalesce(${schema.slaPolicies.enabled} and ${schema.slaPolicies.overdueAlertLeads}, false)`,
       })
       .from(c)
       .leftJoin(schema.brands, eq(schema.brands.id, c.brandId))
@@ -130,6 +139,18 @@ export class InboxLiveService {
         eq(schema.conversationInboxState.conversationId, c.id),
       )
       .leftJoin(schema.customerPrincipals, eq(schema.customerPrincipals.id, c.principalId))
+      .leftJoin(schema.teams, eq(schema.teams.id, schema.conversationInboxState.teamId))
+      .leftJoin(
+        schema.slaPolicies,
+        and(eq(schema.slaPolicies.brandId, c.brandId), eq(schema.slaPolicies.tenantId, c.tenantId)),
+      )
+      .leftJoin(
+        schema.conversationOffers,
+        and(
+          eq(schema.conversationOffers.conversationId, c.id),
+          eq(schema.conversationOffers.state, 'pending'),
+        ),
+      )
       .where(and(inArray(c.id, ids), InboxAccess.condition(scope)));
     return rows.map(({ brandId, inboxId, workspaceId, teamId, ...chat }) => ({
       ...chat,
@@ -187,15 +208,20 @@ export class InboxLiveService {
         const { chats, decision } = await this.access.tx(principal, async (tx) => {
           const chats = await this.visibleChats(principal, tx, wanted);
           const known = new Set(ids);
-          // Alerts are for people who can answer the chat, not for everyone who may read it.
+          // Alerts are for people who can answer the chat, not for everyone who may read it; and
+          // for its leads when it goes overdue, if the brand alerts them (ADR 0016).
           const decision = await this.alerts.derive(
             principal,
             tx,
-            chats.filter(
-              (chat) =>
-                known.has(chat.id) &&
-                this.access.can(principal, 'conversations.reply', chat.resource),
-            ),
+            chats
+              .filter((chat) => known.has(chat.id))
+              .map(({ alertLeads, ...chat }) => ({
+                ...chat,
+                canReply: this.access.can(principal, 'conversations.reply', chat.resource),
+                leadAlert:
+                  alertLeads && this.access.can(principal, 'conversations.assign', chat.resource),
+              }))
+              .filter((chat) => chat.canReply || chat.leadAlert),
             new Date(since),
             new Set(alerted.keys()),
           );

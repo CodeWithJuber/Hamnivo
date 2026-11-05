@@ -35,8 +35,13 @@ export const DEFAULT_SETTINGS: AlertSettings = {
 /** The setting that picks the sound for each kind of alert. */
 export function soundFor(sounds: AlertSettings['sounds'], kind: AlertKind): SoundChoice {
   switch (kind) {
+    // A chat past its reply-time target (H12) is as pressing as a new one waiting, for its lead too.
+    case 'sla_overdue':
+    case 'sla_overdue_lead':
     case 'chat_waiting':
       return sounds.newChat;
+    // A chat offered to this person (HNV-10-03) is theirs to answer, like an assignment.
+    case 'chat_offered':
     case 'assigned':
       return sounds.assigned;
     case 'customer_message':
@@ -45,7 +50,14 @@ export function soundFor(sounds: AlertSettings['sounds'], kind: AlertKind): Soun
 }
 
 /** When several alerts arrive together, one sound plays: the most important kind. */
-const PRIORITY: readonly AlertKind[] = ['chat_waiting', 'assigned', 'customer_message'];
+const PRIORITY: readonly AlertKind[] = [
+  'chat_offered',
+  'sla_overdue',
+  'sla_overdue_lead',
+  'chat_waiting',
+  'assigned',
+  'customer_message',
+];
 
 /** Where the person is, which decides what is worth interrupting them with. */
 export interface Attention {

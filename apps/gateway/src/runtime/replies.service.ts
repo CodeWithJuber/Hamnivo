@@ -24,11 +24,12 @@ import {
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { generateText, isStepCount, type ToolSet } from 'ai';
 import canonicalize from 'canonicalize';
-import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { TOOL_DATA_CLASS } from '../actions/answer-cache.js';
 import { ActionApprovals } from '../actions/approvals.service.js';
 import { type RunTools, ToolGateway } from '../actions/gateway.service.js';
 import { HandoffPackets } from '../actions/handoff.service.js';
+import { reactionOf } from '../authority/extended-parts.js';
 import { type JournalEntry, JournalService } from '../authority/journal.service.js';
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
 import { PublicationsService } from '../authority/publications.service.js';
@@ -40,6 +41,8 @@ import {
   type PublicationFacts,
   type SourceRef,
 } from '../authority/views.js';
+import { AiAttemptUncertainError } from '../billing/ai-credits.model.js';
+import { reservationSize } from '../billing/ai-credits.service.js';
 import { EntitlementsService } from '../billing/entitlements.service.js';
 import { AnswerCache, type AnswerLookup } from '../cache/answers.js';
 import type { SourceRefRow } from '../cache/cache.service.js';
@@ -51,6 +54,7 @@ import {
 import { claimedLiveData, conversationLiveData } from '../commerce/answer-cache.js';
 import { CLAIM_CORRECTION, checkReplyClaims } from '../commerce/claims.js';
 import { AppError } from '../common/app-error.js';
+import { newerCustomerMessage, storeAiDraft } from '../inbox/ai-drafts.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
 import { LanguageService } from '../language/language.service.js';
 import { citeMemories, memoryBlock } from '../memory/prompt.js';
@@ -58,6 +62,7 @@ import { MemoryRecallService, type RecalledMemory } from '../memory/recall.servi
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
+import { WorkflowContextReader } from '../workflows/context-reader.service.js';
 import { type ActiveAgent, AgentsService } from './agents.service.js';
 import {
   type AiHandoffReason,
@@ -111,7 +116,12 @@ interface Generated {
  * Prompt options, why the reply language was chosen (recorded with the model step), and the
  * checks that run around this reply (none for staff suggestions).
  */
-type GenerateOptions = PromptOptions & { languageSource?: string; checks?: RunChecks | null };
+type GenerateOptions = PromptOptions & {
+  languageSource?: string;
+  checks?: RunChecks | null;
+  workflowContext?: { text: string; untrusted: true } | null;
+  workflowLedgerId?: string;
+};
 
 /** Why `generate` returned no reply, and whether the reply it returned may be cached. */
 interface GenerateOutcome {
@@ -292,6 +302,12 @@ class EmptyReplyError extends Error {
 
 /** Failure of a model call, without prompt text or credentials. */
 export function classifyModelError(error: unknown): { kind: string; retryable: boolean } {
+  if (error instanceof AiAttemptUncertainError)
+    return { kind: 'usage_unresolved', retryable: false };
+  if (error instanceof AppError && ['QUOTA_EXCEEDED', 'PLAN_LIMIT_REACHED'].includes(error.code))
+    return { kind: 'ai_allowance', retryable: false };
+  if (error instanceof AppError && error.code === 'IDEMPOTENCY_CONFLICT')
+    return { kind: 'ai_attempt_already_started', retryable: false };
   if (error instanceof ModelUnavailableError) return { kind: error.reason, retryable: false };
   if (error instanceof EmptyReplyError) return { kind: 'empty_reply', retryable: false };
   const normalized = normalizeModelError(error);
@@ -346,6 +362,7 @@ export class RepliesService {
     private readonly approvals: ActionApprovals,
     private readonly handoffs: HandoffPackets,
     private readonly checks: ReplyChecksService,
+    private readonly workflowContext: WorkflowContextReader,
   ) {}
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
@@ -370,22 +387,9 @@ export class RepliesService {
     telemetry: Omit<Parameters<RunsService['finish']>[2], 'outcome' | 'state'> = {},
   ): Promise<boolean> {
     return this.tx(tenantId, async (tx) => {
-      const l = schema.messageLedger;
-      // Compared in SQL: timestamps read into JavaScript lose their microseconds.
-      const [newer] = await tx
-        .select({ id: l.id })
-        .from(l)
-        .where(
-          and(
-            eq(l.conversationId, payload.conversationId),
-            eq(l.senderKind, 'customer'),
-            eq(l.state, 'committed'),
-            ne(l.id, payload.ledgerId),
-            sql`${l.createdAt} > (select m.created_at from message_ledger m where m.id = ${payload.ledgerId})`,
-          ),
-        )
-        .limit(1);
-      if (!newer) return false;
+      if (!(await newerCustomerMessage(tx, payload.conversationId, payload.ledgerId))) {
+        return false;
+      }
       await this.runs.step(tx, tenantId, runId, {
         kind: 'decision',
         name: 'superseded',
@@ -557,7 +561,14 @@ export class RepliesService {
 
     // Plan limits and the workspace's own AI budget (A08) limit what costs tokens: the model's
     // replies, here. They never limit safety: Hamnivo's wording for someone at risk is fixed text.
-    const allowance = await this.entitlements.aiAllowance(tenantId);
+    const checkedAllowance = await this.entitlements.aiAllowance(tenantId);
+    // Token admission is atomic at each provider attempt, and BYOK has no managed token charge.
+    const allowance =
+      !checkedAllowance.allowed &&
+      checkedAllowance.reason !== 'plan_replies' &&
+      agent.config.model.connectionId
+        ? { allowed: true as const }
+        : checkedAllowance;
 
     // Checks around this reply, as the brand set them (shadow records, live acts).
     const checks = await this.checks.forRun({
@@ -649,6 +660,12 @@ export class RepliesService {
     // Commerce data the conversation holds (K06): a reply built from it is never cached. Nor is
     // the reply of an agent that may call tools (G15): it may rest on a tool's answer.
     const liveData = await this.tx(tenantId, (tx) => conversationLiveData(tx, control.id));
+    options.workflowContext = await this.workflowContext.context(tenantId, {
+      conversationId: control.id,
+      epoch: payload.epoch,
+      agentId: agent.profile.id,
+      ledgerId: payload.ledgerId,
+    });
     const cached: AnswerLookup = await this.cachedAnswer(
       tenantId,
       run.id,
@@ -658,7 +675,7 @@ export class RepliesService {
       question,
       options,
       personalContext,
-      options.tools ? [...liveData, TOOL_DATA_CLASS] : liveData,
+      options.tools || options.workflowContext ? [...liveData, TOOL_DATA_CLASS] : liveData,
     );
 
     let generated: Generated | null;
@@ -718,7 +735,7 @@ export class RepliesService {
           control,
           run.id,
           payload.epoch,
-          'ai_unavailable',
+          failure.kind === 'ai_allowance' ? 'ai_limit' : 'ai_unavailable',
           failure.kind,
           handoffContext,
         );
@@ -1683,7 +1700,12 @@ export class RepliesService {
     });
   }
 
-  /** Assist mode (G03): a suggestion for staff as an internal note, never a customer reply. */
+  /**
+   * Assist mode (HNV-09-05, G03): writes a reply for people to review, kept as an AI draft that
+   * Studio shows above the composer. It is never sent on its own and never reaches Chatwoot; a
+   * person approves, edits or rejects it. Outbox handler for `conversation.customer_message`, safe
+   * to run more than once: a retry keeps the draft its run already wrote.
+   */
   private async suggest(
     event: ClaimedOutboxEvent,
     payload: CustomerMessageEvent,
@@ -1693,10 +1715,6 @@ export class RepliesService {
     const { control } = context;
     const agent = context.agent as ActiveAgent;
     const runtime = await this.registry.get(tenantId, control.connectionId);
-    const bot = runtime.primaryBot;
-    if (!bot) return;
-    const ref = String(control.externalConversationId);
-    const key = `hv1:d:${uuidV5(payload.conversationId, `draft:${payload.ledgerId}`)}`;
     const run = await this.tx(tenantId, (tx) =>
       this.runs.start(tx, {
         tenantId,
@@ -1710,12 +1728,14 @@ export class RepliesService {
       }),
     );
     if (run.state !== 'running') return;
-    if (run.attempts > 1 && (await runtime.authority.findByKey(ref, key, run.startedAt))) {
-      await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'drafted' }));
-      return;
-    }
+    // The customer wrote again: that message's own job drafts the reply with everything in view.
+    if (await this.skipIfSuperseded(tenantId, run.id, payload)) return;
     // Suggestions spend tokens too: none once the plan or budget is used up.
-    if (!(await this.entitlements.aiAllowance(tenantId)).allowed) {
+    const allowance = await this.entitlements.aiAllowance(tenantId);
+    if (
+      !allowance.allowed &&
+      (allowance.reason === 'plan_replies' || !agent.config.model.connectionId)
+    ) {
       await this.tx(tenantId, (tx) =>
         this.runs.finish(tx, run.id, { outcome: 'skipped', state: 'skipped' }),
       );
@@ -1733,6 +1753,7 @@ export class RepliesService {
         language: chosen.resolution.language,
         style: chosen.style,
         languageSource: chosen.resolution.source,
+        workflowLedgerId: payload.ledgerId,
       });
     } catch (error) {
       const failure = classifyModelError(error);
@@ -1746,34 +1767,53 @@ export class RepliesService {
       await this.tx(tenantId, (tx) => this.runs.finish(tx, run.id, { outcome: 'blocked' }));
       return;
     }
-    await runtime.authority.appendMessage({
-      conversationRef: ref,
-      key,
-      author: { kind: 'bot', botRef: String(bot.externalBotId) },
-      visibility: 'private',
-      text: [
-        `AI suggestion (not sent to the customer):\n\n${generated.text}`,
-        ...(generated.sources.length
-          ? [
-              `Sources:\n${generated.sources
-                .map(
-                  (source, i) =>
-                    `[${i + 1}] ${source.title}${source.url ? ` (${source.url})` : ''}`,
-                )
-                .join('\n')}`,
-            ]
-          : []),
-      ].join('\n\n'),
-    });
-    await this.tx(tenantId, (tx) =>
-      this.finishWithUsage(tx, tenantId, run.id, 'drafted', {
-        provider: generated.provider,
-        modelId: generated.modelId,
-        inputTokens: generated.inputTokens,
-        outputTokens: generated.outputTokens,
-        latencyMs: generated.latencyMs,
-      }),
-    );
+    const draft = generated;
+    const telemetry = {
+      provider: draft.provider,
+      modelId: draft.modelId,
+      inputTokens: draft.inputTokens,
+      outputTokens: draft.outputTokens,
+      latencyMs: draft.latencyMs,
+    };
+    let kept: boolean;
+    try {
+      kept = await this.tx(tenantId, async (tx) => {
+        const stored = await storeAiDraft(tx, {
+          tenantId,
+          conversationId: control.id,
+          runId: run.id,
+          agentId: agent.profile.id,
+          agentVersionId: agent.version.id,
+          triggerLedgerId: payload.ledgerId,
+          text: draft.text,
+          sources: draft.sources,
+          language: chosen.resolution.language,
+          now: this.clock(),
+        });
+        if (stored === 'not_needed') {
+          // The AI took the conversation back, it was resolved or the customer wrote again.
+          await this.runs.step(tx, tenantId, run.id, {
+            kind: 'decision',
+            name: 'draft_not_needed',
+            status: 'ok',
+          });
+          await this.finishWithUsage(tx, tenantId, run.id, 'skipped', telemetry);
+          await this.runs.finish(tx, run.id, { outcome: 'skipped', state: 'skipped' });
+          return false;
+        }
+        await this.finishWithUsage(tx, tenantId, run.id, 'drafted', telemetry);
+        return stored === 'stored';
+      });
+    } catch (error) {
+      // The model was already paid for: the run ends and its tokens are counted even when the
+      // draft cannot be kept, so the job is not retried into another model call.
+      this.logger.warn(`draft for run ${run.id} not kept: ${String(error)}`);
+      await this.tx(tenantId, (tx) =>
+        this.finishWithUsage(tx, tenantId, run.id, 'error', telemetry),
+      );
+      return;
+    }
+    if (kept) await this.journal.signalInbox(tenantId, control.id);
   }
 
   /** Customer-visible history: the Client API view when the contact is known. */
@@ -1806,12 +1846,12 @@ export class RepliesService {
         contactSourceId: this.contacts.sourceIdOf(tenantId, contact.contact),
         inboxRef: String(contact.inbox.externalInboxId),
       });
-      return { messages, view: 'customer' };
+      return { messages: messages.filter((m) => !reactionOf(m)), view: 'customer' };
     }
     // Conversations from other channels have no Hamnivo contact; private notes are removed here.
     const messages = await runtime.authority.listMessages(ref, { view: 'staff' });
     return {
-      messages: messages.filter((m) => !m.private && m.direction !== 'activity'),
+      messages: messages.filter((m) => !m.private && m.direction !== 'activity' && !reactionOf(m)),
       view: 'staff_filtered',
     };
   }
@@ -1915,8 +1955,22 @@ export class RepliesService {
         config,
         history,
       }));
+    const workflow =
+      options.workflowContext === undefined
+        ? await this.workflowContext.context(tenantId, {
+            conversationId: context.control.id,
+            epoch: context.control.ownershipEpoch,
+            agentId: agent.profile.id,
+            ledgerId: options.workflowLedgerId,
+          })
+        : options.workflowContext;
+    if (workflow) {
+      if (tools) tools.untrusted = true;
+      if (outcome) outcome.cacheable = false;
+    }
     const base =
       systemPrompt(config, context.brandName, passages, options) +
+      (workflow ? `\n\n${workflow.text}` : '') +
       (memories.length ? `\n\n${memoryBlock(memories)}` : '') +
       (assist
         ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
@@ -1938,6 +1992,7 @@ export class RepliesService {
         },
         tools,
         deadlineAt,
+        attempt,
       );
       const cited = applyCitations(generated.text, passages, (p) => p.documentId);
       const remembered = citeMemories(cited.text, memories);
@@ -2041,15 +2096,18 @@ export class RepliesService {
         if (outcome) outcome.blocked = { note: checked.note };
         return null;
       }
-      if (outcome && checked) outcome.cacheable = checked.cacheable;
-      return { ...result, liveData: claimedLiveData(claims.claimed) };
+      if (outcome && checked) outcome.cacheable = checked.cacheable && !workflow;
+      return {
+        ...result,
+        liveData: [...claimedLiveData(claims.claimed), ...(workflow ? [TOOL_DATA_CLASS] : [])],
+      };
     }
     return null;
   }
 
   /**
-   * Passages from the agent's knowledge for the customer's latest words (G05). Customer answers
-   * draw only on public sources; assist mode may use internal ones.
+   * Passages from the agent's knowledge for the customer's latest words (G05). Replies and drafts
+   * alike draw only on public sources: a draft is sent to the customer as written once approved.
    */
   private async retrieve(
     tenantId: string,
@@ -2073,7 +2131,9 @@ export class RepliesService {
       this.retrieval.search(tx, {
         brandId,
         sourceIds: config.knowledgeSourceIds.map((id) => fromPublicId('source', id)),
-        audience: config.mode === 'assist' ? 'staff' : 'customer',
+        // Assist drafts are written to be sent as they are (HNV-09-05): public knowledge only, so
+        // every source they cite can be shown to the customer.
+        audience: 'customer',
         query,
         limit: PASSAGES,
       }),
@@ -2104,35 +2164,50 @@ export class RepliesService {
     tools?: RunTools | null,
     /** A draft written again after a check must still finish within the run's time limit. */
     deadlineAt?: number,
+    generationAttempt = 0,
   ): Promise<Generated> {
     const choices: ModelChoice[] = [config.model, ...config.fallbackModels];
     const inputHash = sha256(canonicalize({ system, messages }) ?? '');
     let lastError: unknown;
     for (const [index, choice] of choices.entries()) {
+      // A BYOK agent never silently falls back to a platform-funded credential.
+      if (config.model.connectionId && !choice.connectionId) continue;
       const started = Date.now();
       try {
-        const resolved = await this.models.resolve(tenantId, choice);
         const timeout = AbortSignal.timeout(
           deadlineAt === undefined
             ? config.limits.timeoutMs
             : Math.max(1, Math.min(config.limits.timeoutMs, deadlineAt - Date.now())),
         );
-        const result = await generateText({
-          model: resolved.model,
-          instructions: system,
-          messages,
-          ...(tools ? { tools: tools.tools as ToolSet } : {}),
-          maxOutputTokens: config.limits.maxOutputTokens,
-          stopWhen: isStepCount(config.limits.maxSteps),
-          maxRetries: 0,
-          abortSignal: tools ? AbortSignal.any([timeout, tools.signal]) : timeout,
-        });
+        const { result, resolved } = await this.models.executeAttempt(
+          tenantId,
+          choice,
+          {
+            key: `run:${runId}:generate:${generationAttempt}:model:${index}`,
+            reserveTokens: reservationSize(system, messages, config.limits.maxOutputTokens, 1),
+            timeoutMs: config.limits.timeoutMs,
+            attribution: { runId },
+          },
+          async (resolved) => ({
+            resolved,
+            result: await generateText({
+              model: resolved.model,
+              instructions: system,
+              messages,
+              ...(tools ? { tools: tools.tools as ToolSet } : {}),
+              maxOutputTokens: config.limits.maxOutputTokens,
+              stopWhen: isStepCount(config.limits.maxSteps),
+              maxRetries: 0,
+              abortSignal: tools ? AbortSignal.any([timeout, tools.signal]) : timeout,
+            }),
+          }),
+        );
         const generated: Generated = {
           text: result.text.trim(),
           provider: resolved.provider,
           modelId: resolved.modelId,
-          inputTokens: result.usage.inputTokens ?? null,
-          outputTokens: result.usage.outputTokens ?? null,
+          inputTokens: result.totalUsage.inputTokens ?? null,
+          outputTokens: result.totalUsage.outputTokens ?? null,
           latencyMs: Date.now() - started,
           sources: [],
           refs: [],
@@ -2196,8 +2271,6 @@ export class RepliesService {
     await this.runs.finish(tx, runId, { outcome, ...telemetry });
     const now = this.clock();
     const entries = [
-      ['ai.tokens.input', telemetry.inputTokens, 'token'],
-      ['ai.tokens.output', telemetry.outputTokens, 'token'],
       // Each reply the customer received counts against the plan's AI replies (A08).
       ['ai.replies', outcome === 'replied' ? 1 : null, 'reply'],
     ] as const;

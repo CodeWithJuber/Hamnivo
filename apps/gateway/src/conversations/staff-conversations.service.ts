@@ -11,6 +11,7 @@ import { JournalService } from '../authority/journal.service.js';
 import { OutboundMessagesService } from '../authority/outbound.service.js';
 import {
   type ControlRow,
+  currentOwnerOf,
   OwnershipService,
   type OwnerTarget,
 } from '../authority/ownership.service.js';
@@ -108,6 +109,7 @@ export class StaffConversationsService {
           throw new AppError('OWNERSHIP_CHANGED', {
             detail:
               'A colleague is handling this conversation. Ask them to hand it over, or ask a supervisor.',
+            currentOwner: await currentOwnerOf(tx, found.control),
           });
         }
       }
@@ -187,6 +189,8 @@ export class StaffConversationsService {
     principal: StaffPrincipal,
     publicId: string,
     input: z.output<typeof StaffMessageRequest>,
+    /** `keepFailed`: keep every failure to retry, refusals too (an approved AI draft, HNV-09-05). */
+    options: { keepFailed?: boolean } = {},
   ) {
     const internal = input.visibility === 'internal';
     const permission: Permission = internal ? 'conversations.note' : 'conversations.reply';
@@ -202,12 +206,14 @@ export class StaffConversationsService {
         if (input.expectedEpoch !== undefined && input.expectedEpoch !== control.ownershipEpoch) {
           throw new AppError('OWNERSHIP_CHANGED', {
             detail: 'Someone else changed who handles this conversation. Nothing was sent.',
+            currentOwner: await currentOwnerOf(tx, control),
           });
         }
         if (ownedByOther(control, principal.staffMemberId)) {
           throw new AppError('OWNERSHIP_CHANGED', {
             detail:
               'A colleague is handling this conversation. Take it over first. Nothing was sent.',
+            currentOwner: await currentOwnerOf(tx, control),
           });
         }
         // A template is what WhatsApp allows once the 24-hour window has closed.
@@ -303,7 +309,7 @@ export class StaffConversationsService {
     } catch (error) {
       const code = error instanceof AppError ? error.code : 'INTERNAL';
       // A failed template is not kept to retry as text: the picker resends it, with the same id.
-      if (KEPT.has(code) && !prepared) {
+      if ((KEPT.has(code) || options.keepFailed) && !prepared) {
         await this.drafts
           .failOutgoing(principal, control.id, input.clientMessageId, code)
           .catch(() => undefined);

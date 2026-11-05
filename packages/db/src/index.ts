@@ -1,4 +1,5 @@
 export * from './actions-resolvers.js';
+export * from './ai-drafts.js';
 export * from './ai-power-resolvers.js';
 export * from './audit.js';
 export * from './automations.js';
@@ -7,9 +8,12 @@ export * from './commerce-resolvers.js';
 export * from './developer-resolvers.js';
 export * from './ids.js';
 export * from './migrate.js';
+export * from './offers.js';
 export * from './operators.js';
+export * from './privacy.js';
 export * from './resolvers.js';
 export * as schema from './schema/index.js';
+export * from './sla.js';
 export * from './tenant.js';
 export * from './uploads.js';
 export * from './visitors.js';

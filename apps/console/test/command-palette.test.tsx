@@ -64,7 +64,7 @@ describe('the command palette', () => {
     await user.keyboard('settings');
     // Every Settings page, and nothing from other groups.
     expect(listed()).toEqual(
-      expect.arrayContaining(['/brands', '/channels', '/team', '/settings/billing']),
+      expect.arrayContaining(['/brands', '/branding', '/team', '/settings/billing']),
     );
     expect(listed()).not.toContain('/knowledge');
     expect(listed()).not.toContain('/inbox');

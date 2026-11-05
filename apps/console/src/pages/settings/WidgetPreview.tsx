@@ -27,6 +27,8 @@ import type { FieldKind } from '../../lib/widget-forms';
  */
 export interface PreviewLook {
   name: string;
+  fontFamily?: WidgetAppearance['fontFamily'];
+  showBranding?: boolean;
   /** Main colour and the text colour used on it, both `#RRGGBB`. */
   colour: string;
   on: string;
@@ -116,6 +118,8 @@ export function previewLookOf(
   const colour = draft ? drawnColour(draft, DEFAULT_PRIMARY_COLOR) : DEFAULT_PRIMARY_COLOR;
   return {
     name,
+    fontFamily: appearance?.fontFamily,
+    showBranding: appearance?.showBranding,
     colour,
     on: onColour(colour),
     radius: draft?.radius ?? DEFAULT_RADIUS,
@@ -208,6 +212,12 @@ export function WidgetPreview({
       dir={rtl ? 'rtl' : 'ltr'}
       className="mx-auto flex w-full max-w-[340px] flex-col overflow-hidden border shadow-lg"
       style={{
+        fontFamily:
+          look.fontFamily === 'system'
+            ? 'system-ui, sans-serif'
+            : look.fontFamily === 'noto-sans'
+              ? '"Noto Sans", sans-serif'
+              : undefined,
         borderRadius: corner(look.radius, 16),
         backgroundColor: '#FFFFFF',
         color: INK,
@@ -374,6 +384,11 @@ export function WidgetPreview({
             <SendIcon className="size-4 rtl:-scale-x-100" />
           </span>
         </div>
+      ) : null}
+      {look.showBranding !== false ? (
+        <p className="pb-2 text-center text-[10px]" style={{ color: SECONDARY }}>
+          Hamnivo
+        </p>
       ) : null}
       {look.privacyUrl ? (
         <p

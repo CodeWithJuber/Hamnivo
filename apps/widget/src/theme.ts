@@ -12,6 +12,7 @@ export interface BrandLook {
   onAccent: string;
   /** Corner radius in pixels, 0 to 24; 12 is the design's own. */
   radius: number;
+  fontFamily?: 'system' | 'dm-sans' | 'noto-sans' | undefined;
 }
 
 /** The look Hamnivo's tokens already have. */
@@ -45,6 +46,12 @@ export function themeVariables(look: BrandLook): Record<string, string> {
   const scale = Math.min(24, Math.max(0, look.radius)) / DEFAULT_LOOK.radius;
   const px = (pixels: number) => `${Math.round(pixels * scale * 10) / 10}px`;
   return {
+    '--hv-brand-font':
+      look.fontFamily === 'system'
+        ? 'system-ui, sans-serif'
+        : look.fontFamily === 'noto-sans'
+          ? '"Hamnivo Noto Sans", "Noto Sans", "Noto Sans Devanagari", "Noto Sans Arabic", sans-serif'
+          : '"Hamnivo DM Sans", "DM Sans Variable", "Noto Sans Devanagari", "Noto Sans Arabic", sans-serif',
     '--hv-primary': look.accent,
     '--hv-primary-hover': mix(look.accent, whiteText ? '#FFFFFF' : '#000000', 0.12),
     '--hv-on-primary': look.onAccent,
@@ -60,6 +67,7 @@ export function isDefaultLook(look: BrandLook): boolean {
   return (
     look.accent.toUpperCase() === DEFAULT_LOOK.accent &&
     look.onAccent.toUpperCase() === DEFAULT_LOOK.onAccent &&
+    (!look.fontFamily || look.fontFamily === 'dm-sans') &&
     look.radius === DEFAULT_LOOK.radius
   );
 }

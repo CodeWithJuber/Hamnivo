@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import { adminRoutes, identityRoutes } from './admin-routes.js';
+import { agencyRoutes } from './agency.js';
 import { agentRoutes } from './agent-routes.js';
+import { AiUsageOverview } from './ai-credits.js';
 import { aiPowerRoutes } from './ai-power.js';
 import { automationRoutes } from './automation-routes.js';
 import { analyticsRoutes, billingRoutes } from './billing-routes.js';
 import { blockRoutes } from './blocks.js';
+import { brandingRoutes } from './branding.js';
 import { cacheRoutes } from './cache-routes.js';
 import { channelRoutes, emailChannelRoutes, messagingChannelRoutes } from './channels.js';
 import { checkRoutes } from './check-routes.js';
@@ -13,6 +16,7 @@ import {
   commerceIntegrationRoutes,
   commerceWidgetRoutes,
 } from './commerce-routes.js';
+import { connectorRoutes } from './connectors.js';
 import {
   CancelHandoffResponse,
   CustomerConversation,
@@ -42,6 +46,7 @@ import { adminMemoryRoutes, widgetMemoryRoutes } from './memory-routes.js';
 import { migrationRoutes } from './migration-routes.js';
 import { AttachmentPart } from './parts.js';
 import { platformRoutes } from './platform-routes.js';
+import { privacyRoutes } from './privacy-routes.js';
 import { saasRoutes } from './saas.js';
 import { securityRoutes } from './security-routes.js';
 import { setupRoutes } from './setup-routes.js';
@@ -61,6 +66,7 @@ import {
   WidgetFramePolicy,
   WidgetSession,
 } from './widget.js';
+import { workflowRoutes } from './workflows.js';
 
 export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
@@ -447,6 +453,7 @@ export const allRoutes: Record<string, RouteDef> = {
   ...inboxLibraryRoutes,
   ...visitorWidgetRoutes,
   ...visitorStaffRoutes,
+  ...privacyRoutes,
   ...securityRoutes,
   ...platformRoutes,
   ...commerceAdminRoutes,
@@ -461,6 +468,19 @@ export const allRoutes: Record<string, RouteDef> = {
   ...notificationRoutes,
   ...customerSurfaceAdminRoutes,
   ...automationRoutes,
+  ...agencyRoutes,
+  ...brandingRoutes,
+  aiUsage: {
+    method: 'get',
+    path: '/v1/admin/ai/usage',
+    operationId: 'getAiUsage',
+    summary: 'Managed AI reservations and BYOK usage',
+    tags: ['Billing'],
+    auth: 'staff_session',
+    success: { status: 200, description: 'AI usage', schema: AiUsageOverview },
+  } satisfies RouteDef,
+  ...connectorRoutes,
+  ...workflowRoutes,
   ...blockRoutes,
   ...channelRoutes,
   ...emailChannelRoutes,

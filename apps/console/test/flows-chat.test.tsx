@@ -89,7 +89,7 @@ describe('the look and wording editor', () => {
 
   it('saves what was changed, and closes once it is saved', async () => {
     const gateway = fakeGateway({
-      'PUT /v1/admin/brands/brd_1/appearance': { json: view({ radius: 4 }) },
+      'PUT /v1/admin/brands/brd_1/appearance/draft': { json: view({ radius: 4 }) },
     });
     const onSaved = vi.fn();
     await editor({}, { onSaved });
@@ -100,17 +100,56 @@ describe('the look and wording editor', () => {
       'https://noor.example/logo.png',
     );
     await user.click(screen.getByRole('checkbox', { name: 'Ask customers to rate the chat' }));
-    await user.click(screen.getByRole('button', { name: 'Save look' }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    expect(gateway.to('PUT', '/v1/admin/brands/brd_1/appearance')[0]?.body).toEqual({
-      primaryColor: '#D17B00',
-      logoUrl: 'https://noor.example/logo.png',
-      radius: 4,
-      greeting: null,
-      offlineText: null,
-      csat: true,
-      privacyUrl: null,
+    expect(gateway.to('PUT', '/v1/admin/brands/brd_1/appearance/draft')[0]?.body).toEqual({
+      expectedRevision: 0,
+      appearance: {
+        fontFamily: 'system',
+        launcherLabel: null,
+        showBranding: true,
+        primaryColor: '#D17B00',
+        logoUrl: 'https://noor.example/logo.png',
+        radius: 4,
+        greeting: null,
+        offlineText: null,
+        csat: true,
+        privacyUrl: null,
+      },
     });
+  });
+
+  it('publishes a saved draft only through the explicit publish action', async () => {
+    const gateway = fakeGateway({
+      'POST /v1/admin/brands/brd_1/appearance/publish': { json: view({ radius: 4 }) },
+    });
+    await mountStudio({
+      permissions: owner,
+      screen: (
+        <AppearanceForm
+          brand={brand}
+          layout="page"
+          view={
+            {
+              ...view(),
+              draftAppearance: view({ radius: 4 }).appearance,
+              draftRevision: 3,
+            } as Parameters<typeof AppearanceForm>[0]['view']
+          }
+        />
+      ),
+    });
+    expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Publish' }));
+    await waitFor(() =>
+      expect(gateway.to('POST', '/v1/admin/brands/brd_1/appearance/publish')).toHaveLength(1),
+    );
+    expect(gateway.to('POST', '/v1/admin/brands/brd_1/appearance/publish')[0]?.body).toEqual({
+      expectedRevision: 3,
+    });
+    expect(gateway.to('PUT', '/v1/admin/brands/brd_1/appearance')).toHaveLength(0);
   });
 
   it('draws the change in the picture as it is made, before anything is saved', async () => {
@@ -144,7 +183,7 @@ describe('the look and wording editor', () => {
 
   it('puts in a colour that reads well when it is offered, then saves it', async () => {
     const gateway = fakeGateway({
-      'PUT /v1/admin/brands/brd_1/appearance': { json: view() },
+      'PUT /v1/admin/brands/brd_1/appearance/draft': { json: view() },
     });
     const onSaved = vi.fn();
     await editor({ primaryColor: '#808080' }, { onSaved });
@@ -158,16 +197,18 @@ describe('the look and wording editor', () => {
     expect((document.getElementById('look-colour') as HTMLInputElement).value).toBe(colour);
     expect(screen.queryByText('Text on this colour is hard to read.')).toBeNull();
     expect(screen.queryByTestId('colour-suggestion')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Save look' }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    expect(gateway.calls[0]?.body?.primaryColor).toBe(colour);
+    expect((gateway.calls[0]?.body?.appearance as Record<string, unknown>)?.primaryColor).toBe(
+      colour,
+    );
   });
 
   it('will not send a colour that cannot be read, and says why in a summary and by the field', async () => {
     const gateway = fakeGateway({});
     await editor({ primaryColor: '#F2F2F2' });
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Save look' }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
     const summary = await errorSummary();
     expect(within(summary).getByText(/too close to white/)).toBeTruthy();
     expect(gateway.writes()).toEqual([]);
@@ -181,7 +222,7 @@ describe('the look and wording editor', () => {
       privacyUrl: 'javascript:alert(1)',
     });
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Save look' }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
     const summary = await errorSummary();
     expect(within(summary).getByText(/Write the English text first/)).toBeTruthy();
     expect(within(summary).getAllByText(/https:\/\//).length).toBe(2);
@@ -190,7 +231,7 @@ describe('the look and wording editor', () => {
 
   it('shows the gateway’s own reason when it refuses what was sent', async () => {
     fakeGateway({
-      'PUT /v1/admin/brands/brd_1/appearance': {
+      'PUT /v1/admin/brands/brd_1/appearance/draft': {
         problem: {
           status: 422,
           code: 'VALIDATION_FAILED',
@@ -201,13 +242,13 @@ describe('the look and wording editor', () => {
     const onSaved = vi.fn();
     await editor({}, { onSaved });
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Save look' }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(
       (await screen.findAllByText('The server does not like this colour.')).length,
     ).toBeGreaterThan(0);
     expect(onSaved).not.toHaveBeenCalled();
     // What was typed is still there to fix.
-    expect(screen.getByRole('button', { name: 'Save look' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeTruthy();
   });
 
   it('says when something is unsaved, and goes back to the saved look on Reset', async () => {
@@ -382,7 +423,9 @@ describe('the business hours page', () => {
     await waitFor(() =>
       expect(gateway.to('PUT', '/v1/admin/brands/brd_1/business-hours')).toHaveLength(1),
     );
-    expect(gateway.calls[0]?.body).toEqual({ businessHours: null });
+    expect(gateway.to('PUT', '/v1/admin/brands/brd_1/business-hours')[0]?.body).toEqual({
+      businessHours: null,
+    });
   });
 
   it('asks before leaving with times that are not saved, and lets the person stay', async () => {

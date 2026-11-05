@@ -1,3 +1,4 @@
+import type { LanguageModelV4 } from '@ai-sdk/provider';
 import { createLanguageModel, ModelConfigError } from '@hamnivo/adapters/models';
 import { guardedFetch } from '@hamnivo/adapters/net';
 import type { ModelChoice, ModelProviderKind } from '@hamnivo/contracts';
@@ -5,6 +6,12 @@ import { type Db, fromPublicId, schema, type TenantTx, withTenant } from '@hamni
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { LanguageModel } from 'ai';
 import { eq } from 'drizzle-orm';
+import { meteredModel } from '../billing/ai-credits.model.js';
+import {
+  type AiAttemptSpec,
+  AiCreditsService,
+  type AiSource,
+} from '../billing/ai-credits.service.js';
 import type { AppConfig } from '../config.js';
 import { EgressService } from '../developer/egress.service.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
@@ -23,6 +30,8 @@ export interface ModelSpec {
 }
 
 export interface ResolvedModel {
+  source: AiSource;
+  connectionId?: string;
   model: LanguageModel;
   provider: ModelProviderKind;
   modelId: string;
@@ -69,6 +78,7 @@ export class ModelFactory {
     @Inject(CONFIG) private readonly config: AppConfig,
     private readonly secrets: SecretBroker,
     private readonly egress: EgressService,
+    private readonly credits: AiCreditsService,
     @Optional() @Inject(LANGUAGE_MODEL) private readonly override?: LanguageModel,
   ) {}
 
@@ -141,7 +151,12 @@ export class ModelFactory {
   }
 
   async resolve(tenantId: string, choice: ModelChoice): Promise<ResolvedModel> {
-    const base = { provider: choice.provider, modelId: choice.modelId };
+    const base = {
+      provider: choice.provider,
+      modelId: choice.modelId,
+      source: (choice.connectionId ? 'byok' : 'managed') as AiSource,
+      ...(choice.connectionId ? { connectionId: choice.connectionId } : {}),
+    };
     if (this.override) return { ...base, model: this.override };
     let credentials: Omit<ModelSpec, 'provider' | 'modelId'> | null;
     if (choice.connectionId) {
@@ -169,5 +184,27 @@ export class ModelFactory {
       );
     }
     return { ...base, model: languageModelFor({ ...base, ...credentials }) };
+  }
+
+  /** A configured tenant connection always means BYOK; failure never selects platform credentials. */
+  async executeAttempt<T>(
+    tenantId: string,
+    choice: ModelChoice,
+    attempt: Pick<AiAttemptSpec, 'key' | 'reserveTokens' | 'timeoutMs' | 'attribution'>,
+    operation: (resolved: ResolvedModel) => Promise<T>,
+  ): Promise<T> {
+    const resolved = await this.resolve(tenantId, choice);
+    if (typeof resolved.model !== 'object' || resolved.model.specificationVersion !== 'v4') {
+      throw new Error('Metered AI requires a version 4 language model.');
+    }
+    const model = meteredModel(resolved.model as LanguageModelV4, this.credits, {
+      ...attempt,
+      tenantId,
+      provider: resolved.provider,
+      modelId: resolved.modelId,
+      source: resolved.source,
+      ...(resolved.connectionId ? { connectionId: resolved.connectionId } : {}),
+    });
+    return operation({ ...resolved, model });
   }
 }

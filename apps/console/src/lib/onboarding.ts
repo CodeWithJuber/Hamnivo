@@ -60,6 +60,7 @@ export function currentStep(
 }
 
 export interface ProgressChange {
+  useCase?: 'support' | 'lead' | 'billing' | 'service' | 'afterhours' | 'handoff';
   steps?: Partial<Record<OnboardingStep, 'done' | 'skipped' | null>>;
   brandId?: string | null;
   finished?: boolean;

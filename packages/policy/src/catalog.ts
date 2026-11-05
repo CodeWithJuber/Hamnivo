@@ -33,6 +33,18 @@ const WORKSPACE: readonly ScopeType[] = ['tenant', 'workspace'];
 const BRAND: readonly ScopeType[] = ['tenant', 'workspace', 'brand'];
 
 export const PERMISSIONS = {
+  'agency.read': { description: 'View agency settings and the client directory', scopes: TENANT },
+  'agency.manage': {
+    description: 'Manage agency settings and client links',
+    scopes: TENANT,
+    stepUp: true,
+  },
+  'branding.read': { description: 'View portal branding and custom domains', scopes: TENANT },
+  'branding.manage': {
+    description: 'Manage portal branding and verified custom domains',
+    scopes: TENANT,
+    stepUp: true,
+  },
   'conversations.read': { description: 'Read conversations and customer history', scopes: ALL },
   'conversations.reply': { description: 'Reply to customers', scopes: ALL },
   'conversations.note': { description: 'Write internal notes', scopes: ALL },
@@ -141,6 +153,18 @@ export const PERMISSIONS = {
     stepUp: true,
     stepUpReads: true,
   },
+  'customers.export': {
+    description: 'Download everything about a customer, for their request to see their data',
+    scopes: BRAND,
+    stepUp: true,
+    stepUpReads: true,
+  },
+  'customers.erase': {
+    description: 'Erase a customer everywhere, for their request to be forgotten',
+    scopes: BRAND,
+    stepUp: true,
+    mfa: true,
+  },
   'commerce.read': {
     description: 'See carts, quotes, orders, payments and refunds',
     scopes: ALL,
@@ -241,6 +265,12 @@ export const PERMISSIONS = {
   'settings.manage': { description: 'Edit workspace settings', scopes: WORKSPACE },
   'security.manage': {
     description: 'Configure sign-in, SSO, MFA and session policies',
+    scopes: TENANT,
+    stepUp: true,
+    mfa: true,
+  },
+  'privacy.manage': {
+    description: 'Choose how long conversations are kept before they are deleted everywhere',
     scopes: TENANT,
     stepUp: true,
     mfa: true,

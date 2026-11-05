@@ -29,7 +29,6 @@ import {
   toJsonSchema,
   validateAgainstSchema,
 } from '@hamnivo/domain/actions';
-import { aiAllowance } from '@hamnivo/domain/billing';
 import { checkCompletionClaims, findCompletionClaims } from '@hamnivo/domain/commerce';
 import { authorize, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
@@ -44,10 +43,9 @@ import {
 import { eq } from 'drizzle-orm';
 import type { ToolRow } from '../actions/adapters.js';
 import { REASON_TEXT } from '../actions/views.js';
-import { EntitlementsService } from '../billing/entitlements.service.js';
+import { reservationSize } from '../billing/ai-credits.service.js';
 import { CLAIM_CORRECTION } from '../commerce/claims.js';
 import { AppError } from '../common/app-error.js';
-import { planLimitError } from '../common/plan-limit.js';
 import type { AppConfig } from '../config.js';
 import { enforce } from '../identity/staff.guard.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
@@ -136,7 +134,6 @@ export class PlaygroundService {
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly models: ModelFactory,
     private readonly retrieval: RetrievalService,
-    private readonly entitlements: EntitlementsService,
     private readonly limiter: PlaygroundLimiter,
   ) {}
 
@@ -228,7 +225,9 @@ export class PlaygroundService {
       .map((m) => m.text.trim())
       .join('\n')
       .slice(-1000);
-    const audience = config.mode === 'assist' ? 'staff' : 'customer';
+    // Public knowledge only, in every mode: an assist draft is sent as it is once approved
+    // (HNV-09-05), so the preview cites only what the customer may see, as a live draft does.
+    const audience = 'customer';
     const started = Date.now();
     const passages = await this.tx(principal, (tx) =>
       this.retrieval.search(tx, {
@@ -372,29 +371,43 @@ export class PlaygroundService {
     tools: ToolSet,
     log: StepLog,
     attempt: number,
+    requestId: string,
   ): Promise<Generated> {
     const choices: ModelChoice[] = [config.model, ...config.fallbackModels];
     let lastKind = 'unavailable';
     for (const [index, choice] of choices.entries()) {
+      if (config.model.connectionId && !choice.connectionId) continue;
       const started = Date.now();
       try {
-        const resolved = await this.models.resolve(tenantId, choice);
-        const result = await generateText({
-          model: resolved.model,
-          instructions: system,
-          messages,
-          ...(Object.keys(tools).length > 0 ? { tools } : {}),
-          maxOutputTokens: config.limits.maxOutputTokens,
-          stopWhen: isStepCount(config.limits.maxSteps),
-          maxRetries: 0,
-          abortSignal: AbortSignal.timeout(config.limits.timeoutMs),
-        });
+        const { resolved, result } = await this.models.executeAttempt(
+          tenantId,
+          choice,
+          {
+            key: `playground:${requestId}:generate:${attempt}:model:${index}`,
+            reserveTokens: reservationSize(system, messages, config.limits.maxOutputTokens, 1),
+            timeoutMs: config.limits.timeoutMs,
+            attribution: { playgroundRequestId: requestId },
+          },
+          async (resolved) => ({
+            resolved,
+            result: await generateText({
+              model: resolved.model,
+              instructions: system,
+              messages,
+              ...(Object.keys(tools).length > 0 ? { tools } : {}),
+              maxOutputTokens: config.limits.maxOutputTokens,
+              stopWhen: isStepCount(config.limits.maxSteps),
+              maxRetries: 0,
+              abortSignal: AbortSignal.timeout(config.limits.timeoutMs),
+            }),
+          }),
+        );
         const generated: Generated = {
           text: result.text.trim(),
           provider: resolved.provider,
           modelId: resolved.modelId,
-          inputTokens: result.usage.inputTokens ?? null,
-          outputTokens: result.usage.outputTokens ?? null,
+          inputTokens: result.totalUsage.inputTokens ?? null,
+          outputTokens: result.totalUsage.outputTokens ?? null,
         };
         log.add({
           kind: 'model',
@@ -414,6 +427,12 @@ export class PlaygroundService {
         });
         return generated;
       } catch (error) {
+        // Admission errors retain their API status and quota details.
+        if (
+          error instanceof AppError &&
+          ['PLAN_LIMIT_REACHED', 'QUOTA_EXCEEDED'].includes(error.code)
+        )
+          throw error;
         const failure = classifyModelError(error);
         lastKind = failure.kind;
         log.add({
@@ -431,40 +450,6 @@ export class PlaygroundService {
     throw new ModelFailure(lastKind);
   }
 
-  /**
-   * A test spends tokens like any run, so the plan's and the workspace's token limits stop it. It
-   * is no reply a customer got, so the plan's count of replies never does.
-   */
-  private async assertTokensLeft(principal: StaffPrincipal): Promise<void> {
-    const allowance = await this.tx(principal, async (tx) => {
-      const snapshot = await this.entitlements.snapshot(tx, ['aiTokens']);
-      return aiAllowance({
-        limits: { ...snapshot.limits, aiReplies: null },
-        budgetTokens: snapshot.budgetTokens,
-        repliesUsed: 0,
-        tokensUsed: snapshot.usage.aiTokens,
-      });
-    });
-    if (allowance.allowed) return;
-    if (allowance.reason === 'plan_tokens') {
-      throw planLimitError('aiTokens', {
-        max: allowance.limit,
-        used: allowance.used,
-        resetsAt: null,
-      });
-    }
-    throw new AppError('QUOTA_EXCEEDED', {
-      detail: 'The workspace’s AI budget for this period is used up.',
-      quota: {
-        scope: 'budget',
-        limit: 'aiTokens',
-        max: allowance.limit,
-        used: allowance.used,
-        resetsAt: null,
-      },
-    });
-  }
-
   async run(
     principal: StaffPrincipal,
     agentId: string,
@@ -472,7 +457,7 @@ export class PlaygroundService {
   ): Promise<PlaygroundResult> {
     const loaded = await this.load(principal, agentId, input.version);
     await this.limiter.check(principal.staffMemberId);
-    await this.assertTokensLeft(principal);
+    const requestId = newId();
 
     const { config, profile } = loaded;
     const log = new StepLog();
@@ -550,6 +535,7 @@ export class PlaygroundService {
           toolSet,
           log,
           attempt,
+          requestId,
         );
         model = { provider: generated.provider, modelId: generated.modelId };
         inputTokens = sum(inputTokens, generated.inputTokens);
@@ -658,28 +644,7 @@ export class PlaygroundService {
     result: PlaygroundResult,
     messages: number,
   ): Promise<void> {
-    const now = this.clock();
-    const id = newId();
     await this.tx(principal, async (tx) => {
-      // The tokens count toward the plan and the budget like any run; no reply was delivered.
-      for (const [meter, quantity] of [
-        ['ai.tokens.input', result.inputTokens],
-        ['ai.tokens.output', result.outputTokens],
-      ] as const) {
-        if (!quantity) continue;
-        await tx
-          .insert(schema.usageEntries)
-          .values({
-            tenantId: principal.tenantId,
-            meter,
-            quantity,
-            unit: 'token',
-            occurredAt: now,
-            dedupeKey: `playground:${id}:${meter}`,
-            sourceRef: `playground:${agentId}`,
-          })
-          .onConflictDoNothing();
-      }
       await appendAudit(tx, {
         actorType: 'staff',
         actorId: toPublicId('staff', principal.staffMemberId),

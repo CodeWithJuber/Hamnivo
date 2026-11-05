@@ -16,7 +16,6 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { toolDefinitions } from './actions.js';
-import { conversationControls } from './authority.js';
 import { bytea, createdAt, id, platformRead, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { secrets, staffMembers } from './identity.js';
 import { brands, tenantId, workspaces } from './tenancy.js';
@@ -274,11 +273,6 @@ export const runs = pgTable(
     uniqueIndex('runs_trigger_key').on(t.tenantId, t.conversationId, t.triggerRef),
     index('runs_conversation_idx').on(t.tenantId, t.conversationId, t.startedAt),
     index('runs_agent_idx').on(t.tenantId, t.agentId, t.startedAt),
-    foreignKey({
-      name: 'runs_conversation_fk',
-      columns: [t.tenantId, t.conversationId],
-      foreignColumns: [conversationControls.tenantId, conversationControls.id],
-    }),
     foreignKey({
       name: 'runs_brand_fk',
       columns: [t.tenantId, t.brandId],

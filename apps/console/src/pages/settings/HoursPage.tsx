@@ -37,6 +37,7 @@ import { isCancelled } from '../../lib/reauth';
 import { useTenant } from '../../lib/tenant';
 import type { Brand } from '../../lib/types';
 import { LeaveGuard } from './DiscardChangesDialog';
+import { ReplyTargets } from './ReplyTargets';
 
 /** The time zone of this browser: where a brand's hours start from when it has none. */
 export const browserZone = (): string => {
@@ -459,6 +460,7 @@ export function HoursPage() {
                 key={`${chosen.id}-${JSON.stringify(chosen.businessHours)}`}
                 brand={chosen}
               />
+              {can('inbox.manage') ? <ReplyTargets brand={chosen} /> : null}
             </div>
           ) : null
         }

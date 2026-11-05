@@ -1,3 +1,4 @@
+export * from './ai-drafts.js';
 export * from './authority.js';
 export * from './business-hours.js';
 export * from './cache.js';
@@ -11,7 +12,10 @@ export * from './human-request.js';
 export * from './inbox.js';
 export * from './language.js';
 export * from './memory/index.js';
+export * from './offers.js';
 export * from './privacy.js';
 export * from './reply-rules.js';
+export * from './retention.js';
 export * from './routing.js';
+export * from './sla.js';
 export * from './whatsapp-templates.js';

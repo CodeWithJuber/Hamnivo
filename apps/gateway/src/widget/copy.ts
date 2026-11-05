@@ -250,6 +250,9 @@ export function widgetConfig(
         ...COPY[locale],
         aiDisclosure: COPY[locale].aiDisclosure.replace('{brand}', brand.name),
         // The brand's own words replace the built-in ones; a language it left empty shows its English.
+        launcherLabel: appearance.launcherLabel
+          ? textIn(appearance.launcherLabel, locale)
+          : undefined,
         greeting: appearance.greeting ? textIn(appearance.greeting, locale) : COPY[locale].greeting,
         offlineMessage:
           offlineText(appearance.offlineText, locale, brand.businessHours, now) ??
@@ -268,6 +271,8 @@ export function widgetConfig(
       accent: appearance.primaryColor.toUpperCase(),
       onAccent: onPrimary(appearance.primaryColor),
       radius: appearance.radius,
+      fontFamily: appearance.fontFamily,
+      showBranding: appearance.showBranding,
       launcherPosition: settings.layout.position,
     },
     locales: { default: 'en', available: ['en', 'ar', 'hi', 'ur'] },
@@ -331,7 +336,10 @@ export function widgetConfig(
 }
 
 /** The loader's own words (W01, W02, W19): its button, the chat frame and a prompt's close. */
-const LAUNCHER_COPY: Record<Locale, Omit<LauncherConfig['launcher'], 'accent' | 'onAccent'>> = {
+const LAUNCHER_COPY: Record<
+  Locale,
+  Omit<LauncherConfig['launcher'], 'accent' | 'onAccent' | 'label' | 'fontFamily'>
+> = {
   en: {
     openLabel: 'Open chat',
     closeLabel: 'Close chat',
@@ -416,6 +424,9 @@ export function launcherConfig(
       accent: config.brand.accent,
       onAccent: config.brand.onAccent,
       ...LAUNCHER_COPY[lang],
+      fontFamily: config.brand.fontFamily,
+      label: config.copy[lang]?.launcherLabel ?? null,
+      openLabel: config.copy[lang]?.launcherLabel ?? LAUNCHER_COPY[lang].openLabel,
     },
     proactive: {
       enabled: rules.length > 0,

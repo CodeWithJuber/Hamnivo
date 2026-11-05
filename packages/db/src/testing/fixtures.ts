@@ -6,6 +6,7 @@ import { newId, toPublicId } from '../ids.js';
 import * as s from '../schema/index.js';
 import { type TenantTx, withTenant } from '../tenant.js';
 import { seedAiPower } from './ai-power-fixtures.js';
+import { seedNewPlatformTables } from './new-platform-fixtures.js';
 import { seedSaas } from './saas-fixtures.js';
 
 export interface SeededTenant {
@@ -520,6 +521,8 @@ async function seedDeveloperPlatform(
     hosts: [{ pattern: 'hooks.example.com', note: null, createdAt: new Date().toISOString() }],
     updatedBy: ref.staffMemberId,
   });
+  // Retention (A10): every conversation kept, as a workspace starts.
+  await tx.insert(s.retentionPolicies).values({ tenantId, updatedBy: ref.staffMemberId });
   // Last, so the seeded rows above are not held to the plan's limits.
   await tx.insert(s.tenantEntitlements).values({
     tenantId,
@@ -667,6 +670,47 @@ async function seedVisitors(
     eventKey: 'chat_started',
     outcome: 'done',
     actions: ['send_message'],
+  });
+  // A customer's data exported, and an erasure's receipt and tombstone (A10).
+  const exportId = newId();
+  await tx.insert(s.privacyRequests).values({
+    id: exportId,
+    tenantId,
+    kind: 'export',
+    brandId: ref.brandId,
+    principalId: ref.principalId,
+    state: 'completed',
+    reason: 'access_request',
+    requestedBy: ref.staffMemberId,
+    counts: { conversations: 1 },
+    completedAt: new Date(),
+  });
+  await tx.insert(s.privacyFiles).values({
+    tenantId,
+    requestId: exportId,
+    raw: Buffer.from('PK'),
+    sha256: '0'.repeat(64),
+    byteSize: 2,
+    purgeAfter: inDays(1),
+  });
+  const erasureId = newId();
+  await tx.insert(s.privacyRequests).values({
+    id: erasureId,
+    tenantId,
+    kind: 'erase',
+    brandId: ref.brandId,
+    principalId: newId(),
+    state: 'completed',
+    reason: 'erasure_request',
+    requestedBy: ref.staffMemberId,
+    completedAt: new Date(),
+  });
+  await tx.insert(s.erasureTombstones).values({
+    tenantId,
+    requestId: erasureId,
+    brandId: ref.brandId,
+    principalId: newId(),
+    fingerprints: ['1:seeded'],
   });
 }
 
@@ -1452,6 +1496,131 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       brandId: ids.brandId,
       appearance: { primaryColor: '#192A30', radius: 12, csat: true },
     });
+    // Reply-time targets (H12).
+    await tx.insert(s.slaPolicies).values({
+      tenantId,
+      brandId: ids.brandId,
+      targets: {
+        urgent: { firstReplyMinutes: 5, nextReplyMinutes: 10 },
+        high: { firstReplyMinutes: 15, nextReplyMinutes: 30 },
+        medium: { firstReplyMinutes: 60, nextReplyMinutes: 120 },
+        low: { firstReplyMinutes: null, nextReplyMinutes: null },
+      },
+    });
+    // How a reply-time clock ended (H12): a first reply given in time.
+    await tx.insert(s.slaOutcomes).values({
+      tenantId,
+      conversationId: ids.conversationId,
+      kind: 'first_reply',
+      priority: 'medium',
+      targetMinutes: 60,
+      startedAt: new Date(Date.now() - 20 * 60_000),
+      endedAt: new Date(),
+      outcome: 'met',
+      businessMinutes: 20,
+    });
+    // Hand-off offers (HNV-10-03): how the owner takes offers, one declined and one pending.
+    await tx.insert(s.staffRoutingProfiles).values({
+      tenantId,
+      staffMemberId: ids.staffMemberId,
+      languages: ['en', 'ur'],
+      maxOpenChats: 5,
+    });
+    const offeredAt = new Date(Date.now() - 120_000);
+    const offer = {
+      tenantId,
+      conversationId: ids.conversationId,
+      teamId: ids.teamId,
+      staffMemberId: ids.staffMemberId,
+      handoffEpoch: 0,
+      offeredAt,
+      expiresAt: new Date(offeredAt.getTime() + 60_000),
+      timeoutSeconds: 60,
+    };
+    await tx.insert(s.conversationOffers).values({
+      ...offer,
+      round: 1,
+      state: 'declined',
+      declineReason: 'at_capacity',
+      decidedAt: new Date(offeredAt.getTime() + 5_000),
+    });
+    await tx.insert(s.conversationOffers).values({
+      ...offer,
+      round: 2,
+      offeredAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    // AI drafts awaiting review (HNV-09-05): one a person approved, and one still pending.
+    const [asked] = await tx
+      .insert(s.messageLedger)
+      .values({
+        tenantId,
+        conversationId: ids.conversationId,
+        senderKind: 'customer',
+        senderId: ids.principalId,
+        clientMessageId: newId(),
+        requestHash: bytes(),
+        sourceKey: `hv1:m:${newId()}`,
+        state: 'committed',
+      })
+      .returning({ id: s.messageLedger.id });
+    if (!asked) throw new Error('ledger insert returned nothing');
+    const draftRuns = [newId(), newId()];
+    for (const [n, runId] of draftRuns.entries()) {
+      await tx.insert(s.runs).values({
+        id: runId,
+        tenantId,
+        conversationId: ids.conversationId,
+        brandId: ids.brandId,
+        agentId: ids.agentId,
+        agentVersionId: ids.agentVersionId,
+        triggerRef: `draft:${suffix}:${n}`,
+        kind: 'draft',
+        state: 'succeeded',
+        outcome: 'drafted',
+        epoch: 0,
+      });
+    }
+    const draft = {
+      tenantId,
+      conversationId: ids.conversationId,
+      agentId: ids.agentId,
+      agentVersionId: ids.agentVersionId,
+      triggerLedgerId: asked.id,
+      ownerEpoch: 0,
+      text: 'Your parcel left our warehouse yesterday.',
+      sources: [
+        {
+          type: 'source' as const,
+          sourceId: 'doc_1',
+          title: 'Shipping and returns',
+          url: null,
+          version: 'v1',
+          excerpt: null,
+          freshness: 'current' as const,
+        },
+      ],
+      language: 'en',
+    };
+    const approvedDraftId = newId();
+    await tx.insert(s.aiDrafts).values({
+      ...draft,
+      id: approvedDraftId,
+      runId: draftRuns[0] as string,
+      state: 'approved',
+      decidedBy: ids.staffMemberId,
+      decidedAt: new Date(),
+    });
+    await tx.insert(s.aiDraftDecisions).values({
+      tenantId,
+      draftId: approvedDraftId,
+      staffMemberId: ids.staffMemberId,
+      clientRequestId: newId(),
+      decision: 'approved',
+      ownerEpoch: 0,
+      clientMessageId: newId(),
+    });
+    await tx.insert(s.aiDrafts).values({ ...draft, runId: draftRuns[1] as string });
     // The chat code was seen on the brand's website.
     await tx.insert(s.brandInstallSightings).values({
       tenantId,
@@ -1508,6 +1677,18 @@ export async function seedTenant(db: Db, label = 'acme'): Promise<SeededTenant> 
       staffMemberId: ids.staffMemberId,
       knowledgeSourceId: ids.knowledgeSourceId,
       documentId: ids.documentId,
+    });
+    await tx.insert(s.agencyConfigs).values({ tenantId, enabled: false });
+    await seedNewPlatformTables(tx, tenantId, suffix, {
+      workspaceId: ids.workspaceId,
+      brandId: ids.brandId,
+      secretId: ids.secretId,
+      staffMemberId: ids.staffMemberId,
+      principalId: ids.principalId,
+      conversationId: ids.conversationId,
+      agentId: ids.agentId,
+      agentVersionId: ids.agentVersionId,
+      runId: ids.runId,
     });
     // Last: the plan's limits it sets would hold any row seeded after it.
     await seedDeveloperPlatform(tx, tenantId, {

@@ -9,6 +9,7 @@ import { parseInput } from '../common/validation.js';
 import { CurrentPrincipal, StaffRoute } from '../identity/request-auth.js';
 import { InboxAlertsService } from './alerts.service.js';
 import { AvailabilityService } from './availability.service.js';
+import { OffersService } from './offers.service.js';
 
 /**
  * What a staff member hears and sees when customers write (alerts, unread chats, availability).
@@ -20,6 +21,7 @@ export class InboxAlertsController {
   constructor(
     private readonly alerts: InboxAlertsService,
     private readonly availability: AvailabilityService,
+    private readonly offers: OffersService,
   ) {}
 
   @Get('preferences')
@@ -37,8 +39,12 @@ export class InboxAlertsController {
   @Put('availability')
   @StaffRoute({ tenant: true, permission: 'conversations.read' })
   @HttpCode(200)
-  setAvailability(@CurrentPrincipal() principal: StaffPrincipal, @Body() body: unknown) {
-    return this.availability.choose(principal, parseInput(SetAvailabilityRequest, body).status);
+  async setAvailability(@CurrentPrincipal() principal: StaffPrincipal, @Body() body: unknown) {
+    const { status } = parseInput(SetAvailabilityRequest, body);
+    const chosen = await this.availability.choose(principal, status);
+    // Away or offline: what is offered to me goes to the next person now (HNV-10-03).
+    if (status !== 'online') await this.offers.releaseMine(principal);
+    return chosen;
   }
 
   @Post('availability/ping')

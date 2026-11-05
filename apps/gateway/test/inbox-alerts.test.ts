@@ -177,6 +177,88 @@ describe('alerts for the staff inbox', () => {
     expect(decision.looked).toEqual(['c1:message:newest']);
   });
 
+  it('tells the owner and people who see a waiting chat that it went past its reply time, once', () => {
+    const late = chat({ slaBreachedAt: at(7) });
+    const alerts = derive([late], [message(3)]);
+    expect(alerts).toMatchObject([
+      { kind: 'sla_overdue', key: `c1:sla:${at(7).getTime()}`, preview: 'Where is my order?' },
+    ]);
+    // The owner hears it; a chat someone else has does not concern this person.
+    const owned = chat({ ownerMode: 'HUMAN_ACTIVE', ownerStaffId: ME, slaBreachedAt: at(7) });
+    expect(derive([owned]).map((a) => a.kind)).toEqual(['sla_overdue']);
+    const theirs = chat({ ownerMode: 'HUMAN_ACTIVE', ownerStaffId: OTHER, slaBreachedAt: at(7) });
+    expect(derive([theirs])).toEqual([]);
+    // Once per deadline: not before the look, and not again once seen.
+    expect(derive([chat({ slaBreachedAt: at(-5) })])).toEqual([]);
+    const key = alerts[0]?.key ?? '';
+    expect(derive([late], [], T0, new Set([key])).map((a) => a.kind)).toEqual([]);
+  });
+
+  it('tells only the person offered a chat about it, once per offer (HNV-10-03)', () => {
+    const offered = chat({
+      ownerChangedAt: at(2),
+      ownershipEpoch: 4,
+      teamOffers: true,
+      offerId: 'o1',
+      offerStaffId: ME,
+      offeredAt: at(3),
+    });
+    expect(derive([offered], [message(1)])).toMatchObject([
+      { kind: 'chat_offered', key: 'c1:offer:o1', preview: 'Where is my order?', at: at(3) },
+    ]);
+    expect(derive([offered], [], T0, new Set(['c1:offer:o1']))).toEqual([]);
+    // The rest of the team is not called while the chat is offered to someone.
+    expect(derive([{ ...offered, offerStaffId: OTHER }])).toEqual([]);
+  });
+
+  it('tells the team a chat is waiting once the offers ended without anyone accepting', () => {
+    const ended = chat({
+      ownerChangedAt: at(-30),
+      ownershipEpoch: 4,
+      teamOffers: true,
+      offersEndedAt: at(6),
+      offersEndedEpoch: 4,
+    });
+    expect(derive([ended])).toMatchObject([
+      { kind: 'chat_waiting', key: `c1:waiting:${at(6).getTime()}`, at: at(6) },
+    ]);
+    // Offers that ended for an earlier hand-off do not count: this one is still being offered.
+    expect(derive([{ ...ended, ownerChangedAt: at(5), offersEndedEpoch: 3 }])).toEqual([]);
+    // A team that does not offer chats calls everyone at once, as before.
+    expect(derive([chat({ ownerChangedAt: at(5), teamOffers: false })]).map((a) => a.kind)).toEqual(
+      ['chat_waiting'],
+    );
+  });
+
+  it('tells a lead when a colleague’s chat goes overdue, once, and nothing else of it (ADR 0016)', () => {
+    // A chat a colleague has: it concerns the lead only as someone who may assign it.
+    const owned = chat({
+      ownerMode: 'HUMAN_ACTIVE',
+      ownerStaffId: OTHER,
+      ownerReason: 'staff_assign',
+      ownerChangedAt: at(2),
+      slaBreachedAt: at(5),
+      leadAlert: true,
+    });
+    const [alert] = derive([owned], [message(4)]);
+    expect(alert).toMatchObject({ kind: 'sla_overdue_lead', preview: 'Where is my order?' });
+    expect(derive([owned], [message(4)], T0, new Set([alert?.key ?? '']))).toEqual([]);
+    // Within its target, a lead hears nothing: not the assignment, not the customer's message.
+    expect(derive([{ ...owned, slaBreachedAt: null }], [message(6)])).toEqual([]);
+    // A brand that does not alert leads: nothing.
+    expect(derive([{ ...owned, leadAlert: false }], [message(4)])).toEqual([]);
+  });
+
+  it('tells a lead who could answer the chat the usual overdue alert', () => {
+    const waiting = chat({ slaBreachedAt: at(5), leadAlert: true });
+    expect(derive([waiting]).map((a) => a.kind)).toEqual(['sla_overdue']);
+    // Someone who may not answer it, and is no lead, hears nothing.
+    expect(derive([{ ...waiting, canReply: false, leadAlert: false }])).toEqual([]);
+    expect(derive([{ ...waiting, canReply: false }]).map((a) => a.kind)).toEqual([
+      'sla_overdue_lead',
+    ]);
+  });
+
   it('calls a customer without a name a visitor, and cuts a long message to one short line', () => {
     expect(derive([chat({ customerName: null, ownerChangedAt: at(1) })])[0]?.customerName).toBe(
       'Visitor',

@@ -51,6 +51,9 @@ const row = (patch: Partial<InboxConversation> = {}): InboxConversation => ({
   ticket: null,
   priority: null,
   waitingSince: null,
+  sla: null,
+  aiDraftReady: false,
+  offer: null,
   replyWindowClosesAt: null,
   unreadCount: 0,
   lastActivityAt: NOW,
@@ -87,7 +90,7 @@ const detail = (patch: Partial<InboxDetail> = {}): InboxDetail => ({
 const listPage = (items: InboxConversation[]) => ({
   items,
   nextCursor: null,
-  counts: { mine: 2, unassigned: 0, ai: 0, team: 0, tickets: 3, all: 2 },
+  counts: { mine: 2, unassigned: 0, overdue: 0, ai: 0, team: 0, tickets: 3, all: 2 },
 });
 
 describe('the tickets queue', () => {

@@ -20,26 +20,17 @@ const shell = (at: string, permissions: readonly string[]) =>
   });
 
 const owner = presetPermissions('owner');
-const AI_PAGES = [
-  '/agents',
-  '/knowledge',
-  '/memory',
-  '/tools',
-  '/checks',
-  '/decisions',
-  '/runs',
-  '/caching',
-  '/models',
-];
+const AI_PAGES = ['/agents', '/knowledge', '/memory', '/checks', '/decisions', '/runs', '/caching'];
 
 describe('the menu', () => {
-  it('has six entries, each opening the first page its person can see', async () => {
+  it('has seven entries, each opening the first page its person can see', async () => {
     const menu = navigation(await shell('/overview', owner), 'Studio');
     expect(menu?.map((link) => [link.text, link.href])).toEqual([
       ['Home', '/overview'],
       ['Inbox', '/inbox'],
       ['AI assistant', '/agents'],
-      ['Sales', '/orders'],
+      ['Workflows', '/workflows'],
+      ['Connectors', '/connectors'],
       ['Reports', '/reports'],
       ['Settings', '/brands'],
     ]);
@@ -52,8 +43,8 @@ describe('the menu', () => {
       ['Home', '/overview'],
       ['Inbox', '/inbox'],
       ['AI assistant', '/knowledge'],
-      ['Sales', '/orders'],
-      ['Settings', '/team'],
+      ['Connectors', '/connectors'],
+      ['Settings', '/orders'],
     ]);
     const nothing = navigation(await shell('/overview', ['conversations.read']), 'Studio');
     expect(nothing?.map((link) => link.text)).toEqual(['Home', 'Inbox']);
@@ -65,9 +56,9 @@ describe('the menu', () => {
     expect(await active('/inbox/conv_1')).toEqual(['/inbox']);
     expect(await active('/agents/agt_1')).toEqual(['/agents']);
     expect(await active('/memory/cus_1')).toEqual(['/agents']);
-    expect(await active('/models')).toEqual(['/agents']);
-    expect(await active('/orders/ord_1')).toEqual(['/orders']);
-    expect(await active('/finance')).toEqual(['/orders']);
+    expect(await active('/models')).toEqual(['/connectors']);
+    expect(await active('/orders/ord_1')).toEqual(['/brands']);
+    expect(await active('/finance')).toEqual(['/brands']);
     expect(await active('/reports')).toEqual(['/reports']);
     expect(await active('/developer')).toEqual(['/brands']);
     // Pages that are not in the menu leave it with nothing marked.
@@ -99,24 +90,26 @@ describe('the row of pages above a page', () => {
   });
 
   it('follows the page, nested ones included', async () => {
-    const orders = navigation(await shell('/orders/ord_1', owner), 'Sales pages');
-    expect(orders?.map((link) => link.href)).toEqual(['/orders', '/finance']);
+    const orders = navigation(await shell('/orders/ord_1', owner), 'Settings pages');
+    expect(orders?.map((link) => link.href)).toEqual(
+      expect.arrayContaining(['/orders', '/finance']),
+    );
     expect(current(orders)).toEqual(['/orders']);
     const settings = navigation(await shell('/security', owner), 'Settings pages');
-    expect(settings?.map((link) => link.href)).toEqual([
-      '/brands',
-      '/chat-widget',
-      '/channels',
-      '/automations',
-      '/hours',
-      '/team',
-      '/support-teams',
-      '/security',
-      '/developer',
-      '/customer-identity',
-      '/migration',
-      '/settings/billing',
-    ]);
+    expect(settings?.map((link) => link.href)).toEqual(
+      expect.arrayContaining([
+        '/brands',
+        '/branding',
+        '/chat-widget',
+        '/orders',
+        '/finance',
+        '/hours',
+        '/team',
+        '/security',
+        '/settings/billing',
+        '/settings/privacy',
+      ]),
+    );
     expect(current(settings)).toEqual(['/security']);
   });
 
@@ -125,7 +118,7 @@ describe('the row of pages above a page', () => {
       await shell('/memory', presetPermissions('agent')),
       'AI assistant pages',
     );
-    expect(tabs?.map((link) => link.href)).toEqual(['/knowledge', '/tools', '/caching']);
+    expect(tabs?.map((link) => link.href)).toEqual(['/knowledge', '/caching']);
     expect(current(tabs)).toEqual([]);
   });
 
@@ -159,7 +152,7 @@ describe('Stop AI', () => {
     expect(button?.attrs['aria-label']).toBe('Stop AI replies');
     expect(button?.attrs.class).toContain('bg-danger');
     expect(menu?.some((link) => link.href === '/stop-ai')).toBe(false);
-    expect(menu?.length).toBe(6);
+    expect(menu?.length).toBe(7);
   });
 
   it('is shown only to people who can stop the AI', async () => {

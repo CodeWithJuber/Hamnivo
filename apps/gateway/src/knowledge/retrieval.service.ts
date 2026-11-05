@@ -1,6 +1,6 @@
 import type { TenantTx } from '@hamnivo/db';
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { type SQL, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../tokens.js';
 import { EmbeddingFactory } from './embeddings.js';
 
@@ -25,6 +25,44 @@ export interface SearchInput {
   audience: 'customer' | 'staff';
   query: string;
   limit: number;
+}
+
+/** Every cache hit and fresh search uses the same live visibility and freshness predicate. */
+export function eligiblePassages(input: SearchInput, now: string): SQL {
+  return sql`
+        select c.id, c.embedding, c.embedding_model, c.search, c.heading, c.text, c.document_id,
+               c.source_id, c.version_id, v.version, d.title, d.url
+        from knowledge_chunks c
+        join document_versions v on v.id = c.version_id and v.state = 'ready'
+          and (v.valid_until is null or v.valid_until > ${now}::timestamptz)
+        join knowledge_documents d on d.id = c.document_id and d.current_version_id = c.version_id
+          and d.status = 'active'
+        join knowledge_sources s on s.id = c.source_id and s.status = 'active'
+          and s.brand_id = ${input.brandId}::uuid
+          and (s.review_every_days is null
+               or coalesce(d.reviewed_at, v.ready_at)
+                  > ${now}::timestamptz - make_interval(days => s.review_every_days))
+        where true
+          ${input.audience === 'customer' ? sql`and s.visibility = 'public'` : sql``}
+          ${
+            input.sourceIds
+              ? sql`and c.source_id in (${sql.join(
+                  input.sourceIds.map((id) => sql`${id}::uuid`),
+                  sql`, `,
+                )})`
+              : sql``
+          }
+  `;
+}
+
+export const RETRIEVAL_CACHE = Symbol('RETRIEVAL_CACHE');
+export interface RetrievalCache {
+  search(
+    tx: TenantTx,
+    input: SearchInput,
+    model: string,
+    compute: () => Promise<Passage[]>,
+  ): Promise<Passage[]>;
 }
 
 /**
@@ -75,6 +113,7 @@ export class RetrievalService {
     private readonly embeddings: EmbeddingFactory,
     @Inject(CLOCK) private readonly clock: Clock,
     @Optional() @Inject(QUERY_VECTOR_CACHE) private readonly vectors?: QueryVectorCache,
+    @Optional() @Inject(RETRIEVAL_CACHE) private readonly results?: RetrievalCache,
   ) {}
 
   private async queryVector(tx: TenantTx, input: SearchInput): Promise<number[]> {
@@ -89,6 +128,19 @@ export class RetrievalService {
   }
 
   async search(tx: TenantTx, input: SearchInput): Promise<Passage[]> {
+    if (input.sourceIds && input.sourceIds.length === 0) return [];
+    const compute = () => this.freshSearch(tx, input);
+    return this.results
+      ? this.results.search(
+          tx,
+          input,
+          `${this.embeddings.id}:${this.embeddings.maxDistance}`,
+          compute,
+        )
+      : compute();
+  }
+
+  private async freshSearch(tx: TenantTx, input: SearchInput): Promise<Passage[]> {
     if (input.sourceIds && input.sourceIds.length === 0) return [];
     const words = queryWords(input.query);
     const queryVector = await this.queryVector(tx, input);
@@ -107,28 +159,7 @@ export class RetrievalService {
       score: string;
     }>(sql`
       with eligible as (
-        select c.id, c.embedding, c.embedding_model, c.search, c.heading, c.text, c.document_id,
-               c.source_id, c.version_id, v.version, d.title, d.url
-        from knowledge_chunks c
-        join document_versions v on v.id = c.version_id and v.state = 'ready'
-          and (v.valid_until is null or v.valid_until > ${now}::timestamptz)
-        join knowledge_documents d on d.id = c.document_id and d.current_version_id = c.version_id
-          and d.status = 'active'
-        join knowledge_sources s on s.id = c.source_id and s.status = 'active'
-          and s.brand_id = ${input.brandId}::uuid
-          and (s.review_every_days is null
-               or coalesce(d.reviewed_at, v.ready_at)
-                  > ${now}::timestamptz - make_interval(days => s.review_every_days))
-        where true
-          ${input.audience === 'customer' ? sql`and s.visibility = 'public'` : sql``}
-          ${
-            input.sourceIds
-              ? sql`and c.source_id in (${sql.join(
-                  input.sourceIds.map((id) => sql`${id}::uuid`),
-                  sql`, `,
-                )})`
-              : sql``
-          }
+        ${eligiblePassages(input, now)}
       ),
       by_vector as (
         select id, row_number() over (order by embedding <=> ${vector}::vector) as rank

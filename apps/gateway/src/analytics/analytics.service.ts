@@ -14,6 +14,9 @@ type Overview = AnalyticsOverview;
 
 const DAY = 86_400_000;
 const MAX_DAYS = 366;
+/** Ended offers and AI drafts are removed after this many days (maintenance). */
+const WORK_QUEUE_KEEP_DAYS = 90;
+const SLA_PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 
 /** Where an actor's `analytics.read` grants reach (a tenant grant reaches everything). */
 export interface AnalyticsScope {
@@ -68,6 +71,36 @@ const uuidList = (ids: string[]) =>
   );
 
 /**
+ * Retention (A10) deletes old conversations but keeps their report row (conversation_metrics,
+ * `retired_at` set) with copies of what reports read from the conversation's other records. These
+ * relations put the live records and the copies side by side, so reports do not change when
+ * conversations are deleted.
+ */
+/** Every conversation: live ones, and those retention deleted. */
+const CONVERSATIONS = sql`(
+  select tenant_id, id, brand_id, inbox_id from conversation_controls
+  union all
+  select tenant_id, id, brand_id, inbox_id from conversation_metrics where retired_at is not null
+)`;
+/** Each conversation's team, priority and ticket. */
+const INBOX_STATE = sql`(
+  select tenant_id, conversation_id, team_id, priority, ticket_number, ticket_source,
+         ticket_opened_at
+  from conversation_inbox_state
+  union all
+  select tenant_id, id, team_id, priority, ticket_number, ticket_source, ticket_opened_at
+  from conversation_metrics where retired_at is not null
+)`;
+/** Each conversation's customer ratings: how many, and their sum. */
+const RATINGS = sql`(
+  select tenant_id, conversation_id, count(*)::bigint as n, sum(rating)::bigint as total
+  from conversation_feedback group by tenant_id, conversation_id
+  union all
+  select tenant_id, id, rating_count::bigint, rating_sum::bigint
+  from conversation_metrics where retired_at is not null and rating_count > 0
+)`;
+
+/**
  * The scope and filter condition over a conversation relation aliased `m` (brand_id, inbox_id),
  * joined with `b` (brands) and `s` (conversation_inbox_state), plus the channel expression.
  */
@@ -88,6 +121,26 @@ function conditions(scope: AnalyticsScope, filters: Filters, channel: SQL): SQL 
   if (filters.brandId) parts.push(sql`m.brand_id = ${filters.brandId}::uuid`);
   if (filters.teamId) parts.push(sql`s.team_id = ${filters.teamId}::uuid`);
   if (filters.channel) parts.push(sql`${channel} = ${filters.channel}`);
+  return parts.length ? sql.join(parts, sql` and `) : sql`true`;
+}
+
+/**
+ * Which teams' offers a caller sees by team (HNV-10-06): an offer belongs to the team it was made
+ * for, which may not be the conversation's team now, so the team filter and a reach limited to
+ * some teams apply to that team as well.
+ */
+function offerTeams(scope: AnalyticsScope, filters: Filters): SQL {
+  const parts: SQL[] = [];
+  if (!scope.all) {
+    const any: SQL[] = [];
+    if (scope.workspaceIds.length)
+      any.push(sql`b.workspace_id in (${uuidList(scope.workspaceIds)})`);
+    if (scope.brandIds.length) any.push(sql`m.brand_id in (${uuidList(scope.brandIds)})`);
+    if (scope.inboxIds.length) any.push(sql`m.inbox_id in (${uuidList(scope.inboxIds)})`);
+    if (scope.teamIds.length) any.push(sql`o.team_id in (${uuidList(scope.teamIds)})`);
+    parts.push(sql`(${sql.join(any, sql` or `)})`);
+  }
+  if (filters.teamId) parts.push(sql`o.team_id = ${filters.teamId}::uuid`);
   return parts.length ? sql.join(parts, sql` and `) : sql`true`;
 }
 
@@ -239,7 +292,7 @@ export class AnalyticsService {
       const where = conditions(scope, parsed.filters, sql`m.channel`);
       const metricsFrom = sql`conversation_metrics m
         left join brands b on b.tenant_id = m.tenant_id and b.id = m.brand_id
-        left join conversation_inbox_state s on s.tenant_id = m.tenant_id and s.conversation_id = m.id`;
+        left join ${INBOX_STATE} s on s.tenant_id = m.tenant_id and s.conversation_id = m.id`;
       const inRange = sql`m.created_at >= ${range.start} and m.created_at < ${range.end}`;
       // A customer still waiting less than an hour is not missed yet.
       const hourAgo = new Date(now.getTime() - 3_600_000);
@@ -271,9 +324,9 @@ export class AnalyticsService {
       const t = totalsRows[0] ?? {};
 
       const { rows: csatRows } = await tx.execute<{ n: string; avg: string | null }>(sql`
-        select count(*) as n, avg(f.rating)::float8 as avg
+        select coalesce(sum(f.n), 0) as n, (sum(f.total)::numeric / nullif(sum(f.n), 0))::float8 as avg
         from ${metricsFrom}
-        join conversation_feedback f on f.tenant_id = m.tenant_id and f.conversation_id = m.id
+        join ${RATINGS} f on f.tenant_id = m.tenant_id and f.conversation_id = m.id
         where ${where} and ${inRange}`);
       const csatSample = num(csatRows[0]?.n);
 
@@ -317,10 +370,7 @@ export class AnalyticsService {
           sum(fb.total)::float8 / nullif(sum(fb.n), 0) as csat_avg
         from ${metricsFrom}
         left join teams tm on tm.tenant_id = m.tenant_id and tm.id = s.team_id
-        left join (
-          select f.conversation_id, count(*) as n, sum(f.rating) as total
-          from conversation_feedback f group by f.conversation_id
-        ) fb on fb.conversation_id = m.id
+        left join ${RATINGS} fb on fb.tenant_id = m.tenant_id and fb.conversation_id = m.id
         where ${where} and ${inRange}
         group by s.team_id, tm.name
         order by 3 desc, 2`);
@@ -334,18 +384,20 @@ export class AnalyticsService {
         group by 1 order by 2 desc`);
 
       // Tickets (H19): opened in the range, and open now whenever they were opened.
+      // A conversation retention deleted was resolved.
       const ticketsFrom = sql`${metricsFrom}
-        join conversation_controls c on c.tenant_id = m.tenant_id and c.id = m.id`;
+        left join conversation_controls c on c.tenant_id = m.tenant_id and c.id = m.id`;
+      const status = sql`coalesce(c.authority_status, 'resolved')`;
       const opened = sql`s.ticket_opened_at >= ${range.start} and s.ticket_opened_at < ${range.end}`;
       const { rows: ticketRows } = await tx.execute<Record<string, unknown>>(sql`
         select
           count(*) filter (where ${opened}) as created,
-          count(*) filter (where ${opened} and c.authority_status = 'resolved') as closed,
-          count(*) filter (where c.authority_status <> 'resolved') as open_now,
-          count(*) filter (where ${opened} and c.authority_status = 'resolved'
+          count(*) filter (where ${opened} and ${status} = 'resolved') as closed,
+          count(*) filter (where ${status} <> 'resolved') as open_now,
+          count(*) filter (where ${opened} and ${status} = 'resolved'
             and m.last_resolved_at >= s.ticket_opened_at) as close_sample,
           percentile_cont(0.5) within group (order by extract(epoch from m.last_resolved_at - s.ticket_opened_at))
-            filter (where ${opened} and c.authority_status = 'resolved'
+            filter (where ${opened} and ${status} = 'resolved'
               and m.last_resolved_at >= s.ticket_opened_at) as close_median
         from ${ticketsFrom}
         where ${where} and s.ticket_number is not null`);
@@ -364,9 +416,9 @@ export class AnalyticsService {
         group by 1 order by 2 desc, 1`);
 
       // Commerce and AI runs reach conversations recorded before analytics began, too.
-      const controlsFrom = sql`conversation_controls m
+      const controlsFrom = sql`${CONVERSATIONS} m
         left join brands b on b.tenant_id = m.tenant_id and b.id = m.brand_id
-        left join conversation_inbox_state s on s.tenant_id = m.tenant_id and s.conversation_id = m.id
+        left join ${INBOX_STATE} s on s.tenant_id = m.tenant_id and s.conversation_id = m.id
         left join authority_inboxes i on i.tenant_id = m.tenant_id and i.id = m.inbox_id`;
       const controlsWhere = conditions(scope, parsed.filters, sql`i.channel_type`);
       const { rows: commerceRows } = await tx.execute<Record<string, unknown>>(sql`
@@ -403,6 +455,16 @@ export class AnalyticsService {
         where ${controlsWhere} and r.finished_at >= ${range.start} and r.finished_at < ${range.end}`);
 
       const cache = await this.cache(tx, scope, parsed.filters, range, k);
+      const workQueue = await this.workQueue(tx, {
+        from: controlsFrom,
+        where: controlsWhere,
+        scope,
+        filters: parsed.filters,
+        range,
+        timezone: tz,
+        now,
+        k,
+      });
 
       const { rows: recordingRows } = await tx.execute<{
         since: Date | null;
@@ -603,8 +665,341 @@ export class AnalyticsService {
           limitHandoffs: protectCount(num(t.limit_handoffs), k),
         },
         cache,
+        ...workQueue,
       };
     });
+  }
+
+  /**
+   * Reports on the inbox work queue: reply-time targets (H12) from the clocks that ended in the
+   * range, offers (HNV-10-03, HNV-10-06) made in it, and AI drafts (HNV-09-05) written in it,
+   * scoped and filtered like the rest through their conversation.
+   */
+  private async workQueue(
+    tx: TenantTx,
+    q: {
+      from: SQL;
+      where: SQL;
+      scope: AnalyticsScope;
+      filters: Filters;
+      range: Range;
+      timezone: string;
+      now: Date;
+      k: number;
+    },
+  ): Promise<Pick<Overview, 'replyTargets' | 'offers' | 'aiDrafts'>> {
+    const { from, where, range, k } = q;
+    /** A count shown on its own, without what it stands on (that would give it away). */
+    const held = (value: number) => ({
+      value: protectCount(value, k),
+      suppressed: protectCount(value, k) === null,
+    });
+    /** A count and its share of a total that is not otherwise split up. */
+    const share = (value: number, sample: number) => ({
+      ...held(value),
+      sample,
+      rate: round(heldRate(value, sample, k)),
+    });
+    type Share = ReturnType<typeof share>;
+    /**
+     * Counts that split one total, which is shown: one withheld is withheld with the next
+     * smallest, so it cannot be worked out by subtracting the others from the total.
+     */
+    const shares = <K extends string>(parts: Record<K, number>): Record<K, Share> => {
+      const keys = Object.keys(parts) as K[];
+      const total = keys.reduce((sum, key) => sum + parts[key], 0);
+      const rows = protectBreakdown(
+        keys.map((key) => ({ key, count: parts[key] })),
+        { k, totalShown: true },
+      );
+      return Object.fromEntries(
+        rows.map((row) => [
+          row.key,
+          {
+            value: row.suppressed ? null : row.count,
+            suppressed: row.suppressed,
+            sample: total,
+            rate: row.suppressed ? null : round(protectedRate(row.count, total, k)),
+          },
+        ]),
+      ) as Record<K, Share>;
+    };
+    /** A row's share of its own total, withheld when a count it is made of is (see `shares`). */
+    const rowRate = <K extends string>(parts: Record<K, number>, of: NoInfer<K>[]) => {
+      const split = shares(parts);
+      if (of.some((key) => split[key].suppressed)) return null;
+      const part = of.reduce((sum, key) => sum + parts[key], 0);
+      return round(protectedRate(part, split[of[0] as K].sample, k));
+    };
+    const median = (sample: number, value: unknown, digits: number) => ({
+      value: sample >= k ? round(numOrNull(value), digits) : null,
+      suppressed: sample > 0 && sample < k,
+      sample,
+    });
+    const reasons = <R extends string>(rows: Array<{ reason: string; n: string }>) =>
+      protectBreakdown(
+        rows.map((row) => ({ reason: row.reason as R, count: num(row.n) })),
+        { k, totalShown: true },
+      ).map((row) => ({
+        reason: row.reason,
+        count: row.suppressed ? null : row.count,
+        suppressed: row.suppressed,
+      }));
+    const windowLimited = range.start.getTime() < q.now.getTime() - WORK_QUEUE_KEEP_DAYS * DAY;
+
+    // Reply-time targets: rows are written when a clock ends.
+    const sla = sql`${from}
+      join sla_outcomes o on o.tenant_id = m.tenant_id and o.conversation_id = m.id`;
+    const ended = sql`o.ended_at >= ${range.start} and o.ended_at < ${range.end}`;
+    const { rows: slaRows } = await tx.execute<Record<string, unknown>>(sql`
+      select
+        count(*) filter (where o.outcome = 'met') as met,
+        count(*) filter (where o.outcome = 'missed') as missed,
+        count(*) filter (where o.outcome = 'stopped') as stopped,
+        count(*) filter (where o.kind = 'first_reply' and o.outcome <> 'stopped') as first_n,
+        percentile_cont(0.5) within group (order by o.business_minutes)
+          filter (where o.kind = 'first_reply' and o.outcome <> 'stopped') as first_median,
+        (select min(x.ended_at) from sla_outcomes x) as since
+      from ${sla}
+      where ${where} and ${ended}`);
+    const { rows: slaPriorityRows } = await tx.execute<{
+      priority: string;
+      replies: string;
+      met: string;
+    }>(sql`
+      select o.priority as priority,
+        count(*) filter (where o.outcome <> 'stopped') as replies,
+        count(*) filter (where o.outcome = 'met') as met
+      from ${sla}
+      where ${where} and ${ended}
+      group by 1`);
+    const { rows: slaDailyRows } = await tx.execute<{ day: string; replies: string; met: string }>(
+      sql`
+      with days as (
+        select d::date as day
+        from generate_series(${range.from}::date, ${range.to}::date, interval '1 day') as d
+      ),
+      counted as (
+        select (o.ended_at at time zone ${q.timezone})::date as day,
+          count(*) filter (where o.outcome <> 'stopped') as replies,
+          count(*) filter (where o.outcome = 'met') as met
+        from ${sla}
+        where ${where} and ${ended}
+        group by 1
+      )
+      select to_char(days.day, 'YYYY-MM-DD') as day,
+             coalesce(c.replies, 0) as replies, coalesce(c.met, 0) as met
+      from days left join counted c on c.day = days.day
+      order by days.day`,
+    );
+    const st = slaRows[0] ?? {};
+    const byPriority = new Map(slaPriorityRows.map((row) => [row.priority, row]));
+    const rated = <T extends { count: number; met: number }>(rows: T[]) =>
+      protectBreakdown(rows, { k, totalShown: true }).map((row) => ({
+        ...row,
+        replies: row.suppressed ? null : row.count,
+        metRate: row.suppressed
+          ? null
+          : rowRate({ met: row.met, missed: row.count - row.met }, ['met']),
+      }));
+
+    // Offers: one row per person offered a chat.
+    const offers = sql`${from}
+      join conversation_offers o on o.tenant_id = m.tenant_id and o.conversation_id = m.id`;
+    const offered = sql`o.offered_at >= ${range.start} and o.offered_at < ${range.end}`;
+    const { rows: offerRows } = await tx.execute<Record<string, unknown>>(sql`
+      select count(*) as offered,
+        count(*) filter (where o.state = 'accepted') as accepted,
+        count(*) filter (where o.state = 'declined') as declined,
+        count(*) filter (where o.state = 'expired') as expired,
+        percentile_cont(0.5) within group (order by extract(epoch from o.decided_at - o.offered_at))
+          filter (where o.state = 'accepted') as accept_median
+      from ${offers}
+      where ${where} and ${offered}`);
+    // A hand-off ended in the queue when its last offer, made in the range or after it, was
+    // declined or ran out.
+    const { rows: handoffRows } = await tx.execute<{ handoffs: string; queued: string }>(sql`
+      with handoffs as (
+        select distinct o.tenant_id, o.conversation_id, o.handoff_epoch
+        from ${offers}
+        where ${where} and ${offered}
+      ),
+      last_offer as (
+        select distinct on (x.conversation_id, x.handoff_epoch) x.state
+        from handoffs h
+        join conversation_offers x on x.tenant_id = h.tenant_id
+          and x.conversation_id = h.conversation_id and x.handoff_epoch = h.handoff_epoch
+        order by x.conversation_id, x.handoff_epoch, x.round desc
+      )
+      select count(*) as handoffs,
+        count(*) filter (where state in ('declined', 'expired')) as queued
+      from last_offer`);
+    const { rows: declineRows } = await tx.execute<{ reason: string; n: string }>(sql`
+      select o.decline_reason as reason, count(*) as n
+      from ${offers}
+      where ${where} and ${offered} and o.state = 'declined' and o.decline_reason is not null
+      group by 1 order by 2 desc, 1`);
+    const { rows: offerTeamRows } = await tx.execute<Record<string, unknown>>(sql`
+      select o.team_id as team_id, tm.name as name, count(*) as offered,
+        count(*) filter (where o.state = 'accepted') as accepted,
+        count(*) filter (where o.state = 'declined') as declined,
+        count(*) filter (where o.state = 'expired') as expired
+      from ${offers}
+      join teams tm on tm.tenant_id = o.tenant_id and tm.id = o.team_id
+      where ${where} and ${offered} and ${offerTeams(q.scope, q.filters)}
+      group by 1, 2 order by 3 desc, 2`);
+    const of = offerRows[0] ?? {};
+    const answers = shares({
+      accepted: num(of.accepted),
+      declined: num(of.declined),
+      expired: num(of.expired),
+    });
+    const handoffs = num(handoffRows[0]?.handoffs);
+
+    // AI drafts: one row per draft, with the person's decision beside it.
+    const drafts = sql`${from}
+      join ai_drafts d on d.tenant_id = m.tenant_id and d.conversation_id = m.id`;
+    const written = sql`d.created_at >= ${range.start} and d.created_at < ${range.end}`;
+    const { rows: draftRows } = await tx.execute<Record<string, unknown>>(sql`
+      select count(*) as written,
+        count(*) filter (where d.state = 'approved') as approved,
+        count(*) filter (where d.state = 'edited') as edited,
+        count(*) filter (where d.state = 'rejected') as rejected
+      from ${drafts}
+      where ${where} and ${written}`);
+    const { rows: rejectRows } = await tx.execute<{ reason: string; n: string }>(sql`
+      select x.reason as reason, count(*) as n
+      from ${drafts}
+      join ai_draft_decisions x on x.tenant_id = d.tenant_id and x.draft_id = d.id
+      where ${where} and ${written} and d.state = 'rejected' and x.reason is not null
+      group by 1 order by 2 desc, 1`);
+    const { rows: setAsideRows } = await tx.execute<{ reason: string; n: string }>(sql`
+      select d.superseded_reason as reason, count(*) as n
+      from ${drafts}
+      where ${where} and ${written} and d.state = 'superseded'
+      group by 1 order by 2 desc, 1`);
+    const { rows: agentRows } = await tx.execute<Record<string, unknown>>(sql`
+      select d.agent_id as agent_id, a.name as name, count(*) as written,
+        count(*) filter (where d.state = 'approved') as approved,
+        count(*) filter (where d.state = 'edited') as edited,
+        count(*) filter (where d.state = 'rejected') as rejected
+      from ${drafts}
+      left join agent_profiles a on a.tenant_id = d.tenant_id and a.id = d.agent_id
+      where ${where} and ${written}
+      group by 1, 2 order by 3 desc, 2`);
+    const dr = draftRows[0] ?? {};
+    const decisions = shares({
+      approved: num(dr.approved),
+      edited: num(dr.edited),
+      rejected: num(dr.rejected),
+    });
+    // Sent is approved and edited together: shown only when both are, so neither is given away.
+    const sent: Share =
+      decisions.approved.suppressed || decisions.edited.suppressed
+        ? { value: null, suppressed: true, sample: decisions.approved.sample, rate: null }
+        : {
+            value: num(dr.approved) + num(dr.edited),
+            suppressed: false,
+            sample: decisions.approved.sample,
+            rate: round(
+              protectedRate(num(dr.approved) + num(dr.edited), decisions.approved.sample, k),
+            ),
+          };
+    const replyShares = shares({ met: num(st.met), missed: num(st.missed) });
+
+    return {
+      replyTargets: {
+        recordingSince: st.since ? new Date(st.since as string).toISOString() : null,
+        met: replyShares.met,
+        missed: replyShares.missed,
+        stopped: held(num(st.stopped)),
+        firstReplyMedianMinutes: median(num(st.first_n), st.first_median, 1),
+        byPriority: rated(
+          SLA_PRIORITIES.map((priority) => ({
+            priority,
+            count: num(byPriority.get(priority)?.replies),
+            met: num(byPriority.get(priority)?.met),
+          })),
+        ).map((row) => ({
+          priority: row.priority,
+          replies: row.replies,
+          metRate: row.metRate,
+          suppressed: row.suppressed,
+        })),
+        daily: rated(
+          slaDailyRows.map((row) => ({
+            date: row.day,
+            count: num(row.replies),
+            met: num(row.met),
+          })),
+        ).map((row) => ({
+          date: row.date,
+          replies: row.replies,
+          metRate: row.metRate,
+          suppressed: row.suppressed,
+        })),
+      },
+      offers: {
+        windowLimited,
+        offered: held(num(of.offered)),
+        accepted: answers.accepted,
+        declined: answers.declined,
+        expired: answers.expired,
+        acceptMedianSeconds: median(num(of.accepted), of.accept_median, 1),
+        leftInQueue: share(num(handoffRows[0]?.queued), handoffs),
+        declineReasons:
+          reasons<Overview['offers']['declineReasons'][number]['reason']>(declineRows),
+        byTeam: protectBreakdown(
+          offerTeamRows.map((row) => ({ row, count: num(row.offered) })),
+          { k, totalShown: true },
+        ).map(({ row, count: n, suppressed }) => ({
+          teamId: toPublicId('team', String(row.team_id)),
+          name: String(row.name),
+          offered: suppressed ? null : n,
+          acceptRate: suppressed
+            ? null
+            : rowRate(
+                {
+                  accepted: num(row.accepted),
+                  declined: num(row.declined),
+                  expired: num(row.expired),
+                },
+                ['accepted'],
+              ),
+          suppressed,
+        })),
+      },
+      aiDrafts: {
+        windowLimited,
+        written: held(num(dr.written)),
+        sent,
+        approved: decisions.approved,
+        edited: decisions.edited,
+        rejected: decisions.rejected,
+        rejectReasons: reasons<Overview['aiDrafts']['rejectReasons'][number]['reason']>(rejectRows),
+        setAsideReasons:
+          reasons<Overview['aiDrafts']['setAsideReasons'][number]['reason']>(setAsideRows),
+        byAgent: protectBreakdown(
+          agentRows.map((row) => ({ row, count: num(row.written) })),
+          { k, totalShown: true },
+        ).map(({ row, count: n, suppressed }) => ({
+          agentId: row.agent_id ? toPublicId('agent', String(row.agent_id)) : null,
+          name: (row.name as string | null) ?? null,
+          written: suppressed ? null : n,
+          sentRate: suppressed
+            ? null
+            : rowRate(
+                {
+                  approved: num(row.approved),
+                  edited: num(row.edited),
+                  rejected: num(row.rejected),
+                },
+                ['approved', 'edited'],
+              ),
+          suppressed,
+        })),
+      },
+    };
   }
 
   /**
@@ -772,6 +1167,64 @@ export class AnalyticsService {
       o.cache.status === 'measured' && o.cache.hitRate === null,
       '',
     ]);
+    const share = (
+      section: string,
+      key: string,
+      m: { value: number | null; suppressed: boolean; sample: number; rate?: number | null },
+    ) => lines.push([section, key, m.value, m.rate ?? '', m.suppressed, m.sample]);
+    const r = o.replyTargets;
+    share('reply_targets', 'met', r.met);
+    share('reply_targets', 'missed', r.missed);
+    lines.push(['reply_targets', 'stopped', r.stopped.value, '', r.stopped.suppressed, '']);
+    share('reply_targets', 'first_reply_median_minutes', r.firstReplyMedianMinutes);
+    for (const row of r.byPriority) {
+      lines.push([
+        'reply_targets_priority',
+        row.priority,
+        row.replies,
+        row.metRate,
+        row.suppressed,
+        '',
+      ]);
+    }
+    for (const day of r.daily) {
+      lines.push(['reply_targets_daily', day.date, day.replies, day.metRate, day.suppressed, '']);
+    }
+    const f = o.offers;
+    lines.push(['offers', 'offered', f.offered.value, '', f.offered.suppressed, '']);
+    share('offers', 'accepted', f.accepted);
+    share('offers', 'declined', f.declined);
+    share('offers', 'expired', f.expired);
+    share('offers', 'accept_median_seconds', f.acceptMedianSeconds);
+    share('offers', 'left_in_queue', f.leftInQueue);
+    for (const row of f.declineReasons) {
+      lines.push(['offer_decline_reason', row.reason, row.count, '', row.suppressed, '']);
+    }
+    for (const row of f.byTeam) {
+      lines.push(['offer_team', row.name, row.offered, row.acceptRate, row.suppressed, '']);
+    }
+    const d = o.aiDrafts;
+    lines.push(['ai_drafts', 'written', d.written.value, '', d.written.suppressed, '']);
+    share('ai_drafts', 'sent', d.sent);
+    share('ai_drafts', 'approved', d.approved);
+    share('ai_drafts', 'edited', d.edited);
+    share('ai_drafts', 'rejected', d.rejected);
+    for (const row of d.rejectReasons) {
+      lines.push(['ai_draft_reject_reason', row.reason, row.count, '', row.suppressed, '']);
+    }
+    for (const row of d.setAsideReasons) {
+      lines.push(['ai_draft_set_aside_reason', row.reason, row.count, '', row.suppressed, '']);
+    }
+    for (const row of d.byAgent) {
+      lines.push([
+        'ai_draft_agent',
+        row.name ?? row.agentId ?? 'unknown',
+        row.written,
+        row.sentRate,
+        row.suppressed,
+        '',
+      ]);
+    }
     return `${lines.map((line) => line.map(csvCell).join(',')).join('\r\n')}\r\n`;
   }
 }

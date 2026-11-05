@@ -36,7 +36,7 @@ export const knowledgeSources = pgTable(
     workspaceId: uuid('workspace_id').notNull(),
     brandId: uuid('brand_id').notNull(),
     name: text('name').notNull(),
-    /** `public`: may ground customer answers. `internal`: staff and assist mode only. */
+    /** `public`: may ground customer answers and AI drafts. `internal`: staff search only. */
     visibility: text('visibility', { enum: ['public', 'internal'] })
       .notNull()
       .default('public'),

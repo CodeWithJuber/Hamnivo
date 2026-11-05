@@ -45,7 +45,16 @@ const workspace = {
   brands: [{ id: 'brd_1', name: 'Noor Books', status: 'active' }],
 };
 const team = (id: string, name: string, workspaceId: string | null = 'wsp_1'): Team =>
-  ({ id, name, workspaceId, status: 'active', members: [], createdAt: NOW }) as Team;
+  ({
+    id,
+    name,
+    workspaceId,
+    status: 'active',
+    members: [],
+    assignmentMode: 'queue',
+    offerTimeoutSeconds: 60,
+    createdAt: NOW,
+  }) as Team;
 const TEAMS = [team('team_billing', 'Billing'), team('team_sales', 'Sales')];
 
 const channel = (overrides: Partial<ChannelInbox> = {}): ChannelInbox =>

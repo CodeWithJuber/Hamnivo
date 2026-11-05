@@ -111,6 +111,7 @@ describe('shared inbox (H01)', () => {
       ai: 2,
       team: 0,
       tickets: 0,
+      overdue: 0,
       all: 3,
     });
 

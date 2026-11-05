@@ -341,6 +341,14 @@ export const conversationControls = pgTable(
       t.externalConversationId,
     ),
     index('conversation_controls_principal_idx').on(t.tenantId, t.principalId),
+    /** Resolved conversations by their last activity, which retention deletes oldest first (A10). */
+    index('conversation_controls_resolved_activity_idx')
+      .on(t.tenantId, t.lastActivityAt)
+      .where(sql`${t.authorityStatus} = 'resolved'`),
+    /** Each person's open chats, counted when a conversation is offered (HNV-10-03). */
+    index('conversation_controls_owner_staff_idx')
+      .on(t.tenantId, t.ownerStaffId)
+      .where(sql`${t.ownerMode} = 'HUMAN_ACTIVE'`),
     foreignKey({
       name: 'conversation_controls_connection_fk',
       columns: [t.tenantId, t.connectionId],
@@ -400,6 +408,11 @@ export const messageLedger = pgTable(
     clientMessageId: uuid('client_message_id').notNull(),
     requestHash: bytea('request_hash').notNull(),
     state: text('state', { enum: LEDGER_STATES }).notNull().default('pending'),
+    /**
+     * The message asks for an answer. A customer's reaction to a reply (W22) does not: it neither
+     * starts an AI reply nor makes the one being written for their question stale.
+     */
+    expectsReply: boolean('expects_reply').notNull().default(true),
     /** Sent to Chatwoot as `source_id` (`hv1:m:{id}`); echoed back in webhooks. */
     sourceKey: text('source_key').notNull(),
     authorityMessageId: bigint('authority_message_id', { mode: 'number' }),

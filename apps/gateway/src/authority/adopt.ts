@@ -8,6 +8,7 @@ import {
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { queueAutomationEvent } from '../automations/events.js';
+import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
@@ -302,6 +303,8 @@ export class ChannelAdoption {
         sourceKey: `${MESSAGE_KEY_PREFIX.external}${key}`,
         authorityMessageId: Number(message.ref),
         committedAt: now,
+        // A reaction (W22) asks for no answer.
+        expectsReply: !reactionOf(message),
       })
       .onConflictDoNothing()
       .returning({ id: schema.messageLedger.id });
@@ -329,6 +332,8 @@ export class ChannelAdoption {
     const quiet =
       channelKindOf(inbox.channelType) === 'email' && (await this.automated(tx, control));
     if (!quiet) {
+      // A pending AI draft answered what they said before (HNV-09-05).
+      await supersedeAiDrafts(tx, conversationId, 'customer_wrote', now);
       await enqueueOutbox(tx, tenantId, {
         topic: 'conversation.customer_message',
         aggregateType: 'conversation',

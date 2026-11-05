@@ -10,6 +10,8 @@ import type {
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, ne } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
+import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
+import { recordHumanReply, syncSla } from '../inbox/sla.js';
 import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { type JournalEntry, JournalService } from './journal.service.js';
 import { type ControlRow, OwnershipService } from './ownership.service.js';
@@ -49,6 +51,8 @@ export interface OutboundInput {
   attachments?: () => OutgoingAttachment[];
   /** Loads (and authorizes) the conversation inside the reservation transaction. */
   load: (tx: TenantTx) => Promise<ControlRow>;
+  /** False for a message that asks for no answer (a customer's reaction, W22). */
+  expectsReply?: boolean;
   /** Runs in the commit transaction, only for the call that committed the message. */
   onCommitted?: (tx: TenantTx, control: ControlRow, ledgerId: string) => Promise<void>;
 }
@@ -117,6 +121,7 @@ export class OutboundMessagesService {
           clientMessageId: input.clientMessageId,
           requestHash: input.requestHash,
           sourceKey: `hv1:${input.visibility === 'private' ? 'n' : 'm'}:${ledgerId}`,
+          expectsReply: input.expectsReply ?? true,
         })
         .onConflictDoNothing()
         .returning();
@@ -248,6 +253,15 @@ export class OutboundMessagesService {
           authorityId,
         },
       ]);
+    }
+    // A person's public reply ends the reply-time clock (H12). Recorded where the message is first
+    // journaled: here, or in the processor when Chatwoot's webhook came first.
+    if (entries.length > 0 && input.sender.kind === 'staff' && input.visibility === 'public') {
+      await recordHumanReply(tx, input.tenantId, input.conversationId, now);
+      await syncSla(tx, input.tenantId, input.conversationId, now);
+      // A person answered by hand: a pending AI draft is no longer needed (HNV-09-05). Approving a
+      // draft decides it before sending, so the draft being sent is never pending here.
+      await supersedeAiDrafts(tx, input.conversationId, 'answered', now);
     }
     if (transitioned && input.onCommitted) await input.onCommitted(tx, control, ledgerId);
     const journaledMessage = (entries[0]?.event.data as { message?: Message } | undefined)?.message;

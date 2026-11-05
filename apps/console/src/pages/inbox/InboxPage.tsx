@@ -13,6 +13,7 @@ import {
   LockIcon,
   MessagesSquareIcon,
   SearchIcon,
+  SparklesIcon,
   XIcon,
 } from 'lucide-react';
 import {
@@ -47,16 +48,20 @@ import { useBrandRefs } from '../../lib/names';
 import { useTenant } from '../../lib/tenant';
 import { BulkBar } from './BulkBar';
 import { DesktopAlertsPrompt, InboxToolbar } from './InboxToolbar';
+import { OffersSection } from './OffersSection';
 import {
   ChannelIcon,
   ConversationStatusBadge,
   languageName,
+  OfferBadge,
   OwnerBadge,
   PriorityBadge,
+  SlaBadge,
   shortTime,
   TicketReference,
   TicketStateBadge,
 } from './parts';
+import { UrgentSection } from './UrgentSection';
 
 /** The row to put focus back on after leaving a conversation (Esc or Back on a phone). */
 let returnFocusTo: string | null = null;
@@ -173,7 +178,18 @@ function QueueRow({
               </>
             ) : null}
             {conversation.priority ? <PriorityBadge priority={conversation.priority} /> : null}
+            {conversation.sla ? <SlaBadge sla={conversation.sla} /> : null}
+            {conversation.aiDraftReady ? (
+              <StatusBadge
+                tone="info"
+                icon={<SparklesIcon className="size-3.5" aria-hidden="true" />}
+                data-testid="draft-ready"
+              >
+                {t('inbox.aiDrafts.badge')}
+              </StatusBadge>
+            ) : null}
             <OwnerBadge conversation={conversation} />
+            {conversation.offer ? <OfferBadge offer={conversation.offer} /> : null}
             {/* A ticket's state already says whether it waits or is closed. */}
             {!conversation.ticket &&
             (conversation.status === 'snoozed' || conversation.status === 'resolved') ? (
@@ -784,6 +800,8 @@ function QueuePane({ open, selectedId }: { open: boolean; selectedId: string | u
       ) : null}
 
       <div className="min-h-0 flex-1 lg:overflow-y-auto">
+        <OffersSection />
+        <UrgentSection />
         {search.q ? (
           <SearchResults q={search.q} />
         ) : (

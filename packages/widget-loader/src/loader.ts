@@ -34,8 +34,11 @@ const CONFIG_TIMEOUT_MS = 3_000;
 const MODES: Mode[] = ['bubble', 'panel', 'inline', 'fullpage'];
 
 interface LauncherConfig {
+  dir?: 'ltr' | 'rtl';
   layout: { mode: Mode; position: 'bottom-right' | 'bottom-left' };
   launcher: {
+    label?: string | null;
+    fontFamily?: 'system' | 'dm-sans' | 'noto-sans';
     accent: string;
     onAccent: string;
     openLabel: string;
@@ -498,13 +501,42 @@ declare global {
     button.setAttribute('data-hamnivo-launcher', '');
     button.innerHTML =
       '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg>';
+    const launcherLabel = config?.launcher.label;
+    button.dir = config?.dir ?? document.documentElement.dir;
+    if (config?.launcher.fontFamily && config.launcher.fontFamily !== 'system') {
+      const fonts = document.createElement('link');
+      fonts.rel = 'stylesheet';
+      fonts.href = new URL('/launcher-fonts.css', widgetOrigin).href;
+      document.head.appendChild(fonts);
+    }
+    if (launcherLabel) {
+      const text = document.createElement('span');
+      text.textContent = launcherLabel;
+      text.dir = 'auto';
+      text.setAttribute('data-hamnivo-launcher-label', '');
+      style(text, {
+        'max-width': 'min(180px, 45vw)',
+        overflow: 'hidden',
+        'text-overflow': 'ellipsis',
+        'white-space': 'nowrap',
+      });
+      button.appendChild(text);
+    }
     style(button, {
       position: 'fixed',
       bottom: '20px',
       [side]: '20px',
-      width: '56px',
+      width: launcherLabel ? 'auto' : '56px',
+      padding: launcherLabel ? '0 18px' : '0',
+      gap: '10px',
+      font:
+        config?.launcher.fontFamily === 'dm-sans'
+          ? '600 14px/1.4 "Hamnivo DM Sans", "DM Sans Variable", system-ui, sans-serif'
+          : config?.launcher.fontFamily === 'noto-sans'
+            ? '600 14px/1.4 "Hamnivo Noto Sans", "Noto Sans", system-ui, sans-serif'
+            : '600 14px/1.4 system-ui, sans-serif',
       height: '56px',
-      'border-radius': '50%',
+      'border-radius': launcherLabel ? '28px' : '50%',
       border: '0',
       background: data.color ?? config?.launcher.accent ?? '#192A30',
       color: config?.launcher.onAccent ?? '#fff',

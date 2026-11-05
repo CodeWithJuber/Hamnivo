@@ -88,6 +88,8 @@ export interface ChatwootConversationInfo {
   status: string;
   attributes: Json;
   createdAt: Date;
+  /** Chatwoot's last activity (the latest message, or the creation time); null when absent. */
+  lastActivityAt: Date | null;
 }
 
 export interface ChatwootContactInfo {
@@ -109,6 +111,10 @@ function conversationInfo(raw: unknown): ChatwootConversationInfo {
     status: String(c.status ?? ''),
     attributes: obj(c.custom_attributes),
     createdAt: new Date(Number(c.created_at ?? 0) * 1000),
+    lastActivityAt:
+      c.last_activity_at === undefined || c.last_activity_at === null
+        ? null
+        : new Date(Number(c.last_activity_at) * 1000),
   };
 }
 
@@ -458,16 +464,18 @@ export class ChatwootImporter {
     }
   }
 
-  /** One page of the account's conversations (25 per page), optionally of one inbox. */
   /**
-   * One page (25) of the account's conversations in every status. `oldestFirst` pages by creation
-   * time, so conversations started while a source is being read land on later pages instead of
-   * shifting the ones already read.
+   * One page (25) of the account's conversations, in every status unless `status` says which,
+   * optionally of one inbox. `oldestFirst` pages by creation time, so conversations started while
+   * a source is being read land on later pages instead of shifting the ones already read;
+   * `leastRecentFirst` puts the conversations with the oldest last activity first.
    */
   async listConversations(options: {
     page: number;
     inboxId?: number;
+    status?: 'all' | 'resolved';
     oldestFirst?: boolean;
+    leastRecentFirst?: boolean;
   }): Promise<{
     conversations: ChatwootConversationInfo[];
     total: number;
@@ -475,10 +483,11 @@ export class ChatwootImporter {
     const result = obj(
       obj(
         await this.request('listConversations', 'GET', '/conversations', undefined, {
-          status: 'all',
+          status: options.status ?? 'all',
           page: options.page,
           ...(options.inboxId ? { inbox_id: options.inboxId } : {}),
           ...(options.oldestFirst ? { sort_by: 'created_at_asc' } : {}),
+          ...(options.leastRecentFirst ? { sort_by: 'last_activity_at_asc' } : {}),
         }),
       ).data,
     );

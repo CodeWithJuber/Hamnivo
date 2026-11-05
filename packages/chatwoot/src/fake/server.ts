@@ -298,7 +298,7 @@ export interface FakeChatwoot {
    * its IMAP poller does after failed sign-ins; saving new credentials clears it.
    */
   setReauthorizationRequired(inboxId: number, required: boolean): void;
-  /** Moves a conversation's messages back in time, as if they were written `hours` ago. */
+  /** Moves a conversation and its messages back in time, as if they were written `hours` ago. */
   ageConversation(conversationId: number, hours: number): void;
   /** The WhatsApp templates Chatwoot synced from Meta for an inbox (Meta's shape). */
   setWhatsappTemplates(inboxId: number, templates: Json[], syncedAt?: Date | null): void;
@@ -639,6 +639,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       status: c.status,
       created_at: Math.floor(c.createdAt),
       updated_at: c.updatedAt,
+      last_activity_at: Math.floor(last?.createdAt ?? c.createdAt),
       timestamp: Math.floor(last?.createdAt ?? c.createdAt),
       first_reply_created_at: 0,
       unread_count: 0,
@@ -2153,8 +2154,10 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
     const page = Math.max(1, Number(query.page ?? 1));
     // Chatwoot lists open conversations unless a status (or `all`) is asked for.
     const status = String(query.status ?? 'open');
-    // Chatwoot sorts by last activity by default; created_at_asc pages oldest first.
+    // Chatwoot sorts by last activity by default; created_at_asc pages oldest first, and
+    // last_activity_at_asc puts the least recently active first.
     const oldestFirst = query.sort_by === 'created_at_asc';
+    const leastRecentFirst = query.sort_by === 'last_activity_at_asc';
     // Chatwoot's `last_activity_at`: the latest message's time, or the creation time.
     const latest = new Map<number, number>();
     for (const m of s.messages.values()) {
@@ -2165,7 +2168,11 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       .filter((c) => c.accountId === accountId && (inboxId === null || c.inboxId === inboxId))
       .filter((c) => status === 'all' || c.status === status)
       .sort((a, b) =>
-        oldestFirst ? a.id - b.id : lastActivity(b) - lastActivity(a) || b.id - a.id,
+        oldestFirst
+          ? a.id - b.id
+          : leastRecentFirst
+            ? lastActivity(a) - lastActivity(b) || a.id - b.id
+            : lastActivity(b) - lastActivity(a) || b.id - a.id,
       );
     return {
       data: {
@@ -2828,6 +2835,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       );
       if (!conversation) throw new Error(`No conversation ${conversationId}`);
       for (const message of messagesOf(conversation)) message.createdAt -= hours * 3600;
+      conversation.createdAt -= hours * 3600;
     },
     setWhatsappTemplates(inboxId, templates, syncedAt) {
       const inbox = s.inboxes.get(inboxId);
