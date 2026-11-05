@@ -1,0 +1,50 @@
+# Hamnivo CI runner on the compute server. See /etc/systemd/system/hamnivo-ci.slice for the caps.
+# CI talks to its own Docker daemon (dind), so its hamnivo/* images, ports and prunes never touch
+# production. The runner shares dind network namespace, so ports CI publishes are on its localhost,
+# and the work volume sits at the same path in both, so bind mounts resolve.
+# Both are pinned to three cores so Node, Vitest and Playwright size their worker pools for three
+# CPUs, not the host's six; HAMNIVO_CI_CONCURRENCY keeps turbo to two tasks (2026-11-05: with
+# turbo's default, typecheck was killed at the 4 GB cap).
+name: hamnivo-ci
+services:
+  dind:
+    image: docker:29.8.1-dind
+    privileged: true
+    restart: unless-stopped
+    cgroup_parent: hamnivo-ci.slice
+    cpuset: "3-5"
+    command: ["dockerd", "--host=unix:///var/run/docker.sock", "--group=123"]
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - dind-sock:/var/run
+      - dind-data:/var/lib/docker
+      - work:/home/runner/_work
+  runner:
+    build: .
+    image: hamnivo-ci-runner:2.338.2
+    restart: unless-stopped
+    cgroup_parent: hamnivo-ci.slice
+    cpuset: "3-5"
+    network_mode: service:dind
+    depends_on: [dind]
+    shm_size: 512m
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      REPO_URL: https://github.com/CodeWithJuber/Hamnivo
+      RUNNER_NAME: compute-hamnivo-ci
+      RUNNER_LABELS: hamnivo
+      TMPDIR: /home/runner/_work/_tmp
+      HAMNIVO_CI_CONCURRENCY: "2"
+    volumes:
+      - dind-sock:/var/run
+      - work:/home/runner/_work
+      - runner-cache:/home/runner/.cache
+      - ./state:/state
+      - ./entrypoint.sh:/entrypoint.sh:ro
+volumes:
+  dind-sock: {}
+  dind-data: {}
+  work: {}
+  runner-cache: {}

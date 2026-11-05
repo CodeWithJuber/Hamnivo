@@ -1,0 +1,15 @@
+# Everything the Hamnivo CI runner starts lives here: the runner, its own Docker daemon and every
+# container that daemon runs. Production shares this server (Hamnivo ADR 0009), so CI gets at most
+# 3 CPUs and 4 GB, no swap, and the lowest CPU and disk priority. When CI runs out of memory the
+# kernel kills a CI process inside this slice, never a production one.
+[Unit]
+Description=Hamnivo CI runner (capped so production keeps its CPU and memory)
+Before=slices.target
+
+[Slice]
+CPUQuota=300%
+CPUWeight=10
+IOWeight=10
+MemoryMax=4G
+MemorySwapMax=0
+TasksMax=4096

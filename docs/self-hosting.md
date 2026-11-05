@@ -1259,9 +1259,12 @@ The summary is written to `test-results/ci-local.md`. On GitHub it is kept as th
 Every push runs this whole pipeline on GitHub Actions (ADR 0009), on a runner of your own. Set it
 up once:
 
-1. **Get a machine for it.** It needs 4 CPUs, 8 GB of memory, 40 GB of free disk and Docker. Don't
-   use the production server: the checks build images with the same names, and they would slow
-   the live service. A machine that already runs another project's runner will do.
+1. **Get a machine for it.** It needs 4 CPUs, 8 GB of memory, 40 GB of free disk and Docker. A
+   machine of its own is best; one that already runs another project's runner will do. Don't
+   install it directly on the production server: the checks build images with the same names,
+   and they would slow the live service. If the production server is the only machine you have,
+   skip the steps below and use the capped setup in
+   [On the production server](#on-the-production-server) instead (ADR 0019).
 2. **Register the runner.** In the repository on GitHub, open **Settings → Actions → Runners →
    New self-hosted runner** and choose Linux x64. Run the commands it shows on the machine, as a
    user other than root. When `config.sh` asks for labels, enter `hamnivo`.
@@ -1274,10 +1277,35 @@ up once:
 
 4. **Install Chromium's system libraries, once:** `sudo npx --yes playwright install-deps chromium`.
 5. **Make `main` wait for the checks.** Under **Settings → Branches**, in the rule for `main`, turn
-   on "Require status checks to pass" and pick `checks`.
+   on "Require status checks to pass" and pick `checks`. For a private repository GitHub offers
+   this only on a paid plan; without it, check that `checks` passed before you merge.
 
 A newer push to the same branch cancels the run that is still going. Runs wait in the queue
 until a runner is online.
+
+#### On the production server
+
+`deploy/ci-runner/` runs the runner in a container next to a Docker daemon of its own, so the
+images, containers and ports the checks create never reach the Docker that serves production.
+Both containers, and everything the inner daemon starts, live in the systemd slice
+`hamnivo-ci.slice`: at most 3 CPUs and 4 GB, no swap, and the lowest CPU and disk priority. When
+the checks run out of memory, the kernel stops a check, not the live service. As root:
+
+```bash
+install -d -m 700 /opt/hamnivo-ci-runner
+install -d -m 700 -o 1001 -g 1001 /opt/hamnivo-ci-runner/state   # the runner's user in its image
+cp deploy/ci-runner/{compose.yaml,Dockerfile,entrypoint.sh} /opt/hamnivo-ci-runner/
+cp deploy/ci-runner/hamnivo-ci.slice /etc/systemd/system/
+systemctl daemon-reload && systemctl start hamnivo-ci.slice
+# A one-time registration token, from a machine where gh is signed in as a repository admin:
+#   gh api -X POST repos/OWNER/REPO/actions/runners/registration-token --jq .token \
+#     | ssh root@SERVER 'umask 077; cat > /opt/hamnivo-ci-runner/state/token; chown 1001:1001 /opt/hamnivo-ci-runner/state/token'
+cd /opt/hamnivo-ci-runner && docker compose up -d --build
+```
+
+The runner registers on its first start and keeps its credentials in `state/`. Set `REPO_URL` in
+`compose.yaml` to your repository. With 4 GB the checks run at most two turbo tasks at once
+(`HAMNIVO_CI_CONCURRENCY=2`), so they take longer than on a laptop.
 
 To use GitHub's own runners instead, set the repository variable `HAMNIVO_CI_RUNNER` to
 `["ubuntu-latest"]`, under **Settings → Secrets and variables → Actions → Variables**. GitHub
