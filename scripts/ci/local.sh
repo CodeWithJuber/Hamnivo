@@ -51,7 +51,8 @@ remove_chatwoot() {
 }
 cleanup() {
   ((${#containers[@]})) && docker rm -f -v "${containers[@]}" >/dev/null 2>&1
-  for project in "${compose_projects[@]}"; do remove_chatwoot "$project"; done
+  # The ${a[@]+...} form: macOS bash 3.2 treats an empty array as unbound under set -u.
+  for project in ${compose_projects[@]+"${compose_projects[@]}"}; do remove_chatwoot "$project"; done
   true
 }
 trap cleanup EXIT
