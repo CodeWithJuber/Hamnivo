@@ -40,6 +40,13 @@ for arg in "$@"; do
   esac
 done
 
+# A runner short of memory (deploy/ci-runner) sets HAMNIVO_CI_CONCURRENCY to run fewer turbo tasks
+# at once; turbo has no variable of its own for this. Elsewhere turbo keeps its default.
+turbo_limit=()
+if [[ -n "${HAMNIVO_CI_CONCURRENCY:-}" ]]; then
+  turbo_limit=(--concurrency="$HAMNIVO_CI_CONCURRENCY")
+fi
+
 results=()
 containers=()
 compose_projects=()
@@ -97,7 +104,7 @@ require() {
 # full run needs Docker for them; --quick leaves them out when Docker is not available.
 unit_tests() {
   local stripe="hamnivo-check-stripe-$$" port
-  pnpm test || return 1
+  pnpm test ${turbo_limit[@]+"${turbo_limit[@]}"} || return 1
   if ((quick == 1)) && ! docker info >/dev/null 2>&1; then
     return 0
   fi
@@ -175,7 +182,7 @@ integration() {
 # as separate processes) → fake Chatwoot, with an accessibility audit of the widget.
 widget_journey() {
   throwaway_services 18 || return 1
-  pnpm build >/dev/null || return 1
+  pnpm build ${turbo_limit[@]+"${turbo_limit[@]}"} >/dev/null || return 1
   env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN -u WIDGET_SIGNING_KEY "${service_env[@]}" \
     pnpm --filter @hamnivo/widget test:e2e
   local status=$?
@@ -187,7 +194,7 @@ widget_journey() {
 # sign-in, model keys, knowledge, stopping the AI and runs, with axe audits in English and Arabic.
 studio_journey() {
   throwaway_services 18 || return 1
-  pnpm build >/dev/null || return 1
+  pnpm build ${turbo_limit[@]+"${turbo_limit[@]}"} >/dev/null || return 1
   env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN -u WIDGET_SIGNING_KEY "${service_env[@]}" \
     pnpm --filter @hamnivo/console test:e2e
   local status=$?
@@ -231,7 +238,7 @@ chatwoot_contract() {
 require node pnpm git openssl
 step "Install dependencies (frozen lockfile)" pnpm install --frozen-lockfile
 step "Lint and format (Biome)" pnpm lint
-step "Typecheck" pnpm typecheck
+step "Typecheck" pnpm typecheck ${turbo_limit[@]+"${turbo_limit[@]}"}
 step "Unit tests" unit_tests
 step "Shell scripts (shellcheck)" shell_scripts
 # The deploy scripts run on Linux servers and use flock and GNU touch, which macOS lacks; elsewhere
