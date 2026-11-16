@@ -80,6 +80,13 @@ the chat). What would still have stopped it with a real model:
   people), links the assistant shares as cards (it writes links in its reply), and acting on the
   page itself (by decision 5, only through what the customer taps).
 
+**Phases A–D results on 2026-11-16.** Gateway integration 879 of 879 (67 files, on PostgreSQL 16
+and Redis); gateway unit 321 of 321; Studio unit 753 of 753; widget unit 99 of 99 and `test:e2e`
+50 of 50 (with `repeat.spec.ts`); client 38 of 38; loader 38 of 38; domain 765 of 765; contracts
+46 of 46 with OpenAPI regenerated; layout audit 300 of 300 clean; `CHECK=api`, `live` and `sites`
+pass. Studio `test:e2e` 121 of 122: `channels.spec.ts:105` looks for a "Settings pages" menu the
+current Studio no longer has (not from these phases).
+
 ## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
 
 The owner's ask: the customer chat should feel as finished as the chats people know from
