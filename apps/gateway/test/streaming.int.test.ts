@@ -20,9 +20,12 @@ const pause = () => {
   paused = { release, wait };
   return paused;
 };
+/** What each model call was given, to check what the model saw. */
+const prompts: unknown[] = [];
 const model: LanguageModelV4 = {
   ...base,
   async doStream(call) {
+    prompts.push(call.prompt);
     const hold = paused;
     paused = null;
     if (!hold) return base.doStream(call);
@@ -165,6 +168,42 @@ describe('a reply written live', () => {
     await stream.until((s) => live(s.events, 'message.draft_discarded').length === 1);
     expect(live(stream.events, 'message.draft_discarded')[0]?.data.reason).toBe('takeover');
     expect(aiReplies(stream.events)).toEqual([]);
+    stream.close();
+  });
+
+  it('posts a reply the customer was reading when they wrote again, then answers the new message', async () => {
+    const { visitor, id, stream } = await conversation('Where is my order?');
+    const hold = pause();
+    const draining = slice.drain();
+    await stream.until((s) =>
+      live(s.events, 'message.delta').some((e) => e.data.textDelta.includes('ships today')),
+    );
+    // The customer writes again while the first answer is still being written.
+    const again = await visitor.call('POST', `/v1/widget/conversations/${id}/messages`, {
+      clientMessageId: randomUUID(),
+      parts: [{ type: 'text', text: 'And can I pay by card?' }],
+    });
+    expect(again.status).toBe(202);
+    const before = prompts.length;
+    hold.release();
+    await draining;
+    await slice.drain();
+    await stream.until((s) => aiReplies(s.events).length === 2);
+    const replies = aiReplies(stream.events).map((e) => e.data.message.parts[0].text as string);
+    // What the customer read is what was posted; nothing was withdrawn as superseded.
+    expect(replies[0]).toBe('Your order ships today. It arrives on Thursday.');
+    expect(
+      live(stream.events, 'message.draft_discarded').filter((e) => e.data.reason === 'superseded'),
+    ).toEqual([]);
+    // The new message's answer saw the first answer before it, and the new message last.
+    const seen = JSON.stringify(prompts.at(-1));
+    expect(prompts.length).toBe(before + 1);
+    expect(seen.indexOf('It arrives on Thursday')).toBeGreaterThan(-1);
+    expect(seen.indexOf('It arrives on Thursday')).toBeLessThan(
+      seen.indexOf('And can I pay by card?'),
+    );
+    const last = (prompts.at(-1) as Array<{ role: string }>).at(-1);
+    expect(last?.role).toBe('user');
     stream.close();
   });
 

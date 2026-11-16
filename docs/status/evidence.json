@@ -359,9 +359,13 @@
       "apps/gateway/test/conversation-flow.int.test.ts",
       "apps/gateway/test/slice.int.test.ts",
       "apps/gateway/src/outbox/relay.service.ts",
-      "apps/gateway/test/outbox.int.test.ts"
+      "apps/gateway/test/outbox.int.test.ts",
+      "apps/gateway/test/streaming.int.test.ts",
+      "apps/gateway/src/runtime/prompt.ts",
+      "apps/gateway/test/runtime.test.ts",
+      "apps/widget/e2e/repeat.spec.ts"
     ],
-    "note": "One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The worker runs different conversations' events side by side (OUTBOX_CONCURRENCY, 4 by default) and each conversation's own in order, renews the leases it holds and wakes as soon as a change is journaled, so a reply never waits behind another conversation, an ingestion or a migration (integration-tested). The conversation lease with expiry (columns present) is not used yet."
+    "note": "One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The worker runs different conversations' events side by side (OUTBOX_CONCURRENCY, 4 by default) and each conversation's own in order, renews the leases it holds and wakes as soon as a change is journaled, so a reply never waits behind another conversation, an ingestion or a migration (integration-tested). The conversation lease with expiry (columns present) is not used yet. A reply the customer has started reading while it streams is posted even when they write again, and the newer message gets its own answer; only a reply with nothing shown yet gives way to one answer for the burst (integration-tested, and fails without the change). The model's history for an answer always ends with the customer: a reply posted after their newest message goes just before it, and a message of files only counts as `[sent a file: name]` (unit-tested). A draft restarts when a tool step, a timeout or a fallback model ends what it wrote; the widget drops a draft whose run ended or that a reconnect may have left, ignores words of an ended run, and keeps a changed message in its place. A browser test sends two questions at once and reloads mid-answer: each question and answer shows once (repeat.spec.ts)."
   },
   "R06": {
     "status": "in-progress",
@@ -693,7 +697,7 @@
       "packages/domain/src/follow-ups.ts",
       "packages/domain/test/follow-ups.test.ts"
     ],
-    "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers as chips that open to an excerpt, a freshness note and a link. Headings sit two levels under the chat's own, tables scroll inside their own frame, code names its language and has a copy button, and [n] links to the answer's nth source (unit-tested in jsdom, and measured in the layout audit's long-answer cases). Questions to ask next: after an answer is published the agent's model, metered, writes up to three; they reach the answer as a suggestions part (message.updated) and show as chips; brands switch them off with help.followUps (integration-tested). A choices card shows its options as buttons; nothing produces one yet. Other structured cards pending."
+    "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers as chips that open to an excerpt, a freshness note and a link. Headings sit two levels under the chat's own, tables scroll inside their own frame, code names its language and has a copy button, and [n] links to the answer's nth source (unit-tested in jsdom, and measured in the layout audit's long-answer cases). Questions to ask next: after an answer is published the agent's model, metered, writes up to three; they reach the answer as a suggestions part (message.updated) and show as chips; brands switch them off with help.followUps (integration-tested). A choices card shows its options as buttons; nothing produces one yet. Other structured cards pending. Only questions are offered, never the customer's question or a line of the answer said back (unit-tested)."
   },
   "J01": {
     "status": "implemented",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyDraftEvent, type Draft, draftText } from '../src/drafts.js';
+import { applyDraftEvent, type Draft, draftText, dropRun } from '../src/drafts.js';
 
 const delta = (index: number, textDelta: string, draftId = 'drf_1') => ({
   type: 'message.delta',
@@ -63,5 +63,17 @@ describe('draft replies before publication', () => {
       }),
     ).toEqual([]);
     expect(applyDraftEvent(drafts, { type: 'typing', data: {} })).toBe(drafts);
+  });
+
+  it('drops what is left of a run that ended, and nothing of another run', () => {
+    const drafts = play([
+      delta(0, 'Old words.', 'drf_1'),
+      {
+        type: 'message.delta',
+        data: { runId: 'run_2', draftId: 'drf_2', index: 0, textDelta: 'New words.' },
+      },
+    ]);
+    expect(dropRun(drafts, 'run_1').map((d) => d.draftId)).toEqual(['drf_2']);
+    expect(dropRun(drafts, 'run_9')).toBe(drafts);
   });
 });

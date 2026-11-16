@@ -15,8 +15,8 @@ moved it, and production let that model answer. Six phases, each pushed when don
 | Phase | What | Status |
 |---|---|---|
 | A | **The AI really answers**: production never lets the test model answer; one-click **Make the assistant live**; the brand's website read without setup | Done, see below |
-| B | **It never repeats**: a draft the customer read is posted; the prompt always ends with the customer; attachment-only messages; follow-up chips without echo; draft restarts; resync | Next |
-| C | **Memory that works**: OpenAI-strict extraction schema, retries, wording, consent in the welcome area, anonymous sessions that last, memory carried over at sign-in | Planned |
+| B | **It never repeats**: a draft the customer read is posted; the prompt always ends with the customer; attachment-only messages; follow-up chips without echo; draft restarts; resync | Done, see below |
+| C | **Memory that works**: OpenAI-strict extraction schema, retries, wording, consent in the welcome area, anonymous sessions that last, memory carried over at sign-in | Next |
 | D | **It acts**: hand over, ticket, contact details, knowledge search, buttons, page links; which page the visitor is on; WHMCS tools granted and kept signed in | Planned |
 | E | **A clean, Tawk-like chat**: home with the team, reply time, one clear action; fewer header buttons | Planned |
 | F | **Shopify and WooCommerce orders** | Planned, after A–E |
@@ -33,6 +33,19 @@ moved it, and production let that model answer. Six phases, each pushed when don
 - Not checked here: answers from a live Anthropic, OpenAI or Google model (no key in this
   container; a scripted model stands in). On production: open Home and press **Make the assistant
   live**.
+
+### Phase B, done
+
+| What | Where | Checked by |
+|---|---|---|
+| **A reply the customer was reading is posted.** It used to be dropped when they wrote again, and the next reply then wrote the same answer a second time. Now only a reply with nothing shown yet gives way to one answer for the burst. | `replies.service.ts` | `streaming.int.test.ts` (fails without the change) |
+| **The model's history ends with the customer.** A reply posted after the customer's newest message goes just before it; a message of files only is `[sent a file: name]`, so the last question is never "already answered". The knowledge search reads it too. | `runtime/prompt.ts` (`historyMessages`, `messageText`) | `runtime.test.ts` |
+| **Drafts restart cleanly.** On any step that called a tool (whatever finish reason the provider gave), on a time-out mid-step (its pre-tool words are never published) and when a fallback model takes over. | `replies.service.ts` `streamed`, `callModels` | `live-reply.test.ts`, `streaming.int.test.ts` |
+| **Next questions never echo.** Only lines that are questions; `Customer:`/`Answer:` labels removed; nothing equal to the question or found in the answer. | `domain/src/follow-ups.ts`, `follow-ups.service.ts` | `follow-ups.test.ts` |
+| **The widget shows each thing once.** A draft whose run ended is dropped after a moment, a reconnect clears drafts, late words of an ended run are ignored, and a changed message (its next questions arrived) keeps its place. | widget `useChat.ts`, `drafts.ts` | `drafts.test.ts`, `history-order.test.ts`, `repeat.spec.ts` (two questions at once, a reload mid-answer) |
+
+- The customer's own message shown twice, and repeats after a reload, did not reproduce on the
+  real stack with streaming and follow-ups on; `repeat.spec.ts` now guards both.
 
 ## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
 

@@ -80,6 +80,7 @@ import { ModelFactory, ModelUnavailableError } from './models.js';
 import {
   applyCitations,
   historyMessages,
+  messageText,
   type PromptOptions,
   promptVersion,
   systemPrompt,
@@ -140,9 +141,10 @@ interface GenerateOutcome {
 /** The customer's most recent words in a conversation. */
 function latestCustomerText(history: AuthorityMessage[]): string {
   const incoming = history
-    .filter((m) => m.direction === 'incoming' && !m.private && m.text?.trim())
+    .filter((m) => m.direction === 'incoming' && !m.private && messageText(m))
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || Number(a.ref) - Number(b.ref));
-  return incoming.at(-1)?.text?.trim() ?? '';
+  const latest = incoming.at(-1);
+  return latest ? messageText(latest) : '';
 }
 
 /** The conversation as it stood at one of the customer's messages: nothing that came after it. */
@@ -369,14 +371,24 @@ interface ModelResult {
  */
 async function streamed(run: ReturnType<typeof streamText>, live: LiveReply): Promise<ModelResult> {
   let failure: unknown;
+  /** This step called a tool: what it wrote is not the reply, whatever finish reason it gave. */
+  let calledTool = false;
   for await (const part of run.fullStream) {
     if (part.type === 'text-delta') live.write(part.text);
-    else if (part.type === 'tool-call') await live.step('tool', 'started');
-    else if (part.type === 'tool-result' || part.type === 'tool-error')
+    else if (part.type === 'tool-call') {
+      calledTool = true;
+      await live.step('tool', 'started');
+    } else if (part.type === 'tool-result' || part.type === 'tool-error')
       await live.step('tool', 'finished');
-    else if (part.type === 'finish-step' && part.finishReason === 'tool-calls')
-      await live.restart('superseded');
-    else if (part.type === 'error' && failure === undefined) failure = part.error;
+    else if (part.type === 'finish-step') {
+      if (calledTool || part.finishReason === 'tool-calls') await live.restart('superseded');
+      calledTool = false;
+    } else if (part.type === 'error' && failure === undefined) failure = part.error;
+    // Stopped by the time limit: the steps done so far are not an answer (their text may be the
+    // words before a tool call), so this fails as generateText would.
+    else if (part.type === 'abort' && failure === undefined) {
+      failure = new DOMException('The model call ran out of time.', 'TimeoutError');
+    }
   }
   if (failure !== undefined) throw failure;
   const [text, totalUsage, finishReason, steps] = await Promise.all([
@@ -906,8 +918,14 @@ export class RepliesService {
         latencyMs: generated.latencyMs,
       };
       // The customer may have written again while the model was working: that message's job
-      // answers both, so this reply is dropped (R05: one AI reply per burst of messages).
-      if (await this.skipIfSuperseded(tenantId, run.id, payload, telemetry)) {
+      // answers both, so this reply is dropped (R05: one AI reply per burst of messages). Not
+      // once the customer has read it being written: it is posted, and the newer message gets
+      // its own answer, with this one before it (otherwise the same answer would be written
+      // again).
+      if (
+        live.currentDraft === null &&
+        (await this.skipIfSuperseded(tenantId, run.id, payload, telemetry))
+      ) {
         live.reason = 'superseded';
         return;
       }
@@ -2077,8 +2095,10 @@ export class RepliesService {
     const { messages: history, view } =
       fetched ?? (await this.history(tenantId, runtime, context.control));
     const config: AgentConfig = agent.config;
-    const messages = historyMessages(history, config.limits.historyMessages);
     const assist = config.mode === 'assist';
+    const messages = historyMessages(history, config.limits.historyMessages, {
+      endWithCustomer: !assist,
+    });
     const live = options.live ?? null;
     const retrieved = await this.retrieve(tenantId, runId, context, config, history, live);
     // Passages that do not help are dropped before the model sees them (live check only).
@@ -2278,10 +2298,10 @@ export class RepliesService {
     const brandId = context.control.brandId;
     if (config.knowledgeSourceIds.length === 0 || !brandId) return [];
     const query = history
-      .filter((m) => m.direction === 'incoming' && !m.private && m.text?.trim())
+      .filter((m) => m.direction === 'incoming' && !m.private && messageText(m))
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
       .slice(-2)
-      .map((m) => (m.text ?? '').trim())
+      .map((m) => messageText(m))
       .join('\n')
       .slice(-1000);
     if (!query) return [];
@@ -2424,6 +2444,8 @@ export class RepliesService {
             },
           }),
         );
+        // What this model wrote before failing is not the reply: the next one starts afresh.
+        await live?.restart('failed');
         // A stopped run is not retried on another model.
         if (tools?.signal.aborted || !FALLBACK_KINDS.has(failure.kind)) throw error;
       }

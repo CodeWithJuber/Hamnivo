@@ -114,7 +114,8 @@ export class FollowUpsService {
       this.logger.warn(`follow-ups not written for ${payload.conversationId}: ${String(error)}`);
       return;
     }
-    const items = followUpsOf(text);
+    // Never the customer's own question or a line of the answer back.
+    const items = followUpsOf(text, [turn.question, turn.answer]);
     if (items.length === 0) return;
     const entries = await this.tx(tenantId, async (tx) => {
       const [publication] = await tx

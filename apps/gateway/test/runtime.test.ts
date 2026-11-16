@@ -6,7 +6,7 @@ import { loadConfig } from '../src/config.js';
 import { DecisionProviders } from '../src/decisions/providers.js';
 import { checkHonesty } from '../src/runtime/honesty.js';
 import { ModelUnavailableError } from '../src/runtime/models.js';
-import { historyMessages, systemPrompt } from '../src/runtime/prompt.js';
+import { historyMessages, messageText, systemPrompt } from '../src/runtime/prompt.js';
 import { classifyModelError } from '../src/runtime/replies.service.js';
 
 describe('honest identity guard', () => {
@@ -100,6 +100,42 @@ describe('history for the model', () => {
       { role: 'assistant', content: 'I am an AI assistant.' },
       { role: 'assistant', content: '[Support agent] Let me check.' },
     ]);
+  });
+
+  it('ends an answer’s history with the customer, and counts a message of files only', () => {
+    const file = (ref: number, name: string | null) =>
+      ({
+        ...message(ref, 'incoming', ''),
+        text: null,
+        attachments: [{ ref: `a${ref}`, fileType: 'image', url: null, size: 10, name }],
+      }) as AuthorityMessage;
+    // The reply to the first question was posted after the second was asked.
+    const asked = [
+      message(1, 'incoming', 'Where is my order?'),
+      message(2, 'incoming', 'And can I pay by card?'),
+      message(3, 'outgoing', 'It ships today.'),
+    ];
+    expect(historyMessages(asked, 10, { endWithCustomer: true })).toEqual([
+      { role: 'user', content: 'Where is my order?' },
+      { role: 'assistant', content: 'It ships today.' },
+      { role: 'user', content: 'And can I pay by card?' },
+    ]);
+    // Suggestions for staff keep the order as it was.
+    expect(historyMessages(asked, 10).at(-1)).toEqual({
+      role: 'assistant',
+      content: 'It ships today.',
+    });
+    const sent = historyMessages(
+      [
+        message(1, 'incoming', 'Is this the right part?'),
+        message(2, 'outgoing', 'Send a photo.'),
+        file(3, 'part.jpg'),
+      ],
+      10,
+      { endWithCustomer: true },
+    );
+    expect(sent.at(-1)).toEqual({ role: 'user', content: '[sent a file: part.jpg]' });
+    expect(messageText(file(4, null))).toBe('[sent a file: image]');
   });
 
   it('keeps only the most recent messages', () => {

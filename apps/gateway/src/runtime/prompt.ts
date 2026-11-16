@@ -135,23 +135,50 @@ export function systemPrompt(
 }
 
 /**
+ * What a message says to the model: its words, or, for a message of files only, what it carried
+ * (`[sent a file: invoice.pdf]`), so a customer who only sent a picture is still the last to speak.
+ */
+export function messageText(m: Pick<AuthorityMessage, 'text' | 'attachments'>): string {
+  const text = m.text?.trim() ?? '';
+  if (text) return text;
+  const files = (m.attachments ?? []).map((a) => a.name?.trim() || a.fileType).filter(Boolean);
+  if (files.length === 0) return '';
+  return files.length === 1
+    ? `[sent a file: ${files[0]}]`
+    : `[sent ${files.length} files: ${files.join(', ')}]`;
+}
+
+/**
  * Customer-visible history as model messages: private notes and activity are never included
  * (they are not in the customer view to begin with). Staff replies are marked so the model does
  * not mistake them for its own.
+ *
+ * For an answer to the customer (`endWithCustomer`), the history ends with the customer: a reply
+ * posted after their newest message answered an earlier one (it was being written when they
+ * wrote again), so it goes just before that message. Ending on it, a model would take the
+ * question as answered and say the same again.
  */
-export function historyMessages(messages: AuthorityMessage[], limit: number): ModelMessage[] {
-  return messages
-    .filter((m) => !m.private && m.direction !== 'activity' && m.text?.trim())
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || Number(a.ref) - Number(b.ref))
-    .slice(-limit)
-    .map((m): ModelMessage => {
-      const text = (m.text ?? '').trim();
-      if (m.direction === 'incoming') return { role: 'user', content: text };
-      return {
-        role: 'assistant',
-        content: m.sender.kind === 'user' ? `[Support agent] ${text}` : text,
-      };
-    });
+export function historyMessages(
+  messages: AuthorityMessage[],
+  limit: number,
+  options: { endWithCustomer?: boolean } = {},
+): ModelMessage[] {
+  const ordered = messages
+    .filter((m) => !m.private && m.direction !== 'activity' && messageText(m))
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || Number(a.ref) - Number(b.ref));
+  const last = ordered.findLastIndex((m) => m.direction === 'incoming');
+  if (options.endWithCustomer && last >= 0 && last < ordered.length - 1) {
+    const after = ordered.splice(last + 1);
+    ordered.splice(last, 0, ...after);
+  }
+  return ordered.slice(-limit).map((m): ModelMessage => {
+    const text = messageText(m);
+    if (m.direction === 'incoming') return { role: 'user', content: text };
+    return {
+      role: 'assistant',
+      content: m.sender.kind === 'user' ? `[Support agent] ${text}` : text,
+    };
+  });
 }
 
 /**
