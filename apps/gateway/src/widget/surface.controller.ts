@@ -95,8 +95,10 @@ export class WidgetSurfaceController {
   }
 
   /**
-   * Read by the loader on the brand's website, before the chat loads. A browser on a website the
-   * brand did not allow gets no CORS permission, so the page cannot read it.
+   * Read by the loader on the brand's website, before the chat loads. A website the brand did not
+   * allow gets a refusal and never the settings. The page that asked may read the refusal itself
+   * (it says nothing about the brand), so the loader can leave the launcher out there and tell
+   * the website's owner why, instead of showing a launcher that opens onto an error.
    */
   @Get('launcher')
   async launcher(
@@ -106,16 +108,17 @@ export class WidgetSurfaceController {
   ) {
     const input = parseInput(customerSurfaceWidgetRoutes.launcherConfig.query, query);
     const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
+    // Set before the brand is looked up: a refusal thrown below keeps these headers.
+    if (origin) {
+      reply.header('access-control-allow-origin', origin);
+      reply.header('vary', 'Origin');
+    }
     const config = await this.sessions.launcher(
       input.widgetId,
       origin,
       input.locale,
       countryOf(request.headers),
     );
-    if (origin) {
-      reply.header('access-control-allow-origin', origin);
-      reply.header('vary', 'Origin');
-    }
     // The prompts depend on this visitor's country and who is online: never a shared cache.
     reply.header('cache-control', 'private, max-age=60');
     return config;

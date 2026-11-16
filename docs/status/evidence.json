@@ -404,9 +404,16 @@
       "deploy/production/Caddyfile",
       "packages/widget-loader/src/loader.ts",
       "packages/widget-loader/test/size.test.ts",
-      "scripts/ci/production-smoke.ts"
+      "scripts/ci/production-smoke.ts",
+      "packages/widget-loader/src/theme.ts",
+      "packages/widget-loader/src/pages.ts",
+      "packages/widget-loader/test/theme.test.ts",
+      "packages/widget-loader/README.md",
+      "apps/widget/e2e/layout-audit.ts",
+      "apps/gateway/src/widget/surface.controller.ts",
+      "apps/gateway/test/customer-surface.int.test.ts"
     ],
-    "note": "One dependency-free script (1.7 KB gzip) adds an accessible launcher; the widget iframe is created only when opened (tested: nothing else loads before). In production the widget page carries CSP frame-ancestors from the brand's allowed websites (GET /v1/widget/frame-policy; tested through Caddy, including a spoofed header and an unknown widget). Brand colours from the published config are pending."
+    "note": "One dependency-free script (8.6 KB gzip, a test fails above 10 KB) adds an accessible launcher; the widget iframe is created only when opened (tested: nothing else loads before), except for a visitor already in a conversation, whose chat loads quietly when the next page is idle so the unread count follows them. The launcher, its count and the prompts live in a shadow root and the frame starts from all: initial, so a website's own styles cannot bend them; everything is styled through the CSSOM and drawn with DOM calls, so a strict Content-Security-Policy with Trusted Types needs no exception. The chat follows the page's light or dark, single-page apps keep it in step (data-hide-on, a replaced body), and the launcher takes offsets, a size, a picture and a stacking order from attributes (all checked in a browser: CHECK=sites in apps/widget/e2e/layout-audit.ts). On a website the brand did not allow, the gateway's refusal is readable by the page, so the loader shows no launcher and says why in the console (integration-tested). In production the widget page carries CSP frame-ancestors from the brand's allowed websites (GET /v1/widget/frame-policy; tested through Caddy, including a spoofed header and an unknown widget). The launcher's fonts carry CORS, which browsers need to use them on another website (asserted in the production smoke test). Brand colours from the published config are pending."
   },
   "W04": {
     "status": "in-progress",
@@ -451,7 +458,7 @@
       "packages/widget-loader/src/loader.ts",
       "apps/widget/src/components/shell/SubHeader.tsx"
     ],
-    "note": "Keyboard operation (tested from the page's launcher into the chat's settings), Escape to close with focus returned to the launcher (what is open on top closes first: the menu, the emoji, a picture), settings and conversations taking focus on their name, labelled controls, polite live announcements, text size and less motion in the chat's settings with the device's own text size and reduced-motion setting applied first, reflow at 320 px and 200 % zoom, and axe audits with no WCAG 2.2 AA violations (tested). Manual screen-reader review pending."
+    "note": "Keyboard operation (tested from the page's launcher into the chat's settings), no motion where the device asks for less (the launcher and the frame included), Escape to close with focus returned to the launcher (what is open on top closes first: the menu, the emoji, a picture), settings and conversations taking focus on their name, labelled controls, polite live announcements, text size and less motion in the chat's settings with the device's own text size and reduced-motion setting applied first, reflow at 320 px and 200 % zoom, and axe audits with no WCAG 2.2 AA violations (tested). Manual screen-reader review pending."
   },
   "D02": {
     "status": "in-progress",
@@ -2647,7 +2654,7 @@
       "packages/widget-loader/test/placement.test.ts",
       "apps/widget/e2e/layout-audit.ts"
     ],
-    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens up to 480 px wide or 520 px tall (phones, phones held sideways, 200 % zoom) the button and the panel open full screen, sized to the visible area, with the page behind held still; elsewhere the floating chat stays inside the window. A layout audit (e2e/layout-audit.ts) checks 20 screen sizes from a 280 px Fold to 2560 px in all four layouts, with no database: 300 of 300 cases clean on 2026-11-16, including a long answer with a table and code, and a message area of at least 160 px on a phone held sideways. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic."
+    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens up to 480 px wide or 520 px tall (phones, phones held sideways, 200 % zoom) the button and the panel open full screen, sized to the visible area, with the page behind held still; elsewhere the floating chat stays inside the window, and grows to 720 × 920 px (a side panel to 640 px) when the visitor asks for more room; a launcher moved by the website's offsets takes the chat with it (unit-tested). A layout audit (e2e/layout-audit.ts) checks 20 screen sizes from a 280 px Fold to 2560 px in all four layouts, with no database: 300 of 300 cases clean on 2026-11-16, including a long answer with a table and code, and a message area of at least 160 px on a phone held sideways. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic."
   },
   "W09": {
     "status": "implemented",
@@ -2833,7 +2840,7 @@
       "packages/widget-loader/src/loader.ts",
       "apps/widget/e2e/surface.spec.ts"
     ],
-    "note": "On narrow screens the chat opens full screen as one pane; the header wraps, the message box stays reachable, its text is 16 px so phones do not zoom in, and it clears the safe area (tested at 320 px and at 200 % zoom)."
+    "note": "On narrow screens the chat opens full screen as one pane; the header wraps, the message box stays reachable, its text is 16 px so phones do not zoom in, and it clears the safe area, which the loader measures on the page and passes to the frame; the page behind is held still at its root and its body, and the launcher is put away under the open chat (tested at 320 px and at 200 % zoom, and in a browser on a phone-sized page)."
   },
   "HNV-07-02": {
     "status": "in-progress",
@@ -3254,9 +3261,10 @@
       "apps/console/src/pages/chat-widget/ShareTab.tsx",
       "apps/console/e2e/chat-widget.spec.ts",
       "deploy/production/Caddyfile",
-      "docs/guide/setup/direct-link.md"
+      "docs/guide/setup/direct-link.md",
+      "scripts/ci/production-smoke.ts"
     ],
-    "note": "The chat on its own page at /c/<widget>, off by default; a session from the link is allowed only while the brand keeps it on, and turning it off ends those sessions at their next renewal. Caddy serves the page unframable and with noindex. Studio shows the link, a QR code (SVG, downloadable) and the install code."
+    "note": "The chat on its own page at /c/<widget>, off by default; a session from the link is allowed only while the brand keeps it on, and turning it off ends those sessions at their next renewal. Caddy serves the page on the chat host, where the link points, unframable and with noindex (asserted in the production smoke test; until 2026-11-16 the route sat in Studio's host block and the link answered 404). Studio shows the link, a QR code (SVG, downloadable) and the install code."
   },
   "H19": {
     "status": "implemented",

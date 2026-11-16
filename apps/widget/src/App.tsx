@@ -32,6 +32,8 @@ export interface WidgetParams {
   direct?: boolean;
   /** Light or dark, as the website around the chat is; null when it did not say. */
   theme?: Scheme | null;
+  /** What the loader around the chat can do for it (`caps` in the address): `env`, `resize`. */
+  caps?: readonly string[];
 }
 
 const darkDevice = () =>
@@ -111,7 +113,13 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   // Light or dark is said on the page itself, so the chat never turns dark on a light website
   // only because the visitor's device is dark.
   const device = useDeviceScheme();
-  const scheme = resolveScheme('auto', params.theme ?? null, Boolean(params.hostOrigin), device);
+  /** What the loader says about the page around the chat; it changes with the page. */
+  const [around, setAround] = useState<{
+    theme: Scheme | null;
+    fullScreen: boolean;
+    expanded: boolean;
+  }>({ theme: params.theme ?? null, fullScreen: false, expanded: false });
+  const scheme = resolveScheme('auto', around.theme, Boolean(params.hostOrigin), device);
   useEffect(() => {
     document.documentElement.dataset.theme = scheme;
   }, [scheme]);
@@ -194,6 +202,17 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       if (message.type === 'proactive') setTrigger(message.triggerId);
       if (message.type === 'prefill') setPrefill({ text: message.text, at: Date.now() });
       if (message.type === 'visitor') setVisitorKey(message.key);
+      if (message.type === 'env') {
+        setAround((now) => ({
+          theme: message.theme ?? now.theme,
+          fullScreen: message.fullScreen ?? now.fullScreen,
+          expanded: message.expanded ?? now.expanded,
+        }));
+        // The screen's own bottom edge, which a frame cannot measure for itself.
+        if (message.safeBottom !== undefined) {
+          document.documentElement.style.setProperty('--hv-safe-bottom', `${message.safeBottom}px`);
+        }
+      }
       if (message.type === 'set-locale')
         setLocale((message.locale.split('-')[0] as Locale) ?? 'en');
       if (message.type === 'identify') {
@@ -252,6 +271,8 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     null;
   // Inline and full-page chats have no launcher to go back to.
   const closable = Boolean(params.hostOrigin) && mode !== 'inline' && mode !== 'fullpage';
+  // A floating or side-panel chat can grow where the loader can resize it and there is room.
+  const resizable = closable && params.caps?.includes('resize') === true && !around.fullScreen;
   return (
     <AnnouncerProvider>
       <ActionsContext.Provider value={actions}>
@@ -290,6 +311,15 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           onLeaveMessage={chat.leaveMessage}
           onConsentRequired={chat.consentRequired}
           onUnavailable={chat.unavailableBy}
+          expand={
+            resizable
+              ? {
+                  expanded: around.expanded,
+                  onToggle: () =>
+                    bridge.post({ type: 'resize', size: around.expanded ? 'default' : 'expanded' }),
+                }
+              : null
+          }
           onDismissError={chat.dismissError}
           onReconnect={() => void chat.reconnect()}
           language={language}

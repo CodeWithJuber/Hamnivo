@@ -18,6 +18,11 @@ const loader = readFileSync(
 const WIDGET = 'wid_01j9zk7w3xq8r4t2v6m5n1p0ce';
 const host = window as unknown as { Hamnivo?: { loaded: boolean; open(): void } };
 
+/** Where the loader puts the launcher: in a shadow root, apart from the page's own styles. */
+const root = () => document.querySelector<HTMLElement>('[data-hamnivo-root]');
+const launcher = () =>
+  root()?.shadowRoot?.querySelector<HTMLElement>('[data-hamnivo-launcher]') ?? null;
+
 /** Runs the loader as the page would, for a script with this address and these data attributes. */
 function runLoader(src: string, attributes: Record<string, string> = {}) {
   const script = document.createElement('script');
@@ -58,6 +63,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Each test starts its own loader; the one before is taken off the page, or it would put its
+  // launcher and frame back into the next test's page, as it does for a page that replaces <body>.
+  (host.Hamnivo as { destroy?: () => void } | undefined)?.destroy?.();
   document.body.innerHTML = '';
   Reflect.deleteProperty(window, 'Hamnivo');
   vi.unstubAllGlobals();
@@ -68,7 +76,7 @@ describe('the loader, given its settings in its address', () => {
   it('starts with the widget ID, and opens the chat app on the origin of its own address', () => {
     runLoader(`https://chat.example.com/loader.js?widgetId=${WIDGET}`);
     expect(host.Hamnivo?.loaded).toBe(true);
-    expect(document.querySelector('[data-hamnivo-launcher]')).not.toBeNull();
+    expect(launcher()).not.toBeNull();
     const frame = openFrame();
     expect(frame.origin).toBe('https://chat.example.com');
     expect(frame.params.get('widgetId')).toBe(WIDGET);
@@ -79,9 +87,7 @@ describe('the loader, given its settings in its address', () => {
     runLoader(
       `https://chat.example.com/loader.js?widgetId=${WIDGET}&api=${encodeURIComponent('https://api.example.com/')}`,
     );
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-hamnivo-launcher]')).not.toBeNull(),
-    );
+    await vi.waitFor(() => expect(launcher()).not.toBeNull());
     // The launcher is the only GET; the visit report the loader also sends (POST) is another test's.
     expect(fetched.filter((url) => url.includes('/v1/widget/launcher'))).toEqual([
       `https://api.example.com/v1/widget/launcher?widgetId=${WIDGET}`,
@@ -94,9 +100,9 @@ describe('the loader, given its settings in its address', () => {
     runLoader(
       `https://chat.example.com/loader.js?widgetId=${WIDGET}&position=bottom-left&color=%23ff0000`,
     );
-    const launcher = document.querySelector<HTMLElement>('[data-hamnivo-launcher]');
-    expect(launcher?.style.left).toBe('20px');
-    expect(launcher?.style.background).toMatch(/#ff0000|rgb\(255, 0, 0\)/);
+    // The corner belongs to the root; the colour to the button in it.
+    expect(root()?.style.left).toBe('20px');
+    expect(launcher()?.style.background).toMatch(/#ff0000|rgb\(255, 0, 0\)/);
   });
 
   it('lets a data attribute win over the same setting in the address', () => {
@@ -108,9 +114,7 @@ describe('the loader, given its settings in its address', () => {
       },
     );
     expect(openFrame().params.get('widgetId')).toBe(WIDGET);
-    expect(document.querySelector<HTMLElement>('[data-hamnivo-launcher]')?.style.right).toBe(
-      '20px',
-    );
+    expect(root()?.style.right).toBe('20px');
   });
 
   it('still works with data attributes alone, as the install code uses it', () => {
@@ -124,7 +128,7 @@ describe('the loader, given its settings in its address', () => {
     runLoader('https://chat.example.com/loader.js?api=https%3A%2F%2Fapi.example.com');
     expect(error).toHaveBeenCalledWith(expect.stringContaining('data-widget-id'));
     expect(host.Hamnivo).toBeUndefined();
-    expect(document.querySelector('[data-hamnivo-launcher]')).toBeNull();
+    expect(root()).toBeNull();
   });
 
   it('does not fail on an address it cannot read', () => {
@@ -134,7 +138,7 @@ describe('the loader, given its settings in its address', () => {
 });
 
 describe('the template and the loader together', () => {
-  it('start the chat from the address the template builds', () => {
+  it('start the chat from the address the template builds', async () => {
     const code = section('SANDBOXED_JS_FOR_WEB_TEMPLATE');
     const result = runTemplate(code, {
       widgetId: WIDGET,
@@ -145,6 +149,8 @@ describe('the template and the loader together', () => {
     expect(result.success).toBe(1);
     runLoader(address as string);
     expect(host.Hamnivo?.loaded).toBe(true);
+    // The chat opens in the brand's layout, so it waits for the launcher's settings.
+    await vi.waitFor(() => expect(launcher()).not.toBeNull());
     const frame = openFrame();
     expect(frame.origin).toBe('https://chat.example.com');
     expect(frame.params.get('widgetId')).toBe(WIDGET);

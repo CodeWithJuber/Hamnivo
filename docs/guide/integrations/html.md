@@ -57,10 +57,10 @@ opened from a file on your computer has no address, and the chat does not open o
 
 | What you see | What to do |
 |---|---|
-| No chat button | The code is not on the page you opened. View the page's source, and search for `loader.js`. Then clear any cache in front of your website. |
-| The button shows, but the chat stays empty | Almost always the allowed websites list. The address must match exactly: `https://example.com` and `https://www.example.com` are two different websites. |
-| The button shows twice | The code is on the page twice. Keep one. |
-| Your website sends a Content-Security-Policy | It has to allow the chat address in `script-src` and `frame-src`, and the API address in `connect-src`. |
+| No chat button | Open the browser's console (F12). "Add this website to the brand's allowed websites" means the address is not on the brand's list: it must match exactly, `https://example.com` and `https://www.example.com` are two different websites. Nothing in the console: the code is not on the page you opened. View the page's source, and search for `loader.js`. Then clear any cache in front of your website. |
+| The button shows, but the chat stays empty | Almost always a security rule (Content-Security-Policy) that blocks the chat's address; see the next row. |
+| The console says the loader is on the page twice | The code is on the page twice. Only the first one runs; remove the other. |
+| Your website sends a Content-Security-Policy | It has to allow the chat address in `script-src` and `frame-src`, and the API address in `connect-src`. Nothing else is needed: no `'unsafe-inline'`, and Trusted Types work. For a launcher in the brand's own font, also allow the chat address in `style-src` and `font-src`. |
 
 ## Signed-in customers
 

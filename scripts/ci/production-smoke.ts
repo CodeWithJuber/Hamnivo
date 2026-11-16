@@ -257,6 +257,32 @@ await check('the widget page may only be framed by the brand’s websites', asyn
   expect(unknown.status === 404, `unknown widget ${unknown.status}`);
   const loader = await call('GET', `${CHAT}/loader.js`);
   expect(loader.status === 200 && loader.text.length > 500, `loader ${loader.status}`);
+  // The launcher's fonts are read by the brand's website, so they carry CORS.
+  const font = await call('GET', `${CHAT}/fonts/dm-sans-latin.woff2`, {
+    headers: { origin: HOST_PAGE },
+  });
+  expect(font.status === 200, `launcher font ${font.status}`);
+  expect(
+    font.headers['access-control-allow-origin'] === '*',
+    `font CORS: ${font.headers['access-control-allow-origin']}`,
+  );
+});
+
+await check('the direct chat link opens the chat on its own page, never framed', async () => {
+  const page = await call('GET', `${CHAT}/c/${brand.widgetId}`);
+  expect(page.status === 200, `direct link ${page.status}`);
+  expect(page.text.includes('<div id="root">'), 'not the chat page');
+  const csp = String(page.headers['content-security-policy'] ?? '');
+  expect(csp.includes("frame-ancestors 'none'"), `CSP was: ${csp}`);
+  expect(csp.includes(`connect-src 'self' ${API}`), `CSP was: ${csp}`);
+  expect(
+    String(page.headers['x-robots-tag']).includes('noindex'),
+    `robots: ${page.headers['x-robots-tag']}`,
+  );
+  // The chat's own script, not Studio's: the page loads the chat's assets from this host.
+  const script = /src="(\/assets\/[^"]+\.js)"/.exec(page.text)?.[1];
+  expect(script, 'no script in the direct chat page');
+  expect((await call('GET', `${CHAT}${script}`)).status === 200, 'the chat script is missing');
 });
 
 await check('a customer chats and the AI answers over the live stream', async () => {

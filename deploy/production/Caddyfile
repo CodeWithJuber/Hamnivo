@@ -45,19 +45,6 @@
 		Content-Security-Policy "default-src 'self'; script-src 'self' {$HAMNIVO_CAPTCHA_ORIGIN}; frame-src 'self' {$HAMNIVO_CAPTCHA_ORIGIN} {$HAMNIVO_CHAT_ORIGIN}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 		X-Frame-Options DENY
 	}
-	# The brand's direct chat link (W28): the chat on its own page, opened from a link rather than
-	# framed by a website. Nobody may frame it, search engines leave it out, and the gateway decides
-	# per brand whether the link works at all (the session is refused while it is off).
-	@direct path /c/*
-	route @direct {
-		rewrite * /index.html
-		header {
-			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-			X-Robots-Tag "noindex, nofollow"
-			Cache-Control no-store
-		}
-	}
-
 	@assets path /assets/*
 	header @assets Cache-Control "public, max-age=31536000, immutable"
 	@app not path /assets/*
@@ -111,6 +98,22 @@
 	encode zstd gzip
 	root * /srv/chat
 
+	# The brand's direct chat link (W28): the chat on its own page, opened from a link rather than
+	# framed by a website. The gateway builds it on this host (PUBLIC_WIDGET_ORIGIN/c/<widgetId>).
+	# Nobody may frame it, search engines leave it out, and the gateway decides per brand whether
+	# the link works at all (the session is refused while it is off). It is answered here, so the
+	# framed page's route below never sees it.
+	@direct path /c/*
+	route @direct {
+		rewrite * /index.html
+		header {
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' {$HAMNIVO_API_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+			X-Robots-Tag "noindex, nofollow"
+			Cache-Control no-store
+		}
+		file_server
+	}
+
 	@page path / /index.html
 	route @page {
 		request_header -X-Hamnivo-Frame-Ancestors
@@ -132,6 +135,13 @@
 	header @assets Cache-Control "public, max-age=31536000, immutable"
 	# Customer websites load this script; a short cache lets updates reach them quickly.
 	header /loader.js Cache-Control "public, max-age=300"
+	# The launcher's fonts are read by the brand's website, another origin: browsers fetch fonts
+	# for @font-face in CORS mode and drop them without this header.
+	@fonts path /fonts/*
+	header @fonts {
+		Access-Control-Allow-Origin "*"
+		Cache-Control "public, max-age=604800"
+	}
 	file_server
 }
 

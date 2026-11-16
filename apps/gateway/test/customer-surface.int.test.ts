@@ -314,7 +314,17 @@ describe('widget settings and the launcher (W02, W19)', () => {
       { headers: { origin: 'https://evil.example' } },
     );
     expect(refused.status).toBe(403);
-    expect(refused.headers.get('access-control-allow-origin')).toBeNull();
+    // The page may read the refusal, so its loader shows no launcher and says why in the
+    // console; it carries the reason and nothing of the brand's settings.
+    expect(refused.headers.get('access-control-allow-origin')).toBe('https://evil.example');
+    expect(refused.headers.get('vary')).toMatch(/origin/i);
+    const body = (await refused.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({ status: 403, code: 'ORIGIN_NOT_ALLOWED' });
+    expect(Object.keys(body).sort()).toEqual(
+      ['code', 'detail', 'requestId', 'retryable', 'status', 'title', 'type'].sort(),
+    );
+    // The brand's name (connectedTenant names it "<label> Shop") never reaches that website.
+    expect(JSON.stringify(body)).not.toContain('surface Shop');
     const unknown = await fetch(
       `${slice.baseUrl}/v1/widget/launcher?widgetId=wid_01j9zk7w3xq8r4t2v6m5n1p0cd`,
     );

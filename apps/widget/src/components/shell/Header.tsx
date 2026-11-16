@@ -118,7 +118,7 @@ export function Header(props: {
         {props.expand ? (
           <button
             type="button"
-            className={`${iconButton} max-[30rem]:hidden`}
+            className={iconButton}
             title={t(props.expand.expanded ? 'ui.smaller' : 'ui.larger')}
             aria-label={t(props.expand.expanded ? 'ui.smaller' : 'ui.larger')}
             onClick={props.expand.onToggle}

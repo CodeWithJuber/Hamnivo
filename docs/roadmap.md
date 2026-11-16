@@ -13,8 +13,8 @@ Claude or Hostinger, and work on every kind of website. Four phases, each pushed
 | Phase | What | Status |
 |---|---|---|
 | 1 | **The chat itself** (`apps/widget`): look, home, thread, a reply on its way, rich answers, message actions, message box, pictures | Done, see below |
-| 2 | **Launcher and every website** (`packages/widget-loader`): launcher in a shadow root, animation, the website's light or dark theme passed to the chat, single-page sites, phones, options by attribute, the direct-link and font routes in Caddy | Next |
-| 3 | **Live replies** (gateway): the worker starts a reply at once instead of after every other job, metered streaming, `activity` and `message.delta` events, a Stop button, questions to ask next | Planned |
+| 2 | **Launcher and every website** (`packages/widget-loader`): launcher in a shadow root, animation, the website's light or dark theme passed to the chat, single-page sites, phones, options by attribute, the direct-link and font routes in Caddy | Done, see below |
+| 3 | **Live replies** (gateway): the worker starts a reply at once instead of after every other job, metered streaming, `activity` and `message.delta` events, a Stop button, questions to ask next | Next |
 | 4 | **Brand controls** (contracts, gateway, Studio): theme, header style, launcher icon and size, offsets | Planned |
 
 ### Phase 1, done
@@ -32,7 +32,7 @@ Claude or Hostinger, and work on every kind of website. Four phases, each pushed
 | **Pictures open larger** in the chat; Escape closes the picture, then the chat. | `Lightbox.tsx`, `Parts.tsx` | `surface.spec.ts` with axe |
 | **A lighter first load.** Screens a visitor may never open (memory, settings, conversations, forms, cards, emoji, lightbox) load when asked for; bubbles are not redrawn when a reply arrives. | `Chat.tsx` | Build: main script 400 → 344 kB gzip |
 
-**Results on 2026-11-16** (Linux container, PostgreSQL 16 with pgvector and Redis installed
+**Phase 1 results on 2026-11-16** (Linux container, PostgreSQL 16 with pgvector and Redis installed
 natively, `HAMNIVO_SERVICES=native`).
 
 - Widget unit tests: 97 of 97 (70 before).
@@ -55,6 +55,42 @@ natively, `HAMNIVO_SERVICES=native`).
   (phase 2), and a brand cannot choose a theme or a plain header in Studio (phase 4).
 - No producer for `suggestions` or `choices` parts yet (phase 3 for the first).
 - Translations of the new strings (Arabic, Hindi, Urdu) await native review, like the rest.
+
+### Phase 2, done
+
+| What | Where | Checked by |
+|---|---|---|
+| **A website's styles cannot bend the chat.** The launcher, its count and the prompts live in a shadow root; the root and the frame start from `all: initial` and hold their place with `!important`. A page that styles every `button`, `div`, `svg` and `iframe` changes nothing. | `widget-loader/src/loader.ts` | `CHECK=sites` (hostile CSS) |
+| **Strict security rules need no exception.** Styling goes through the CSSOM and the launcher's picture is built with DOM calls, so a Content-Security-Policy without `'unsafe-inline'` and with Trusted Types works. Before, the picture was set with `innerHTML`, which Trusted Types refuse. | `loader.ts` | `CHECK=sites` (strict CSP, no violation reported) |
+| **Light or dark, as the website is.** The page's painted background, then its declared colour scheme; never the device alone. The chat follows when the page changes. `data-theme` decides it instead. | `widget-loader/src/theme.ts`, `contracts/src/bridge.ts` (`env`), widget `App.tsx` | `theme.test.ts`, `CHECK=sites` (dark page, then light) |
+| **Single-page apps and tag managers.** A new address is a new page view for prompts and `data-hide-on`; a replaced `<body>` gets the launcher back; a missing `currentScript` is found by its widget ID; a second copy says so and does nothing. | `loader.ts`, `widget-loader/src/pages.ts` | `theme.test.ts` (paths), `CHECK=sites` (SPA) |
+| **Options without Studio.** `data-offset-x/y`, `data-size`, `data-icon`, `data-z-index`, `data-hide-on`, `data-hide-on-mobile`; the same as props in `@hamnivo/react` and `@hamnivo/vue`. | `loader.ts`, `placement.ts`, `react/vue src/embed.ts` | `placement.test.ts`, `CHECK=sites` (options), the wrappers' docs tests |
+| **A larger chat on request.** "Make the chat larger" in the header asks the loader (`resize`), which grows the floating chat to 720 × 920 px. | `placement.ts`, widget `App.tsx`, `shell/Header.tsx` | `placement.test.ts`, `CHECK=sites` |
+| **It feels alive, and calm when asked.** Launcher entrance, hover lift, chat↔cross icon, count pop, prompt slide-in, frame rise; nothing moves under reduced motion. | `loader.ts` | Screenshots |
+| **Phones.** The launcher steps away under a full-screen chat and gets focus back; the page is held at its root and body; the screen's bottom edge is measured on the page for the chat. | `loader.ts` | `CHECK=sites` (phone), layout audit |
+| **Replies follow the visitor.** A visitor in a conversation gets the chat loaded quietly on the next page, so the count and preview work there; a first visit still loads only `loader.js`. | `loader.ts` | `CHECK=sites` (return visit), `journey.spec.ts` |
+| **No launcher where the brand did not allow the website.** The gateway's refusal is readable by that page, so the loader shows nothing and the console says why. | `gateway/src/widget/surface.controller.ts`, `loader.ts` | `customer-surface.int.test.ts`, `CHECK=sites` |
+| **Two production fixes.** The direct chat link `/c/<id>` was routed in Studio's host block, so on the chat host, where the link points, it found no page. The launcher's fonts had no CORS, so other websites could not use them. | `deploy/production/Caddyfile` | Caddy 2.10 adapts the file and runs `/c/*` before the framed page; both asserted in `production-smoke.ts` (not run here: no Docker) |
+
+**Phase 2 results on 2026-11-16** (same container, PostgreSQL 16 and Redis started again after
+a restart of the session's machine).
+
+- Loader: 38 of 38 unit tests (31 before); 8.6 KB gzip (5.7 KB before, budget 10 KB).
+- Contracts 42 of 42, `@hamnivo/react` 102 of 102, `@hamnivo/vue` 39 of 39, the GTM example
+  47 of 47, widget 97 of 97.
+- Gateway: the launcher cases of `customer-surface.int.test.ts` (4 of 4) and of
+  `brands.int.test.ts` (3 of 3). The rest of `test:int` was not run: only the launcher route
+  changed.
+- Layout audit 300 of 300 clean with the new loader; `CHECK=api`, `CHECK=live` and the new
+  `CHECK=sites` pass.
+- Widget `test:e2e`: 48 of 48. The first full run had one failure that passed 3 of 3 on its
+  own: axe measured a receipt card while it was still fading in. The journeys now run as a
+  visitor who asked for less motion (`playwright.config.ts`), so audits see what stays on
+  screen; the motion is checked by `CHECK=live` and `CHECK=sites`.
+- The Caddyfile was adapted with Caddy 2.10.2 to check its routes; it was not served here, and
+  the production smoke test (which needs Docker) was not run.
+- Not checked: Safari and iOS, and real third-party websites.
+
 
 ## Done in this pass
 

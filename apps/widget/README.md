@@ -197,6 +197,7 @@ pnpm --filter @hamnivo/widget-loader build && pnpm --filter @hamnivo/widget exec
 node apps/widget/e2e/layout-audit.ts <dir>             # every screen size, layout and scenario
 CHECK=live node apps/widget/e2e/layout-audit.ts <dir>  # how a reply arrives
 CHECK=api node apps/widget/e2e/layout-audit.ts <dir>   # the website's side (Hamnivo.on, prefill…)
+CHECK=sites node apps/widget/e2e/layout-audit.ts <dir> # websites of other kinds (below)
 ```
 
 - The audit opens the built chat against a mocked gateway on 20 screen sizes, in the four
@@ -208,3 +209,11 @@ CHECK=api node apps/widget/e2e/layout-audit.ts <dir>   # the website's side (Ham
   wrong: the dots after sending, the step in words, the draft (formatted, marked, not counted
   as a reply), the published message in its place, the menu and Escape, reading earlier
   messages while a reply arrives, and the long answer on a phone, light and dark.
+- `CHECK=sites` puts the chat on websites of other kinds and fails on the first thing wrong:
+  rules that style every button, frame and div; a strict Content-Security-Policy with Trusted
+  Types (no violation may be reported); a dark page, and the same page turning light; a page
+  read right to left; the loader's own options and the larger chat; a single-page app that
+  changes its address and replaces its body; a phone, where the launcher steps away under the
+  chat and gets focus back; a return visit; and a website the brand did not allow.
+- The browser journeys (`test:e2e`) run with reduced motion, so their accessibility audits see
+  what stays on screen; the motion is what `CHECK=live` and `CHECK=sites` look at.

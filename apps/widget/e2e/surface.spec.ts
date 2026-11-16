@@ -602,7 +602,11 @@ test.describe('layouts (W02)', () => {
     // From the top of the page to the launcher with Tab.
     for (
       let i = 0;
-      i < 10 && !(await launcher.evaluate((el) => el === document.activeElement));
+      // The launcher is in a shadow root: the page's own activeElement is the root around it.
+      i < 10 &&
+      !(await launcher.evaluate(
+        (el) => el === (el.getRootNode() as Document | ShadowRoot).activeElement,
+      ));
       i += 1
     ) {
       await page.keyboard.press('Tab');

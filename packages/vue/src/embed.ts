@@ -29,6 +29,21 @@ export interface HamnivoLoaderOptions {
   height?: string;
   /** Accessible names. Without them the brand's own labels are used. */
   labels?: { open?: string; close?: string; title?: string };
+  /** A light or dark chat. Without it the brand's choice applies, and then the page's own look. */
+  theme?: 'light' | 'dark' | 'auto';
+  /** The launcher's distance from the side and from the bottom of the window, in pixels. */
+  offset?: { x?: number; y?: number };
+  /** The launcher's size and picture. Without them the brand's own are used. */
+  launcher?: {
+    size?: 'small' | 'medium' | 'large';
+    icon?: 'chat' | 'message' | 'help' | 'sparkle';
+  };
+  /** Stacking order of the launcher and the chat, for pages with their own overlays. */
+  zIndex?: number;
+  /** Pages the chat is kept off: paths, each exact or with a star, such as "/checkout*". */
+  hideOn?: string[];
+  /** Keeps the launcher off phones. */
+  hideOnMobile?: boolean;
   /** The nonce of your Content-Security-Policy, if it needs one for scripts and styles. */
   nonce?: string;
 }
@@ -39,11 +54,24 @@ export interface HamnivoApi {
   open(): void;
   close(): void;
   toggle(): void;
+  /** Shows or hides the launcher, and the chat with it. */
+  show(): void;
+  hide(): void;
+  isOpen(): boolean;
+  getState(): { open: boolean; hidden: boolean; unread: number; mode: HamnivoMode };
+  /** The chat's language from now on: en, ar, hi or ur. */
+  setLocale(locale: string): void;
+  /** Types words in the message box and opens the chat; the visitor chooses to send them. */
+  prefill(text: string): void;
   /** Tells the chat who the visitor is, with an assertion your server signed. */
   identify(assertion: string): Promise<void>;
   /** Signs the visitor out of the chat, on this device and in Hamnivo. */
   reset(): Promise<void>;
   on(event: string, listener: (payload: Record<string, unknown>) => void): () => void;
+  /** Stops a listener; the same as calling what `on` returned. Loaders before 2026-11 lack it. */
+  off?(event: string, listener: (payload: Record<string, unknown>) => void): void;
+  /** Takes the chat off the page for good. Loaders before 2026-11 lack it. */
+  destroy?(): void;
 }
 
 /** The signed-in customer, as your page knows them. */
@@ -233,6 +261,14 @@ export function loadHamnivo(options: HamnivoLoaderOptions): Promise<HamnivoApi> 
   if (options.labels?.open) data.label = options.labels.open;
   if (options.labels?.close) data.closeLabel = options.labels.close;
   if (options.labels?.title) data.title = options.labels.title;
+  if (options.theme) data.theme = options.theme;
+  if (options.offset?.x !== undefined) data.offsetX = String(options.offset.x);
+  if (options.offset?.y !== undefined) data.offsetY = String(options.offset.y);
+  if (options.launcher?.size) data.size = options.launcher.size;
+  if (options.launcher?.icon) data.icon = options.launcher.icon;
+  if (options.zIndex !== undefined) data.zIndex = String(options.zIndex);
+  if (options.hideOn?.length) data.hideOn = options.hideOn.join(',');
+  if (options.hideOnMobile) data.hideOnMobile = 'true';
   if (options.nonce) script.nonce = options.nonce;
 
   loadedWith = { widgetId: options.widgetId, chatOrigin };

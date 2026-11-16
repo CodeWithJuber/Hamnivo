@@ -25,6 +25,7 @@ const params: WidgetParams = {
   test: !direct && query.get('test') === '1',
   direct: direct !== null,
   theme: schemeOf(query.get('theme')),
+  caps: (query.get('caps') ?? '').split(',').filter(Boolean),
 };
 // Light or dark is decided before anything is drawn, so the chat never flashes the other one.
 document.documentElement.dataset.theme = resolveScheme(

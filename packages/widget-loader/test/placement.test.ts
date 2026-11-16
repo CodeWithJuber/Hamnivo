@@ -74,4 +74,27 @@ describe('where the chat sits for each screen (W02)', () => {
     expect(isFullScreen('inline', screen(320, 568))).toBe(false);
     expect(isFullScreen('fullpage', screen(1920, 1080))).toBe(true);
   });
+  it('follows a launcher the website moved or resized', () => {
+    const style = placement('bubble', screen(1440, 800), 'left', { x: 32, y: 96, launcher: 64 });
+    // Above the launcher: 96 from the bottom, 64 tall, and the 12 px gap.
+    expect(style).toMatchObject({ bottom: '172px', left: '32px', right: 'auto', width: '400px' });
+    expect(style?.height).toBe(`${800 - 172 - 16}px`);
+    // Pushed far in from the side, the chat still ends 20 px before the other edge.
+    expect(placement('bubble', screen(600, 900), 'right', { x: 300 })?.width).toBe('280px');
+  });
+
+  it('grows when the visitor asks for more room, and never past the window', () => {
+    expect(placement('bubble', screen(1920, 1080), 'right', { expanded: true })).toMatchObject({
+      width: '720px',
+      height: '920px',
+      bottom: '88px',
+    });
+    expect(placement('bubble', screen(700, 800), 'right', { expanded: true })).toMatchObject({
+      width: '660px',
+      height: `${800 - 88 - 16}px`,
+    });
+    expect(placement('panel', screen(1440, 900), 'right', { expanded: true })?.width).toBe('640px');
+    // A full-screen chat has nowhere to grow.
+    expect(placement('bubble', screen(390, 844), 'right', { expanded: true })?.width).toBe('100%');
+  });
 });
