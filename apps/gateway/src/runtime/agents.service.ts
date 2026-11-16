@@ -5,6 +5,7 @@ import {
   type AgentDetail,
   type AgentVersion,
   type CreateAgentRequest,
+  type GoLiveAgentRequest,
   type PublishAgentRequest,
   type SaveAgentDraftRequest,
   type UpdateAgentRequest,
@@ -341,107 +342,205 @@ export class AgentsService {
     return this.tx(principal, async (tx) => {
       const row = await this.load(tx, publicId, true);
       enforce(this.allowed(principal, 'agents.publish', row));
-      if (row.status !== 'active') {
-        throw new AppError('VALIDATION_FAILED', { detail: 'Archived agents cannot be published.' });
+      return this.publishIn(tx, principal, row, input);
+    });
+  }
+
+  private async publishIn(
+    tx: TenantTx,
+    principal: StaffPrincipal,
+    row: ProfileRow,
+    input: z.output<typeof PublishAgentRequest>,
+    audit: Record<string, unknown> = {},
+  ): Promise<AgentDetail> {
+    if (row.status !== 'active') {
+      throw new AppError('VALIDATION_FAILED', { detail: 'Archived agents cannot be published.' });
+    }
+    const versions = await this.versionsOf(tx, row.id);
+    const target =
+      input.version !== undefined
+        ? versions.find((v) => v.version === input.version)
+        : versions.find((v) => v.state === 'draft');
+    if (!target) {
+      throw new AppError('NOT_FOUND', {
+        detail: input.version ? `Version ${input.version} not found.` : 'There is no draft.',
+      });
+    }
+    if (target.id === row.publishedVersionId) return this.detail(row, versions);
+    const config = AgentConfig.parse(target.config);
+    const barred = [config.model, ...config.fallbackModels].findIndex((choice) =>
+      this.models.testModelBarred(choice),
+    );
+    if (barred >= 0) {
+      const message =
+        'The test model gives every customer the same fixed reply. Choose your AI provider’s ' +
+        'model (add a key under AI models first), then publish.';
+      throw new AppError('VALIDATION_FAILED', {
+        detail: message,
+        fields: [
+          { path: barred === 0 ? 'config.model' : `config.fallbackModels.${barred - 1}`, message },
+        ],
+      });
+    }
+    try {
+      for (const choice of [config.model, ...config.fallbackModels]) {
+        await this.models.check(tx, choice);
       }
-      const versions = await this.versionsOf(tx, row.id);
-      const target =
-        input.version !== undefined
-          ? versions.find((v) => v.version === input.version)
-          : versions.find((v) => v.state === 'draft');
-      if (!target) {
-        throw new AppError('NOT_FOUND', {
-          detail: input.version ? `Version ${input.version} not found.` : 'There is no draft.',
+    } catch (error) {
+      if (error instanceof ModelUnavailableError) {
+        throw new AppError('VALIDATION_FAILED', {
+          detail: error.message,
+          fields: [{ path: 'config.model', message: error.message }],
         });
       }
-      if (target.id === row.publishedVersionId) return this.detail(row, versions);
-      const config = AgentConfig.parse(target.config);
-      try {
-        for (const choice of [config.model, ...config.fallbackModels]) {
-          await this.models.check(tx, choice);
-        }
-      } catch (error) {
-        if (error instanceof ModelUnavailableError) {
-          throw new AppError('VALIDATION_FAILED', {
-            detail: error.message,
-            fields: [{ path: 'config.model', message: error.message }],
-          });
-        }
-        throw error;
+      throw error;
+    }
+    if (config.knowledgeSourceIds.length > 0) {
+      const ids = config.knowledgeSourceIds.map((id) => fromPublicId('source', id));
+      const sources = await tx
+        .select()
+        .from(schema.knowledgeSources)
+        .where(inArray(schema.knowledgeSources.id, ids));
+      const usable = new Set(
+        sources.filter((s) => s.brandId === row.brandId && s.status !== 'retired').map((s) => s.id),
+      );
+      if (ids.some((id) => !usable.has(id))) {
+        throw new AppError('VALIDATION_FAILED', {
+          detail: 'Some knowledge sources are missing, retired or belong to another brand.',
+          fields: [{ path: 'config.knowledgeSourceIds', message: 'Unknown or unusable source' }],
+        });
       }
-      if (config.knowledgeSourceIds.length > 0) {
-        const ids = config.knowledgeSourceIds.map((id) => fromPublicId('source', id));
-        const sources = await tx
-          .select()
-          .from(schema.knowledgeSources)
-          .where(inArray(schema.knowledgeSources.id, ids));
-        const usable = new Set(
-          sources
-            .filter((s) => s.brandId === row.brandId && s.status !== 'retired')
-            .map((s) => s.id),
-        );
-        if (ids.some((id) => !usable.has(id))) {
-          throw new AppError('VALIDATION_FAILED', {
-            detail: 'Some knowledge sources are missing, retired or belong to another brand.',
-            fields: [{ path: 'config.knowledgeSourceIds', message: 'Unknown or unusable source' }],
-          });
-        }
+    }
+    // A draft goes live only with tools it may use (G07) and after passing the required
+    // simulations (G11). A rollback restores a version exactly as it was published.
+    if (target.state === 'draft') {
+      const problems = [
+        ...(await toolGrantProblems(tx, row.brandId, config)),
+        ...(await simulationProblems(tx, row.id, target.id, configHash(config))),
+      ];
+      if (problems.length > 0) {
+        throw new AppError('VALIDATION_FAILED', {
+          detail: problems[0]?.message ?? 'The draft cannot be published yet.',
+          fields: problems,
+        });
       }
-      // A draft goes live only with tools it may use (G07) and after passing the required
-      // simulations (G11). A rollback restores a version exactly as it was published.
-      if (target.state === 'draft') {
-        const problems = [
-          ...(await toolGrantProblems(tx, row.brandId, config)),
-          ...(await simulationProblems(tx, row.id, target.id, configHash(config))),
-        ];
-        if (problems.length > 0) {
-          throw new AppError('VALIDATION_FAILED', {
-            detail: problems[0]?.message ?? 'The draft cannot be published yet.',
-            fields: problems,
-          });
-        }
+    }
+    const now = this.clock();
+    // The live version retires first: at most one version is published at a time.
+    await tx
+      .update(schema.agentVersions)
+      .set({ state: 'retired', updatedAt: now })
+      .where(
+        and(
+          eq(schema.agentVersions.profileId, row.id),
+          eq(schema.agentVersions.state, 'published'),
+        ),
+      );
+    await tx
+      .update(schema.agentVersions)
+      .set(
+        target.state === 'draft'
+          ? {
+              state: 'published',
+              configHash: configHash(config),
+              publishedAt: now,
+              publishedBy: principal.staffMemberId,
+              updatedAt: now,
+            }
+          : { state: 'published', updatedAt: now },
+      )
+      .where(eq(schema.agentVersions.id, target.id));
+    await tx
+      .update(schema.agentProfiles)
+      .set({ publishedVersionId: target.id, updatedAt: now })
+      .where(eq(schema.agentProfiles.id, row.id));
+    await this.audit(tx, principal, 'agent.published', row.id, {
+      version: target.version,
+      rollback: target.state !== 'draft',
+      configHash: (target.configHash ?? configHash(config)).toString('hex'),
+      model: `${config.model.provider}/${config.model.modelId}`,
+      mode: config.mode,
+      ...audit,
+    });
+    const [updated] = await tx
+      .select()
+      .from(schema.agentProfiles)
+      .where(eq(schema.agentProfiles.id, row.id));
+    return this.detail(updated ?? row, await this.versionsOf(tx, row.id));
+  }
+
+  /**
+   * Makes the agent answer customers for real, in one step (the owner's "Make the assistant
+   * live"): a real model (the key named, the workspace's newest key, or the platform's), every
+   * knowledge source of its brand, memory on (customers are still asked), then the publish
+   * checks and publish. What it started from is kept: a draft's instructions, tools and limits.
+   */
+  async goLive(
+    principal: StaffPrincipal,
+    publicId: string,
+    input: z.output<typeof GoLiveAgentRequest>,
+  ): Promise<AgentDetail> {
+    return this.tx(principal, async (tx) => {
+      const row = await this.load(tx, publicId, true);
+      enforce(this.allowed(principal, 'agents.manage', row));
+      enforce(this.allowed(principal, 'agents.publish', row));
+      const versions = await this.versionsOf(tx, row.id);
+      const base =
+        versions.find((v) => v.state === 'draft') ??
+        versions.find((v) => v.id === row.publishedVersionId) ??
+        versions[0];
+      if (!base) throw new AppError('NOT_FOUND', { detail: 'The agent has no configuration.' });
+      const current = AgentConfig.parse(base.config);
+      // A real model already chosen stays; asked again, this only brings in new knowledge.
+      const model =
+        input.connectionId || current.model.provider === 'mock'
+          ? await this.models.liveChoice(tx, input.connectionId)
+          : current.model;
+      if (!model) {
+        const message = input.connectionId
+          ? 'This key has no model to use. Choose one for it under AI models.'
+          : 'Add an AI key under AI models first: Anthropic, OpenAI or Google.';
+        throw new AppError('VALIDATION_FAILED', {
+          detail: message,
+          fields: [{ path: 'connectionId', message }],
+        });
       }
-      const now = this.clock();
-      // The live version retires first: at most one version is published at a time.
-      await tx
-        .update(schema.agentVersions)
-        .set({ state: 'retired', updatedAt: now })
+      const sources = await tx
+        .select({ id: schema.knowledgeSources.id })
+        .from(schema.knowledgeSources)
         .where(
           and(
-            eq(schema.agentVersions.profileId, row.id),
-            eq(schema.agentVersions.state, 'published'),
+            eq(schema.knowledgeSources.brandId, row.brandId),
+            ne(schema.knowledgeSources.status, 'retired'),
           ),
-        );
-      await tx
-        .update(schema.agentVersions)
-        .set(
-          target.state === 'draft'
-            ? {
-                state: 'published',
-                configHash: configHash(config),
-                publishedAt: now,
-                publishedBy: principal.staffMemberId,
-                updatedAt: now,
-              }
-            : { state: 'published', updatedAt: now },
         )
-        .where(eq(schema.agentVersions.id, target.id));
-      await tx
-        .update(schema.agentProfiles)
-        .set({ publishedVersionId: target.id, updatedAt: now })
-        .where(eq(schema.agentProfiles.id, row.id));
-      await this.audit(tx, principal, 'agent.published', row.id, {
-        version: target.version,
-        rollback: target.state !== 'draft',
-        configHash: (target.configHash ?? configHash(config)).toString('hex'),
-        model: `${config.model.provider}/${config.model.modelId}`,
-        mode: config.mode,
+        .orderBy(asc(schema.knowledgeSources.createdAt))
+        .limit(20);
+      const config = AgentConfig.parse({
+        ...current,
+        mode: 'answer',
+        model,
+        // A fallback on the test model would answer with the fixed text when the model is busy.
+        fallbackModels: current.fallbackModels.filter((choice) => choice.provider !== 'mock'),
+        knowledgeSourceIds: sources.map((source) => toPublicId('source', source.id)),
+        memory: { ...current.memory, enabled: true },
       });
-      const [updated] = await tx
-        .select()
-        .from(schema.agentProfiles)
-        .where(eq(schema.agentProfiles.id, row.id));
-      return this.detail(updated ?? row, await this.versionsOf(tx, row.id));
+      const draft = versions.find((v) => v.state === 'draft');
+      if (draft) {
+        await tx
+          .update(schema.agentVersions)
+          .set({ config, createdBy: principal.staffMemberId, updatedAt: this.clock() })
+          .where(eq(schema.agentVersions.id, draft.id));
+      } else {
+        await tx.insert(schema.agentVersions).values({
+          tenantId: principal.tenantId,
+          profileId: row.id,
+          version: (versions[0]?.version ?? 0) + 1,
+          config,
+          createdBy: principal.staffMemberId,
+        });
+      }
+      return this.publishIn(tx, principal, row, {}, { wentLive: true });
     });
   }
 
@@ -459,7 +558,8 @@ export class AgentsService {
     const config: AgentConfig = AgentConfig.parse({
       displayName: 'AI assistant',
       purpose: `Answer questions from ${brand.name}'s customers and hand over to a person when needed.`,
-      model: { provider: 'mock', modelId: 'hamnivo-mock' },
+      // The platform's model when the server has a key, so publishing is all that is left.
+      model: this.models.platformChoice() ?? { provider: 'mock', modelId: 'hamnivo-mock' },
     });
     try {
       // A savepoint, so losing a race to another default keeps the outer transaction usable.
@@ -494,6 +594,10 @@ export class AgentsService {
     const agent = await this.activeFor(tx, brandId);
     if (!agent) return { answering: false, reason: 'no_agent' };
     if (agent.config.mode !== 'answer') return { answering: false, reason: 'assist_mode' };
+    // Published before production refused it: a fixed reply is no answer, so people answer.
+    if (this.models.testModelBarred(agent.config.model)) {
+      return { answering: false, reason: 'no_live_model' };
+    }
     if (await this.switches.activeFor(tx, { brandId, agentId: agent.profile.id })) {
       return { answering: false, reason: 'ai_stopped' };
     }

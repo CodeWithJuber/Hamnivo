@@ -116,10 +116,19 @@ Press **Finish setup** when you are done, or skip the step.
 
 Two more things make the chat useful:
 
-- **Publish an AI agent.** The AI assistant only answers customers once you publish it with a real
-  AI model. Open **AI assistant**, then **AI agents**. Open your agent, choose the same provider as
-  the key you added and a model, and publish it. Until then it uses an offline practice model that
-  gives canned replies, and Home keeps showing **Publish an AI agent** as a step to do.
+- **Make the assistant live.** The AI assistant only answers customers once it is live on a real
+  AI model. Home, **AI agents** and **AI models** show a red card for each brand whose assistant is
+  not live yet: press **Make the assistant live**. In one step it uses your newest AI key (or your
+  server's), the brand's knowledge (its website included, see below) and
+  [memory](../ai/see-what-the-ai-remembers.md) for customers who agree, then publishes it. You can
+  change any of it later in the agent's editor.
+
+  Until then the assistant is on an offline test model that gives every customer the same fixed
+  reply. A production server never lets that model answer: those chats go to your team, with a note
+  saying why.
+- **Your website is already the AI's knowledge.** When a brand has a website (an `https://`
+  address on its allowed list), Hamnivo starts reading it at once, the same way as
+  [adding a website yourself](../ai/teach-your-ai-your-website.md).
 - **Set your business hours**, so the chat tells customers honestly when a person can answer.
   [How](business-hours.md).
 

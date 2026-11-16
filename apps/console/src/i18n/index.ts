@@ -10,6 +10,10 @@ import { billingEn } from './billing/en';
 import { billingHi } from './billing/hi';
 import { billingUr } from './billing/ur';
 import { en } from './en';
+import { goLiveAr } from './go-live/ar';
+import { goLiveEn } from './go-live/en';
+import { goLiveHi } from './go-live/hi';
+import { goLiveUr } from './go-live/ur';
 import { hi } from './hi';
 import { inboxAlertsAr } from './inbox-alerts/ar';
 import { inboxAlertsEn } from './inbox-alerts/en';
@@ -42,6 +46,7 @@ declare module 'i18next' {
         aiPower: typeof aiPowerEn;
         palette: typeof paletteEn;
         agentic: typeof platformCopy.en;
+        goLive: typeof goLiveEn;
       };
     };
   }
@@ -96,6 +101,7 @@ export async function initI18n(locale: Locale) {
           inboxAlerts: inboxAlertsEn,
           aiPower: aiPowerEn,
           palette: paletteEn,
+          goLive: goLiveEn,
         },
       },
       ar: {
@@ -108,6 +114,7 @@ export async function initI18n(locale: Locale) {
           inboxAlerts: inboxAlertsAr,
           aiPower: aiPowerAr,
           palette: paletteAr,
+          goLive: goLiveAr,
         },
       },
       hi: {
@@ -120,6 +127,7 @@ export async function initI18n(locale: Locale) {
           inboxAlerts: inboxAlertsHi,
           aiPower: aiPowerHi,
           palette: paletteHi,
+          goLive: goLiveHi,
         },
       },
       ur: {
@@ -132,6 +140,7 @@ export async function initI18n(locale: Locale) {
           inboxAlerts: inboxAlertsUr,
           aiPower: aiPowerUr,
           palette: paletteUr,
+          goLive: goLiveUr,
         },
       },
     },

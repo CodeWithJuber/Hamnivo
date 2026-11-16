@@ -184,6 +184,13 @@ const EnvSchema = z.object({
   COMMERCE_CHECKOUT_MINUTES: z.coerce.number().int().min(30).max(1440).default(60),
   /** Allows `mock` merchant connections (in-memory store) outside development and tests. */
   COMMERCE_ALLOW_MOCK: bool.default(false),
+  /**
+   * Whether an agent on the offline test model (`hamnivo-mock`) may answer customers. It gives
+   * every customer the same fixed reply, so by default production refuses to publish it and hands
+   * its conversations to people; elsewhere it is allowed (development, tests). Set it to say so
+   * either way (a demo server: true).
+   */
+  ALLOW_MOCK_MODEL: bool.optional(),
 
   /**
    * AI actions (G07–G15, D10). The demo tools (address change, store credit) use an in-memory

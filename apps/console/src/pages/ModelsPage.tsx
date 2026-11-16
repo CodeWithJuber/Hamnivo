@@ -14,6 +14,7 @@ import { KeyRoundIcon, PlusIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/AppDialog';
+import { GoLiveNotices } from '../components/agent/GoLiveNotices';
 import { PageHeader } from '../components/PageHeader';
 import { QueryState } from '../components/States';
 import { api } from '../lib/api';
@@ -101,6 +102,7 @@ export function ModelsPage() {
           onReplace={setReplacing}
         />
       ) : null}
+      <GoLiveNotices />
       <QueryState
         query={connections}
         label={t('models.loading')}

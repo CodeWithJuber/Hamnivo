@@ -523,9 +523,12 @@
       "apps/gateway/src/runtime/agents.service.ts",
       "apps/gateway/test/agents.int.test.ts",
       "packages/contracts/src/agents.ts",
-      "packages/db/src/schema/runtime.ts"
+      "packages/db/src/schema/runtime.ts",
+      "apps/gateway/test/go-live.int.test.ts",
+      "apps/console/src/components/agent/GoLiveNotices.tsx",
+      "apps/console/test/go-live.test.tsx"
     ],
-    "note": "Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending."
+    "note": "Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending. A brand's assistant is made live in one step (Make the assistant live, on Home, AI agents and AI models): a real model from the workspace's newest key or the server's, every knowledge source of the brand and memory on, then the usual publish checks; asked again it keeps the model and brings in new knowledge. The offline test model, which gives every customer the same fixed reply, cannot be published in production (ALLOW_MOCK_MODEL unset) and an agent already published on it hands its conversations to people with the reason no_live_model; with a server key a new brand's agent starts on the server's model (integration-tested with production's rules; Studio's notice unit-tested)."
   },
   "G03": {
     "status": "in-progress",
@@ -605,9 +608,11 @@
       "apps/gateway/src/knowledge/web/sources.service.ts",
       "apps/gateway/test/web-knowledge.test.ts",
       "apps/gateway/test/web-knowledge.int.test.ts",
-      "docs/guide/ai/teach-your-ai-your-website.md"
+      "docs/guide/ai/teach-your-ai-your-website.md",
+      "apps/gateway/src/knowledge/web/brand-website.ts",
+      "apps/gateway/test/go-live.int.test.ts"
     ],
-    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). A website can be a source: its pages become documents, found through its sitemap and the links between them within one site and the folder of the address, with robots.txt followed, limits on pages and link depth, read on a schedule or on request. A changed page becomes a new version, and a page that is gone or now off limits is retired; a site that is down loses nothing (tested against a made-up site over real HTTP). The website panel in Studio is rendered in unit tests; there is no browser test of it."
+    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). A website can be a source: its pages become documents, found through its sitemap and the links between them within one site and the folder of the address, with robots.txt followed, limits on pages and link depth, read on a schedule or on request. A changed page becomes a new version, and a page that is gone or now off limits is retired; a site that is down loses nothing (tested against a made-up site over real HTTP). The website panel in Studio is rendered in unit tests; there is no browser test of it. A brand's own website is added and read without setup when the brand gets its first https website (never a test address such as localhost, an IP address or a reserved name, never twice, and within the workspace's limit of 20) (integration-tested)."
   },
   "G05": {
     "status": "in-progress",

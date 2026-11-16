@@ -2,6 +2,7 @@ import { Button } from '@hamnivo/ui/components/button';
 import { StatusBadge } from '@hamnivo/ui/components/status-badge';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GoLiveNotices } from '../../components/agent/GoLiveNotices';
 import { useModelConnections } from '../../lib/queries';
 import { hasServerKey, type ModelProbeResult, useModelStatus } from '../../lib/setup';
 import { useTenant } from '../../lib/tenant';
@@ -60,6 +61,7 @@ export function AiKeyStep({ onDone }: { onDone: () => void | Promise<void> }) {
             onReplace={setReplacing}
             onResult={report}
           />
+          {worked ? <GoLiveNotices /> : null}
           {worked ? (
             <div>
               <Button type="button" onClick={() => void onDone()}>

@@ -1,6 +1,7 @@
 import {
   agentRoutes,
   CreateAgentRequest,
+  GoLiveAgentRequest,
   PublishAgentRequest,
   SaveAgentDraftRequest,
   UpdateAgentRequest,
@@ -91,5 +92,16 @@ export class AgentsController {
     @Body() body: unknown,
   ) {
     return this.agents.publish(principal, agentId, parseInput(PublishAgentRequest, body ?? {}));
+  }
+
+  @Post(':agentId/go-live')
+  @HttpCode(200)
+  @StaffRoute({ tenant: true, permission: 'agents.publish' })
+  goLive(
+    @CurrentPrincipal() principal: StaffPrincipal,
+    @Param('agentId') agentId: string,
+    @Body() body: unknown,
+  ) {
+    return this.agents.goLive(principal, agentId, parseInput(GoLiveAgentRequest, body ?? {}));
   }
 }

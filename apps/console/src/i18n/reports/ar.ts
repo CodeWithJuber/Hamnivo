@@ -79,6 +79,7 @@ export const reportsAr: ReportsTranslation = {
       no_agent: 'لم يُنشر وكيل ذكاء اصطناعي',
       assist_mode: 'الذكاء الاصطناعي يقترح الردود فقط',
       channel_ai_off: 'الذكاء الاصطناعي لا يرد على هذه القناة',
+      no_live_model: 'الذكاء الاصطناعي على نموذج الاختبار الذي يعطي ردًا ثابتًا',
       staff_takeover: 'تولّى موظف المحادثة',
       staff_reply: 'ردّ موظف',
       staff_assign: 'أُسندت إلى موظف',

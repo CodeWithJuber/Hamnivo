@@ -23,6 +23,7 @@ import type { AppConfig } from '../../config.js';
 import { EgressService } from '../../developer/egress.service.js';
 import { enforce } from '../../identity/staff.guard.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../../tokens.js';
+import { MAX_WEB_SOURCES } from './brand-website.js';
 import { firstRunFor } from './summary.js';
 import { normalizePageUrl } from './urls.js';
 import { type WebSourceRow, webPageView, webSourceView } from './views.js';
@@ -30,7 +31,6 @@ import { type WebSourceRow, webPageView, webSourceView } from './views.js';
 type SourceRow = typeof schema.knowledgeSources.$inferSelect;
 
 /** Websites one workspace keeps at a time (retired ones do not count). */
-const MAX_WEB_SOURCES = 20;
 const MAX_PAGES_LISTED = 1000;
 
 /** The words for an address the egress guard refuses, as the address field's error. */

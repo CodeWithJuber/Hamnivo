@@ -4196,6 +4196,73 @@
         }
       }
     },
+    "/v1/admin/agents/{agentId}/go-live": {
+      "post": {
+        "operationId": "goLiveAgent",
+        "summary": "Make the agent answer for real: a real model, its brand’s knowledge, memory, then publish (agents.manage and agents.publish, fresh sign-in)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "description": "Agent ID (agt_…)"
+            },
+            "required": true,
+            "description": "Agent ID (agt_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoLiveAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/model-connections": {
       "get": {
         "operationId": "listModelConnections",
@@ -34657,6 +34724,16 @@
           }
         }
       },
+      "GoLiveAgentRequest": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "description": "modelConnection identifier (TypeID with prefix \"mcn\")",
+            "example": "mcn_01j9zk7w3xq8r4t2v6m5n1p0cd"
+          }
+        }
+      },
       "CreateModelConnectionRequest": {
         "type": "object",
         "properties": {
@@ -53667,6 +53744,7 @@
                   "ai_blocked",
                   "ai_escalated",
                   "channel_ai_off",
+                  "no_live_model",
                   "ai_limit",
                   "offer_accepted",
                   "sla_moved"
@@ -54575,6 +54653,7 @@
                   "ai_blocked",
                   "ai_escalated",
                   "channel_ai_off",
+                  "no_live_model",
                   "ai_limit",
                   "offer_accepted",
                   "sla_moved"

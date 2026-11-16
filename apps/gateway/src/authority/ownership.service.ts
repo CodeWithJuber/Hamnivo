@@ -46,6 +46,7 @@ export interface TransitionOptions {
     | 'ai_limit'
     | 'ai_escalated'
     | 'channel_ai_off'
+    | 'no_live_model'
     | 'offer_accepted'
     | 'sla_moved';
   /** Audit actor (`stf_…`, `cus_…`, `authority`). */

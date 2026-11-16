@@ -10,7 +10,8 @@ export type AiHandoffReason =
   | 'ai_limit'
   | 'customer_request'
   | 'ai_escalated'
-  | 'channel_ai_off';
+  | 'channel_ai_off'
+  | 'no_live_model';
 
 /** Internal notes for staff (the staff lane), in the operator's language. */
 export const HANDOFF_NOTES: Record<AiHandoffReason, string> = {
@@ -25,6 +26,9 @@ export const HANDOFF_NOTES: Record<AiHandoffReason, string> = {
   customer_request: 'The customer asked to talk to a person, so the AI stepped back.',
   ai_escalated: 'The escalation check passed this conversation to people. Please answer.',
   channel_ai_off: 'The AI does not answer on this channel, so a person needs to answer.',
+  no_live_model:
+    "This brand's AI agent is on the test model, which gives every customer the same fixed " +
+    'reply, so a person needs to answer. Make the assistant live under AI agents.',
 };
 
 /**

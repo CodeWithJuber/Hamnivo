@@ -187,6 +187,14 @@ export const PublishAgentRequest = z
   })
   .meta({ id: 'PublishAgentRequest' });
 
+/** Make the assistant live in one step: a real model, the brand's knowledge, memory, publish. */
+export const GoLiveAgentRequest = z
+  .object({
+    /** The workspace key to use. Default: its newest active key, else the platform's. */
+    connectionId: typeId('modelConnection').optional(),
+  })
+  .meta({ id: 'GoLiveAgentRequest' });
+
 export const ModelConnection = z
   .object({
     id: typeId('modelConnection'),

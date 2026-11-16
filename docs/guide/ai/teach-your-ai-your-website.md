@@ -7,6 +7,13 @@ address once. Hamnivo reads it again on the schedule you choose.
 A website is a knowledge source like any other. Its pages are the source's documents, so you can
 see them, review them, retire them and search them in **Knowledge**.
 
+**Your brand's own website is added for you.** When a brand gets its first `https://` website on
+its allowed list, Hamnivo adds that website here and starts reading it, with the settings below
+(the whole site, 50 pages, every week, public answers). It is not added again, and test addresses
+(`localhost`, IP addresses, `.example`, `.test`) are never read. **Make the assistant live** (on
+Home or under AI agents) then gives the brand's assistant all of its knowledge. A website you add
+later is used once you press it again, or tick it in the agent's editor and publish.
+
 ## What you need
 
 - The **Owner**, **Administrator** or **Knowledge editor** role (the permission

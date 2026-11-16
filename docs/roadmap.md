@@ -5,6 +5,35 @@ features as published on 2026-11-05 (tawk.to/features, /add-ons, developer.tawk.
 come from [`feature-status.md`](feature-status.md) and the code. Effort: S ≤ 1 day, M ≤ 1 week,
 L > 1 week.
 
+## A real AI that acts, remembers and never repeats (started 2026-11-16)
+
+After the advanced chat below was deployed, the owner reported from production: every answer was
+the same ("Thank you for your message. I am an AI assistant…"), memory did nothing, nothing was
+agentic. Cause: every brand's default agent starts on the offline test model, adding an AI key never
+moved it, and production let that model answer. Six phases, each pushed when done.
+
+| Phase | What | Status |
+|---|---|---|
+| A | **The AI really answers**: production never lets the test model answer; one-click **Make the assistant live**; the brand's website read without setup | Done, see below |
+| B | **It never repeats**: a draft the customer read is posted; the prompt always ends with the customer; attachment-only messages; follow-up chips without echo; draft restarts; resync | Next |
+| C | **Memory that works**: OpenAI-strict extraction schema, retries, wording, consent in the welcome area, anonymous sessions that last, memory carried over at sign-in | Planned |
+| D | **It acts**: hand over, ticket, contact details, knowledge search, buttons, page links; which page the visitor is on; WHMCS tools granted and kept signed in | Planned |
+| E | **A clean, Tawk-like chat**: home with the team, reply time, one clear action; fewer header buttons | Planned |
+| F | **Shopify and WooCommerce orders** | Planned, after A–E |
+
+### Phase A, done
+
+| What | Where | Checked by |
+|---|---|---|
+| **No fake assistant in production.** With `ALLOW_MOCK_MODEL` unset, production refuses to publish an agent on `hamnivo-mock` (it says why and what to do), and an agent already published on it hands each conversation to people with the reason `no_live_model` and a staff note. Development and tests keep the mock. | `runtime/models.ts` (`testModelBarred`), `agents.service.ts`, `replies.service.ts`, `handoff-notes.ts`, contracts `OwnerReason` | `go-live.int.test.ts` |
+| **Make the assistant live, in one click.** `POST /v1/admin/agents/{id}/go-live`: a real model (the key named, the workspace's newest key with its first allowed or recommended model, else the server's), every knowledge source of the brand, memory on, then the usual publish checks and publish, audited (`wentLive`). Asked again it keeps a real model and brings in new knowledge. With a server key, a new brand's agent starts on the server's recommended model. | `agents.service.ts` `goLive`, `models.ts` `liveChoice`, `platformChoice` | `go-live.int.test.ts` (no key, a workspace key, a server key, twice) |
+| **Studio says it in red, with the fix.** Each brand whose assistant is on the test model or not published gets a red card on Home, AI agents and AI models (and after adding a key in setup) with **Make the assistant live**; without a key it links to AI models. | `components/agent/GoLiveNotices.tsx`, `i18n/go-live/*` | `go-live.test.tsx` (4) |
+| **The website is the AI's knowledge without setup.** A brand's first `https` website (never `localhost`, an IP address or a reserved test name) is added as a public web source and read at once, within the workspace's limit; going live attaches it. | `knowledge/web/brand-website.ts`, `admin/brands.service.ts`, `identity/tenants.service.ts` | `go-live.int.test.ts` |
+
+- Not checked here: answers from a live Anthropic, OpenAI or Google model (no key in this
+  container; a scripted model stands in). On production: open Home and press **Make the assistant
+  live**.
+
 ## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
 
 The owner's ask: the customer chat should feel as finished as the chats people know from

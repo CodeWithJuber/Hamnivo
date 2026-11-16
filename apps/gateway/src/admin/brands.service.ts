@@ -24,6 +24,7 @@ import { AppError } from '../common/app-error.js';
 import type { AppConfig } from '../config.js';
 import { enforce } from '../identity/staff.guard.js';
 import { queueSlaResync } from '../inbox/sla.service.js';
+import { readBrandWebsite } from '../knowledge/web/brand-website.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { originAllowed, sessionOrigin } from '../widget/origins.js';
 
@@ -149,6 +150,8 @@ export class BrandsService {
       });
       // The workspace's first brand gets its Chatwoot account by itself (SaaS onboarding).
       await queueFirstBrandSetup(tx, this.config, principal.tenantId, row.id, this.clock());
+      // Its AI learns its website without setup.
+      await readBrandWebsite(tx, row, { staffId: principal.staffMemberId }, this.clock());
       return brandView(row);
     });
   }
@@ -208,6 +211,9 @@ export class BrandsService {
         .where(eq(schema.brands.id, brand.id))
         .returning();
       if (!row) throw new Error('brand update returned nothing');
+      if (added.length > 0) {
+        await readBrandWebsite(tx, row, { staffId: principal.staffMemberId }, now);
+      }
 
       const open = and(
         eq(schema.widgetSessions.brandId, brand.id),

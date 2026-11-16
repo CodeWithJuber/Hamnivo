@@ -553,7 +553,9 @@ export class RepliesService {
     if (await this.skipIfSuperseded(tenantId, run.id, payload)) return;
     // The AI cannot answer, so people have the conversation. Someone at risk is still looked for
     // once that hand-off is committed, and still gets the safety wording and an urgent note.
-    const handOffAndGuard = async (reason: 'no_agent' | 'assist_mode' | 'ai_stopped') => {
+    const handOffAndGuard = async (
+      reason: 'no_agent' | 'assist_mode' | 'ai_stopped' | 'no_live_model',
+    ) => {
       const handedOffAt = await this.handOff(tenantId, control, run.id, payload.epoch, reason);
       if (handedOffAt === null) return;
       await this.guardAfterHandoff({
@@ -569,6 +571,12 @@ export class RepliesService {
     };
     if (agent?.config.mode !== 'answer') {
       await handOffAndGuard(agent ? 'assist_mode' : 'no_agent');
+      return;
+    }
+    // The offline test model answers every question with the same text: in production a person
+    // answers instead, and Studio says how to make the assistant live.
+    if (this.models.testModelBarred(agent.config.model)) {
+      await handOffAndGuard('no_live_model');
       return;
     }
     if (context.stopped) {
