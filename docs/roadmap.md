@@ -131,6 +131,17 @@ contracts 42 of 42 with OpenAPI regenerated; widget unit 97 of 97; widget `test:
 Strings in English, Arabic, Hindi and Urdu; [the guide](guide/setup/widget-look.md) rewritten to
 match the page (it still said **Save look**, which became **Save draft** and **Publish**).
 
+**Phase 4 results on 2026-11-16.** Studio unit 747 of 747; Studio browser tests for the
+Behaviour tab and the look (`chat-settings.spec.ts`, `agentic-platform.spec.ts`) 5 of 5; gateway
+integration 864 of 864 (65 files, on PostgreSQL 16 and Redis); contracts 46 of 46 with OpenAPI
+regenerated; widget unit 97 of 97; widget `test:e2e` 48 of 48; layout audit 300 of 300 clean;
+`CHECK=api`, `live` and `sites` (with the new `brand` case) pass.
+
+- Not done: Studio's picture draws the launcher on the right whatever the brand's corner (the
+  Look tab does not read the Behaviour tab's settings); the dark chat keeps the brand's own
+  colour for the customer's messages in the picture, where the real chat lightens it.
+- Not checked: Safari and iOS, and real third-party websites.
+
 ## Done in this pass
 
 | What | Where | Checked by |
