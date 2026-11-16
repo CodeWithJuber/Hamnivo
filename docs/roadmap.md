@@ -14,8 +14,8 @@ Claude or Hostinger, and work on every kind of website. Four phases, each pushed
 |---|---|---|
 | 1 | **The chat itself** (`apps/widget`): look, home, thread, a reply on its way, rich answers, message actions, message box, pictures | Done, see below |
 | 2 | **Launcher and every website** (`packages/widget-loader`): launcher in a shadow root, animation, the website's light or dark theme passed to the chat, single-page sites, phones, options by attribute, the direct-link and font routes in Caddy | Done, see below |
-| 3 | **Live replies** (gateway): the worker starts a reply at once instead of after every other job, metered streaming, `activity` and `message.delta` events, a Stop button, questions to ask next | Next |
-| 4 | **Brand controls** (contracts, gateway, Studio): theme, header style, launcher icon and size, offsets | Planned |
+| 3 | **Live replies** (gateway): the worker starts a reply at once instead of after every other job, metered streaming, `activity` and `message.delta` events, a Stop button, questions to ask next | Done, see below |
+| 4 | **Brand controls** (contracts, gateway, Studio): theme, header style, launcher icon and size, offsets | Next |
 
 ### Phase 1, done
 
@@ -91,6 +91,31 @@ a restart of the session's machine).
   the production smoke test (which needs Docker) was not run.
 - Not checked: Safari and iOS, and real third-party websites.
 
+
+### Phase 3, done
+
+| What | Where | Checked by |
+|---|---|---|
+| **A reply starts at once.** The worker ran every job of every workspace one after another, looking every second: a reply waited behind other replies, ingestions and migrations. It is now a pump with `OUTBOX_CONCURRENCY` slots (4; 1 is the old way): each conversation's jobs stay in order, others run beside them; it renews what it holds, hands back what waits when it stops, and wakes as soon as a change is journaled. | `gateway/src/outbox/relay.service.ts`, `authority/journal.service.ts` | `units.test.ts`, `outbox.int.test.ts` (a slow job holds only its conversation; order kept; woken in under a second) |
+| **Streamed calls are metered.** Metering refused `doStream`. It now reserves before the stream and settles from its final usage; a stream that breaks off, is stopped or never reports usage keeps its reservation held and is never retried. | `billing/ai-credits.model.ts` | `ai-credits.test.ts` (5 new cases) |
+| **The reply is written live** (`AI_STREAM_REPLIES`, on). Steps (`activity`: run, searching, tool, writing, checking) and the draft's words (`message.delta`) reach the customer's stream, live only. Whole sentences only, and only while they pass the checks that need no lookup; markers left out; status only while a brand's answer check or message guard is live. A draft that will not be the reply is withdrawn (`message.draft_discarded`, journaled). | `runtime/live-reply.ts`, `stream-gate.ts`, `run-signals.ts`, `replies.service.ts`, `widget/events.service.ts` | `live-reply.test.ts` (10), `streaming.int.test.ts` (words before the published reply, live-only, one draft) |
+| **Stop.** The customer's Stop asks the run to stop as a person's Cancel does: nothing is posted, the draft goes at once, a second Stop finds nothing. | `widget/conversations.service.ts`, `client.ts` `stopReply`, widget `Composer.tsx` | `streaming.int.test.ts` (Stop, takeover, another visitor refused) |
+| **Questions to ask next** (`AI_FOLLOW_UPS`, `help.followUps` per brand, both on). Written by the agent's model after the answer, metered, at most three; added to the answer as a `suggestions` part. | `runtime/follow-ups.service.ts`, `domain/src/follow-ups.ts`, `contracts/src/parts.ts` | `follow-ups.test.ts`, `follow-ups.int.test.ts` (live and in history; once; off per brand) |
+| **Fixed on the way: a sign-in could be lost.** A request refused because a sign-in had just ended its session renewed the ended session, failed, and started an anonymous session over the signed-in one; the customer's next messages went to the anonymous visitor. It now waits for the sign-in and uses its session. Found by the browser journey, which failed in 2 of 4 runs with the new widget's timing (the old widget's timing hid it). | `client/src/client.ts` | `client.test.ts` (2 new cases), `journey.spec.ts` 4 of 4 |
+
+**Phase 3 results on 2026-11-16.** Gateway unit 314 of 314; integration 862 of 862 (65 files,
+on PostgreSQL 16 and Redis, after every change below); client 37 of 37; domain follow-ups 3 of 3;
+contracts 42 of 42 with OpenAPI regenerated; widget unit 97 of 97; widget `test:e2e` 48 of 48
+(streaming and follow-ups on, as in production); `CHECK=api`, `live` and `sites` pass.
+
+- The read-receipt journey now waits a second before staff look: Chatwoot keeps whole seconds,
+  and a look counts only when it came after the message. Replies are now quick enough that the
+  look landed in the message's own second, and the honest rule did not count it.
+- Tests written before streaming run with `AI_STREAM_REPLIES` and `AI_FOLLOW_UPS` off
+  (`test/harness.ts`); the new tests turn them on. With streaming off nothing live is sent.
+- Not done: `message.created` does not name the draft it replaces (the widget drops every draft
+  when a reply is published, which is the same while one reply is written at a time); a
+  producer for `choices` cards; Studio's switch for follow-ups (phase 4).
 
 ## Done in this pass
 

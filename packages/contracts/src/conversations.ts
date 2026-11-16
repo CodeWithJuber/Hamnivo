@@ -171,6 +171,15 @@ export const CancelHandoffResponse = z
   .meta({ id: 'CancelHandoffResponse' });
 export type CancelHandoffResponse = z.infer<typeof CancelHandoffResponse>;
 
+/**
+ * The customer stopped the reply being written. `stopped`: a reply was being written and will
+ * not be posted; false when there was none (it was already posted, or none was due).
+ */
+export const StopReplyResponse = z
+  .object({ stopped: z.boolean() })
+  .meta({ id: 'StopReplyResponse' });
+export type StopReplyResponse = z.infer<typeof StopReplyResponse>;
+
 export const FeedbackRequest = z
   .object({
     rating: z.int().min(1).max(5),

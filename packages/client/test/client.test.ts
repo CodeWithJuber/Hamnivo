@@ -225,6 +225,93 @@ describe('identity changes', () => {
   });
 });
 
+describe('a request caught by a sign-in', () => {
+  it('waits for the sign-in and tries again with its session, instead of starting a new one', async () => {
+    let signedIn = false;
+    let releaseIdentity: (() => void) | null = null;
+    const refreshes: string[] = [];
+    const starts: number[] = [];
+    const seen: string[] = [];
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => {
+        starts.push(1);
+        return HttpResponse.json(session({ accessToken: 'access-anonymous' }), { status: 201 });
+      }),
+      http.post(`${API}/v1/widget/identity`, async () => {
+        await new Promise<void>((resolve) => {
+          releaseIdentity = resolve;
+        });
+        signedIn = true;
+        return HttpResponse.json(
+          session({ accessToken: 'access-verified', refreshToken: 'ses_x.verified' }),
+        );
+      }),
+      http.post(`${API}/v1/widget/sessions/refresh`, async ({ request }) => {
+        refreshes.push(((await request.json()) as { refreshToken: string }).refreshToken);
+        // The sign-in ended the old session, and its refresh token with it.
+        return problem(401, 'UNAUTHENTICATED', false);
+      }),
+      http.get(`${API}/v1/widget/conversations`, async ({ request }) => {
+        const token = request.headers.get('authorization') ?? '';
+        seen.push(token);
+        // Sent with the old session: answered once the sign-in has ended it.
+        if (token === 'Bearer access-anonymous') {
+          await vi.waitFor(() => expect(signedIn).toBe(true));
+          return problem(401, 'UNAUTHENTICATED', false);
+        }
+        return HttpResponse.json({ items: [] });
+      }),
+    );
+    const storage = new MemoryStorage();
+    const c = client(storage);
+    await c.connect();
+    const signingIn = c.identify('header.payload.signature-of-a-real-assertion');
+    await vi.waitFor(() => expect(releaseIdentity).not.toBeNull());
+    const listing = c.listConversations();
+    await vi.waitFor(() => expect(seen).toEqual(['Bearer access-anonymous']));
+    (releaseIdentity as unknown as () => void)();
+    await Promise.all([signingIn, listing]);
+    expect(seen).toEqual(['Bearer access-anonymous', 'Bearer access-verified']);
+    // Nobody renewed the ended session or started an anonymous one over the signed-in one.
+    expect(refreshes).toEqual([]);
+    expect(starts).toEqual([1]);
+    expect(c.current?.accessToken).toBe('access-verified');
+    expect(storage.getItem('hamnivo:wid_test:refresh')).toBe('ses_x.verified');
+  });
+
+  it('keeps a signed-in session that arrived while an ended one was being renewed', async () => {
+    let releaseRefresh: (() => void) | null = null;
+    const starts: number[] = [];
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => {
+        starts.push(1);
+        return HttpResponse.json(session({ accessToken: 'access-anonymous' }), { status: 201 });
+      }),
+      http.post(`${API}/v1/widget/sessions/refresh`, async () => {
+        await new Promise<void>((resolve) => {
+          releaseRefresh = resolve;
+        });
+        return problem(401, 'UNAUTHENTICATED', false);
+      }),
+      http.post(`${API}/v1/widget/identity`, () =>
+        HttpResponse.json(session({ accessToken: 'access-verified', refreshToken: 'ses_x.v2' })),
+      ),
+    );
+    const c = client();
+    await c.connect();
+    const renewal = c.renew();
+    await vi.waitFor(() => expect(releaseRefresh).not.toBeNull());
+    // A sign-in lands while the refresh of the old session is still on its way back.
+    (c as unknown as { adopt(s: unknown): void }).adopt(
+      session({ accessToken: 'access-verified', refreshToken: 'ses_x.v2' }),
+    );
+    (releaseRefresh as unknown as () => void)();
+    const renewed = await renewal;
+    expect(renewed.accessToken).toBe('access-verified');
+    expect(starts).toEqual([1]);
+  });
+});
+
 describe('outbox', () => {
   it('retries retryable failures with the same message id and fails fast otherwise', async () => {
     const seen: string[] = [];

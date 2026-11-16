@@ -115,6 +115,18 @@ export const MemoryPart = z
   })
   .meta({ id: 'MemoryPart' });
 
+/**
+ * Questions the customer might ask next, offered under the newest AI answer (up to three). The
+ * client shows them as choices; picking one sends it as the customer's own message. They are a
+ * suggestion, written after the answer was published, and never part of its text.
+ */
+export const SuggestionsPart = z
+  .object({
+    type: z.literal('suggestions'),
+    items: z.array(z.string().min(1).max(120)).min(1).max(3),
+  })
+  .meta({ id: 'SuggestionsPart' });
+
 export const CardPart = z
   .object({
     type: z.literal('card'),
@@ -196,6 +208,7 @@ export const KnownPart = z.discriminatedUnion('type', [
   LocationPart,
   ContactPart,
   ReactionPart,
+  SuggestionsPart,
 ]);
 export const MessagePart = z.union([KnownPart, UnknownPart]).meta({ id: 'MessagePart' });
 export type MessagePart = z.infer<typeof MessagePart>;
@@ -213,6 +226,7 @@ const KNOWN_PART_TYPES = new Set([
   'location',
   'contact',
   'reaction',
+  'suggestions',
 ]);
 
 /**
@@ -264,6 +278,9 @@ function partToPlainText(part: MessagePart): string {
       return [part.name, part.phone, part.email].filter(Boolean).join(', ');
     case 'reaction':
       return part.emoji;
+    case 'suggestions':
+      // Offers to the customer, not something said in the conversation.
+      return '';
     default:
       return part.fallbackText ?? '';
   }

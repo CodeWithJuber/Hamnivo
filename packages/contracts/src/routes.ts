@@ -28,6 +28,7 @@ import {
   SendMessageRequest,
   SendMessageResponse,
   StartConversationRequest,
+  StopReplyResponse,
 } from './conversations.js';
 import {
   customerSurfaceAdminRoutes,
@@ -261,6 +262,17 @@ export const widgetRoutes = {
     auth: 'widget_session',
     params: conversationParams,
     success: { status: 200, description: 'What happened', schema: CancelHandoffResponse },
+  },
+  stopReply: {
+    method: 'post',
+    path: '/v1/widget/conversations/{conversationId}/reply/stop',
+    operationId: 'stopReply',
+    summary:
+      'Stop the AI reply being written: nothing of it is posted, and what was shown of it goes',
+    tags: ['Widget'],
+    auth: 'widget_session',
+    params: conversationParams,
+    success: { status: 200, description: 'Whether a reply was stopped', schema: StopReplyResponse },
   },
   reopen: {
     method: 'post',

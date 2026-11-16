@@ -17,7 +17,7 @@ import { requestIdFrom } from '../src/common/request-id.js';
 import { loadConfig } from '../src/config.js';
 import { deterministicUuid } from '../src/identity/tenants.service.js';
 import { checkSourceUrl, sourceFetch } from '../src/migration/source-guard.js';
-import { retryDelayMs } from '../src/outbox/relay.service.js';
+import { orderKey, retryDelayMs, runKeyed } from '../src/outbox/relay.service.js';
 import { hintOf, type KeyRing, open, rewrap, seal, secretAad } from '../src/secrets/envelope.js';
 
 const ring = (version = 1, retired = new Map<number, Buffer>()): KeyRing => ({
@@ -131,6 +131,55 @@ describe('errors and identifiers', () => {
     expect(id).toBe(deterministicUuid('tenant:user:key'));
     expect(id).not.toBe(deterministicUuid('tenant:user:other'));
     expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+
+  it('keeps each conversation’s outbox events in order and runs other conversations beside them', async () => {
+    const started: string[] = [];
+    const finished: string[] = [];
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const events = [
+      { key: 'a', name: 'a1', slow: true },
+      { key: 'b', name: 'b1', slow: false },
+      { key: 'a', name: 'a2', slow: false },
+      { key: 'b', name: 'b2', slow: false },
+      { key: 'c', name: 'c1', slow: false },
+    ];
+    const done = runKeyed(
+      events,
+      (event) => event.key,
+      2,
+      async (event) => {
+        started.push(event.name);
+        if (event.slow) await gate;
+        finished.push(event.name);
+      },
+    );
+    // A slow event holds only its own conversation: b and then c go on while a1 waits.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(finished).toEqual(['b1', 'b2', 'c1']);
+    expect(started).not.toContain('a2');
+    release();
+    await done;
+    expect(finished).toEqual(['b1', 'b2', 'c1', 'a1', 'a2']);
+  });
+
+  it('runs one by one with one slot, and keys events by tenant and aggregate', async () => {
+    const order: number[] = [];
+    await runKeyed(
+      [1, 2, 3, 4],
+      (n) => String(n % 2),
+      1,
+      async (n) => {
+        order.push(n);
+      },
+    );
+    expect(order).toEqual([1, 3, 2, 4]);
+    expect(orderKey({ tenantId: 't1', aggregateType: 'conversation', aggregateId: 'c1' })).not.toBe(
+      orderKey({ tenantId: 't2', aggregateType: 'conversation', aggregateId: 'c1' }),
+    );
   });
 
   it('backs off exponentially with jitter up to ten minutes', () => {

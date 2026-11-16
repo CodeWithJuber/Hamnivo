@@ -650,6 +650,20 @@ export function useChat(client: HamnivoClient) {
     [],
   );
 
+  /**
+   * Stops the AI reply being written (the visitor pressed Stop). What was shown of it goes when
+   * the gateway withdraws it; nothing of it is posted.
+   */
+  const stop = useCallback(async () => {
+    const conversation = state.conversation;
+    if (!conversation) return;
+    try {
+      await client.stopReply(conversation.id);
+    } catch {
+      // Nothing was stopped: the reply arrives as it would have.
+    }
+  }, [client, state.conversation]);
+
   /** Loads the conversation on screen again after something did not load (the visitor asked to). */
   const reconnect = useCallback(
     () =>
@@ -897,5 +911,6 @@ export function useChat(client: HamnivoClient) {
     retryStart,
     dismissError,
     reconnect,
+    stop,
   };
 }

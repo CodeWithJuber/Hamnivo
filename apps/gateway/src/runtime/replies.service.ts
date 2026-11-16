@@ -21,8 +21,9 @@ import {
   checkActionClaims,
   findActionClaims,
 } from '@hamnivo/domain/actions';
+import { findCompletionClaims } from '@hamnivo/domain/commerce';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { generateText, isStepCount, type ToolSet } from 'ai';
+import { generateText, isStepCount, streamText, type ToolSet } from 'ai';
 import canonicalize from 'canonicalize';
 import { and, eq, inArray } from 'drizzle-orm';
 import { TOOL_DATA_CLASS } from '../actions/answer-cache.js';
@@ -54,16 +55,18 @@ import {
 import { claimedLiveData, conversationLiveData } from '../commerce/answer-cache.js';
 import { CLAIM_CORRECTION, checkReplyClaims } from '../commerce/claims.js';
 import { AppError } from '../common/app-error.js';
+import type { AppConfig } from '../config.js';
 import { newerCustomerMessage, storeAiDraft } from '../inbox/ai-drafts.js';
 import { type Passage, RetrievalService } from '../knowledge/retrieval.service.js';
 import { LanguageService } from '../language/language.service.js';
 import { citeMemories, memoryBlock } from '../memory/prompt.js';
 import { MemoryRecallService, type RecalledMemory } from '../memory/recall.service.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
-import { APP_DB, CLOCK, type Clock } from '../tokens.js';
+import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
 import { WorkflowContextReader } from '../workflows/context-reader.service.js';
 import { type ActiveAgent, AgentsService } from './agents.service.js';
+import { FOLLOW_UPS_TOPIC, type FollowUpsEvent } from './follow-ups.service.js';
 import {
   type AiHandoffReason,
   HANDOFF_NOTES,
@@ -72,6 +75,7 @@ import {
 } from './handoff-notes.js';
 import { checkHonesty } from './honesty.js';
 import { KillSwitchesService } from './kill-switches.service.js';
+import { type DiscardReason, LiveReply } from './live-reply.js';
 import { ModelFactory, ModelUnavailableError } from './models.js';
 import {
   applyCitations,
@@ -80,6 +84,7 @@ import {
   promptVersion,
   systemPrompt,
 } from './prompt.js';
+import { RunSignals } from './run-signals.js';
 import { type RunOutcome, RunsService } from './runs.service.js';
 
 interface CustomerMessageEvent {
@@ -119,6 +124,8 @@ interface Generated {
 type GenerateOptions = PromptOptions & {
   languageSource?: string;
   checks?: RunChecks | null;
+  /** A customer reply as it is written: its steps, and its words where the checks allow. */
+  live?: LiveReply | null;
   workflowContext?: { text: string; untrusted: true } | null;
   workflowLedgerId?: string;
 };
@@ -337,6 +344,50 @@ const FALLBACK_KINDS = new Set(['rate_limited', 'overloaded', 'unavailable', 'ti
  * when nobody else is speaking: never over a person or the AI. One automatic wording per
  * conversation in 24 hours, on every path.
  */
+/**
+ * Whether what a streamed draft would show so far passes the checks that need no lookup: it
+ * does not claim to be a person, nor that a payment, refund or change went through. A sentence
+ * that does is held back with everything after it, for the full checks once the model is done.
+ */
+export const draftPasses = (text: string): boolean =>
+  checkHonesty(text).ok &&
+  findCompletionClaims(text).length === 0 &&
+  findActionClaims(text).length === 0;
+
+/** What the reply path reads of a model call, streamed or not. */
+interface ModelResult {
+  text: string;
+  totalUsage: { inputTokens?: number | undefined; outputTokens?: number | undefined };
+  finishReason: string;
+  steps: readonly unknown[];
+}
+
+/**
+ * A model call streamed: its words go to the live reply as they come, tool calls are said as
+ * steps, and words written before a tool call are withdrawn (the reply is what comes after). The
+ * result is read as `generateText`'s would be, and an error is thrown as it would throw it.
+ */
+async function streamed(run: ReturnType<typeof streamText>, live: LiveReply): Promise<ModelResult> {
+  let failure: unknown;
+  for await (const part of run.fullStream) {
+    if (part.type === 'text-delta') live.write(part.text);
+    else if (part.type === 'tool-call') await live.step('tool', 'started');
+    else if (part.type === 'tool-result' || part.type === 'tool-error')
+      await live.step('tool', 'finished');
+    else if (part.type === 'finish-step' && part.finishReason === 'tool-calls')
+      await live.restart('superseded');
+    else if (part.type === 'error' && failure === undefined) failure = part.error;
+  }
+  if (failure !== undefined) throw failure;
+  const [text, totalUsage, finishReason, steps] = await Promise.all([
+    run.text,
+    run.totalUsage,
+    run.finishReason,
+    run.steps,
+  ]);
+  return { text, totalUsage, finishReason, steps };
+}
+
 @Injectable()
 export class RepliesService {
   private readonly logger = new Logger(RepliesService.name);
@@ -363,7 +414,29 @@ export class RepliesService {
     private readonly handoffs: HandoffPackets,
     private readonly checks: ReplyChecksService,
     private readonly workflowContext: WorkflowContextReader,
+    @Inject(CONFIG) private readonly config: AppConfig,
+    private readonly signals: RunSignals,
   ) {}
+
+  /** Journals that a draft the customer saw will not be the reply. */
+  private async discardDraft(
+    tenantId: string,
+    conversationId: string,
+    runId: string,
+    draftId: string,
+    reason: DiscardReason,
+  ): Promise<void> {
+    const entries = await this.tx(tenantId, (tx) =>
+      this.journal.append(tx, tenantId, conversationId, [
+        {
+          lane: 'customer',
+          type: 'message.draft_discarded',
+          data: { runId: toPublicId('run', runId), draftId, reason },
+        },
+      ]),
+    );
+    await this.journal.notify(tenantId, conversationId, entries);
+  }
 
   private tx<T>(tenantId: string, work: (tx: TenantTx) => Promise<T>): Promise<T> {
     return withTenant(this.db, { tenantId, actorId: 'ai' }, work);
@@ -504,393 +577,453 @@ export class RepliesService {
       await handOffAndGuard('ai_stopped');
       return;
     }
-    const history = await this.history(tenantId, runtime, control);
-    const question = latestCustomerText(history.messages);
-    // An answer to an approval request by text ("APPROVE 4F2A9C" where cards are not shown, W16)
-    // is a decision, not a question: it is recorded and the AI does not reply to it. It costs no
-    // tokens, so the plan's limits and the AI budget never stand in its way.
-    if (await this.approvals.decideByText(tenantId, control, question, payload.ledgerId)) {
-      await this.tx(tenantId, async (tx) => {
-        await this.runs.step(tx, tenantId, run.id, {
-          kind: 'decision',
-          name: 'text_approval',
-          status: 'ok',
-          detail: {},
+    // The customer sees the reply being written from here on: its steps, and its words where the
+    // brand's checks allow (see LiveReply). Every way out below ends it.
+    const live = new LiveReply(
+      {
+        signals: this.signals,
+        discard: (draftId, reason) =>
+          this.discardDraft(tenantId, control.id, run.id, draftId, reason),
+        passes: draftPasses,
+      },
+      tenantId,
+      control.id,
+      toPublicId('run', run.id),
+      false,
+      !this.config.AI_STREAM_REPLIES,
+    );
+    await live.step('run', 'started');
+    // The customer's Stop: nothing more is shown at once, and the run stops as a person's Cancel
+    // would (its cancel request is read before anything is posted).
+    const unsubscribeStop = this.config.AI_STREAM_REPLIES
+      ? await this.signals
+          .onStop(tenantId, control.id, (stopped) => {
+            if (stopped === run.id) void live.stop();
+          })
+          .catch(() => () => undefined)
+      : () => undefined;
+    try {
+      const history = await this.history(tenantId, runtime, control);
+      const question = latestCustomerText(history.messages);
+      // An answer to an approval request by text ("APPROVE 4F2A9C" where cards are not shown, W16)
+      // is a decision, not a question: it is recorded and the AI does not reply to it. It costs no
+      // tokens, so the plan's limits and the AI budget never stand in its way.
+      if (await this.approvals.decideByText(tenantId, control, question, payload.ledgerId)) {
+        await this.tx(tenantId, async (tx) => {
+          await this.runs.step(tx, tenantId, run.id, {
+            kind: 'decision',
+            name: 'text_approval',
+            status: 'ok',
+            detail: {},
+          });
+          await this.runs.finish(tx, run.id, { outcome: 'skipped', state: 'skipped' });
         });
-        await this.runs.finish(tx, run.id, { outcome: 'skipped', state: 'skipped' });
-      });
-      return;
-    }
-    // Handoff precedence 1: a customer who asks for a person gets one, and no model or decision
-    // provider is consulted first (J04).
-    const asked = detectHumanRequest(question);
-    if (asked.requested) {
-      await this.tx(tenantId, (tx) =>
-        this.runs.step(tx, tenantId, run.id, {
-          kind: 'decision',
-          name: 'human_request',
-          status: 'ok',
-          detail: { language: asked.language ?? null },
-        }),
-      );
-      const handedOffAt = await this.handOff(
-        tenantId,
-        control,
-        run.id,
-        payload.epoch,
-        'customer_request',
-        undefined,
-        { request: question },
-      );
-      // The hand-off is committed. Only now may Jev add to it: a customer who asks for a person
-      // and also writes of hurting themselves still gets the safety wording and an urgent note.
-      if (handedOffAt !== null) {
-        await this.guardAfterHandoff({
+        return;
+      }
+      // Handoff precedence 1: a customer who asks for a person gets one, and no model or decision
+      // provider is consulted first (J04).
+      const asked = detectHumanRequest(question);
+      if (asked.requested) {
+        await this.tx(tenantId, (tx) =>
+          this.runs.step(tx, tenantId, run.id, {
+            kind: 'decision',
+            name: 'human_request',
+            status: 'ok',
+            detail: { language: asked.language ?? null },
+          }),
+        );
+        const handedOffAt = await this.handOff(
           tenantId,
-          context,
+          control,
+          run.id,
+          payload.epoch,
+          'customer_request',
+          undefined,
+          { request: question },
+        );
+        // The hand-off is committed. Only now may Jev add to it: a customer who asks for a person
+        // and also writes of hurting themselves still gets the safety wording and an urgent note.
+        if (handedOffAt !== null) {
+          await this.guardAfterHandoff({
+            tenantId,
+            context,
+            runId: run.id,
+            payload,
+            sourceKey,
+            botRef: String(bot.externalBotId),
+            history: async () => history,
+            handedOffAt,
+          });
+        }
+        return;
+      }
+
+      // Plan limits and the workspace's own AI budget (A08) limit what costs tokens: the model's
+      // replies, here. They never limit safety: Hamnivo's wording for someone at risk is fixed text.
+      const checkedAllowance = await this.entitlements.aiAllowance(tenantId);
+      // Token admission is atomic at each provider attempt, and BYOK has no managed token charge.
+      const allowance =
+        !checkedAllowance.allowed &&
+        checkedAllowance.reason !== 'plan_replies' &&
+        agent.config.model.connectionId
+          ? { allowed: true as const }
+          : checkedAllowance;
+
+      // Checks around this reply, as the brand set them (shadow records, live acts).
+      const checks = await this.checks.forRun({
+        tenantId,
+        brandId: control.brandId,
+        conversationId: control.id,
+        runId: run.id,
+        budgetMs: agent.config.limits.timeoutMs,
+      });
+
+      // Reply in the customer's language (U01): their explicit choice, otherwise their words.
+      const chosen = await this.language.forReply(
+        tenantId,
+        control.principalId,
+        question,
+        checks?.languageDecider(),
+      );
+      const options: GenerateOptions = {
+        language: chosen.resolution.language,
+        style: chosen.style,
+        languageSource: chosen.resolution.source,
+        tools: agent.config.tools.grants.length > 0,
+        checks,
+        live,
+      };
+      // Words go out while the reply is written only where nothing live could still hold it back.
+      live.words = this.config.AI_STREAM_REPLIES && !checks?.holdsDrafts;
+      const handoffContext = { request: question, language: chosen.resolution.language ?? null };
+      // Jev's checks of the customer's messages (message guard, escalation): they can only hand the
+      // conversation to people, never answer, approve or unlock anything. With the AI's allowance
+      // used up the conversation goes to people anyway, so only the safety question is asked.
+      const forGuard = {
+        messages: history.messages,
+        language: chosen.detection.language ?? chosen.resolution.language,
+        replyLanguage: chosen.resolution.language,
+      };
+      const inbound = allowance.allowed
+        ? await checks?.inbound(forGuard)
+        : await checks?.inboundGuard(forGuard);
+      if (inbound?.action === 'handoff') {
+        await this.handOff(
+          tenantId,
+          control,
+          run.id,
+          payload.epoch,
+          inbound.reason,
+          undefined,
+          handoffContext,
+          inbound.note,
+        );
+        return;
+      }
+      // Someone may be at risk: Hamnivo's safe wording goes out at once, without a model, memory or
+      // cache, and people have the conversation with an urgent note from the same commit.
+      if (inbound?.action === 'urgent') {
+        await this.safeReply({
+          tenantId,
+          control,
+          displayName: agent.config.displayName,
           runId: run.id,
           payload,
           sourceKey,
           botRef: String(bot.externalBotId),
-          history: async () => history,
-          handedOffAt,
+          urgent: inbound,
+          handoff: handoffContext,
         });
+        return;
       }
-      return;
-    }
-
-    // Plan limits and the workspace's own AI budget (A08) limit what costs tokens: the model's
-    // replies, here. They never limit safety: Hamnivo's wording for someone at risk is fixed text.
-    const checkedAllowance = await this.entitlements.aiAllowance(tenantId);
-    // Token admission is atomic at each provider attempt, and BYOK has no managed token charge.
-    const allowance =
-      !checkedAllowance.allowed &&
-      checkedAllowance.reason !== 'plan_replies' &&
-      agent.config.model.connectionId
-        ? { allowed: true as const }
-        : checkedAllowance;
-
-    // Checks around this reply, as the brand set them (shadow records, live acts).
-    const checks = await this.checks.forRun({
-      tenantId,
-      brandId: control.brandId,
-      conversationId: control.id,
-      runId: run.id,
-      budgetMs: agent.config.limits.timeoutMs,
-    });
-
-    // Reply in the customer's language (U01): their explicit choice, otherwise their words.
-    const chosen = await this.language.forReply(
-      tenantId,
-      control.principalId,
-      question,
-      checks?.languageDecider(),
-    );
-    const options: GenerateOptions = {
-      language: chosen.resolution.language,
-      style: chosen.style,
-      languageSource: chosen.resolution.source,
-      tools: agent.config.tools.grants.length > 0,
-      checks,
-    };
-    const handoffContext = { request: question, language: chosen.resolution.language ?? null };
-    // Jev's checks of the customer's messages (message guard, escalation): they can only hand the
-    // conversation to people, never answer, approve or unlock anything. With the AI's allowance
-    // used up the conversation goes to people anyway, so only the safety question is asked.
-    const forGuard = {
-      messages: history.messages,
-      language: chosen.detection.language ?? chosen.resolution.language,
-      replyLanguage: chosen.resolution.language,
-    };
-    const inbound = allowance.allowed
-      ? await checks?.inbound(forGuard)
-      : await checks?.inboundGuard(forGuard);
-    if (inbound?.action === 'handoff') {
-      await this.handOff(
-        tenantId,
-        control,
-        run.id,
-        payload.epoch,
-        inbound.reason,
-        undefined,
-        handoffContext,
-        inbound.note,
-      );
-      return;
-    }
-    // Someone may be at risk: Hamnivo's safe wording goes out at once, without a model, memory or
-    // cache, and people have the conversation with an urgent note from the same commit.
-    if (inbound?.action === 'urgent') {
-      await this.safeReply({
-        tenantId,
-        control,
-        displayName: agent.config.displayName,
-        runId: run.id,
-        payload,
-        sourceKey,
-        botRef: String(bot.externalBotId),
-        urgent: inbound,
-        handoff: handoffContext,
-      });
-      return;
-    }
-    // Only now, with nothing urgent left to do, the limit: once used up, people answer instead.
-    if (!allowance.allowed) {
-      await this.tx(tenantId, (tx) =>
-        this.runs.step(tx, tenantId, run.id, {
-          kind: 'decision',
-          name: 'ai_limit',
-          status: 'ok',
-          detail: { reason: allowance.reason },
-        }),
-      );
-      await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_limit');
-      return;
-    }
-    // Customer memory (G19) is recalled before the cache: a reply built with it never enters a
-    // shared entry, only the customer's own (keyed by their memory version, K09).
-    const memories = await this.memory.recall(tenantId, {
-      runId: run.id,
-      control: context.control,
-      config: agent.config,
-      history: history.messages,
-    });
-    const shared = sharedCacheEligibility({ memoryItems: memories.length });
-    const personalContext = shared.eligible ? [] : [shared.reason];
-    // Commerce data the conversation holds (K06): a reply built from it is never cached. Nor is
-    // the reply of an agent that may call tools (G15): it may rest on a tool's answer.
-    const liveData = await this.tx(tenantId, (tx) => conversationLiveData(tx, control.id));
-    options.workflowContext = await this.workflowContext.context(tenantId, {
-      conversationId: control.id,
-      epoch: payload.epoch,
-      agentId: agent.profile.id,
-      ledgerId: payload.ledgerId,
-    });
-    const cached: AnswerLookup = await this.cachedAnswer(
-      tenantId,
-      run.id,
-      context,
-      agent,
-      history,
-      question,
-      options,
-      personalContext,
-      options.tools || options.workflowContext ? [...liveData, TOOL_DATA_CLASS] : liveData,
-    );
-
-    let generated: Generated | null;
-    const outcome: GenerateOutcome = {};
-    if (cached.kind === 'hit') {
-      generated = {
-        text: cached.answer.text,
-        provider: 'cache',
-        modelId: cached.answer.modelId,
-        inputTokens: 0,
-        outputTokens: 0,
-        latencyMs: 0,
-        sources: cached.answer.sources,
-        refs: cached.answer.refs,
-        memories: cached.answer.memories ?? [],
-        liveData: [],
-      };
-    } else {
-      // The agent's granted tools (G07, G08), cancelled with the run or when someone takes over.
-      const tools =
-        options.tools && control.brandId
-          ? await this.toolGateway.forRun({
-              tenantId,
-              brandId: control.brandId,
-              conversationId: control.id,
-              principalId: control.principalId,
-              runId: run.id,
-              epoch: payload.epoch,
-              agentId: agent.profile.id,
-              agentVersionId: agent.version.id,
-              agentDisplayName: agent.config.displayName,
-              config: agent.config,
-              controller: new AbortController(),
-            })
-          : null;
-      try {
-        generated = await this.generate(
-          tenantId,
-          run.id,
-          context,
-          agent,
-          history,
-          options,
-          memories,
-          tools,
-          outcome,
+      // Only now, with nothing urgent left to do, the limit: once used up, people answer instead.
+      if (!allowance.allowed) {
+        await this.tx(tenantId, (tx) =>
+          this.runs.step(tx, tenantId, run.id, {
+            kind: 'decision',
+            name: 'ai_limit',
+            status: 'ok',
+            detail: { reason: allowance.reason },
+          }),
         );
-      } catch (error) {
+        await this.handOff(tenantId, control, run.id, payload.epoch, 'ai_limit');
+        return;
+      }
+      // Customer memory (G19) is recalled before the cache: a reply built with it never enters a
+      // shared entry, only the customer's own (keyed by their memory version, K09).
+      const memories = await this.memory.recall(tenantId, {
+        runId: run.id,
+        control: context.control,
+        config: agent.config,
+        history: history.messages,
+      });
+      const shared = sharedCacheEligibility({ memoryItems: memories.length });
+      const personalContext = shared.eligible ? [] : [shared.reason];
+      // Commerce data the conversation holds (K06): a reply built from it is never cached. Nor is
+      // the reply of an agent that may call tools (G15): it may rest on a tool's answer.
+      const liveData = await this.tx(tenantId, (tx) => conversationLiveData(tx, control.id));
+      options.workflowContext = await this.workflowContext.context(tenantId, {
+        conversationId: control.id,
+        epoch: payload.epoch,
+        agentId: agent.profile.id,
+        ledgerId: payload.ledgerId,
+      });
+      const cached: AnswerLookup = await this.cachedAnswer(
+        tenantId,
+        run.id,
+        context,
+        agent,
+        history,
+        question,
+        options,
+        personalContext,
+        options.tools || options.workflowContext ? [...liveData, TOOL_DATA_CLASS] : liveData,
+      );
+
+      let generated: Generated | null;
+      const outcome: GenerateOutcome = {};
+      if (cached.kind === 'hit') {
+        generated = {
+          text: cached.answer.text,
+          provider: 'cache',
+          modelId: cached.answer.modelId,
+          inputTokens: 0,
+          outputTokens: 0,
+          latencyMs: 0,
+          sources: cached.answer.sources,
+          refs: cached.answer.refs,
+          memories: cached.answer.memories ?? [],
+          liveData: [],
+        };
+      } else {
+        // The agent's granted tools (G07, G08), cancelled with the run or when someone takes over.
+        const tools =
+          options.tools && control.brandId
+            ? await this.toolGateway.forRun({
+                tenantId,
+                brandId: control.brandId,
+                conversationId: control.id,
+                principalId: control.principalId,
+                runId: run.id,
+                epoch: payload.epoch,
+                agentId: agent.profile.id,
+                agentVersionId: agent.version.id,
+                agentDisplayName: agent.config.displayName,
+                config: agent.config,
+                controller: new AbortController(),
+              })
+            : null;
+        try {
+          generated = await this.generate(
+            tenantId,
+            run.id,
+            context,
+            agent,
+            history,
+            options,
+            memories,
+            tools,
+            outcome,
+          );
+        } catch (error) {
+          if (tools?.signal.aborted) {
+            live.reason = tools.signal.reason === 'cancel_requested' ? 'cancelled' : 'takeover';
+            await this.stopped(tenantId, run.id, tools);
+            return;
+          }
+          const failure = classifyModelError(error);
+          if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
+          await this.handOff(
+            tenantId,
+            control,
+            run.id,
+            payload.epoch,
+            failure.kind === 'ai_allowance' ? 'ai_limit' : 'ai_unavailable',
+            failure.kind,
+            handoffContext,
+          );
+          return;
+        } finally {
+          tools?.close();
+        }
         if (tools?.signal.aborted) {
+          live.reason = tools.signal.reason === 'cancel_requested' ? 'cancelled' : 'takeover';
           await this.stopped(tenantId, run.id, tools);
           return;
         }
-        const failure = classifyModelError(error);
-        if (failure.retryable && event.attempts < MODEL_ATTEMPTS) throw error;
-        await this.handOff(
-          tenantId,
-          control,
-          run.id,
-          payload.epoch,
-          failure.kind === 'ai_allowance' ? 'ai_limit' : 'ai_unavailable',
-          failure.kind,
-          handoffContext,
-        );
+        if (!generated) {
+          await this.handOff(
+            tenantId,
+            control,
+            run.id,
+            payload.epoch,
+            'ai_blocked',
+            undefined,
+            handoffContext,
+            outcome.blocked?.note,
+          );
+          return;
+        }
+        // Only complete answers that passed the honesty guard and the live checks, from the
+        // configured model, are kept.
+        const config = agent.config;
+        if (
+          cached.kind === 'fill' &&
+          outcome.cacheable !== false &&
+          generated.provider === config.model.provider &&
+          generated.modelId === config.model.modelId
+        ) {
+          await cached.fill(
+            {
+              text: generated.text,
+              sources: generated.sources,
+              refs: generated.refs,
+              memories: generated.memories,
+              provider: generated.provider,
+              modelId: generated.modelId,
+              inputTokens: generated.inputTokens,
+              outputTokens: generated.outputTokens,
+              latencyMs: generated.latencyMs,
+            },
+            { personalContext, dataClasses: generated.liveData },
+          );
+        }
+      }
+      const reply = generated.text;
+      const telemetry = {
+        provider: generated.provider,
+        modelId: generated.modelId,
+        inputTokens: generated.inputTokens,
+        outputTokens: generated.outputTokens,
+        latencyMs: generated.latencyMs,
+      };
+      // The customer may have written again while the model was working: that message's job
+      // answers both, so this reply is dropped (R05: one AI reply per burst of messages).
+      if (await this.skipIfSuperseded(tenantId, run.id, payload, telemetry)) {
+        live.reason = 'superseded';
         return;
-      } finally {
-        tools?.close();
       }
-      if (tools?.signal.aborted) {
-        await this.stopped(tenantId, run.id, tools);
+      // A person stopped this run (Cancel run), or the customer did (Stop): nothing is posted.
+      if (await this.cancelRequested(tenantId, run.id, telemetry)) {
+        live.reason = 'cancelled';
         return;
       }
-      if (!generated) {
-        await this.handOff(
-          tenantId,
-          control,
-          run.id,
-          payload.epoch,
-          'ai_blocked',
-          undefined,
-          handoffContext,
-          outcome.blocked?.note,
-        );
-        return;
-      }
-      // Only complete answers that passed the honesty guard and the live checks, from the
-      // configured model, are kept.
-      const config = agent.config;
-      if (
-        cached.kind === 'fill' &&
-        outcome.cacheable !== false &&
-        generated.provider === config.model.provider &&
-        generated.modelId === config.model.modelId
-      ) {
-        await cached.fill(
-          {
-            text: generated.text,
-            sources: generated.sources,
-            refs: generated.refs,
-            memories: generated.memories,
-            provider: generated.provider,
-            modelId: generated.modelId,
-            inputTokens: generated.inputTokens,
-            outputTokens: generated.outputTokens,
-            latencyMs: generated.latencyMs,
-          },
-          { personalContext, dataClasses: generated.liveData },
-        );
-      }
-    }
-    const reply = generated.text;
-    const telemetry = {
-      provider: generated.provider,
-      modelId: generated.modelId,
-      inputTokens: generated.inputTokens,
-      outputTokens: generated.outputTokens,
-      latencyMs: generated.latencyMs,
-    };
-    // The customer may have written again while the model was working: that message's job
-    // answers both, so this reply is dropped (R05: one AI reply per burst of messages).
-    if (await this.skipIfSuperseded(tenantId, run.id, payload, telemetry)) return;
-    // A person stopped this run (Cancel run): nothing more is posted.
-    if (await this.cancelRequested(tenantId, run.id, telemetry)) return;
 
-    const facts: PublicationFacts = {
-      sources: generated.sources,
-      displayName: agent.config.displayName,
-      ...(generated.memories.length ? { memories: generated.memories } : {}),
-    };
-    const reserved = await this.tx(tenantId, async (tx) => {
-      const locked = await this.ownership.lock(tx, payload.conversationId);
-      const reason = this.fenced(locked, payload.epoch);
-      const [row] = await tx
-        .insert(schema.publications)
-        .values({
-          tenantId,
-          conversationId: locked.id,
-          epoch: payload.epoch,
-          sourceKey,
-          contentHash: sha256(reply),
-          state: reason ? 'aborted' : 'reserved',
-          detail: reason ? { reason, currentEpoch: locked.ownershipEpoch } : facts,
-        })
-        .onConflictDoUpdate({
-          target: schema.publications.sourceKey,
-          set: reason
-            ? {
-                state: 'aborted',
-                detail: { reason, currentEpoch: locked.ownershipEpoch },
-                updatedAt: this.clock(),
-              }
-            : { updatedAt: this.clock(), detail: facts },
-        })
-        .returning();
-      if (reason) await this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry });
-      return { publication: row, reason };
-    });
-    if (reserved.reason || !reserved.publication) {
-      this.logger.log(
-        `reply for ${payload.conversationId} not published: ${reserved.reason ?? 'no publication'}`,
-      );
-      return;
-    }
+      const facts: PublicationFacts = {
+        sources: generated.sources,
+        displayName: agent.config.displayName,
+        ...(generated.memories.length ? { memories: generated.memories } : {}),
+      };
+      const reserved = await this.tx(tenantId, async (tx) => {
+        const locked = await this.ownership.lock(tx, payload.conversationId);
+        const reason = this.fenced(locked, payload.epoch);
+        const [row] = await tx
+          .insert(schema.publications)
+          .values({
+            tenantId,
+            conversationId: locked.id,
+            epoch: payload.epoch,
+            sourceKey,
+            contentHash: sha256(reply),
+            state: reason ? 'aborted' : 'reserved',
+            detail: reason ? { reason, currentEpoch: locked.ownershipEpoch } : facts,
+          })
+          .onConflictDoUpdate({
+            target: schema.publications.sourceKey,
+            set: reason
+              ? {
+                  state: 'aborted',
+                  detail: { reason, currentEpoch: locked.ownershipEpoch },
+                  updatedAt: this.clock(),
+                }
+              : { updatedAt: this.clock(), detail: facts },
+          })
+          .returning();
+        if (reason) await this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry });
+        return { publication: row, reason };
+      });
+      if (reserved.reason || !reserved.publication) {
+        live.reason = 'takeover';
+        this.logger.log(
+          `reply for ${payload.conversationId} not published: ${reserved.reason ?? 'no publication'}`,
+        );
+        return;
+      }
 
-    // Pre-flight: Chatwoot must still show the Hamnivo bot as the conversation's owner.
-    const state = await runtime.authority.getState(ref);
-    if (state.owner.kind !== 'bot' || state.owner.botRef !== String(bot.externalBotId)) {
-      await this.abort(tenantId, sourceKey, 'preflight_owner_mismatch', {
-        authorityOwner: state.owner,
-      });
-      await this.tx(tenantId, (tx) =>
-        this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry }),
-      );
-      return;
-    }
-    // A takeover committed in Hamnivo reaches Chatwoot through the outbox, so the pre-flight can
-    // still show the bot: check Hamnivo's own fence once more, right before posting.
-    const current = await this.tx(tenantId, (tx) =>
-      tx
-        .select()
-        .from(schema.conversationControls)
-        .where(eq(schema.conversationControls.id, payload.conversationId)),
-    );
-    const latest = current[0];
-    const lateReason = latest ? this.fenced(latest, payload.epoch) : 'not_ai_owned';
-    if (lateReason) {
-      await this.abort(tenantId, sourceKey, lateReason, {
-        currentEpoch: latest?.ownershipEpoch ?? null,
-      });
-      await this.tx(tenantId, (tx) =>
-        this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry }),
-      );
-      return;
-    }
-    let posted: AuthorityMessage;
-    try {
-      ({ message: posted } = await runtime.authority.appendMessage({
-        conversationRef: ref,
-        key: sourceKey,
-        author: { kind: 'bot', botRef: String(bot.externalBotId) },
-        visibility: 'public',
-        text: reply,
-      }));
-    } catch (error) {
-      await this.tx(tenantId, (tx) =>
+      // Pre-flight: Chatwoot must still show the Hamnivo bot as the conversation's owner.
+      const state = await runtime.authority.getState(ref);
+      if (state.owner.kind !== 'bot' || state.owner.botRef !== String(bot.externalBotId)) {
+        live.reason = 'takeover';
+        await this.abort(tenantId, sourceKey, 'preflight_owner_mismatch', {
+          authorityOwner: state.owner,
+        });
+        await this.tx(tenantId, (tx) =>
+          this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry }),
+        );
+        return;
+      }
+      // A takeover committed in Hamnivo reaches Chatwoot through the outbox, so the pre-flight can
+      // still show the bot: check Hamnivo's own fence once more, right before posting.
+      const current = await this.tx(tenantId, (tx) =>
         tx
-          .update(schema.publications)
-          .set({ state: 'unknown', updatedAt: this.clock() })
-          .where(eq(schema.publications.sourceKey, sourceKey)),
+          .select()
+          .from(schema.conversationControls)
+          .where(eq(schema.conversationControls.id, payload.conversationId)),
       );
-      throw error;
+      const latest = current[0];
+      const lateReason = latest ? this.fenced(latest, payload.epoch) : 'not_ai_owned';
+      if (lateReason) {
+        live.reason = 'takeover';
+        await this.abort(tenantId, sourceKey, lateReason, {
+          currentEpoch: latest?.ownershipEpoch ?? null,
+        });
+        await this.tx(tenantId, (tx) =>
+          this.runs.finish(tx, run.id, { outcome: 'fenced', ...telemetry }),
+        );
+        return;
+      }
+      let posted: AuthorityMessage;
+      try {
+        ({ message: posted } = await runtime.authority.appendMessage({
+          conversationRef: ref,
+          key: sourceKey,
+          author: { kind: 'bot', botRef: String(bot.externalBotId) },
+          visibility: 'public',
+          text: reply,
+        }));
+      } catch (error) {
+        await this.tx(tenantId, (tx) =>
+          tx
+            .update(schema.publications)
+            .set({ state: 'unknown', updatedAt: this.clock() })
+            .where(eq(schema.publications.sourceKey, sourceKey)),
+        );
+        throw error;
+      }
+      await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted, facts);
+      live.markPublished();
+      await this.tx(tenantId, async (tx) => {
+        await this.finishWithUsage(tx, tenantId, run.id, 'replied', telemetry);
+        // What the customer might ask next is written afterwards, apart from the answer itself.
+        if (this.config.AI_FOLLOW_UPS) {
+          const followUps: FollowUpsEvent = {
+            conversationId: payload.conversationId,
+            sourceKey,
+            runId: run.id,
+            authorityId: Number(posted.ref),
+          };
+          await enqueueOutbox(tx, tenantId, {
+            topic: FOLLOW_UPS_TOPIC,
+            aggregateType: 'conversation',
+            aggregateId: payload.conversationId,
+            payload: { ...followUps },
+          });
+        }
+      });
+    } finally {
+      unsubscribeStop();
+      await live.close();
     }
-    await this.record(tenantId, runtime, payload.conversationId, sourceKey, posted, facts);
-    await this.tx(tenantId, (tx) =>
-      this.finishWithUsage(tx, tenantId, run.id, 'replied', telemetry),
-    );
   }
 
   /**
@@ -1938,7 +2071,8 @@ export class RepliesService {
     const config: AgentConfig = agent.config;
     const messages = historyMessages(history, config.limits.historyMessages);
     const assist = config.mode === 'assist';
-    const retrieved = await this.retrieve(tenantId, runId, context, config, history);
+    const live = options.live ?? null;
+    const retrieved = await this.retrieve(tenantId, runId, context, config, history, live);
     // Passages that do not help are dropped before the model sees them (live check only).
     const passages =
       (await options.checks?.passages({
@@ -1977,6 +2111,11 @@ export class RepliesService {
         : '');
     let correction: string | null = null;
     let deadlineAt: number | undefined;
+    /** This attempt will not be the reply: its draft goes, and the next attempt writes anew. */
+    const again = async (reason: DiscardReason) => {
+      await live?.step('checking', 'finished');
+      await live?.restart(reason);
+    };
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const system = correction ? `${base}\n\n${correction}` : base;
       const generated = await this.callModels(
@@ -1993,7 +2132,11 @@ export class RepliesService {
         tools,
         deadlineAt,
         attempt,
+        live,
       );
+      // What is left of the draft goes out; then the checks run before anything is published.
+      live?.end();
+      await live?.step('checking', 'started');
       const cited = applyCitations(generated.text, passages, (p) => p.documentId);
       const remembered = citeMemories(cited.text, memories);
       const result: Generated = {
@@ -2029,6 +2172,7 @@ export class RepliesService {
       );
       if (!verdict.ok) {
         correction = CORRECTION;
+        await again('superseded');
         continue;
       }
       // X10: "paid" or "refunded" only with a provider receipt in this conversation.
@@ -2048,6 +2192,7 @@ export class RepliesService {
       }
       if (!claims.verdict.ok) {
         correction = CLAIM_CORRECTION;
+        await again('superseded');
         continue;
       }
       // G14: "changed", "done" or "checked" only with a receipt for an action in this
@@ -2074,6 +2219,7 @@ export class RepliesService {
         );
         if (!verdict.ok) {
           correction = ACTION_CLAIM_CORRECTION;
+          await again('superseded');
           continue;
         }
       }
@@ -2090,18 +2236,22 @@ export class RepliesService {
       if (checked?.action === 'regenerate') {
         correction = checked.correction;
         deadlineAt = checked.deadlineAt;
+        await again('check_failed');
         continue;
       }
       if (checked?.action === 'handoff') {
         if (outcome) outcome.blocked = { note: checked.note };
+        if (live) live.reason = 'check_failed';
         return null;
       }
       if (outcome && checked) outcome.cacheable = checked.cacheable && !workflow;
+      await live?.step('checking', 'finished');
       return {
         ...result,
         liveData: [...claimedLiveData(claims.claimed), ...(workflow ? [TOOL_DATA_CLASS] : [])],
       };
     }
+    if (live) live.reason = 'check_failed';
     return null;
   }
 
@@ -2115,6 +2265,7 @@ export class RepliesService {
     context: Context,
     config: AgentConfig,
     history: AuthorityMessage[],
+    live: LiveReply | null = null,
   ): Promise<Passage[]> {
     const brandId = context.control.brandId;
     if (config.knowledgeSourceIds.length === 0 || !brandId) return [];
@@ -2127,6 +2278,7 @@ export class RepliesService {
       .slice(-1000);
     if (!query) return [];
     const started = Date.now();
+    await live?.step('searching', 'started');
     const passages = await this.tx(tenantId, (tx) =>
       this.retrieval.search(tx, {
         brandId,
@@ -2137,7 +2289,7 @@ export class RepliesService {
         query,
         limit: PASSAGES,
       }),
-    );
+    ).finally(() => live?.step('searching', 'finished'));
     await this.tx(tenantId, (tx) =>
       this.runs.step(tx, tenantId, runId, {
         kind: 'retrieval',
@@ -2165,6 +2317,8 @@ export class RepliesService {
     /** A draft written again after a check must still finish within the run's time limit. */
     deadlineAt?: number,
     generationAttempt = 0,
+    /** A customer reply being written: streamed, so its steps and words can be shown. */
+    live: LiveReply | null = null,
   ): Promise<Generated> {
     const choices: ModelChoice[] = [config.model, ...config.fallbackModels];
     const inputHash = sha256(canonicalize({ system, messages }) ?? '');
@@ -2188,9 +2342,8 @@ export class RepliesService {
             timeoutMs: config.limits.timeoutMs,
             attribution: { runId },
           },
-          async (resolved) => ({
-            resolved,
-            result: await generateText({
+          async (resolved) => {
+            const call = {
               model: resolved.model,
               instructions: system,
               messages,
@@ -2199,8 +2352,17 @@ export class RepliesService {
               stopWhen: isStepCount(config.limits.maxSteps),
               maxRetries: 0,
               abortSignal: tools ? AbortSignal.any([timeout, tools.signal]) : timeout,
-            }),
-          }),
+            };
+            const result: ModelResult =
+              live && this.config.AI_STREAM_REPLIES
+                ? await streamed(
+                    // Errors are read from the stream and thrown as generateText would.
+                    streamText({ ...call, onError: () => undefined }),
+                    live,
+                  )
+                : await generateText(call);
+            return { resolved, result };
+          },
         );
         const generated: Generated = {
           text: result.text.trim(),

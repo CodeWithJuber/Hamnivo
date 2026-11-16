@@ -196,11 +196,29 @@ const EnvSchema = z.object({
    * Development and tests only: refused in production.
    */
   TOOLS_EGRESS_ALLOW_PRIVATE: bool.default(false),
+  /**
+   * AI replies to customers are streamed while they are written: whole sentences that pass the
+   * deterministic checks are shown as a draft, and what the assistant is doing is said. Off: the
+   * reply arrives whole, as before. Status only (no text) while a brand's answer check or message
+   * guard is live, since those can still hold a reply back.
+   */
+  AI_STREAM_REPLIES: bool.default(true),
+  /**
+   * After an AI answer is published, the agent's model suggests up to three questions the
+   * customer might ask next (brands can switch them off in their chat settings). Off: never.
+   */
+  AI_FOLLOW_UPS: bool.default(true),
   /** Tool calls of one run that may run at the same time (X03). */
   TOOLS_MAX_PARALLEL: z.coerce.number().int().min(1).max(10).default(3),
 
   /** The worker rewrites this file after every outbox pass (for container health checks). */
   WORKER_HEARTBEAT_FILE: z.string().min(1).optional(),
+  /**
+   * Outbox events the worker runs at the same time. Each conversation's events stay in order;
+   * different conversations no longer wait for each other. 1 runs them one by one, as before.
+   * Each slot can hold a database connection, so keep it under DATABASE_POOL_MAX.
+   */
+  OUTBOX_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
 
   /** Bearer token for GET /metrics; the endpoint is disabled without it. */
   METRICS_TOKEN: z.string().min(16).optional(),

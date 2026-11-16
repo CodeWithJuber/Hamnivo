@@ -133,6 +133,7 @@ import {
   PLAYGROUND_API_CONTROLLERS,
   PLAYGROUND_API_PROVIDERS,
 } from './runtime/playground.module.js';
+import { RunSignals } from './runtime/run-signals.js';
 import { RunsController } from './runtime/runs.controller.js';
 import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
@@ -284,6 +285,7 @@ export class ApiModule {
         InboxAccess,
         InboxSignals,
         TypingSignals,
+        RunSignals,
         AvailabilityService,
         InboxAlertsService,
         CustomerTypingService,

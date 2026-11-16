@@ -5,6 +5,7 @@ import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
 import type { AppConfig } from '../config.js';
 import { inboxChannel } from '../inbox/projection.js';
+import { OUTBOX_SIGNAL } from '../outbox/outbox.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, REDIS } from '../tokens.js';
 
 export type Lane = 'customer' | 'staff' | 'agent_work';
@@ -154,6 +155,9 @@ export class JournalService implements OnApplicationShutdown {
         .publish(channelOf(tenantId, conversationId), String(entries.length))
         // Staff inboxes reload the conversation; their streams check who may see it.
         .publish(inboxChannel(tenantId), JSON.stringify({ c: conversationId, k: 'change' }))
+        // What was journaled was committed with the work it starts (a customer's message and
+        // its reply job): the worker takes it now, not on its next look.
+        .publish(OUTBOX_SIGNAL, tenantId)
         .exec();
     } catch (error) {
       // Streams also poll, so a lost signal only adds latency.

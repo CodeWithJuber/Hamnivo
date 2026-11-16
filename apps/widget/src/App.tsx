@@ -321,6 +321,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
               : null
           }
           onDismissError={chat.dismissError}
+          onStop={() => void chat.stop()}
           onReconnect={() => void chat.reconnect()}
           language={language}
           memory={memory}

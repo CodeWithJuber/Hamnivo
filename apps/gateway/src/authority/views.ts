@@ -26,6 +26,8 @@ export interface PublicationFacts {
   card?: { part: z.infer<typeof CardPart>; senderName: string };
   /** Customer memories the answer relied on (G19); removed when a memory is deleted. */
   memories?: MemoryPartRef[];
+  /** Questions the customer might ask next, written after the answer was published. */
+  followUps?: string[];
 }
 
 /**
@@ -71,6 +73,7 @@ export async function publicationFacts(
       part?: z.infer<typeof CardPart>;
       senderName?: string;
       memories?: MemoryPartRef[];
+      followUps?: unknown;
     };
     const facts: PublicationFacts = {
       sources: detail.sources ?? [],
@@ -79,6 +82,13 @@ export async function publicationFacts(
         ? { card: { part: detail.part, senderName: detail.senderName ?? 'Shop' } }
         : {}),
       ...(detail.memories?.length ? { memories: detail.memories } : {}),
+      ...(Array.isArray(detail.followUps) && detail.followUps.length
+        ? {
+            followUps: detail.followUps
+              .filter((q): q is string => typeof q === 'string' && q.length > 0)
+              .slice(0, 3),
+          }
+        : {}),
     };
     const byKey = messages.find((m) => m.key === row.key);
     const ref = byKey?.ref ?? (row.authorityId === null ? null : String(row.authorityId));
@@ -178,6 +188,9 @@ export function contractMessage(input: {
           ...files,
           ...(input.facts?.sources ?? []),
           ...(input.facts?.memories ?? []),
+          ...(input.facts?.followUps?.length && sender.kind === 'ai_agent'
+            ? [{ type: 'suggestions' as const, items: input.facts.followUps }]
+            : []),
         ];
   return {
     id: input.id,

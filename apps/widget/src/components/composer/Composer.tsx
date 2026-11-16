@@ -260,7 +260,8 @@ export function Composer(props: {
         >
           <SmileIcon className="size-5" aria-hidden="true" />
         </Button>
-        {props.onStop ? (
+        {/* While a reply is written, an empty box offers Stop; words typed meanwhile can still be sent. */}
+        {props.onStop && !text.trim() && !ready ? (
           <Button
             type="button"
             variant="secondary"

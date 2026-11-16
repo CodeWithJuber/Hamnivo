@@ -5,13 +5,22 @@ The Hamnivo Gateway: one codebase, two processes, both built on NestJS 12 and Fa
 | Process | Entry | Does |
 |---|---|---|
 | API | `src/main.api.ts` | REST API, staff sign-in at `/api/auth/*` (Better Auth), administration, OpenAPI at `/v1/openapi.json` and `/docs`, health, metrics |
-| Worker | `src/main.worker.ts` | Outbox relay (at-least-once), BullMQ maintenance: audit partitions and expiry purge |
+| Worker | `src/main.worker.ts` | Outbox relay (at-least-once, `OUTBOX_CONCURRENCY` at a time, each conversation in order), BullMQ maintenance: audit partitions and expiry purge |
 | Migrations | `src/main.migrate.ts` | Applies pending database migrations as the schema owner (`DATABASE_OWNER_URL`), then exits |
 | Platform operators | `src/main.operator.ts` | Names, changes or disables a platform operator as the schema owner, then exits (`<email> <role>` or `<email> --disable`) |
 
 In production, all three run from one image (`deploy/docker/Dockerfile`, target `gateway`); see
 `docs/self-hosting.md`, Part A. The worker rewrites `WORKER_HEARTBEAT_FILE` after every outbox
 pass, and the container health check reads it.
+
+**The outbox relay** (`src/outbox/relay.service.ts`) is a pump with `OUTBOX_CONCURRENCY` slots
+(4 by default; 1 runs events one by one, as before). Events of one aggregate (a conversation, a
+migration, a document) run in the order they were claimed; different aggregates run side by side,
+so a customer's reply never waits behind another conversation, an ingestion or a migration. It
+claims only what it has room for, renews the leases of what it holds, hands back what waits when
+it stops, and wakes on `hamnivo:outbox`, published with every journaled change, instead of on its
+next one-second look. `drainOnce()` keeps its contract for tests. Covered by `test/units.test.ts`
+and `test/outbox.int.test.ts`.
 
 ## Request pipeline
 
@@ -81,6 +90,35 @@ How a customer message is handled:
    with a correction. If the second reply fails too, nothing is published and people take over.
 4. **The outbox retries a failing model twice.** After that, the conversation goes to people.
 5. **Assist mode never answers customers.** The agent writes a suggestion as an internal note.
+
+**Replies are written live** (`AI_STREAM_REPLIES`, on by default; `src/runtime/live-reply.ts`,
+`stream-gate.ts`, `run-signals.ts`). The model is called with `streamText`, metered as before
+(`billing/ai-credits.model.ts` reserves before the stream and settles from its final usage; a
+stream that ends without usage keeps its reservation held and is never retried).
+
+- The customer's streams hear what the assistant is doing (`activity`: the run, a knowledge
+  search, a tool, writing, checking) and the draft's words (`message.delta`), live only, through
+  Redis. Every step started is finished, whatever way the run ends.
+- Only whole sentences go out, and only while everything so far passes the checks that need no
+  lookup (claiming to be a person, a payment, refund or change said to be done); after the
+  first that does not, nothing more goes out until the full checks decide. Citation markers are
+  left out. With a brand's answer check or message guard live, only the steps go out.
+- A draft that will not be the reply is withdrawn with `message.draft_discarded` (journaled, so
+  a client that missed the live words drops it too): words before a tool call, a rewrite after a
+  check, Stop, a takeover, a newer customer message, a failure. The published reply replaces the
+  draft. Cached answers and people's replies are never typed out.
+- **Stop** (`POST /v1/widget/conversations/{id}/reply/stop`) asks the run to stop as a person's
+  Cancel does: nothing of it is posted, a tool call it has not made is not made, and its draft
+  goes at once. A model call already under way finishes unseen, so its usage is exact.
+- **Questions to ask next** (`AI_FOLLOW_UPS`, and `help.followUps` per brand, on by default):
+  after an answer is published, `reply.follow_ups` asks the agent's model, metered, for up to
+  three short questions, adds them to the answer as a `suggestions` part and journals
+  `message.updated`. Skipped when people have the conversation or the customer already wrote
+  again; a failure changes nothing for the customer (`src/runtime/follow-ups.service.ts`).
+
+Covered by `test/live-reply.test.ts`, `test/ai-credits.test.ts`, `test/streaming.int.test.ts`
+and `test/follow-ups.int.test.ts`. Tests written before streaming run with both switches off
+(`test/harness.ts`).
 
 `test/agents.int.test.ts` covers these paths over HTTP. A mutation check confirms the tests catch a
 missing kill-switch check and a disabled honesty guard.

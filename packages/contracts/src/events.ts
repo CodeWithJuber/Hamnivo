@@ -109,6 +109,14 @@ export const TypingEvent = ev(
   'typing',
   z.object({ participantId: z.string(), displayName: z.string(), typing: z.boolean() }),
 );
+/**
+ * What kind of step an activity is, so a client can say it in its own language: the whole run
+ * (`run`, which starts and ends every reply), a knowledge search, a tool call, writing the
+ * answer, or checking it. `label` is the gateway's own words, for clients that do not know a kind.
+ */
+export const ActivityKind = z.enum(['run', 'searching', 'tool', 'writing', 'checking']);
+export type ActivityKind = z.infer<typeof ActivityKind>;
+
 /** Real activity ("Checking order", "Waiting for approval") — no fabricated progress or private reasoning. */
 export const ActivityEvent = ev(
   'activity',
@@ -116,6 +124,8 @@ export const ActivityEvent = ev(
     runId: z.string(),
     label: z.string().max(120),
     state: z.enum(['started', 'finished']),
+    /** Newer gateways name the step; older clients read `label` alone. */
+    kind: ActivityKind.optional(),
   }),
 );
 export const HandoffRequestedEvent = ev(

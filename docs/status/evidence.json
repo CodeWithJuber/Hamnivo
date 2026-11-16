@@ -321,7 +321,7 @@
       "apps/console/src/lib/identity.ts",
       "apps/console/test/setup-screens.test.tsx"
     ],
-    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, and identity assertions signed by the tenant: kid, audience, a five-minute lifetime and a single-use jti. A new identity is a new principal: the old session and its streams end. Brands register their keys through the admin API, with two-step verification and a recent sign-in: ES256, EdDSA or RS256 public keys, or an HS256 secret shown once. Keys can be retired, or revoked, which also ends the chats they signed in. Assertions may be dated up to 5 seconds ahead. @hamnivo/server signs assertions. In the widget, identify shows the customer's own chats; reset clears the screen, ends the session in Hamnivo and in the browser, forgets unsent messages and clears other tabs; a late token renewal cannot undo either. All of this is tested, including in Chromium with a real key. The widget does not yet show the signed-in customer's name. Studio manages the keys too: create one (a shared secret is shown once, to copy), replace one (a new key of the same kind, the old one marked retiring) and revoke one."
+    "note": "Anonymous start, ES256 access tokens, rotating refresh tokens with reuse revocation, and identity assertions signed by the tenant: kid, audience, a five-minute lifetime and a single-use jti. A new identity is a new principal: the old session and its streams end. Brands register their keys through the admin API, with two-step verification and a recent sign-in: ES256, EdDSA or RS256 public keys, or an HS256 secret shown once. Keys can be retired, or revoked, which also ends the chats they signed in. Assertions may be dated up to 5 seconds ahead. @hamnivo/server signs assertions. A request sent just before a sign-in or sign-out finished, and refused because its session ended, waits for the change and is sent again with the session it left: before 2026-11-16 it renewed the ended session, failed, and started an anonymous one over the signed-in one (client-tested; with the new widget's timing the browser journey failed in 2 of 4 runs before the fix, in none of 4 after). In the widget, identify shows the customer's own chats; reset clears the screen, ends the session in Hamnivo and in the browser, forgets unsent messages and clears other tabs; a late token renewal cannot undo either. All of this is tested, including in Chromium with a real key. The widget does not yet show the signed-in customer's name. Studio manages the keys too: create one (a shared secret is shown once, to copy), replace one (a new key of the same kind, the old one marked retiring) and revoke one."
   },
   "H08": {
     "status": "implemented",
@@ -352,9 +352,11 @@
       "apps/gateway/src/authority/ownership.service.ts",
       "apps/gateway/src/runtime/replies.service.ts",
       "apps/gateway/test/conversation-flow.int.test.ts",
-      "apps/gateway/test/slice.int.test.ts"
+      "apps/gateway/test/slice.int.test.ts",
+      "apps/gateway/src/outbox/relay.service.ts",
+      "apps/gateway/test/outbox.int.test.ts"
     ],
-    "note": "One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The lease with expiry (columns present) is not used yet."
+    "note": "One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The worker runs different conversations' events side by side (OUTBOX_CONCURRENCY, 4 by default) and each conversation's own in order, renews the leases it holds and wakes as soon as a change is journaled, so a reply never waits behind another conversation, an ingestion or a migration (integration-tested). The conversation lease with expiry (columns present) is not used yet."
   },
   "R06": {
     "status": "in-progress",
@@ -627,9 +629,16 @@
       "apps/widget/src/run.ts",
       "apps/widget/test/run.test.ts",
       "apps/widget/test/drafts.test.ts",
-      "apps/widget/src/components/thread/Draft.tsx"
+      "apps/widget/src/components/thread/Draft.tsx",
+      "apps/gateway/src/runtime/live-reply.ts",
+      "apps/gateway/src/runtime/stream-gate.ts",
+      "apps/gateway/src/runtime/run-signals.ts",
+      "apps/gateway/test/live-reply.test.ts",
+      "apps/gateway/test/streaming.int.test.ts",
+      "apps/gateway/src/billing/ai-credits.model.ts",
+      "apps/gateway/test/ai-credits.test.ts"
     ],
-    "note": "Answers cite retrieved passages; citation numbers that match nothing retrieved are removed and the rest renumbered per document; sources travel as source parts from Hamnivo's publication record and the widget lists them (tested). Before an AI reply is published, the answer check asks Jev, in one call, how each cited passage relates to each sentence that cites it (supports, contradicts or says nothing). Live: a reply with a sentence that is contradicted, unaddressed or below its threshold is never published; it is written again once without that sentence (within the run's time limit), then handed to people with a note. Shadow (every brand's start): recorded only. Jev unavailable or a language without thresholds: the reply goes out as before and the check is recorded; while the check is live, such replies are not cached and earlier cached answers are not reused. Verified live on 2026-10-02 with jev-1.13.0: a supported reply was published (231 ms) and a contradicted claim never reached the customer (147 ms, then 286 ms for the rewritten reply). No thresholds were evaluated for the answer check yet: each brand sets them per language. Replies are not streamed by the gateway yet. The widget is ready for it: a streamed draft shows as formatted text marked as still being written, is never counted as a message, is replaced by the published reply it names (draftId) and dropped when it is withdrawn; activity events say what the assistant is doing (unit-tested, and checked in the browser against a mocked gateway with CHECK=live)."
+    "note": "Answers cite retrieved passages; citation numbers that match nothing retrieved are removed and the rest renumbered per document; sources travel as source parts from Hamnivo's publication record and the widget lists them (tested). Before an AI reply is published, the answer check asks Jev, in one call, how each cited passage relates to each sentence that cites it (supports, contradicts or says nothing). Live: a reply with a sentence that is contradicted, unaddressed or below its threshold is never published; it is written again once without that sentence (within the run's time limit), then handed to people with a note. Shadow (every brand's start): recorded only. Jev unavailable or a language without thresholds: the reply goes out as before and the check is recorded; while the check is live, such replies are not cached and earlier cached answers are not reused. Verified live on 2026-10-02 with jev-1.13.0: a supported reply was published (231 ms) and a contradicted claim never reached the customer (147 ms, then 286 ms for the rewritten reply). No thresholds were evaluated for the answer check yet: each brand sets them per language. Replies are streamed while written (AI_STREAM_REPLIES, on by default): only whole sentences that pass the deterministic checks (claiming to be a person, a payment, refund or change said to be done) go out, nothing more after the first that does not, citation markers left out; with the answer check or message guard live only the steps go out. A draft that will not be the reply is withdrawn with a journaled message.draft_discarded (before a tool call, after a rewrite, on Stop, a takeover, a newer customer message or a failure), and the published reply replaces it. Streamed calls are metered: reserved before, settled from the stream's final usage, held and never retried when a stream ends without it (integration-tested over SSE; the widget's side also checked in the browser with CHECK=live)."
   },
   "G17": {
     "status": "in-progress",
@@ -668,9 +677,13 @@
       "apps/widget/test/markdown.test.ts",
       "apps/widget/src/components/thread/Markdown.tsx",
       "apps/widget/src/components/thread/Sources.tsx",
-      "apps/widget/e2e/layout-audit.ts"
+      "apps/widget/e2e/layout-audit.ts",
+      "apps/gateway/src/runtime/follow-ups.service.ts",
+      "apps/gateway/test/follow-ups.int.test.ts",
+      "packages/domain/src/follow-ups.ts",
+      "packages/domain/test/follow-ups.test.ts"
     ],
-    "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers as chips that open to an excerpt, a freshness note and a link. Headings sit two levels under the chat's own, tables scroll inside their own frame, code names its language and has a copy button, and [n] links to the answer's nth source (unit-tested in jsdom, and measured in the layout audit's long-answer cases). A suggestions part shows as questions to ask next and a choices card as buttons; the gateway produces neither yet. Other structured cards pending."
+    "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers as chips that open to an excerpt, a freshness note and a link. Headings sit two levels under the chat's own, tables scroll inside their own frame, code names its language and has a copy button, and [n] links to the answer's nth source (unit-tested in jsdom, and measured in the layout audit's long-answer cases). Questions to ask next: after an answer is published the agent's model, metered, writes up to three; they reach the answer as a suggestions part (message.updated) and show as chips; brands switch them off with help.followUps (integration-tested). A choices card shows its options as buttons; nothing produces one yet. Other structured cards pending."
   },
   "J01": {
     "status": "implemented",

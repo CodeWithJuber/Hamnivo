@@ -53,16 +53,21 @@ external-store runtime and the Hamnivo design tokens.
     and `message.delta` shows the answer while it is written, as formatted text with a caret,
     marked "Writing…" and never counted as a message. The published message takes its place;
     a withdrawn draft leaves nothing behind.
-  - Where the gateway sends neither (today's gateway does not stream), the dots show for up to
-    45 seconds after the visitor's message, and end when a reply or a person arrives.
+  - The gateway streams replies (`AI_STREAM_REPLIES`, on by default): whole sentences that pass
+    its checks, while a brand's live answer check or message guard shows only the steps. Where
+    the gateway sends nothing live (an older gateway, streaming off), the dots show for up to 45
+    seconds after the visitor's message, and end when a reply or a person arrives.
+  - While a reply is written and the message box is empty, Send becomes Stop: nothing of that
+    reply is posted, and its draft goes at once (`POST …/reply/stop`). Words typed meanwhile can
+    still be sent.
   - Nothing is read out piece by piece: the published reply is announced once.
 - **Rich answers** (W08). Markdown through an allow-list: headings (two levels under the chat's
   own), lists, links, tables that scroll inside their own frame, and code with its language and
   a "Copy" button. `[1]` in an answer links to its first source. Sources show as numbered chips
   that open to an excerpt, a note when the source may have changed, and a link.
-  - Questions the assistant offers next (a `suggestions` part) show as chips under the newest
-    answer; a `choices` card shows its options as buttons. Either sends the words as the
-    visitor's own message.
+  - Questions the customer might ask next (a `suggestions` part the gateway adds after the
+    answer, `AI_FOLLOW_UPS`) show as chips under the newest answer; a `choices` card shows its
+    options as buttons. Either sends the words as the visitor's own message.
 - **Files** (W09). The paperclip attaches pictures or PDFs; so does dropping files on the chat or
   pasting them into the message box. Each file is checked by the gateway (type read from its
   bytes, size and count limits, virus scan) before it can be sent; a refused file says why.

@@ -356,6 +356,10 @@ test.describe('history and read receipts (W05, W06)', () => {
       email: `team-${randomUUID()}@example.com`,
       role: 'administrator',
     });
+    // Chatwoot keeps whole seconds, and a look counts only if it came after the message: in the
+    // same second it may have come first. Replies are quick enough now that the look would
+    // otherwise land in the message's own second.
+    await page.waitForTimeout(1100);
     const seen = await fetch(
       `${s.chatwootUrl}/api/v1/accounts/${accountId}/conversations/${control?.external}/update_last_seen`,
       { method: 'POST', headers: { api_access_token: agent.token } },

@@ -1,5 +1,11 @@
 import { schema, type TenantTx } from '@hamnivo/db';
 
+/**
+ * Published after a commit that may have queued outbox work (JournalService.notify does it for
+ * every journaled change), so the worker starts at once instead of on its next look.
+ */
+export const OUTBOX_SIGNAL = 'hamnivo:outbox';
+
 export interface OutboxMessage {
   topic: string;
   aggregateType: string;

@@ -664,6 +664,54 @@
         }
       }
     },
+    "/v1/widget/conversations/{conversationId}/reply/stop": {
+      "post": {
+        "operationId": "stopReply",
+        "summary": "Stop the AI reply being written: nothing of it is posted, and what was shown of it goes",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether a reply was stopped",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopReplyResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/widget/conversations/{conversationId}/reopen": {
       "post": {
         "operationId": "reopenConversation",
@@ -38186,6 +38234,9 @@
               "search": {
                 "default": true,
                 "type": "boolean"
+              },
+              "followUps": {
+                "type": "boolean"
               }
             }
           },
@@ -42681,6 +42732,9 @@
               },
               {
                 "$ref": "#/components/schemas/ReactionPart"
+              },
+              {
+                "$ref": "#/components/schemas/SuggestionsPart"
               }
             ],
             "type": "object",
@@ -42697,7 +42751,8 @@
                 "notice": "#/components/schemas/NoticePart",
                 "location": "#/components/schemas/LocationPart",
                 "contact": "#/components/schemas/ContactPart",
-                "reaction": "#/components/schemas/ReactionPart"
+                "reaction": "#/components/schemas/ReactionPart",
+                "suggestions": "#/components/schemas/SuggestionsPart"
               }
             }
           },
@@ -44018,6 +44073,30 @@
         ],
         "additionalProperties": false
       },
+      "SuggestionsPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "suggestions"
+          },
+          "items": {
+            "minItems": 1,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        },
+        "required": [
+          "type",
+          "items"
+        ],
+        "additionalProperties": false
+      },
       "UnknownPart": {
         "type": "object",
         "properties": {
@@ -44147,6 +44226,18 @@
           "outcome",
           "message",
           "conversation"
+        ],
+        "additionalProperties": false
+      },
+      "StopReplyResponse": {
+        "type": "object",
+        "properties": {
+          "stopped": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stopped"
         ],
         "additionalProperties": false
       },
@@ -45182,6 +45273,16 @@
                     "enum": [
                       "started",
                       "finished"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "run",
+                      "searching",
+                      "tool",
+                      "writing",
+                      "checking"
                     ]
                   }
                 },
@@ -72720,6 +72821,9 @@
               },
               "search": {
                 "default": true,
+                "type": "boolean"
+              },
+              "followUps": {
                 "type": "boolean"
               }
             },

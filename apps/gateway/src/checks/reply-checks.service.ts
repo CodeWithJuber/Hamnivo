@@ -177,6 +177,16 @@ export class RunChecks {
       .join('');
   }
 
+  /**
+   * Whether a check that can still hold the reply back is live (the answer check, the message
+   * guard): then nothing of the reply is shown while it is written, only what is being done.
+   */
+  get holdsDrafts(): boolean {
+    return (['answer-check', 'message-guard'] as const).some(
+      (task) => this.settings.get(task)?.mode === 'live',
+    );
+  }
+
   remainingMs(now = Date.now()): number {
     return this.context.deadlineAt - now;
   }

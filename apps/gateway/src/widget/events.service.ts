@@ -5,6 +5,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { JournalService } from '../authority/journal.service.js';
 import type { AppConfig } from '../config.js';
 import { type StaffTyping, TypingSignals } from '../inbox/typing.service.js';
+import { type RunSignal, RunSignals } from '../runtime/run-signals.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { SessionSignals } from './session-signals.service.js';
 import type { WidgetClaims } from './tokens.service.js';
@@ -27,6 +28,7 @@ export class WidgetEventsService {
     private readonly journal: JournalService,
     private readonly signals: SessionSignals,
     private readonly typing: TypingSignals,
+    private readonly runs: RunSignals,
   ) {}
 
   private async sessionActive(claims: WidgetClaims): Promise<boolean> {
@@ -157,10 +159,30 @@ export class WidgetEventsService {
         write(`event: typing\ndata: ${JSON.stringify(event)}\n\n`);
       },
     );
+    // An AI reply being written: what it is doing, and its draft's words. Live-only too.
+    const unsubscribeRun = await this.runs.onSignal(
+      tenantId,
+      conversationId,
+      (signal: RunSignal) => {
+        const event = {
+          schemaVersion: '1.0',
+          eventId: toPublicId('event', newId()),
+          conversationId: toPublicId('conversation', conversationId),
+          sequence: null,
+          occurredAt: this.clock().toISOString(),
+          correlationId: null,
+          lane: 'customer',
+          type: signal.type,
+          data: signal.data,
+        };
+        write(`event: ${signal.type}\ndata: ${JSON.stringify(event)}\n\n`);
+      },
+    );
     unsubscribe = () => {
       unsubscribeJournal();
       unsubscribeSession();
       unsubscribeTyping();
+      unsubscribeRun();
     };
     if (closed) {
       unsubscribe();

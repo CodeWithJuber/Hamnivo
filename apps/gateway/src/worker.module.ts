@@ -64,6 +64,7 @@ import { IdentityFingerprints } from './privacy/identity-fingerprints.js';
 import { PRIVACY_REPLAY_TOPIC, PrivacyWorker } from './privacy/privacy-worker.service.js';
 import { RetentionSweep } from './privacy/retention-sweep.service.js';
 import { AgentsService } from './runtime/agents.service.js';
+import { FOLLOW_UPS_TOPIC, FollowUpsService } from './runtime/follow-ups.service.js';
 import { KillSwitchesService } from './runtime/kill-switches.service.js';
 import { LANGUAGE_MODEL, ModelFactory } from './runtime/models.js';
 import {
@@ -71,6 +72,7 @@ import {
   SAFE_REPLY_FALLBACK_TOPIC,
   SAFE_REPLY_TOPIC,
 } from './runtime/replies.service.js';
+import { RunSignals } from './runtime/run-signals.js';
 import { RunsService } from './runtime/runs.service.js';
 import { SecretBroker } from './secrets/secret-broker.service.js';
 import { AuthorityContactsService } from './widget/contacts.service.js';
@@ -159,6 +161,8 @@ export class WorkerModule {
         MemoryExtractionService,
         ...developerWorkerProviders(overrides),
         RepliesService,
+        RunSignals,
+        FollowUpsService,
         InboxAccess,
         AvailabilityService,
         AutomationRunner,
@@ -175,6 +179,7 @@ export class WorkerModule {
           inject: [
             AuthoritySyncService,
             RepliesService,
+            FollowUpsService,
             IngestionService,
             MigrationEngine,
             MigrationExporter,
@@ -201,6 +206,7 @@ export class WorkerModule {
           useFactory: (
             sync: AuthoritySyncService,
             replies: RepliesService,
+            followUps: FollowUpsService,
             ingestion: IngestionService,
             migration: MigrationEngine,
             exporter: MigrationExporter,
@@ -252,6 +258,7 @@ export class WorkerModule {
                 },
               ],
               [SAFE_REPLY_TOPIC, (event) => replies.onSafeReply(event)],
+              [FOLLOW_UPS_TOPIC, (event) => followUps.onFollowUps(event)],
               [SAFE_REPLY_FALLBACK_TOPIC, (event) => replies.onSafeReplyFallback(event)],
               ['knowledge.ingest', (event) => ingestion.onIngest(event)],
               ['migration.scan', (event) => migration.onScan(event)],

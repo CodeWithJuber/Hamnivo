@@ -69,6 +69,12 @@ export const WidgetSettings = z
         suggestions: z.array(LocalizedText(120)).max(6).default([]),
         /** Search of the brand's public knowledge before a conversation starts. */
         search: z.boolean().default(true),
+        /**
+         * Up to three questions the customer might ask next, under each new AI answer. Written by
+         * the agent's model after the answer is published, so they cost a few tokens per answer.
+         * On unless set to false.
+         */
+        followUps: z.boolean().optional(),
       })
       .prefault({}),
     deletion: z

@@ -17,6 +17,7 @@ import type {
   OfflineMessageResponse,
   ReactionEmoji,
   SetWidgetLanguageRequest,
+  StopReplyResponse,
   VisitorLinkResponse,
   WidgetLanguageState,
   WidgetSession,
@@ -81,6 +82,8 @@ export class HamnivoClient {
   private readonly fetchImpl: typeof fetch;
   private session: WidgetSession | null = null;
   private renewing: Promise<WidgetSession> | null = null;
+  /** A sign-in or sign-out under way: requests refused meanwhile wait for it, then use its session. */
+  private changing: Promise<unknown> | null = null;
   private readonly listeners = new Set<(session: WidgetSession | null) => void>();
   private draftStore: Drafts | undefined;
 
@@ -193,7 +196,8 @@ export class HamnivoClient {
   async renew(): Promise<WidgetSession> {
     if (this.renewing) return this.renewing;
     this.renewing = (async () => {
-      const refreshToken = this.session?.refreshToken ?? this.storage.getItem(this.refreshKey);
+      const before = this.session;
+      const refreshToken = before?.refreshToken ?? this.storage.getItem(this.refreshKey);
       if (refreshToken) {
         const response = await this.raw('POST', '/v1/widget/sessions/refresh', { refreshToken });
         if (response.ok) {
@@ -203,6 +207,9 @@ export class HamnivoClient {
         }
         const problem = await problemOf(response);
         if (problem.status !== 401) throw problem;
+        // The refresh token was ended by a sign-in that has its own session by now: that one
+        // stays. Only a session nobody replaced falls back to a new one.
+        if (this.session && this.session !== before) return this.session;
         this.adopt(null);
       }
       return this.connect();
@@ -222,6 +229,18 @@ export class HamnivoClient {
     return (await this.renew()).accessToken;
   }
 
+  /**
+   * The token to try again with after a 401. A request sent just before a sign-in or sign-out
+   * finished was refused because its session ended: it waits for the change, then uses the
+   * session the change left. Otherwise the session expired, and is renewed.
+   */
+  private async afterRefusal(sent: string): Promise<string> {
+    await this.changing?.catch(() => undefined);
+    const current = this.session?.accessToken;
+    if (current && current !== sent) return current;
+    return (await this.renew()).accessToken;
+  }
+
   /** Authorized JSON request with one renewal on an expired session. */
   async request<T>(
     method: string,
@@ -229,9 +248,10 @@ export class HamnivoClient {
     body?: unknown,
     headers?: Record<string, string>,
   ): Promise<T> {
-    let response = await this.raw(method, path, body, await this.token(), headers);
+    const sent = await this.token();
+    let response = await this.raw(method, path, body, sent, headers);
     if (response.status === 401) {
-      response = await this.raw(method, path, body, (await this.renew()).accessToken, headers);
+      response = await this.raw(method, path, body, await this.afterRefusal(sent), headers);
     }
     if (!response.ok) throw await problemOf(response);
     return (response.status === 204 ? undefined : await response.json()) as T;
@@ -258,8 +278,9 @@ export class HamnivoClient {
         throw HamnivoApiError.network(error);
       }
     };
-    let response = await attempt(await this.token());
-    if (response.status === 401) response = await attempt((await this.renew()).accessToken);
+    const sent = await this.token();
+    let response = await attempt(sent);
+    if (response.status === 401) response = await attempt(await this.afterRefusal(sent));
     if (!response.ok) throw await problemOf(response);
     return response;
   }
@@ -482,6 +503,14 @@ export class HamnivoClient {
     );
   }
 
+  /**
+   * Stops the AI reply being written: nothing of it is posted, and the chat drops what it showed
+   * of it. `stopped` is false when no reply was being written.
+   */
+  stopReply(id: string): Promise<StopReplyResponse> {
+    return this.request('POST', `/v1/widget/conversations/${encodeURIComponent(id)}/reply/stop`);
+  }
+
   /** The customer's language settings (U01): interface locale, reply language, open question. */
   language(): Promise<WidgetLanguageState> {
     return this.request('GET', '/v1/widget/language');
@@ -537,12 +566,37 @@ export class HamnivoClient {
     await this.renewing?.catch(() => undefined);
   }
 
+  /** Runs a sign-in or sign-out; requests refused while it runs wait for it (see afterRefusal). */
+  private async change<T>(work: () => Promise<T>): Promise<T> {
+    const run = work();
+    this.changing = run;
+    try {
+      return await run;
+    } finally {
+      if (this.changing === run) this.changing = null;
+    }
+  }
+
   /** Signs the visitor in with an assertion minted by the website's backend (new principal). */
-  async identify(assertion: string): Promise<WidgetSession> {
-    await this.settled();
-    const session = await this.request<WidgetSession>('POST', '/v1/widget/identity', { assertion });
-    this.adopt(session);
-    return session;
+  identify(assertion: string): Promise<WidgetSession> {
+    return this.change(async () => {
+      await this.settled();
+      // Sent as itself, not through `request`: a refusal here renews, never waits for itself.
+      const body = { assertion };
+      let response = await this.raw('POST', '/v1/widget/identity', body, await this.token());
+      if (response.status === 401) {
+        response = await this.raw(
+          'POST',
+          '/v1/widget/identity',
+          body,
+          (await this.renew()).accessToken,
+        );
+      }
+      if (!response.ok) throw await problemOf(response);
+      const session = (await response.json()) as WidgetSession;
+      this.adopt(session);
+      return session;
+    });
   }
 
   /**
@@ -550,17 +604,27 @@ export class HamnivoClient {
    * server revokes it, and this device forgets it and any unsent messages. The device forgets them
    * even when the server cannot be reached; the error is still thrown so the caller can tell.
    */
-  async reset(): Promise<void> {
-    await this.settled();
-    try {
-      if (this.session) await this.request('POST', '/v1/widget/sessions/reset');
-    } finally {
-      // Unsent messages and drafts belong to the person leaving too; the next one never sees them.
-      for (const id of this.outboxes()) this.storage.removeItem(this.outboxKey(id));
-      this.storage.removeItem(this.outboxIndexKey);
-      this.drafts.clearAll();
-      this.adopt(null);
-    }
+  reset(): Promise<void> {
+    return this.change(async () => {
+      await this.settled();
+      try {
+        if (this.session) {
+          const sent = await this.token();
+          let response = await this.raw('POST', '/v1/widget/sessions/reset', undefined, sent);
+          if (response.status === 401) {
+            const renewed = (await this.renew()).accessToken;
+            response = await this.raw('POST', '/v1/widget/sessions/reset', undefined, renewed);
+          }
+          if (!response.ok) throw await problemOf(response);
+        }
+      } finally {
+        // Unsent messages and drafts belong to the person leaving too; the next one never sees them.
+        for (const id of this.outboxes()) this.storage.removeItem(this.outboxKey(id));
+        this.storage.removeItem(this.outboxIndexKey);
+        this.drafts.clearAll();
+        this.adopt(null);
+      }
+    });
   }
 
   /** Forgets the session on this device only, for example after another tab signed out. */
@@ -577,8 +641,9 @@ export class HamnivoClient {
     const url = `${this.options.apiBase.replace(/\/$/, '')}${path}`;
     const attempt = async (token: string) =>
       this.fetchImpl(url, { headers: { ...headers, authorization: `Bearer ${token}` }, signal });
-    let response = await attempt(await this.token());
-    if (response.status === 401) response = await attempt((await this.renew()).accessToken);
+    const sent = await this.token();
+    let response = await attempt(sent);
+    if (response.status === 401) response = await attempt(await this.afterRefusal(sent));
     return response;
   }
 }
