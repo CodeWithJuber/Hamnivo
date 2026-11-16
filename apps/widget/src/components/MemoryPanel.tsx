@@ -4,25 +4,8 @@ import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { Switch } from '@hamnivo/ui/components/switch';
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSlotLabel } from '../memory-slots.js';
 import type { MemoryControls } from '../useMemory.js';
-
-const SLOTS = new Set([
-  'preferred_language',
-  'preferred_name',
-  'contact_method',
-  'contact_time',
-  'communication_style',
-  'delivery_note',
-  'product_interest',
-  'size_preference',
-  'open_issue',
-  'stated_order_reference',
-]);
-
-export function useSlotLabel() {
-  const { t } = useTranslation();
-  return (key: string) => (SLOTS.has(key) ? t(`memory.slots.${key}`) : key);
-}
 
 function useDate() {
   const { i18n } = useTranslation();

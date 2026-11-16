@@ -19,6 +19,7 @@ import type {
 } from '@hamnivo/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { applyDraftEvent, DRAFT_EVENTS, type Draft } from './drafts.js';
+import { applyRunEvent, type LiveRun } from './run.js';
 
 export type Connection = StreamStatus | 'idle' | 'offline';
 
@@ -55,6 +56,15 @@ export interface ChatState {
   lastSync: string | null;
   /** AI replies still being written or checked: provisional, never shown as messages. */
   drafts: readonly Draft[];
+  /** What the assistant is doing right now, from the conversation's live events; null when idle. */
+  run: LiveRun | null;
+  /**
+   * When the visitor last sent something from this page (ms, this device's clock), until someone
+   * answers. Where the gateway sends no live activity, it is how the chat knows a reply is due.
+   */
+  awaitingSince: number | null;
+  /** When the assistant last stopped working (ms): nothing more is on its way from that run. */
+  runEndedAt: number | null;
   /**
    * The gateway refused a chat write with CHAT_UNAVAILABLE (H20): chat isn't available to this
    * visitor, though help, past conversations and privacy choices are. Cleared by a session that
@@ -113,6 +123,17 @@ function firstUnread(messages: Message[], unread: number): string | null {
   return messages.find((m) => m.sender.kind !== 'customer')?.id ?? null;
 }
 
+/** Drafts and the live run after one event, journaled or live-only. */
+function withLive(s: ChatState, type: string, data: Record<string, unknown>): ChatState {
+  const now = Date.now();
+  const drafts = DRAFT_EVENTS.has(type) ? applyDraftEvent(s.drafts, { type, data }) : s.drafts;
+  const run = applyRunEvent(s.run, { type, data }, now);
+  if (drafts === s.drafts && run === s.run) return s;
+  // A run that ended has nothing more on its way, whatever the visitor is still waiting for.
+  const ended = s.run !== null && run === null;
+  return { ...s, drafts, run, ...(ended ? { awaitingSince: null, runEndedAt: now } : {}) };
+}
+
 const EMPTY: ChatState = {
   phase: 'loading',
   session: null,
@@ -131,6 +152,9 @@ const EMPTY: ChatState = {
   firstUnreadId: null,
   lastSync: null,
   drafts: [],
+  run: null,
+  awaitingSince: null,
+  runEndedAt: null,
   unavailable: false,
 };
 
@@ -244,12 +268,7 @@ export function useChat(client: HamnivoClient) {
     const data = (event.data ?? {}) as Record<string, unknown>;
     const sequence = Number(event.sequence);
     for (const listener of listeners.current) listener({ type: event.type, data });
-    if (DRAFT_EVENTS.has(event.type)) {
-      setState((s) => {
-        const drafts = applyDraftEvent(s.drafts, { type: event.type, data });
-        return drafts === s.drafts ? s : { ...s, drafts };
-      });
-    }
+    setState((s) => withLive(s, event.type, data));
     setState((current) => {
       const s: ChatState = {
         ...current,
@@ -271,6 +290,8 @@ export function useChat(client: HamnivoClient) {
             ...s,
             messages: merge(s.messages, message),
             unread: isNew ? s.unread + 1 : s.unread,
+            // Someone answered: nothing is waited for until the visitor writes again.
+            awaitingSince: message.sender.kind === 'customer' ? s.awaitingSince : null,
           };
         }
         case 'message.redacted':
@@ -288,6 +309,7 @@ export function useChat(client: HamnivoClient) {
           return s.conversation
             ? {
                 ...s,
+                awaitingSince: data.responder === 'ai' ? s.awaitingSince : null,
                 conversation: {
                   ...s.conversation,
                   status: data.status as CustomerConversation['status'],
@@ -297,7 +319,11 @@ export function useChat(client: HamnivoClient) {
             : s;
         case 'conversation.resolved':
           return s.conversation
-            ? { ...s, conversation: { ...s.conversation, status: 'resolved', responder: 'none' } }
+            ? {
+                ...s,
+                awaitingSince: null,
+                conversation: { ...s.conversation, status: 'resolved', responder: 'none' },
+              }
             : s;
         case 'conversation.reopened':
           return s.conversation ? { ...s, conversation: { ...s.conversation, status: 'open' } } : s;
@@ -333,6 +359,9 @@ export function useChat(client: HamnivoClient) {
           : [conversation, ...s.conversations],
         messages,
         drafts: [],
+        run: null,
+        awaitingSince: null,
+        runEndedAt: null,
         olderCursor,
         loadingOlder: false,
         latestSequence: after,
@@ -348,10 +377,14 @@ export function useChat(client: HamnivoClient) {
         conversation.id,
         {
           onEvent: apply,
-          // Live-only events (a person typing) go to the parts that follow them, nowhere else.
+          // Live-only events are for now and never replayed. A person typing goes to the parts
+          // that follow it; an answer being written and what the assistant is doing are shown.
           onTransient: (event) => {
             const data = (event.data ?? {}) as Record<string, unknown>;
             for (const listener of listeners.current) listener({ type: event.type, data });
+            if (event.type === 'message.delta' || event.type === 'activity') {
+              setState((s) => withLive(s, event.type, data));
+            }
           },
           onStatus: (connection) =>
             setState((s) => ({
@@ -595,10 +628,44 @@ export function useChat(client: HamnivoClient) {
       // Typed by the person before an identity change: never sent as the next one.
       if (current === generation.current) {
         outbox.current?.enqueue(trimmed, attachments);
-        setState((s) => ({ ...s, firstUnreadId: null }));
+        setState((s) => ({ ...s, firstUnreadId: null, awaitingSince: Date.now() }));
       }
     },
     [ready],
+  );
+
+  /** Tries to start the chat again after it could not start (the visitor asked to). */
+  const retryStart = useCallback(
+    () =>
+      serial(async () => {
+        setState(EMPTY);
+        await startOver();
+      }),
+    [serial, startOver],
+  );
+
+  /** Puts away a problem that was shown and did not stop the chat. */
+  const dismissError = useCallback(
+    () => setState((s) => (s.error === null ? s : { ...s, error: null })),
+    [],
+  );
+
+  /** Loads the conversation on screen again after something did not load (the visitor asked to). */
+  const reconnect = useCallback(
+    () =>
+      serial(async () => {
+        const conversation = state.conversation;
+        setState((s) => (s.error === null ? s : { ...s, error: null }));
+        if (!conversation) return;
+        generation.current += 1;
+        attaching.current = null;
+        try {
+          await attach(conversation, true);
+        } catch (error) {
+          setState((s) => ({ ...s, error: messageOf(error) }));
+        }
+      }),
+    [attach, serial, state.conversation],
   );
 
   /** The conversation files are uploaded to; started on the first file if needed. */
@@ -827,5 +894,8 @@ export function useChat(client: HamnivoClient) {
     leaveMessage,
     reopen,
     unavailableBy,
+    retryStart,
+    dismissError,
+    reconnect,
   };
 }

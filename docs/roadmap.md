@@ -5,6 +5,57 @@ features as published on 2026-11-05 (tawk.to/features, /add-ons, developer.tawk.
 come from [`feature-status.md`](feature-status.md) and the code. Effort: S ≤ 1 day, M ≤ 1 week,
 L > 1 week.
 
+## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
+
+The owner's ask: the customer chat should feel as finished as the chats people know from
+Claude or Hostinger, and work on every kind of website. Four phases, each pushed when done.
+
+| Phase | What | Status |
+|---|---|---|
+| 1 | **The chat itself** (`apps/widget`): look, home, thread, a reply on its way, rich answers, message actions, message box, pictures | Done, see below |
+| 2 | **Launcher and every website** (`packages/widget-loader`): launcher in a shadow root, animation, the website's light or dark theme passed to the chat, single-page sites, phones, options by attribute, the direct-link and font routes in Caddy | Next |
+| 3 | **Live replies** (gateway): the worker starts a reply at once instead of after every other job, metered streaming, `activity` and `message.delta` events, a Stop button, questions to ask next | Planned |
+| 4 | **Brand controls** (contracts, gateway, Studio): theme, header style, launcher icon and size, offsets | Planned |
+
+### Phase 1, done
+
+| What | Where | Checked by |
+|---|---|---|
+| **A brand-coloured chat.** The header and the greeting carry the brand's colour, as Studio's picture always showed. Light or dark is an explicit choice (`data-theme`): an embedded chat stays light unless told `theme=dark`, and only the chat's own page follows the device. Before, a dark device turned the chat dark with a brand colour that was only checked on white. On the dark chat the colour is lightened until it stands out. | `theme.ts`, `styles.css`, `shell/Header.tsx`, `App.tsx` | `appearance.test.tsx` (contrast in both), live check (dark) |
+| **Nothing appears from nowhere.** New messages, menus, chips and the reply sign move a little on the existing motion tokens; nothing moves under reduced motion. The chat shows its shape while it starts instead of "…", and a failed start offers "Try again". | `styles.css`, `shell/Skeleton.tsx` | Browser journeys (reduced motion), layout audit |
+| **Home.** Greeting and who can answer in the brand's colour, the last conversation one press away, suggested questions as rows, help search in one field. | `Home.tsx` | `forms.test.tsx`, `unavailable.test.tsx`, journeys |
+| **A thread that reads like a conversation.** Pictures beside replies, name and role once per turn (kept for screen readers on every message), a line where a day starts, the time on every message. | `thread/Bubble.tsx`, `thread/model.ts`, `thread/grouping.ts` | `grouping.test.ts`, `thread-model.test.ts`, journeys |
+| **A reply on its way.** Three dots as soon as the visitor has written; the box stays open for the next message. With live events: the step in words, then the answer as formatted text marked as still being written, replaced by the published message. Before, the sign was a text line guessed for 60 seconds, and a streamed draft was plain text that the widget never even received (live-only events were dropped). | `useChat.ts`, `run.ts`, `drafts.ts`, `thread/Thinking.tsx`, `thread/Draft.tsx` | `run.test.ts`, `drafts.test.ts`, live check |
+| **Rich answers.** Headings, tables that scroll in their own frame, code with its language and a copy button, `[n]` linked to the nth source, sources as chips with excerpt and freshness, questions to ask next, `choices` cards as buttons. | `markdown.ts`, `thread/Markdown.tsx`, `thread/Sources.tsx`, `commerce/Cards.tsx` | `markdown.test.ts` (7 cases in jsdom), layout audit (long answer) |
+| **What to do with a reply.** Copy, Helpful, Not helpful and more reactions under each reply; the reaction shows as a badge on the reply. | `thread/Toolbar.tsx` | `surface.spec.ts` |
+| **The message box.** One rounded field with attach, emoji and a round send button; 16 px text (no zoom on iPhones); files by drop and paste; files come back when a send fails. | `composer/` | `composer.spec.ts`, `surface.spec.ts`, live check |
+| **Pictures open larger** in the chat; Escape closes the picture, then the chat. | `Lightbox.tsx`, `Parts.tsx` | `surface.spec.ts` with axe |
+| **A lighter first load.** Screens a visitor may never open (memory, settings, conversations, forms, cards, emoji, lightbox) load when asked for; bubbles are not redrawn when a reply arrives. | `Chat.tsx` | Build: main script 400 → 344 kB gzip |
+
+**Results on 2026-11-16** (Linux container, PostgreSQL 16 with pgvector and Redis installed
+natively, `HAMNIVO_SERVICES=native`).
+
+- Widget unit tests: 97 of 97 (70 before).
+- Layout audit: 300 of 300 cases clean. Before: 233 of 260, the rest a message area under
+  160 px on phones held sideways. 40 of the cases are new: a long answer in the bubble and on
+  the full page.
+- `CHECK=live` and `CHECK=api` pass.
+- Widget `test:e2e`: 48 of 48, with two journeys extended (picture opened larger, Helpful).
+- Not run: the gateway's integration suite and Studio's e2e (no gateway or Studio code changed),
+  and nothing on a real iPhone or in Safari.
+
+**Found by the new tests and fixed.** Table cells lost their alignment (the sanitizer treated
+`align` as an address), and `[1]` never became a link because identifiers were isolated first.
+
+**Not there yet, said plainly.**
+
+- The gateway does not stream: today the dots show until the whole reply arrives (phase 3).
+  Stop, the steps in words and the draft only show against the mocked gateway of the live check.
+- The loader does not pass the website's theme yet, so an embedded chat is always light
+  (phase 2), and a brand cannot choose a theme or a plain header in Studio (phase 4).
+- No producer for `suggestions` or `choices` parts yet (phase 3 for the first).
+- Translations of the new strings (Arabic, Hindi, Urdu) await native review, like the rest.
+
 ## Done in this pass
 
 | What | Where | Checked by |

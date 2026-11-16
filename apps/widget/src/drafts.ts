@@ -53,9 +53,14 @@ export function applyDraftEvent(drafts: readonly Draft[], event: DraftEvent): re
       return draftId ? drafts.filter((d) => d.draftId !== draftId) : drafts;
     }
     case 'message.created': {
-      // A published AI reply replaces its draft.
+      // A published AI reply replaces its draft: the one it names, or every draft when it
+      // names none (a gateway from before drafts were named).
       const message = data.message as { sender?: { kind?: string } } | undefined;
-      return message?.sender?.kind === 'ai_agent' && drafts.length > 0 ? [] : drafts;
+      if (message?.sender?.kind !== 'ai_agent' || drafts.length === 0) return drafts;
+      const draftId = text(data.draftId);
+      if (!draftId) return [];
+      const left = drafts.filter((d) => d.draftId !== draftId);
+      return left.length === drafts.length ? drafts : left;
     }
     case 'conversation.updated':
       // A person took over or the AI stepped back: no AI draft can still become a reply.

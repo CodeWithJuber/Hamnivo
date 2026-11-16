@@ -11,25 +11,63 @@ external-store runtime and the Hamnivo design tokens.
   under (phones, phones held sideways, a laptop at 200 % zoom), the floating and side-panel chats
   open full screen, and an inline chat is never taller than the screen. Inline and full-page
   chats have no close button.
-- **Home before a conversation** (W17). The brand's greeting, its suggested questions (each starts
+- **Look** (W03). The header and the greeting under it carry the brand's colour, with its logo
+  and name; buttons and the visitor's own messages use the same colour.
+  - The chat is light or dark by an explicit choice (`data-theme` on the page), never by the
+    visitor's device alone: what the website says (`theme=light|dark` in the frame URL), and
+    the device only on the chat's own page (`/c/<widgetId>`). An embedded chat that is told
+    nothing stays light.
+  - On the dark chat the brand's colour is made lighter until it stands out from the panel
+    (3:1); the header keeps the brand's own colour.
+  - New messages, menus and the sign that a reply is on its way move a little. Nothing moves
+    when the device or the visitor asks for less motion (W14).
+  - While the chat starts it shows its own shape, not an empty frame. If it cannot start, it
+    says so once and offers "Try again".
+- **Home before a conversation** (W17). The greeting and who can answer, in the brand's colour;
+  the visitor's last conversation, one press away; the brand's suggested questions (each starts
   the conversation) and a search of its public help articles. A proactive prompt the visitor
   opened shows in the brand's own words (W19).
 - **Conversations and messages.**
   - Starts a conversation or resumes the visitor's last one, including history; earlier messages
     load on request (W05). A signed-in customer finds the same conversations on every device
     (W18), listed under "More".
-  - Shows each message with its sender role: the AI assistant, a support agent, or the visitor.
+  - Shows each message with its sender's name and role (the AI assistant, a support agent) and
+    a picture beside it: the sender's own, the brand's logo for its assistant, or initials.
+    Replies one sender writes in a row share one name and picture; screen readers still hear
+    the name on every message. A line says where a day starts, and every message has its time.
   - Shows honest send states (W06): waiting for connection, sending, sent, read (when Chatwoot
     reports the team saw it), or not sent with the reason and retry, edit and remove.
   - Unread replies: a line where they start, a count on the launcher while the chat is closed and
     a "New messages" button while reading back; what the visitor saw is reported as read.
-  - The visitor can delete their own message within the brand's window, after confirming (W23),
-    and react to replies with a few emoji (W22).
+  - The visitor can delete their own message within the brand's window, after confirming (W23).
+  - Under a reply: copy its text, "Helpful", "Not helpful", and a few more reactions (W22). The
+    reaction shows as a small badge on the reply it is for. On devices with a pointer, the
+    actions of older replies wait for the pointer or the keyboard.
+  - While reading earlier messages, new ones never move the page: a button says how many wait,
+    and an arrow goes back to the newest.
   - Shared places and contacts show as cards; anything unknown shows as its text (W24).
-- **Files** (W09). The paperclip attaches pictures or PDFs. Each file is checked by the gateway
-  (type read from its bytes, size and count limits, virus scan) before it can be sent; a refused
-  file says why. Pictures show as previews and other files download, both fetched with the
-  session.
+- **A reply on its way.** As soon as the visitor has written, three dots show beside the
+  assistant's picture; the visitor can keep writing.
+  - The sign follows the conversation's live events where the gateway sends them: `activity`
+    says what the assistant is doing ("Searching the help articles…", "Checking the answer…"),
+    and `message.delta` shows the answer while it is written, as formatted text with a caret,
+    marked "Writing…" and never counted as a message. The published message takes its place;
+    a withdrawn draft leaves nothing behind.
+  - Where the gateway sends neither (today's gateway does not stream), the dots show for up to
+    45 seconds after the visitor's message, and end when a reply or a person arrives.
+  - Nothing is read out piece by piece: the published reply is announced once.
+- **Rich answers** (W08). Markdown through an allow-list: headings (two levels under the chat's
+  own), lists, links, tables that scroll inside their own frame, and code with its language and
+  a "Copy" button. `[1]` in an answer links to its first source. Sources show as numbered chips
+  that open to an excerpt, a note when the source may have changed, and a link.
+  - Questions the assistant offers next (a `suggestions` part) show as chips under the newest
+    answer; a `choices` card shows its options as buttons. Either sends the words as the
+    visitor's own message.
+- **Files** (W09). The paperclip attaches pictures or PDFs; so does dropping files on the chat or
+  pasting them into the message box. Each file is checked by the gateway (type read from its
+  bytes, size and count limits, virus scan) before it can be sent; a refused file says why.
+  Pictures show as previews that open larger in the chat, and other files download, both
+  fetched with the session. Files of a message that could not be sent stay attached.
 - **Connection** (W07, W11).
   - A banner shows when the device is offline, with the last update and "Try again".
   - Messages typed while offline wait ("Queue") and are sent once when the connection returns.
@@ -73,10 +111,12 @@ external-store runtime and the Hamnivo design tokens.
     should use (suggestion first, "not now" to close). The choice is saved on the server, and so
     is the interface language, as inputs to the reply language.
 - **Typing.** Enter sends and Shift+Enter starts a new line. An Enter that confirms an input
-  method composition (Hindi, Urdu, Arabic or Chinese keyboards) never sends.
+  method composition (Hindi, Urdu, Arabic or Chinese keyboards) never sends. The message box is
+  one rounded field with attach, emoji and send; its text is 16 px, so phones do not zoom in.
 - **Accessibility.**
   - Everything works from the keyboard.
-  - Escape closes the chat.
+  - Escape closes what is open on top first (the menu, the emoji, a picture), then the chat.
+  - A screen opened from the chat (settings, conversations) takes focus on its name.
   - Labelled controls.
   - New messages are announced politely.
 - **Shopping** (`src/commerce/`, when the brand has a merchant connection).
@@ -131,7 +171,9 @@ pnpm --filter @hamnivo/widget test:e2e
 - `e2e/composer.spec.ts` covers input method composition (no send on the confirming Enter),
   message direction and isolated identifiers in Urdu with axe, and the Hinglish/Roman Urdu
   language question.
-- `pnpm --filter @hamnivo/widget test` checks that every locale has every key and placeholder.
+- `pnpm --filter @hamnivo/widget test` checks that every locale has every key and placeholder,
+  and the chat's pure rules: Markdown (what is kept, tables, code, source links), how messages
+  group, the live run and draft reducers, and the light and dark colours.
 - `e2e/shopping.spec.ts` buys through the fake Stripe server (`startFakeStripe`) and its hosted
   page; nothing reaches the real Stripe. It covers: products → cart → exact quote → approval →
   payment page → paid receipt → a delay update; cancelling with the cart kept, and the quote in
@@ -146,3 +188,23 @@ pnpm --filter @hamnivo/widget test:e2e
   launcher, deleting and reacting, help suggestions and search, proactive prompts with their
   limits, the four layouts, text size and less motion, keyboard use, 320 px and 200 % zoom in
   English and Arabic, continuing on another device and email choices, with axe audits.
+
+
+## Layout audit and live check (no database)
+
+```bash
+pnpm --filter @hamnivo/widget-loader build && pnpm --filter @hamnivo/widget exec vite build
+node apps/widget/e2e/layout-audit.ts <dir>             # every screen size, layout and scenario
+CHECK=live node apps/widget/e2e/layout-audit.ts <dir>  # how a reply arrives
+CHECK=api node apps/widget/e2e/layout-audit.ts <dir>   # the website's side (Hamnivo.on, prefill…)
+```
+
+- The audit opens the built chat against a mocked gateway on 20 screen sizes, in the four
+  layouts, with an empty home, a conversation (English and Arabic), a waiting banner and a long
+  answer (table, code, sources). It measures sideways overflow, controls off screen, small tap
+  targets, the frame leaving the window and a message area under 160 px, and writes a
+  screenshot per case and `report.json`.
+- `CHECK=live` sends the events a streaming gateway would send and fails on the first thing
+  wrong: the dots after sending, the step in words, the draft (formatted, marked, not counted
+  as a reply), the published message in its place, the menu and Escape, reading earlier
+  messages while a reply arrives, and the long answer on a phone, light and dark.

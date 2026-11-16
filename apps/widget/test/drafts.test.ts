@@ -11,6 +11,18 @@ function play(events: Array<{ type: string; data?: Record<string, unknown> }>) {
 }
 
 describe('draft replies before publication', () => {
+  it('replaces only the draft a published reply names, and every draft when it names none', () => {
+    const published = (draftId?: string) => ({
+      type: 'message.created',
+      data: { ...(draftId ? { draftId } : {}), message: { sender: { kind: 'ai_agent' } } },
+    });
+    const two = [delta(0, 'First.', 'drf_1'), delta(0, 'Second.', 'drf_2')];
+    expect(play([...two, published('drf_1')]).map((d) => d.draftId)).toEqual(['drf_2']);
+    expect(play([...two, published()])).toEqual([]);
+    // A reply that names a draft not on screen leaves the others as they are.
+    expect(play([...two, published('drf_9')])).toHaveLength(2);
+  });
+
   it('builds a provisional draft from its pieces, in order, ignoring repeats', () => {
     const drafts = play([delta(0, 'Returns take '), delta(1, '90 days.'), delta(1, 'garbled')]);
     expect(drafts).toHaveLength(1);

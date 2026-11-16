@@ -1,10 +1,10 @@
 import type { HamnivoClient } from '@hamnivo/client';
 import type { NotificationPreferences } from '@hamnivo/contracts';
-import { Button } from '@hamnivo/ui/components/button';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type DisplayControls, TEXT_SIZES } from '../useDisplay.js';
+import { SubHeader } from './shell/SubHeader.js';
 
 /**
  * Emails about the visitor's conversations (W25): offered to signed-in customers with a verified
@@ -107,14 +107,12 @@ export function Settings(props: {
       className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4"
       data-testid="settings"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={`${id}-title`} className="text-base font-semibold text-text">
-          {t('surface.settings.title')}
-        </h2>
-        <Button variant="link" className="h-auto" onClick={props.onBack}>
-          {t('surface.settings.back')}
-        </Button>
-      </div>
+      <SubHeader
+        title={t('surface.settings.title')}
+        titleId={`${id}-title`}
+        back={t('surface.settings.back')}
+        onBack={props.onBack}
+      />
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-sm font-medium text-text">
           {t('surface.settings.textSize')}

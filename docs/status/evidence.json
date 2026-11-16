@@ -33,9 +33,11 @@
       "apps/console/src/pages/settings/WidgetPreview.tsx",
       "apps/console/src/lib/appearance.ts",
       "packages/db/src/schema/setup.ts",
-      "docs/guide/setup/widget-look.md"
+      "docs/guide/setup/widget-look.md",
+      "apps/widget/src/styles.css",
+      "apps/widget/src/components/shell/Header.tsx"
     ],
-    "note": "Each brand sets its main colour, logo, corner radius, greeting, offline text, rating on or off and privacy link in Studio, with a live picture of the chat in each language. The gateway refuses a colour whose text cannot be read or that fades into a white page (the same contrast check as the brand package) and Studio suggests a darker one. The widget draws itself from design tokens; a brand that changes nothing looks as before. Typography is not configurable, and the launcher position is a chat setting (W02)."
+    "note": "Each brand sets its main colour, logo, corner radius, greeting, offline text, rating on or off and privacy link in Studio, with a live picture of the chat in each language. The gateway refuses a colour whose text cannot be read or that fades into a white page (the same contrast check as the brand package) and Studio suggests a darker one. The widget draws itself from design tokens: the header and the greeting carry the brand's colour, as Studio's picture shows. The chat is light or dark by an explicit choice, never by the visitor's device alone: an embedded chat stays light unless the frame URL says theme=dark, and only the chat's own page follows the device; on the dark chat the brand's colour is lightened until it stands out (3:1, unit-tested). The loader does not pass the website's theme yet, and brands cannot choose a theme or a plain header in Studio yet. Typography is not configurable, and the launcher position is a chat setting (W02)."
   },
   "HNV-24-01": {
     "status": "implemented",
@@ -412,9 +414,14 @@
       "apps/gateway/src/authority/views.ts",
       "apps/gateway/test/knowledge.int.test.ts",
       "apps/widget/e2e/journey.spec.ts",
-      "apps/widget/src/components/Chat.tsx"
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/components/thread/Bubble.tsx",
+      "apps/widget/src/components/thread/model.ts",
+      "apps/widget/src/components/thread/grouping.ts",
+      "apps/widget/test/thread-model.test.ts",
+      "apps/widget/test/grouping.test.ts"
     ],
-    "note": "Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested)."
+    "note": "Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested). Replies one sender writes in a row share one name and picture (the sender's own, the brand's logo for its assistant, or initials); the name and role stay in the page for every message, so identity never rests on a picture (grouping unit-tested)."
   },
   "W10": {
     "status": "in-progress",
@@ -441,9 +448,10 @@
       "apps/widget/e2e/surface.spec.ts",
       "apps/widget/src/components/Chat.tsx",
       "apps/widget/src/useDisplay.ts",
-      "packages/widget-loader/src/loader.ts"
+      "packages/widget-loader/src/loader.ts",
+      "apps/widget/src/components/shell/SubHeader.tsx"
     ],
-    "note": "Keyboard operation (tested from the page's launcher into the chat's settings), Escape to close with focus returned to the launcher, labelled controls, polite live announcements, text size and less motion in the chat's settings with the device's own text size and reduced-motion setting applied first, reflow at 320 px and 200 % zoom, and axe audits with no WCAG 2.2 AA violations (tested). Manual screen-reader review pending."
+    "note": "Keyboard operation (tested from the page's launcher into the chat's settings), Escape to close with focus returned to the launcher (what is open on top closes first: the menu, the emoji, a picture), settings and conversations taking focus on their name, labelled controls, polite live announcements, text size and less motion in the chat's settings with the device's own text size and reduced-motion setting applied first, reflow at 320 px and 200 % zoom, and axe audits with no WCAG 2.2 AA violations (tested). Manual screen-reader review pending."
   },
   "D02": {
     "status": "in-progress",
@@ -608,9 +616,13 @@
       "apps/gateway/src/checks/reply-checks.service.ts",
       "apps/gateway/test/checks.int.test.ts",
       "apps/gateway/test/checks.live.test.ts",
-      "apps/widget/src/drafts.ts"
+      "apps/widget/src/drafts.ts",
+      "apps/widget/src/run.ts",
+      "apps/widget/test/run.test.ts",
+      "apps/widget/test/drafts.test.ts",
+      "apps/widget/src/components/thread/Draft.tsx"
     ],
-    "note": "Answers cite retrieved passages; citation numbers that match nothing retrieved are removed and the rest renumbered per document; sources travel as source parts from Hamnivo's publication record and the widget lists them (tested). Before an AI reply is published, the answer check asks Jev, in one call, how each cited passage relates to each sentence that cites it (supports, contradicts or says nothing). Live: a reply with a sentence that is contradicted, unaddressed or below its threshold is never published; it is written again once without that sentence (within the run's time limit), then handed to people with a note. Shadow (every brand's start): recorded only. Jev unavailable or a language without thresholds: the reply goes out as before and the check is recorded; while the check is live, such replies are not cached and earlier cached answers are not reused. Verified live on 2026-10-02 with jev-1.13.0: a supported reply was published (231 ms) and a contradicted claim never reached the customer (147 ms, then 286 ms for the rewritten reply). No thresholds were evaluated for the answer check yet: each brand sets them per language. Replies are not streamed in this branch; the widget keeps any streamed draft provisional until it is published and drops it when it is withdrawn."
+    "note": "Answers cite retrieved passages; citation numbers that match nothing retrieved are removed and the rest renumbered per document; sources travel as source parts from Hamnivo's publication record and the widget lists them (tested). Before an AI reply is published, the answer check asks Jev, in one call, how each cited passage relates to each sentence that cites it (supports, contradicts or says nothing). Live: a reply with a sentence that is contradicted, unaddressed or below its threshold is never published; it is written again once without that sentence (within the run's time limit), then handed to people with a note. Shadow (every brand's start): recorded only. Jev unavailable or a language without thresholds: the reply goes out as before and the check is recorded; while the check is live, such replies are not cached and earlier cached answers are not reused. Verified live on 2026-10-02 with jev-1.13.0: a supported reply was published (231 ms) and a contradicted claim never reached the customer (147 ms, then 286 ms for the rewritten reply). No thresholds were evaluated for the answer check yet: each brand sets them per language. Replies are not streamed by the gateway yet. The widget is ready for it: a streamed draft shows as formatted text marked as still being written, is never counted as a message, is replaced by the published reply it names (draftId) and dropped when it is withdrawn; activity events say what the assistant is doing (unit-tested, and checked in the browser against a mocked gateway with CHECK=live)."
   },
   "G17": {
     "status": "in-progress",
@@ -643,8 +655,15 @@
   },
   "W08": {
     "status": "in-progress",
-    "evidence": ["apps/widget/src/components/Chat.tsx", "apps/widget/src/markdown.ts"],
-    "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers. Structured cards pending."
+    "evidence": [
+      "apps/widget/src/components/Chat.tsx",
+      "apps/widget/src/markdown.ts",
+      "apps/widget/test/markdown.test.ts",
+      "apps/widget/src/components/thread/Markdown.tsx",
+      "apps/widget/src/components/thread/Sources.tsx",
+      "apps/widget/e2e/layout-audit.ts"
+    ],
+    "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers as chips that open to an excerpt, a freshness note and a link. Headings sit two levels under the chat's own, tables scroll inside their own frame, code names its language and has a copy button, and [n] links to the answer's nth source (unit-tested in jsdom, and measured in the layout audit's long-answer cases). A suggestions part shows as questions to ask next and a choices card as buttons; the gateway produces neither yet. Other structured cards pending."
   },
   "J01": {
     "status": "implemented",
@@ -2628,7 +2647,7 @@
       "packages/widget-loader/test/placement.test.ts",
       "apps/widget/e2e/layout-audit.ts"
     ],
-    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens up to 480 px wide or 520 px tall (phones, phones held sideways, 200 % zoom) the button and the panel open full screen, sized to the visible area, with the page behind held still; elsewhere the floating chat stays inside the window. A layout audit (e2e/layout-audit.ts) checks 20 screen sizes from a 280 px Fold to 2560 px in all four layouts, with no database. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic."
+    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens up to 480 px wide or 520 px tall (phones, phones held sideways, 200 % zoom) the button and the panel open full screen, sized to the visible area, with the page behind held still; elsewhere the floating chat stays inside the window. A layout audit (e2e/layout-audit.ts) checks 20 screen sizes from a 280 px Fold to 2560 px in all four layouts, with no database: 300 of 300 cases clean on 2026-11-16, including a long answer with a table and code, and a message area of at least 160 px on a phone held sideways. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic."
   },
   "W09": {
     "status": "implemented",
@@ -2655,7 +2674,7 @@
       "apps/widget/e2e/surface.spec.ts",
       "apps/console/src/pages/BrandChatSettings.tsx"
     ],
-    "note": "A home before the conversation: the brand's suggested questions in each language, each starting the conversation, and a search of the brand's public knowledge with the assistant's retrieval and the customer audience (internal sources and other brands excluded), limited per session. Results are the brand's own articles, never generated text (tested)."
+    "note": "A home before the conversation: the greeting and who can answer in the brand's colour, the visitor's last conversation one press away, the brand's suggested questions in each language, each starting the conversation, and a search of the brand's public knowledge with the assistant's retrieval and the customer audience (internal sources and other brands excluded), limited per session. Results are the brand's own articles, never generated text (tested)."
   },
   "W18": {
     "status": "implemented",
@@ -2694,9 +2713,10 @@
       "apps/gateway/test/customer-surface.int.test.ts",
       "apps/widget/src/components/MessageActions.tsx",
       "apps/widget/e2e/surface.spec.ts",
-      "packages/chatwoot/src/authority.ts"
+      "packages/chatwoot/src/authority.ts",
+      "apps/widget/src/components/thread/Toolbar.tsx"
     ],
-    "note": "Chatwoot CE has no reactions (the adapter reports reactions: false), so a reaction travels as a short customer message quoting the reply (in_reply_to, a stable parent reference) that staff read as such, sent once and never answered by the assistant. Threads (replying to a chosen message) are not offered."
+    "note": "Chatwoot CE has no reactions (the adapter reports reactions: false), so a reaction travels as a short customer message quoting the reply (in_reply_to, a stable parent reference) that staff read as such, sent once and never answered by the assistant. In the widget, Helpful and Not helpful under a reply are two of these reactions, the others open from one more button, and a reaction shows as a badge on the reply it is for. Threads (replying to a chosen message) are not offered."
   },
   "W23": {
     "status": "partial",
@@ -2804,7 +2824,7 @@
       "apps/widget/src/useChat.ts",
       "apps/widget/e2e/surface.spec.ts"
     ],
-    "note": "While reading back, new replies leave the reading position alone and a button says how many wait."
+    "note": "While reading back, new replies leave the reading position alone and a button says how many wait; an arrow goes back to the newest message when nothing new waits."
   },
   "HNV-07-01": {
     "status": "implemented",
@@ -2813,7 +2833,7 @@
       "packages/widget-loader/src/loader.ts",
       "apps/widget/e2e/surface.spec.ts"
     ],
-    "note": "On narrow screens the chat opens full screen as one pane; the header wraps, the message box stays reachable and clears the safe area (tested at 320 px and at 200 % zoom)."
+    "note": "On narrow screens the chat opens full screen as one pane; the header wraps, the message box stays reachable, its text is 16 px so phones do not zoom in, and it clears the safe area (tested at 320 px and at 200 % zoom)."
   },
   "HNV-07-02": {
     "status": "in-progress",

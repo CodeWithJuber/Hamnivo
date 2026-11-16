@@ -6,6 +6,12 @@
  *
  *   pnpm --filter @hamnivo/widget-loader build && pnpm --filter @hamnivo/widget exec vite build
  *   node apps/widget/e2e/layout-audit.ts <outDir>
+ *
+ * CHECK=api checks the website's side instead (Hamnivo.on, prefill, hide…), and CHECK=live how a
+ * reply arrives: the sign that one is on its way, what the assistant is doing, the answer while
+ * it is written, and its place taken by the published message. Both throw on the first thing
+ * that is wrong. ONLY=<regex> runs the matching cases of the matrix, and SCALE=2 takes its
+ * screenshots at twice the size.
  */
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -37,7 +43,7 @@ function serveFile(response: ServerResponse, file: string) {
 }
 
 // ---------------------------------------------------------------- fixtures
-type Scenario = 'home' | 'conversation' | 'waiting';
+type Scenario = 'home' | 'conversation' | 'waiting' | 'rich';
 
 const conversation = (scenario: Scenario) => ({
   id: 'cnv_layout1',
@@ -69,7 +75,74 @@ const text = (value: string, format: 'plain' | 'markdown' = 'plain') => [
   { type: 'text', text: value, format },
 ];
 
-function messages() {
+/** An answer with everything an answer can carry: a table, code, sources and what to ask next. */
+const RICH_ANSWER = [
+  '### Delivery options',
+  '',
+  '| Option | Arrives in | Cost | Tracking |',
+  '|---|---|---|---|',
+  '| Standard | 5–7 working days | Free over $35 | Yes |',
+  '| Express | 1–2 working days | $9.90 | Yes, live |',
+  '| International | 7–14 working days | From $14.50 | Depends on the carrier |',
+  '',
+  'Orders placed before **2 pm** ship the same day [1]. A damaged book can be returned within 30 days [2].',
+  '',
+  '### Track an order from your own system',
+  '',
+  '```bash',
+  'curl https://api.noorbooks.example.com/v1/orders/NB-2026-0000918273645/tracking \\',
+  '  -H "Authorization: Bearer $NOOR_API_KEY"',
+  '```',
+  '',
+  '- The reply lists every parcel',
+  '- `status` is one of `packed`, `shipped` or `delivered`',
+].join('\n');
+
+const richParts = [
+  { type: 'text', text: RICH_ANSWER, format: 'markdown' },
+  {
+    type: 'source',
+    sourceId: 'src_1',
+    title: 'Delivery times and costs',
+    url: 'https://noorbooks.example.com/help/delivery',
+    version: '3',
+    excerpt: 'Orders placed before 2 pm on a working day leave our warehouse the same day.',
+    freshness: 'current',
+  },
+  {
+    type: 'source',
+    sourceId: 'src_2',
+    title: 'Returns and refunds for damaged or missing items',
+    url: 'https://noorbooks.example.com/help/returns',
+    version: '7',
+    excerpt: 'A damaged book can be returned within 30 days of delivery for a replacement.',
+    freshness: 'stale',
+  },
+  {
+    type: 'suggestions',
+    items: ['Do you deliver to Germany?', 'Where is my order?', 'Change my delivery address'],
+  },
+];
+
+function messages(sc: Scenario = scenario) {
+  if (sc === 'rich') {
+    const rich = [
+      [me, text('What are the delivery options, and can I track an order from my own system?')],
+      [ai, richParts],
+    ] as const;
+    return rich.map(([sender, parts], index) => ({
+      id: `msg_${index + 1}`,
+      conversationId: 'cnv_layout1',
+      sequence: index + 1,
+      sender,
+      visibility: 'public',
+      parts,
+      createdAt: at(index + 1),
+      clientMessageId: sender.kind === 'customer' ? '00000000-0000-4000-8000-000000000000' : null,
+      delivery: sender.kind === 'customer' ? 'read' : null,
+      language: 'en',
+    }));
+  }
   const items = [
     [
       me,
@@ -218,8 +291,9 @@ function api(request: IncomingMessage, response: ServerResponse) {
   const path = url.pathname;
   if (path === '/v1/widget/sessions' || path === '/v1/widget/sessions/refresh') {
     json(session(scenario));
-  } else if (path === '/v1/widget/conversations/cnv_layout1/messages') {
-    json({ items: messages(), olderCursor: null, latestSequence: 6 });
+  } else if (path === '/v1/widget/conversations/cnv_layout1/messages' && request.method === 'GET') {
+    const items = messages();
+    json({ items, olderCursor: null, latestSequence: items.length });
   } else if (path.endsWith('/events')) {
     // Held open with no events, like a quiet conversation.
     response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store' });
@@ -228,10 +302,53 @@ function api(request: IncomingMessage, response: ServerResponse) {
     request.on('close', () => streams.delete(response));
   } else if (path === '/__push') {
     pushed += 1;
-    const message = { ...messages()[4], id: `msg_${pushed}`, sequence: pushed, createdAt: at(30) };
+    const message = {
+      ...messages('conversation')[4],
+      id: `msg_${pushed}`,
+      sequence: pushed,
+      createdAt: at(30),
+    };
     const event = { type: 'message.created', sequence: pushed, data: { message } };
     for (const stream of streams) stream.write(`data: ${JSON.stringify(event)}\n\n`);
     json({ streams: streams.size });
+  } else if (path === '/__event') {
+    // Any event a check wants the gateway to have sent, as given.
+    let body = '';
+    request.on('data', (chunk) => {
+      body += chunk;
+    });
+    request.on('end', () => {
+      for (const stream of streams) stream.write(`data: ${body}\n\n`);
+      json({ streams: streams.size });
+    });
+  } else if (/\/messages$/.test(path) && request.method === 'POST') {
+    // The visitor's own message, accepted as the gateway would.
+    let body = '';
+    request.on('data', (chunk) => {
+      body += chunk;
+    });
+    request.on('end', () => {
+      const sent = JSON.parse(body || '{}') as {
+        clientMessageId?: string;
+        parts?: Array<{ text?: string }>;
+      };
+      pushed += 1;
+      const message = {
+        id: `msg_${pushed}`,
+        conversationId: 'cnv_layout1',
+        sequence: pushed,
+        sender: me,
+        visibility: 'public',
+        parts: text(sent.parts?.[0]?.text ?? ''),
+        createdAt: new Date().toISOString(),
+        clientMessageId: sent.clientMessageId ?? null,
+        delivery: 'sent',
+        language: 'en',
+      };
+      const event = { type: 'message.created', sequence: pushed, data: { message } };
+      for (const stream of streams) stream.write(`data: ${JSON.stringify(event)}\n\n`);
+      json({ message, conversation: conversation('conversation') }, 201);
+    });
   } else if (path === '/v1/widget/conversations') {
     json({ items: scenario === 'home' ? [] : [conversation(scenario)] });
   } else {
@@ -414,7 +531,7 @@ const VIEWPORTS: Array<[string, number, number]> = [
   ['2560x1440', 2560, 1440],
 ];
 const MODES = ['bubble', 'panel', 'inline', 'fullpage'] as const;
-const SCENARIOS: Scenario[] = ['home', 'conversation', 'waiting'];
+const SCENARIOS: Scenario[] = ['home', 'conversation', 'waiting', 'rich'];
 
 async function runCase(
   browser: Awaited<ReturnType<typeof chromium.launch>>,
@@ -424,7 +541,12 @@ async function runCase(
   lang: string,
 ): Promise<Problem[]> {
   const [, width, height] = viewport;
-  const context = await browser.newContext({ viewport: { width, height }, locale: lang });
+  const context = await browser.newContext({
+    viewport: { width, height },
+    locale: lang,
+    // SCALE=2 for screenshots people will look at; measurements are the same either way.
+    deviceScaleFactor: Number(process.env.SCALE ?? 1),
+  });
   const page = await context.newPage();
   const problems: Problem[] = [];
   try {
@@ -532,6 +654,189 @@ async function checkApi(browser: Awaited<ReturnType<typeof chromium.launch>>) {
   await page.close();
 }
 
+/**
+ * How a reply arrives (CHECK=live), with the events a gateway that streams would send: the sign
+ * that a reply is on its way as soon as the visitor has written, what the assistant is doing,
+ * the answer while it is written (never counted as a message), and the published message in its
+ * place. Then the menu and Escape, reading earlier messages while new ones arrive, and the dark
+ * chat. Screenshots at twice the size go to <outDir>/live. Throws on the first thing wrong.
+ */
+async function checkLive(browser: Awaited<ReturnType<typeof chromium.launch>>) {
+  const dir = join(outDir, 'live');
+  mkdirSync(dir, { recursive: true });
+  const fail = (what: string) => {
+    throw new Error(`live check: ${what}`);
+  };
+  const send = (event: unknown) =>
+    fetch(`${origin(ports.api)}/__event`, { method: 'POST', body: JSON.stringify(event) });
+  const live = (type: string, data: Record<string, unknown>) =>
+    send({ type, sequence: null, data: { conversationId: 'cnv_layout1', ...data } });
+  const activity = (kind: string, state: 'started' | 'finished') =>
+    live('activity', { runId: 'run_1', kind, state, label: null });
+
+  scenario = 'conversation';
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    deviceScaleFactor: 2,
+  });
+  const page = await context.newPage();
+  await page.goto(`${origin(ports.host)}/bubble?lang=en`);
+  await page.locator('[data-hamnivo-launcher]').click();
+  const frame = page.frameLocator('iframe[data-hamnivo-frame]');
+  const shot = (name: string) => page.screenshot({ path: join(dir, `${name}.png`) });
+  await frame.locator('[data-sender]').first().waitFor({ timeout: 15_000 });
+  await page.waitForTimeout(600);
+  const replies = () => frame.locator('[data-sender="ai_primary"]').count();
+  const before = await replies();
+
+  // 1. The visitor writes: a reply is on its way, without a word from the gateway yet.
+  const box = frame.locator('textarea[aria-label]');
+  await box.fill('Can it arrive before Friday?');
+  await box.press('Enter');
+  await frame.getByTestId('ai-writing').waitFor({ timeout: 5_000 });
+  if ((await box.inputValue()) !== '') fail('the message box kept the sent words');
+  if (await box.isDisabled()) fail('the message box is closed while a reply is on its way');
+  await shot('1-reply-on-its-way');
+
+  // 2. What the assistant is doing, in words.
+  await activity('run', 'started');
+  await activity('searching', 'started');
+  const step = frame.getByTestId('run-step');
+  await step.waitFor({ timeout: 5_000 });
+  if ((await step.innerText()) !== 'Searching the help articles…')
+    fail(`the step says "${await step.innerText()}"`);
+  await shot('2-searching');
+  await activity('searching', 'finished');
+
+  // 3. The answer while it is written: on screen, marked as not final, and not a message.
+  const pieces = [
+    'Yes. **Express** delivery ',
+    'takes 1–2 working days, ',
+    'so an order placed today ',
+    'arrives by Thursday.\n\n',
+    '- Cost: $9.90\n',
+    '- Order before **2 pm**',
+  ];
+  for (const [index, textDelta] of pieces.entries()) {
+    await live('message.delta', { runId: 'run_1', draftId: 'drf_1', index, textDelta });
+    if (index === 2) {
+      await frame.getByTestId('draft-reply').waitFor({ timeout: 5_000 });
+      await shot('3-writing');
+    }
+  }
+  const draft = frame.getByTestId('draft-reply');
+  await frame.getByText('Order before').waitFor({ timeout: 5_000 });
+  if (await frame.getByTestId('ai-writing').count()) fail('dots stayed beside the draft');
+  if ((await replies()) !== before) fail('a draft was counted as a reply');
+  if ((await draft.getAttribute('data-state')) !== 'provisional') fail('the draft is not marked');
+  if (!(await draft.locator('strong').count())) fail('the draft is not shown as formatted text');
+  await shot('4-written');
+
+  // 4. Published: the message takes the draft's place, once.
+  pushed += 1;
+  await send({
+    type: 'message.created',
+    sequence: pushed,
+    data: {
+      draftId: 'drf_1',
+      message: {
+        id: `msg_${pushed}`,
+        conversationId: 'cnv_layout1',
+        sequence: pushed,
+        sender: ai,
+        visibility: 'public',
+        parts: [
+          ...text(pieces.join(''), 'markdown'),
+          { type: 'suggestions', items: ['What does Express cost abroad?', 'Change my address'] },
+        ],
+        createdAt: new Date().toISOString(),
+        clientMessageId: null,
+        delivery: null,
+        language: 'en',
+      },
+    },
+  });
+  await activity('run', 'finished');
+  await frame.getByTestId('follow-ups').waitFor({ timeout: 5_000 });
+  if (await draft.count()) fail('the draft stayed after its reply was published');
+  if (await frame.getByTestId('ai-writing').count()) fail('dots stayed after the reply');
+  if ((await replies()) !== before + 1) fail(`replies went from ${before} to ${await replies()}`);
+  await page.waitForTimeout(500);
+  await shot('5-published');
+
+  // 5. The menu closes with Escape and the chat stays; Escape again closes the chat.
+  await frame.getByRole('button', { name: 'More options' }).click();
+  await frame.getByTestId('more-menu').waitFor({ timeout: 2_000 });
+  await page.waitForTimeout(350);
+  await shot('6-menu');
+  await page.keyboard.press('Escape');
+  await frame.getByTestId('more-menu').waitFor({ state: 'detached', timeout: 2_000 });
+  const chat = page.locator('iframe[data-hamnivo-frame]');
+  if (!(await chat.isVisible())) fail('Escape closed the chat together with its menu');
+
+  // The emoji go where the caret is; Escape puts them away and gives focus back, chat open.
+  const emojiButton = frame.getByRole('button', { name: 'Add an emoji' });
+  await emojiButton.click();
+  const emoji = frame.getByRole('group', { name: 'Add an emoji' });
+  await emoji.waitFor({ timeout: 5_000 });
+  await page.waitForTimeout(350);
+  await shot('6b-emoji');
+  await emoji.getByRole('button').nth(1).click();
+  if ((await box.inputValue()) !== '😊') fail(`the emoji went in as "${await box.inputValue()}"`);
+  await page.keyboard.press('Escape');
+  await emoji.waitFor({ state: 'detached', timeout: 2_000 });
+  if (!(await chat.isVisible())) fail('Escape closed the chat together with the emoji');
+  if (!(await emojiButton.evaluate((el) => el === document.activeElement)))
+    fail('focus did not go back to the emoji button');
+  await box.fill('');
+
+  // 6. Reading earlier messages: a new reply does not move the page, and says it is there.
+  const thread = frame.getByTestId('thread');
+  await thread.evaluate((el) => el.scrollTo({ top: 0 }));
+  await frame.getByTestId('jump-latest').waitFor({ timeout: 3_000 });
+  await fetch(`${origin(ports.api)}/__push`, { method: 'POST' });
+  const jump = frame.getByTestId('jump-new');
+  await jump.waitFor({ timeout: 5_000 });
+  if ((await jump.innerText()) !== 'New messages: 1') fail(`jump says "${await jump.innerText()}"`);
+  if ((await thread.evaluate((el) => el.scrollTop)) > 4) fail('a new reply moved the page');
+  await shot('7-new-while-reading');
+  await jump.click();
+  await jump.waitFor({ state: 'detached', timeout: 5_000 });
+  await page.keyboard.press('Escape');
+  await chat.waitFor({ state: 'hidden', timeout: 3_000 });
+  await context.close();
+
+  // 7. The long answer, and the same on a phone and in the dark chat.
+  scenario = 'rich';
+  for (const [name, width, height, query] of [
+    ['8-rich', 1280, 800, ''],
+    ['9-rich-phone', 390, 844, ''],
+    ['10-rich-dark', 390, 844, '&theme=dark'],
+  ] as const) {
+    const view = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 });
+    const direct = await view.newPage();
+    await direct.goto(
+      `${origin(ports.widget)}/?widgetId=${WIDGET_ID}&api=${encodeURIComponent(origin(ports.api))}${query}`,
+    );
+    await direct.locator('.hv-table').waitFor({ timeout: 15_000 });
+    await direct.waitForTimeout(600);
+    const theme = await direct.evaluate(() => document.documentElement.dataset.theme);
+    if (theme !== (query ? 'dark' : 'light')) fail(`${name}: the chat is ${theme}`);
+    const wide = await direct.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth + 1,
+    );
+    if (wide) fail(`${name}: the long answer makes the chat scroll sideways`);
+    if (!(await direct.locator('[data-hv-copy]').count())) fail(`${name}: code has no copy button`);
+    if ((await direct.getByTestId('sources').locator('li').count()) !== 2)
+      fail(`${name}: sources are not listed`);
+    await direct.screenshot({ path: join(dir, `${name}.png`) });
+    await view.close();
+  }
+  process.stdout.write(
+    '✓ live check: reply on its way, steps, draft, published, menu, reading, long answer, dark\n',
+  );
+}
+
 async function main() {
   mkdirSync(outDir, { recursive: true });
   const servers = [
@@ -543,9 +848,9 @@ async function main() {
   const browser = await chromium.launch(
     process.env.CHANNEL ? { channel: process.env.CHANNEL } : {},
   );
-  if (process.env.CHECK === 'api') {
+  if (process.env.CHECK === 'api' || process.env.CHECK === 'live') {
     try {
-      await checkApi(browser);
+      await (process.env.CHECK === 'api' ? checkApi : checkLive)(browser);
     } finally {
       await browser.close();
       for (const server of servers) server.close();
@@ -562,6 +867,8 @@ async function main() {
           // Arabic for the conversation only, and the waiting banner in the bubble only.
           if (lang === 'ar' && sc !== 'conversation') continue;
           if (mode !== 'bubble' && sc === 'waiting') continue;
+          // The long answer where it is narrowest (the bubble) and widest (the full page).
+          if (sc === 'rich' && (lang !== 'en' || mode === 'panel' || mode === 'inline')) continue;
           const id = `${sc}-${mode}-${viewport[0]}-${lang}`;
           if (only && !only.test(id)) continue;
           const problems = await runCase(browser, sc, mode, viewport, lang);

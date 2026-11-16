@@ -3,7 +3,7 @@ import { useState } from 'react';
 /**
  * The brand's logo at the start of the chat's header, when it has one. The brand's name is in the
  * header as text, so the picture is decoration: no alternative text, and no empty space where it
- * would have been if it cannot be loaded.
+ * would have been if it cannot be loaded. It sits on a white tile, so it reads on any header colour.
  */
 export function BrandMark({ url }: { url: string | null }) {
   const [failed, setFailed] = useState<string | null>(null);
@@ -16,7 +16,7 @@ export function BrandMark({ url }: { url: string | null }) {
       height={36}
       referrerPolicy="no-referrer"
       onError={() => setFailed(url)}
-      className="size-9 shrink-0 rounded-md object-contain"
+      className="size-9 shrink-0 rounded-lg bg-white object-contain p-0.5"
       data-testid="brand-logo"
     />
   );
