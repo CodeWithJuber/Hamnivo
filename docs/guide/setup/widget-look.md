@@ -1,8 +1,8 @@
 # How the chat looks
 
-You can change the colour, logo and words of your chat, so it looks like your business. Each
-brand has its own look. You see a picture of the chat change as you type, and nothing reaches your
-customers until you press **Save look**.
+You can change the colour, logo, words, light or dark, and the launcher button of your chat, so
+it looks like your business. Each brand has its own look. You see a picture of the chat change
+as you type, and nothing reaches your customers until you press **Publish**.
 
 ## Open the editor
 
@@ -16,14 +16,15 @@ Only an owner or administrator can change the look. If you do not see the button
 The page has the fields on the left and a picture of your chat on the right. Under the picture
 you can choose a **Language**, and whether it shows the chat while **the team is online** or
 **the team is away**. Use these to check every language your customers use, and the message
-customers read when nobody is online. Arabic and Urdu show right to left.
+customers read when nobody is online. Arabic and Urdu show right to left. When you choose a
+launcher picture, the picture shows the launcher button under the chat too.
 
 ## What you can change
 
 ### Main colour
 
-The colour of the chat's top bar, the send button and your customers' messages. Type a colour
-code, such as `#D17B00`, or press the coloured square and pick one.
+The colour of the chat's top bar, the send button, the launcher and your customers' messages.
+Type a colour code, such as `#D17B00`, or press the coloured square and pick one.
 
 Studio checks that the writing on your colour can be read, and that the colour does not fade into
 a white web page. If it fails, Studio says why and suggests a slightly darker colour. Press **Use**
@@ -38,6 +39,47 @@ appears small, next to your brand name. Leave it empty for no logo. The address 
 ### Roundness of corners
 
 A slider from 0 (square corners) to 24 (very round). The picture shows the effect.
+
+### Typography
+
+The letters the chat uses: **System** (the visitor's own device font), **DM Sans** or
+**Noto Sans**. Noto Sans covers Arabic, Hindi and Urdu well.
+
+### Light or dark
+
+- **Follow the website** (the default): the chat is dark only on a dark website. It looks at the
+  website's own background, and at the colour scheme the website says it uses. It changes when
+  the website changes, for example when a visitor switches the website to dark. It does not turn
+  dark only because the visitor's phone or computer is dark.
+- **Light** or **Dark**: always that, on every website.
+
+On a dark chat, the top bar is a calm dark colour, so your writing stays readable. Your main
+colour stays on the launcher, the send button and buttons.
+
+A developer can still decide for one website with `data-theme` on the script, which comes before
+this setting. [All the options of the install code](../integrations/html.md).
+
+### Header
+
+- **Brand colour** (the default): the top bar and the welcome area are in your main colour.
+- **Plain**: the top bar is white (or dark on a dark chat), with a thin line under it. Choose this
+  when your main colour is strong and you want a quieter chat.
+
+### Launcher picture and size
+
+The round button that opens the chat. Choose its picture (**Round speech bubble**, **Square
+speech bubble**, **Question mark** or **Sparkle**) and its size: **Small** (48 pixels),
+**Medium** (56, the default) or **Large** (64). On every size the button is easy to press with a
+finger.
+
+### Launcher label
+
+Optional words beside the launcher, such as "Chat with us". As with the greeting, write English
+first. Leave it empty for a button without words.
+
+### Show Hamnivo branding
+
+When on, a small "Hamnivo" shows at the bottom of the chat.
 
 ### Greeting
 
@@ -65,12 +107,38 @@ default.
 When you give an `https://` address, the chat shows a **Privacy policy** link at the bottom. It
 opens in a new tab. Leave it empty for no link.
 
-## Save, reset and leave
+## Where the launcher sits
 
-- **Save look** puts the new look on your chat. Customers see it the next time the chat loads.
+These are on the **Behaviour** tab of the same page, under **Where the chat appears**. They
+apply to the floating button and the side panel.
+
+- **Button corner**: bottom right or bottom left.
+- **Space from the side** and **Space from the bottom**: how far the launcher is from the edges
+  of the window, in pixels, from 0 to 400. Leave both empty for the usual 20. Move it up when
+  your website has its own button in that corner, such as a cookie notice or "back to top".
+- **No button on phones**: on screens up to 480 pixels wide there is no launcher. Your website
+  can still open the chat with a link or button of its own that calls `Hamnivo.open()`.
+
+A developer's `data-offset-x`, `data-offset-y`, `data-size`, `data-icon` and
+`data-hide-on-mobile` on the script come before these settings, for that one website.
+
+## Next questions under AI answers
+
+On the **Behaviour** tab, under **Help before a conversation**, **Suggest next questions under AI
+answers** is on by default. After the AI assistant answers, up to three short questions the
+customer might ask next appear under the answer; pressing one sends it. They are written after
+the answer is sent, so the answer itself is never slower. Each set uses a few AI credits. Turn
+it off to show none.
+
+## Save, publish and reset
+
+- **Save draft** keeps your changes. Customers still see the published look.
+- **Publish** puts the saved look on your chat. Customers see it the next time the chat loads.
 - **Reset** puts the fields back to what is saved.
 - If you leave the page or switch tabs with changes that are not saved, Studio asks first:
   **Keep editing** or **Discard changes**.
+
+The settings on the **Behaviour** tab are saved with **Save settings** and reach customers at once.
 
 ## Check it for real
 

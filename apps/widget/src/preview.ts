@@ -49,6 +49,8 @@ export function previewConfig(config: WidgetConfig, appearance: WidgetAppearance
       logoUrl: appearance.logoUrl,
       fontFamily: appearance.fontFamily,
       showBranding: appearance.showBranding,
+      theme: appearance.theme ?? 'auto',
+      headerStyle: appearance.headerStyle ?? 'brand',
     },
     copy,
     features: { ...config.features, csat: appearance.csat },

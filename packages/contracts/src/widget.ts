@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { SupportedLocale, Timestamp } from './common.js';
 import { CustomerConversation } from './conversations.js';
-import { WidgetLayoutMode } from './customer-surface.js';
+import { WidgetLayoutMode, WidgetTheme } from './customer-surface.js';
 import { WidgetConsentConfig, WidgetFormsConfig } from './widget-forms.js';
 
 export const LauncherPosition = z.enum(['bottom-right', 'bottom-left']);
@@ -23,6 +23,10 @@ export const WidgetConfig = z
       launcherPosition: LauncherPosition,
       fontFamily: z.enum(['system', 'dm-sans', 'noto-sans']).optional(),
       showBranding: z.boolean().optional(),
+      /** Light or dark; `auto` (or left out) follows the website the chat is on. */
+      theme: WidgetTheme.optional(),
+      /** The header in the brand's colour (`brand`, the default) or `plain`. */
+      headerStyle: z.enum(['brand', 'plain']).optional(),
     }),
     locales: z.object({ default: SupportedLocale, available: z.array(SupportedLocale).min(1) }),
     /** Per-locale copy authored by the tenant. */

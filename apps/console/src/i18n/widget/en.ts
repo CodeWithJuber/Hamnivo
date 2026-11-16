@@ -23,6 +23,11 @@ export const chatSettingsEn = {
     side: 'Button corner',
     right: 'Bottom right',
     left: 'Bottom left',
+    offsetX: 'Space from the side, in pixels',
+    offsetY: 'Space from the bottom, in pixels',
+    offsetHint: 'From 0 to 400; 20 when left empty.',
+    hideOnMobile: 'No button on phones',
+    hideOnMobileHint: 'Your website can still open the chat, with Hamnivo.open().',
     note: 'On phones, the floating button and the side panel open the chat full screen.',
   },
   files: {
@@ -45,6 +50,9 @@ export const chatSettingsEn = {
   help: {
     legend: 'Help before a conversation',
     search: 'Customers can search your public help articles',
+    followUps: 'Suggest next questions under AI answers',
+    followUpsHint:
+      'Up to three short questions, written after each answer; each uses a few AI credits.',
     suggestions: 'Suggested questions',
     suggestionsHint:
       'Up to 6, on the chat’s first screen. English is required; an empty language shows the English.',

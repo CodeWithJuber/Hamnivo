@@ -34917,6 +34917,38 @@
                 "type": "null"
               }
             ]
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark",
+              "auto"
+            ]
+          },
+          "headerStyle": {
+            "type": "string",
+            "enum": [
+              "brand",
+              "plain"
+            ]
+          },
+          "launcherIcon": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "message",
+              "help",
+              "sparkle"
+            ]
+          },
+          "launcherSize": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "large"
+            ]
           }
         }
       },
@@ -38148,6 +38180,28 @@
                   "bottom-right",
                   "bottom-left"
                 ]
+              },
+              "offset": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ]
+              },
+              "hideOnMobile": {
+                "type": "boolean"
               }
             }
           },
@@ -41505,6 +41559,21 @@
               },
               "showBranding": {
                 "type": "boolean"
+              },
+              "theme": {
+                "type": "string",
+                "enum": [
+                  "light",
+                  "dark",
+                  "auto"
+                ]
+              },
+              "headerStyle": {
+                "type": "string",
+                "enum": [
+                  "brand",
+                  "plain"
+                ]
               }
             },
             "required": [
@@ -66484,6 +66553,29 @@
                   "bottom-right",
                   "bottom-left"
                 ]
+              },
+              "offset": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false
+              },
+              "hideOnMobile": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -66492,9 +66584,34 @@
             ],
             "additionalProperties": false
           },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark",
+              "auto"
+            ]
+          },
           "launcher": {
             "type": "object",
             "properties": {
+              "icon": {
+                "type": "string",
+                "enum": [
+                  "chat",
+                  "message",
+                  "help",
+                  "sparkle"
+                ]
+              },
+              "size": {
+                "type": "string",
+                "enum": [
+                  "small",
+                  "medium",
+                  "large"
+                ]
+              },
               "accent": {
                 "type": "string",
                 "pattern": "^#[0-9a-fA-F]{6}$"
@@ -72417,6 +72534,38 @@
                 "type": "null"
               }
             ]
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark",
+              "auto"
+            ]
+          },
+          "headerStyle": {
+            "type": "string",
+            "enum": [
+              "brand",
+              "plain"
+            ]
+          },
+          "launcherIcon": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "message",
+              "help",
+              "sparkle"
+            ]
+          },
+          "launcherSize": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "large"
+            ]
           }
         },
         "required": [
@@ -72725,6 +72874,29 @@
                   "bottom-right",
                   "bottom-left"
                 ]
+              },
+              "offset": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false
+              },
+              "hideOnMobile": {
+                "type": "boolean"
               }
             },
             "required": [

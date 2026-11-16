@@ -29,6 +29,9 @@ const origin = (port: number) => `http://127.0.0.1:${port}`;
 const WIDGET_ID = 'wid_layoutaudit';
 /** A widget whose brand did not allow the page's website. */
 const REFUSED_ID = 'wid_refusedhere';
+/** A brand that chose its look in Studio: dark, a plain header, its own launcher and place. */
+const BRAND_ID = 'wid_brandlookhere';
+let brandLook = false;
 const now = new Date('2026-11-04T10:00:00Z');
 const at = (minutes: number) => new Date(now.getTime() + minutes * 60_000).toISOString();
 
@@ -209,6 +212,7 @@ function session(scenario: Scenario) {
         onAccent: '#FFFFFF',
         radius: 12,
         launcherPosition: 'bottom-right',
+        ...(brandLook ? { theme: 'dark', headerStyle: 'plain' } : {}),
       },
       locales: { default: 'en', available: ['en', 'ar', 'hi', 'ur'] },
       copy: Object.fromEntries(
@@ -317,8 +321,16 @@ function api(request: IncomingMessage, response: ServerResponse) {
           version: 1,
           locale: 'en',
           dir: 'ltr',
-          layout: { mode: 'bubble', position: 'bottom-right' },
+          ...(url.searchParams.get('widgetId') === BRAND_ID
+            ? {
+                theme: 'dark',
+                layout: { mode: 'bubble', position: 'bottom-right', offset: { x: 32, y: 96 } },
+              }
+            : { layout: { mode: 'bubble', position: 'bottom-right' } }),
           launcher: {
+            ...(url.searchParams.get('widgetId') === BRAND_ID
+              ? { icon: 'sparkle', size: 'small' }
+              : {}),
             accent: '#0F5132',
             onAccent: '#FFFFFF',
             openLabel: 'Open chat',
@@ -428,6 +440,7 @@ const SITES: Record<string, { style?: string; html?: string; loader?: string; cs
   },
   spa: { loader: 'data-hide-on="/checkout*, /account/private"' },
   refused: {},
+  brand: {},
 };
 
 function host(request: IncomingMessage, response: ServerResponse) {
@@ -454,7 +467,12 @@ function host(request: IncomingMessage, response: ServerResponse) {
     'content-type': 'text/html; charset=utf-8',
     ...(site?.csp ? { 'content-security-policy': site.csp } : {}),
   });
-  const widgetId = url.searchParams.get('site') === 'refused' ? REFUSED_ID : WIDGET_ID;
+  const widgetId =
+    url.searchParams.get('site') === 'refused'
+      ? REFUSED_ID
+      : url.searchParams.get('site') === 'brand'
+        ? BRAND_ID
+        : WIDGET_ID;
   // A page under a strict policy has no inline styles of its own either.
   const styles = site?.csp
     ? ''
@@ -1106,6 +1124,27 @@ async function checkSites(browser: Awaited<ReturnType<typeof chromium.launch>>) 
     await context.close();
   }
 
+  // 5b. The brand's own choices in Studio, with no attribute on the page: dark, a plain header,
+  // a small sparkle launcher moved up and in.
+  {
+    brandLook = true;
+    const { context, page } = await visit('brand');
+    await page.locator('[data-hamnivo-launcher]').waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(400);
+    const l = await launcherOf(page);
+    if (!l || !near(l.right, 32) || !near(l.bottom, 96) || !near(l.width, 48))
+      fail(`brand: launcher ${JSON.stringify(l)}`);
+    if (!l?.icon.startsWith('M12 3l2 6')) fail('brand: not the sparkle picture');
+    const frame = await open(page);
+    if ((await frame.locator('html').getAttribute('data-theme')) !== 'dark')
+      fail('brand: the brand chose dark, the chat is not');
+    if ((await frame.locator('[data-header="plain"]').count()) === 0)
+      fail('brand: the header is not plain');
+    await page.screenshot({ path: join(dir, '5b-brand.png') });
+    await context.close();
+    brandLook = false;
+  }
+
   // 6. A single-page app: pages the chat is kept off, and a body the framework replaces.
   {
     const { context, page } = await visit('spa');
@@ -1178,7 +1217,7 @@ async function checkSites(browser: Awaited<ReturnType<typeof chromium.launch>>) 
     await context.close();
   }
   process.stdout.write(
-    '✓ sites check: hostile CSS, strict CSP, dark page, right to left, options, single-page app, phone, return visit, refused website\n',
+    '✓ sites check: hostile CSS, strict CSP, dark page, right to left, options, brand look, single-page app, phone, return visit, refused website\n',
   );
 }
 

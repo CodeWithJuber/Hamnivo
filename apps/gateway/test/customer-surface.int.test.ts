@@ -370,6 +370,37 @@ describe('widget settings and the launcher (W02, W19)', () => {
     });
   });
 
+  it('places the launcher where the brand put it, and keeps it off phones when asked', async () => {
+    const launcherOf = async () => {
+      const got = await fetch(
+        `${slice.baseUrl}/v1/widget/launcher?widgetId=${shop.brand.widgetId}`,
+        { headers: { origin: shop.hostOrigin } },
+      );
+      return ((await got.json()) as { layout: Record<string, unknown> }).layout;
+    };
+    expect(await launcherOf()).toEqual({ mode: 'bubble', position: 'bottom-right' });
+    await settings({
+      layout: {
+        mode: 'bubble',
+        position: 'bottom-left',
+        offset: { x: 32, y: 96 },
+        hideOnMobile: true,
+      },
+    });
+    expect(await launcherOf()).toEqual({
+      mode: 'bubble',
+      position: 'bottom-left',
+      offset: { x: 32, y: 96 },
+      hideOnMobile: true,
+    });
+    const off = await shop.owner.put(`/v1/admin/brands/${shop.brand.id}/widget-settings`, {
+      layout: { mode: 'bubble', position: 'bottom-left', offset: { x: 32, y: 900 } },
+    });
+    expect(off.status).toBe(422);
+    await settings({ layout: { mode: 'bubble', position: 'bottom-right' } });
+    expect(await launcherOf()).toEqual({ mode: 'bubble', position: 'bottom-right' });
+  });
+
   it('shows website prompts from published automations, edited under their own permission', async () => {
     const developer = await join(slice, shop, 'Dev Eloper', 'developer');
     const path = `/v1/admin/brands/${shop.brand.id}`;

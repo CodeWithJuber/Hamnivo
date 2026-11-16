@@ -8,6 +8,7 @@ import { initI18n } from '../src/i18n';
 import { accessKeys } from '../src/lib/access';
 import { identityKeysKey } from '../src/lib/identity';
 import { keys } from '../src/lib/queries';
+import { SettingsForm } from '../src/pages/BrandChatSettings';
 import { AppearanceForm } from '../src/pages/settings/AppearanceDialog';
 import { HoursPage } from '../src/pages/settings/HoursPage';
 import { IdentityPage } from '../src/pages/settings/IdentityPage';
@@ -65,6 +66,91 @@ const view = (appearance: Record<string, unknown> = {}) => ({
   updatedAt: NOW,
 });
 
+// ------------------------------------------------------------------ how the chat behaves
+
+describe('the chat settings', () => {
+  const settings = (
+    patch: { layout?: Record<string, unknown>; help?: Record<string, unknown> } = {},
+  ) => ({
+    layout: { mode: 'bubble', position: 'bottom-right', ...patch.layout },
+    attachments: {
+      enabled: true,
+      allowedTypes: ['image/png', 'image/jpeg', 'application/pdf'],
+      maxMegabytes: 10,
+      maxFiles: 3,
+    },
+    help: { search: true, suggestions: [], ...patch.help },
+    deletion: { windowMinutes: 15 },
+    notifications: { email: true },
+  });
+  const form = (initial = settings()) =>
+    mountStudio({
+      permissions: owner,
+      screen: (
+        <SettingsForm
+          brand={brand as Parameters<typeof SettingsForm>[0]['brand']}
+          initial={initial as Parameters<typeof SettingsForm>[0]['initial']}
+        />
+      ),
+    });
+  const saved = (gateway: ReturnType<typeof fakeGateway>) =>
+    gateway.to('PUT', '/v1/admin/brands/brd_1/widget-settings')[0]?.body as Record<string, any>;
+
+  it('moves the launcher, hides it on phones and turns next questions off, saving only that', async () => {
+    const gateway = fakeGateway({
+      'PUT /v1/admin/brands/brd_1/widget-settings': {
+        json: { brandId: 'brd_1', settings: settings(), configVersion: 5, updatedAt: NOW },
+      },
+    });
+    await form();
+    const user = userEvent.setup();
+    expect(
+      screen.getByRole('checkbox', { name: /Suggest next questions/ }).getAttribute('data-state'),
+    ).toBe('checked');
+    await user.type(screen.getByLabelText(/Space from the side/), '32');
+    await user.click(screen.getByRole('checkbox', { name: /No button on phones/ }));
+    await user.click(screen.getByRole('checkbox', { name: /Suggest next questions/ }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => expect(saved(gateway)).toBeDefined());
+    expect(saved(gateway).layout).toEqual({
+      mode: 'bubble',
+      position: 'bottom-right',
+      offset: { x: 32, y: 20 },
+      hideOnMobile: true,
+    });
+    expect(saved(gateway).help).toEqual({ search: true, suggestions: [], followUps: false });
+  });
+
+  it('keeps what was saved before, and leaves the defaults out', async () => {
+    const gateway = fakeGateway({
+      'PUT /v1/admin/brands/brd_1/widget-settings': {
+        json: { brandId: 'brd_1', settings: settings(), configVersion: 5, updatedAt: NOW },
+      },
+    });
+    await form(settings({ layout: { offset: { x: 0, y: 96 } }, help: { followUps: false } }));
+    expect((screen.getByLabelText(/Space from the bottom/) as HTMLInputElement).value).toBe('96');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('checkbox', { name: /Suggest next questions/ }));
+    await user.clear(screen.getByLabelText(/Space from the side/));
+    await user.clear(screen.getByLabelText(/Space from the bottom/));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => expect(saved(gateway)).toBeDefined());
+    expect(saved(gateway).layout).toEqual({ mode: 'bubble', position: 'bottom-right' });
+    expect(saved(gateway).help).toEqual({ search: true, suggestions: [] });
+  });
+
+  it('says what is wrong with a place off the screen, and sends nothing', async () => {
+    const gateway = fakeGateway({});
+    await form();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/Space from the bottom/), '900');
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    const box = await errorSummary();
+    expect(within(box).getByText('Enter a whole number from 0 to 400.')).toBeTruthy();
+    expect(gateway.to('PUT', '/v1/admin/brands/brd_1/widget-settings')).toHaveLength(0);
+  });
+});
+
 describe('the look and wording editor', () => {
   const editor = (
     appearance: Record<string, unknown> = {},
@@ -100,6 +186,17 @@ describe('the look and wording editor', () => {
       'https://noor.example/logo.png',
     );
     await user.click(screen.getByRole('checkbox', { name: 'Ask customers to rate the chat' }));
+    // Light or dark, the header and the launcher are drawn as they are chosen.
+    await user.selectOptions(screen.getByLabelText('Light or dark', { exact: false }), 'dark');
+    await user.selectOptions(screen.getByLabelText('Header'), 'plain');
+    await user.selectOptions(screen.getByLabelText('Launcher picture'), 'sparkle');
+    await user.selectOptions(screen.getByLabelText('Launcher size'), 'large');
+    const panel = screen.getByTestId('widget-preview');
+    expect(panel.getAttribute('data-theme')).toBe('dark');
+    expect(panel.getAttribute('data-header')).toBe('plain');
+    const launcher = screen.getByTestId('preview-launcher');
+    expect(launcher.getAttribute('data-icon')).toBe('sparkle');
+    expect(launcher.style.width).toBe('64px');
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(gateway.to('PUT', '/v1/admin/brands/brd_1/appearance/draft')[0]?.body).toEqual({
@@ -115,6 +212,10 @@ describe('the look and wording editor', () => {
         offlineText: null,
         csat: true,
         privacyUrl: null,
+        theme: 'dark',
+        headerStyle: 'plain',
+        launcherIcon: 'sparkle',
+        launcherSize: 'large',
       },
     });
   });

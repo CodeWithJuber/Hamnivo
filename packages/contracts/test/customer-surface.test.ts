@@ -3,11 +3,13 @@ import {
   AutomationDefinition,
   allRoutes,
   HostToFrame,
+  LauncherConfig,
   PromptLimits,
   parsePart,
   partsToPlainText,
   ReactionRequest,
   SendMessageRequest,
+  WidgetAppearance,
   WidgetSettings,
 } from '../src/index.js';
 
@@ -97,6 +99,67 @@ describe('widget settings (W02, W09, W17, W23, W25)', () => {
     expect(bad({ attachments: { maxFiles: 6 } })).toBe(false);
     expect(bad({ layout: { mode: 'floating' } })).toBe(false);
     expect(bad({ deletion: { windowMinutes: 61 } })).toBe(false);
+  });
+
+  it('keeps the launcher on the screen, and leaves its place out until a brand chooses one', () => {
+    const ok = (layout: unknown) => WidgetSettings.safeParse({ layout }).success;
+    expect(ok({ offset: { x: 0, y: 400 }, hideOnMobile: true })).toBe(true);
+    expect(ok({ offset: { x: -1, y: 20 } })).toBe(false);
+    expect(ok({ offset: { x: 20, y: 401 } })).toBe(false);
+    expect(ok({ offset: { x: 20.5, y: 20 } })).toBe(false);
+    expect(WidgetSettings.parse({}).layout).not.toHaveProperty('offset');
+    expect(WidgetSettings.parse({}).help).not.toHaveProperty('followUps');
+  });
+});
+
+describe('the brand’s look (W03)', () => {
+  it('reads a look saved before light or dark and the launcher could be chosen', () => {
+    const old = WidgetAppearance.parse({ primaryColor: '#0B5D3B' });
+    expect(old.theme).toBeUndefined();
+    expect(old.headerStyle).toBeUndefined();
+    expect(old.launcherIcon).toBeUndefined();
+    expect(old.launcherSize).toBeUndefined();
+  });
+
+  it('accepts only the offered themes, headers and launchers', () => {
+    const ok = (look: object) =>
+      WidgetAppearance.safeParse({ primaryColor: '#0B5D3B', ...look }).success;
+    expect(
+      ok({ theme: 'dark', headerStyle: 'plain', launcherIcon: 'sparkle', launcherSize: 'large' }),
+    ).toBe(true);
+    expect(ok({ theme: 'sepia' })).toBe(false);
+    expect(ok({ headerStyle: 'gradient' })).toBe(false);
+    expect(ok({ launcherIcon: 'rocket' })).toBe(false);
+    expect(ok({ launcherSize: 'xl' })).toBe(false);
+  });
+
+  it('lets an older launcher configuration without them still parse', () => {
+    const launcher = {
+      widgetId: 'wid_1',
+      version: 1,
+      locale: 'en',
+      dir: 'ltr',
+      layout: { mode: 'bubble', position: 'bottom-right' },
+      launcher: {
+        accent: '#0B5D3B',
+        onAccent: '#FFFFFF',
+        openLabel: 'Open chat',
+        closeLabel: 'Close chat',
+        title: 'Chat',
+        dismissLabel: 'Dismiss',
+        unreadLabel: '{count} unread',
+      },
+      proactive: { enabled: false, maxPerDay: 1, dismissHours: 24, triggers: [], rules: [] },
+    };
+    expect(LauncherConfig.safeParse(launcher).success).toBe(true);
+    expect(
+      LauncherConfig.safeParse({
+        ...launcher,
+        theme: 'dark',
+        layout: { ...launcher.layout, offset: { x: 24, y: 88 }, hideOnMobile: true },
+        launcher: { ...launcher.launcher, icon: 'help', size: 'small' },
+      }).success,
+    ).toBe(true);
   });
 });
 

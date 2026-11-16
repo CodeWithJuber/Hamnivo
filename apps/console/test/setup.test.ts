@@ -236,6 +236,10 @@ describe('the look editor’s working copy', () => {
       offline: { en: '', ar: '', hi: '', ur: '' },
       csat: true,
       privacyUrl: '',
+      theme: 'auto',
+      headerStyle: 'brand',
+      launcherIcon: 'chat',
+      launcherSize: 'medium',
     });
   });
 
@@ -251,6 +255,10 @@ describe('the look editor’s working copy', () => {
       offlineText: null,
       csat: true,
       privacyUrl: null,
+      theme: 'auto',
+      headerStyle: 'brand',
+      launcherIcon: 'chat',
+      launcherSize: 'medium',
     });
     expect(bodyOf(draft({ logoUrl: '  ', colour: ' #d17b00 ' }))).toMatchObject({
       logoUrl: null,

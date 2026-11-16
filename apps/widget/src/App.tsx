@@ -119,7 +119,11 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     fullScreen: boolean;
     expanded: boolean;
   }>({ theme: params.theme ?? null, fullScreen: false, expanded: false });
-  const scheme = resolveScheme('auto', around.theme, Boolean(params.hostOrigin), device);
+  // A draft in Studio wins; on a website the loader already chose (its attribute, then the
+  // brand's choice, then the page) and says so; on the chat's own page the brand's choice counts.
+  const brandTheme =
+    preview?.theme ?? (around.theme ? 'auto' : chat.state.session?.config.brand.theme);
+  const scheme = resolveScheme(brandTheme, around.theme, Boolean(params.hostOrigin), device);
   useEffect(() => {
     document.documentElement.dataset.theme = scheme;
   }, [scheme]);
@@ -323,6 +327,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           onDismissError={chat.dismissError}
           onStop={() => void chat.stop()}
           onReconnect={() => void chat.reconnect()}
+          headerStyle={session.config.brand.headerStyle}
           language={language}
           memory={memory}
           onClose={

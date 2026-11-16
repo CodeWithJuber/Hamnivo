@@ -103,9 +103,9 @@ words.
 | `data-position` | the brand's side | `bottom-right` or `bottom-left`. |
 | `data-color` | the brand's accent | Launcher background. |
 | `data-theme` | the brand's choice, then the page's | `light`, `dark` or `auto` (follow the page). |
-| `data-offset-x`, `data-offset-y` | `20` | The launcher's distance from the side and from the bottom, in pixels (0 to 400). The chat follows it. |
-| `data-size` | `medium` | Launcher size: `small` (48 px), `medium` (56 px) or `large` (64 px). |
-| `data-icon` | `chat` | Launcher picture: `chat`, `message`, `help` or `sparkle`. |
+| `data-offset-x`, `data-offset-y` | the brand's place, else `20` | The launcher's distance from the side and from the bottom, in pixels (0 to 400). The chat follows it. |
+| `data-size` | the brand's size, else `medium` | Launcher size: `small` (48 px), `medium` (56 px) or `large` (64 px). |
+| `data-icon` | the brand's picture, else `chat` | Launcher picture: `chat`, `message`, `help` or `sparkle`. |
 | `data-z-index` | `2147483000` | Stacking order of the launcher and the chat, for pages with overlays of their own. |
 | `data-hide-on` | none | Pages the chat is kept off: paths separated by commas, each exact or with `*` (`/checkout*, /account/*`). |
 | `data-hide-on-mobile` | the brand's choice | `true`: no launcher on screens up to 480 px wide. |

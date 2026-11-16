@@ -19,7 +19,7 @@
     "note": "Self-hosted pipeline (lint, typecheck, unit, integration on PostgreSQL 16 and 18, licence and status checks, Chatwoot contract, accessibility, browser journeys) run with pnpm ci:local; --with-production also builds the images and checks the deployment. Every push to main can deploy itself without hosted CI. A signed GitHub webhook and a 5-minute check trigger it. The server checks and builds a clean copy of each version (Biome, type checks, unit tests, commit-tagged images), backs up before database changes, and starts the new version behind health checks and a soak period. Unhealthy versions are rolled back automatically. Changes a rollback cannot undo (destructive migrations, new versions of Chatwoot or PostgreSQL) wait for a deploy by hand, and migration mistakes stop the deploy. GitHub deployment statuses are reported when a token is set. All of this is tested end to end against a stand-in for GitHub."
   },
   "W03": {
-    "status": "partial",
+    "status": "implemented",
     "evidence": [
       "packages/brand/src/contrast.ts",
       "packages/brand/test/contrast.test.ts",
@@ -35,9 +35,14 @@
       "packages/db/src/schema/setup.ts",
       "docs/guide/setup/widget-look.md",
       "apps/widget/src/styles.css",
-      "apps/widget/src/components/shell/Header.tsx"
+      "apps/widget/src/components/shell/Header.tsx",
+      "packages/contracts/src/setup.ts",
+      "apps/console/test/flows-chat.test.tsx",
+      "apps/console/test/setup-screens.test.tsx",
+      "apps/widget/src/preview.ts",
+      "apps/widget/e2e/layout-audit.ts"
     ],
-    "note": "Each brand sets its main colour, logo, corner radius, greeting, offline text, rating on or off and privacy link in Studio, with a live picture of the chat in each language. The gateway refuses a colour whose text cannot be read or that fades into a white page (the same contrast check as the brand package) and Studio suggests a darker one. The widget draws itself from design tokens: the header and the greeting carry the brand's colour, as Studio's picture shows. The chat is light or dark by an explicit choice, never by the visitor's device alone: an embedded chat stays light unless the frame URL says theme=dark, and only the chat's own page follows the device; on the dark chat the brand's colour is lightened until it stands out (3:1, unit-tested). The loader does not pass the website's theme yet, and brands cannot choose a theme or a plain header in Studio yet. Typography is not configurable, and the launcher position is a chat setting (W02)."
+    "note": "Each brand sets its main colour, logo, corner radius, typography, greeting, offline text, launcher label, rating on or off, privacy link and Hamnivo branding in Studio, with a live picture of the chat in each language. The gateway refuses a colour whose text cannot be read or that fades into a white page (the same contrast check as the brand package) and Studio suggests a darker one. Brands also choose light, dark or 'follow the website' (the default), a brand-coloured or plain header, and the launcher's picture (four) and size (48, 56 or 64 px); Studio's picture draws all of them, dark included, with the launcher under the chat. The choices are left out of the chat and launcher configuration until a brand makes them, so a chat saved before reads the same. The chat is light or dark by an explicit choice, never by the visitor's device alone: the loader decides from its data-theme attribute, then the brand's choice, then the website's own background and colour scheme, and tells the chat; only the chat's own page follows the device. On the dark chat the header is calm and the brand's colour is lightened until it stands out (3:1, unit-tested). Tested in Studio (the controls, the picture and the saved draft), the gateway (the choices reach new sessions and the launcher; values outside the lists are refused) and a browser (layout-audit CHECK=sites 'brand': with no attribute on the page the chat opens dark with a plain header and a small sparkle launcher at the brand's place)."
   },
   "HNV-24-01": {
     "status": "implemented",
@@ -2665,9 +2670,10 @@
       "packages/widget-loader/src/loader.ts",
       "packages/widget-loader/src/placement.ts",
       "packages/widget-loader/test/placement.test.ts",
-      "apps/widget/e2e/layout-audit.ts"
+      "apps/widget/e2e/layout-audit.ts",
+      "apps/console/test/flows-chat.test.tsx"
     ],
-    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens up to 480 px wide or 520 px tall (phones, phones held sideways, 200 % zoom) the button and the panel open full screen, sized to the visible area, with the page behind held still; elsewhere the floating chat stays inside the window, and grows to 720 × 920 px (a side panel to 640 px) when the visitor asks for more room; a launcher moved by the website's offsets takes the chat with it (unit-tested). A layout audit (e2e/layout-audit.ts) checks 20 screen sizes from a 280 px Fold to 2560 px in all four layouts, with no database: 300 of 300 cases clean on 2026-11-16, including a long answer with a table and code, and a message area of at least 160 px on a phone held sideways. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic."
+    "note": "Four layouts: a floating button, a side panel, inline in an element of the page and the whole page. Each brand chooses one in Studio (widget.configure) and the loader's data-mode overrides it; on screens up to 480 px wide or 520 px tall (phones, phones held sideways, 200 % zoom) the button and the panel open full screen, sized to the visible area, with the page behind held still; elsewhere the floating chat stays inside the window, and grows to 720 × 920 px (a side panel to 640 px) when the visitor asks for more room; a launcher moved by the website's offsets takes the chat with it (unit-tested). A layout audit (e2e/layout-audit.ts) checks 20 screen sizes from a 280 px Fold to 2560 px in all four layouts, with no database: 300 of 300 cases clean on 2026-11-16, including a long answer with a table and code, and a message area of at least 160 px on a phone held sideways. Tested in the gateway (settings reach new sessions and the launcher, which only allowed websites may read) and in the browser, also at 320 px and 200 % zoom in English and Arabic. Brands place the launcher in Studio too (space from the side and from the bottom, 0 to 400 px, and no launcher on phones); the loader's data-offset-x/y and data-hide-on-mobile come first."
   },
   "W09": {
     "status": "implemented",

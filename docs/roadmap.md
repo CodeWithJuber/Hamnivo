@@ -15,7 +15,7 @@ Claude or Hostinger, and work on every kind of website. Four phases, each pushed
 | 1 | **The chat itself** (`apps/widget`): look, home, thread, a reply on its way, rich answers, message actions, message box, pictures | Done, see below |
 | 2 | **Launcher and every website** (`packages/widget-loader`): launcher in a shadow root, animation, the website's light or dark theme passed to the chat, single-page sites, phones, options by attribute, the direct-link and font routes in Caddy | Done, see below |
 | 3 | **Live replies** (gateway): the worker starts a reply at once instead of after every other job, metered streaming, `activity` and `message.delta` events, a Stop button, questions to ask next | Done, see below |
-| 4 | **Brand controls** (contracts, gateway, Studio): theme, header style, launcher icon and size, offsets | Next |
+| 4 | **Brand controls** (contracts, gateway, Studio): theme, header style, launcher icon and size, offsets | Done, see below |
 
 ### Phase 1, done
 
@@ -116,6 +116,20 @@ contracts 42 of 42 with OpenAPI regenerated; widget unit 97 of 97; widget `test:
 - Not done: `message.created` does not name the draft it replaces (the widget drops every draft
   when a reply is published, which is the same while one reply is written at a time); a
   producer for `choices` cards; Studio's switch for follow-ups (phase 4).
+
+### Phase 4, done
+
+| What | Where | Checked by |
+|---|---|---|
+| **Light or dark, chosen by the brand.** `Follow the website` (the default), `Light` or `Dark`. The loader decides from its `data-theme`, then the brand's choice, then the website's own background and colour scheme, and tells the chat; the chat's own page uses the brand's choice. Left out of the configuration until a brand chooses, so older chats read the same. | `contracts/src/setup.ts`, `customer-surface.ts`, `widget.ts`, `gateway/src/widget/copy.ts`, widget `App.tsx` | `setup.int.test.ts`, `customer-surface.test.ts`, layout audit `CHECK=sites` `brand` |
+| **A plain header.** The top bar and welcome area in the brand's colour (default) or in the panel's own colour with a line under it. | the same, widget `styles.css` (`data-header`) | the same, and Studio's real preview in `agentic-platform.spec.ts` |
+| **The launcher's picture and size.** Round or square speech bubble, question mark or sparkle; 48, 56 or 64 px. The loader's `data-icon` and `data-size` still come first. | `contracts`, `copy.ts`, `widget-loader` (already read them) | `setup.int.test.ts`, `CHECK=sites` `brand` (small sparkle at the brand's place) |
+| **Where the launcher sits.** Space from the side and from the bottom (0 to 400 px, 20 when empty) and no launcher on phones, on the Behaviour tab. | `BrandChatSettings.tsx`, `copy.ts` | `flows-chat.test.tsx` (3), `customer-surface.int.test.ts`, `chat-settings.spec.ts` |
+| **Studio's switch for questions to ask next** (`help.followUps`), on by default and left out of what is saved while on. | `BrandChatSettings.tsx` | `flows-chat.test.tsx`, `chat-settings.spec.ts` |
+| **Studio's picture of the chat** draws the new look: dark, plain header, the launcher under the chat, a rounded message box with a round send button, the assistant's avatar. | `pages/settings/WidgetPreview.tsx`, `AppearanceDialog.tsx`, `lib/appearance.ts` | `setup-screens.test.tsx`, `flows-chat.test.tsx` |
+
+Strings in English, Arabic, Hindi and Urdu; [the guide](guide/setup/widget-look.md) rewritten to
+match the page (it still said **Save look**, which became **Save draft** and **Publish**).
 
 ## Done in this pass
 

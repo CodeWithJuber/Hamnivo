@@ -43,6 +43,11 @@ export interface AppearanceDraft {
   fontFamily: WidgetAppearance['fontFamily'];
   launcher: ChatTexts;
   showBranding: boolean;
+  /** Light, dark, or `auto`: the website's own light or dark. */
+  theme: NonNullable<WidgetAppearance['theme']>;
+  headerStyle: NonNullable<WidgetAppearance['headerStyle']>;
+  launcherIcon: NonNullable<WidgetAppearance['launcherIcon']>;
+  launcherSize: NonNullable<WidgetAppearance['launcherSize']>;
 }
 
 export const draftOf = (appearance: WidgetAppearance): AppearanceDraft => ({
@@ -56,6 +61,10 @@ export const draftOf = (appearance: WidgetAppearance): AppearanceDraft => ({
   offline: textsOf(appearance.offlineText),
   csat: appearance.csat,
   privacyUrl: appearance.privacyUrl ?? '',
+  theme: appearance.theme ?? 'auto',
+  headerStyle: appearance.headerStyle ?? 'brand',
+  launcherIcon: appearance.launcherIcon ?? 'chat',
+  launcherSize: appearance.launcherSize ?? 'medium',
 });
 
 /** What is saved for a draft. */
@@ -70,6 +79,10 @@ export const bodyOf = (draft: AppearanceDraft): WidgetAppearance => ({
   offlineText: localizedOf(draft.offline),
   csat: draft.csat,
   privacyUrl: draft.privacyUrl.trim() || null,
+  theme: draft.theme,
+  headerStyle: draft.headerStyle,
+  launcherIcon: draft.launcherIcon,
+  launcherSize: draft.launcherSize,
 });
 
 export const isDirty = (draft: AppearanceDraft, saved: AppearanceDraft): boolean =>

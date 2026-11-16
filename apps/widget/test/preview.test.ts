@@ -75,5 +75,9 @@ describe('real renderer draft preview', () => {
     expect(next.chatAvailable).toBe(false);
     expect(next.features.attachments).toBe(true);
     expect(config.copy.en.greeting).toBe('Original');
+    // Nothing chosen in the draft: the website decides light or dark, the header is the brand's.
+    expect(next.brand).toMatchObject({ theme: 'auto', headerStyle: 'brand' });
+    const dark = previewConfig(config, { ...appearance, theme: 'dark', headerStyle: 'plain' });
+    expect(dark.brand).toMatchObject({ theme: 'dark', headerStyle: 'plain' });
   });
 });

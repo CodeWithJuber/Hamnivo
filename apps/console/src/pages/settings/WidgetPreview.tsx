@@ -21,14 +21,21 @@ import type { FieldKind } from '../../lib/widget-forms';
 
 /**
  * The chat as customers will see it, drawn from the values being edited, before anything is
- * saved. It is a picture of the chat panel (white, with ink text, as the real one always is), so
- * it keeps its own colours whatever theme Studio is in. The real chat is one button away
- * ("Test chat").
+ * saved. It is a picture of the chat panel in the chat's own light or dark colours, so it keeps
+ * them whatever theme Studio is in. The real chat is one button away ("Test chat").
  */
 export interface PreviewLook {
   name: string;
   fontFamily?: WidgetAppearance['fontFamily'];
   showBranding?: boolean;
+  /** Light or dark; `auto` follows the website, and is drawn light here. */
+  theme?: WidgetAppearance['theme'];
+  headerStyle?: WidgetAppearance['headerStyle'];
+  /** The launcher is drawn under the panel only when its picture is given. */
+  launcherIcon?: WidgetAppearance['launcherIcon'];
+  launcherSize?: WidgetAppearance['launcherSize'];
+  /** Which side of the window the launcher is on. */
+  launcherSide?: 'bottom-right' | 'bottom-left';
   /** Main colour and the text colour used on it, both `#RRGGBB`. */
   colour: string;
   on: string;
@@ -74,10 +81,35 @@ export interface PreviewContent {
   attachments?: boolean;
 }
 
-const INK = '#192A30';
-const MUTED = '#F1F2F2';
-const BORDER = '#D9DDDF';
-const SECONDARY = '#5A6A70';
+/** The chat's own colours (packages/brand tokens), light and dark. */
+const PALETTES = {
+  light: {
+    surface: '#FFFFFF',
+    ink: '#192A30',
+    muted: '#F1F2F2',
+    border: '#D9DDDF',
+    secondary: '#5A6A70',
+    subtle: '#EEF1F2',
+  },
+  dark: {
+    surface: '#16242A',
+    ink: '#F2EFE8',
+    muted: '#1B2C33',
+    border: '#2A3B42',
+    secondary: '#C9D1D4',
+    subtle: '#1F3139',
+  },
+} as const;
+type Palette = (typeof PALETTES)[keyof typeof PALETTES];
+
+/** The launcher's pictures, as the loader draws them (one path each, on a 24 px grid). */
+const LAUNCHER_ICONS: Record<NonNullable<WidgetAppearance['launcherIcon']>, string> = {
+  chat: 'M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z',
+  message: 'M4 5h16v11H10l-5 4v-4H4z',
+  help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.7.4-1.2 1-1.2 1.8M12 17h.01',
+  sparkle: 'M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2zM19 3v4M17 5h4',
+};
+const LAUNCHER_SIZES = { small: 48, medium: 56, large: 64 } as const;
 
 /** The design's corner sizes at the default radius (6, 8, 12, 16 px), scaled with the brand's choice. */
 export const corner = (radius: number, base: 6 | 8 | 12 | 16): string =>
@@ -120,6 +152,8 @@ export function previewLookOf(
     name,
     fontFamily: appearance?.fontFamily,
     showBranding: appearance?.showBranding,
+    theme: appearance?.theme,
+    headerStyle: appearance?.headerStyle,
     colour,
     on: onColour(colour),
     radius: draft?.radius ?? DEFAULT_RADIUS,
@@ -143,12 +177,16 @@ function FieldPicture({
   radius,
   optional,
   choose,
+  palette,
 }: {
   field: PreviewField;
   radius: number;
   optional: string;
   choose: string;
+  palette: Palette;
 }) {
+  const BORDER = palette.border;
+  const SECONDARY = palette.secondary;
   const box: CSSProperties = { borderRadius: corner(radius, 8), borderColor: BORDER };
   const long = field.kind === 'question' || field.kind === 'text';
   const list = field.kind === 'choice' || field.kind === 'department';
@@ -195,19 +233,41 @@ export function WidgetPreview({
   const { t } = useTranslation();
   const rtl = look.lang === 'ar' || look.lang === 'ur';
   const words = PREVIEW_TEXT[look.lang];
+  const dark = look.theme === 'dark';
+  const palette = dark ? PALETTES.dark : PALETTES.light;
+  const { ink: INK, muted: MUTED, border: BORDER, secondary: SECONDARY } = palette;
   const bubble = { borderRadius: corner(look.radius, 12) };
   const filled: CSSProperties = {
     borderRadius: corner(look.radius, 8),
     backgroundColor: look.colour,
     color: look.on,
   };
+  // As the chat draws it: the brand's colour with a soft fall, a calm dark one on a dark chat
+  // (the brand's colour is kept for buttons there), or the panel's own colour.
+  const plain = look.headerStyle === 'plain';
+  const header: CSSProperties = plain
+    ? { backgroundColor: palette.surface, color: INK, borderBottom: `1px solid ${BORDER}` }
+    : dark
+      ? {
+          backgroundColor: palette.subtle,
+          color: INK,
+          backgroundImage: `linear-gradient(180deg, ${palette.subtle}, ${palette.surface})`,
+        }
+      : {
+          backgroundColor: look.colour,
+          color: look.on,
+          backgroundImage: `linear-gradient(180deg, ${look.colour}, color-mix(in srgb, ${look.colour} 82%, #000))`,
+        };
   const fields = content.fields ?? [];
   const form = screen === 'prechat' || screen === 'offline';
-  return (
+  const launcherSize = LAUNCHER_SIZES[look.launcherSize ?? 'medium'];
+  const panel = (
     <section
       aria-label={t('setup.appearance.previewLabel')}
       data-testid="widget-preview"
       data-screen={screen}
+      data-theme={dark ? 'dark' : 'light'}
+      data-header={plain ? 'plain' : 'brand'}
       lang={look.lang}
       dir={rtl ? 'rtl' : 'ltr'}
       className="mx-auto flex w-full max-w-[340px] flex-col overflow-hidden border shadow-lg"
@@ -219,14 +279,14 @@ export function WidgetPreview({
               ? '"Noto Sans", sans-serif'
               : undefined,
         borderRadius: corner(look.radius, 16),
-        backgroundColor: '#FFFFFF',
+        backgroundColor: palette.surface,
         color: INK,
         borderColor: BORDER,
       }}
     >
       <header
         className="flex items-center gap-3 px-4 py-3"
-        style={{ backgroundColor: look.colour, color: look.on }}
+        style={header}
         data-testid="preview-header"
       >
         {look.logoUrl ? (
@@ -234,32 +294,51 @@ export function WidgetPreview({
             src={look.logoUrl}
             alt=""
             referrerPolicy="no-referrer"
-            className="size-7 shrink-0 rounded-sm bg-white object-contain"
-            style={{ borderRadius: corner(look.radius, 6) }}
+            className="size-8 shrink-0 bg-white object-contain"
+            style={{ borderRadius: corner(look.radius, 8) }}
           />
-        ) : null}
+        ) : (
+          <span
+            className="flex size-8 shrink-0 items-center justify-center"
+            style={{
+              borderRadius: corner(look.radius, 8),
+              backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)',
+            }}
+            aria-hidden="true"
+          >
+            <LauncherPicture icon="chat" className="size-4" />
+          </span>
+        )}
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">
           <bdi>{look.name}</bdi>
         </span>
+        <ChevronDownIcon className="size-4 shrink-0 opacity-80" aria-hidden="true" />
         <XIcon className="size-4 shrink-0" aria-hidden="true" />
       </header>
       {screen === 'home' ? (
         <div className="flex min-h-56 flex-col gap-3 p-4 text-sm">
-          <p
-            className="max-w-[85%] self-start px-3 py-2"
-            style={{ ...bubble, backgroundColor: MUTED }}
-            data-testid="preview-greeting"
-          >
-            {look.greeting}
-          </p>
+          <div className="flex max-w-[88%] items-end gap-2 self-start">
+            <span
+              className="mb-0.5 size-6 shrink-0 rounded-full"
+              style={{ backgroundColor: look.colour }}
+              aria-hidden="true"
+            />
+            <p
+              className="px-3 py-2"
+              style={{ ...bubble, backgroundColor: MUTED }}
+              data-testid="preview-greeting"
+            >
+              {look.greeting}
+            </p>
+          </div>
           {content.suggestions && content.suggestions.length > 0 ? (
-            <ul className="flex flex-wrap gap-2" data-testid="preview-suggestions">
+            <ul className="flex flex-wrap gap-2 ps-8" data-testid="preview-suggestions">
               {content.suggestions.map((question, index) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: questions of a picture, in their order
                 <li key={index}>
                   <span
                     className="inline-block border px-3 py-1 text-xs"
-                    style={{ ...bubble, borderColor: look.colour }}
+                    style={{ borderRadius: '999px', borderColor: look.colour }}
                   >
                     <bdi>{question}</bdi>
                   </span>
@@ -311,6 +390,7 @@ export function WidgetPreview({
               radius={look.radius}
               optional={words.optional}
               choose={words.choose}
+              palette={palette}
             />
           ))}
           <span
@@ -355,34 +435,28 @@ export function WidgetPreview({
         </div>
       ) : null}
       {screen === 'home' ? (
-        <div
-          className="flex items-center gap-2 border-t px-3 py-2"
-          style={{ borderColor: BORDER }}
-          aria-hidden="true"
-        >
-          {content.attachments ? (
-            <PaperclipIcon
-              className="size-4 shrink-0"
-              style={{ color: SECONDARY }}
-              data-testid="preview-attach"
-            />
-          ) : null}
-          <span
-            className="flex-1 border px-3 py-2 text-xs"
-            style={{ borderRadius: corner(look.radius, 8), borderColor: BORDER, color: SECONDARY }}
+        <div className="px-3 pb-2" aria-hidden="true">
+          <div
+            className="flex items-center gap-2 border py-1.5 ps-3 pe-1.5"
+            style={{ borderRadius: corner(look.radius, 16), borderColor: BORDER }}
           >
-            {words.placeholder}
-          </span>
-          <span
-            className="flex size-9 items-center justify-center"
-            style={{
-              borderRadius: corner(look.radius, 8),
-              backgroundColor: look.colour,
-              color: look.on,
-            }}
-          >
-            <SendIcon className="size-4 rtl:-scale-x-100" />
-          </span>
+            {content.attachments ? (
+              <PaperclipIcon
+                className="size-4 shrink-0"
+                style={{ color: SECONDARY }}
+                data-testid="preview-attach"
+              />
+            ) : null}
+            <span className="flex-1 truncate text-xs" style={{ color: SECONDARY }}>
+              {words.placeholder}
+            </span>
+            <span
+              className="flex size-8 shrink-0 items-center justify-center rounded-full"
+              style={{ backgroundColor: look.colour, color: look.on }}
+            >
+              <SendIcon className="size-4 rtl:-scale-x-100" />
+            </span>
+          </div>
         </div>
       ) : null}
       {look.showBranding !== false ? (
@@ -400,5 +474,54 @@ export function WidgetPreview({
         </p>
       ) : null}
     </section>
+  );
+  if (!look.launcherIcon) return panel;
+  return (
+    <div className="mx-auto flex w-full max-w-[340px] flex-col gap-3">
+      {panel}
+      <span
+        className="flex items-center justify-center rounded-full shadow-lg"
+        style={{
+          width: launcherSize,
+          height: launcherSize,
+          backgroundColor: look.colour,
+          color: look.on,
+          alignSelf: look.launcherSide === 'bottom-left' ? 'flex-start' : 'flex-end',
+        }}
+        data-testid="preview-launcher"
+        data-icon={look.launcherIcon}
+        data-size={look.launcherSize ?? 'medium'}
+        aria-hidden="true"
+      >
+        <LauncherPicture
+          icon={look.launcherIcon}
+          className={launcherSize > 56 ? 'size-7' : launcherSize < 56 ? 'size-5' : 'size-6'}
+        />
+      </span>
+    </div>
+  );
+}
+
+/** One of the launcher's pictures, drawn as the loader draws it. */
+function LauncherPicture({
+  icon,
+  className,
+}: {
+  icon: NonNullable<WidgetAppearance['launcherIcon']>;
+  className: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d={LAUNCHER_ICONS[icon]} />
+    </svg>
   );
 }

@@ -274,6 +274,9 @@ export function widgetConfig(
       fontFamily: appearance.fontFamily,
       showBranding: appearance.showBranding,
       launcherPosition: settings.layout.position,
+      // Left out until the brand chose, so a chat from before them reads the same config.
+      ...(appearance.theme ? { theme: appearance.theme } : {}),
+      ...(appearance.headerStyle ? { headerStyle: appearance.headerStyle } : {}),
     },
     locales: { default: 'en', available: ['en', 'ar', 'hi', 'ur'] },
     copy,
@@ -419,8 +422,15 @@ export function launcherConfig(
     version: brand.configVersion,
     locale: lang,
     dir: lang === 'ar' || lang === 'ur' ? 'rtl' : 'ltr',
-    layout: config.layout,
+    layout: {
+      ...config.layout,
+      ...(surface.settings.layout.offset ? { offset: surface.settings.layout.offset } : {}),
+      ...(surface.settings.layout.hideOnMobile ? { hideOnMobile: true } : {}),
+    },
+    ...(config.brand.theme ? { theme: config.brand.theme } : {}),
     launcher: {
+      ...(surface.appearance?.launcherIcon ? { icon: surface.appearance.launcherIcon } : {}),
+      ...(surface.appearance?.launcherSize ? { size: surface.appearance.launcherSize } : {}),
       accent: config.brand.accent,
       onAccent: config.brand.onAccent,
       ...LAUNCHER_COPY[lang],
