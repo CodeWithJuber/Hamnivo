@@ -517,6 +517,26 @@ describe('the picture of the chat', () => {
     expect(textOf(hindi)).toContain('संदेश लिखें…');
   });
 
+  it('draws a dark chat, a plain header and the launcher as they are chosen', async () => {
+    const styleOf = (html: string, testId: string) => {
+      const tag = html.match(new RegExp(`<[a-z]+[^>]*data-testid="${testId}"[^>]*>`))?.[0] ?? '';
+      return tag.match(/style="([^"]*)"/)?.[1] ?? '';
+    };
+    const light = await draw();
+    expect(styleOf(light, 'widget-preview')).toContain('background-color:#FFFFFF');
+    expect(light).not.toContain('data-testid="preview-launcher"');
+    const dark = await draw({ theme: 'dark', launcherIcon: 'help', launcherSize: 'small' });
+    expect(styleOf(dark, 'widget-preview')).toContain('background-color:#16242A');
+    // On a dark chat the header is calm; the brand's colour stays on the launcher and buttons.
+    expect(styleOf(dark, 'preview-header')).not.toContain('background-color:#D17B00');
+    expect(styleOf(dark, 'preview-launcher')).toContain('background-color:#D17B00');
+    expect(styleOf(dark, 'preview-launcher')).toContain('width:48px');
+    expect(dark).toContain('data-icon="help"');
+    const plain = await draw({ headerStyle: 'plain' });
+    expect(styleOf(plain, 'preview-header')).toContain('background-color:#FFFFFF');
+    expect(styleOf(plain, 'preview-header')).toContain('color:#192A30');
+  });
+
   it('puts the brand name, and no logo picture when it has none', async () => {
     const html = await draw();
     expect(

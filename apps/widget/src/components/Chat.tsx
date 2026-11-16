@@ -1,10 +1,7 @@
 import {
   AssistantRuntimeProvider,
-  ComposerPrimitive,
   type ThreadMessageLike,
   ThreadPrimitive,
-  useAui,
-  useAuiState,
   useExternalStoreRuntime,
   useThreadViewport,
 } from '@assistant-ui/react';
@@ -16,10 +13,7 @@ import {
   type StartConversationInput,
 } from '@hamnivo/client';
 import type {
-  DeliveryState,
   FormAnswers,
-  Message,
-  MessagePart,
   OfflineMessageResponse,
   ReactionEmoji,
   ReplyLanguage,
@@ -29,31 +23,19 @@ import type {
 } from '@hamnivo/contracts';
 import { Button } from '@hamnivo/ui/components/button';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
-import { ParticipantBadge, type ParticipantKind } from '@hamnivo/ui/components/participant-badge';
+import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import {
-  BrainIcon,
-  EllipsisVerticalIcon,
-  GlobeIcon,
-  PaperclipIcon,
-  SendHorizontalIcon,
+  ArrowDownIcon,
+  MessagesSquareIcon,
+  SettingsIcon,
   UserRoundIcon,
-  XIcon,
+  WifiOffIcon,
 } from 'lucide-react';
-import {
-  type FormEvent,
-  type KeyboardEvent,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { offlineFormApplies } from '../availability.js';
-import { CommerceCard, type Part } from '../commerce/Cards.js';
 import { ShopBar } from '../commerce/ShopBar.js';
 import type { Commerce } from '../commerce/useCommerce.js';
-import { type Draft, draftText } from '../drafts.js';
 import {
   consentNeeded,
   type FieldValues,
@@ -62,507 +44,47 @@ import {
   labelOf,
   prechatNeeded,
 } from '../forms.js';
-import { LANGUAGE_NAMES, LOCALES, type Locale, REPLY_LANGUAGE_NAMES } from '../i18n.js';
-import { renderMarkdown } from '../markdown.js';
+import { type Locale, REPLY_LANGUAGE_NAMES } from '../i18n.js';
+import { runIsLive } from '../run.js';
 import { type ChatState, chatAvailable } from '../useChat.js';
 import type { DisplayControls } from '../useDisplay.js';
 import type { MemoryControls } from '../useMemory.js';
-import { useTypingReports } from '../useTyping.js';
-import { BidiText, directionOf } from './BidiText.js';
-import { BrandMark } from './BrandMark.js';
-import { ContactForm } from './ContactForm.js';
-import { Conversations } from './Conversations.js';
 import { Csat } from './Csat.js';
+import { type Chip, Composer } from './composer/Composer.js';
+import { useFileDrop } from './composer/useFileDrop.js';
 import { Home } from './Home.js';
 import { MemoryConsent } from './MemoryConsent.js';
-import { MemoryPanel, useSlotLabel } from './MemoryPanel.js';
-import { DeleteMessage, EMOJI_NAMES, Reactions } from './MessageActions.js';
-import { Contact, Files, fileSize, Place, Unknown } from './Parts.js';
 import { PrivacyLink } from './PrivacyLink.js';
 import { Reopen } from './Reopen.js';
-import { Settings } from './Settings.js';
 import { StaffTypingLine } from './StaffTyping.js';
-import { StartGate } from './StartGate.js';
 import { StatusLine } from './StatusLine.js';
+import { Header } from './shell/Header.js';
 import { TicketLine } from './TicketLine.js';
+import { Bubble, type BubbleContext } from './thread/Bubble.js';
+import { DraftBubble } from './thread/Draft.js';
+import { type Custom, deletedOf, reactionOf, spokenOf, toThread } from './thread/model.js';
+import { Thinking } from './thread/Thinking.js';
 import { VisitorNotice } from './VisitorNotice.js';
 
-interface Source {
-  id: string;
-  title: string;
-  url: string | null;
-  excerpt: string | null;
-}
+// Screens a visitor may never open load when they are first asked for.
+const MemoryPanel = lazy(() =>
+  import('./MemoryPanel.js').then((module) => ({ default: module.MemoryPanel })),
+);
+const Settings = lazy(() =>
+  import('./Settings.js').then((module) => ({ default: module.Settings })),
+);
+const Conversations = lazy(() =>
+  import('./Conversations.js').then((module) => ({ default: module.Conversations })),
+);
+const ContactForm = lazy(() =>
+  import('./ContactForm.js').then((module) => ({ default: module.ContactForm })),
+);
+const StartGate = lazy(() =>
+  import('./StartGate.js').then((module) => ({ default: module.StartGate })),
+);
 
-type AttachmentPart = Extract<MessagePart, { type: 'attachment' }>;
-
-interface Custom {
-  kind: ParticipantKind;
-  name: string;
-  role: string;
-  /** `provisional`: an AI reply still being written or checked, not a message yet. */
-  state: 'accepted' | 'provisional' | OutgoingMessage['state'];
-  clientMessageId?: string;
-  /** Knowledge an AI answer cites, numbered as in its text (G06). */
-  sources?: Source[];
-  /** A card (quote, receipt…) from Hamnivo's records, rendered instead of text. */
-  card?: Part;
-  /** Memories an AI answer used (G19): shown as memories, never as something said now. */
-  memories?: string[];
-  /** The confirmed message's id and time (for deleting and reacting). */
-  messageId?: string;
-  createdAt?: string;
-  delivery?: DeliveryState | null;
-  /** Files the message carries (W09), and those of a message still being sent. */
-  files?: AttachmentPart[];
-  pendingFiles?: OutgoingAttachment[];
-  /** Places, contacts and parts this widget does not know (W24). */
-  extras?: MessagePart[];
-  deleted?: boolean;
-  reaction?: { emoji: ReactionEmoji };
-  /** The first reply the visitor had not seen when the conversation opened (W05). */
-  firstUnread?: boolean;
-  /** The visitor's newest confirmed message, which shows "Sent" or "Read" (W06). */
-  lastMine?: boolean;
-  /** The API's code for a failed send, to explain it. */
-  errorCode?: string;
-}
-
-const textOf = (m: Message) =>
-  m.parts
-    .map((p) => (p.type === 'text' ? p.text : p.type === 'card' ? p.fallbackText : ''))
-    .join('\n')
-    .trim();
-
-/** Words of a message for announcements, naming what was shared. */
-const spokenOf = (m: Message, file: (name: string) => string) =>
-  [textOf(m), ...m.parts.flatMap((p) => (p.type === 'attachment' ? [file(p.name)] : []))]
-    .filter(Boolean)
-    .join(' ');
-
-const cardOf = (m: Message): Part | undefined => m.parts.find((p): p is Part => p.type === 'card');
-const memoriesOf = (m: Message): string[] =>
-  m.parts.flatMap((p) => (p.type === 'memory' ? [p.key] : []));
-
-const sourcesOf = (m: Message): Source[] =>
-  m.parts.flatMap((p) =>
-    p.type === 'source' ? [{ id: p.sourceId, title: p.title, url: p.url, excerpt: p.excerpt }] : [],
-  );
-const filesOf = (m: Message): AttachmentPart[] =>
-  m.parts.filter((p): p is AttachmentPart => p.type === 'attachment');
-const extrasOf = (m: Message): MessagePart[] =>
-  m.parts.filter((p) => p.type === 'location' || p.type === 'contact' || p.type === 'unknown');
-const deletedOf = (m: Message) =>
-  m.parts.some((p) => p.type === 'notice' && p.notice === 'message_deleted');
-const reactionOf = (m: Message) => {
-  const part = m.parts.find((p) => p.type === 'reaction');
-  return part?.type === 'reaction' ? { emoji: part.emoji } : undefined;
-};
-
-function toThread(
-  messages: Message[],
-  pending: readonly OutgoingMessage[],
-  you: string,
-  firstUnreadId: string | null,
-  drafts: readonly Draft[] = [],
-): ThreadMessageLike[] {
-  const lastMine = messages.findLast(
-    (m) => m.sender.kind === 'customer' && !deletedOf(m) && !reactionOf(m),
-  )?.id;
-  const confirmed = messages.map((m): ThreadMessageLike => {
-    const kind: ParticipantKind =
-      m.sender.kind === 'ai_agent' ? 'ai_primary' : (m.sender.kind as ParticipantKind);
-    const deleted = deletedOf(m);
-    return {
-      id: m.id,
-      role:
-        m.sender.kind === 'customer' ? 'user' : m.sender.kind === 'system' ? 'system' : 'assistant',
-      content: [{ type: 'text', text: deleted ? '' : textOf(m) }],
-      createdAt: new Date(m.createdAt),
-      metadata: {
-        custom: {
-          kind,
-          name: m.sender.kind === 'customer' ? you : m.sender.displayName,
-          role: m.sender.roleLabel ?? '',
-          state: 'accepted',
-          sources: sourcesOf(m),
-          ...(cardOf(m) ? { card: cardOf(m) } : {}),
-          memories: memoriesOf(m),
-          messageId: m.id,
-          createdAt: m.createdAt,
-          delivery: m.delivery,
-          files: deleted ? [] : filesOf(m),
-          extras: deleted ? [] : extrasOf(m),
-          deleted,
-          ...(reactionOf(m) ? { reaction: reactionOf(m) } : {}),
-          firstUnread: m.id === firstUnreadId,
-          lastMine: m.id === lastMine,
-        } satisfies Custom,
-      },
-    };
-  });
-  const unsent = pending.map(
-    (p): ThreadMessageLike => ({
-      id: `pending-${p.clientMessageId}`,
-      role: 'user',
-      content: [{ type: 'text', text: p.text }],
-      createdAt: new Date(p.createdAt),
-      metadata: {
-        custom: {
-          kind: 'customer',
-          name: you,
-          role: '',
-          state: p.state,
-          clientMessageId: p.clientMessageId,
-          pendingFiles: p.attachments ?? [],
-          ...(p.errorCode ? { errorCode: p.errorCode } : {}),
-        } satisfies Custom,
-      },
-    }),
-  );
-  const provisional = drafts.map(
-    (draft): ThreadMessageLike => ({
-      id: `draft-${draft.draftId}`,
-      role: 'assistant',
-      content: [{ type: 'text', text: draftText(draft) }],
-      metadata: {
-        custom: { kind: 'ai_primary', name: '', role: '', state: 'provisional' } satisfies Custom,
-      },
-    }),
-  );
-  return [...confirmed, ...unsent, ...provisional];
-}
-
-interface BubbleContext {
-  client: HamnivoClient;
-  conversationId: string | null;
-  commerce: Commerce;
-  locale: Locale;
-  offline: boolean;
-  /** How long after sending a message can be deleted; 0 when it can't (W23). */
-  deleteWindowMs: number;
-  /** Chat isn't available to this visitor (H20): messages can be read, not answered or reacted to. */
-  readOnly: boolean;
-  onRetry: (id: string) => void;
-  onEdit: (id: string) => void;
-  onRemove: (id: string) => void;
-  onHelp: (() => void) | undefined;
-  onOpenMemory: () => void;
-  onDelete: (messageId: string) => Promise<void>;
-  onReact: (messageId: string, emoji: ReactionEmoji) => Promise<void>;
-}
-
-/** Why a message was not sent, in words a customer can act on (HNV-06-03). */
-function causeOf(
-  code: string | undefined,
-): 'files' | 'invalid' | 'closed' | 'unavailable' | 'other' {
-  if (code === 'CHAT_UNAVAILABLE') return 'unavailable';
-  if (code === 'UPLOAD_REJECTED' || code === 'FEATURE_DISABLED') return 'files';
-  if (code === 'VALIDATION_FAILED' || code === 'IDEMPOTENCY_CONFLICT') return 'invalid';
-  if (code === 'NOT_FOUND' || code === 'CONVERSATION_CLOSED') return 'closed';
-  return 'other';
-}
-
-/**
- * When a message was sent, in the visitor's own time zone: the time today, the day and time
- * before. Nothing for a message not confirmed yet.
- */
-function SentAt({ at, locale }: { at: string | undefined; locale: string }) {
-  const date = at ? new Date(at) : null;
-  if (!date || Number.isNaN(date.getTime())) return null;
-  const today = date.toDateString() === new Date().toDateString();
-  const label = new Intl.DateTimeFormat(
-    locale,
-    today
-      ? { timeStyle: 'short' }
-      : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' },
-  ).format(date);
-  return (
-    <time dateTime={date.toISOString()} data-testid="sent-at">
-      {label}
-    </time>
-  );
-}
-
-/** "Waiting", "Sending…", "Not sent" with what to do, or "Sent" and "Read" (W06). */
-function Delivery({ custom, ctx }: { custom: Partial<Custom>; ctx: BubbleContext }) {
-  const { t } = useTranslation();
-  const id = custom.clientMessageId;
-  if (custom.state === 'failed' && id) {
-    const cause = causeOf(custom.errorCode);
-    // While chat isn't available, sending again or editing can't help; the message can go.
-    const stuck = cause === 'unavailable' || ctx.readOnly;
-    return (
-      <div className="flex max-w-[85%] flex-col items-end gap-1 text-xs" role="alert">
-        <span className="text-danger">
-          {t('surface.delivery.failed')} {t(`surface.delivery.causes.${cause}`)}
-        </span>
-        <span className="flex flex-wrap justify-end gap-3">
-          {stuck ? null : (
-            <>
-              <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onRetry(id)}>
-                {t('surface.delivery.retry')}
-              </Button>
-              <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onEdit(id)}>
-                {t('surface.delivery.edit')}
-              </Button>
-            </>
-          )}
-          <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onRemove(id)}>
-            {t('surface.delivery.remove')}
-          </Button>
-        </span>
-      </div>
-    );
-  }
-  if (custom.state === 'queued' || custom.state === 'sending') {
-    const waiting = custom.state === 'queued' && ctx.offline;
-    return (
-      <p
-        className="flex flex-wrap items-center justify-end gap-3 text-xs text-text-muted"
-        data-testid="delivery"
-      >
-        <span>{waiting ? t('surface.delivery.queued') : t('surface.delivery.sending')}</span>
-        {waiting && id ? (
-          <>
-            <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onEdit(id)}>
-              {t('surface.delivery.edit')}
-            </Button>
-            <Button variant="link" className="h-auto text-xs" onClick={() => ctx.onRemove(id)}>
-              {t('surface.delivery.remove')}
-            </Button>
-          </>
-        ) : null}
-      </p>
-    );
-  }
-  if (custom.lastMine) {
-    return (
-      <p className="text-xs text-text-muted" data-testid="delivery">
-        {custom.delivery === 'read' ? t('surface.delivery.read') : t('surface.delivery.sent')}
-      </p>
-    );
-  }
-  return null;
-}
-
-function Bubble({ message, ctx }: { message: ThreadMessageLike; ctx: BubbleContext }) {
-  const { t } = useTranslation();
-  const slotLabel = useSlotLabel();
-  const custom = (message.metadata?.custom ?? {}) as unknown as Partial<Custom>;
-  const divider = custom.firstUnread ? (
-    <li
-      className="flex items-center gap-2 text-xs font-medium text-info"
-      data-testid="unread-divider"
-    >
-      <span className="h-px flex-1 bg-info/40" aria-hidden="true" />
-      {t('surface.history.newMessages')}
-      <span className="h-px flex-1 bg-info/40" aria-hidden="true" />
-    </li>
-  ) : null;
-  if (custom.card) {
-    return (
-      <>
-        {divider}
-        <li className="flex flex-col items-start gap-1" data-sender="system">
-          <CommerceCard
-            part={custom.card}
-            commerce={ctx.commerce}
-            locale={ctx.locale}
-            onHelp={ctx.onHelp}
-          />
-        </li>
-      </>
-    );
-  }
-  // While the AI is expected to answer, assistant-ui adds an optimistic placeholder message.
-  if (!custom.kind) {
-    return message.role === 'assistant' ? (
-      <li className="text-sm text-text-muted" data-testid="ai-writing">
-        {t('typing')}
-      </li>
-    ) : null;
-  }
-  const mine = message.role === 'user';
-  if (custom.reaction) {
-    return (
-      <li
-        className={`flex text-xs text-text-muted ${mine ? 'justify-end' : 'justify-start'}`}
-        data-sender={custom.kind}
-        data-testid="reaction"
-      >
-        {t('surface.actions.reacted', {
-          emoji: t(`surface.actions.emoji.${EMOJI_NAMES[custom.reaction.emoji]}`),
-        })}{' '}
-        <span aria-hidden="true">{custom.reaction.emoji}</span>
-      </li>
-    );
-  }
-  const text =
-    typeof message.content === 'string'
-      ? message.content
-      : message.content.map((p) => ('text' in p ? p.text : '')).join('');
-  // A draft is shown as an answer being checked, plain text, never as a final message.
-  if (custom.state === 'provisional') {
-    return (
-      <li
-        className="flex flex-col items-start gap-1"
-        data-sender={custom.kind}
-        data-state="provisional"
-        data-testid="draft-reply"
-        aria-busy="true"
-      >
-        <p className="text-xs text-text-muted">{t('draftChecking')}</p>
-        <div
-          dir={directionOf(text)}
-          className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl border border-dashed border-border px-3 py-2 text-[15px] leading-relaxed text-text-muted"
-        >
-          <BidiText text={text} />
-        </div>
-      </li>
-    );
-  }
-  const messageId = custom.messageId;
-  const canDelete =
-    mine &&
-    !ctx.readOnly &&
-    custom.state === 'accepted' &&
-    !custom.deleted &&
-    messageId !== undefined &&
-    ctx.deleteWindowMs > 0 &&
-    Date.now() - Date.parse(custom.createdAt ?? '') < ctx.deleteWindowMs;
-  const canReact =
-    !mine &&
-    !ctx.readOnly &&
-    !custom.deleted &&
-    messageId !== undefined &&
-    (custom.kind === 'ai_primary' || custom.kind === 'human_agent');
-  return (
-    <>
-      {divider}
-      <li
-        className={`flex flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}
-        data-sender={custom.kind}
-        data-state={custom.state}
-        data-delivery={custom.delivery ?? undefined}
-      >
-        {!mine && custom.kind !== 'system' ? (
-          <ParticipantBadge
-            kind={custom.kind}
-            name={custom.name ?? ''}
-            roleLabel={custom.role ?? ''}
-          />
-        ) : null}
-        {custom.deleted ? (
-          <p
-            className="max-w-[85%] rounded-2xl border border-dashed border-border px-3 py-2 text-sm italic text-text-muted"
-            data-testid="message-deleted"
-          >
-            {t('surface.parts.deleted')}
-          </p>
-        ) : !text ? null : mine || custom.kind === 'system' ? (
-          <div
-            dir={directionOf(text)}
-            data-testid="message-text"
-            className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-[0.9375rem] leading-relaxed ${
-              mine ? 'bg-primary text-primary-foreground' : 'bg-transparent text-text-muted text-sm'
-            }`}
-          >
-            <BidiText text={text} />
-          </div>
-        ) : (
-          <div
-            dir={directionOf(text)}
-            data-testid="message-text"
-            className="hv-markdown max-w-[85%] break-words rounded-2xl border border-border bg-surface px-3 py-2 text-[0.9375rem] leading-relaxed text-text"
-            // Sanitized by renderMarkdown: a short allow-list of tags and http(s) links only.
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized above
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }}
-          />
-        )}
-        {custom.files?.length && ctx.conversationId ? (
-          <Files
-            client={ctx.client}
-            conversationId={ctx.conversationId}
-            parts={custom.files}
-            locale={ctx.locale}
-          />
-        ) : null}
-        {custom.pendingFiles?.length ? (
-          <ul className="flex max-w-[85%] flex-col items-end gap-1 text-xs text-text-muted">
-            {custom.pendingFiles.map((file) => (
-              <li key={file.uploadId} className="flex items-center gap-1">
-                <PaperclipIcon className="size-3.5" aria-hidden="true" />
-                <BidiText text={file.name} /> · {fileSize(file.sizeBytes, ctx.locale)}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {custom.extras?.map((part) =>
-          part.type === 'location' ? (
-            <Place key={`place-${part.latitude}-${part.longitude}`} part={part} />
-          ) : part.type === 'contact' ? (
-            <Contact key={`contact-${part.name}-${part.phone ?? ''}`} part={part} />
-          ) : part.type === 'unknown' ? (
-            <Unknown key={`unknown-${part.originalType}-${part.fallbackText ?? ''}`} part={part} />
-          ) : null,
-        )}
-        {custom.sources?.length ? (
-          <div className="max-w-[85%] text-xs text-text-muted" data-testid="sources">
-            <p className="font-medium">{t('sources')}</p>
-            <ol className="list-decimal ps-5">
-              {custom.sources.map((source) => (
-                <li key={source.id} dir="auto">
-                  {source.url ? (
-                    <a
-                      href={source.url}
-                      target="_blank"
-                      rel="noopener noreferrer nofollow"
-                      className="text-link underline underline-offset-2"
-                    >
-                      {source.title}
-                    </a>
-                  ) : (
-                    source.title
-                  )}
-                </li>
-              ))}
-            </ol>
-          </div>
-        ) : null}
-        {custom.memories?.length ? (
-          <p className="max-w-[85%] text-xs text-text-muted" data-testid="memory-note">
-            {t('memory.used', {
-              labels: [...new Set(custom.memories)].map(slotLabel).join(', '),
-            })}{' '}
-            <Button variant="link" className="h-auto text-xs" onClick={ctx.onOpenMemory}>
-              {t('memory.see')}
-            </Button>
-          </p>
-        ) : null}
-        {mine ? (
-          <div className="flex flex-wrap items-center justify-end gap-x-2 text-xs text-text-muted">
-            {custom.state === 'accepted' ? (
-              <SentAt at={custom.createdAt} locale={ctx.locale} />
-            ) : null}
-            <Delivery custom={custom} ctx={ctx} />
-          </div>
-        ) : null}
-        {canDelete && messageId ? <DeleteMessage onDelete={() => ctx.onDelete(messageId)} /> : null}
-        {!mine && custom.kind !== 'system' ? (
-          <div className="flex items-start gap-1 text-xs text-text-muted">
-            <span className="leading-8">
-              <SentAt at={custom.createdAt} locale={ctx.locale} />
-            </span>
-            {canReact && messageId ? (
-              <Reactions onReact={(emoji) => ctx.onReact(messageId, emoji)} />
-            ) : null}
-          </div>
-        ) : null}
-      </li>
-    </>
-  );
-}
+/** How long after the visitor wrote a reply is still shown as on its way, without any word of it. */
+const REPLY_DUE_MS = 45_000;
 
 /** Language tags for the reply language buttons, so screen readers use the right voice. */
 const LANG_TAGS: Record<ReplyLanguage, string> = {
@@ -602,7 +124,7 @@ function LanguageQuestion(props: {
   return (
     <section
       aria-labelledby="hv-language-question"
-      className="mb-2 rounded-xl border border-border bg-surface-sunken px-3 py-2"
+      className="hv-enter mb-2 rounded-xl border border-border bg-surface px-3 py-2 shadow-sm"
       data-testid="language-question"
     >
       <h2 id="hv-language-question" className="mb-2 text-sm font-medium text-text">
@@ -635,219 +157,6 @@ function LanguageQuestion(props: {
   );
 }
 
-/** A file being attached: checked by the gateway, then sent with the next message (W09). */
-export interface Chip {
-  id: string;
-  name: string;
-  size: number;
-  state: 'uploading' | 'ready' | 'refused';
-  file?: OutgoingAttachment;
-  reason?: string;
-}
-
-/** "Send" with an arrow; on phones under 352 px (or with large text) only the arrow shows. */
-function SendLabel({ text }: { text: string }) {
-  return (
-    <>
-      <SendHorizontalIcon className="size-4 rtl:-scale-x-100" aria-hidden="true" />
-      <span className="max-[22rem]:sr-only">{text}</span>
-    </>
-  );
-}
-
-/**
- * The message box (U08). Enter sends and Shift+Enter starts a new line, but an Enter that
- * confirms an input method composition (Hindi, Urdu, Arabic or Chinese keyboards) never sends:
- * browsers flag it with isComposing, Safari only with key code 229 after the composition ends.
- * The box follows the direction of what is typed, so Urdu typed in the English interface reads
- * right to left. Files go with the words (W09); what is typed is kept as a draft (W07).
- */
-function Composer(props: {
-  label: string;
-  send: string;
-  draftScope: string;
-  /** The conversation the words go to; null before there is one (nothing is reported then). */
-  conversationId: string | null;
-  client: HamnivoClient;
-  chips: readonly Chip[];
-  attach: { allowed: boolean; accept: string; maxFiles: number; maxMb: number };
-  onFiles: (files: File[]) => void;
-  onRemoveChip: (id: string) => void;
-  onSendFiles: () => void;
-  locale: string;
-  prefill: { text: string; at: number } | null;
-  /** Called once the words are in the box, so a remounted box does not type them again. */
-  onPrefilled: (at: number) => void;
-}) {
-  const { t } = useTranslation();
-  const aui = useAui();
-  const text = useAuiState((s) => s.composer.text);
-  const composing = useRef(false);
-  const picker = useRef<HTMLInputElement>(null);
-  const hintId = useId();
-  const uploading = props.chips.some((c) => c.state === 'uploading');
-  const ready = props.chips.some((c) => c.state === 'ready');
-  const { drafts } = props.client;
-  const scope = props.draftScope;
-  const { conversationId, client } = props;
-  // Staff see "typing…" while the visitor writes.
-  useTypingReports(
-    conversationId ? (typing) => client.reportTyping(conversationId, typing) : null,
-    text,
-  );
-
-  // The draft comes back after a reload; typing keeps it for this person and conversation.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the scope changes
-  useEffect(() => {
-    const draft = drafts.get(scope);
-    if (draft && !aui.composer().getState().text) aui.composer().setText(draft);
-  }, [scope]);
-  useEffect(() => {
-    const timer = setTimeout(() => drafts.set(scope, text), 300);
-    return () => clearTimeout(timer);
-  }, [drafts, scope, text]);
-  // The website's words go in the box only; the visitor reads them and chooses to send.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once per prefill
-  useEffect(() => {
-    if (!props.prefill) return;
-    aui.composer().setText(props.prefill.text);
-    props.onPrefilled(props.prefill.at);
-  }, [props.prefill]);
-
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== 'Enter' || event.shiftKey) return;
-    if (event.nativeEvent.isComposing || event.keyCode === 229 || composing.current) return;
-    event.preventDefault();
-    event.currentTarget.form?.requestSubmit();
-  };
-  const onSubmit = (event: FormEvent) => {
-    if (uploading) {
-      event.preventDefault();
-      return;
-    }
-    // Files alone: the composer only sends words, so they go from here.
-    if (!text.trim() && ready) {
-      event.preventDefault();
-      props.onSendFiles();
-    }
-  };
-  return (
-    <ComposerPrimitive.Root className="flex flex-col gap-2" onSubmit={onSubmit}>
-      {props.chips.length ? (
-        <ul
-          className="flex flex-wrap gap-2"
-          aria-label={t('surface.files.attach')}
-          data-testid="file-chips"
-        >
-          {props.chips.map((chip) => (
-            <li
-              key={chip.id}
-              className={`flex max-w-full items-center gap-1 rounded-full border px-2 py-1 text-xs ${
-                chip.state === 'refused'
-                  ? 'border-danger/40 text-danger'
-                  : 'border-border text-text'
-              }`}
-              data-state={chip.state}
-            >
-              <PaperclipIcon className="size-3.5 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 break-all">
-                <BidiText text={chip.name} />
-              </span>
-              <span className="text-text-muted">· {fileSize(chip.size, props.locale)}</span>
-              <span className="text-text-muted">
-                ·{' '}
-                {chip.state === 'uploading'
-                  ? t('surface.files.uploading')
-                  : chip.state === 'ready'
-                    ? t('surface.files.ready')
-                    : (chip.reason ?? t('surface.files.refused'))}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="size-8"
-                aria-label={t('surface.files.remove', { name: chip.name })}
-                onClick={() => props.onRemoveChip(chip.id)}
-              >
-                <XIcon className="size-3.5" aria-hidden="true" />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <div className="flex items-end gap-2">
-        {props.attach.allowed ? (
-          <>
-            <input
-              ref={picker}
-              type="file"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden="true"
-              accept={props.attach.accept}
-              multiple={props.attach.maxFiles > 1}
-              onChange={(e) => {
-                props.onFiles([...(e.target.files ?? [])]);
-                e.target.value = '';
-              }}
-              data-testid="file-input"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="min-h-11 min-w-11"
-              aria-label={t('surface.files.attach')}
-              aria-describedby={hintId}
-              onClick={() => picker.current?.click()}
-            >
-              <PaperclipIcon className="size-5" aria-hidden="true" />
-            </Button>
-            <span id={hintId} className="sr-only">
-              {t('surface.files.hint', { size: props.attach.maxMb })}
-            </span>
-          </>
-        ) : null}
-        <ComposerPrimitive.Input
-          aria-label={props.label}
-          placeholder={props.label}
-          maxLength={10_000}
-          dir={directionOf(text)}
-          rows={1}
-          // A long message scrolls in the box instead of pushing the conversation off a phone.
-          maxRows={5}
-          submitMode="none"
-          onKeyDown={onKeyDown}
-          onCompositionStart={() => {
-            composing.current = true;
-          }}
-          onCompositionEnd={() => {
-            composing.current = false;
-          }}
-          className="min-h-11 min-w-0 flex-1 resize-none rounded-xl border border-input bg-bg px-3 py-2.5 text-base text-text"
-        />
-        {text.trim() ? (
-          <ComposerPrimitive.Send asChild>
-            <Button className="min-h-11" aria-disabled={uploading || undefined}>
-              <SendLabel text={props.send} />
-            </Button>
-          </ComposerPrimitive.Send>
-        ) : (
-          <Button
-            type="submit"
-            className="min-h-11"
-            disabled={!ready || uploading}
-            data-testid="send-files"
-          >
-            <SendLabel text={props.send} />
-          </Button>
-        )}
-      </div>
-    </ComposerPrimitive.Root>
-  );
-}
-
 /** Reports what the visitor saw while the newest messages are on screen (W05, W06). */
 function SeenReporter({
   visible,
@@ -872,12 +181,48 @@ function SeenReporter({
   return null;
 }
 
-type View = 'chat' | 'memory' | 'settings' | 'conversations' | 'contact';
-
 /**
- * What the visitor did before the first conversation, kept while the chat asks its pre-chat form
- * or for consent (W26, W27): a message, "talk to a person", or files to attach.
+ * The way back to the newest message while reading earlier ones (HNV-06-06). With replies not
+ * seen yet it says how many wait; otherwise it is a small arrow. New messages never move the
+ * page by themselves once the visitor has scrolled up.
  */
+function JumpToLatest({ unread, smooth }: { unread: number; smooth: boolean }) {
+  const { t } = useTranslation();
+  const atBottom = useThreadViewport((s) => s.isAtBottom);
+  if (unread > 0) {
+    return (
+      <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center">
+        <ThreadPrimitive.ScrollToBottom asChild behavior={smooth ? 'smooth' : 'auto'}>
+          <Button
+            size="sm"
+            className="hv-pop pointer-events-auto rounded-full shadow-md disabled:hidden"
+            data-testid="jump-new"
+          >
+            {t('surface.history.jump', { count: unread })}
+          </Button>
+        </ThreadPrimitive.ScrollToBottom>
+      </div>
+    );
+  }
+  if (atBottom) return null;
+  return (
+    <div className="pointer-events-none absolute end-3 bottom-2 flex">
+      <ThreadPrimitive.ScrollToBottom asChild behavior={smooth ? 'smooth' : 'auto'}>
+        <Button
+          variant="secondary"
+          size="icon"
+          className="hv-pop pointer-events-auto rounded-full shadow-md disabled:hidden"
+          aria-label={t('ui.latest')}
+          title={t('ui.latest')}
+          data-testid="jump-latest"
+        >
+          <ArrowDownIcon className="size-5" aria-hidden="true" />
+        </Button>
+      </ThreadPrimitive.ScrollToBottom>
+    </div>
+  );
+}
+
 /**
  * "Back to the assistant" while a request for a person waits (HNV-10-02, HNV-10-05). It can be
  * pressed once at a time; the answer replaces the banner, and focus moves to the composer when
@@ -887,66 +232,65 @@ function BackToAssistant({ onCancel }: { onCancel: () => Promise<void> }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   return (
-    <div>
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        disabled={busy}
-        aria-busy={busy || undefined}
-        data-testid="back-to-assistant"
-        onClick={async () => {
-          setBusy(true);
-          try {
-            await onCancel();
-          } catch {
-            // The banner stays as it was; the reason, if any, is shown by the chat.
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        {t('backToAssistant')}
-      </Button>
-    </div>
+    <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      className="[@media(max-height:26rem)]:h-8"
+      disabled={busy}
+      aria-busy={busy || undefined}
+      data-testid="back-to-assistant"
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await onCancel();
+        } catch {
+          // The banner stays as it was; the reason, if any, is shown by the chat.
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {t('backToAssistant')}
+    </Button>
   );
 }
 
-/**
- * The chat's language (W13), small enough for one header row: the native list over a globe and
- * the language's short name, so phones still open their own picker and screen readers hear
- * "Language, combo box". The ring follows the keyboard.
- */
-function LanguagePicker(props: { locale: Locale; onLocale: (next: Locale) => void }) {
+/** A screen that is still on its way: its shape, with words for screen readers. */
+function PanelLoading() {
   const { t } = useTranslation();
   return (
-    <div className="relative">
-      <label className="sr-only" htmlFor="hv-locale">
-        {t('language')}
-      </label>
-      <select
-        id="hv-locale"
-        className="peer absolute inset-0 size-full cursor-pointer appearance-none opacity-0"
-        value={props.locale}
-        onChange={(e) => props.onLocale(e.target.value as Locale)}
-      >
-        {LOCALES.map((l) => (
-          <option key={l} value={l} lang={l}>
-            {LANGUAGE_NAMES[l]}
-          </option>
-        ))}
-      </select>
-      <span
-        aria-hidden="true"
-        className="flex h-10 items-center gap-1 rounded-md px-2 text-sm font-medium text-text peer-hover:bg-surface-sunken peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
-      >
-        <GlobeIcon className="size-4" />
-        {props.locale.toUpperCase()}
-      </span>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-4" role="status">
+      <span className="sr-only">{t('ui.loading')}</span>
+      <Skeleton className="h-5 w-40" />
+      <Skeleton className="h-16 w-full rounded-xl" />
+      <Skeleton className="h-16 w-full rounded-xl" />
     </div>
   );
 }
 
+/** True on a screen too short for everything at once: a phone held sideways, a zoomed window. */
+function useShortScreen(): boolean {
+  const [short, setShort] = useState(
+    () => typeof matchMedia === 'function' && matchMedia('(max-height: 26rem)').matches,
+  );
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const query = matchMedia('(max-height: 26rem)');
+    const update = () => setShort(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return short;
+}
+
+type View = 'chat' | 'memory' | 'settings' | 'conversations' | 'contact';
+
+/**
+ * What the visitor did before the first conversation, kept while the chat asks its pre-chat form
+ * or for consent (W26, W27): a message, "talk to a person", or files to attach.
+ */
 type Intent = { kind: 'send'; text: string } | { kind: 'handoff' } | { kind: 'files' };
 
 /** Puts focus back in the message box, after it comes back. */
@@ -974,6 +318,10 @@ export function Chat(props: {
   staffTyping: string | null;
   /** Says the website notes which pages are viewed (from the gateway), or null. */
   visitorNotice: string | null;
+  /** The header in the brand's colour, or plain like the rest of the chat. */
+  headerStyle?: 'brand' | 'plain' | undefined;
+  /** Makes the chat larger or smaller, where the website's loader can; null otherwise. */
+  expand?: { expanded: boolean; onToggle: () => void } | null | undefined;
   onLocale: (locale: Locale) => void;
   onSend: (text: string, attachments?: readonly OutgoingAttachment[]) => Promise<void>;
   onRetry: (clientMessageId: string) => void;
@@ -1001,6 +349,12 @@ export function Chat(props: {
   onConsentRequired: () => Promise<void>;
   /** Notes a refusal because chat isn't available (H20); true when it was one. */
   onUnavailable: (error: unknown) => boolean;
+  /** Puts away a problem that did not stop the chat. */
+  onDismissError?: (() => void) | undefined;
+  /** Loads the conversation again after a problem. */
+  onReconnect?: (() => void) | undefined;
+  /** Stops the answer being written, where the gateway can; absent otherwise. */
+  onStop?: (() => void) | undefined;
   onClose?: (() => void) | undefined;
   language: {
     state: WidgetLanguageState | null;
@@ -1020,6 +374,7 @@ export function Chat(props: {
   const chipsRef = useRef(chips);
   chipsRef.current = chips;
   const moreId = useId();
+  const short = useShortScreen();
   const remembered = memory.state.memory;
   // When memory can't be loaded, the entry stays so the customer can see why (HNV-15-06).
   const memoryShown =
@@ -1046,19 +401,42 @@ export function Chat(props: {
   // the chat says only that chat isn't available, never why.
   const available = chatAvailable(state);
   const noticeRef = useRef<HTMLParagraphElement>(null);
+  const you = t('you');
   const messages = useMemo(
-    () => toThread(state.messages, props.pending, t('you'), state.firstUnreadId, state.drafts),
-    [state.messages, props.pending, t, state.firstUnreadId, state.drafts],
+    () => toThread(state.messages, props.pending, you, state.firstUnreadId),
+    [state.messages, props.pending, you, state.firstUnreadId],
   );
   const canAskPerson =
     available &&
     conversation?.responder !== 'person' &&
     conversation?.status !== 'waiting_for_person';
-  const last = state.messages.at(-1);
-  const aiWriting =
+
+  // A reply is on its way: the gateway says what the assistant is doing, or, where it says
+  // nothing, the visitor's newest message is still young. A reaction or a deleted message is
+  // nothing to answer. The clock is read again every few seconds, so the sign ends on time.
+  const [now, setNow] = useState(() => Date.now());
+  const newest = state.messages.findLast((m) => !reactionOf(m));
+  const owed =
     conversation?.responder === 'ai' &&
-    last?.sender.kind === 'customer' &&
-    Date.now() - Date.parse(last.createdAt) < 60_000;
+    newest !== undefined &&
+    newest.sender.kind === 'customer' &&
+    !deletedOf(newest);
+  const asked =
+    conversation?.responder === 'ai' || !conversation
+      ? (state.awaitingSince ?? (owed && newest ? Date.parse(newest.createdAt) : null))
+      : null;
+  const due =
+    asked !== null &&
+    now - asked < REPLY_DUE_MS &&
+    !(state.runEndedAt !== null && state.runEndedAt >= asked);
+  const working = runIsLive(state.run, now);
+  const replying = (working || due) && available;
+  useEffect(() => {
+    if (!(asked !== null || state.run !== null)) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, [asked, state.run]);
 
   // Announce replies from others once, not every render (UX flow spec §4).
   // What is already there when the chat opens (its history) is not read out; only what comes after.
@@ -1201,20 +579,24 @@ export function Chat(props: {
     if (intent.kind === 'handoff') await props.onHandoff().catch(() => undefined);
   };
 
+  // The chat shows by itself that a reply is on its way and lets the visitor write meanwhile,
+  // so the thread is never "running" for the message box.
   const runtime = useExternalStoreRuntime<ThreadMessageLike>({
     messages,
     convertMessage: (m) => m,
-    isRunning: aiWriting,
     onNew: async (append) => {
       const text = append.content.map((p) => (p.type === 'text' ? p.text : '')).join('\n');
+      const taken = chipsRef.current;
       const files = readyFiles();
       setChips([]);
       client.drafts.clear(draftScope);
       try {
         await send(text, files);
       } catch {
-        // Not sent (for example offline before the conversation existed): the words come back.
+        // Not sent (for example offline before the conversation existed): the words and the
+        // files come back.
         runtime.thread.composer.setText(text);
+        setChips((current) => (current.length ? current : taken));
       }
     },
   });
@@ -1228,10 +610,12 @@ export function Chat(props: {
   };
 
   const sendFiles = () => {
+    const taken = chipsRef.current;
     const files = readyFiles();
     if (!files.length) return;
     setChips([]);
-    void props.onSend('', files);
+    // Files alone go the way words do; when that fails, they stay attached.
+    send('', files).catch(() => setChips((current) => (current.length ? current : taken)));
   };
 
   const limits = config.attachmentLimits;
@@ -1322,46 +706,85 @@ export function Chat(props: {
         })),
       ]);
     }
-    requestAnimationFrame(() =>
-      document.querySelector<HTMLTextAreaElement>('textarea[aria-label]')?.focus(),
-    );
+    focusComposer();
   };
 
-  const ctx: BubbleContext = {
-    client,
-    conversationId: conversation?.id ?? null,
-    commerce: props.commerce,
-    locale,
-    offline,
-    deleteWindowMs: (config.messageDeletion?.windowSeconds ?? 0) * 1000,
-    readOnly: !available,
+  // What bubbles call. The bubbles keep one context between renders, so a new reply does not
+  // redraw the whole conversation; the newest functions are reached through this.
+  const calls = useRef({
     onRetry: props.onRetry,
     onEdit: edit,
-    onRemove: (id) => {
-      props.onRemove(id);
-    },
-    onHelp: canAskPerson ? () => void handoff() : undefined,
+    onRemove: props.onRemove,
+    onHelp: handoff,
     onOpenMemory: () => show('memory'),
     onDelete: props.onDelete,
     onReact: props.onReact,
+    onAsk: send,
+  });
+  calls.current = {
+    onRetry: props.onRetry,
+    onEdit: edit,
+    onRemove: props.onRemove,
+    onHelp: handoff,
+    onOpenMemory: () => show('memory'),
+    onDelete: props.onDelete,
+    onReact: props.onReact,
+    onAsk: send,
   };
+  const conversationId = conversation?.id ?? null;
+  // Messages written from now on arrive with a small movement; the history just shown does not.
+  const [freshAfter, setFreshAfter] = useState(() => Date.now());
+  // biome-ignore lint/correctness/useExhaustiveDependencies: again for each conversation shown
+  useEffect(() => setFreshAfter(Date.now()), [conversationId]);
+  const deleteWindowMs = (config.messageDeletion?.windowSeconds ?? 0) * 1000;
+  const logoUrl = config.brand.logoUrl;
+  const ctx = useMemo<BubbleContext>(
+    () => ({
+      client,
+      conversationId,
+      locale,
+      offline,
+      deleteWindowMs,
+      readOnly: !available,
+      logoUrl,
+      freshAfter,
+      canAskPerson,
+      onRetry: (id) => calls.current.onRetry(id),
+      onEdit: (id) => calls.current.onEdit(id),
+      onRemove: (id) => {
+        calls.current.onRemove(id);
+      },
+      onHelp: () => void calls.current.onHelp(),
+      onOpenMemory: () => calls.current.onOpenMemory(),
+      onDelete: (id) => calls.current.onDelete(id),
+      onReact: (id, emoji) => calls.current.onReact(id, emoji),
+      onAsk: (text) => void calls.current.onAsk(text),
+    }),
+    [
+      client,
+      conversationId,
+      locale,
+      offline,
+      deleteWindowMs,
+      available,
+      logoUrl,
+      freshAfter,
+      canAskPerson,
+    ],
+  );
 
-  const banner =
-    conversation?.status === 'waiting_for_person'
-      ? (state.handoffNotice ?? t('waitingForPerson'))
-      : conversation?.status === 'with_person'
-        ? t('withPerson')
-        : conversation?.status === 'resolved'
-          ? t('resolved')
-          : conversation?.responder === 'ai'
-            ? state.assistantNotice
-            : null;
+  const waiting = conversation?.status === 'waiting_for_person';
+  const banner = waiting
+    ? (state.handoffNotice ?? t('waitingForPerson'))
+    : conversation?.status === 'with_person'
+      ? t('withPerson')
+      : conversation?.status === 'resolved'
+        ? t('resolved')
+        : conversation?.responder === 'ai'
+          ? state.assistantNotice
+          : null;
   // Waiting because they asked, and nobody has the chat yet: they may change their mind.
-  const canGoBack =
-    conversation?.status === 'waiting_for_person' &&
-    conversation.canReturnToAssistant &&
-    available &&
-    !offline;
+  const canGoBack = waiting && conversation.canReturnToAssistant && available && !offline;
   const lastSync = state.lastSync
     ? new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(state.lastSync))
     : null;
@@ -1370,7 +793,8 @@ export function Chat(props: {
   const prefill = props.prefill && props.prefill.at > prefillUsed.current ? props.prefill : null;
   const allowFiles = config.features.attachments;
   // A message left while nobody could answer is listed even before a chat is on screen.
-  const hasOthers = state.conversations.some((c) => c.id !== conversation?.id);
+  const others = state.conversations.filter((c) => c.id !== conversation?.id);
+  const hasOthers = others.length > 0;
   const empty = state.messages.length === 0 && props.pending.length === 0;
   const centered = props.mode === 'fullpage';
   const resolved = conversation?.status === 'resolved';
@@ -1382,104 +806,122 @@ export function Chat(props: {
   const statusInHeader =
     empty && Boolean(config.availability) && (view !== 'chat' || gate !== null);
   const contact = available && offlineFormApplies(config) ? () => show('contact') : null;
+  const drop = useFileDrop(allowFiles && available && view === 'chat' && !gate, (files) => {
+    void addFiles(files);
+  });
+  // The assistant's name and role for an answer still being written, from its last answer.
+  const assistant = state.messages.findLast((m) => m.sender.kind === 'ai_agent')?.sender;
+  const person = canAskPerson ? (
+    <Button
+      variant="outline"
+      size={short ? 'icon' : 'sm'}
+      className={
+        short
+          ? 'size-11 shrink-0 rounded-full'
+          : 'mb-2 h-auto min-h-9 rounded-full whitespace-normal py-1.5 text-start shadow-sm'
+      }
+      aria-label={short ? t('talkToPerson') : undefined}
+      title={short ? t('talkToPerson') : undefined}
+      onClick={() => void handoff()}
+    >
+      <UserRoundIcon className="size-4" aria-hidden="true" />
+      {short ? null : t('talkToPerson')}
+    </Button>
+  ) : null;
+  const fine = (
+    <>
+      <PrivacyLink url={config.privacyPolicyUrl} />
+      {config.brand.showBranding !== false ? (
+        <p className="pt-2 text-center text-[10px] text-text-muted" data-testid="widget-branding">
+          Hamnivo
+        </p>
+      ) : null}
+    </>
+  );
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <section
         aria-label={config.brand.name}
-        className={`flex h-full flex-col ${centered ? 'mx-auto w-full max-w-2xl' : ''}`}
+        className={`relative flex h-full flex-col ${centered ? 'mx-auto w-full max-w-2xl' : ''}`}
         data-conversation-id={conversation?.id ?? ''}
         data-mode={props.mode}
+        data-header={props.headerStyle ?? 'brand'}
+        {...drop.handlers}
       >
-        {/* One row of name and icons, then the AI notice: compact on a phone held sideways. */}
-        <header className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border bg-surface px-3 py-2 [@media(max-height:26rem)]:py-0.5">
-          <BrandMark url={config.brand.logoUrl} />
-          <div className="min-w-0 flex-1 basis-24 ps-1">
-            <h1 className="truncate text-base font-semibold text-text">{config.brand.name}</h1>
-            {conversation?.ticket ? (
-              <p className="text-xs text-text-muted" data-testid="header-ticket">
-                <TicketLine ticket={conversation.ticket} />
-              </p>
-            ) : null}
-            {statusInHeader ? (
-              <StatusLine availability={config.availability} locale={locale} compact />
-            ) : null}
-          </div>
-          <div className="flex items-center">
-            <LanguagePicker locale={locale} onLocale={props.onLocale} />
-            {memoryShown ? (
-              <Button
-                id="hv-memory-open"
-                variant="ghost"
-                size="icon"
-                title={t('memory.open')}
-                aria-label={t('memory.open')}
-                aria-pressed={view === 'memory'}
-                onClick={() => (view === 'memory' ? back('hv-memory-open') : show('memory'))}
-              >
-                <BrainIcon className="size-5" aria-hidden="true" />
-              </Button>
-            ) : null}
-            <Button
-              id="hv-more"
-              variant="ghost"
-              size="icon"
-              title={t('surface.more')}
-              aria-expanded={more}
-              aria-controls={moreId}
-              aria-label={t('surface.moreLabel')}
-              onClick={() => setMore((open) => !open)}
-            >
-              <EllipsisVerticalIcon className="size-5" aria-hidden="true" />
-            </Button>
-            {props.onClose ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                title={t('close')}
-                aria-label={t('close')}
-                onClick={props.onClose}
-              >
-                <XIcon className="size-5" aria-hidden="true" />
-              </Button>
-            ) : null}
-          </div>
-          <p
-            className="w-full text-xs leading-snug text-text-muted [@media(max-height:26rem)]:line-clamp-1"
-            data-testid="ai-disclosure"
-          >
-            {copy.aiDisclosure}
-          </p>
-          {more ? (
-            <ul id={moreId} className="flex w-full flex-wrap gap-2" data-testid="more-menu">
-              {hasOthers ? (
+        <Header
+          brand={config.brand}
+          locale={locale}
+          onLocale={props.onLocale}
+          disclosure={copy.aiDisclosure}
+          memory={
+            memoryShown
+              ? {
+                  pressed: view === 'memory',
+                  onToggle: () => (view === 'memory' ? back('hv-memory-open') : show('memory')),
+                }
+              : null
+          }
+          menu={{
+            id: moreId,
+            open: more,
+            onToggle: () => setMore((open) => !open),
+            onClose: (focus) => {
+              setMore(false);
+              if (focus) document.getElementById('hv-more')?.focus();
+            },
+            items: (
+              <>
+                {hasOthers ? (
+                  <li>
+                    <Button
+                      id="hv-conversations-open"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => show('conversations')}
+                    >
+                      <MessagesSquareIcon className="size-4" aria-hidden="true" />
+                      {t('surface.conversations.title')}
+                    </Button>
+                  </li>
+                ) : null}
                 <li>
                   <Button
-                    id="hv-conversations-open"
-                    variant="outline"
+                    id="hv-settings-open"
+                    variant="ghost"
                     size="sm"
-                    onClick={() => show('conversations')}
+                    className="w-full justify-start"
+                    onClick={() => show('settings')}
                   >
-                    {t('surface.conversations.title')}
+                    <SettingsIcon className="size-4" aria-hidden="true" />
+                    {t('surface.settings.title')}
                   </Button>
                 </li>
-              ) : null}
-              <li>
-                <Button
-                  id="hv-settings-open"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => show('settings')}
-                >
-                  {t('surface.settings.title')}
-                </Button>
-              </li>
-            </ul>
+                {/* On a short screen the small print lives here, so the conversation keeps its room. */}
+                {short ? <li className="border-t border-border px-2 pt-1 pb-1.5">{fine}</li> : null}
+              </>
+            ),
+          }}
+          expand={props.expand ?? null}
+          onClose={props.onClose}
+        >
+          {conversation?.ticket ? (
+            <p className="text-xs" data-testid="header-ticket">
+              <TicketLine ticket={conversation.ticket} />
+            </p>
           ) : null}
-        </header>
+          {statusInHeader ? (
+            <StatusLine availability={config.availability} locale={locale} compact tone="inherit" />
+          ) : null}
+        </Header>
         {banner ? (
-          <div className="flex flex-col gap-2 border-b border-border bg-surface-sunken px-4 py-2">
-            <p role="status" className="text-sm text-text" data-testid="status-banner">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface-sunken px-4 py-2 [@media(max-height:26rem)]:py-1">
+            <p
+              role="status"
+              className="min-w-0 flex-1 basis-40 text-sm text-text [@media(max-height:26rem)]:text-xs"
+              data-testid="status-banner"
+            >
               {banner}
             </p>
             {/* Without a rating to ask, the banner is where to open the conversation again. */}
@@ -1496,7 +938,8 @@ export function Chat(props: {
             className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-warning-subtle px-4 py-1.5 text-xs text-text"
             data-testid="connection"
           >
-            <span>
+            <WifiOffIcon className="size-3.5 shrink-0 text-warning" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
               {t('surface.offline.banner')}
               {lastSync ? ` ${t('surface.offline.lastSync', { time: lastSync })}` : ''}
             </span>
@@ -1513,48 +956,50 @@ export function Chat(props: {
             {t('reconnecting')}
           </p>
         ) : null}
-        {view === 'memory' ? (
-          <MemoryPanel controls={memory} onBack={() => back('hv-memory-open')} />
-        ) : null}
-        {view === 'settings' ? (
-          <Settings
-            client={client}
-            person={session.principal.id}
-            display={props.display}
-            emails={config.notifications?.email !== false}
-            onBack={() => back('hv-more')}
-          />
-        ) : null}
-        {view === 'conversations' ? (
-          <Conversations
-            conversations={state.conversations}
-            current={conversation?.id ?? null}
-            locale={locale}
-            onOpen={(id) => {
-              setView('chat');
-              void props.onOpenConversation(id);
-            }}
-            onBack={() => back('hv-more')}
-          />
-        ) : null}
-        {view === 'contact' ? (
-          <ContactForm
-            config={config}
-            locale={locale}
-            remembered={contactAnswers.current}
-            onValues={(values) => {
-              contactAnswers.current = values;
-            }}
-            onAgree={() => client.giveConsent(config.consent.noticeVersion)}
-            onLeave={async (answers, clientRequestId) => {
-              const sent = await props.onLeaveMessage(answers, clientRequestId);
-              contactAnswers.current = {};
-              return sent;
-            }}
-            onConsentRequired={props.onConsentRequired}
-            onBack={() => back('hv-contact-open')}
-          />
-        ) : null}
+        <Suspense fallback={<PanelLoading />}>
+          {view === 'memory' ? (
+            <MemoryPanel controls={memory} onBack={() => back('hv-memory-open')} />
+          ) : null}
+          {view === 'settings' ? (
+            <Settings
+              client={client}
+              person={session.principal.id}
+              display={props.display}
+              emails={config.notifications?.email !== false}
+              onBack={() => back('hv-more')}
+            />
+          ) : null}
+          {view === 'conversations' ? (
+            <Conversations
+              conversations={state.conversations}
+              current={conversation?.id ?? null}
+              locale={locale}
+              onOpen={(id) => {
+                setView('chat');
+                void props.onOpenConversation(id);
+              }}
+              onBack={() => back('hv-more')}
+            />
+          ) : null}
+          {view === 'contact' ? (
+            <ContactForm
+              config={config}
+              locale={locale}
+              remembered={contactAnswers.current}
+              onValues={(values) => {
+                contactAnswers.current = values;
+              }}
+              onAgree={() => client.giveConsent(config.consent.noticeVersion)}
+              onLeave={async (answers, clientRequestId) => {
+                const sent = await props.onLeaveMessage(answers, clientRequestId);
+                contactAnswers.current = {};
+                return sent;
+              }}
+              onConsentRequired={props.onConsentRequired}
+              onBack={() => back('hv-contact-open')}
+            />
+          ) : null}
+        </Suspense>
         <ThreadPrimitive.Root
           className={view === 'chat' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}
         >
@@ -1563,99 +1008,130 @@ export function Chat(props: {
             onSeen={props.onSeen}
             latest={state.latestSequence}
           />
-          {/* Focusable so keyboard users can scroll it even when no card has a control. */}
-          <ThreadPrimitive.Viewport
-            className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
-            tabIndex={0}
-            aria-label={t('title')}
-          >
-            {state.olderCursor ? (
-              <div className="mb-3 flex justify-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  busy={state.loadingOlder}
-                  onClick={() => void props.onLoadOlder()}
-                  data-testid="older"
-                >
-                  {state.loadingOlder ? t('surface.history.loading') : t('surface.history.older')}
-                </Button>
-              </div>
-            ) : null}
-            {gate ? (
-              <StartGate
-                fields={askPrechat ? config.forms.prechat.fields : []}
-                consent={
-                  mustAgree
-                    ? {
-                        text: labelOf(config.consent.text, locale),
-                        privacyPolicyUrl: config.privacyPolicyUrl,
-                      }
-                    : null
-                }
-                pending={gate.intent.kind === 'send' ? gate.intent.text : ''}
-                remembered={prechatAnswers.current}
-                locale={locale}
-                onSubmit={passGate}
-                onConsentRequired={props.onConsentRequired}
-                onValues={(values) => {
-                  prechatAnswers.current = values;
-                }}
-                onCancel={cancelGate}
-              />
-            ) : empty ? (
-              <Home
-                client={client}
-                greeting={copy.greeting}
-                prompt={proactive}
-                suggestions={config.help?.suggestions?.[locale] ?? []}
-                search={config.features.helpCenter}
-                availability={config.availability}
-                locale={locale}
-                onContact={contact}
-                available={available}
-                onAsk={(question) => void send(question)}
-              />
-            ) : null}
-            {askConsent && remembered ? (
-              <MemoryConsent
-                maxRetentionDays={remembered.maxRetentionDays}
-                privacyPolicyUrl={config.privacyPolicyUrl}
-                onLater={() => setAskLater(true)}
-                onChoose={async (choice) => {
-                  await memory.setConsent(choice);
-                  announce(
-                    t(choice === 'granted' ? 'memory.switch.turnedOn' : 'memory.consent.declined'),
-                  );
-                }}
-              />
-            ) : null}
-            <ul className="flex flex-col gap-4" aria-label={t('title')}>
-              <ThreadPrimitive.Messages>
-                {({ message }) => (
-                  <Bubble message={message as unknown as ThreadMessageLike} ctx={ctx} />
-                )}
-              </ThreadPrimitive.Messages>
-            </ul>
-            {state.unread > 0 ? (
-              <div className="pointer-events-none sticky bottom-2 mt-2 flex justify-center">
-                <ThreadPrimitive.ScrollToBottom
-                  asChild
-                  behavior={props.display.reduced ? 'auto' : 'smooth'}
-                >
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {/* Focusable so keyboard users can scroll it even when no card has a control. */}
+            <ThreadPrimitive.Viewport
+              className="hv-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4"
+              tabIndex={0}
+              aria-label={t('title')}
+              data-testid="thread"
+            >
+              {state.olderCursor ? (
+                <div className="mb-3 flex justify-center">
                   <Button
+                    variant="outline"
                     size="sm"
-                    className="pointer-events-auto shadow-md disabled:hidden"
-                    data-testid="jump-new"
+                    className="rounded-full"
+                    busy={state.loadingOlder}
+                    onClick={() => void props.onLoadOlder()}
+                    data-testid="older"
                   >
-                    {t('surface.history.jump', { count: state.unread })}
+                    {state.loadingOlder ? t('surface.history.loading') : t('surface.history.older')}
                   </Button>
-                </ThreadPrimitive.ScrollToBottom>
-              </div>
-            ) : null}
-          </ThreadPrimitive.Viewport>
-          <div className="border-t border-border bg-surface px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] [@media(max-height:26rem)]:pt-1 [@media(max-height:26rem)]:pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+                </div>
+              ) : null}
+              {gate ? (
+                <Suspense fallback={<PanelLoading />}>
+                  <StartGate
+                    fields={askPrechat ? config.forms.prechat.fields : []}
+                    consent={
+                      mustAgree
+                        ? {
+                            text: labelOf(config.consent.text, locale),
+                            privacyPolicyUrl: config.privacyPolicyUrl,
+                          }
+                        : null
+                    }
+                    pending={gate.intent.kind === 'send' ? gate.intent.text : ''}
+                    remembered={prechatAnswers.current}
+                    locale={locale}
+                    onSubmit={passGate}
+                    onConsentRequired={props.onConsentRequired}
+                    onValues={(values) => {
+                      prechatAnswers.current = values;
+                    }}
+                    onCancel={cancelGate}
+                  />
+                </Suspense>
+              ) : empty ? (
+                <Home
+                  client={client}
+                  greeting={copy.greeting}
+                  prompt={proactive}
+                  suggestions={config.help?.suggestions?.[locale] ?? []}
+                  search={config.features.helpCenter}
+                  availability={config.availability}
+                  locale={locale}
+                  onContact={contact}
+                  available={available}
+                  recent={others[0] ?? null}
+                  onOpenRecent={(id) => void props.onOpenConversation(id)}
+                  onAsk={(question) => void send(question)}
+                />
+              ) : null}
+              {askConsent && remembered ? (
+                <MemoryConsent
+                  maxRetentionDays={remembered.maxRetentionDays}
+                  privacyPolicyUrl={config.privacyPolicyUrl}
+                  onLater={() => setAskLater(true)}
+                  onChoose={async (choice) => {
+                    await memory.setConsent(choice);
+                    announce(
+                      t(
+                        choice === 'granted' ? 'memory.switch.turnedOn' : 'memory.consent.declined',
+                      ),
+                    );
+                  }}
+                />
+              ) : null}
+              <ul className="flex flex-col gap-3" aria-label={t('title')}>
+                <ThreadPrimitive.Messages>
+                  {({ message }) => {
+                    const item = message as unknown as ThreadMessageLike;
+                    const card = (item.metadata?.custom as Partial<Custom> | undefined)?.card;
+                    // Only a card follows the shop's state; other bubbles are left as they are.
+                    return (
+                      <Bubble message={item} ctx={ctx} commerce={card ? props.commerce : null} />
+                    );
+                  }}
+                </ThreadPrimitive.Messages>
+                {state.drafts.map((draft) => (
+                  <DraftBubble
+                    key={draft.draftId}
+                    draft={draft}
+                    name={assistant?.displayName ?? ''}
+                    role={assistant?.roleLabel ?? ''}
+                    logoUrl={logoUrl}
+                  />
+                ))}
+                {replying && state.drafts.length === 0 ? (
+                  <Thinking run={working ? state.run : null} logoUrl={logoUrl} />
+                ) : null}
+              </ul>
+            </ThreadPrimitive.Viewport>
+            <JumpToLatest unread={state.unread} smooth={!props.display.reduced} />
+          </div>
+          <div className="bg-bg px-3 pt-1 pb-[max(0.75rem,var(--hv-safe-bottom,env(safe-area-inset-bottom)))] [@media(max-height:26rem)]:pb-[max(0.25rem,var(--hv-safe-bottom,env(safe-area-inset-bottom)))]">
             {available ? <ShopBar commerce={props.commerce} locale={locale} /> : null}
+            {state.error && available ? (
+              <p
+                role="status"
+                className="mb-2 flex items-start gap-2 rounded-lg bg-danger-subtle px-3 py-2 text-xs text-text"
+                data-testid="chat-problem"
+              >
+                <span className="min-w-0 flex-1">{t('ui.problem')}</span>
+                {props.onReconnect ? (
+                  <Button variant="link" className="h-auto text-xs" onClick={props.onReconnect}>
+                    {t('ui.retry')}
+                  </Button>
+                ) : null}
+                {props.onDismissError ? (
+                  <Button variant="link" className="h-auto text-xs" onClick={props.onDismissError}>
+                    {t('ui.dismiss')}
+                  </Button>
+                ) : null}
+              </p>
+            ) : null}
             {/* While the chat asks before starting, its card is the one thing to answer. */}
             {!available ? (
               <>
@@ -1671,17 +1147,7 @@ export function Chat(props: {
               </>
             ) : gate ? null : (
               <>
-                {canAskPerson ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mb-2 h-auto min-h-9 whitespace-normal py-1.5 text-start [@media(max-height:26rem)]:mb-1 [@media(max-height:26rem)]:min-h-8 [@media(max-height:26rem)]:py-1"
-                    onClick={() => void handoff()}
-                  >
-                    <UserRoundIcon className="size-4" aria-hidden="true" />
-                    {t('talkToPerson')}
-                  </Button>
-                ) : null}
+                {short ? null : person}
                 <LanguageQuestion
                   state={props.language.state}
                   onChoose={props.language.choose}
@@ -1689,41 +1155,49 @@ export function Chat(props: {
                 />
                 <StaffTypingLine name={props.staffTyping} />
                 <VisitorNotice text={props.visitorNotice} />
-                <Composer
-                  label={t('placeholder')}
-                  send={offline ? t('surface.offline.queue') : t('send')}
-                  draftScope={draftScope}
-                  conversationId={conversation?.id ?? null}
-                  client={client}
-                  chips={chips}
-                  attach={{
-                    allowed: allowFiles,
-                    accept: limits.allowedMimeTypes.join(','),
-                    maxFiles,
-                    maxMb: Math.round(limits.maxBytes / (1024 * 1024)),
-                  }}
-                  onFiles={(files) => void addFiles(files)}
-                  onRemoveChip={(id) => setChips((current) => current.filter((c) => c.id !== id))}
-                  onSendFiles={sendFiles}
-                  locale={locale}
-                  prefill={prefill}
-                  onPrefilled={(at) => {
-                    prefillUsed.current = at;
-                  }}
-                />
+                <div className="flex items-end gap-2">
+                  {short ? person : null}
+                  <div className="min-w-0 flex-1">
+                    <Composer
+                      label={t('placeholder')}
+                      send={offline ? t('surface.offline.queue') : t('send')}
+                      draftScope={draftScope}
+                      conversationId={conversation?.id ?? null}
+                      client={client}
+                      chips={chips}
+                      attach={{
+                        allowed: allowFiles,
+                        accept: limits.allowedMimeTypes.join(','),
+                        maxFiles,
+                        maxMb,
+                      }}
+                      onFiles={(files) => void addFiles(files)}
+                      onRemoveChip={(id) =>
+                        setChips((current) => current.filter((c) => c.id !== id))
+                      }
+                      onSendFiles={sendFiles}
+                      locale={locale}
+                      prefill={prefill}
+                      onPrefilled={(at) => {
+                        prefillUsed.current = at;
+                      }}
+                      onStop={working ? props.onStop : undefined}
+                    />
+                  </div>
+                </div>
               </>
             )}
-            <PrivacyLink url={config.privacyPolicyUrl} />
-            {config.brand.showBranding !== false ? (
-              <p
-                className="pt-2 text-center text-[10px] text-text-muted"
-                data-testid="widget-branding"
-              >
-                Hamnivo
-              </p>
-            ) : null}
+            {short ? null : fine}
           </div>
         </ThreadPrimitive.Root>
+        {drop.over ? (
+          <div
+            className="hv-fade pointer-events-none absolute inset-2 z-40 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-surface/95 p-4 text-center text-sm font-medium text-text"
+            data-testid="drop-zone"
+          >
+            {t('ui.drop')}
+          </div>
+        ) : null}
       </section>
     </AssistantRuntimeProvider>
   );

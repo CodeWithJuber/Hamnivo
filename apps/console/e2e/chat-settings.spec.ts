@@ -39,6 +39,9 @@ test('W02 W09 W17 W23 W25 · choose how the chat looks and what customers can do
 
   await form.getByRole('radio', { name: 'Side panel' }).click();
   await form.getByRole('combobox', { name: 'Button corner' }).selectOption('bottom-left');
+  // Moved up, clear of the website's own button in that corner; next questions turned off.
+  await form.getByRole('textbox', { name: /Space from the bottom/ }).fill('88');
+  await form.getByRole('checkbox', { name: 'Suggest next questions under AI answers' }).click();
   await form.getByRole('checkbox', { name: 'GIF pictures' }).click();
   // Checked before saving: the gateway would refuse files over 10 MB.
   await form.getByRole('textbox', { name: 'Largest file (MB)' }).fill('50');
@@ -63,13 +66,17 @@ test('W02 W09 W17 W23 W25 · choose how the chat looks and what customers can do
     `/v1/admin/brands/${workspace.brand.id}/widget-settings`,
   );
   expect(saved.settings).toMatchObject({
-    layout: { mode: 'panel', position: 'bottom-left' },
+    layout: { mode: 'panel', position: 'bottom-left', offset: { x: 20, y: 88 } },
     attachments: {
       enabled: true,
       allowedTypes: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'],
       maxMegabytes: 5,
     },
-    help: { search: true, suggestions: [{ en: 'Where is my order?', ar: 'أين طلبي؟' }] },
+    help: {
+      search: true,
+      suggestions: [{ en: 'Where is my order?', ar: 'أين طلبي؟' }],
+      followUps: false,
+    },
     deletion: { windowMinutes: 5 },
     notifications: { email: true },
   });

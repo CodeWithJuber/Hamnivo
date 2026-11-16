@@ -664,6 +664,54 @@
         }
       }
     },
+    "/v1/widget/conversations/{conversationId}/reply/stop": {
+      "post": {
+        "operationId": "stopReply",
+        "summary": "Stop the AI reply being written: nothing of it is posted, and what was shown of it goes",
+        "tags": [
+          "Widget"
+        ],
+        "security": [
+          {
+            "widgetSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "schema": {
+              "type": "string",
+              "description": "Conversation ID (conv_…)"
+            },
+            "required": true,
+            "description": "Conversation ID (conv_…)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether a reply was stopped",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopReplyResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/widget/conversations/{conversationId}/reopen": {
       "post": {
         "operationId": "reopenConversation",
@@ -34869,6 +34917,38 @@
                 "type": "null"
               }
             ]
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark",
+              "auto"
+            ]
+          },
+          "headerStyle": {
+            "type": "string",
+            "enum": [
+              "brand",
+              "plain"
+            ]
+          },
+          "launcherIcon": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "message",
+              "help",
+              "sparkle"
+            ]
+          },
+          "launcherSize": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "large"
+            ]
           }
         }
       },
@@ -38100,6 +38180,28 @@
                   "bottom-right",
                   "bottom-left"
                 ]
+              },
+              "offset": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ]
+              },
+              "hideOnMobile": {
+                "type": "boolean"
               }
             }
           },
@@ -38185,6 +38287,9 @@
               },
               "search": {
                 "default": true,
+                "type": "boolean"
+              },
+              "followUps": {
                 "type": "boolean"
               }
             }
@@ -41454,6 +41559,21 @@
               },
               "showBranding": {
                 "type": "boolean"
+              },
+              "theme": {
+                "type": "string",
+                "enum": [
+                  "light",
+                  "dark",
+                  "auto"
+                ]
+              },
+              "headerStyle": {
+                "type": "string",
+                "enum": [
+                  "brand",
+                  "plain"
+                ]
               }
             },
             "required": [
@@ -42681,6 +42801,9 @@
               },
               {
                 "$ref": "#/components/schemas/ReactionPart"
+              },
+              {
+                "$ref": "#/components/schemas/SuggestionsPart"
               }
             ],
             "type": "object",
@@ -42697,7 +42820,8 @@
                 "notice": "#/components/schemas/NoticePart",
                 "location": "#/components/schemas/LocationPart",
                 "contact": "#/components/schemas/ContactPart",
-                "reaction": "#/components/schemas/ReactionPart"
+                "reaction": "#/components/schemas/ReactionPart",
+                "suggestions": "#/components/schemas/SuggestionsPart"
               }
             }
           },
@@ -44018,6 +44142,30 @@
         ],
         "additionalProperties": false
       },
+      "SuggestionsPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "suggestions"
+          },
+          "items": {
+            "minItems": 1,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        },
+        "required": [
+          "type",
+          "items"
+        ],
+        "additionalProperties": false
+      },
       "UnknownPart": {
         "type": "object",
         "properties": {
@@ -44147,6 +44295,18 @@
           "outcome",
           "message",
           "conversation"
+        ],
+        "additionalProperties": false
+      },
+      "StopReplyResponse": {
+        "type": "object",
+        "properties": {
+          "stopped": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stopped"
         ],
         "additionalProperties": false
       },
@@ -45182,6 +45342,16 @@
                     "enum": [
                       "started",
                       "finished"
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "run",
+                      "searching",
+                      "tool",
+                      "writing",
+                      "checking"
                     ]
                   }
                 },
@@ -66383,6 +66553,29 @@
                   "bottom-right",
                   "bottom-left"
                 ]
+              },
+              "offset": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false
+              },
+              "hideOnMobile": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -66391,9 +66584,34 @@
             ],
             "additionalProperties": false
           },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark",
+              "auto"
+            ]
+          },
           "launcher": {
             "type": "object",
             "properties": {
+              "icon": {
+                "type": "string",
+                "enum": [
+                  "chat",
+                  "message",
+                  "help",
+                  "sparkle"
+                ]
+              },
+              "size": {
+                "type": "string",
+                "enum": [
+                  "small",
+                  "medium",
+                  "large"
+                ]
+              },
               "accent": {
                 "type": "string",
                 "pattern": "^#[0-9a-fA-F]{6}$"
@@ -72316,6 +72534,38 @@
                 "type": "null"
               }
             ]
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark",
+              "auto"
+            ]
+          },
+          "headerStyle": {
+            "type": "string",
+            "enum": [
+              "brand",
+              "plain"
+            ]
+          },
+          "launcherIcon": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "message",
+              "help",
+              "sparkle"
+            ]
+          },
+          "launcherSize": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "large"
+            ]
           }
         },
         "required": [
@@ -72624,6 +72874,29 @@
                   "bottom-right",
                   "bottom-left"
                 ]
+              },
+              "offset": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 400
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false
+              },
+              "hideOnMobile": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -72720,6 +72993,9 @@
               },
               "search": {
                 "default": true,
+                "type": "boolean"
+              },
+              "followUps": {
                 "type": "boolean"
               }
             },

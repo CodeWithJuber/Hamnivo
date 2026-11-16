@@ -10,8 +10,10 @@ import type {
 } from '@ai-sdk/provider';
 import {
   type ExtractionInput,
+  FOLLOW_UPS_MARKER,
   MEMORY_EXTRACTION_MARKER,
   mockExtractMemories,
+  mockFollowUps,
 } from '@hamnivo/domain';
 import {
   lastToolResult,
@@ -145,6 +147,7 @@ const FIRST_MEMORY = /^\[M1\] ([^:\n]+): ([^\n]+) \([^()\n]*\)$/m;
  */
 export const defaultMockReply: MockReply = ({ system, text }) => {
   if (system.includes(MEMORY_EXTRACTION_MARKER)) return mockMemoryExtraction(text);
+  if (system.includes(FOLLOW_UPS_MARKER)) return mockFollowUps(text);
   const requested = requestedLanguage(system);
   const reply = requested ?? REPLIES[scriptOf(text)];
   const english = reply === REPLIES.latin;

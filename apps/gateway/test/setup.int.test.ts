@@ -454,6 +454,45 @@ describe('how the chat looks', () => {
     });
   });
 
+  it('gives the chat and the launcher the brand’s light or dark, header and launcher picture', async () => {
+    const launcherOf = async () => {
+      const got = await fetch(
+        `${slice.baseUrl}/v1/widget/launcher?widgetId=${shop.brand.widgetId}`,
+        { headers: { origin: shop.hostOrigin } },
+      );
+      expect(got.status).toBe(200);
+      return (await got.json()) as Record<string, any>;
+    };
+    // Nothing chosen: nothing said, so the loader follows the website as before.
+    const plain = await launcherOf();
+    expect(plain.theme).toBeUndefined();
+    expect(plain.launcher.icon).toBeUndefined();
+    expect((await open()).config.brand.theme).toBeUndefined();
+    const saved = await shop.owner.put(path(), {
+      primaryColor: '#d17b00',
+      theme: 'dark',
+      headerStyle: 'plain',
+      launcherIcon: 'sparkle',
+      launcherSize: 'large',
+    });
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    expect(saved.body.appearance).toMatchObject({
+      theme: 'dark',
+      headerStyle: 'plain',
+      launcherIcon: 'sparkle',
+      launcherSize: 'large',
+    });
+    expect((await open()).config.brand).toMatchObject({ theme: 'dark', headerStyle: 'plain' });
+    const launcher = await launcherOf();
+    expect(launcher.theme).toBe('dark');
+    expect(launcher.launcher).toMatchObject({ icon: 'sparkle', size: 'large' });
+    for (const bad of [{ theme: 'blue' }, { launcherIcon: 'rocket' }, { launcherSize: 'huge' }]) {
+      const refused = await shop.owner.put(path(), { primaryColor: '#d17b00', ...bad });
+      expect(refused.status, JSON.stringify(bad)).toBe(422);
+    }
+    expect((await shop.owner.put(path(), { primaryColor: '#d17b00' })).status).toBe(200);
+  });
+
   it('refuses a colour nobody can read, and says why', async () => {
     for (const primaryColor of ['#808080', '#f2f2f2']) {
       const refused = await shop.owner.put(path(), { primaryColor });

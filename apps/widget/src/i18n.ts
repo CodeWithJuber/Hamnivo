@@ -4,6 +4,7 @@ import { initReactI18next } from 'react-i18next';
 import { ACTION_COPY } from './actions/copy.js';
 import { APPEARANCE_COPY } from './appearance-copy.js';
 import { SHOP_COPY } from './commerce/copy.js';
+import { EXPERIENCE_COPY } from './experience-copy.js';
 import { SURFACE_COPY } from './surface-copy.js';
 
 /** Widget chrome in the four launch languages (translations await native review). */
@@ -40,6 +41,7 @@ export const resources = {
       surface: SURFACE_COPY.en,
       actions: ACTION_COPY.en,
       appearance: APPEARANCE_COPY.en,
+      ui: EXPERIENCE_COPY.en,
       memory: {
         open: 'Memory',
         title: 'What we remember',
@@ -158,6 +160,7 @@ export const resources = {
       surface: SURFACE_COPY.ar,
       actions: ACTION_COPY.ar,
       appearance: APPEARANCE_COPY.ar,
+      ui: EXPERIENCE_COPY.ar,
       memory: {
         open: 'الذاكرة',
         title: 'ما نتذكره',
@@ -274,6 +277,7 @@ export const resources = {
       surface: SURFACE_COPY.hi,
       actions: ACTION_COPY.hi,
       appearance: APPEARANCE_COPY.hi,
+      ui: EXPERIENCE_COPY.hi,
       memory: {
         open: 'मेमोरी',
         title: 'हम क्या याद रखते हैं',
@@ -392,6 +396,7 @@ export const resources = {
       surface: SURFACE_COPY.ur,
       actions: ACTION_COPY.ur,
       appearance: APPEARANCE_COPY.ur,
+      ui: EXPERIENCE_COPY.ur,
       memory: {
         open: 'میموری',
         title: 'ہم کیا یاد رکھتے ہیں',

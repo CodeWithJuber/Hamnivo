@@ -50,6 +50,8 @@ test('appearance remains a draft until publish and the real widget preview suppo
   );
   await page.locator('#look-colour').fill('#0B5D3B');
   await page.locator('#look-greeting-en').fill('Welcome to our support desk.');
+  await page.locator('#look-theme').selectOption('dark');
+  await page.locator('#look-header').selectOption('plain');
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeEnabled();
   const draft = await workspace.staff.call<{ configVersion: number; draftAppearance: unknown }>(
@@ -70,6 +72,9 @@ test('appearance remains a draft until publish and the real widget preview suppo
   await expect(
     preview.getByRole('heading', { name: workspace.brand.name, exact: true }),
   ).toBeVisible();
+  // The real chat takes the brand's dark and plain header from the draft, before it is published.
+  await expect(preview.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(preview.locator('[data-header="plain"]')).toHaveCount(1);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#look-preview-lang').selectOption('ar');
   await expect(preview.locator('html')).toHaveAttribute('dir', 'rtl');

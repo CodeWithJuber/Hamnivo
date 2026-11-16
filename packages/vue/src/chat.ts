@@ -52,6 +52,19 @@ export const HamnivoChat = defineComponent({
       type: Object as PropType<{ open?: string; close?: string; title?: string }>,
       default: undefined,
     },
+    theme: { type: String as PropType<'light' | 'dark' | 'auto'>, default: undefined },
+    offset: { type: Object as PropType<{ x?: number; y?: number }>, default: undefined },
+    launcher: {
+      type: Object as PropType<{
+        size?: 'small' | 'medium' | 'large';
+        icon?: 'chat' | 'message' | 'help' | 'sparkle';
+      }>,
+      default: undefined,
+    },
+    zIndex: { type: Number, default: undefined },
+    hideOn: { type: Array as PropType<string[]>, default: undefined },
+    // Left out is "not said", not false: the brand's own choice then applies.
+    hideOnMobile: { type: Boolean, default: undefined },
     nonce: { type: String, default: undefined },
     customer: { type: Object as PropType<HamnivoCustomer | null>, default: null },
   },

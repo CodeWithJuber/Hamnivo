@@ -18,10 +18,13 @@ export function StatusLine({
   availability,
   locale,
   compact = false,
+  tone = 'default',
 }: {
   availability: WidgetConfig['availability'];
   locale: string;
   compact?: boolean;
+  /** `inherit` takes the colour of where it sits: the chat's header, the greeting. */
+  tone?: 'default' | 'inherit';
 }) {
   const { t } = useTranslation();
   const status = availabilityOf(availability);
@@ -34,7 +37,9 @@ export function StatusLine({
       : t(`surface.availability.${status.kind}`);
   return (
     <p
-      className={`flex items-start gap-2 ${compact ? 'text-xs text-text-muted' : 'px-1 text-sm text-text'}`}
+      className={`flex items-start gap-2 ${compact ? 'text-xs' : 'text-sm'} ${
+        tone === 'inherit' ? '' : compact ? 'text-text-muted' : 'px-1 text-text'
+      }`}
       data-testid="availability"
       data-state={status.kind}
     >

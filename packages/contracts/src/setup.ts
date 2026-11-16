@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Timestamp } from './common.js';
-import { LocalizedText } from './customer-surface.js';
+import { LauncherIcon, LauncherSize, LocalizedText, WidgetTheme } from './customer-surface.js';
 import { typeId } from './ids.js';
 
 /**
@@ -243,6 +243,16 @@ export const WidgetAppearance = z
     /** Ask customers for a 1 to 5 rating when a chat is closed. */
     csat: z.boolean().default(false),
     privacyUrl: HttpsUrl.nullable().default(null),
+    /**
+     * Light or dark chat. `auto` (the default when left out) follows the website the chat is on:
+     * its background, then the colour scheme it declares; never the visitor's device alone.
+     */
+    theme: WidgetTheme.optional(),
+    /** The header and the greeting in the brand's colour (`brand`, the default) or `plain`. */
+    headerStyle: z.enum(['brand', 'plain']).optional(),
+    /** The launcher's picture and size; `chat` and `medium` when left out. */
+    launcherIcon: LauncherIcon.optional(),
+    launcherSize: LauncherSize.optional(),
   })
   .meta({ id: 'WidgetAppearance' });
 export type WidgetAppearance = z.infer<typeof WidgetAppearance>;

@@ -188,6 +188,18 @@ test.describe('files (W09)', () => {
     await expect
       .poll(() => picture.evaluate((img: HTMLImageElement) => img.naturalWidth))
       .toBeGreaterThan(0);
+    // The picture opens larger inside the chat. Escape closes the picture, not the chat, and
+    // focus goes back to where it was.
+    const view = frame.getByRole('button', { name: 'View photo.png larger' });
+    await view.click();
+    const larger = frame.getByRole('dialog', { name: 'Picture: photo.png' });
+    await expect(larger.getByRole('img')).toBeVisible();
+    await expect(larger.getByRole('button', { name: 'Close picture' })).toBeFocused();
+    await audit(page);
+    await page.keyboard.press('Escape');
+    await expect(larger).toBeHidden();
+    await expect(view).toBeFocused();
+    await expect(page.locator('iframe[data-hamnivo-frame]')).toBeVisible();
     const download = page.waitForEvent('download');
     await frame.getByRole('button', { name: 'Download receipt.pdf' }).click();
     const saved = await download;
@@ -344,6 +356,10 @@ test.describe('history and read receipts (W05, W06)', () => {
       email: `team-${randomUUID()}@example.com`,
       role: 'administrator',
     });
+    // Chatwoot keeps whole seconds, and a look counts only if it came after the message: in the
+    // same second it may have come first. Replies are quick enough now that the look would
+    // otherwise land in the message's own second.
+    await page.waitForTimeout(1100);
     const seen = await fetch(
       `${s.chatwootUrl}/api/v1/accounts/${accountId}/conversations/${control?.external}/update_last_seen`,
       { method: 'POST', headers: { api_access_token: agent.token } },
@@ -399,6 +415,15 @@ test.describe('deleting and reacting (W22, W23)', () => {
     await reply.getByRole('button', { name: 'React to this message' }).click();
     await reply.getByRole('button', { name: 'Thank you' }).click();
     await expect(frame.getByTestId('reaction').last()).toContainText('You reacted with Thank you');
+    // "Helpful" is a reaction too: it shows on the reply it is for, and is given once.
+    const helpful = reply.getByRole('button', { name: 'Helpful', exact: true });
+    await helpful.click();
+    await expect(reply.getByTestId('reaction')).toContainText([
+      'You reacted with Thank you',
+      'You reacted with Thumbs up',
+    ]);
+    await expect(helpful).toBeDisabled();
+    await expect(helpful).toHaveAttribute('aria-pressed', 'true');
     await audit(page);
   });
 });
@@ -581,7 +606,11 @@ test.describe('layouts (W02)', () => {
     // From the top of the page to the launcher with Tab.
     for (
       let i = 0;
-      i < 10 && !(await launcher.evaluate((el) => el === document.activeElement));
+      // The launcher is in a shadow root: the page's own activeElement is the root around it.
+      i < 10 &&
+      !(await launcher.evaluate(
+        (el) => el === (el.getRootNode() as Document | ShadowRoot).activeElement,
+      ));
       i += 1
     ) {
       await page.keyboard.press('Tab');

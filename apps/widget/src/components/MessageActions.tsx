@@ -1,8 +1,7 @@
 import { HamnivoApiError } from '@hamnivo/client';
-import { REACTIONS, type ReactionEmoji } from '@hamnivo/contracts';
+import type { ReactionEmoji } from '@hamnivo/contracts';
 import { Button } from '@hamnivo/ui/components/button';
 import { useAnnouncer } from '@hamnivo/ui/components/live-region';
-import { SmilePlusIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -71,68 +70,6 @@ export function DeleteMessage({ onDelete }: { onDelete: () => Promise<void> }) {
       {error ? (
         <p role="alert" className="text-danger">
           {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/** Reacts to a reply with one of a few emoji (W22), each with a name screen readers read. */
-export function Reactions({ onReact }: { onReact: (emoji: ReactionEmoji) => Promise<void> }) {
-  const { t } = useTranslation();
-  const announce = useAnnouncer();
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
-  const react = async (emoji: ReactionEmoji) => {
-    setBusy(true);
-    setError(false);
-    try {
-      await onReact(emoji);
-      setOpen(false);
-      announce(
-        t('surface.actions.reacted', { emoji: t(`surface.actions.emoji.${EMOJI_NAMES[emoji]}`) }),
-      );
-    } catch {
-      setError(true);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="flex flex-col items-start gap-1 text-xs">
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="size-8 text-text-muted"
-        aria-expanded={open}
-        aria-label={t('surface.actions.reactTo')}
-        title={t('surface.actions.react')}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <SmilePlusIcon className="size-4" aria-hidden="true" />
-      </Button>
-      {open ? (
-        <ul className="flex flex-wrap gap-1" data-testid="reactions">
-          {REACTIONS.map((emoji) => (
-            <li key={emoji}>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-10 text-lg"
-                disabled={busy}
-                aria-label={t(`surface.actions.emoji.${EMOJI_NAMES[emoji]}`)}
-                onClick={() => void react(emoji)}
-              >
-                <span aria-hidden="true">{emoji}</span>
-              </Button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {error ? (
-        <p role="alert" className="text-danger">
-          {t('surface.actions.reactFailed')}
         </p>
       ) : null}
     </div>

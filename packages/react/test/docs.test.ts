@@ -59,6 +59,12 @@ describe('the guide', () => {
       'container',
       'height',
       'labels',
+      'theme',
+      'offset',
+      'launcher',
+      'zIndex',
+      'hideOn',
+      'hideOnMobile',
       'nonce',
     ]);
     for (const name of [...named, 'customer', 'onReady', 'onError']) {

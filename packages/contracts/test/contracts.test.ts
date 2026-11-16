@@ -196,6 +196,16 @@ describe('widget bridge', () => {
     expect(HostToFrame.safeParse({ ...base, v: 2, type: 'open' }).success).toBe(false);
     expect(HostToFrame.safeParse({ ...base, type: 'eval', code: 'alert(1)' }).success).toBe(false);
   });
+  it('tells the chat about the page around it, and lets it ask for more room', () => {
+    const env = { ...base, type: 'env', theme: 'dark', fullScreen: false, expanded: true };
+    expect(HostToFrame.safeParse({ ...env, safeBottom: 34 }).success).toBe(true);
+    // Every part is optional, so a loader may send only what it knows.
+    expect(HostToFrame.safeParse({ ...base, type: 'env' }).success).toBe(true);
+    expect(HostToFrame.safeParse({ ...env, theme: 'sepia' }).success).toBe(false);
+    expect(HostToFrame.safeParse({ ...env, safeBottom: -1 }).success).toBe(false);
+    expect(FrameToHost.safeParse({ ...base, type: 'resize', size: 'expanded' }).success).toBe(true);
+    expect(FrameToHost.safeParse({ ...base, type: 'resize', size: '900px' }).success).toBe(false);
+  });
   it('limits frame events to scalar payload values', () => {
     expect(
       FrameToHost.safeParse({ ...base, type: 'event', event: 'unread', payload: { count: 2 } })

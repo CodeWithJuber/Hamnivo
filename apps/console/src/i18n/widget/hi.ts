@@ -24,6 +24,11 @@ export const chatSettingsHi: ChatSettingsTranslation = {
     side: 'बटन का कोना',
     right: 'नीचे दाएँ',
     left: 'नीचे बाएँ',
+    offsetX: 'किनारे से दूरी, पिक्सेल में',
+    offsetY: 'नीचे से दूरी, पिक्सेल में',
+    offsetHint: '0 से 400 तक; ख़ाली छोड़ने पर 20।',
+    hideOnMobile: 'फ़ोन पर बटन नहीं',
+    hideOnMobileHint: 'आपकी वेबसाइट फिर भी Hamnivo.open() से चैट खोल सकती है।',
     note: 'फ़ोन पर तैरता बटन और साइड पैनल चैट को पूरी स्क्रीन पर खोलते हैं।',
   },
   files: {
@@ -46,6 +51,8 @@ export const chatSettingsHi: ChatSettingsTranslation = {
   help: {
     legend: 'बातचीत से पहले मदद',
     search: 'ग्राहक आपके सार्वजनिक मदद लेख खोज सकते हैं',
+    followUps: 'AI जवाबों के नीचे अगले सवाल सुझाएँ',
+    followUpsHint: 'हर जवाब के बाद तीन तक छोटे सवाल; हर बार कुछ AI क्रेडिट लगते हैं।',
     suggestions: 'सुझाए गए सवाल',
     suggestionsHint: '6 तक, चैट की पहली स्क्रीन पर। अंग्रेज़ी ज़रूरी है; ख़ाली भाषा में अंग्रेज़ी दिखती है।',
     question: 'सवाल {{number}}',

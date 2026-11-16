@@ -2,9 +2,12 @@ import type { HamnivoClient } from '@hamnivo/client';
 import type { MessagePart } from '@hamnivo/contracts';
 import { Button } from '@hamnivo/ui/components/button';
 import { FileTextIcon, ImageIcon, MapPinIcon, PhoneIcon, UserIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BidiText } from './BidiText.js';
+
+// The larger view of a picture loads when a visitor first opens one.
+const Lightbox = lazy(() => import('./Lightbox.js'));
 
 type Part<T extends MessagePart['type']> = Extract<MessagePart, { type: T }>;
 
@@ -53,6 +56,7 @@ function Picture({
   const { t } = useTranslation();
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     let cancelled = false;
     let created: string | null = null;
@@ -80,14 +84,33 @@ function Picture({
     );
   }
   return url ? (
-    <a
-      href={url}
-      download={part.name}
-      className="block overflow-hidden rounded-lg border border-border focus-visible:outline-2"
-      data-testid="file-picture"
-    >
-      <img src={url} alt={label} className="max-h-48 max-w-full object-contain" />
-    </a>
+    <>
+      <span
+        className="relative inline-block overflow-hidden rounded-lg border border-border bg-surface"
+        data-testid="file-picture"
+      >
+        <img src={url} alt={label} className="block max-h-48 max-w-full object-contain" />
+        {/* The picture keeps its own name; the button over it opens it larger. */}
+        <button
+          type="button"
+          className="absolute inset-0 cursor-zoom-in rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          aria-label={t('ui.view', { name: part.name })}
+          onClick={() => setOpen(true)}
+        />
+      </span>
+      {open ? (
+        <Suspense fallback={null}>
+          <Lightbox
+            url={url}
+            name={part.name}
+            label={label}
+            closeLabel={t('ui.closeView')}
+            downloadLabel={t('surface.files.download', { name: part.name })}
+            onClose={() => setOpen(false)}
+          />
+        </Suspense>
+      ) : null}
+    </>
   ) : (
     <span
       className="flex h-24 w-32 items-center justify-center rounded-lg border border-border bg-surface-sunken"

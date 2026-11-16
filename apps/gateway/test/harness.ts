@@ -41,6 +41,10 @@ export function testEnv(
     // (the SaaS tests do).
     HAMNIVO_DEFAULT_PLAN: 'unlimited',
     CHATWOOT_AUTO_PROVISION: 'false',
+    // Replies arrive whole, as the tests written before streaming expect; the streaming tests
+    // turn it on.
+    AI_STREAM_REPLIES: 'false',
+    AI_FOLLOW_UPS: 'false',
     ...extra,
   };
 }

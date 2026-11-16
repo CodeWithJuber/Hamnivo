@@ -193,6 +193,16 @@ export class WidgetController {
     return this.conversations.cancelHandoff(claims, conversationId, language);
   }
 
+  @Post('conversations/:conversationId/reply/stop')
+  @WidgetRoute()
+  @HttpCode(200)
+  stopReply(
+    @CurrentWidget() claims: WidgetClaims,
+    @Param('conversationId') conversationId: string,
+  ) {
+    return this.conversations.stopReply(claims, conversationId);
+  }
+
   @Post('conversations/:conversationId/reopen')
   @WidgetRoute()
   @HttpCode(200)

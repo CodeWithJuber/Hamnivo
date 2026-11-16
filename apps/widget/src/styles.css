@@ -10,21 +10,87 @@ body,
 }
 body {
   @apply bg-bg;
+  /* Brand typography keeps script-specific fallbacks for every supported locale. */
+  font-family: var(--hv-brand-font, var(--font-sans, sans-serif));
+  /* Scrolling to the end of the chat never drags the website behind it along. */
+  overscroll-behavior: contain;
 }
 :where([dir="rtl"]) body {
-  font-family: "Noto Sans Arabic", var(--font-sans, sans-serif);
+  font-family: "Noto Sans Arabic", var(--hv-brand-font, var(--font-sans, sans-serif));
 }
 :where(html[lang="ur"]) body {
-  font-family: "Noto Nastaliq Urdu", "Noto Sans Arabic", var(--font-sans, sans-serif);
+  font-family: "Noto Nastaliq Urdu", "Noto Sans Arabic", var(--hv-brand-font, sans-serif);
   line-height: 1.9;
 }
-:where(html[lang="hi"]) body {
-  font-family: "DM Sans Variable", "Noto Sans Devanagari", sans-serif;
+/* A tap answers at once: no wait for a second tap that would zoom. */
+:where(button, a, select, summary, label, [role="button"]) {
+  touch-action: manipulation;
+}
+
+/* The chat's header and the greeting under it carry the brand's colour (W03). A brand that kept
+   Hamnivo's own look gets these from the tokens; another look sets them on the page's root. */
+:root {
+  --hv-header-from: var(--hv-primary);
+  --hv-header-to: var(--hv-primary-hover);
+  --hv-header-fg: var(--hv-on-primary);
+}
+:root[data-theme="dark"] {
+  --hv-header-from: var(--hv-info-subtle);
+  --hv-header-to: var(--hv-surface);
+  --hv-header-fg: var(--hv-text);
+}
+.hv-header,
+.hv-hero {
+  color: var(--hv-header-fg);
+  background-color: var(--hv-header-from);
+}
+.hv-header {
+  background-image: linear-gradient(180deg, var(--hv-header-from), var(--hv-header-to));
+}
+.hv-hero {
+  background-color: var(--hv-header-to);
+}
+[data-header="plain"] :is(.hv-header, .hv-hero) {
+  color: var(--hv-text);
+  background-color: var(--hv-surface);
+  background-image: none;
+}
+[data-header="plain"] .hv-header {
+  border-bottom: 1px solid var(--hv-border);
+}
+/* Focus shows in the colour of the header's own text, whatever the brand's colour is. */
+:is(.hv-header, .hv-hero) :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline-color: currentColor;
+}
+.hv-header-button {
+  color: inherit;
+}
+.hv-header-button:hover,
+.hv-header-button[aria-expanded="true"],
+.hv-header-button[aria-pressed="true"] {
+  background-color: color-mix(in srgb, currentColor 16%, transparent);
+}
+
+/* The message list scrolls by itself; a thin bar keeps it out of the words' way. */
+.hv-scroll {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hv-border) transparent;
 }
 
 /* Markdown in answers: compact spacing inside a chat bubble. */
 .hv-markdown > * + * {
   margin-top: 0.5em;
+}
+.hv-markdown :where(h3, h4, h5, h6) {
+  font-weight: 600;
+  line-height: 1.35;
+}
+.hv-markdown h3 {
+  font-size: 1.0625rem;
+}
+.hv-markdown h4 {
+  font-size: 1rem;
 }
 .hv-markdown ul,
 .hv-markdown ol {
@@ -36,22 +102,184 @@ body {
 .hv-markdown ol {
   list-style: decimal;
 }
+.hv-markdown li > p {
+  margin: 0;
+}
 .hv-markdown a {
   color: var(--color-link);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 .hv-markdown code {
-  font-family: ui-monospace, monospace;
-  font-size: 0.9em;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.875em;
 }
-.hv-markdown pre {
-  overflow-x: auto;
-  white-space: pre;
+.hv-markdown :not(pre) > code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background-color: var(--color-surface-sunken);
+}
+.hv-markdown hr {
+  border: 0;
+  border-top: 1px solid var(--color-border);
 }
 .hv-markdown blockquote {
   border-inline-start: 3px solid var(--color-border);
   padding-inline-start: 0.75em;
+  color: var(--color-text-secondary);
+}
+/* Code: its language and a copy button above it; long lines scroll inside, never the chat. */
+.hv-code {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--hv-radius-md);
+  background-color: var(--color-surface-sunken);
+}
+.hv-code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-block: 2px;
+  padding-inline: 10px 4px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+.hv-code-head button {
+  min-height: 28px;
+  padding-inline: 8px;
+  border-radius: 6px;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 500;
+}
+.hv-code-head button:hover {
+  background-color: var(--color-surface);
+}
+.hv-code pre {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  white-space: pre;
+  line-height: 1.5;
+}
+.hv-table {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--hv-radius-md);
+}
+.hv-table table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.hv-table :is(th, td) {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: start;
+  vertical-align: top;
+}
+.hv-table th {
+  background-color: var(--color-surface-sunken);
+  font-weight: 600;
+}
+.hv-table tr:last-child td {
+  border-bottom: 0;
+}
+/* The number of a source inside an answer: a small link to that source under it. */
+.hv-cite {
+  margin-inline-start: 1px;
+  padding-inline: 0.3em;
+  border-radius: 6px;
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: 0.75em;
+  font-weight: 600;
+  text-decoration: none;
+  vertical-align: super;
+}
+.hv-markdown a.hv-cite {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+/* Motion (W14). Durations come from the design tokens, which are zero when the device asks for
+   less motion; the visitor's own choice in the chat's settings is applied below. */
+@keyframes hv-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes hv-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hv-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@keyframes hv-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@keyframes hv-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.hv-enter {
+  animation: hv-rise var(--hv-motion-slow) var(--hv-easing) both;
+}
+.hv-fade {
+  animation: hv-fade var(--hv-motion-base) var(--hv-easing) both;
+}
+.hv-pop {
+  animation: hv-pop var(--hv-motion-base) var(--hv-easing) both;
+}
+/* Three dots while a reply is on its way. */
+.hv-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hv-dots > i {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: currentColor;
+  opacity: 0.4;
+  animation: hv-dot 1.2s ease-in-out infinite;
+}
+.hv-dots > i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.hv-dots > i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+/* A caret after the last word of an answer that is still being written. */
+.hv-streaming > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-inline-start: 2px;
+  background-color: currentColor;
+  vertical-align: -0.15em;
+  animation: hv-caret 1s steps(1, end) infinite;
 }
 
 /* Less motion (W14) when the visitor asks for it in the chat's settings; the device's own setting
@@ -67,15 +295,4 @@ html[data-motion="reduce"] *::after {
   transition-duration: 0.01ms !important;
   /* biome-ignore lint/complexity/noImportantStyles: must override animation utilities */
   scroll-behavior: auto !important;
-}
-
-/* Brand typography keeps script-specific fallbacks for every supported locale. */
-body {
-  font-family: var(--hv-brand-font, var(--font-sans, sans-serif));
-}
-:where([dir="rtl"]) body {
-  font-family: "Noto Sans Arabic", var(--hv-brand-font, var(--font-sans, sans-serif));
-}
-:where(html[lang="ur"]) body {
-  font-family: "Noto Nastaliq Urdu", "Noto Sans Arabic", var(--hv-brand-font, sans-serif);
 }

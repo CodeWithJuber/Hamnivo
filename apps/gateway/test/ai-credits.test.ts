@@ -133,3 +133,96 @@ describe('provider-boundary AI metering', () => {
     expect(reservationSize('hi', ['hello'], 10, 1)).toBeGreaterThan(10);
   });
 });
+
+describe('metered streaming', () => {
+  /**
+   * A provider stream of these parts; `broken` errors after them instead of ending, and `open`
+   * keeps it going, as a provider still generating does.
+   */
+  function streaming(parts: unknown[], broken?: Error, open = false) {
+    const f = fixture(async () => result);
+    const cancelled = vi.fn();
+    const doStream = vi.fn(async () => ({
+      stream: new ReadableStream({
+        start(controller) {
+          for (const part of parts) controller.enqueue(part);
+          if (broken) controller.error(broken);
+          else if (!open) controller.close();
+        },
+        cancel: cancelled,
+      }),
+    }));
+    (f.raw as unknown as { doStream: typeof doStream }).doStream = doStream;
+    return { ...f, doStream, cancelled };
+  }
+  const read = async (stream: ReadableStream<unknown>) => {
+    const seen: unknown[] = [];
+    const reader = stream.getReader();
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) return seen;
+      seen.push(next.value);
+    }
+  };
+  const finish = {
+    type: 'finish',
+    finishReason: { unified: 'stop', raw: 'stop' },
+    usage: { inputTokens: { total: 30 }, outputTokens: { total: 11 } },
+  };
+
+  it('reserves before the provider streams, and settles the usage its finish part reports', async () => {
+    const f = streaming([
+      { type: 'text-delta', id: 't', delta: 'Hello' },
+      { type: 'text-delta', id: 't', delta: ' there.' },
+      finish,
+    ]);
+    const { stream } = await f.model.doStream(call);
+    expect(f.credits.reserve).toHaveBeenCalledOnce();
+    expect(f.credits.settle).not.toHaveBeenCalled();
+    const parts = await read(stream);
+    expect(parts).toHaveLength(3);
+    expect(f.credits.settle).toHaveBeenCalledOnce();
+    expect(f.credits.settle).toHaveBeenCalledWith(expect.anything(), {
+      inputTokens: 30,
+      outputTokens: 11,
+    });
+  });
+
+  it('keeps the reservation held, and says so, when a stream ends without its usage', async () => {
+    const f = streaming([{ type: 'text-delta', id: 't', delta: 'Hello' }]);
+    const { stream } = await f.model.doStream(call);
+    await expect(read(stream)).rejects.toBeInstanceOf(AiAttemptUncertainError);
+    expect(f.credits.settle).toHaveBeenCalledWith(expect.anything(), {
+      inputTokens: null,
+      outputTokens: null,
+    });
+    expect(f.credits.release).not.toHaveBeenCalled();
+  });
+
+  it('treats a stream that breaks off as uncertain, never as free', async () => {
+    const f = streaming([{ type: 'text-delta', id: 't', delta: 'Hel' }], new Error('reset'));
+    const { stream } = await f.model.doStream(call);
+    await expect(read(stream)).rejects.toBeInstanceOf(AiAttemptUncertainError);
+    expect(f.credits.settle).toHaveBeenCalledOnce();
+    expect(f.credits.release).not.toHaveBeenCalled();
+  });
+
+  it('settles once when the reader stops it early, and stops the provider’s stream', async () => {
+    const f = streaming([{ type: 'text-delta', id: 't', delta: 'Hello' }], undefined, true);
+    const { stream } = await f.model.doStream(call);
+    const reader = stream.getReader();
+    await reader.read();
+    await reader.cancel('stopped');
+    expect(f.cancelled).toHaveBeenCalled();
+    expect(f.credits.settle).toHaveBeenCalledOnce();
+    expect(f.credits.release).not.toHaveBeenCalled();
+  });
+
+  it('releases a request the provider refused before streaming anything', async () => {
+    const f = streaming([]);
+    f.doStream.mockRejectedValueOnce(Object.assign(new Error('rate limit'), { statusCode: 429 }));
+    await expect(f.model.doStream(call)).rejects.toThrow('rate limit');
+    expect(f.credits.release).toHaveBeenCalledOnce();
+    expect(f.credits.settle).not.toHaveBeenCalled();
+  });
+});

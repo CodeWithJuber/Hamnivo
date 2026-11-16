@@ -7,10 +7,11 @@ import { ActionsContext, useActions } from './actions/useActions.js';
 import type { HostBridge } from './bridge.js';
 import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
+import { ChatSkeleton, StartError } from './components/shell/Skeleton.js';
 import { type ChatSnapshot, eventsBetween, snapshotOf } from './hostEvents.js';
 import { applyLocale, type Locale } from './i18n.js';
 import { previewConfig, previewTextColour, readPreview } from './preview.js';
-import { applyTheme } from './theme.js';
+import { applyTheme, resolveScheme, type Scheme } from './theme.js';
 import { CHAT_OFFLINE, useChat } from './useChat.js';
 import { useDisplay } from './useDisplay.js';
 import { useMemory } from './useMemory.js';
@@ -29,6 +30,26 @@ export interface WidgetParams {
   test?: boolean;
   /** The brand's direct chat link (W28): the chat on its own page, with no website around it. */
   direct?: boolean;
+  /** Light or dark, as the website around the chat is; null when it did not say. */
+  theme?: Scheme | null;
+  /** What the loader around the chat can do for it (`caps` in the address): `env`, `resize`. */
+  caps?: readonly string[];
+}
+
+const darkDevice = () =>
+  typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+
+/** The visitor's device setting, which the chat follows only where it is a page of its own. */
+function useDeviceScheme(): Scheme {
+  const [dark, setDark] = useState(darkDevice);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const query = matchMedia('(prefers-color-scheme: dark)');
+    const update = () => setDark(query.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return dark ? 'dark' : 'light';
 }
 
 export function App({ params, bridge }: { params: WidgetParams; bridge: HostBridge }) {
@@ -89,11 +110,28 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     : chat.state.session?.config.brand.onAccent;
   const radius = preview?.radius ?? chat.state.session?.config.brand.radius;
   const fontFamily = preview?.fontFamily ?? chat.state.session?.config.brand.fontFamily;
+  // Light or dark is said on the page itself, so the chat never turns dark on a light website
+  // only because the visitor's device is dark.
+  const device = useDeviceScheme();
+  /** What the loader says about the page around the chat; it changes with the page. */
+  const [around, setAround] = useState<{
+    theme: Scheme | null;
+    fullScreen: boolean;
+    expanded: boolean;
+  }>({ theme: params.theme ?? null, fullScreen: false, expanded: false });
+  // A draft in Studio wins; on a website the loader already chose (its attribute, then the
+  // brand's choice, then the page) and says so; on the chat's own page the brand's choice counts.
+  const brandTheme =
+    preview?.theme ?? (around.theme ? 'auto' : chat.state.session?.config.brand.theme);
+  const scheme = resolveScheme(brandTheme, around.theme, Boolean(params.hostOrigin), device);
+  useEffect(() => {
+    document.documentElement.dataset.theme = scheme;
+  }, [scheme]);
   useEffect(() => {
     if (accent !== undefined && onAccent !== undefined && radius !== undefined) {
-      applyTheme(document.documentElement, { accent, onAccent, radius, fontFamily });
+      applyTheme(document.documentElement, { accent, onAccent, radius, fontFamily }, scheme);
     }
-  }, [accent, onAccent, radius, fontFamily]);
+  }, [accent, onAccent, radius, fontFamily, scheme]);
   // Embedded, the chat is on screen only while the loader shows it; on its own page, always.
   const [open, setOpen] = useState(
     !params.hostOrigin || params.mode === 'inline' || params.mode === 'fullpage',
@@ -168,6 +206,17 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       if (message.type === 'proactive') setTrigger(message.triggerId);
       if (message.type === 'prefill') setPrefill({ text: message.text, at: Date.now() });
       if (message.type === 'visitor') setVisitorKey(message.key);
+      if (message.type === 'env') {
+        setAround((now) => ({
+          theme: message.theme ?? now.theme,
+          fullScreen: message.fullScreen ?? now.fullScreen,
+          expanded: message.expanded ?? now.expanded,
+        }));
+        // The screen's own bottom edge, which a frame cannot measure for itself.
+        if (message.safeBottom !== undefined) {
+          document.documentElement.style.setProperty('--hv-safe-bottom', `${message.safeBottom}px`);
+        }
+      }
       if (message.type === 'set-locale')
         setLocale((message.locale.split('-')[0] as Locale) ?? 'en');
       if (message.type === 'identify') {
@@ -204,18 +253,14 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     });
   }, [bridge, identify, reset, setVisitorKey]);
 
-  if (chat.state.phase === 'loading') {
-    return (
-      <p className="p-6 text-sm text-text-muted" role="status">
-        …
-      </p>
-    );
-  }
+  if (chat.state.phase === 'loading') return <ChatSkeleton label={t('ui.loading')} />;
   if (chat.state.phase === 'error' || !chat.state.session) {
     return (
-      <p className="p-6 text-sm text-text" role="alert">
-        {chat.state.error === CHAT_OFFLINE ? t('chatOffline') : t('startError')}
-      </p>
+      <StartError
+        message={chat.state.error === CHAT_OFFLINE ? t('chatOffline') : t('startError')}
+        retry={t('ui.retry')}
+        onRetry={() => void chat.retryStart()}
+      />
     );
   }
   const session = preview
@@ -230,6 +275,8 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
     null;
   // Inline and full-page chats have no launcher to go back to.
   const closable = Boolean(params.hostOrigin) && mode !== 'inline' && mode !== 'fullpage';
+  // A floating or side-panel chat can grow where the loader can resize it and there is room.
+  const resizable = closable && params.caps?.includes('resize') === true && !around.fullScreen;
   return (
     <AnnouncerProvider>
       <ActionsContext.Provider value={actions}>
@@ -268,6 +315,19 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           onLeaveMessage={chat.leaveMessage}
           onConsentRequired={chat.consentRequired}
           onUnavailable={chat.unavailableBy}
+          expand={
+            resizable
+              ? {
+                  expanded: around.expanded,
+                  onToggle: () =>
+                    bridge.post({ type: 'resize', size: around.expanded ? 'default' : 'expanded' }),
+                }
+              : null
+          }
+          onDismissError={chat.dismissError}
+          onStop={() => void chat.stop()}
+          onReconnect={() => void chat.reconnect()}
+          headerStyle={session.config.brand.headerStyle}
           language={language}
           memory={memory}
           onClose={

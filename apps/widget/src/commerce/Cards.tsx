@@ -11,8 +11,10 @@ type CatalogCard = Extract<Card, { kind: 'catalog' }>;
 type QuoteCard = Extract<Card, { kind: 'quote' }>;
 type ReceiptCard = Extract<Card, { kind: 'receipt' }>;
 type OrderStatusCard = Extract<Card, { kind: 'order_status' }>;
+type ChoicesCard = Extract<Card, { kind: 'choices' }>;
 
-const box = 'w-full max-w-[92%] rounded-2xl border border-border bg-surface p-3 text-sm text-text';
+const box =
+  'w-full max-w-[92%] rounded-xl border border-border bg-surface p-3 text-sm text-text shadow-sm';
 
 /** A card shown in the conversation, rendered from Hamnivo's record (never from model text). */
 export function CommerceCard(props: {
@@ -21,6 +23,8 @@ export function CommerceCard(props: {
   locale: string;
   /** Asks for a person; absent when a person already has the conversation. */
   onHelp?: (() => void) | undefined;
+  /** Sends the answer chosen on a card as the visitor's own message; absent when they can't write. */
+  onChoose?: ((label: string) => void) | undefined;
 }) {
   const { card } = props.part;
   switch (card.kind) {
@@ -41,6 +45,8 @@ export function CommerceCard(props: {
       );
     case 'order_status':
       return <OrderStatus card={card} locale={props.locale} onHelp={props.onHelp} />;
+    case 'choices':
+      return <Choices card={card} onChoose={props.onChoose} />;
     default:
       return (
         <p dir="auto" className="text-sm text-text-muted">
@@ -48,6 +54,39 @@ export function CommerceCard(props: {
         </p>
       );
   }
+}
+
+/**
+ * A question with a few answers to tap (HNV-05-04). The answer chosen is sent as the visitor's
+ * own message, so it reads in the conversation like anything else they wrote; writing an answer
+ * of their own in the message box works as always.
+ */
+function Choices(props: { card: ChoicesCard; onChoose?: ((label: string) => void) | undefined }) {
+  const { t } = useTranslation();
+  const { card, onChoose } = props;
+  return (
+    <section className={box} aria-label={t('ui.choose')} data-card="choices">
+      <p dir="auto" className="font-medium">
+        {card.prompt}
+      </p>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {card.options.map((option) => (
+          <li key={option.value} className="max-w-full">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-auto min-h-9 max-w-full rounded-full whitespace-normal py-1.5 text-start"
+              dir="auto"
+              disabled={!onChoose}
+              onClick={() => onChoose?.(option.label)}
+            >
+              {option.label}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 function Catalog(props: { card: CatalogCard; commerce: Commerce; locale: string }) {

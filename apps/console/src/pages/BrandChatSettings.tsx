@@ -165,11 +165,16 @@ export function LocalizedFields({
 interface SettingsDraft {
   mode: Settings['layout']['mode'];
   position: Settings['layout']['position'];
+  /** Pixels from the side and from the bottom, as typed; empty is the default 20. */
+  offsetX: string;
+  offsetY: string;
+  hideOnMobile: boolean;
   files: boolean;
   types: string[];
   maxMegabytes: string;
   maxFiles: string;
   search: boolean;
+  followUps: boolean;
   suggestions: Texts[];
   deleteMinutes: string;
   emails: boolean;
@@ -178,11 +183,15 @@ interface SettingsDraft {
 const settingsDraft = (s: Settings): SettingsDraft => ({
   mode: s.layout.mode,
   position: s.layout.position,
+  offsetX: s.layout.offset ? String(s.layout.offset.x) : '',
+  offsetY: s.layout.offset ? String(s.layout.offset.y) : '',
+  hideOnMobile: s.layout.hideOnMobile === true,
   files: s.attachments.enabled,
   types: [...s.attachments.allowedTypes],
   maxMegabytes: String(s.attachments.maxMegabytes),
   maxFiles: String(s.attachments.maxFiles),
   search: s.help.search,
+  followUps: s.help.followUps !== false,
   suggestions: s.help.suggestions.map((q) => texts(q)),
   deleteMinutes: String(s.deletion.windowMinutes),
   emails: s.notifications.email,
@@ -191,7 +200,11 @@ const settingsDraft = (s: Settings): SettingsDraft => ({
 /** Where the gateway's refusal of a settings field points (`attachments.maxMegabytes` …). */
 export function settingsControlOfPath(path: string): string {
   const [area, key, index, lang] = path.split('.');
-  if (area === 'layout') return key === 'position' ? 'chat-position' : 'chat-mode-bubble';
+  if (area === 'layout') {
+    if (key === 'offset') return index === 'y' ? 'chat-offsetY' : 'chat-offsetX';
+    if (key === 'hideOnMobile') return 'chat-hideOnMobile';
+    return key === 'position' ? 'chat-position' : 'chat-mode-bubble';
+  }
   if (area === 'attachments') {
     if (key === 'maxMegabytes') return 'chat-maxMegabytes';
     if (key === 'maxFiles') return 'chat-maxFiles';
@@ -202,7 +215,7 @@ export function settingsControlOfPath(path: string): string {
     if (key === 'suggestions' && index !== undefined && /^\d+$/.test(index)) {
       return `chat-suggestion-${index}-${lang && (LANGS as string[]).includes(lang) ? lang : 'en'}`;
     }
-    return 'chat-search';
+    return key === 'followUps' ? 'chat-followUps' : 'chat-search';
   }
   if (area === 'deletion') return 'chat-deletion';
   if (area === 'notifications') return 'chat-emails';
@@ -264,6 +277,12 @@ export function SettingsForm({
     const maxMegabytes = whole(draft.maxMegabytes, 1, 10);
     const maxFiles = whole(draft.maxFiles, 1, 5);
     const minutes = whole(draft.deleteMinutes, 0, 60);
+    // Both empty is the default place; one given, the other is the default 20.
+    const placed = draft.offsetX.trim() !== '' || draft.offsetY.trim() !== '';
+    const offsetX = draft.offsetX.trim() === '' ? 20 : whole(draft.offsetX, 0, 400);
+    const offsetY = draft.offsetY.trim() === '' ? 20 : whole(draft.offsetY, 0, 400);
+    if (offsetX === null) next.offsetX = t('chatSettings.invalidNumber', { min: 0, max: 400 });
+    if (offsetY === null) next.offsetY = t('chatSettings.invalidNumber', { min: 0, max: 400 });
     if (maxMegabytes === null)
       next.maxMegabytes = t('chatSettings.invalidNumber', { min: 1, max: 10 });
     if (maxFiles === null) next.maxFiles = t('chatSettings.invalidNumber', { min: 1, max: 5 });
@@ -277,7 +296,12 @@ export function SettingsForm({
     if (Object.keys(next).length > 0) return;
     try {
       const result = await save.mutateAsync({
-        layout: { mode: draft.mode, position: draft.position },
+        layout: {
+          mode: draft.mode,
+          position: draft.position,
+          ...(placed ? { offset: { x: offsetX as number, y: offsetY as number } } : {}),
+          ...(draft.hideOnMobile ? { hideOnMobile: true } : {}),
+        },
         attachments: {
           enabled: draft.files,
           allowedTypes: (draft.types.length
@@ -286,7 +310,12 @@ export function SettingsForm({
           maxMegabytes: maxMegabytes as number,
           maxFiles: maxFiles as number,
         },
-        help: { search: draft.search, suggestions: draft.suggestions.map(localized) },
+        help: {
+          search: draft.search,
+          suggestions: draft.suggestions.map(localized),
+          // Left out while on, as before the switch existed.
+          ...(draft.followUps ? {} : { followUps: false }),
+        },
         deletion: { windowMinutes: minutes as number },
         notifications: { email: draft.emails },
       });
@@ -351,6 +380,39 @@ export function SettingsForm({
           { value: 'bottom-left', label: t('chatSettings.layout.left') },
         ]}
       />
+      {draft.mode === 'bubble' || draft.mode === 'panel' ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField
+              id="chat-offsetX"
+              label={t('chatSettings.layout.offsetX')}
+              hint={t('chatSettings.layout.offsetHint')}
+              inputMode="numeric"
+              placeholder="20"
+              value={draft.offsetX}
+              error={errorOf('offsetX')}
+              onChange={(event) => set({ offsetX: event.target.value })}
+            />
+            <TextField
+              id="chat-offsetY"
+              label={t('chatSettings.layout.offsetY')}
+              hint={t('chatSettings.layout.offsetHint')}
+              inputMode="numeric"
+              placeholder="20"
+              value={draft.offsetY}
+              error={errorOf('offsetY')}
+              onChange={(event) => set({ offsetY: event.target.value })}
+            />
+          </div>
+          <CheckboxField
+            id="chat-hideOnMobile"
+            label={t('chatSettings.layout.hideOnMobile')}
+            hint={t('chatSettings.layout.hideOnMobileHint')}
+            checked={draft.hideOnMobile}
+            onCheckedChange={(hideOnMobile) => set({ hideOnMobile })}
+          />
+        </>
+      ) : null}
       <FieldSet className="gap-3">
         <FieldLegend variant="label" className="mb-0">
           {t('chatSettings.files.legend')}
@@ -421,6 +483,13 @@ export function SettingsForm({
           label={t('chatSettings.help.search')}
           checked={draft.search}
           onCheckedChange={(search) => set({ search })}
+        />
+        <CheckboxField
+          id="chat-followUps"
+          label={t('chatSettings.help.followUps')}
+          hint={t('chatSettings.help.followUpsHint')}
+          checked={draft.followUps}
+          onCheckedChange={(followUps) => set({ followUps })}
         />
         <p className="text-sm text-text-secondary">{t('chatSettings.help.suggestionsHint')}</p>
         {draft.suggestions.map((question, index) => (

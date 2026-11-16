@@ -1,3 +1,4 @@
+import { contrastRatio } from '@hamnivo/brand';
 import { HamnivoClient, MemoryStorage } from '@hamnivo/client';
 import { AnnouncerProvider } from '@hamnivo/ui/components/live-region';
 import { renderToString } from 'react-dom/server';
@@ -7,7 +8,15 @@ import { Csat } from '../src/components/Csat.js';
 import { PrivacyLink } from '../src/components/PrivacyLink.js';
 import { ratedKey, readRated, sendRating } from '../src/csat.js';
 import { initI18n } from '../src/i18n.js';
-import { applyTheme, DEFAULT_LOOK, isDefaultLook, themeVariables } from '../src/theme.js';
+import {
+  applyTheme,
+  DEFAULT_LOOK,
+  darkAccent,
+  isDefaultLook,
+  resolveScheme,
+  schemeOf,
+  themeVariables,
+} from '../src/theme.js';
 
 /** The brand's look in the chat (W03): colour and corners, logo, rating and privacy link. */
 
@@ -181,5 +190,48 @@ describe('the logo and the privacy link', () => {
     expect(renderToString(<PrivacyLink url={null} />)).toBe('');
     expect(renderToString(<PrivacyLink url="javascript:alert(1)" />)).toBe('');
     expect(renderToString(<PrivacyLink url="not a url" />)).toBe('');
+  });
+});
+
+describe('the light and the dark chat', () => {
+  it('is light or dark by choice: the brand, then the website, then the device on its own page', () => {
+    expect(resolveScheme('dark', 'light', true, 'light')).toBe('dark');
+    expect(resolveScheme('light', 'dark', false, 'dark')).toBe('light');
+    expect(resolveScheme('auto', 'dark', true, 'light')).toBe('dark');
+    // A website that says nothing is light, whatever the visitor's device.
+    expect(resolveScheme('auto', null, true, 'dark')).toBe('light');
+    expect(resolveScheme(undefined, null, false, 'dark')).toBe('dark');
+    expect(schemeOf('dark')).toBe('dark');
+    expect(schemeOf('sepia')).toBeNull();
+    expect(schemeOf(null)).toBeNull();
+  });
+
+  it('makes a dark brand colour lighter until it stands out on the dark chat', () => {
+    for (const accent of ['#192A30', '#0F5132', '#000000', '#3B0764']) {
+      expect(contrastRatio(darkAccent(accent), '#16242A')).toBeGreaterThanOrEqual(3);
+    }
+    // A colour that already stands out stays the brand's own.
+    expect(darkAccent('#F59E0B')).toBe('#F59E0B');
+    expect(darkAccent('not-a-colour')).toBe('not-a-colour');
+  });
+
+  it('keeps text readable on buttons and on the header in both', () => {
+    const look = { accent: '#0F5132', onAccent: '#FFFFFF', radius: 12 };
+    const light = themeVariables(look, 'light');
+    expect(light['--hv-primary']).toBe('#0F5132');
+    expect(light['--hv-header-from']).toBe('#0F5132');
+    const dark = themeVariables(look, 'dark');
+    const primary = dark['--hv-primary'] ?? '';
+    expect(primary).not.toBe('#0F5132');
+    expect(contrastRatio(dark['--hv-on-primary'] ?? '', primary)).toBeGreaterThanOrEqual(4.5);
+    // The header keeps the brand's own colour and the text colour the gateway checked on it.
+    expect(dark['--hv-header-from']).toBe('#0F5132');
+    expect(dark['--hv-header-fg']).toBe('#FFFFFF');
+    for (const scheme of ['light', 'dark'] as const) {
+      const header = themeVariables(look, scheme);
+      expect(
+        contrastRatio(header['--hv-header-fg'] ?? '', header['--hv-header-to'] ?? ''),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });

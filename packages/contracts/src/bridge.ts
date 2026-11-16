@@ -52,6 +52,21 @@ export const HostToFrame = z.discriminatedUnion('type', [
    * The chat passes it on so staff can see the pages next to the conversation.
    */
   z.object({ ...base, type: z.literal('visitor'), key: VisitorKey }),
+  /**
+   * What the chat cannot see from inside its frame: whether the page around it is light or dark,
+   * whether the chat fills the screen, whether the visitor made it larger, and how much of the
+   * screen's bottom edge is not for content (a phone's home bar), in pixels. Sent when the chat
+   * loads and again when any of it changes. A loader from before this message sends none, and
+   * the chat then keeps its own defaults.
+   */
+  z.object({
+    ...base,
+    type: z.literal('env'),
+    theme: z.enum(['light', 'dark']).optional(),
+    fullScreen: z.boolean().optional(),
+    expanded: z.boolean().optional(),
+    safeBottom: z.number().min(0).max(200).optional(),
+  }),
 ]);
 export type HostToFrame = z.infer<typeof HostToFrame>;
 
@@ -98,5 +113,10 @@ export const FrameToHost = z.discriminatedUnion('type', [
     ok: z.boolean(),
     error: z.string().max(80).optional(),
   }),
+  /**
+   * The visitor asked for a larger chat, or for its usual size again. Only sent to a loader that
+   * said it can resize (`caps` in the frame's address); the loader answers with `env`.
+   */
+  z.object({ ...base, type: z.literal('resize'), size: z.enum(['default', 'expanded']) }),
 ]);
 export type FrameToHost = z.infer<typeof FrameToHost>;

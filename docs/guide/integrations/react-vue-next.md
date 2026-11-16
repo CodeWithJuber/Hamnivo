@@ -51,6 +51,9 @@ export function App() {
 | `mode`, `position`, `color` | Replace the layout, the side and the launcher colour the brand chose in Studio. |
 | `container`, `height` | For the `inline` mode: the element to put the chat in, and its height. |
 | `labels` | Accessible names: `{ open, close, title }`. |
+| `theme` | `light`, `dark` or `auto`. Without it the brand's choice applies; `auto` follows your page: its background first, then the colour scheme it declares. The visitor's device alone never turns the chat dark. |
+| `offset`, `launcher`, `zIndex` | Where the launcher sits and how it looks: `{ x, y }` in pixels from the side and the bottom, `{ size: 'small' \| 'medium' \| 'large', icon: 'chat' \| 'message' \| 'help' \| 'sparkle' }`, and its stacking order for pages with overlays of their own. |
+| `hideOn`, `hideOnMobile` | Pages the chat is kept off, as paths that are exact or end in a star (`['/checkout*']`), and `true` to keep the launcher off phones. On a single-page app the paths are checked again on every navigation. |
 | `nonce` | The nonce of your Content-Security-Policy, if it needs one for scripts and styles. |
 | `customer` | The signed-in customer: see [Signed-in customers](#signed-in-customers). |
 | `onReady`, `onError` | Called when the loader has started, and when it cannot, or when telling the chat who is signed in fails. Without `onError`, the message goes to the console. |

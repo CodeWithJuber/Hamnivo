@@ -8,6 +8,7 @@ export * from './checks.js';
 export * from './decision-questions.js';
 export * from './decisions.js';
 export * from './decisions-mock.js';
+export * from './follow-ups.js';
 export * from './human-request.js';
 export * from './inbox.js';
 export * from './language.js';

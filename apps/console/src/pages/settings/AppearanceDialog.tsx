@@ -268,6 +268,59 @@ export function AppearanceForm({
           { value: 'noto-sans', label: 'Noto Sans' },
         ]}
       />
+      <SelectField
+        id="look-theme"
+        label={t('agentic.theme')}
+        hint={t('agentic.themeHint')}
+        value={draft.theme}
+        onChange={(event) => set({ theme: event.target.value as AppearanceDraft['theme'] })}
+        options={[
+          { value: 'auto', label: t('agentic.themeAuto') },
+          { value: 'light', label: t('agentic.themeLight') },
+          { value: 'dark', label: t('agentic.themeDark') },
+        ]}
+      />
+      <SelectField
+        id="look-header"
+        label={t('agentic.headerStyle')}
+        value={draft.headerStyle}
+        onChange={(event) =>
+          set({ headerStyle: event.target.value as AppearanceDraft['headerStyle'] })
+        }
+        options={[
+          { value: 'brand', label: t('agentic.headerBrand') },
+          { value: 'plain', label: t('agentic.headerPlain') },
+        ]}
+      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SelectField
+          id="look-launcher-icon"
+          label={t('agentic.launcherIcon')}
+          value={draft.launcherIcon}
+          onChange={(event) =>
+            set({ launcherIcon: event.target.value as AppearanceDraft['launcherIcon'] })
+          }
+          options={[
+            { value: 'chat', label: t('agentic.iconChat') },
+            { value: 'message', label: t('agentic.iconMessage') },
+            { value: 'help', label: t('agentic.iconHelp') },
+            { value: 'sparkle', label: t('agentic.iconSparkle') },
+          ]}
+        />
+        <SelectField
+          id="look-launcher-size"
+          label={t('agentic.launcherSize')}
+          value={draft.launcherSize}
+          onChange={(event) =>
+            set({ launcherSize: event.target.value as AppearanceDraft['launcherSize'] })
+          }
+          options={[
+            { value: 'small', label: t('agentic.sizeSmall') },
+            { value: 'medium', label: t('agentic.sizeMedium') },
+            { value: 'large', label: t('agentic.sizeLarge') },
+          ]}
+        />
+      </div>
       <LocalizedFields
         id="look-launcher"
         legend={t('agentic.launcher')}
@@ -465,6 +518,10 @@ export function AppearanceForm({
             look={{
               fontFamily: draft.fontFamily,
               showBranding: draft.showBranding,
+              theme: draft.theme,
+              headerStyle: draft.headerStyle,
+              launcherIcon: draft.launcherIcon,
+              launcherSize: draft.launcherSize,
               name: brand.name,
               colour,
               on,

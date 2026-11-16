@@ -44,12 +44,36 @@ export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const ATTACHMENT_MAX_FILES = 5;
 
 /** A brand's widget settings (widget.configure). */
+/** Light or dark chat; `auto` follows the website it is on. */
+export const WidgetTheme = z.enum(['light', 'dark', 'auto']);
+export type WidgetTheme = z.infer<typeof WidgetTheme>;
+/** The launcher's picture. */
+export const LauncherIcon = z.enum(['chat', 'message', 'help', 'sparkle']);
+export type LauncherIcon = z.infer<typeof LauncherIcon>;
+/** The launcher's size: 48, 56 or 64 pixels. */
+export const LauncherSize = z.enum(['small', 'medium', 'large']);
+export type LauncherSize = z.infer<typeof LauncherSize>;
+
+/** Where the launcher sits, in pixels from the side and from the bottom of the window. */
+export const LauncherOffset = z.object({
+  x: z.int().min(0).max(400),
+  y: z.int().min(0).max(400),
+});
+export type LauncherOffset = z.infer<typeof LauncherOffset>;
+
 export const WidgetSettings = z
   .object({
     layout: z
       .object({
         mode: WidgetLayoutMode.default('bubble'),
         position: LauncherSide.default('bottom-right'),
+        /**
+         * The launcher's distance from the side and from the bottom of the window, in pixels;
+         * 20 each when left out. The chat opens above it.
+         */
+        offset: LauncherOffset.optional(),
+        /** No launcher on screens up to 480 pixels wide (the website can still open the chat). */
+        hideOnMobile: z.boolean().optional(),
       })
       .prefault({}),
     attachments: z
@@ -69,6 +93,12 @@ export const WidgetSettings = z
         suggestions: z.array(LocalizedText(120)).max(6).default([]),
         /** Search of the brand's public knowledge before a conversation starts. */
         search: z.boolean().default(true),
+        /**
+         * Up to three questions the customer might ask next, under each new AI answer. Written by
+         * the agent's model after the answer is published, so they cost a few tokens per answer.
+         * On unless set to false.
+         */
+        followUps: z.boolean().optional(),
       })
       .prefault({}),
     deletion: z
@@ -146,8 +176,17 @@ export const LauncherConfig = z
     version: z.int().positive(),
     locale: SupportedLocale,
     dir: z.enum(['ltr', 'rtl']),
-    layout: z.object({ mode: WidgetLayoutMode, position: LauncherSide }),
+    layout: z.object({
+      mode: WidgetLayoutMode,
+      position: LauncherSide,
+      offset: LauncherOffset.optional(),
+      hideOnMobile: z.boolean().optional(),
+    }),
+    /** The brand's light or dark choice; left out or `auto`, the loader follows the website. */
+    theme: WidgetTheme.optional(),
     launcher: z.object({
+      icon: LauncherIcon.optional(),
+      size: LauncherSize.optional(),
       accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
       onAccent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
       openLabel: z.string().max(80),

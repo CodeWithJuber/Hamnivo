@@ -8,6 +8,7 @@ import type {
   MessagePage,
   SendMessageRequest,
   StartConversationRequest,
+  StopReplyResponse,
 } from '@hamnivo/contracts';
 import {
   appendAudit,
@@ -22,7 +23,7 @@ import {
 import type { AuthorityMessage } from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import canonicalize from 'canonicalize';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
 import { JournalService } from '../authority/journal.service.js';
 import {
@@ -46,6 +47,7 @@ import { syncSla } from '../inbox/sla.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
+import { RunSignals } from '../runtime/run-signals.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { parseAppearance } from './appearance.js';
 import { WidgetAttachmentsService } from './attachments.service.js';
@@ -91,7 +93,44 @@ export class WidgetConversationsService {
     private readonly entitlements: EntitlementsService,
     private readonly attachments: WidgetAttachmentsService,
     private readonly availability: AvailabilityService,
+    private readonly runSignals: RunSignals,
   ) {}
+
+  /**
+   * The customer stops the reply being written (Stop). It is asked to stop as a person's Cancel
+   * asks it: nothing it wrote is posted, a tool call it has not made is not made, and what was
+   * shown of it goes at once. A reply already posted stays; `stopped` says whether one was being
+   * written. A call to the model already under way is left to finish unseen, so what it used is
+   * counted exactly.
+   */
+  async stopReply(claims: WidgetClaims, publicId: string): Promise<StopReplyResponse> {
+    const conversationId = this.conversationId(publicId);
+    const runId = await this.tx(claims, async (tx) => {
+      await this.own(tx, claims, conversationId);
+      const [run] = await tx
+        .select({ id: schema.runs.id })
+        .from(schema.runs)
+        .where(
+          and(
+            eq(schema.runs.conversationId, conversationId),
+            eq(schema.runs.kind, 'reply'),
+            eq(schema.runs.state, 'running'),
+            isNull(schema.runs.cancelRequestedAt),
+          ),
+        )
+        .orderBy(desc(schema.runs.startedAt))
+        .limit(1)
+        .for('update');
+      if (!run) return null;
+      await tx
+        .update(schema.runs)
+        .set({ cancelRequestedAt: this.clock() })
+        .where(eq(schema.runs.id, run.id));
+      return run.id;
+    });
+    if (runId) await this.runSignals.stop(claims.tenantId, conversationId, runId);
+    return { stopped: runId !== null };
+  }
 
   private tx<T>(claims: WidgetClaims, work: (tx: TenantTx) => Promise<T>): Promise<T> {
     return withTenant(

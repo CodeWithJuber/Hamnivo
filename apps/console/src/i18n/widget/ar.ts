@@ -24,6 +24,11 @@ export const chatSettingsAr: ChatSettingsTranslation = {
     side: 'زاوية الزر',
     right: 'أسفل اليمين',
     left: 'أسفل اليسار',
+    offsetX: 'المسافة من الجانب، بالبكسل',
+    offsetY: 'المسافة من الأسفل، بالبكسل',
+    offsetHint: 'من 0 إلى 400؛ 20 عند تركه فارغًا.',
+    hideOnMobile: 'بلا زر على الهواتف',
+    hideOnMobileHint: 'يمكن لموقعك فتح المحادثة رغم ذلك عبر Hamnivo.open().',
     note: 'على الهواتف، يفتح الزر العائم واللوحة الجانبية المحادثة بملء الشاشة.',
   },
   files: {
@@ -46,6 +51,8 @@ export const chatSettingsAr: ChatSettingsTranslation = {
   help: {
     legend: 'المساعدة قبل المحادثة',
     search: 'يمكن للعملاء البحث في مقالات المساعدة العامة',
+    followUps: 'اقتراح أسئلة تالية تحت إجابات الذكاء الاصطناعي',
+    followUpsHint: 'حتى ثلاثة أسئلة قصيرة بعد كل إجابة؛ يستهلك كل منها بعض أرصدة الذكاء الاصطناعي.',
     suggestions: 'أسئلة مقترحة',
     suggestionsHint:
       'حتى 6 أسئلة، في أول شاشة من المحادثة. الإنجليزية مطلوبة؛ وتظهر الإنجليزية مكان أي لغة فارغة.',

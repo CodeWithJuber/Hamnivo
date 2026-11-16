@@ -17,6 +17,10 @@ export default defineConfig({
     ...devices['Desktop Chrome'],
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
     trace: 'retain-on-failure',
+    // The journeys run as a visitor who asked for less motion: new messages and cards then
+    // appear at once, so the accessibility audits measure them as they stay, never half faded
+    // in. The motion itself is checked by the layout audit's browser checks (CHECK=live, sites).
+    reducedMotion: 'reduce',
   },
   webServer: {
     command: 'node e2e/stack.ts',
