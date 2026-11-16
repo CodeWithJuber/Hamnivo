@@ -34547,6 +34547,10 @@
           "tools": {
             "default": {},
             "$ref": "#/components/schemas/AgentTools"
+          },
+          "actions": {
+            "default": {},
+            "$ref": "#/components/schemas/AgentActions"
           }
         },
         "required": [
@@ -34677,6 +34681,27 @@
         "required": [
           "toolId"
         ]
+      },
+      "AgentActions": {
+        "type": "object",
+        "properties": {
+          "handoff": {
+            "default": false,
+            "type": "boolean"
+          },
+          "choices": {
+            "default": false,
+            "type": "boolean"
+          },
+          "contact": {
+            "default": false,
+            "type": "boolean"
+          },
+          "search": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
       },
       "UpdateAgentRequest": {
         "type": "object",
@@ -72292,6 +72317,9 @@
           },
           "tools": {
             "$ref": "#/components/schemas/AgentToolsOutput"
+          },
+          "actions": {
+            "$ref": "#/components/schemas/AgentActionsOutput"
           }
         },
         "required": [
@@ -72306,7 +72334,8 @@
           "limits",
           "knowledgeSourceIds",
           "memory",
-          "tools"
+          "tools",
+          "actions"
         ],
         "additionalProperties": false
       },
@@ -72443,6 +72472,34 @@
         "required": [
           "toolId",
           "autopilot"
+        ],
+        "additionalProperties": false
+      },
+      "AgentActionsOutput": {
+        "type": "object",
+        "properties": {
+          "handoff": {
+            "default": false,
+            "type": "boolean"
+          },
+          "choices": {
+            "default": false,
+            "type": "boolean"
+          },
+          "contact": {
+            "default": false,
+            "type": "boolean"
+          },
+          "search": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "handoff",
+          "choices",
+          "contact",
+          "search"
         ],
         "additionalProperties": false
       },

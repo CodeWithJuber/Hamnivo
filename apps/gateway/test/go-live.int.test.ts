@@ -132,7 +132,11 @@ describe('a server with its own AI key', () => {
   let slice: Slice;
   let shop: Shop;
   /** A real model stands in: each question gets its own answer. */
-  const model = createMockModel({ reply: ({ text }) => `You asked: ${text.slice(0, 40)}` });
+  // It never calls a tool: the assistant's actions are tested in assistant-actions.int.
+  const model = createMockModel({
+    reply: ({ text }) => `You asked: ${text.slice(0, 40)}`,
+    tools: false,
+  });
 
   beforeAll(async () => {
     slice = await startSlice({
@@ -213,5 +217,18 @@ describe('a server with its own AI key', () => {
           ),
     );
     expect(versions).toHaveLength(1);
+  });
+
+  it('grants the tools that only read, and never one that changes something', async () => {
+    const tool = await shop.owner.post('/v1/admin/tools', {
+      brandId: shop.brand.id,
+      builtin: 'order_status',
+    });
+    expect(tool.status, JSON.stringify(tool.body)).toBe(201);
+    const live = await shop.owner.post(`/v1/admin/agents/${shop.agentId}/go-live`, {});
+    expect(live.status, JSON.stringify(live.body)).toBe(200);
+    const config = live.body.published.config;
+    expect(config.tools.grants).toEqual([{ toolId: tool.body.id, autopilot: true }]);
+    expect(config.actions).toEqual({ handoff: true, choices: true, contact: true, search: true });
   });
 });

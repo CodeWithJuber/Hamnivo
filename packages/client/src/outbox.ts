@@ -1,5 +1,5 @@
 import type { Message } from '@hamnivo/contracts';
-import type { HamnivoClient } from './client.js';
+import type { HamnivoClient, PageContext } from './client.js';
 import type { HamnivoApiError } from './errors.js';
 
 export type OutgoingState = 'queued' | 'sending' | 'accepted' | 'failed';
@@ -24,6 +24,8 @@ export interface OutgoingMessage {
   error?: string;
   /** The API's code for a failure (for example UPLOAD_REJECTED), to explain it. */
   errorCode?: string;
+  /** The page it was written on, kept so a retry sends the same. */
+  context?: PageContext;
 }
 
 export interface OutboxOptions {
@@ -117,6 +119,7 @@ export class Outbox {
       clientMessageId: uuid(),
       text,
       ...(attachments.length ? { attachments: [...attachments] } : {}),
+      ...(this.client.pageContext ? { context: this.client.pageContext } : {}),
       state: 'queued',
       attempts: 0,
       createdAt: new Date().toISOString(),
@@ -188,6 +191,7 @@ export class Outbox {
             next.clientMessageId,
             next.text,
             (next.attachments ?? []).map((a) => a.uploadId),
+            next.context,
           );
           this.update(next.clientMessageId, { state: 'accepted', message: result.message });
         } catch (error) {

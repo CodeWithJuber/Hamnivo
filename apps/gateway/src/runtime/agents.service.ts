@@ -516,14 +516,38 @@ export class AgentsService {
         )
         .orderBy(asc(schema.knowledgeSources.createdAt))
         .limit(20);
+      // Tools that only read (a connected store's or billing system's order and invoice look-ups)
+      // are granted; what changes something stays for the owner to grant, with its approvals.
+      const readers = await tx
+        .select({ id: schema.toolDefinitions.id })
+        .from(schema.toolDefinitions)
+        .where(
+          and(
+            eq(schema.toolDefinitions.brandId, row.brandId),
+            eq(schema.toolDefinitions.status, 'enabled'),
+            eq(schema.toolDefinitions.risk, 'read'),
+          ),
+        )
+        .orderBy(asc(schema.toolDefinitions.createdAt));
+      const granted = new Set(current.tools.grants.map((g) => g.toolId));
+      const grants = [
+        ...current.tools.grants,
+        ...readers
+          .map((tool) => toPublicId('tool', tool.id))
+          .filter((id) => !granted.has(id))
+          .map((toolId) => ({ toolId, autopilot: true })),
+      ].slice(0, 30);
       const config = AgentConfig.parse({
         ...current,
         mode: 'answer',
         model,
+        tools: { ...current.tools, grants },
         // A fallback on the test model would answer with the fixed text when the model is busy.
         fallbackModels: current.fallbackModels.filter((choice) => choice.provider !== 'mock'),
         knowledgeSourceIds: sources.map((source) => toPublicId('source', source.id)),
         memory: { ...current.memory, enabled: true },
+        // It may hand over, offer answers to tap, note contact details and search again.
+        actions: { handoff: true, choices: true, contact: true, search: true },
       });
       const draft = versions.find((v) => v.state === 'draft');
       if (draft) {

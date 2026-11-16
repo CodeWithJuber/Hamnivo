@@ -17,8 +17,8 @@ moved it, and production let that model answer. Six phases, each pushed when don
 | A | **The AI really answers**: production never lets the test model answer; one-click **Make the assistant live**; the brand's website read without setup | Done, see below |
 | B | **It never repeats**: a draft the customer read is posted; the prompt always ends with the customer; attachment-only messages; follow-up chips without echo; draft restarts; resync | Done, see below |
 | C | **Memory that works**: OpenAI-strict extraction schema, retries, wording, consent in the welcome area, anonymous sessions that last, memory carried over at sign-in | Done in part, see below |
-| D | **It acts**: hand over, ticket, contact details, knowledge search, buttons, page links; which page the visitor is on; WHMCS tools granted and kept signed in | Next |
-| E | **A clean, Tawk-like chat**: home with the team, reply time, one clear action; fewer header buttons | Planned |
+| D | **It acts**: hand over, ticket, contact details, knowledge search, buttons, page links; which page the visitor is on; WHMCS tools granted and kept signed in | Done in part, see below |
+| E | **A clean, Tawk-like chat**: home with the team, reply time, one clear action; fewer header buttons | Next |
 | F | **Shopify and WooCommerce orders** | Planned, after A–E |
 
 ### Phase A, done
@@ -66,6 +66,19 @@ the chat). What would still have stopped it with a real model:
     give one person's memory to whoever signs in next, so it needs the owner's decision first.
   - A running summary for chats longer than the agent's history window (20 messages).
   - A list of what extraction found or skipped in Studio (only logged, as counts).
+
+### Phase D, done in part
+
+| What | Where | Checked by |
+|---|---|---|
+| **The assistant acts while answering** (`AgentConfig.actions`, in the agent editor; all on with **Make the assistant live**): hands over with its summary, offers answers to tap (a `choices` card on its reply, which the widget already draws), notes contact details on the contact and in a staff note, searches the knowledge again (twice at most, cited like the rest). Carried out only once its reply is posted. | `runtime/assistant-actions.ts`, `replies.service.ts` (`carryOut`), `authority/views.ts`, Studio `AgentEditorPage.tsx`, `lib/agent-form.ts` | `assistant-actions.int.test.ts` (4), `assistant-actions.test.ts` (3), `agent-actions.test.ts` (2) |
+| **It knows the page.** The loader sends the page's address (no query or fragment) and title on load and on every change; each message carries the page it was written on, the same on a retry; the model gets it as one fenced line, and such an answer is not cached. | `widget-loader/src/loader.ts`, `client/src/outbox.ts`, `client.ts`, widget `App.tsx`, `runtime/prompt.ts` (`pageLine`) | `runtime.test.ts`, `client.test.ts`, `assistant-actions.int.test.ts` |
+| **Read-only tools are granted** by **Make the assistant live** (order and invoice look-ups of a connected system); tools that change something stay for the owner, with their approvals. | `agents.service.ts` `goLive` | `go-live.int.test.ts` |
+| **WHMCS keeps a signed-in customer linked** for the session's lifetime instead of the assertion's five minutes; changes still need their approval with a fresh sign-in. | `widget/sessions.service.ts` | `whmcs-tools.test.ts` (unchanged rules); no WHMCS integration test |
+
+- Not done: a ticket made by the assistant (the contact form makes tickets; a hand-off reaches
+  people), links the assistant shares as cards (it writes links in its reply), and acting on the
+  page itself (by decision 5, only through what the customer taps).
 
 ## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
 

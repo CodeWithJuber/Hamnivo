@@ -122,6 +122,7 @@ Two more things make the chat useful:
   server's), the brand's knowledge (its website included, see below) and
   [memory](../ai/see-what-the-ai-remembers.md) for customers who agree, then publishes it. You can
   change any of it later in the agent's editor.
+  [What the assistant can do](../ai/what-the-assistant-can-do.md).
 
   Until then the assistant is on an offline test model that gives every customer the same fixed
   reply. A production server never lets that model answer: those chats go to your team, with a note

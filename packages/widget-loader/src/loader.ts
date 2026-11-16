@@ -318,6 +318,21 @@ declare global {
   };
 
   /**
+   * The page the visitor is on, for the assistant to understand what they mean: its address
+   * without the query or fragment (which can hold tokens) and its title. Sent when the chat
+   * loads and whenever either changes; a message the visitor sends carries it.
+   */
+  let placed = '';
+  const tellPage = () => {
+    const title = doc.title.trim().slice(0, 300);
+    const context = { url: location.origin + location.pathname, ...(title ? { title } : {}) };
+    const now = JSON.stringify(context);
+    if (now === placed || !location.origin.startsWith('http')) return;
+    placed = now;
+    send({ type: 'set-context', context });
+  };
+
+  /**
    * Places the frame for the screen (see placement.ts): full screen on phones, sideways phones and
    * zoomed windows, sized to the visible area so the keyboard hides nothing. While it covers the
    * page, the page behind it does not scroll and the launcher under it is put away.
@@ -684,6 +699,8 @@ declare global {
       for (const message of pending) frame.contentWindow?.postMessage(message, widgetOrigin);
       told = '';
       tell();
+      placed = '';
+      tellPage();
       emit('ready');
     } else if (m.type === 'layout' && m.open === false) {
       setOpen(false);
@@ -776,6 +793,8 @@ declare global {
         doc.body.appendChild(frame);
       }
     }
+    // A single-page app sets its title after its address: both are watched.
+    if (ready) tellPage();
     if (location.href === address) return;
     // A new address without a new page (a single-page app): a new page view for the prompts.
     address = location.href;

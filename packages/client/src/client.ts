@@ -86,6 +86,11 @@ export class HamnivoClient {
   private changing: Promise<unknown> | null = null;
   private readonly listeners = new Set<(session: WidgetSession | null) => void>();
   private draftStore: Drafts | undefined;
+  /**
+   * The page the visitor is on (the website's loader says), sent with each message they write
+   * so the assistant understands what they mean. Null where nothing said.
+   */
+  pageContext: PageContext | null = null;
 
   constructor(readonly options: HamnivoClientOptions) {
     this.storage = options.storage ?? defaultStorage();
@@ -373,6 +378,8 @@ export class HamnivoClient {
     clientMessageId: string,
     text: string,
     uploadIds: readonly string[] = [],
+    /** The page the message was written on, as it was then (the same on every retry). */
+    context?: PageContext,
   ): Promise<SendResult> {
     return this.request('POST', `/v1/widget/conversations/${encodeURIComponent(id)}/messages`, {
       clientMessageId,
@@ -380,6 +387,7 @@ export class HamnivoClient {
         ...(text.trim() || uploadIds.length === 0 ? [{ type: 'text', text }] : []),
         ...uploadIds.map((uploadId) => ({ type: 'attachment', uploadId })),
       ],
+      ...(context ? { context } : {}),
     });
   }
 

@@ -206,6 +206,8 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       if (message.type === 'proactive') setTrigger(message.triggerId);
       if (message.type === 'prefill') setPrefill({ text: message.text, at: Date.now() });
       if (message.type === 'visitor') setVisitorKey(message.key);
+      // The page the visitor is on: their next messages carry it, for the assistant.
+      if (message.type === 'set-context') client.pageContext = message.context;
       if (message.type === 'env') {
         setAround((now) => ({
           theme: message.theme ?? now.theme,
@@ -251,7 +253,7 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
         });
       }
     });
-  }, [bridge, identify, reset, setVisitorKey]);
+  }, [bridge, identify, reset, setVisitorKey, client]);
 
   if (chat.state.phase === 'loading') return <ChatSkeleton label={t('ui.loading')} />;
   if (chat.state.phase === 'error' || !chat.state.session) {

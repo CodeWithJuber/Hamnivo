@@ -517,6 +517,7 @@ export const en = {
       limits: 'Limits',
       knowledge: 'Knowledge',
       memory: 'Customer memory',
+      actions: 'What the assistant can do',
     },
     displayName: 'Name customers see',
     displayNameHint:
@@ -579,6 +580,20 @@ export const en = {
       none: 'This brand has no knowledge sources yet.',
       manage: 'Manage knowledge',
       hidden: 'You can’t see knowledge sources.',
+    },
+    actions: {
+      intro:
+        'Besides answering, the assistant can do these in the chat. It does each only once its reply is sent.',
+      handoff: 'Pass the chat to your team when it should',
+      handoffHint:
+        'When the customer asks for a person, is upset, or needs something it cannot do. Your team gets its summary.',
+      choices: 'Offer answers to tap',
+      choicesHint: 'When the customer has to pick between a few options.',
+      contact: 'Note contact details the customer gives',
+      contactHint:
+        'Name, email or phone, for your team, on the contact and in a note. Never passwords or card numbers.',
+      search: 'Search the knowledge again in its own words',
+      searchHint: 'When the first search did not find the answer. Uses the knowledge ticked above.',
     },
     memory: {
       enabled: 'Remember customer preferences',

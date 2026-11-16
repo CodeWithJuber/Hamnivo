@@ -530,9 +530,14 @@
       "packages/db/src/schema/runtime.ts",
       "apps/gateway/test/go-live.int.test.ts",
       "apps/console/src/components/agent/GoLiveNotices.tsx",
-      "apps/console/test/go-live.test.tsx"
+      "apps/console/test/go-live.test.tsx",
+      "apps/gateway/src/runtime/assistant-actions.ts",
+      "apps/gateway/test/assistant-actions.int.test.ts",
+      "apps/gateway/test/assistant-actions.test.ts",
+      "apps/console/test/agent-actions.test.ts",
+      "docs/guide/ai/what-the-assistant-can-do.md"
     ],
-    "note": "Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending. A brand's assistant is made live in one step (Make the assistant live, on Home, AI agents and AI models): a real model from the workspace's newest key or the server's, every knowledge source of the brand and memory on, then the usual publish checks; asked again it keeps the model and brings in new knowledge. The offline test model, which gives every customer the same fixed reply, cannot be published in production (ALLOW_MOCK_MODEL unset) and an agent already published on it hands its conversations to people with the reason no_live_model; with a server key a new brand's agent starts on the server's model (integration-tested with production's rules; Studio's notice unit-tested)."
+    "note": "Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending. A brand's assistant is made live in one step (Make the assistant live, on Home, AI agents and AI models): a real model from the workspace's newest key or the server's, every knowledge source of the brand and memory on, then the usual publish checks; asked again it keeps the model and brings in new knowledge. The offline test model, which gives every customer the same fixed reply, cannot be published in production (ALLOW_MOCK_MODEL unset) and an agent already published on it hands its conversations to people with the reason no_live_model; with a server key a new brand's agent starts on the server's model (integration-tested with production's rules; Studio's notice unit-tested). The assistant can act while answering (AgentConfig.actions, set in the agent editor and by Make the assistant live): pass the conversation to people with its summary, offer answers to tap (a choices card on its reply), note contact details the customer gives (on the contact and in a staff note; malformed ones dropped), and search the brand's knowledge again in its own words (up to twice, cited like the rest). Each is carried out only once its reply is posted (integration-tested with a stand-in model; unit-tested). It is told the page the customer wrote from (address without query or fragment, and title, sent by the loader and carried with each message), fenced as data; an answer that used it is not cached (integration- and unit-tested). Making it live also grants the brand's enabled read-only tools (integration-tested)."
   },
   "G03": {
     "status": "in-progress",

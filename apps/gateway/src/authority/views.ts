@@ -1,11 +1,12 @@
-import type {
-  CardPart,
-  DeliveryState,
-  MemoryPart,
-  Message,
-  MessagePart,
-  Sender,
-  SourcePart,
+import {
+  type CardPart,
+  ChoicesCard,
+  type DeliveryState,
+  type MemoryPart,
+  type Message,
+  type MessagePart,
+  type Sender,
+  type SourcePart,
 } from '@hamnivo/contracts';
 import { schema, type TenantTx } from '@hamnivo/db';
 import type { OwnerMode } from '@hamnivo/db/schema';
@@ -28,6 +29,8 @@ export interface PublicationFacts {
   memories?: MemoryPartRef[];
   /** Questions the customer might ask next, written after the answer was published. */
   followUps?: string[];
+  /** Answers to tap that the assistant offered with its reply (offer_choices). */
+  choices?: z.infer<typeof ChoicesCard>;
 }
 
 /**
@@ -74,7 +77,9 @@ export async function publicationFacts(
       senderName?: string;
       memories?: MemoryPartRef[];
       followUps?: unknown;
+      choices?: unknown;
     };
+    const choices = ChoicesCard.safeParse(detail.choices);
     const facts: PublicationFacts = {
       sources: detail.sources ?? [],
       ...(detail.displayName ? { displayName: detail.displayName } : {}),
@@ -89,6 +94,7 @@ export async function publicationFacts(
               .slice(0, 3),
           }
         : {}),
+      ...(choices.success ? { choices: choices.data } : {}),
     };
     const byKey = messages.find((m) => m.key === row.key);
     const ref = byKey?.ref ?? (row.authorityId === null ? null : String(row.authorityId));
@@ -188,6 +194,15 @@ export function contractMessage(input: {
           ...files,
           ...(input.facts?.sources ?? []),
           ...(input.facts?.memories ?? []),
+          ...(input.facts?.choices && sender.kind === 'ai_agent'
+            ? [
+                {
+                  type: 'card' as const,
+                  card: input.facts.choices,
+                  fallbackText: input.facts.choices.options.map((o) => o.label).join(' · '),
+                },
+              ]
+            : []),
           ...(input.facts?.followUps?.length && sender.kind === 'ai_agent'
             ? [{ type: 'suggestions' as const, items: input.facts.followUps }]
             : []),

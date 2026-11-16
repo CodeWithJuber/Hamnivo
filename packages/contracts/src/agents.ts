@@ -71,6 +71,22 @@ export const AgentTools = z
   .meta({ id: 'AgentTools' });
 
 /**
+ * What the assistant may do within Hamnivo itself while answering, without any tool to grant: pass
+ * the conversation to people, offer answers to tap, note the customer's contact details for the
+ * team, and search the brand's knowledge again in its own words. Off until the owner turns them on
+ * (Make the assistant live turns them all on).
+ */
+export const AgentActions = z
+  .object({
+    handoff: z.boolean().default(false),
+    choices: z.boolean().default(false),
+    contact: z.boolean().default(false),
+    search: z.boolean().default(false),
+  })
+  .meta({ id: 'AgentActions' });
+export type AgentActions = z.output<typeof AgentActions>;
+
+/**
  * Everything that decides how an agent behaves. A published version of it never changes; edits
  * create a new draft (A07).
  */
@@ -101,6 +117,8 @@ export const AgentConfig = z
     memory: AgentMemory.prefault({}),
     /** Tools the agent may call and its action budgets (G07, G15). */
     tools: AgentTools.prefault({}),
+    /** What it may do within Hamnivo while answering (hand over, offer choices, …). */
+    actions: AgentActions.prefault({}),
   })
   .meta({ id: 'AgentConfig' });
 export type AgentConfig = z.output<typeof AgentConfig>;
