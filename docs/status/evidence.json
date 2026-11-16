@@ -1019,9 +1019,11 @@
       "packages/domain/src/memory/policy.ts",
       "packages/domain/test/memory-policy.test.ts",
       "packages/db/src/schema/memory.ts",
-      "apps/gateway/test/memory.int.test.ts"
+      "apps/gateway/test/memory.int.test.ts",
+      "apps/gateway/src/memory/extraction.service.ts",
+      "apps/gateway/test/memory-extraction.test.ts"
     ],
-    "note": "Memory records use the typed envelope (kind, scope, source, evidence status, purposes, roles, sensitivity, retention, policy version) and a closed catalogue of slots; the write policy sets every governing field and claims stay unverified (tested). Only preference, observation and claim slots exist so far; procedure, commitment and outcome kinds have no slots yet."
+    "note": "Memory records use the typed envelope (kind, scope, source, evidence status, purposes, roles, sensitivity, retention, policy version) and a closed catalogue of slots; the write policy sets every governing field and claims stay unverified (tested). Only preference, observation and claim slots exist so far; procedure, commitment and outcome kinds have no slots yet. Extraction works with every provider's structured output: the model is asked for every field (null where none) without length rules, which OpenAI's strict mode refuses, and the limits are applied to the answer (unit-tested on the schema itself). A model busy on the first try is tried again with a new attempt key, and the agent's fallback models are tried while one is busy (integration-tested; the retry failed before). The instructions ask for facts and preferences the customer states about themselves, for the listed keys."
   },
   "L02": {
     "status": "implemented",
@@ -1114,9 +1116,11 @@
       "packages/domain/src/memory/recall.ts",
       "packages/domain/test/memory-recall.test.ts",
       "apps/gateway/test/memory.int.test.ts",
-      "apps/widget/e2e/memory.spec.ts"
+      "apps/widget/e2e/memory.spec.ts",
+      "apps/gateway/src/runtime/stream-gate.ts",
+      "apps/gateway/test/live-reply.test.ts"
     ],
-    "note": "Replies use only consented, current, in-scope memory of the conversation's own customer that allows AI use and is not under review, ranked by vectors and words within the agent's budget and fenced as data. Answers cite them as memories ([M1] becomes a memory part the widget shows as “based on what you told us before”), never as something said in the chat; turning memory off, outdated, expired and future values are never used (tested)."
+    "note": "Replies use only consented, current, in-scope memory of the conversation's own customer that allows AI use and is not under review, ranked by vectors and words within the agent's budget and fenced as data. Answers cite them as memories ([M1] becomes a memory part the widget shows as “based on what you told us before”), never as something said in the chat; turning memory off, outdated, expired and future values are never used (tested). Memory markers ([M1]) are left out of streamed drafts, as knowledge markers are (unit-tested)."
   },
   "HNV-15-01": {
     "status": "implemented",
@@ -2719,9 +2723,10 @@
       "apps/gateway/src/widget/sessions.service.ts",
       "apps/gateway/test/customer-surface.int.test.ts",
       "apps/widget/src/components/Conversations.tsx",
-      "apps/widget/e2e/surface.spec.ts"
+      "apps/widget/e2e/surface.spec.ts",
+      "apps/gateway/test/front-door.int.test.ts"
     ],
-    "note": "A customer signed in by the website's assertion is one principal per brand on every device and continues the same conversations. Anonymous visitors, other customers and the same person on another brand see none of them by any path (list, history, files, stream). Signing in as someone else or out ends the old session's open streams at once. Resuming by an emailed link is not offered (tested, mutation-checked)."
+    "note": "A customer signed in by the website's assertion is one principal per brand on every device and continues the same conversations. Anonymous visitors, other customers and the same person on another brand see none of them by any path (list, history, files, stream). Signing in as someone else or out ends the old session's open streams at once. Resuming by an emailed link is not offered (tested, mutation-checked). An anonymous visitor's session lasts WIDGET_SESSION_DAYS (30) from its last use, so a visitor who keeps coming back keeps their chat and what it remembers; a signed-in session still ends when the website's sign-in says (integration-tested)."
   },
   "W19": {
     "status": "implemented",

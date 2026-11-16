@@ -591,3 +591,41 @@ describe('direct chat link (W28)', () => {
     expect(ended.body.code).toBe('SESSION_EXPIRED');
   });
 });
+
+describe('a visitor who keeps coming back', () => {
+  it('keeps their chat: each return moves the end of an anonymous session forward', async () => {
+    const visitor = new Visitor(slice.baseUrl, shop.brand.widgetId, shop.hostOrigin);
+    await visitor.open();
+    const ends = async () => {
+      const [session] = await withTenant(slice.app, { tenantId }, (tx) =>
+        tx
+          .select({ expiresAt: schema.widgetSessions.expiresAt })
+          .from(schema.widgetSessions)
+          .where(
+            and(
+              eq(schema.widgetSessions.principalId, fromPublicId('customer', visitor.principalId)),
+              isNull(schema.widgetSessions.revokedAt),
+            ),
+          ),
+      );
+      return session?.expiresAt.getTime() ?? 0;
+    };
+    const first = await ends();
+    // As if the visitor came back a while later.
+    await withTenant(slice.app, { tenantId }, (tx) =>
+      tx
+        .update(schema.widgetSessions)
+        .set({ expiresAt: new Date(first - 20 * 86_400_000) })
+        .where(
+          eq(schema.widgetSessions.principalId, fromPublicId('customer', visitor.principalId)),
+        ),
+    );
+    const back = await visitor.call('POST', '/v1/widget/sessions/refresh', {
+      refreshToken: visitor.refreshToken,
+    });
+    expect(back.status).toBe(200);
+    expect(back.body.principal.id).toBe(visitor.principalId);
+    // 30 days from now again, not what was left.
+    expect(await ends()).toBeGreaterThanOrEqual(first);
+  });
+});

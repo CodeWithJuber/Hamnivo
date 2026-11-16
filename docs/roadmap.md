@@ -16,8 +16,8 @@ moved it, and production let that model answer. Six phases, each pushed when don
 |---|---|---|
 | A | **The AI really answers**: production never lets the test model answer; one-click **Make the assistant live**; the brand's website read without setup | Done, see below |
 | B | **It never repeats**: a draft the customer read is posted; the prompt always ends with the customer; attachment-only messages; follow-up chips without echo; draft restarts; resync | Done, see below |
-| C | **Memory that works**: OpenAI-strict extraction schema, retries, wording, consent in the welcome area, anonymous sessions that last, memory carried over at sign-in | Next |
-| D | **It acts**: hand over, ticket, contact details, knowledge search, buttons, page links; which page the visitor is on; WHMCS tools granted and kept signed in | Planned |
+| C | **Memory that works**: OpenAI-strict extraction schema, retries, wording, consent in the welcome area, anonymous sessions that last, memory carried over at sign-in | Done in part, see below |
+| D | **It acts**: hand over, ticket, contact details, knowledge search, buttons, page links; which page the visitor is on; WHMCS tools granted and kept signed in | Next |
 | E | **A clean, Tawk-like chat**: home with the team, reply time, one clear action; fewer header buttons | Planned |
 | F | **Shopify and WooCommerce orders** | Planned, after A–E |
 
@@ -46,6 +46,26 @@ moved it, and production let that model answer. Six phases, each pushed when don
 
 - The customer's own message shown twice, and repeats after a reload, did not reproduce on the
   real stack with streaming and follow-ups on; `repeat.spec.ts` now guards both.
+
+### Phase C, done in part
+
+Memory did nothing in production mostly because of phase A: it was off on every agent and the
+test model answered. **Make the assistant live** turns it on (customers are still asked, once, in
+the chat). What would still have stopped it with a real model:
+
+| What | Where | Checked by |
+|---|---|---|
+| **Extraction works with every provider.** The schema the model fills had optional fields and length rules, which OpenAI's strict structured output refuses (every extraction would have failed, silently). Every field is now present (null where none) and the limits are checked on the answer. | `memory/extraction.service.ts` (`ExtractionAnswer`), `domain/src/memory/extraction.ts` | `memory-extraction.test.ts` (the schema itself) |
+| **A busy model is tried again.** A retry reused the first attempt's key and was refused as already started; each attempt now has its own, and the agent's fallback models are tried while one is busy. | `memory/extraction.service.ts` | `memory.int.test.ts` (fails without the change) |
+| **It looks for what is worth remembering.** The instructions asked only for what a customer "explicitly asked to remember"; they now ask for facts and preferences the customer states about themselves, for the listed keys. | `memory/extraction.service.ts` | — (needs a real model) |
+| **No raw `[M1]` in a streamed draft.** | `runtime/stream-gate.ts` | `live-reply.test.ts` |
+| **A returning visitor keeps their memory.** An anonymous session lasts 30 days from its last use instead of 30 days from the first. | `widget/sessions.service.ts` | `front-door.int.test.ts` |
+
+- Not done:
+  - Carrying an anonymous visitor's memory over when they sign in. On a shared computer it would
+    give one person's memory to whoever signs in next, so it needs the owner's decision first.
+  - A running summary for chats longer than the agent's history window (20 messages).
+  - A list of what extraction found or skipped in Studio (only logged, as counts).
 
 ## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
 

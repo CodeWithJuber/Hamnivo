@@ -26,6 +26,13 @@ describe('what of a reply may show while it is written', () => {
     expect(gate.shown).toBe('Returns are free. Refunds take five days.\n Ask us.');
   });
 
+  it('leaves memory markers out as well', () => {
+    const gate = new SentenceGate(() => true);
+    expect(gate.push('You told us you like email [M')).toBe('');
+    expect(gate.push('1]. We will write there.')).toBe('You told us you like email.');
+    expect(gate.end()).toBe(' We will write there.');
+  });
+
   it('holds everything back from the first sentence a check would stop', () => {
     const gate = new SentenceGate(draftPasses);
     expect(gate.push('Thanks for waiting. ')).toBe('Thanks for waiting.');

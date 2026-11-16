@@ -37,7 +37,9 @@ function memoryModel() {
     extractions: number;
     answer: string | null;
     extraction: ((input: ExtractionInput) => unknown) | null;
-  } = { replySystem: '', extractions: 0, answer: null, extraction: null };
+    /** Extraction calls still to refuse as a busy provider would (HTTP 429). */
+    busy: number;
+  } = { replySystem: '', extractions: 0, answer: null, extraction: null, busy: 0 };
   const model: LanguageModelV4 = {
     ...base,
     async doGenerate(call) {
@@ -45,6 +47,13 @@ function memoryModel() {
       const result = await base.doGenerate(call);
       if (system.includes(MEMORY_EXTRACTION_MARKER)) {
         state.extractions += 1;
+        if (state.busy > 0) {
+          state.busy -= 1;
+          throw Object.assign(new Error('Too many requests'), {
+            name: 'AI_APICallError',
+            statusCode: 429,
+          });
+        }
         if (!state.extraction) return result;
         const input = JSON.parse(textOf(call.prompt, 'user')) as ExtractionInput;
         const text = JSON.stringify(state.extraction(input));
@@ -364,6 +373,23 @@ describe('writing through the independent policy (L01, L02, L07)', () => {
         .where(eq(schema.memoryEmbeddings.memoryId, record?.id ?? '')),
     );
     expect(vectors).toHaveLength(1);
+  });
+
+  it('tries again when the model was busy, and remembers on the next try', async () => {
+    const dina = await anonymous();
+    await dina.consent('granted');
+    models.state.busy = 1;
+    const before = models.state.extractions;
+    await dina.say('Please answer in Urdu from now on.');
+    expect(models.state.extractions).toBe(before + 1);
+    expect(await dina.records()).toEqual([]);
+    // The outbox tries again after its back-off; each try is a call of its own.
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    await slice.drain();
+    expect(models.state.extractions).toBe(before + 2);
+    expect((await dina.records()).map((r) => [r.key, r.payload])).toEqual([
+      ['preferred_language', { value: 'Urdu' }],
+    ]);
   });
 
   it('refuses sensitive categories, secrets, authority claims and invented evidence', async () => {

@@ -373,6 +373,12 @@ export class WidgetSessionsService {
           previousRefreshHash: current ? session.refreshHash : session.previousRefreshHash,
           generation: session.generation + 1,
           lastUsedAt: now,
+          // A visitor who keeps coming back keeps their chat and what it remembers: an anonymous
+          // session lasts WIDGET_SESSION_DAYS from its last use. A signed-in one ends when the
+          // website's sign-in says (the identity assertion).
+          ...(session.identityKeyId
+            ? {}
+            : { expiresAt: new Date(now.getTime() + this.config.WIDGET_SESSION_DAYS * 86_400_000) }),
         })
         .where(eq(schema.widgetSessions.id, session.id))
         .returning();
