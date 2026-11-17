@@ -44,8 +44,8 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
+          package-manager-cache: false
           node-version: 24
-          cache: pnpm
           registry-url: https://registry.npmjs.org
 
       # The tag is read from the environment, never put into the script text.
