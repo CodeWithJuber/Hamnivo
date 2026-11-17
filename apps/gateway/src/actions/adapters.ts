@@ -25,6 +25,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { moneyText } from '../commerce/common.js';
 import type { AppConfig } from '../config.js';
+import { StoreTools } from '../connectors/store-tools.service.js';
 import { ToolCallFailure } from '../connectors/tool-call-failure.js';
 import { WhmcsTools } from '../connectors/whmcs-tools.service.js';
 import { EgressService } from '../developer/egress.service.js';
@@ -196,6 +197,7 @@ export class ToolAdapters {
     private readonly credentials: McpCredentials,
     private readonly secrets: SecretBroker,
     private readonly whmcs: WhmcsTools,
+    private readonly stores: StoreTools,
   ) {}
 
   /** Demo tools are offered outside production, or where demos are switched on. */
@@ -224,7 +226,11 @@ export class ToolAdapters {
 
   /** The action as it would be proposed: its resource, revision, changes and amount. */
   async prepare(tx: TenantTx, tool: ToolRow, args: Args, scope: ToolScope): Promise<Prepared> {
-    if (tool.source === 'native') return this.whmcs.prepare(tx, tool, args, scope);
+    if (tool.source === 'native') {
+      return tool.resourceType === 'store'
+        ? this.stores.prepare(tx, tool, args, scope)
+        : this.whmcs.prepare(tx, tool, args, scope);
+    }
     if (tool.source === 'http') return this.prepareHttp(tx, tool, args);
     if (tool.source === 'mcp') {
       return {
@@ -436,7 +442,11 @@ export class ToolAdapters {
     scope: ToolScope,
     options: { idempotencyKey: string; signal: AbortSignal },
   ): Promise<ToolOutcome> {
-    if (tool.source === 'native') return this.whmcs.execute(tool, args, scope, options);
+    if (tool.source === 'native') {
+      return tool.resourceType === 'store'
+        ? this.stores.execute(tool, args, scope, options)
+        : this.whmcs.execute(tool, args, scope, options);
+    }
     if (tool.source === 'http') return this.executeHttp(tool, args, scope, options);
     if (tool.source === 'mcp') {
       const { serverId, endpoint } = await this.mcpEndpoint(tool, scope);

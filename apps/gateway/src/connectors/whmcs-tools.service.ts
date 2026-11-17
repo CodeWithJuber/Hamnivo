@@ -124,6 +124,7 @@ export class WhmcsTools {
       !hostAllowed(new URL(connection.baseUrl).hostname, tool.egressHosts)
     )
       throw denied();
+    if (connection.kind !== 'whmcs' || !connection.identityKeyId) throw denied();
     const [key] = await tx
       .select()
       .from(schema.brandIdentityKeys)
@@ -140,6 +141,7 @@ export class WhmcsTools {
         ),
       );
     if (!binding || binding.expiresAt <= this.clock()) throw denied();
+    if (!connection.identifierSecretId) throw denied();
     const credentials = {
       identifier: await this.secrets.reveal(tx, scope.tenantId, connection.identifierSecretId),
       secret: await this.secrets.reveal(tx, scope.tenantId, connection.tokenSecretId),
@@ -198,7 +200,8 @@ export class WhmcsTools {
     if (
       grant?.enabled !== 'yes' ||
       grant.capability !== inspected.capability ||
-      grant.version !== connection.grantVersion
+      grant.version !== connection.grantVersion ||
+      !connection.identityKeyId
     )
       throw denied();
     const [key] = await tx

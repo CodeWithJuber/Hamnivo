@@ -24158,6 +24158,14 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "whmcs",
+                              "shopify",
+                              "woocommerce"
+                            ]
+                          },
                           "key": {
                             "type": "string",
                             "enum": [
@@ -24171,7 +24179,9 @@
                               "upgrade.quote",
                               "upgrade.request",
                               "cancellation.request",
-                              "refund.handoff"
+                              "refund.handoff",
+                              "orders.read",
+                              "order.status"
                             ]
                           },
                           "title": {
@@ -24198,6 +24208,7 @@
                           }
                         },
                         "required": [
+                          "kind",
                           "key",
                           "title",
                           "description",
@@ -24286,7 +24297,11 @@
                           },
                           "kind": {
                             "type": "string",
-                            "const": "whmcs"
+                            "enum": [
+                              "whmcs",
+                              "shopify",
+                              "woocommerce"
+                            ]
                           },
                           "label": {
                             "type": "string"
@@ -24317,7 +24332,9 @@
                                 "upgrade.quote",
                                 "upgrade.request",
                                 "cancellation.request",
-                                "refund.handoff"
+                                "refund.handoff",
+                                "orders.read",
+                                "order.status"
                               ]
                             }
                           },
@@ -24346,9 +24363,16 @@
                             ]
                           },
                           "identityKeyId": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -24390,7 +24414,7 @@
       },
       "post": {
         "operationId": "createConnector",
-        "summary": "Create WHMCS connection and capability grants",
+        "summary": "Create a WHMCS, Shopify or WooCommerce connection and its capability grants",
         "tags": [
           "Connectors"
         ],
@@ -24434,7 +24458,11 @@
                   },
                   "kind": {
                     "type": "string",
-                    "const": "whmcs"
+                    "enum": [
+                      "whmcs",
+                      "shopify",
+                      "woocommerce"
+                    ]
                   },
                   "label": {
                     "type": "string",
@@ -24476,7 +24504,9 @@
                         "upgrade.quote",
                         "upgrade.request",
                         "cancellation.request",
-                        "refund.handoff"
+                        "refund.handoff",
+                        "orders.read",
+                        "order.status"
                       ]
                     }
                   }
@@ -24486,9 +24516,7 @@
                   "kind",
                   "label",
                   "baseUrl",
-                  "identifier",
                   "secret",
-                  "identityKeyId",
                   "capabilities"
                 ]
               }
@@ -24515,7 +24543,11 @@
                     },
                     "kind": {
                       "type": "string",
-                      "const": "whmcs"
+                      "enum": [
+                        "whmcs",
+                        "shopify",
+                        "woocommerce"
+                      ]
                     },
                     "label": {
                       "type": "string"
@@ -24546,7 +24578,9 @@
                           "upgrade.quote",
                           "upgrade.request",
                           "cancellation.request",
-                          "refund.handoff"
+                          "refund.handoff",
+                          "orders.read",
+                          "order.status"
                         ]
                       }
                     },
@@ -24575,9 +24609,16 @@
                       ]
                     },
                     "identityKeyId": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -24614,7 +24655,7 @@
     "/v1/admin/connectors/{connectionId}/test": {
       "post": {
         "operationId": "testConnector",
-        "summary": "Test WHMCS API credential",
+        "summary": "Test a connection’s API credential",
         "tags": [
           "Connectors"
         ],
@@ -24794,7 +24835,9 @@
                               "upgrade.quote",
                               "upgrade.request",
                               "cancellation.request",
-                              "refund.handoff"
+                              "refund.handoff",
+                              "orders.read",
+                              "order.status"
                             ]
                           },
                           "configured": {
@@ -24856,7 +24899,7 @@
     "/v1/admin/connectors/{connectionId}/reconnect": {
       "post": {
         "operationId": "reconnectConnector",
-        "summary": "Rotate WHMCS credential and test it",
+        "summary": "Rotate a connection’s credential and test it",
         "tags": [
           "Connectors"
         ],
@@ -24906,7 +24949,6 @@
                   }
                 },
                 "required": [
-                  "identifier",
                   "secret"
                 ]
               }
@@ -24933,7 +24975,11 @@
                     },
                     "kind": {
                       "type": "string",
-                      "const": "whmcs"
+                      "enum": [
+                        "whmcs",
+                        "shopify",
+                        "woocommerce"
+                      ]
                     },
                     "label": {
                       "type": "string"
@@ -24964,7 +25010,9 @@
                           "upgrade.quote",
                           "upgrade.request",
                           "cancellation.request",
-                          "refund.handoff"
+                          "refund.handoff",
+                          "orders.read",
+                          "order.status"
                         ]
                       }
                     },
@@ -24993,9 +25041,16 @@
                       ]
                     },
                     "identityKeyId": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -25083,7 +25138,11 @@
                     },
                     "kind": {
                       "type": "string",
-                      "const": "whmcs"
+                      "enum": [
+                        "whmcs",
+                        "shopify",
+                        "woocommerce"
+                      ]
                     },
                     "label": {
                       "type": "string"
@@ -25114,7 +25173,9 @@
                           "upgrade.quote",
                           "upgrade.request",
                           "cancellation.request",
-                          "refund.handoff"
+                          "refund.handoff",
+                          "orders.read",
+                          "order.status"
                         ]
                       }
                     },
@@ -25143,9 +25204,16 @@
                       ]
                     },
                     "identityKeyId": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -25235,7 +25303,9 @@
                         "upgrade.quote",
                         "upgrade.request",
                         "cancellation.request",
-                        "refund.handoff"
+                        "refund.handoff",
+                        "orders.read",
+                        "order.status"
                       ]
                     }
                   },
@@ -25273,7 +25343,11 @@
                     },
                     "kind": {
                       "type": "string",
-                      "const": "whmcs"
+                      "enum": [
+                        "whmcs",
+                        "shopify",
+                        "woocommerce"
+                      ]
                     },
                     "label": {
                       "type": "string"
@@ -25304,7 +25378,9 @@
                           "upgrade.quote",
                           "upgrade.request",
                           "cancellation.request",
-                          "refund.handoff"
+                          "refund.handoff",
+                          "orders.read",
+                          "order.status"
                         ]
                       }
                     },
@@ -25333,9 +25409,16 @@
                       ]
                     },
                     "identityKeyId": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [

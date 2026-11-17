@@ -3,6 +3,9 @@ import { Timestamp } from './common.js';
 import { typeId } from './ids.js';
 import type { RouteDef } from './routes.js';
 
+/** WHMCS (billing and hosting), Shopify and WooCommerce (orders, read only). */
+export const ConnectorKind = z.enum(['whmcs', 'shopify', 'woocommerce']);
+export type ConnectorKind = z.infer<typeof ConnectorKind>;
 export const ConnectorCapability = z.enum([
   'invoices.read',
   'services.read',
@@ -15,9 +18,13 @@ export const ConnectorCapability = z.enum([
   'upgrade.request',
   'cancellation.request',
   'refund.handoff',
+  'orders.read',
+  'order.status',
 ]);
 export type ConnectorCapability = z.infer<typeof ConnectorCapability>;
 export const ConnectorCatalogItem = z.object({
+  /** The kind of connection that offers it. */
+  kind: ConnectorKind,
   key: ConnectorCapability,
   title: z.string(),
   description: z.string(),
@@ -27,7 +34,7 @@ export const ConnectorCatalogItem = z.object({
 export const ConnectorConnection = z.object({
   id: typeId('connection'),
   brandId: typeId('brand'),
-  kind: z.literal('whmcs'),
+  kind: ConnectorKind,
   label: z.string(),
   baseUrl: z.url(),
   status: z.enum(['active', 'disabled']),
@@ -35,20 +42,25 @@ export const ConnectorConnection = z.object({
   grantVersion: z.int().positive(),
   lastTestedAt: Timestamp.nullable(),
   lastError: z.string().nullable(),
-  identityKeyId: z.string().min(1).max(128),
+  /** WHMCS only: the identity key whose sign-ins the connection trusts. */
+  identityKeyId: z.string().min(1).max(128).nullable(),
 });
 export const CreateConnectorRequest = z.object({
   brandId: typeId('brand'),
-  kind: z.literal('whmcs'),
+  kind: ConnectorKind,
   label: z.string().trim().min(1).max(120),
+  /** WHMCS's or WooCommerce's public HTTPS root; a Shopify shop's `https://….myshopify.com/`. */
   baseUrl: z.url(),
-  identifier: z.string().min(1).max(512),
+  /** WHMCS API identifier or WooCommerce consumer key; not used for Shopify. */
+  identifier: z.string().min(1).max(512).optional(),
+  /** WHMCS API secret, WooCommerce consumer secret or Shopify Admin API access token. */
   secret: z.string().min(1).max(2048),
-  identityKeyId: z.string().min(1).max(128),
+  /** WHMCS only (required there): the identity key that signs customers in. */
+  identityKeyId: z.string().min(1).max(128).optional(),
   capabilities: z.array(ConnectorCapability).min(1),
 });
 export const ReconnectConnectorRequest = z.object({
-  identifier: z.string().min(1).max(512),
+  identifier: z.string().min(1).max(512).optional(),
   secret: z.string().min(1).max(2048),
 });
 export const UpdateConnectorGrantsRequest = z.object({
@@ -120,7 +132,7 @@ export const connectorRoutes = {
     method: 'post',
     path: '/v1/admin/connectors',
     operationId: 'createConnector',
-    summary: 'Create WHMCS connection and capability grants',
+    summary: 'Create a WHMCS, Shopify or WooCommerce connection and its capability grants',
     tags: ['Connectors'],
     auth: 'staff_session',
     body: CreateConnectorRequest,
@@ -131,7 +143,7 @@ export const connectorRoutes = {
     method: 'post',
     path: '/v1/admin/connectors/{connectionId}/test',
     operationId: 'testConnector',
-    summary: 'Test WHMCS API credential',
+    summary: 'Test a connection’s API credential',
     tags: ['Connectors'],
     auth: 'staff_session',
     params: id,
@@ -156,7 +168,7 @@ export const connectorRoutes = {
     method: 'post',
     path: '/v1/admin/connectors/{connectionId}/reconnect',
     operationId: 'reconnectConnector',
-    summary: 'Rotate WHMCS credential and test it',
+    summary: 'Rotate a connection’s credential and test it',
     tags: ['Connectors'],
     auth: 'staff_session',
     params: id,

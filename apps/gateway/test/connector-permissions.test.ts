@@ -54,6 +54,7 @@ beforeEach(() => {
           tenantId,
           brandId,
           workspaceId: newId(),
+          kind: 'whmcs',
           status: 'active',
           grantVersion: 1,
           baseUrl: 'https://billing.example.com/',

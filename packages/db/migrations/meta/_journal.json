@@ -582,6 +582,13 @@
       "when": 1794877955443,
       "tag": "20261117011235_staff_public_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1794888556209,
+      "tag": "20261117040916_store_connectors",
+      "breakpoints": true
     }
   ]
 }

@@ -1016,9 +1016,18 @@
       "integrations/php-sdk/src/functions.php",
       "integrations/php-sdk/tests/IdentityFixturesTest.php",
       "scripts/build-integrations.sh",
-      "docs/guide/integrations/README.md"
+      "docs/guide/integrations/README.md",
+      "packages/domain/src/connectors/stores.ts",
+      "packages/domain/test/stores.test.ts",
+      "packages/adapters/src/stores/client.ts",
+      "packages/adapters/test/stores.test.ts",
+      "apps/gateway/src/connectors/store-tools.service.ts",
+      "apps/gateway/test/store-tools.test.ts",
+      "apps/gateway/test/store-connectors.int.test.ts",
+      "apps/console/test/store-connectors.test.tsx",
+      "docs/guide/ai/connect-your-store.md"
     ],
-    "note": "One-click installs for four platforms, with a guide for each: a WordPress plugin (settings page, Test connection, verified customers for WordPress users and WooCommerce customers; tested in a real WordPress and WooCommerce on PHP 7.4 to 8.5), a WHMCS addon (loader, verified clients, optional product names; tested with stand-ins for WHMCS on PHP 7.4 to 8.5), a Shopify app embed (rendered with LiquidJS, and Shopify's Theme Check finds no offenses), and a Google Tag Manager template (run in a stand-in for its sandbox). All sign with a PHP SDK that matches @hamnivo/server byte for byte against its fixtures. pnpm build:integrations writes the zips and the template. Nothing is tried in a real WHMCS, Shopify store or Tag Manager yet, and the Shopify app and the Gallery listing need the owner's Partner and Google accounts."
+    "note": "One-click installs for four platforms, with a guide for each: a WordPress plugin (settings page, Test connection, verified customers for WordPress users and WooCommerce customers; tested in a real WordPress and WooCommerce on PHP 7.4 to 8.5), a WHMCS addon (loader, verified clients, optional product names; tested with stand-ins for WHMCS on PHP 7.4 to 8.5), a Shopify app embed (rendered with LiquidJS, and Shopify's Theme Check finds no offenses), and a Google Tag Manager template (run in a stand-in for its sandbox). All sign with a PHP SDK that matches @hamnivo/server byte for byte against its fixtures. pnpm build:integrations writes the zips and the template. Nothing is tried in a real WHMCS, Shopify store or Tag Manager yet, and the Shopify app and the Gallery listing need the owner's Partner and Google accounts. Shopify and WooCommerce orders, read only: a connection per store (Shopify Admin API token on the shop's myshopify.com address; WooCommerce REST key and secret), tested when it is made, with failures in plain words; the assistant reads a signed-in customer's recent orders by the email the website verified, or one order by its number and the email it was placed with (a wrong email reads exactly like an unknown order), and never sees an address, a phone or payment details. Only fixed queries and paths are sent, through the egress guard (adapters tested against fake Shopify and WooCommerce servers; the gateway integration-tested end to end against them; Studio forms unit-tested in English); no real store tried yet."
   },
   "L01": {
     "status": "implemented",

@@ -118,6 +118,22 @@ for `apps/site` and `integrations/php-sdk`, which it cannot run).
 | **A teammate's replies carry the first name and photo they chose**, the same rule as the home screen: in the live chat, its history and the emailed transcript. A Chatwoot user Hamnivo did not create shows as the first word of their name. Staff views keep the full name. | `authority/staff-faces.ts` (from `staff_authority_links`), `authority/views.ts`, `processor.service.ts`, `outbound.service.ts`, `widget/conversations.service.ts`, `widget/customer-emails.service.ts` | `inbox.int.test.ts` (live, history, staff view; fails without the change), `customer-surface.test.ts`, widget `team.test.tsx`, `journey.spec.ts` |
 | **The Studio channels journey** checks the Connectors row Channels sits in today (it looked for a "Settings pages" row Studio no longer has). | `apps/console/e2e/channels.spec.ts` | Studio e2e |
 
+### Phase F: Shopify and WooCommerce orders (read only)
+
+Owner's choice (2026-11-17): start without a test store; real stores stay unverified until there
+is one.
+
+| What | Where | Checked by |
+|---|---|---|
+| **Two reads, nothing else.** `orders.read`: a signed-in customer's recent orders, by the email the website verified. `order.status`: one order by its number and the email it was placed with; a wrong email reads exactly like an unknown order. Number, date, payment, delivery, tracking, item count and total; never an address, a phone or payment details. | `packages/domain/src/connectors/stores.ts` | `stores.test.ts` (domain) |
+| **Fixed calls through the egress guard.** Shopify Admin GraphQL (`2025-07`, two named queries, `X-Shopify-Access-Token`); WooCommerce REST `/wp-json/wc/v3/orders` (Basic auth, never in the address). Ten orders at most, bounded answers, failures as kinds (refused, not found, throttled, down). | `packages/adapters/src/stores/` | `stores.test.ts` (adapters, against fake servers) |
+| **Connections.** `connector_connections.kind` adds `shopify` and `woocommerce` (migration `20261117040916`; a Shopify connection has no identifier, and only WHMCS needs an identity key). Created, tested and reconnected like WHMCS, with what went wrong in plain words; both reads are created enabled, so **Make the assistant live** grants them. | `connectors.service.ts`, `store-tools.service.ts`, `actions/adapters.ts` | `store-connectors.int.test.ts` (fake stores), `store-tools.test.ts` |
+| **Studio.** Connectors shows WHMCS, Shopify and WooCommerce, each with its own form (shop address and token; site, consumer key and secret), in four languages. | `pages/ConnectorsPage.tsx`, `i18n/platform.ts` | `store-connectors.test.tsx` |
+| **Guide.** Where to get each key, what the assistant can say, and what each error means. | `docs/guide/ai/connect-your-store.md` | |
+
+- Not done: the order card in the chat (the assistant tells the order in words); a real Shopify
+  store or WooCommerce site.
+
 ## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
 
 The owner's ask: the customer chat should feel as finished as the chats people know from

@@ -38,6 +38,7 @@ import { IdempotencyService } from './common/idempotency.service.js';
 import type { AppConfig } from './config.js';
 import { ConnectorsController } from './connectors/connectors.controller.js';
 import { ConnectorsService } from './connectors/connectors.service.js';
+import { StoreTools } from './connectors/store-tools.service.js';
 import { WhmcsTools } from './connectors/whmcs-tools.service.js';
 import { StaffConversationsController } from './conversations/staff-conversations.controller.js';
 import { StaffConversationsService } from './conversations/staff-conversations.service.js';
@@ -301,6 +302,7 @@ export class ApiModule {
         AgencyService,
         ConnectorsService,
         WhmcsTools,
+        StoreTools,
         BrandingService,
         AiCreditsService,
         AnnotationsService,

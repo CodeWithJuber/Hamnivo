@@ -1,0 +1,5 @@
+ALTER TABLE "connector_connections" ALTER COLUMN "identifier_secret_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "connector_connections" ALTER COLUMN "identity_key_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "connector_connections" ADD CONSTRAINT "connector_connections_kind_ck" CHECK ("connector_connections"."kind" in ('whmcs', 'shopify', 'woocommerce'));--> statement-breakpoint
+ALTER TABLE "connector_connections" ADD CONSTRAINT "connector_connections_identifier_ck" CHECK ("connector_connections"."kind" = 'shopify' or "connector_connections"."identifier_secret_id" is not null);--> statement-breakpoint
+ALTER TABLE "connector_connections" ADD CONSTRAINT "connector_connections_identity_key_ck" CHECK ("connector_connections"."kind" <> 'whmcs' or "connector_connections"."identity_key_id" is not null);

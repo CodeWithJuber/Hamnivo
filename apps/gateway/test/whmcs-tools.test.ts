@@ -54,6 +54,7 @@ function setup(capability: keyof typeof WHMCS_SPEC = 'invoices.read') {
         {
           id: 'connection',
           brandId: 'brand',
+          kind: 'whmcs',
           status: 'active',
           grantVersion: 1,
           identityKeyId: 'key',
