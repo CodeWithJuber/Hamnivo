@@ -25,6 +25,7 @@ jobs:
       TURBO_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v7
+        id: checkout
 
       # The pnpm version comes from packageManager in package.json.
       - uses: pnpm/action-setup@v6
@@ -74,8 +75,12 @@ jobs:
       - name: Checks
         run: pnpm ci:local --with-production --with-autodeploy
 
-      - name: Keep the summary
-        if: always()
+      - name: Keep results on the compute runner
+        if: always() && steps.checkout.outcome == 'success' && runner.environment == 'self-hosted'
+        run: bash scripts/ci/archive-results.sh
+
+      - name: Keep results for the hosted runner override
+        if: always() && runner.environment == 'github-hosted'
         uses: actions/upload-artifact@v7
         with:
           name: ci-results

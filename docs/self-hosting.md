@@ -1251,8 +1251,13 @@ is never touched:
 
 - The built website in Chromium: every language at desktop and phone width, with an axe audit.
 
-The summary is written to `test-results/ci-local.md`. On GitHub it is kept as the run's
-`ci-results` artifact.
+The checks write `test-results/ci-local.md`. On the self-hosted runner, the Actions run summary shows the report and the archive path. The compute server retains the full `test-results/` archive for 14 days. To copy a run's archive from the capped runner over an existing SSH connection, use its run ID and attempt number:
+
+```bash
+ssh COMPUTE_HOST 'docker exec hamnivo-ci-runner-1 cat /home/runner/.cache/hamnivo-ci-results/ci-results-RUN_ID-ATTEMPT.tar.gz' > ci-results.tar.gz
+```
+
+The operator's SSH account needs access to the runner container. An explicitly selected GitHub-hosted runner keeps the existing `ci-results` Actions download for 14 days.
 
 ### Run the checks on GitHub
 
