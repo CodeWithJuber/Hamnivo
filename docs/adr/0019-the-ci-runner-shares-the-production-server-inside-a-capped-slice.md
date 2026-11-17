@@ -41,6 +41,10 @@ The pipeline wants about 8 GB.
     137), and a third lost its runner mid-step without a log, probably the same way. `pnpm ci:local` runs them with `--concurrency=1` whenever
     `HAMNIVO_CI_CONCURRENCY` is set, or with `HAMNIVO_CI_HEAVY_CONCURRENCY` when that is set.
     The other steps keep two tasks at a time.
+  - A run whose runner dies never runs its cleanup, so its databases, Chatwoot and smoke stacks
+    would hold the next run's memory. Every run starts by removing containers, volumes and
+    networks named like the checks' own (`hamnivo-check-`, `hamnivo-smoke-`,
+    `hamnivo-autodeploy-`, `hamnivo-https-test`), and prints what is left and the memory it sees.
 - **Credentials.** The runner registers once with a one-time token. It keeps its credentials in a
   folder only root can reach on the host. The runner's user id, 1001, belongs to another account
   there.
