@@ -25,4 +25,4 @@ trap 'rm -f -- "$temporary"' EXIT
 mv -- "$temporary" "$archive_dir/$archive"
 find "$archive_dir" -regextype posix-extended -maxdepth 1 -type f \
   -regex '.*/ci-results-[0-9]+-[0-9]+\.tar\.gz' -mmin +20160 -delete
-printf '\nFull results on the compute runner: `%s/%s` (14 days).\n' "$archive_dir" "$archive" >> "$GITHUB_STEP_SUMMARY"
+printf '\nFull results on the compute runner: %s/%s (14 days).\n' "$archive_dir" "$archive" >> "$GITHUB_STEP_SUMMARY"
