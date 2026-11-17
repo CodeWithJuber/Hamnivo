@@ -1021,6 +1021,9 @@ export function Chat(props: {
             {/* Focusable so keyboard users can scroll it even when no card has a control. */}
             <ThreadPrimitive.Viewport
               className="hv-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4"
+              // The home screen reads from the top (the greeting, who is online); a conversation
+              // keeps to its newest message.
+              autoScroll={!empty}
               tabIndex={0}
               aria-label={t('title')}
               data-testid="thread"
@@ -1120,7 +1123,9 @@ export function Chat(props: {
                 ) : null}
               </ul>
             </ThreadPrimitive.Viewport>
-            <JumpToLatest unread={state.unread} smooth={!props.display.reduced} />
+            {empty ? null : (
+              <JumpToLatest unread={state.unread} smooth={!props.display.reduced} />
+            )}
           </div>
           <div className="bg-bg px-3 pt-1 pb-[max(0.75rem,var(--hv-safe-bottom,env(safe-area-inset-bottom)))] [@media(max-height:26rem)]:pb-[max(0.25rem,var(--hv-safe-bottom,env(safe-area-inset-bottom)))]">
             {available ? <ShopBar commerce={props.commerce} locale={locale} /> : null}
