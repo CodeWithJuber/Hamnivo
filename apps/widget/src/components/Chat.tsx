@@ -1123,9 +1123,7 @@ export function Chat(props: {
                 ) : null}
               </ul>
             </ThreadPrimitive.Viewport>
-            {empty ? null : (
-              <JumpToLatest unread={state.unread} smooth={!props.display.reduced} />
-            )}
+            {empty ? null : <JumpToLatest unread={state.unread} smooth={!props.display.reduced} />}
           </div>
           <div className="bg-bg px-3 pt-1 pb-[max(0.75rem,var(--hv-safe-bottom,env(safe-area-inset-bottom)))] [@media(max-height:26rem)]:pb-[max(0.25rem,var(--hv-safe-bottom,env(safe-area-inset-bottom)))]">
             {available ? <ShopBar commerce={props.commerce} locale={locale} /> : null}
