@@ -118,10 +118,19 @@ describe('the workflow', () => {
     expect(workflow).not.toMatch(/branches:|pull_request|workflow_dispatch|schedule:/);
   });
 
-  it('uses the same runners and the same actions as ci.yml', () => {
+  it('keeps CI on the dedicated compute runner that owns its reports', () => {
     const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
-    const runner = /runs-on: (.*)$/m;
-    expect(runner.exec(workflow)?.[1]).toBe(runner.exec(ci)?.[1]);
+    expect(/runs-on: (.*)$/m.exec(ci)?.[1]).toBe('[self-hosted, linux, x64, hamnivo]');
+  });
+
+  it('defaults package publication to compute and preserves its optional runner override', () => {
+    expect(/runs-on: (.*)$/m.exec(workflow)?.[1]).toBe(
+      '${{ fromJSON(vars.HAMNIVO_CI_RUNNER || \'["self-hosted", "linux", "x64", "hamnivo"]\') }}',
+    );
+  });
+
+  it('uses the same actions as ci.yml', () => {
+    const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
     for (const action of ['actions/checkout@v7', 'pnpm/action-setup@v6', 'actions/setup-node@v7']) {
       expect(ci, action).toContain(action);
       expect(workflow, action).toContain(action);
