@@ -76,6 +76,21 @@ Customers who ask to talk to a person are told "a person from our team is online
 someone who can answer that brand is online. Otherwise they are told the team will reply. When you
 choose who to assign a chat to, each name shows whether that person is online, away or offline.
 
+## How customers see you
+
+While you are online, the chat's home screen shows customers who on the team is there: up to
+three people, each with a first name and a photo, and how soon your team usually replies.
+
+1. Open **Inbox**, then **Alerts** (the bell).
+2. Under **How customers see you**, type the **First name customers see**. Leave it empty to use
+   the first word of your name.
+3. Type a **Photo address**: an `https://` address of a square photo. Leave it empty to show your
+   initials.
+4. Press **Save**.
+
+Customers never see your full name or your email. "Usually replies in …" comes from your team's
+replies over the last 30 days, and is shown only once there are enough chats to say it.
+
 ## Typing
 
 You see **Maya is typing…** under the chat while the customer writes. The customer sees that you

@@ -4,6 +4,7 @@ import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import { Link } from '@tanstack/react-router';
 import { AlertTriangleIcon, CircleCheckIcon, OctagonPauseIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { GoLiveNotices } from '../components/agent/GoLiveNotices';
 import { AgentBadge, ConnectionBadge, OutcomeBadge } from '../components/Badges';
 import { InstallBadge } from '../components/InstallStatus';
 import { PageHeader, Section } from '../components/PageHeader';
@@ -381,6 +382,7 @@ export function OverviewPage() {
       />
       <DegradedNotice />
       {staffOnly && can('conversations.read') ? <YourChats /> : null}
+      <GoLiveNotices />
       <GetSetUp />
       {can('agents.read') ? <StopsSection /> : null}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">

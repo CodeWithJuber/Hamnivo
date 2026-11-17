@@ -26,6 +26,7 @@ import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import {
   ArrowDownIcon,
+  BrainIcon,
   MessagesSquareIcon,
   SettingsIcon,
   UserRoundIcon,
@@ -854,14 +855,6 @@ export function Chat(props: {
           locale={locale}
           onLocale={props.onLocale}
           disclosure={copy.aiDisclosure}
-          memory={
-            memoryShown
-              ? {
-                  pressed: view === 'memory',
-                  onToggle: () => (view === 'memory' ? back('hv-memory-open') : show('memory')),
-                }
-              : null
-          }
           menu={{
             id: moreId,
             open: more,
@@ -872,6 +865,22 @@ export function Chat(props: {
             },
             items: (
               <>
+                {/* Memory lives here, not in the header, so the header keeps to a few controls. */}
+                {memoryShown ? (
+                  <li>
+                    <Button
+                      id="hv-memory-open"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      aria-pressed={view === 'memory'}
+                      onClick={() => (view === 'memory' ? back('hv-more') : show('memory'))}
+                    >
+                      <BrainIcon className="size-4" aria-hidden="true" />
+                      {t('memory.open')}
+                    </Button>
+                  </li>
+                ) : null}
                 {hasOthers ? (
                   <li>
                     <Button
@@ -958,7 +967,7 @@ export function Chat(props: {
         ) : null}
         <Suspense fallback={<PanelLoading />}>
           {view === 'memory' ? (
-            <MemoryPanel controls={memory} onBack={() => back('hv-memory-open')} />
+            <MemoryPanel controls={memory} onBack={() => back('hv-more')} />
           ) : null}
           {view === 'settings' ? (
             <Settings
@@ -1012,6 +1021,9 @@ export function Chat(props: {
             {/* Focusable so keyboard users can scroll it even when no card has a control. */}
             <ThreadPrimitive.Viewport
               className="hv-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4"
+              // The home screen reads from the top (the greeting, who is online); a conversation
+              // keeps to its newest message.
+              autoScroll={!empty}
               tabIndex={0}
               aria-label={t('title')}
               data-testid="thread"
@@ -1067,6 +1079,8 @@ export function Chat(props: {
                   recent={others[0] ?? null}
                   onOpenRecent={(id) => void props.onOpenConversation(id)}
                   onAsk={(question) => void send(question)}
+                  team={config.team}
+                  onChat={() => document.getElementById('hv-composer')?.focus()}
                 />
               ) : null}
               {askConsent && remembered ? (
@@ -1109,7 +1123,7 @@ export function Chat(props: {
                 ) : null}
               </ul>
             </ThreadPrimitive.Viewport>
-            <JumpToLatest unread={state.unread} smooth={!props.display.reduced} />
+            {empty ? null : <JumpToLatest unread={state.unread} smooth={!props.display.reduced} />}
           </div>
           <div className="bg-bg px-3 pt-1 pb-[max(0.75rem,var(--hv-safe-bottom,env(safe-area-inset-bottom)))] [@media(max-height:26rem)]:pb-[max(0.25rem,var(--hv-safe-bottom,env(safe-area-inset-bottom)))]">
             {available ? <ShopBar commerce={props.commerce} locale={locale} /> : null}

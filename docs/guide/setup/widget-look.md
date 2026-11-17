@@ -4,6 +4,17 @@ You can change the colour, logo, words, light or dark, and the launcher button o
 it looks like your business. Each brand has its own look. You see a picture of the chat change
 as you type, and nothing reaches your customers until you press **Publish**.
 
+## The home screen
+
+Before a customer writes, the chat shows your greeting in your main colour. While someone on your
+team is online, it shows who, with their photos (or initials) and first names, and how soon your
+team usually replies. One **Chat with us** button takes the customer straight to the message box.
+Each teammate chooses their own first name and photo
+([how](../inbox/sounds-and-notifications.md#how-customers-see-you)).
+
+The top of the chat keeps to a few controls: language, **More** and close (and, on a computer,
+**Make the chat larger**). Memory, past chats and settings are in **More**.
+
 ## Open the editor
 
 1. Open **Settings** in the menu, then **Chat widget**.

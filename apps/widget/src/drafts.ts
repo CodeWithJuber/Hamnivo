@@ -27,6 +27,13 @@ export const DRAFT_EVENTS: ReadonlySet<string> = new Set([
 
 export const draftText = (draft: Draft) => draft.pieces.join('');
 
+/**
+ * Drafts of a run that ended without its reply naming them (a withdrawal missed while the stream
+ * was reconnecting): nothing of that run can still become a reply.
+ */
+export const dropRun = (drafts: readonly Draft[], runId: string): readonly Draft[] =>
+  drafts.some((d) => d.runId === runId) ? drafts.filter((d) => d.runId !== runId) : drafts;
+
 const text = (value: unknown) => (typeof value === 'string' ? value : null);
 
 /** Applies one live event to the drafts on screen; unrelated events change nothing. */

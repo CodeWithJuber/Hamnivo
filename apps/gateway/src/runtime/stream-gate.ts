@@ -10,7 +10,8 @@
 
 /** Where a sentence or a line ends: closing punctuation before a space, or a line break. */
 const BOUNDARY = /[.!?…।؟۔](?=\s)|\n/g;
-const CITATION = / ?\[\d{1,2}\]/g;
+/** Knowledge `[2]` and memory `[M1]` markers: the published reply turns them into sources. */
+const CITATION = / ?\[M?\d{1,2}\]/g;
 
 export class SentenceGate {
   /** What the model wrote, all of it. */

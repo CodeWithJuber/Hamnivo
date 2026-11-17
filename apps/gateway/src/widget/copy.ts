@@ -169,6 +169,8 @@ export interface ConfigContext {
   direct?: boolean;
   /** False when this customer is blocked (H20); the widget says only that chat is unavailable. */
   chatAvailable?: boolean;
+  /** Who is online (first name and photo only) and how soon people usually reply (W17). */
+  team?: WidgetConfig['team'];
 }
 
 const LOCALES: Locale[] = ['en', 'ar', 'hi', 'ur'];
@@ -280,6 +282,7 @@ export function widgetConfig(
     },
     locales: { default: 'en', available: ['en', 'ar', 'hi', 'ur'] },
     copy,
+    ...(options.team ? { team: options.team } : {}),
     availability,
     features: {
       attachments: settings.attachments.enabled && options.filesScannable !== false,

@@ -40,6 +40,19 @@ export const WidgetConfig = z
         privacyNotice: z.string().max(500).nullable(),
       }),
     ),
+    /**
+     * Who on the team is online now (at most three: the first name and photo each chose, never
+     * more), and how soon people usually reply, in minutes (the brand's median over 30 days; null
+     * until there are enough chats to say). Left out by a gateway from before it.
+     */
+    team: z
+      .object({
+        online: z
+          .array(z.object({ name: z.string().max(40), photoUrl: z.url().max(500).nullable() }))
+          .max(3),
+        replyMinutes: z.int().positive().nullable(),
+      })
+      .optional(),
     availability: z.object({
       /** True only when an actual human route exists right now (W11). */
       humanAvailable: z.boolean(),

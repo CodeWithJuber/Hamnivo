@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Timestamp } from './common.js';
 import { typeId } from './ids.js';
+import { HttpsUrl } from './setup.js';
 
 /**
  * Alerts, unread chats, availability and typing in the staff inbox. What a person chose is kept
@@ -80,6 +81,30 @@ export type InboxPreferences = z.infer<typeof InboxPreferences>;
 export const SetAvailabilityRequest = z
   .object({ status: AvailabilityStatus })
   .meta({ id: 'SetAvailabilityRequest' });
+
+/**
+ * What customers see of you in the chat while you are online (W17): a first name and a photo.
+ * Nothing else about you (your full name, your email) reaches the chat.
+ */
+export const StaffPublicProfile = z
+  .object({
+    /** The name you chose; null: the first word of your display name. */
+    publicName: z.string().trim().min(1).max(40).nullable(),
+    /** An https address of your photo; null: your initials. */
+    photoUrl: HttpsUrl.nullable(),
+    /** The name customers see now. */
+    shownAs: z.string(),
+  })
+  .meta({ id: 'StaffPublicProfile' });
+export type StaffPublicProfile = z.infer<typeof StaffPublicProfile>;
+
+/** Change what customers see of you; only what you send changes, null clears it. */
+export const UpdateStaffPublicProfile = z
+  .object({
+    publicName: z.string().trim().min(1).max(40).nullable().optional(),
+    photoUrl: HttpsUrl.nullable().optional(),
+  })
+  .meta({ id: 'UpdateStaffPublicProfile' });
 
 /** Studio's sign of life, every 30 seconds while it is open. */
 export const AvailabilityPing = z

@@ -4196,6 +4196,73 @@
         }
       }
     },
+    "/v1/admin/agents/{agentId}/go-live": {
+      "post": {
+        "operationId": "goLiveAgent",
+        "summary": "Make the agent answer for real: a real model, its brand’s knowledge, memory, then publish (agents.manage and agents.publish, fresh sign-in)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentId",
+            "schema": {
+              "type": "string",
+              "description": "Agent ID (agt_…)"
+            },
+            "required": true,
+            "description": "Agent ID (agt_…)"
+          },
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoLiveAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/model-connections": {
       "get": {
         "operationId": "listModelConnections",
@@ -13325,6 +13392,108 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbox/profile": {
+      "get": {
+        "operationId": "getMyPublicProfile",
+        "summary": "What customers see of you in the chat: a first name and a photo (conversations.read)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your public profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffPublicProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateMyPublicProfile",
+        "summary": "Change the first name and photo customers see; only what you send changes",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStaffPublicProfile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Your public profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffPublicProfile"
                 }
               }
             }
@@ -34480,6 +34649,10 @@
           "tools": {
             "default": {},
             "$ref": "#/components/schemas/AgentTools"
+          },
+          "actions": {
+            "default": {},
+            "$ref": "#/components/schemas/AgentActions"
           }
         },
         "required": [
@@ -34611,6 +34784,27 @@
           "toolId"
         ]
       },
+      "AgentActions": {
+        "type": "object",
+        "properties": {
+          "handoff": {
+            "default": false,
+            "type": "boolean"
+          },
+          "choices": {
+            "default": false,
+            "type": "boolean"
+          },
+          "contact": {
+            "default": false,
+            "type": "boolean"
+          },
+          "search": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      },
       "UpdateAgentRequest": {
         "type": "object",
         "properties": {
@@ -34654,6 +34848,16 @@
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991
+          }
+        }
+      },
+      "GoLiveAgentRequest": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "description": "modelConnection identifier (TypeID with prefix \"mcn\")",
+            "example": "mcn_01j9zk7w3xq8r4t2v6m5n1p0cd"
           }
         }
       },
@@ -36744,6 +36948,35 @@
         "required": [
           "staffMemberIds"
         ]
+      },
+      "UpdateStaffPublicProfile": {
+        "type": "object",
+        "properties": {
+          "publicName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "photoUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "UpdateInboxAlertSettings": {
         "type": "object",
@@ -41674,6 +41907,58 @@
               "hi",
               "ur"
             ]
+          },
+          "team": {
+            "type": "object",
+            "properties": {
+              "online": {
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "photoUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 500,
+                          "format": "uri"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "photoUrl"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "replyMinutes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "online",
+              "replyMinutes"
+            ],
+            "additionalProperties": false
           },
           "availability": {
             "type": "object",
@@ -53667,6 +53952,7 @@
                   "ai_blocked",
                   "ai_escalated",
                   "channel_ai_off",
+                  "no_live_model",
                   "ai_limit",
                   "offer_accepted",
                   "sla_moved"
@@ -54575,6 +54861,7 @@
                   "ai_blocked",
                   "ai_escalated",
                   "channel_ai_off",
+                  "no_live_model",
                   "ai_limit",
                   "offer_accepted",
                   "sla_moved"
@@ -56336,6 +56623,44 @@
         "required": [
           "conversationId",
           "state"
+        ],
+        "additionalProperties": false
+      },
+      "StaffPublicProfile": {
+        "type": "object",
+        "properties": {
+          "publicName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "photoUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shownAs": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "publicName",
+          "photoUrl",
+          "shownAs"
         ],
         "additionalProperties": false
       },
@@ -72213,6 +72538,9 @@
           },
           "tools": {
             "$ref": "#/components/schemas/AgentToolsOutput"
+          },
+          "actions": {
+            "$ref": "#/components/schemas/AgentActionsOutput"
           }
         },
         "required": [
@@ -72227,7 +72555,8 @@
           "limits",
           "knowledgeSourceIds",
           "memory",
-          "tools"
+          "tools",
+          "actions"
         ],
         "additionalProperties": false
       },
@@ -72364,6 +72693,34 @@
         "required": [
           "toolId",
           "autopilot"
+        ],
+        "additionalProperties": false
+      },
+      "AgentActionsOutput": {
+        "type": "object",
+        "properties": {
+          "handoff": {
+            "default": false,
+            "type": "boolean"
+          },
+          "choices": {
+            "default": false,
+            "type": "boolean"
+          },
+          "contact": {
+            "default": false,
+            "type": "boolean"
+          },
+          "search": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "handoff",
+          "choices",
+          "contact",
+          "search"
         ],
         "additionalProperties": false
       },

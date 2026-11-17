@@ -50,6 +50,19 @@ body {
 .hv-hero {
   background-color: var(--hv-header-to);
 }
+/* The team on the home screen and its one action (W17): in the header's colours, reversed. */
+.hv-team-avatar {
+  color: var(--hv-header-from);
+  background-color: var(--hv-header-fg);
+  --tw-ring-color: var(--hv-header-to);
+}
+.hv-hero .hv-hero-action {
+  color: var(--hv-header-from);
+  background-color: var(--hv-header-fg);
+}
+.hv-hero .hv-hero-action:hover {
+  background-color: color-mix(in srgb, var(--hv-header-fg) 88%, var(--hv-header-from));
+}
 [data-header="plain"] :is(.hv-header, .hv-hero) {
   color: var(--hv-text);
   background-color: var(--hv-surface);

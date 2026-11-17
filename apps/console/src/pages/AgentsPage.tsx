@@ -17,6 +17,7 @@ import { PlusIcon } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppDialog, DialogFooter } from '../components/AppDialog';
+import { GoLiveNotices } from '../components/agent/GoLiveNotices';
 import { AgentBadge } from '../components/Badges';
 import { CheckboxField, SelectField, TextField } from '../components/Fields';
 import { PageHeader } from '../components/PageHeader';
@@ -449,6 +450,7 @@ export function AgentsPage() {
         description={t('agents.description')}
         actions={create}
       />
+      <GoLiveNotices />
       <QueryState
         query={agents}
         label={t('agents.loading')}

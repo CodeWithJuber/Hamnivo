@@ -28,6 +28,7 @@ export const slaUr: SlaTranslation = {
       ai_limit: 'AI اپنی حد تک پہنچ گیا',
       staff_release: 'قطار میں واپس رکھی گئی',
       channel_ai_off: 'اس چینل پر AI جواب نہیں دیتا',
+      no_live_model: 'AI ٹیسٹ ماڈل پر ہے، جو ہر بار ایک ہی جواب دیتا ہے',
       sla_moved: 'منتقل کی گئی: کسی نے وقت پر جواب نہیں دیا',
       other: 'کسی انسان کا انتظار',
     },

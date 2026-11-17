@@ -30,6 +30,7 @@ export const slaEn = {
       ai_limit: 'The AI reached its limit',
       staff_release: 'Put back in the queue',
       channel_ai_off: 'The AI does not answer on this channel',
+      no_live_model: 'The AI is on the test model, which gives a fixed reply',
       sla_moved: 'Moved: nobody replied in time',
       other: 'Waiting for a person',
     },

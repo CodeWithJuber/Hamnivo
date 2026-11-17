@@ -97,6 +97,12 @@ export const staffMembers = pgTable(
     authUserId: text('auth_user_id').notNull(),
     displayName: text('display_name').notNull(),
     email: citext('email').notNull(),
+    /**
+     * What customers see of this person in the chat (W17): a first name they chose, and an https
+     * photo address. Null: the first word of the display name, and initials.
+     */
+    publicName: text('public_name'),
+    photoUrl: text('photo_url'),
     status: text('status', { enum: ['invited', 'active', 'suspended', 'removed'] })
       .notNull()
       .default('invited'),

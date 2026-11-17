@@ -21,6 +21,25 @@ describe('questions offered after an answer', () => {
     expect(followUpsOf('')).toEqual([]);
   });
 
+  it('offers only questions, never the customer’s question or the answer said back', () => {
+    const question = 'Where is my order?';
+    const answer = 'Your order ships today. It arrives on Thursday.';
+    expect(
+      followUpsOf(
+        [
+          'Customer: Where is my order?',
+          'Answer: Your order ships today.',
+          'It arrives on Thursday.',
+          'where is my order',
+          'Q: Can I change the delivery address?',
+          'Do you ship to Lahore؟',
+          'Thank you',
+        ].join('\n'),
+        [question, answer],
+      ),
+    ).toEqual(['Can I change the delivery address?', 'Do you ship to Lahore؟']);
+  });
+
   it('answers in the script of the answer for tests and the mock provider', () => {
     expect(followUpsOf(mockFollowUps('Your order ships today.'))).toHaveLength(2);
     expect(mockFollowUps('طلبك في الطريق')).toMatch(/[؀-ۿ]/);

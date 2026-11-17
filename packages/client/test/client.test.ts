@@ -349,6 +349,41 @@ describe('outbox', () => {
     outbox.dispose();
   });
 
+  it('sends the page each message was written on, the same on every retry', async () => {
+    const bodies: Array<{ clientMessageId: string; context?: unknown }> = [];
+    let busy = 1;
+    server.use(
+      http.post(`${API}/v1/widget/sessions`, () => HttpResponse.json(session(), { status: 201 })),
+      http.post(`${API}/v1/widget/conversations/:id/messages`, async ({ request }) => {
+        const body = (await request.json()) as { clientMessageId: string; context?: unknown };
+        bodies.push(body);
+        if (busy > 0) {
+          busy -= 1;
+          return problem(503, 'AUTHORITY_UNAVAILABLE', true);
+        }
+        return HttpResponse.json(
+          { status: 'accepted', message: { id: 'msg_1', clientMessageId: body.clientMessageId } },
+          { status: 202 },
+        );
+      }),
+    );
+    const c = client();
+    await c.connect();
+    c.pageContext = { url: 'https://noor.example/plans/pro', title: 'Pro plan' };
+    const outbox = new Outbox(c, 'conv_1', () => 5);
+    const item = outbox.enqueue('Is this plan right for me?');
+    // The visitor moves on before the retry: the message keeps the page it was written on.
+    c.pageContext = { url: 'https://noor.example/checkout', title: 'Checkout' };
+    await expect
+      .poll(() => outbox.messages.find((m) => m.clientMessageId === item.clientMessageId)?.state)
+      .toBe('accepted');
+    expect(bodies.map((b) => b.context)).toEqual([
+      { url: 'https://noor.example/plans/pro', title: 'Pro plan' },
+      { url: 'https://noor.example/plans/pro', title: 'Pro plan' },
+    ]);
+    outbox.dispose();
+  });
+
   it('keeps unsent messages across a reload and resends them with the same id', async () => {
     const storage = new MemoryStorage();
     let online = false;

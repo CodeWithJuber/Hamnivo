@@ -1,11 +1,11 @@
 import type { LanguageModelV4 } from '@ai-sdk/provider';
 import { createLanguageModel, ModelConfigError } from '@hamnivo/adapters/models';
 import { guardedFetch } from '@hamnivo/adapters/net';
-import type { ModelChoice, ModelProviderKind } from '@hamnivo/contracts';
-import { type Db, fromPublicId, schema, type TenantTx, withTenant } from '@hamnivo/db';
+import { type ModelChoice, type ModelProviderKind, recommendedModel } from '@hamnivo/contracts';
+import { type Db, fromPublicId, schema, type TenantTx, toPublicId, withTenant } from '@hamnivo/db';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { LanguageModel } from 'ai';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { meteredModel } from '../billing/ai-credits.model.js';
 import {
   type AiAttemptSpec,
@@ -81,6 +81,55 @@ export class ModelFactory {
     private readonly credits: AiCreditsService,
     @Optional() @Inject(LANGUAGE_MODEL) private readonly override?: LanguageModel,
   ) {}
+
+  /**
+   * The offline test model may not answer customers here: production, unless ALLOW_MOCK_MODEL is
+   * set. It answers every question with the same fixed text.
+   */
+  testModelBarred(choice: Pick<ModelChoice, 'provider'>): boolean {
+    if (choice.provider !== 'mock') return false;
+    return !(this.config.ALLOW_MOCK_MODEL ?? this.config.NODE_ENV !== 'production');
+  }
+
+  /** The platform's own model, when the server has a key: the first of Anthropic, OpenAI, Google. */
+  platformChoice(): ModelChoice | null {
+    for (const provider of ['anthropic', 'openai', 'google'] as const) {
+      const modelId = recommendedModel(provider);
+      if (this.platform(provider) && modelId) return { provider, modelId };
+    }
+    return null;
+  }
+
+  /**
+   * A real model to answer customers with: the workspace's own key (the one named, or its newest
+   * active one), else the platform's. Null when there is none, or a key whose model cannot be
+   * told (an OpenAI-compatible server with no model listed).
+   */
+  async liveChoice(tx: TenantTx, connectionId?: string): Promise<ModelChoice | null> {
+    const rows = await tx
+      .select()
+      .from(schema.modelConnections)
+      .where(
+        and(
+          eq(schema.modelConnections.status, 'active'),
+          ...(connectionId
+            ? [eq(schema.modelConnections.id, fromPublicId('modelConnection', connectionId))]
+            : []),
+        ),
+      )
+      .orderBy(desc(schema.modelConnections.createdAt));
+    for (const row of rows) {
+      const modelId = row.allowedModels[0] ?? recommendedModel(row.provider);
+      if (modelId) {
+        return {
+          provider: row.provider,
+          modelId,
+          connectionId: toPublicId('modelConnection', row.id),
+        };
+      }
+    }
+    return connectionId ? null : this.platformChoice();
+  }
 
   private platform(provider: ModelProviderKind): { apiKey?: string; baseURL?: string } | null {
     const c = this.config;

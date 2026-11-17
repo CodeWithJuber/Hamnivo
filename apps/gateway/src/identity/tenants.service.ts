@@ -24,6 +24,7 @@ import { applyPlan, NO_PLAN, planByKey, trialEnd } from '../billing/plans.js';
 import { AppError } from '../common/app-error.js';
 import { isUniqueViolation } from '../common/pg-error.js';
 import type { AppConfig } from '../config.js';
+import { readBrandWebsite } from '../knowledge/web/brand-website.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { type Mailer, sendTemplate } from '../platform/mailer.js';
 import { SignupPolicy } from '../platform/signup.js';
@@ -396,6 +397,18 @@ export class TenantsService {
             widgetPublicId: toPublicId('widget', newId()),
             allowedOrigins: input.brand.website ? [new URL(input.brand.website).origin] : [],
           });
+          // Its AI learns its website without setup.
+          await readBrandWebsite(
+            tx,
+            {
+              id: brandId,
+              tenantId,
+              workspaceId: workspace?.id as string,
+              allowedOrigins: input.brand.website ? [new URL(input.brand.website).origin] : [],
+            },
+            { staffId: null },
+            this.clock(),
+          );
           // The tenant.created handler sets up its Chatwoot account; Studio shows it queued.
           if (
             this.config.CHATWOOT_AUTO_PROVISION &&

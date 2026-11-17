@@ -94,6 +94,8 @@ function sectionLabel(t: TFunction, key: SectionKey): string {
       return t('editor.sections.memory');
     case 'tools':
       return t('tools.grants.title');
+    case 'actions':
+      return t('editor.sections.actions');
   }
 }
 
@@ -788,6 +790,23 @@ function Editor({ detail }: { detail: AgentDetail }) {
                 />
               </div>
             ) : null}
+          </FormSection>
+
+          <FormSection id="section-actions" title={t('editor.sections.actions')}>
+            <p className="text-sm text-text-secondary">{t('editor.actions.intro')}</p>
+            {(['handoff', 'choices', 'contact', 'search'] as const).map((key) => (
+              <CheckboxField
+                key={key}
+                id={FIELD_IDS.action(key)}
+                label={t(`editor.actions.${key}`)}
+                hint={t(`editor.actions.${key}Hint`)}
+                checked={form.actions[key]}
+                disabled={!editable}
+                onCheckedChange={(checked) =>
+                  update({ actions: { ...form.actions, [key]: checked } })
+                }
+              />
+            ))}
           </FormSection>
 
           <FormSection id="tools" title={t('tools.grants.title')}>

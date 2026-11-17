@@ -4,9 +4,11 @@ import {
   InboxPreferences,
   SetAvailabilityRequest,
   StaffAvailability,
+  StaffPublicProfile,
   TypingRequest,
   UnreadSummary,
   UpdateInboxAlertSettings,
+  UpdateStaffPublicProfile,
 } from './inbox-alerts.js';
 import type { RouteDef } from './routes.js';
 
@@ -20,6 +22,25 @@ const tag = ['Inbox'];
  * X-Hamnivo-Tenant and `conversations.read` somewhere; what a person chose here is theirs alone.
  */
 export const inboxAlertRoutes = {
+  getMyPublicProfile: {
+    method: 'get',
+    path: '/v1/inbox/profile',
+    operationId: 'getMyPublicProfile',
+    summary: 'What customers see of you in the chat: a first name and a photo (conversations.read)',
+    tags: tag,
+    auth: 'staff_session',
+    success: { status: 200, description: 'Your public profile', schema: StaffPublicProfile },
+  },
+  updateMyPublicProfile: {
+    method: 'patch',
+    path: '/v1/inbox/profile',
+    operationId: 'updateMyPublicProfile',
+    summary: 'Change the first name and photo customers see; only what you send changes',
+    tags: tag,
+    auth: 'staff_session',
+    body: UpdateStaffPublicProfile,
+    success: { status: 200, description: 'Your public profile', schema: StaffPublicProfile },
+  },
   getInboxPreferences: {
     method: 'get',
     path: '/v1/inbox/preferences',

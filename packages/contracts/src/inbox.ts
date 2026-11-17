@@ -63,6 +63,8 @@ export const OwnerReason = z.enum([
   'ai_blocked',
   'ai_escalated',
   'channel_ai_off',
+  /** The agent is on the offline test model, which production does not let answer customers. */
+  'no_live_model',
   'ai_limit',
   'offer_accepted',
   /** Nobody replied in time, so Hamnivo moved it back to the queue or to another team (H12). */

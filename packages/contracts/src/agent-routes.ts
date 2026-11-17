@@ -6,6 +6,7 @@ import {
   CreateAgentRequest,
   CreateKillSwitchRequest,
   CreateModelConnectionRequest,
+  GoLiveAgentRequest,
   KillSwitch,
   ModelConnection,
   PublishAgentRequest,
@@ -97,6 +98,19 @@ export const agentRoutes = {
     auth: 'staff_session',
     params: agentParams,
     body: PublishAgentRequest,
+    success: { status: 200, description: 'Published', schema: AgentDetail },
+  },
+  goLiveAgent: {
+    method: 'post',
+    path: '/v1/admin/agents/{agentId}/go-live',
+    operationId: 'goLiveAgent',
+    summary:
+      'Make the agent answer for real: a real model, its brand’s knowledge, memory, then publish ' +
+      '(agents.manage and agents.publish, fresh sign-in)',
+    tags: ['Agents'],
+    auth: 'staff_session',
+    params: agentParams,
+    body: GoLiveAgentRequest,
     success: { status: 200, description: 'Published', schema: AgentDetail },
   },
   listModelConnections: {

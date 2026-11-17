@@ -5,6 +5,113 @@ features as published on 2026-11-05 (tawk.to/features, /add-ons, developer.tawk.
 come from [`feature-status.md`](feature-status.md) and the code. Effort: S ≤ 1 day, M ≤ 1 week,
 L > 1 week.
 
+## A real AI that acts, remembers and never repeats (started 2026-11-16)
+
+After the advanced chat below was deployed, the owner reported from production: every answer was
+the same ("Thank you for your message. I am an AI assistant…"), memory did nothing, nothing was
+agentic. Cause: every brand's default agent starts on the offline test model, adding an AI key never
+moved it, and production let that model answer. Six phases, each pushed when done.
+
+| Phase | What | Status |
+|---|---|---|
+| A | **The AI really answers**: production never lets the test model answer; one-click **Make the assistant live**; the brand's website read without setup | Done, see below |
+| B | **It never repeats**: a draft the customer read is posted; the prompt always ends with the customer; attachment-only messages; follow-up chips without echo; draft restarts; resync | Done, see below |
+| C | **Memory that works**: OpenAI-strict extraction schema, retries, wording, consent in the welcome area, anonymous sessions that last, memory carried over at sign-in | Done in part, see below |
+| D | **It acts**: hand over, ticket, contact details, knowledge search, buttons, page links; which page the visitor is on; WHMCS tools granted and kept signed in | Done in part, see below |
+| E | **A clean, Tawk-like chat**: home with the team, reply time, one clear action; fewer header buttons | Done, see below |
+| F | **Shopify and WooCommerce orders** | Planned, after A–E |
+
+### Phase A, done
+
+| What | Where | Checked by |
+|---|---|---|
+| **No fake assistant in production.** With `ALLOW_MOCK_MODEL` unset, production refuses to publish an agent on `hamnivo-mock` (it says why and what to do), and an agent already published on it hands each conversation to people with the reason `no_live_model` and a staff note. Development and tests keep the mock. | `runtime/models.ts` (`testModelBarred`), `agents.service.ts`, `replies.service.ts`, `handoff-notes.ts`, contracts `OwnerReason` | `go-live.int.test.ts` |
+| **Make the assistant live, in one click.** `POST /v1/admin/agents/{id}/go-live`: a real model (the key named, the workspace's newest key with its first allowed or recommended model, else the server's), every knowledge source of the brand, memory on, then the usual publish checks and publish, audited (`wentLive`). Asked again it keeps a real model and brings in new knowledge. With a server key, a new brand's agent starts on the server's recommended model. | `agents.service.ts` `goLive`, `models.ts` `liveChoice`, `platformChoice` | `go-live.int.test.ts` (no key, a workspace key, a server key, twice) |
+| **Studio says it in red, with the fix.** Each brand whose assistant is on the test model or not published gets a red card on Home, AI agents and AI models (and after adding a key in setup) with **Make the assistant live**; without a key it links to AI models. | `components/agent/GoLiveNotices.tsx`, `i18n/go-live/*` | `go-live.test.tsx` (4) |
+| **The website is the AI's knowledge without setup.** A brand's first `https` website (never `localhost`, an IP address or a reserved test name) is added as a public web source and read at once, within the workspace's limit; going live attaches it. | `knowledge/web/brand-website.ts`, `admin/brands.service.ts`, `identity/tenants.service.ts` | `go-live.int.test.ts` |
+
+- Not checked here: answers from a live Anthropic, OpenAI or Google model (no key in this
+  container; a scripted model stands in). On production: open Home and press **Make the assistant
+  live**.
+
+### Phase B, done
+
+| What | Where | Checked by |
+|---|---|---|
+| **A reply the customer was reading is posted.** It used to be dropped when they wrote again, and the next reply then wrote the same answer a second time. Now only a reply with nothing shown yet gives way to one answer for the burst. | `replies.service.ts` | `streaming.int.test.ts` (fails without the change) |
+| **The model's history ends with the customer.** A reply posted after the customer's newest message goes just before it; a message of files only is `[sent a file: name]`, so the last question is never "already answered". The knowledge search reads it too. | `runtime/prompt.ts` (`historyMessages`, `messageText`) | `runtime.test.ts` |
+| **Drafts restart cleanly.** On any step that called a tool (whatever finish reason the provider gave), on a time-out mid-step (its pre-tool words are never published) and when a fallback model takes over. | `replies.service.ts` `streamed`, `callModels` | `live-reply.test.ts`, `streaming.int.test.ts` |
+| **Next questions never echo.** Only lines that are questions; `Customer:`/`Answer:` labels removed; nothing equal to the question or found in the answer. | `domain/src/follow-ups.ts`, `follow-ups.service.ts` | `follow-ups.test.ts` |
+| **The widget shows each thing once.** A draft whose run ended is dropped after a moment, a reconnect clears drafts, late words of an ended run are ignored, and a changed message (its next questions arrived) keeps its place. | widget `useChat.ts`, `drafts.ts` | `drafts.test.ts`, `history-order.test.ts`, `repeat.spec.ts` (two questions at once, a reload mid-answer) |
+
+- The customer's own message shown twice, and repeats after a reload, did not reproduce on the
+  real stack with streaming and follow-ups on; `repeat.spec.ts` now guards both.
+
+### Phase C, done in part
+
+Memory did nothing in production mostly because of phase A: it was off on every agent and the
+test model answered. **Make the assistant live** turns it on (customers are still asked, once, in
+the chat). What would still have stopped it with a real model:
+
+| What | Where | Checked by |
+|---|---|---|
+| **Extraction works with every provider.** The schema the model fills had optional fields and length rules, which OpenAI's strict structured output refuses (every extraction would have failed, silently). Every field is now present (null where none) and the limits are checked on the answer. | `memory/extraction.service.ts` (`ExtractionAnswer`), `domain/src/memory/extraction.ts` | `memory-extraction.test.ts` (the schema itself) |
+| **A busy model is tried again.** A retry reused the first attempt's key and was refused as already started; each attempt now has its own, and the agent's fallback models are tried while one is busy. | `memory/extraction.service.ts` | `memory.int.test.ts` (fails without the change) |
+| **It looks for what is worth remembering.** The instructions asked only for what a customer "explicitly asked to remember"; they now ask for facts and preferences the customer states about themselves, for the listed keys. | `memory/extraction.service.ts` | — (needs a real model) |
+| **No raw `[M1]` in a streamed draft.** | `runtime/stream-gate.ts` | `live-reply.test.ts` |
+| **A returning visitor keeps their memory.** An anonymous session lasts 30 days from its last use instead of 30 days from the first. | `widget/sessions.service.ts` | `front-door.int.test.ts` |
+
+- Not done:
+  - Carrying an anonymous visitor's memory over when they sign in. On a shared computer it would
+    give one person's memory to whoever signs in next, so it needs the owner's decision first.
+  - A running summary for chats longer than the agent's history window (20 messages).
+  - A list of what extraction found or skipped in Studio (only logged, as counts).
+
+### Phase D, done in part
+
+| What | Where | Checked by |
+|---|---|---|
+| **The assistant acts while answering** (`AgentConfig.actions`, in the agent editor; all on with **Make the assistant live**): hands over with its summary, offers answers to tap (a `choices` card on its reply, which the widget already draws), notes contact details on the contact and in a staff note, searches the knowledge again (twice at most, cited like the rest). Carried out only once its reply is posted. | `runtime/assistant-actions.ts`, `replies.service.ts` (`carryOut`), `authority/views.ts`, Studio `AgentEditorPage.tsx`, `lib/agent-form.ts` | `assistant-actions.int.test.ts` (4), `assistant-actions.test.ts` (3), `agent-actions.test.ts` (2) |
+| **It knows the page.** The loader sends the page's address (no query or fragment) and title on load and on every change; each message carries the page it was written on, the same on a retry; the model gets it as one fenced line, and such an answer is not cached. | `widget-loader/src/loader.ts`, `client/src/outbox.ts`, `client.ts`, widget `App.tsx`, `runtime/prompt.ts` (`pageLine`) | `runtime.test.ts`, `client.test.ts`, `assistant-actions.int.test.ts` |
+| **Read-only tools are granted** by **Make the assistant live** (order and invoice look-ups of a connected system); tools that change something stay for the owner, with their approvals. | `agents.service.ts` `goLive` | `go-live.int.test.ts` |
+| **WHMCS keeps a signed-in customer linked** for the session's lifetime instead of the assertion's five minutes; changes still need their approval with a fresh sign-in. | `widget/sessions.service.ts` | `whmcs-tools.test.ts` (unchanged rules); no WHMCS integration test |
+
+- Not done: a ticket made by the assistant (the contact form makes tickets; a hand-off reaches
+  people), links the assistant shares as cards (it writes links in its reply), and acting on the
+  page itself (by decision 5, only through what the customer taps).
+
+**Phases A–D results on 2026-11-16.** Gateway integration 879 of 879 (67 files, on PostgreSQL 16
+and Redis); gateway unit 321 of 321; Studio unit 753 of 753; widget unit 99 of 99 and `test:e2e`
+50 of 50 (with `repeat.spec.ts`); client 38 of 38; loader 38 of 38; domain 765 of 765; contracts
+46 of 46 with OpenAPI regenerated; layout audit 300 of 300 clean; `CHECK=api`, `live` and `sites`
+pass. Studio `test:e2e` 121 of 122: `channels.spec.ts:105` looks for a "Settings pages" menu the
+current Studio no longer has (not from these phases).
+
+### Phase E, done
+
+Owner's choices (2026-11-17): the team on the home screen with photo and first name; anonymous
+memory is **not** carried over at sign-in (privacy on shared computers); Shopify and WooCommerce
+wait for a test store.
+
+| What | Where | Checked by |
+|---|---|---|
+| **How customers see a teammate.** Each person sets a first name and an https photo in Studio (Inbox → Alerts → How customers see you); otherwise the first word of their name, and initials. `GET`/`PATCH /v1/inbox/profile`, audited without the values. | `staff_members.public_name`, `photo_url` (migration `20261117011235`), `inbox/availability.service.ts`, `pages/inbox/PublicProfile.tsx` | `team.int.test.ts`, `public-profile.test.tsx` |
+| **The team on the home screen.** Up to three online people (photo or initials, first names), "Sara and Ali are online", "Usually replies in 5 minutes" (median time to a person's first reply over 30 days, above the reports' smallest group, cached an hour per brand), and one **Chat with us** button to the message box. Never a full name or an email. | `WidgetConfig.team`, `widget/sessions.service.ts`, widget `Home.tsx`, `shell/TeamAvatars.tsx` | `team.int.test.ts`, `team.test.tsx` (four languages), layout audit |
+| **A calmer header.** Language, More and close (and larger where the website allows); memory moved into More with past chats and settings. | `shell/Header.tsx`, `Chat.tsx` | `memory.spec.ts` (opens More first) |
+
+- Not done: a teammate's photo next to their replies in the conversation (replies still show
+  their name; their photo needs the reply's sender linked to the teammate on both the history and
+  the live paths). The language picker stays in the header: it is how visitors who read Arabic or
+  Urdu find their language, and 11 browser journeys use it there.
+- Found by the screenshots and fixed: with the team row the home screen grew taller than a
+  desktop chat, and it opened scrolled to its bottom like a conversation (greeting half hidden).
+  It now reads from the top.
+
+**Phase E results on 2026-11-17.** Gateway integration 882 of 882 (68 files); gateway unit 321 of
+321; Studio unit 754 of 754; widget unit 102 of 102 and `test:e2e` 50 of 50; layout audit 300 of
+300 clean with the team on home at every size; `forge verify`: all 24 suites pass (INCOMPLETE only
+for `apps/site` and `integrations/php-sdk`, which it cannot run).
+
 ## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
 
 The owner's ask: the customer chat should feel as finished as the chats people know from

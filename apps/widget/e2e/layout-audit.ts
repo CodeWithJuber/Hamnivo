@@ -214,6 +214,14 @@ function session(scenario: Scenario) {
         launcherPosition: 'bottom-right',
         ...(brandLook ? { theme: 'dark', headerStyle: 'plain' } : {}),
       },
+      // Who is online, as on the home screen (W17): two people, one without a photo.
+      team: {
+        online: [
+          { name: 'Sara', photoUrl: null },
+          { name: 'Ali', photoUrl: null },
+        ],
+        replyMinutes: 5,
+      },
       locales: { default: 'en', available: ['en', 'ar', 'hi', 'ur'] },
       copy: Object.fromEntries(
         ['en', 'ar', 'hi', 'ur'].map((l) => [

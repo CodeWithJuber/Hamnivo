@@ -279,6 +279,11 @@ export class WidgetSessionsService {
       widgetId: brand.widgetPublicId,
       verified: principal.kind === 'verified',
     });
+    // Who customers see is online (a first name and photo each), and so whether anyone is.
+    const online = await this.availability.onlineTeam(tx, session.tenantId, {
+      workspaceId: brand.workspaceId,
+      brandId: brand.id,
+    });
     return {
       accessToken: access.token,
       accessTokenExpiresAt: access.expiresAt.toISOString(),
@@ -290,10 +295,11 @@ export class WidgetSessionsService {
       },
       config: widgetConfig(brand as BrandRow, this.clock(), surface, {
         filesScannable: filesScannable(this.config),
-        staffOnline: await this.availability.anyOnline(tx, session.tenantId, {
-          workspaceId: brand.workspaceId,
-          brandId: brand.id,
-        }),
+        staffOnline: online.length > 0,
+        team: {
+          online,
+          replyMinutes: await this.availability.replyMinutes(tx, session.tenantId, brand.id),
+        },
         consentRequired: consent.required,
         consentGiven: consent.given,
         direct: session.hostOrigin === DIRECT_ORIGIN,
@@ -373,6 +379,14 @@ export class WidgetSessionsService {
           previousRefreshHash: current ? session.refreshHash : session.previousRefreshHash,
           generation: session.generation + 1,
           lastUsedAt: now,
+          // A visitor who keeps coming back keeps their chat and what it remembers: an anonymous
+          // session lasts WIDGET_SESSION_DAYS from its last use. A signed-in one ends when the
+          // website's sign-in says (the identity assertion).
+          ...(session.identityKeyId
+            ? {}
+            : {
+                expiresAt: new Date(now.getTime() + this.config.WIDGET_SESSION_DAYS * 86_400_000),
+              }),
         })
         .where(eq(schema.widgetSessions.id, session.id))
         .returning();
@@ -533,6 +547,10 @@ export class WidgetSessionsService {
               eq(schema.connectorConnections.status, 'active'),
             ),
           );
+        // The link lasts as long as the signed-in session it comes with, not the five minutes
+        // of the assertion that proved it: a customer who stays on one page keeps their tools.
+        // Changes still need the customer's approval with a fresh sign-in.
+        const linkedUntil = new Date(now.getTime() + this.config.WIDGET_SESSION_DAYS * 86_400_000);
         for (const connection of connections)
           await tx
             .insert(schema.connectorIdentityBindings)
@@ -543,7 +561,7 @@ export class WidgetSessionsService {
               principalId: principal.id,
               userId: whmcs.userId,
               clientId: whmcs.clientId,
-              expiresAt: new Date(payload.exp * 1000),
+              expiresAt: linkedUntil,
             })
             .onConflictDoUpdate({
               target: [
@@ -554,7 +572,7 @@ export class WidgetSessionsService {
               set: {
                 userId: whmcs.userId,
                 clientId: whmcs.clientId,
-                expiresAt: new Date(payload.exp * 1000),
+                expiresAt: linkedUntil,
                 updatedAt: now,
               },
             });

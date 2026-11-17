@@ -80,6 +80,7 @@ export const reportsUr: ReportsTranslation = {
       no_agent: 'کوئی AI ایجنٹ شائع نہیں تھا',
       assist_mode: 'AI صرف جوابات تجویز کرتا ہے',
       channel_ai_off: 'اس چینل پر AI جواب نہیں دیتا',
+      no_live_model: 'AI ٹیسٹ ماڈل پر ہے، جو ہر بار ایک ہی جواب دیتا ہے',
       staff_takeover: 'کسی انسان نے سنبھالا',
       staff_reply: 'کسی انسان نے جواب دیا',
       staff_assign: 'کسی انسان کو سونپی گئی',

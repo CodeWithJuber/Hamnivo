@@ -66,6 +66,12 @@ import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import { AuthorityContactsService } from '../widget/contacts.service.js';
 import { WorkflowContextReader } from '../workflows/context-reader.service.js';
 import { type ActiveAgent, AgentsService } from './agents.service.js';
+import {
+  type AssistantEffects,
+  actionRules,
+  assistantTools,
+  newEffects,
+} from './assistant-actions.js';
 import { FOLLOW_UPS_TOPIC, type FollowUpsEvent } from './follow-ups.service.js';
 import {
   type AiHandoffReason,
@@ -80,7 +86,9 @@ import { ModelFactory, ModelUnavailableError } from './models.js';
 import {
   applyCitations,
   historyMessages,
+  messageText,
   type PromptOptions,
+  pageLine,
   promptVersion,
   systemPrompt,
 } from './prompt.js';
@@ -115,6 +123,8 @@ interface Generated {
   memories: MemoryPartRef[];
   /** Commerce data the reply's receipt check read (X10), which keeps it out of caches (K06). */
   liveData: ModuleDataClass[];
+  /** What the assistant asked to do besides replying, carried out once the reply is posted. */
+  effects: AssistantEffects;
 }
 
 /**
@@ -140,9 +150,10 @@ interface GenerateOutcome {
 /** The customer's most recent words in a conversation. */
 function latestCustomerText(history: AuthorityMessage[]): string {
   const incoming = history
-    .filter((m) => m.direction === 'incoming' && !m.private && m.text?.trim())
+    .filter((m) => m.direction === 'incoming' && !m.private && messageText(m))
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || Number(a.ref) - Number(b.ref));
-  return incoming.at(-1)?.text?.trim() ?? '';
+  const latest = incoming.at(-1);
+  return latest ? messageText(latest) : '';
 }
 
 /** The conversation as it stood at one of the customer's messages: nothing that came after it. */
@@ -369,14 +380,24 @@ interface ModelResult {
  */
 async function streamed(run: ReturnType<typeof streamText>, live: LiveReply): Promise<ModelResult> {
   let failure: unknown;
+  /** This step called a tool: what it wrote is not the reply, whatever finish reason it gave. */
+  let calledTool = false;
   for await (const part of run.fullStream) {
     if (part.type === 'text-delta') live.write(part.text);
-    else if (part.type === 'tool-call') await live.step('tool', 'started');
-    else if (part.type === 'tool-result' || part.type === 'tool-error')
+    else if (part.type === 'tool-call') {
+      calledTool = true;
+      await live.step('tool', 'started');
+    } else if (part.type === 'tool-result' || part.type === 'tool-error')
       await live.step('tool', 'finished');
-    else if (part.type === 'finish-step' && part.finishReason === 'tool-calls')
-      await live.restart('superseded');
-    else if (part.type === 'error' && failure === undefined) failure = part.error;
+    else if (part.type === 'finish-step') {
+      if (calledTool || part.finishReason === 'tool-calls') await live.restart('superseded');
+      calledTool = false;
+    } else if (part.type === 'error' && failure === undefined) failure = part.error;
+    // Stopped by the time limit: the steps done so far are not an answer (their text may be the
+    // words before a tool call), so this fails as generateText would.
+    else if (part.type === 'abort' && failure === undefined) {
+      failure = new DOMException('The model call ran out of time.', 'TimeoutError');
+    }
   }
   if (failure !== undefined) throw failure;
   const [text, totalUsage, finishReason, steps] = await Promise.all([
@@ -553,7 +574,9 @@ export class RepliesService {
     if (await this.skipIfSuperseded(tenantId, run.id, payload)) return;
     // The AI cannot answer, so people have the conversation. Someone at risk is still looked for
     // once that hand-off is committed, and still gets the safety wording and an urgent note.
-    const handOffAndGuard = async (reason: 'no_agent' | 'assist_mode' | 'ai_stopped') => {
+    const handOffAndGuard = async (
+      reason: 'no_agent' | 'assist_mode' | 'ai_stopped' | 'no_live_model',
+    ) => {
       const handedOffAt = await this.handOff(tenantId, control, run.id, payload.epoch, reason);
       if (handedOffAt === null) return;
       await this.guardAfterHandoff({
@@ -569,6 +592,12 @@ export class RepliesService {
     };
     if (agent?.config.mode !== 'answer') {
       await handOffAndGuard(agent ? 'assist_mode' : 'no_agent');
+      return;
+    }
+    // The offline test model answers every question with the same text: in production a person
+    // answers instead, and Studio says how to make the assistant live.
+    if (this.models.testModelBarred(agent.config.model)) {
+      await handOffAndGuard('no_live_model');
       return;
     }
     if (context.stopped) {
@@ -794,6 +823,7 @@ export class RepliesService {
           refs: cached.answer.refs,
           memories: cached.answer.memories ?? [],
           liveData: [],
+          effects: newEffects(),
         };
       } else {
         // The agent's granted tools (G07, G08), cancelled with the run or when someone takes over.
@@ -898,8 +928,14 @@ export class RepliesService {
         latencyMs: generated.latencyMs,
       };
       // The customer may have written again while the model was working: that message's job
-      // answers both, so this reply is dropped (R05: one AI reply per burst of messages).
-      if (await this.skipIfSuperseded(tenantId, run.id, payload, telemetry)) {
+      // answers both, so this reply is dropped (R05: one AI reply per burst of messages). Not
+      // once the customer has read it being written: it is posted, and the newer message gets
+      // its own answer, with this one before it (otherwise the same answer would be written
+      // again).
+      if (
+        live.currentDraft === null &&
+        (await this.skipIfSuperseded(tenantId, run.id, payload, telemetry))
+      ) {
         live.reason = 'superseded';
         return;
       }
@@ -913,6 +949,7 @@ export class RepliesService {
         sources: generated.sources,
         displayName: agent.config.displayName,
         ...(generated.memories.length ? { memories: generated.memories } : {}),
+        ...(generated.effects.choices ? { choices: generated.effects.choices } : {}),
       };
       const reserved = await this.tx(tenantId, async (tx) => {
         const locked = await this.ownership.lock(tx, payload.conversationId);
@@ -1020,9 +1057,79 @@ export class RepliesService {
           });
         }
       });
+      // What the assistant asked to do besides replying, now that its reply is out.
+      await this.carryOut(
+        tenantId,
+        runtime,
+        control,
+        run.id,
+        payload.epoch,
+        ref,
+        generated.effects,
+      );
     } finally {
       unsubscribeStop();
       await live.close();
+    }
+  }
+
+  /**
+   * The assistant's actions, once its reply is posted (AgentConfig.actions): the contact details
+   * the customer gave go on their contact and in a note for the team; a hand-off gives the
+   * conversation to people with the assistant's summary. A failure here loses nothing the
+   * customer saw: it is logged, and the reply stands.
+   */
+  private async carryOut(
+    tenantId: string,
+    runtime: ConnectionRuntime,
+    control: ControlRow,
+    runId: string,
+    epoch: number,
+    ref: string,
+    effects: AssistantEffects,
+  ): Promise<void> {
+    if (effects.contact) {
+      const { name, email, phone } = effects.contact;
+      const lines = [
+        'The customer gave contact details to the assistant:',
+        ...(name ? [`Name: ${name}`] : []),
+        ...(email ? [`Email: ${email}`] : []),
+        ...(phone ? [`Phone: ${phone}`] : []),
+      ];
+      try {
+        const state = await runtime.authority.getState(ref);
+        if (state.contactRef) {
+          // Typed by the customer, never verified: an attribute, so it never merges contacts.
+          await runtime.authority.updateContact(state.contactRef, {
+            ...(name ? { name } : {}),
+            attributes: {
+              ...(email ? { hv_email_given: email } : {}),
+              ...(phone ? { hv_phone_given: phone } : {}),
+            },
+          });
+        }
+        await runtime.authority.appendMessage({
+          conversationRef: ref,
+          key: `hv1:n:${uuidV5(control.id, `contact:${runId}`)}`,
+          author: { kind: 'integration' },
+          visibility: 'private',
+          text: lines.join('\n'),
+        });
+      } catch (error) {
+        this.logger.warn(`contact details not noted for ${control.id}: ${String(error)}`);
+      }
+    }
+    if (effects.handoff) {
+      await this.handOff(
+        tenantId,
+        control,
+        runId,
+        epoch,
+        'ai_escalated',
+        undefined,
+        {},
+        `The assistant passed this conversation to people: ${effects.handoff.summary}`,
+      );
     }
   }
 
@@ -2069,17 +2176,33 @@ export class RepliesService {
     const { messages: history, view } =
       fetched ?? (await this.history(tenantId, runtime, context.control));
     const config: AgentConfig = agent.config;
-    const messages = historyMessages(history, config.limits.historyMessages);
     const assist = config.mode === 'assist';
+    const messages = historyMessages(history, config.limits.historyMessages, {
+      endWithCustomer: !assist,
+    });
     const live = options.live ?? null;
     const retrieved = await this.retrieve(tenantId, runId, context, config, history, live);
-    // Passages that do not help are dropped before the model sees them (live check only).
-    const passages =
-      (await options.checks?.passages({
+    // Passages that do not help are dropped before the model sees them (live check only). A
+    // search the assistant makes while answering adds to this list (search_knowledge).
+    const passages = [
+      ...((await options.checks?.passages({
         messages: history,
         passages: retrieved,
         language: options.language,
-      })) ?? retrieved;
+      })) ?? retrieved),
+    ];
+    // What the assistant may do besides replying (AgentConfig.actions): never for staff drafts.
+    const actions = assist
+      ? null
+      : {
+          ...config.actions,
+          search: config.actions.search && config.knowledgeSourceIds.length > 0,
+        };
+    const actionText = actions ? actionRules(actions) : '';
+    // Where the customer is on the website, for answers (never staff drafts). An answer that
+    // depends on the page is never reused for another.
+    const page = assist ? '' : pageLine(history);
+    if (page && outcome) outcome.cacheable = false;
     // Customer memory (G19): only with the customer's consent, in scope and currently valid.
     const memories =
       recalled ??
@@ -2106,6 +2229,8 @@ export class RepliesService {
       systemPrompt(config, context.brandName, passages, options) +
       (workflow ? `\n\n${workflow.text}` : '') +
       (memories.length ? `\n\n${memoryBlock(memories)}` : '') +
+      (actionText ? `\n\n${actionText}` : '') +
+      (page ? `\n\n${page}` : '') +
       (assist
         ? '\n\nYou are writing a suggested reply for a support agent to review. Write only the reply.'
         : '');
@@ -2118,6 +2243,17 @@ export class RepliesService {
     };
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const system = correction ? `${base}\n\n${correction}` : base;
+      // Each attempt asks anew: what a rejected attempt asked for is not carried out.
+      const effects = newEffects();
+      const assistant =
+        actions && actionText
+          ? {
+              effects,
+              tools: assistantTools(actions, effects, passages, (query) =>
+                this.searchKnowledge(tenantId, context, config, query),
+              ),
+            }
+          : null;
       const generated = await this.callModels(
         tenantId,
         runId,
@@ -2133,6 +2269,7 @@ export class RepliesService {
         deadlineAt,
         attempt,
         live,
+        assistant,
       );
       // What is left of the draft goes out; then the checks run before anything is published.
       live?.end();
@@ -2259,6 +2396,26 @@ export class RepliesService {
    * Passages from the agent's knowledge for the customer's latest words (G05). Replies and drafts
    * alike draw only on public sources: a draft is sent to the customer as written once approved.
    */
+  /** The assistant's own search of the brand's knowledge (search_knowledge), public only. */
+  private async searchKnowledge(
+    tenantId: string,
+    context: Context,
+    config: AgentConfig,
+    query: string,
+  ): Promise<Passage[]> {
+    const brandId = context.control.brandId;
+    if (!brandId || !query || config.knowledgeSourceIds.length === 0) return [];
+    return this.tx(tenantId, (tx) =>
+      this.retrieval.search(tx, {
+        brandId,
+        sourceIds: config.knowledgeSourceIds.map((id) => fromPublicId('source', id)),
+        audience: 'customer',
+        query,
+        limit: PASSAGES,
+      }),
+    );
+  }
+
   private async retrieve(
     tenantId: string,
     runId: string,
@@ -2270,10 +2427,10 @@ export class RepliesService {
     const brandId = context.control.brandId;
     if (config.knowledgeSourceIds.length === 0 || !brandId) return [];
     const query = history
-      .filter((m) => m.direction === 'incoming' && !m.private && m.text?.trim())
+      .filter((m) => m.direction === 'incoming' && !m.private && messageText(m))
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
       .slice(-2)
-      .map((m) => (m.text ?? '').trim())
+      .map((m) => messageText(m))
       .join('\n')
       .slice(-1000);
     if (!query) return [];
@@ -2319,8 +2476,14 @@ export class RepliesService {
     generationAttempt = 0,
     /** A customer reply being written: streamed, so its steps and words can be shown. */
     live: LiveReply | null = null,
+    /** The assistant's own actions for this attempt, and where what it asks for is kept. */
+    assistant: { tools: ToolSet; effects: AssistantEffects } | null = null,
   ): Promise<Generated> {
     const choices: ModelChoice[] = [config.model, ...config.fallbackModels];
+    const toolSet: ToolSet = {
+      ...(tools ? (tools.tools as ToolSet) : {}),
+      ...(assistant?.tools ?? {}),
+    };
     const inputHash = sha256(canonicalize({ system, messages }) ?? '');
     let lastError: unknown;
     for (const [index, choice] of choices.entries()) {
@@ -2347,7 +2510,7 @@ export class RepliesService {
               model: resolved.model,
               instructions: system,
               messages,
-              ...(tools ? { tools: tools.tools as ToolSet } : {}),
+              ...(Object.keys(toolSet).length > 0 ? { tools: toolSet } : {}),
               maxOutputTokens: config.limits.maxOutputTokens,
               stopWhen: isStepCount(config.limits.maxSteps),
               maxRetries: 0,
@@ -2375,6 +2538,7 @@ export class RepliesService {
           refs: [],
           memories: [],
           liveData: [],
+          effects: assistant?.effects ?? newEffects(),
         };
         await this.tx(tenantId, (tx) =>
           this.runs.step(tx, tenantId, runId, {
@@ -2416,6 +2580,8 @@ export class RepliesService {
             },
           }),
         );
+        // What this model wrote before failing is not the reply: the next one starts afresh.
+        await live?.restart('failed');
         // A stopped run is not retried on another model.
         if (tools?.signal.aborted || !FALLBACK_KINDS.has(failure.kind)) throw error;
       }
@@ -2428,7 +2594,7 @@ export class RepliesService {
     tenantId: string,
     runId: string,
     outcome: RunOutcome,
-    telemetry: Omit<Generated, 'text' | 'sources' | 'refs' | 'memories' | 'liveData'>,
+    telemetry: Omit<Generated, 'text' | 'sources' | 'refs' | 'memories' | 'liveData' | 'effects'>,
   ) {
     await this.runs.finish(tx, runId, { outcome, ...telemetry });
     const now = this.clock();

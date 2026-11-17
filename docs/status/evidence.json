@@ -359,9 +359,13 @@
       "apps/gateway/test/conversation-flow.int.test.ts",
       "apps/gateway/test/slice.int.test.ts",
       "apps/gateway/src/outbox/relay.service.ts",
-      "apps/gateway/test/outbox.int.test.ts"
+      "apps/gateway/test/outbox.int.test.ts",
+      "apps/gateway/test/streaming.int.test.ts",
+      "apps/gateway/src/runtime/prompt.ts",
+      "apps/gateway/test/runtime.test.ts",
+      "apps/widget/e2e/repeat.spec.ts"
     ],
-    "note": "One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The worker runs different conversations' events side by side (OUTBOX_CONCURRENCY, 4 by default) and each conversation's own in order, renews the leases it holds and wakes as soon as a change is journaled, so a reply never waits behind another conversation, an ingestion or a migration (integration-tested). The conversation lease with expiry (columns present) is not used yet."
+    "note": "One public AI speaker per conversation fenced by the ownership epoch, and one AI reply per burst of customer messages: a reply is dropped when the customer wrote again meanwhile, and the newer message is answered with both in view (tested). The worker runs different conversations' events side by side (OUTBOX_CONCURRENCY, 4 by default) and each conversation's own in order, renews the leases it holds and wakes as soon as a change is journaled, so a reply never waits behind another conversation, an ingestion or a migration (integration-tested). The conversation lease with expiry (columns present) is not used yet. A reply the customer has started reading while it streams is posted even when they write again, and the newer message gets its own answer; only a reply with nothing shown yet gives way to one answer for the burst (integration-tested, and fails without the change). The model's history for an answer always ends with the customer: a reply posted after their newest message goes just before it, and a message of files only counts as `[sent a file: name]` (unit-tested). A draft restarts when a tool step, a timeout or a fallback model ends what it wrote; the widget drops a draft whose run ended or that a reconnect may have left, ignores words of an ended run, and keeps a changed message in its place. A browser test sends two questions at once and reloads mid-answer: each question and answer shows once (repeat.spec.ts)."
   },
   "R06": {
     "status": "in-progress",
@@ -523,9 +527,17 @@
       "apps/gateway/src/runtime/agents.service.ts",
       "apps/gateway/test/agents.int.test.ts",
       "packages/contracts/src/agents.ts",
-      "packages/db/src/schema/runtime.ts"
+      "packages/db/src/schema/runtime.ts",
+      "apps/gateway/test/go-live.int.test.ts",
+      "apps/console/src/components/agent/GoLiveNotices.tsx",
+      "apps/console/test/go-live.test.tsx",
+      "apps/gateway/src/runtime/assistant-actions.ts",
+      "apps/gateway/test/assistant-actions.int.test.ts",
+      "apps/gateway/test/assistant-actions.test.ts",
+      "apps/console/test/agent-actions.test.ts",
+      "docs/guide/ai/what-the-assistant-can-do.md"
     ],
-    "note": "Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending."
+    "note": "Agents per brand with display name (a role, never a person), purpose, instructions, tone, reply languages, mode, model and limits; the brand's default agent answers its conversations (tested). Supported intents and a richer escalation policy pending. A brand's assistant is made live in one step (Make the assistant live, on Home, AI agents and AI models): a real model from the workspace's newest key or the server's, every knowledge source of the brand and memory on, then the usual publish checks; asked again it keeps the model and brings in new knowledge. The offline test model, which gives every customer the same fixed reply, cannot be published in production (ALLOW_MOCK_MODEL unset) and an agent already published on it hands its conversations to people with the reason no_live_model; with a server key a new brand's agent starts on the server's model (integration-tested with production's rules; Studio's notice unit-tested). The assistant can act while answering (AgentConfig.actions, set in the agent editor and by Make the assistant live): pass the conversation to people with its summary, offer answers to tap (a choices card on its reply), note contact details the customer gives (on the contact and in a staff note; malformed ones dropped), and search the brand's knowledge again in its own words (up to twice, cited like the rest). Each is carried out only once its reply is posted (integration-tested with a stand-in model; unit-tested). It is told the page the customer wrote from (address without query or fragment, and title, sent by the loader and carried with each message), fenced as data; an answer that used it is not cached (integration- and unit-tested). Making it live also grants the brand's enabled read-only tools (integration-tested)."
   },
   "G03": {
     "status": "in-progress",
@@ -605,9 +617,11 @@
       "apps/gateway/src/knowledge/web/sources.service.ts",
       "apps/gateway/test/web-knowledge.test.ts",
       "apps/gateway/test/web-knowledge.int.test.ts",
-      "docs/guide/ai/teach-your-ai-your-website.md"
+      "docs/guide/ai/teach-your-ai-your-website.md",
+      "apps/gateway/src/knowledge/web/brand-website.ts",
+      "apps/gateway/test/go-live.int.test.ts"
     ],
-    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). A website can be a source: its pages become documents, found through its sitemap and the links between them within one site and the folder of the address, with robots.txt followed, limits on pages and link depth, read on a schedule or on request. A changed page becomes a new version, and a page that is gone or now off limits is retired; a site that is down loses nothing (tested against a made-up site over real HTTP). The website panel in Studio is rendered in unit tests; there is no browser test of it."
+    "note": "Sources with owner, public/internal visibility, status and a review cycle; documents with versions, end dates, review and retirement; stale and expired documents stop grounding answers (tested). A website can be a source: its pages become documents, found through its sitemap and the links between them within one site and the folder of the address, with robots.txt followed, limits on pages and link depth, read on a schedule or on request. A changed page becomes a new version, and a page that is gone or now off limits is retired; a site that is down loses nothing (tested against a made-up site over real HTTP). The website panel in Studio is rendered in unit tests; there is no browser test of it. A brand's own website is added and read without setup when the brand gets its first https website (never a test address such as localhost, an IP address or a reserved name, never twice, and within the workspace's limit of 20) (integration-tested)."
   },
   "G05": {
     "status": "in-progress",
@@ -688,7 +702,7 @@
       "packages/domain/src/follow-ups.ts",
       "packages/domain/test/follow-ups.test.ts"
     ],
-    "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers as chips that open to an excerpt, a freshness note and a link. Headings sit two levels under the chat's own, tables scroll inside their own frame, code names its language and has a copy button, and [n] links to the answer's nth source (unit-tested in jsdom, and measured in the layout audit's long-answer cases). Questions to ask next: after an answer is published the agent's model, metered, writes up to three; they reach the answer as a suggestions part (message.updated) and show as chips; brands switch them off with help.followUps (integration-tested). A choices card shows its options as buttons; nothing produces one yet. Other structured cards pending."
+    "note": "Agent and staff messages render Markdown through an allow-list sanitizer (no images, scripts or event handlers; http(s)/mailto links open in a new tab with noopener), and cited sources are listed under answers as chips that open to an excerpt, a freshness note and a link. Headings sit two levels under the chat's own, tables scroll inside their own frame, code names its language and has a copy button, and [n] links to the answer's nth source (unit-tested in jsdom, and measured in the layout audit's long-answer cases). Questions to ask next: after an answer is published the agent's model, metered, writes up to three; they reach the answer as a suggestions part (message.updated) and show as chips; brands switch them off with help.followUps (integration-tested). A choices card shows its options as buttons; nothing produces one yet. Other structured cards pending. Only questions are offered, never the customer's question or a line of the answer said back (unit-tested)."
   },
   "J01": {
     "status": "implemented",
@@ -1010,9 +1024,11 @@
       "packages/domain/src/memory/policy.ts",
       "packages/domain/test/memory-policy.test.ts",
       "packages/db/src/schema/memory.ts",
-      "apps/gateway/test/memory.int.test.ts"
+      "apps/gateway/test/memory.int.test.ts",
+      "apps/gateway/src/memory/extraction.service.ts",
+      "apps/gateway/test/memory-extraction.test.ts"
     ],
-    "note": "Memory records use the typed envelope (kind, scope, source, evidence status, purposes, roles, sensitivity, retention, policy version) and a closed catalogue of slots; the write policy sets every governing field and claims stay unverified (tested). Only preference, observation and claim slots exist so far; procedure, commitment and outcome kinds have no slots yet."
+    "note": "Memory records use the typed envelope (kind, scope, source, evidence status, purposes, roles, sensitivity, retention, policy version) and a closed catalogue of slots; the write policy sets every governing field and claims stay unverified (tested). Only preference, observation and claim slots exist so far; procedure, commitment and outcome kinds have no slots yet. Extraction works with every provider's structured output: the model is asked for every field (null where none) without length rules, which OpenAI's strict mode refuses, and the limits are applied to the answer (unit-tested on the schema itself). A model busy on the first try is tried again with a new attempt key, and the agent's fallback models are tried while one is busy (integration-tested; the retry failed before). The instructions ask for facts and preferences the customer states about themselves, for the listed keys."
   },
   "L02": {
     "status": "implemented",
@@ -1105,9 +1121,11 @@
       "packages/domain/src/memory/recall.ts",
       "packages/domain/test/memory-recall.test.ts",
       "apps/gateway/test/memory.int.test.ts",
-      "apps/widget/e2e/memory.spec.ts"
+      "apps/widget/e2e/memory.spec.ts",
+      "apps/gateway/src/runtime/stream-gate.ts",
+      "apps/gateway/test/live-reply.test.ts"
     ],
-    "note": "Replies use only consented, current, in-scope memory of the conversation's own customer that allows AI use and is not under review, ranked by vectors and words within the agent's budget and fenced as data. Answers cite them as memories ([M1] becomes a memory part the widget shows as “based on what you told us before”), never as something said in the chat; turning memory off, outdated, expired and future values are never used (tested)."
+    "note": "Replies use only consented, current, in-scope memory of the conversation's own customer that allows AI use and is not under review, ranked by vectors and words within the agent's budget and fenced as data. Answers cite them as memories ([M1] becomes a memory part the widget shows as “based on what you told us before”), never as something said in the chat; turning memory off, outdated, expired and future values are never used (tested). Memory markers ([M1]) are left out of streamed drafts, as knowledge markers are (unit-tested)."
   },
   "HNV-15-01": {
     "status": "implemented",
@@ -2698,9 +2716,16 @@
       "apps/widget/src/components/Home.tsx",
       "apps/gateway/test/customer-surface.int.test.ts",
       "apps/widget/e2e/surface.spec.ts",
-      "apps/console/src/pages/BrandChatSettings.tsx"
+      "apps/console/src/pages/BrandChatSettings.tsx",
+      "apps/widget/src/components/shell/TeamAvatars.tsx",
+      "apps/widget/test/team.test.tsx",
+      "apps/gateway/src/inbox/availability.service.ts",
+      "apps/gateway/test/team.int.test.ts",
+      "apps/console/src/pages/inbox/PublicProfile.tsx",
+      "apps/console/test/public-profile.test.tsx",
+      "docs/guide/inbox/sounds-and-notifications.md"
     ],
-    "note": "A home before the conversation: the greeting and who can answer in the brand's colour, the visitor's last conversation one press away, the brand's suggested questions in each language, each starting the conversation, and a search of the brand's public knowledge with the assistant's retrieval and the customer audience (internal sources and other brands excluded), limited per session. Results are the brand's own articles, never generated text (tested)."
+    "note": "A home before the conversation: the greeting and who can answer in the brand's colour, the visitor's last conversation one press away, the brand's suggested questions in each language, each starting the conversation, and a search of the brand's public knowledge with the assistant's retrieval and the customer audience (internal sources and other brands excluded), limited per session. Results are the brand's own articles, never generated text (tested). The home screen shows who on the team is online, the way Tawk does: up to three people, each with the first name and https photo they chose in Studio (How customers see you), or initials, and nothing else about them (never a full name or an email); and how soon the team usually replies, the brand's median time to a person's first reply over 30 days, only above the reports' smallest group. One Chat with us button takes the visitor to the message box. The header keeps language, More and close (and larger, where the website allows); memory moved into More (gateway integration-tested; the avatars and wording unit-tested in four languages; the layout audit draws the team at every size)."
   },
   "W18": {
     "status": "implemented",
@@ -2710,9 +2735,10 @@
       "apps/gateway/src/widget/sessions.service.ts",
       "apps/gateway/test/customer-surface.int.test.ts",
       "apps/widget/src/components/Conversations.tsx",
-      "apps/widget/e2e/surface.spec.ts"
+      "apps/widget/e2e/surface.spec.ts",
+      "apps/gateway/test/front-door.int.test.ts"
     ],
-    "note": "A customer signed in by the website's assertion is one principal per brand on every device and continues the same conversations. Anonymous visitors, other customers and the same person on another brand see none of them by any path (list, history, files, stream). Signing in as someone else or out ends the old session's open streams at once. Resuming by an emailed link is not offered (tested, mutation-checked)."
+    "note": "A customer signed in by the website's assertion is one principal per brand on every device and continues the same conversations. Anonymous visitors, other customers and the same person on another brand see none of them by any path (list, history, files, stream). Signing in as someone else or out ends the old session's open streams at once. Resuming by an emailed link is not offered (tested, mutation-checked). An anonymous visitor's session lasts WIDGET_SESSION_DAYS (30) from its last use, so a visitor who keeps coming back keeps their chat and what it remembers; a signed-in session still ends when the website's sign-in says (integration-tested)."
   },
   "W19": {
     "status": "implemented",

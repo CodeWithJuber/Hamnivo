@@ -31,7 +31,8 @@ export interface ProposedMemoryJson {
   sourceRef: string;
   confidence: 'high' | 'medium' | 'low';
   basis: 'stated' | 'inferred';
-  sensitivity?: string;
+  /** Always present (null when none): providers' strict structured output requires every field. */
+  sensitivity: string | null;
 }
 
 interface Rule {
@@ -170,6 +171,7 @@ export function mockExtractMemories(input: ExtractionInput): ProposedMemoryJson[
         sourceRef: message.ref,
         confidence: 'high',
         basis: 'stated',
+        sensitivity: null,
       });
     }
   }

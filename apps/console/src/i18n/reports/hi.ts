@@ -79,6 +79,7 @@ export const reportsHi: ReportsTranslation = {
       no_agent: 'कोई AI एजेंट प्रकाशित नहीं था',
       assist_mode: 'AI केवल उत्तर सुझाता है',
       channel_ai_off: 'इस चैनल पर AI जवाब नहीं देता',
+      no_live_model: 'AI टेस्ट मॉडल पर है, जो हर बार एक ही जवाब देता है',
       staff_takeover: 'किसी व्यक्ति ने सँभाला',
       staff_reply: 'किसी व्यक्ति ने उत्तर दिया',
       staff_assign: 'किसी व्यक्ति को सौंपी गई',

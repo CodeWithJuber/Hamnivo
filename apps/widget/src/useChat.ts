@@ -18,7 +18,7 @@ import type {
   WidgetSession,
 } from '@hamnivo/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { applyDraftEvent, DRAFT_EVENTS, type Draft } from './drafts.js';
+import { applyDraftEvent, DRAFT_EVENTS, type Draft, dropRun } from './drafts.js';
 import { applyRunEvent, type LiveRun } from './run.js';
 
 export type Connection = StreamStatus | 'idle' | 'offline';
@@ -90,12 +90,15 @@ const byTime = (a: Message, b: Message) =>
  */
 export const inOrder = (items: Message[]) => [...items].reverse().sort(byTime);
 
-function merge(messages: Message[], incoming: Message): Message[] {
+export function merge(messages: Message[], incoming: Message): Message[] {
   const previous = messages.find((m) => m.id === incoming.id);
   const without = messages.filter((m) => m.id !== incoming.id);
   // A read receipt that arrived first is not lost when the message itself comes again.
   const delivery = previous?.delivery === 'read' ? 'read' : incoming.delivery;
-  return [...without, { ...incoming, delivery }].sort(byTime);
+  // A change to a message (an edit, its next questions) keeps its place: the change's own,
+  // later sequence would move it below the messages that came after it in the same second.
+  const sequence = previous ? (previous.sequence ?? incoming.sequence) : incoming.sequence;
+  return [...without, { ...incoming, delivery, sequence }].sort(byTime);
 }
 
 /** Marks a message and every earlier one from the customer as read (W06). */
@@ -159,6 +162,8 @@ const EMPTY: ChatState = {
 };
 
 const PAGE = 50;
+/** How long a draft may outlive its run's end, for its reply to arrive and replace it. */
+const RUN_GRACE_MS = 3000;
 const messageOf = (error: unknown) => String((error as Error)?.message ?? error);
 
 /** The gateway's answer to a chat write from a visitor who can't chat now (H20). */
@@ -240,6 +245,8 @@ export function useChat(client: HamnivoClient) {
   const reported = useRef(0);
   /** Other parts of the widget (the shop) that follow live events. */
   const listeners = useRef(new Set<(event: ChatEvent) => void>());
+  /** Runs whose end was said: their late words are not shown again. */
+  const endedRuns = useRef(new Set<string>());
   const onEvent = useCallback((listener: (event: ChatEvent) => void) => {
     listeners.current.add(listener);
     return () => {
@@ -382,8 +389,24 @@ export function useChat(client: HamnivoClient) {
           onTransient: (event) => {
             const data = (event.data ?? {}) as Record<string, unknown>;
             for (const listener of listeners.current) listener({ type: event.type, data });
+            const runId = typeof data.runId === 'string' ? data.runId : null;
+            // Words of a run that already ended are late, never a new draft.
+            if (event.type === 'message.delta' && runId && endedRuns.current.has(runId)) return;
             if (event.type === 'message.delta' || event.type === 'activity') {
               setState((s) => withLive(s, event.type, data));
+            }
+            if (
+              event.type === 'activity' &&
+              runId &&
+              data.kind === 'run' &&
+              data.state === 'finished'
+            ) {
+              endedRuns.current.add(runId);
+              // Its reply, when there is one, replaces its draft on arrival; a draft still there
+              // after a moment was withdrawn while the stream was away.
+              setTimeout(() => {
+                if (!stale()) setState((s) => ({ ...s, drafts: dropRun(s.drafts, runId) }));
+              }, RUN_GRACE_MS);
             }
           },
           onStatus: (connection) =>
@@ -398,6 +421,9 @@ export function useChat(client: HamnivoClient) {
               if (!stale())
                 setState((s) => ({
                   ...s,
+                  // A draft's withdrawal may have been missed while away: the history is what
+                  // was said, and a reply still being written sends its words again.
+                  drafts: [],
                   messages: inOrder(page.items),
                   olderCursor: page.olderCursor,
                   latestSequence: page.latestSequence,

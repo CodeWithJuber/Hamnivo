@@ -4,6 +4,18 @@
  * can grow on its own; merged under `inboxAlerts`.
  */
 export const inboxAlertsEn = {
+  profile: {
+    title: 'How customers see you',
+    hint: 'While you are online, the chat shows customers your first name and photo. Nothing else about you.',
+    name: 'First name customers see',
+    nameHint: 'Leave it empty to use {{name}}.',
+    nameTooLong: 'Use 40 characters or fewer.',
+    photo: 'Photo address',
+    photoHint: 'An https address of a square photo. Leave it empty to show your initials.',
+    photoHttps: 'Use an address that starts with https://.',
+    save: 'Save',
+    saved: 'Customers now see you as {{name}}.',
+  },
   status: {
     label: 'Your status',
     online: 'Online',

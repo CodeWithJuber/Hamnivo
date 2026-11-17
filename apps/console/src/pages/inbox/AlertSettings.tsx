@@ -13,6 +13,7 @@ import {
   useChangeAlertSettings,
   useDesktopPermission,
 } from '../../lib/inbox-alerts';
+import { PublicProfileSection } from './PublicProfile';
 
 const EVENTS = [
   { key: 'newChat', id: 'sound-new-chat' },
@@ -212,6 +213,7 @@ export function AlertSettingsForm() {
   const silent = settings.sounds.muted || settings.sounds.volume <= 0;
   return (
     <div className="flex flex-col gap-5" data-testid="alert-settings">
+      <PublicProfileSection />
       <CheckboxField
         id="sounds-muted"
         label={t('inboxAlerts.settings.mute')}

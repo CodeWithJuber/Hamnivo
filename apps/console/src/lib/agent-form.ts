@@ -45,6 +45,8 @@ export interface AgentForm {
   /** Action budgets (G15, X03). */
   maxCallsPerRun: string;
   maxAutopilotPerConversation: string;
+  /** What the assistant may do within Hamnivo while answering. */
+  actions: AgentConfig['actions'];
 }
 
 const toRow = (choice: ModelChoice): ModelRow => ({
@@ -80,6 +82,12 @@ export function toForm(config: AgentConfig): AgentForm {
     })),
     maxCallsPerRun: String(config.tools?.maxCallsPerRun ?? 4),
     maxAutopilotPerConversation: String(config.tools?.maxAutopilotPerConversation ?? 5),
+    actions: {
+      handoff: config.actions?.handoff ?? false,
+      choices: config.actions?.choices ?? false,
+      contact: config.actions?.contact ?? false,
+      search: config.actions?.search ?? false,
+    },
   };
 }
 
@@ -102,6 +110,7 @@ export const FIELD_IDS = {
   tools: 'agent-tools',
   maxCallsPerRun: 'agent-tools-maxCallsPerRun',
   maxAutopilotPerConversation: 'agent-tools-maxAutopilot',
+  action: (key: keyof AgentConfig['actions']) => `agent-action-${key}`,
 } as const;
 
 function choice(row: ModelRow): ModelChoice {
@@ -212,6 +221,13 @@ export function toConfig(
         maxCallsPerRun,
         maxAutopilotPerConversation,
       },
+      // In the gateway's key order, so an unchanged configuration compares equal.
+      actions: {
+        handoff: form.actions.handoff,
+        choices: form.actions.choices,
+        contact: form.actions.contact,
+        search: form.actions.search,
+      },
     },
   };
 }
@@ -232,7 +248,8 @@ export type SectionKey =
   | 'limits'
   | 'knowledge'
   | 'memory'
-  | 'tools';
+  | 'tools'
+  | 'actions';
 
 /** Which parts differ between two working copies, for the conflict message. */
 export function differences(mine: AgentForm, theirs: AgentForm): SectionKey[] {
@@ -275,6 +292,7 @@ export function differences(mine: AgentForm, theirs: AgentForm): SectionKey[] {
   ) {
     result.push('tools');
   }
+  if (!same(mine.actions, theirs.actions)) result.push('actions');
   return result;
 }
 
