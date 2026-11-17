@@ -1305,7 +1305,8 @@ cd /opt/hamnivo-ci-runner && docker compose up -d --build
 
 The runner registers on its first start and keeps its credentials in `state/`. Set `REPO_URL` in
 `compose.yaml` to your repository. With 4 GB the checks run at most two turbo tasks at once
-(`HAMNIVO_CI_CONCURRENCY=2`), so they take longer than on a laptop.
+(`HAMNIVO_CI_CONCURRENCY=2`), and type checks and builds one at a time
+(`HAMNIVO_CI_HEAVY_CONCURRENCY=1`), so they take longer than on a laptop.
 
 To use GitHub's own runners instead, set the repository variable `HAMNIVO_CI_RUNNER` to
 `["ubuntu-latest"]`, under **Settings → Secrets and variables → Actions → Variables**. GitHub
