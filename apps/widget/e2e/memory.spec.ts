@@ -199,6 +199,7 @@ test.describe('customer memory in the widget', () => {
     await consent.getByRole('button', { name: 'بعد میں فیصلہ کریں' }).click();
     await expect(consent).toBeHidden();
 
+    await frame.locator('#hv-more').click();
     await frame.getByRole('button', { name: 'میموری', exact: true }).click();
     const panel = frame.getByTestId('memory-panel');
     await expect(panel.getByRole('heading', { name: 'ہم کیا یاد رکھتے ہیں' })).toBeVisible();
