@@ -2716,9 +2716,16 @@
       "apps/widget/src/components/Home.tsx",
       "apps/gateway/test/customer-surface.int.test.ts",
       "apps/widget/e2e/surface.spec.ts",
-      "apps/console/src/pages/BrandChatSettings.tsx"
+      "apps/console/src/pages/BrandChatSettings.tsx",
+      "apps/widget/src/components/shell/TeamAvatars.tsx",
+      "apps/widget/test/team.test.tsx",
+      "apps/gateway/src/inbox/availability.service.ts",
+      "apps/gateway/test/team.int.test.ts",
+      "apps/console/src/pages/inbox/PublicProfile.tsx",
+      "apps/console/test/public-profile.test.tsx",
+      "docs/guide/inbox/sounds-and-notifications.md"
     ],
-    "note": "A home before the conversation: the greeting and who can answer in the brand's colour, the visitor's last conversation one press away, the brand's suggested questions in each language, each starting the conversation, and a search of the brand's public knowledge with the assistant's retrieval and the customer audience (internal sources and other brands excluded), limited per session. Results are the brand's own articles, never generated text (tested)."
+    "note": "A home before the conversation: the greeting and who can answer in the brand's colour, the visitor's last conversation one press away, the brand's suggested questions in each language, each starting the conversation, and a search of the brand's public knowledge with the assistant's retrieval and the customer audience (internal sources and other brands excluded), limited per session. Results are the brand's own articles, never generated text (tested). The home screen shows who on the team is online, the way Tawk does: up to three people, each with the first name and https photo they chose in Studio (How customers see you), or initials, and nothing else about them (never a full name or an email); and how soon the team usually replies, the brand's median time to a person's first reply over 30 days, only above the reports' smallest group. One Chat with us button takes the visitor to the message box. The header keeps language, More and close (and larger, where the website allows); memory moved into More (gateway integration-tested; the avatars and wording unit-tested in four languages; the layout audit draws the team at every size)."
   },
   "W18": {
     "status": "implemented",

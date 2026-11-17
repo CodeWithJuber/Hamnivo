@@ -2,6 +2,18 @@ import type { InboxAlertsTranslation } from './en';
 
 /** Hindi. Pending review by native speakers, as the note in the interface says. */
 export const inboxAlertsHi: InboxAlertsTranslation = {
+  profile: {
+    title: 'ग्राहक आपको कैसे देखते हैं',
+    hint: 'जब आप ऑनलाइन हों, चैट ग्राहकों को आपका पहला नाम और फ़ोटो दिखाती है। आपके बारे में और कुछ नहीं।',
+    name: 'ग्राहकों को दिखने वाला पहला नाम',
+    nameHint: '{{name}} इस्तेमाल करने के लिए ख़ाली छोड़ें।',
+    nameTooLong: '40 या कम अक्षर इस्तेमाल करें।',
+    photo: 'फ़ोटो का पता',
+    photoHint: 'एक चौकोर फ़ोटो का https पता। अपने नाम के पहले अक्षर दिखाने के लिए ख़ाली छोड़ें।',
+    photoHttps: 'https:// से शुरू होने वाला पता इस्तेमाल करें।',
+    save: 'सहेजें',
+    saved: 'ग्राहक अब आपको {{name}} के रूप में देखते हैं।',
+  },
   status: {
     label: 'आपकी स्थिति',
     online: 'ऑनलाइन',

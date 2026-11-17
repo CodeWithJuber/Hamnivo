@@ -6,6 +6,7 @@ import { type FormEvent, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BidiText } from './BidiText.js';
 import { StatusLine } from './StatusLine.js';
+import { TeamAvatars } from './shell/TeamAvatars.js';
 
 /** Only web links open from the chat. */
 const webLink = (url: string | null): string | null => {
@@ -44,6 +45,10 @@ export function Home(props: {
   recent?: CustomerConversation | null;
   onOpenRecent?: (conversationId: string) => void;
   onAsk: (question: string) => void;
+  /** Who is online and how soon people reply (W17); left out by an older gateway. */
+  team?: WidgetConfig['team'] | undefined;
+  /** "Chat with us": takes the visitor to the message box. */
+  onChat?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const searchId = useId();
@@ -81,12 +86,26 @@ export function Home(props: {
         <p className="text-[0.9375rem] leading-relaxed" data-testid="greeting">
           {props.greeting}
         </p>
+        {props.team && available ? (
+          <TeamAvatars team={props.team} locale={props.locale ?? 'en'} />
+        ) : null}
         {props.availability && available ? (
           <StatusLine
             availability={props.availability}
             locale={props.locale ?? 'en'}
             tone="inherit"
           />
+        ) : null}
+        {props.onChat && available ? (
+          <Button
+            type="button"
+            className="hv-hero-action mt-1 h-auto min-h-11 self-start whitespace-normal py-2"
+            onClick={props.onChat}
+            data-testid="chat-with-us"
+          >
+            <MessagesSquareIcon className="size-4" aria-hidden="true" />
+            {t('surface.home.chat')}
+          </Button>
         ) : null}
       </div>
       {props.prompt ? (

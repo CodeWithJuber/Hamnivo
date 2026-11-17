@@ -2,6 +2,18 @@ import type { InboxAlertsTranslation } from './en';
 
 /** Urdu. Pending review by native speakers, as the note in the interface says. */
 export const inboxAlertsUr: InboxAlertsTranslation = {
+  profile: {
+    title: 'کسٹمرز آپ کو کیسے دیکھتے ہیں',
+    hint: 'جب آپ آن لائن ہوں، چیٹ کسٹمرز کو آپ کا پہلا نام اور تصویر دکھاتی ہے۔ آپ کے بارے میں اور کچھ نہیں۔',
+    name: 'کسٹمرز کو دکھنے والا پہلا نام',
+    nameHint: '{{name}} استعمال کرنے کے لیے خالی چھوڑیں۔',
+    nameTooLong: '40 یا کم حروف استعمال کریں۔',
+    photo: 'تصویر کا پتہ',
+    photoHint: 'ایک چوکور تصویر کا https پتہ۔ اپنے نام کے پہلے حروف دکھانے کے لیے خالی چھوڑیں۔',
+    photoHttps: 'https:// سے شروع ہونے والا پتہ استعمال کریں۔',
+    save: 'محفوظ کریں',
+    saved: 'کسٹمرز اب آپ کو {{name}} کے طور پر دیکھتے ہیں۔',
+  },
   status: {
     label: 'آپ کی حالت',
     online: 'آن لائن',

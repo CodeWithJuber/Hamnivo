@@ -2,6 +2,18 @@ import type { InboxAlertsTranslation } from './en';
 
 /** Arabic (Modern Standard). Pending review by native speakers, as the note in the interface says. */
 export const inboxAlertsAr: InboxAlertsTranslation = {
+  profile: {
+    title: 'كيف يراك العملاء',
+    hint: 'أثناء اتصالك، تعرض المحادثة للعملاء اسمك الأول وصورتك. لا شيء غير ذلك.',
+    name: 'الاسم الأول الذي يراه العملاء',
+    nameHint: 'اتركه فارغًا لاستخدام {{name}}.',
+    nameTooLong: 'استخدم 40 حرفًا أو أقل.',
+    photo: 'عنوان الصورة',
+    photoHint: 'عنوان https لصورة مربعة. اتركه فارغًا لعرض الأحرف الأولى من اسمك.',
+    photoHttps: 'استخدم عنوانًا يبدأ بـ https://.',
+    save: 'حفظ',
+    saved: 'يراك العملاء الآن باسم {{name}}.',
+  },
   status: {
     label: 'حالتك',
     online: 'متصل',

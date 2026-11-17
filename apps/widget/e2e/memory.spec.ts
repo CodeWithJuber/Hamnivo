@@ -102,6 +102,8 @@ test.describe('customer memory in the widget', () => {
       expect(async () => {
         if (await panel.isVisible())
           await panel.getByRole('button', { name: 'Back to chat' }).click();
+        // Memory is in More, so the header keeps to a few controls (W17).
+        await frame.locator('#hv-more').click();
         await open.click();
         await check();
       }).toPass({ timeout: 20_000 });
@@ -169,6 +171,7 @@ test.describe('customer memory in the widget', () => {
         : route.fallback(),
     );
     const frame = await openWidget(page);
+    await frame.locator('#hv-more').click();
     await frame.getByRole('button', { name: 'Memory', exact: true }).click();
     const panel = frame.getByTestId('memory-panel');
     await expect(panel.getByTestId('memory-unavailable')).toContainText(

@@ -1,11 +1,4 @@
-import {
-  BrainIcon,
-  EllipsisVerticalIcon,
-  GlobeIcon,
-  Maximize2Icon,
-  Minimize2Icon,
-  XIcon,
-} from 'lucide-react';
+import { EllipsisVerticalIcon, GlobeIcon, Maximize2Icon, Minimize2Icon, XIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LANGUAGE_NAMES, LOCALES, type Locale } from '../../i18n.js';
@@ -51,7 +44,9 @@ function LanguagePicker(props: { locale: Locale; onLocale: (next: Locale) => voi
 
 /**
  * The top of the chat, in the brand's colour (W03): its logo and name, what is true of this
- * conversation (a ticket, who can answer), and the few controls every screen needs. "More" opens
+ * conversation (a ticket, who can answer), and the few controls every screen needs: language,
+ * larger (where the website allows), More and close; memory, past chats and settings are in More,
+ * so a phone's header stays calm (W17). "More" opens
  * a small panel under itself: it closes with Escape or a click elsewhere and gives focus back,
  * and Escape then does not close the chat as well.
  */
@@ -63,7 +58,6 @@ export function Header(props: {
   children?: ReactNode;
   /** The brand's words about its assistant, always in view (U09). */
   disclosure: string;
-  memory: { pressed: boolean; onToggle: () => void } | null;
   menu: {
     id: string;
     open: boolean;
@@ -129,19 +123,6 @@ export function Header(props: {
             ) : (
               <Maximize2Icon className="size-[18px]" aria-hidden="true" />
             )}
-          </button>
-        ) : null}
-        {props.memory ? (
-          <button
-            type="button"
-            id="hv-memory-open"
-            className={iconButton}
-            title={t('memory.open')}
-            aria-label={t('memory.open')}
-            aria-pressed={props.memory.pressed}
-            onClick={props.memory.onToggle}
-          >
-            <BrainIcon className="size-5" aria-hidden="true" />
           </button>
         ) : null}
         <button

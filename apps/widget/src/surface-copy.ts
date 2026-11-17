@@ -8,8 +8,14 @@ export const SURFACE_COPY = {
     more: 'More',
     moreLabel: 'More options',
     alerts: { newReply: 'New reply from {{name}}' },
+    team: {
+      online_one: '{{names}} is online',
+      online_other: '{{names}} are online',
+      reply: 'Usually replies in {{time}}',
+    },
     home: {
       title: 'How can we help?',
+      chat: 'Chat with us',
       suggestions: 'Popular questions',
       searchLabel: 'Search help articles',
       searchPlaceholder: 'Search help',
@@ -192,8 +198,18 @@ export const SURFACE_COPY = {
     more: 'المزيد',
     moreLabel: 'خيارات أخرى',
     alerts: { newReply: 'رد جديد من {{name}}' },
+    team: {
+      online_zero: '{{names}} متصل الآن',
+      online_one: '{{names}} متصل الآن',
+      online_two: '{{names}} متصلان الآن',
+      online_few: '{{names}} متصلون الآن',
+      online_many: '{{names}} متصلون الآن',
+      online_other: '{{names}} متصلون الآن',
+      reply: 'يرد عادةً خلال {{time}}',
+    },
     home: {
       title: 'كيف يمكننا مساعدتك؟',
+      chat: 'تحدّث معنا',
       suggestions: 'أسئلة شائعة',
       searchLabel: 'ابحث في مقالات المساعدة',
       searchPlaceholder: 'ابحث في المساعدة',
@@ -375,8 +391,14 @@ export const SURFACE_COPY = {
     more: 'और',
     moreLabel: 'और विकल्प',
     alerts: { newReply: '{{name}} का नया जवाब' },
+    team: {
+      online_one: '{{names}} ऑनलाइन हैं',
+      online_other: '{{names}} ऑनलाइन हैं',
+      reply: 'आम तौर पर {{time}} में जवाब देते हैं',
+    },
     home: {
       title: 'हम आपकी क्या मदद कर सकते हैं?',
+      chat: 'हमसे चैट करें',
       suggestions: 'आम सवाल',
       searchLabel: 'मदद के लेख खोजें',
       searchPlaceholder: 'मदद खोजें',
@@ -559,8 +581,14 @@ export const SURFACE_COPY = {
     more: 'مزید',
     moreLabel: 'مزید اختیارات',
     alerts: { newReply: '{{name}} کا نیا جواب' },
+    team: {
+      online_one: '{{names}} آن لائن ہیں',
+      online_other: '{{names}} آن لائن ہیں',
+      reply: 'عام طور پر {{time}} میں جواب دیتے ہیں',
+    },
     home: {
       title: 'ہم آپ کی کیا مدد کر سکتے ہیں؟',
+      chat: 'ہم سے چیٹ کریں',
       suggestions: 'عام سوالات',
       searchLabel: 'مدد کے مضامین تلاش کریں',
       searchPlaceholder: 'مدد تلاش کریں',

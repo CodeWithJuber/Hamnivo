@@ -2,6 +2,7 @@ import {
   AvailabilityPing,
   SetAvailabilityRequest,
   UpdateInboxAlertSettings,
+  UpdateStaffPublicProfile,
 } from '@hamnivo/contracts';
 import type { StaffPrincipal } from '@hamnivo/policy';
 import { Body, Controller, Get, HttpCode, Param, Patch, Post, Put } from '@nestjs/common';
@@ -34,6 +35,22 @@ export class InboxAlertsController {
   @StaffRoute({ tenant: true, permission: 'conversations.read' })
   update(@CurrentPrincipal() principal: StaffPrincipal, @Body() body: unknown) {
     return this.alerts.update(principal, parseInput(UpdateInboxAlertSettings, body));
+  }
+
+  /** What customers see of me in the chat while I am online (W17). */
+  @Get('profile')
+  @StaffRoute({ tenant: true, permission: 'conversations.read' })
+  profile(@CurrentPrincipal() principal: StaffPrincipal) {
+    return this.availability.publicProfile(principal);
+  }
+
+  @Patch('profile')
+  @StaffRoute({ tenant: true, permission: 'conversations.read' })
+  updateProfile(@CurrentPrincipal() principal: StaffPrincipal, @Body() body: unknown) {
+    return this.availability.updatePublicProfile(
+      principal,
+      parseInput(UpdateStaffPublicProfile, body),
+    );
   }
 
   @Put('availability')

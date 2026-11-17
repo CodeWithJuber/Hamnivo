@@ -18,7 +18,7 @@ moved it, and production let that model answer. Six phases, each pushed when don
 | B | **It never repeats**: a draft the customer read is posted; the prompt always ends with the customer; attachment-only messages; follow-up chips without echo; draft restarts; resync | Done, see below |
 | C | **Memory that works**: OpenAI-strict extraction schema, retries, wording, consent in the welcome area, anonymous sessions that last, memory carried over at sign-in | Done in part, see below |
 | D | **It acts**: hand over, ticket, contact details, knowledge search, buttons, page links; which page the visitor is on; WHMCS tools granted and kept signed in | Done in part, see below |
-| E | **A clean, Tawk-like chat**: home with the team, reply time, one clear action; fewer header buttons | Next |
+| E | **A clean, Tawk-like chat**: home with the team, reply time, one clear action; fewer header buttons | Done, see below |
 | F | **Shopify and WooCommerce orders** | Planned, after A–E |
 
 ### Phase A, done
@@ -86,6 +86,23 @@ and Redis); gateway unit 321 of 321; Studio unit 753 of 753; widget unit 99 of 9
 46 of 46 with OpenAPI regenerated; layout audit 300 of 300 clean; `CHECK=api`, `live` and `sites`
 pass. Studio `test:e2e` 121 of 122: `channels.spec.ts:105` looks for a "Settings pages" menu the
 current Studio no longer has (not from these phases).
+
+### Phase E, done
+
+Owner's choices (2026-11-17): the team on the home screen with photo and first name; anonymous
+memory is **not** carried over at sign-in (privacy on shared computers); Shopify and WooCommerce
+wait for a test store.
+
+| What | Where | Checked by |
+|---|---|---|
+| **How customers see a teammate.** Each person sets a first name and an https photo in Studio (Inbox → Alerts → How customers see you); otherwise the first word of their name, and initials. `GET`/`PATCH /v1/inbox/profile`, audited without the values. | `staff_members.public_name`, `photo_url` (migration `20261117011235`), `inbox/availability.service.ts`, `pages/inbox/PublicProfile.tsx` | `team.int.test.ts`, `public-profile.test.tsx` |
+| **The team on the home screen.** Up to three online people (photo or initials, first names), "Sara and Ali are online", "Usually replies in 5 minutes" (median time to a person's first reply over 30 days, above the reports' smallest group, cached an hour per brand), and one **Chat with us** button to the message box. Never a full name or an email. | `WidgetConfig.team`, `widget/sessions.service.ts`, widget `Home.tsx`, `shell/TeamAvatars.tsx` | `team.int.test.ts`, `team.test.tsx` (four languages), layout audit |
+| **A calmer header.** Language, More and close (and larger where the website allows); memory moved into More with past chats and settings. | `shell/Header.tsx`, `Chat.tsx` | `memory.spec.ts` (opens More first) |
+
+- Not done: a teammate's photo next to their replies in the conversation (replies still show
+  their name; their photo needs the reply's sender linked to the teammate on both the history and
+  the live paths). The language picker stays in the header: it is how visitors who read Arabic or
+  Urdu find their language, and 11 browser journeys use it there.
 
 ## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
 

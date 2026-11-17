@@ -13409,6 +13409,108 @@
         }
       }
     },
+    "/v1/inbox/profile": {
+      "get": {
+        "operationId": "getMyPublicProfile",
+        "summary": "What customers see of you in the chat: a first name and a photo (conversations.read)",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your public profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffPublicProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateMyPublicProfile",
+        "summary": "Change the first name and photo customers see; only what you send changes",
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStaffPublicProfile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Your public profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffPublicProfile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/inbox/preferences": {
       "get": {
         "operationId": "getInboxPreferences",
@@ -36847,6 +36949,35 @@
           "staffMemberIds"
         ]
       },
+      "UpdateStaffPublicProfile": {
+        "type": "object",
+        "properties": {
+          "publicName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "photoUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "UpdateInboxAlertSettings": {
         "type": "object",
         "properties": {
@@ -41776,6 +41907,58 @@
               "hi",
               "ur"
             ]
+          },
+          "team": {
+            "type": "object",
+            "properties": {
+              "online": {
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "photoUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 500,
+                          "format": "uri"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "photoUrl"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "replyMinutes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "online",
+              "replyMinutes"
+            ],
+            "additionalProperties": false
           },
           "availability": {
             "type": "object",
@@ -56440,6 +56623,44 @@
         "required": [
           "conversationId",
           "state"
+        ],
+        "additionalProperties": false
+      },
+      "StaffPublicProfile": {
+        "type": "object",
+        "properties": {
+          "publicName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "photoUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shownAs": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "publicName",
+          "photoUrl",
+          "shownAs"
         ],
         "additionalProperties": false
       },

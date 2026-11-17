@@ -165,7 +165,7 @@ export type ModelSetupStatus = z.infer<typeof ModelSetupStatus>;
 const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour such as #192A30');
 
 /** An https address with no user name or password in it. */
-const HttpsUrl = z
+export const HttpsUrl = z
   .url({ protocol: /^https$/ })
   .max(500)
   .refine(

@@ -279,6 +279,11 @@ export class WidgetSessionsService {
       widgetId: brand.widgetPublicId,
       verified: principal.kind === 'verified',
     });
+    // Who customers see is online (a first name and photo each), and so whether anyone is.
+    const online = await this.availability.onlineTeam(tx, session.tenantId, {
+      workspaceId: brand.workspaceId,
+      brandId: brand.id,
+    });
     return {
       accessToken: access.token,
       accessTokenExpiresAt: access.expiresAt.toISOString(),
@@ -290,10 +295,11 @@ export class WidgetSessionsService {
       },
       config: widgetConfig(brand as BrandRow, this.clock(), surface, {
         filesScannable: filesScannable(this.config),
-        staffOnline: await this.availability.anyOnline(tx, session.tenantId, {
-          workspaceId: brand.workspaceId,
-          brandId: brand.id,
-        }),
+        staffOnline: online.length > 0,
+        team: {
+          online,
+          replyMinutes: await this.availability.replyMinutes(tx, session.tenantId, brand.id),
+        },
         consentRequired: consent.required,
         consentGiven: consent.given,
         direct: session.hostOrigin === DIRECT_ORIGIN,

@@ -229,6 +229,7 @@ export function Composer(props: {
           </>
         ) : null}
         <ComposerPrimitive.Input
+          id="hv-composer"
           aria-label={props.label}
           placeholder={props.label}
           maxLength={10_000}

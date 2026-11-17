@@ -26,6 +26,7 @@ import { useAnnouncer } from '@hamnivo/ui/components/live-region';
 import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import {
   ArrowDownIcon,
+  BrainIcon,
   MessagesSquareIcon,
   SettingsIcon,
   UserRoundIcon,
@@ -854,14 +855,6 @@ export function Chat(props: {
           locale={locale}
           onLocale={props.onLocale}
           disclosure={copy.aiDisclosure}
-          memory={
-            memoryShown
-              ? {
-                  pressed: view === 'memory',
-                  onToggle: () => (view === 'memory' ? back('hv-memory-open') : show('memory')),
-                }
-              : null
-          }
           menu={{
             id: moreId,
             open: more,
@@ -872,6 +865,22 @@ export function Chat(props: {
             },
             items: (
               <>
+                {/* Memory lives here, not in the header, so the header keeps to a few controls. */}
+                {memoryShown ? (
+                  <li>
+                    <Button
+                      id="hv-memory-open"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      aria-pressed={view === 'memory'}
+                      onClick={() => (view === 'memory' ? back('hv-more') : show('memory'))}
+                    >
+                      <BrainIcon className="size-4" aria-hidden="true" />
+                      {t('memory.open')}
+                    </Button>
+                  </li>
+                ) : null}
                 {hasOthers ? (
                   <li>
                     <Button
@@ -958,7 +967,7 @@ export function Chat(props: {
         ) : null}
         <Suspense fallback={<PanelLoading />}>
           {view === 'memory' ? (
-            <MemoryPanel controls={memory} onBack={() => back('hv-memory-open')} />
+            <MemoryPanel controls={memory} onBack={() => back('hv-more')} />
           ) : null}
           {view === 'settings' ? (
             <Settings
@@ -1067,6 +1076,8 @@ export function Chat(props: {
                   recent={others[0] ?? null}
                   onOpenRecent={(id) => void props.onOpenConversation(id)}
                   onAsk={(question) => void send(question)}
+                  team={config.team}
+                  onChat={() => document.getElementById('hv-composer')?.focus()}
                 />
               ) : null}
               {askConsent && remembered ? (
