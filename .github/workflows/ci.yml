@@ -42,6 +42,35 @@ jobs:
       - name: Install Chromium for the browser checks
         run: pnpm --filter @hamnivo/console exec playwright install chromium
 
+      # A run whose runner died never ran its cleanup: its databases, Chatwoot and smoke stacks stay
+      # in the runner's Docker and hold the next run's 4 GB (ADR 0019). Only the checks' own names
+      # are removed. What the runner has left is printed, so a run that dies leaves evidence.
+      - name: Remove what a killed run left behind
+        run: |
+          command -v docker >/dev/null || exit 0
+          pattern='^(hamnivo-check-|hamnivo-smoke-|hamnivo-autodeploy-|hamnivo-https-test)'
+          mapfile -t containers < <(docker ps -a --format '{{.Names}}' | grep -E "$pattern" || true)
+          if ((${#containers[@]})); then
+            printf 'Removing container %s\n' "${containers[@]}"
+            docker rm -f -v "${containers[@]}" >/dev/null
+          fi
+          mapfile -t volumes < <(docker volume ls -q | grep -E "$pattern" || true)
+          if ((${#volumes[@]})); then
+            printf 'Removing volume %s\n' "${volumes[@]}"
+            docker volume rm "${volumes[@]}" >/dev/null || true
+          fi
+          mapfile -t networks < <(docker network ls --format '{{.Name}}' | grep -E "$pattern" || true)
+          if ((${#networks[@]})); then
+            printf 'Removing network %s\n' "${networks[@]}"
+            docker network rm "${networks[@]}" >/dev/null || true
+          fi
+          echo 'Containers still running:'
+          docker ps --format '  {{.Names}} ({{.Status}})'
+          free -m || true
+          for file in /sys/fs/cgroup/memory.current /sys/fs/cgroup/memory.max; do
+            if [[ -r "$file" ]]; then echo "$file: $(cat "$file")"; fi
+          done
+
       - name: Checks
         run: pnpm ci:local --with-production --with-autodeploy
 

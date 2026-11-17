@@ -267,6 +267,67 @@ describe('assignment and ownership (H02, H08)', () => {
     expect(messages.find((m) => m.text?.startsWith('Internal: courier'))?.private).toBe(true);
   });
 
+  it('shows a teammate to the customer by first name and photo, never the full name', async () => {
+    type Event = { data?: { message?: { parts?: { text?: string }[]; sender?: unknown } } };
+    const live = (events: Event[], text: string) =>
+      events.find((e) => e.data?.message?.parts?.[0]?.text === text)?.data?.message?.sender;
+    const history = async () =>
+      (await v2.call('GET', `/v1/widget/conversations/${c2}/messages?limit=50`)).body as {
+        items: { parts: { text?: string }[]; sender: unknown }[];
+      };
+    const said = (body: Awaited<ReturnType<typeof history>>, text: string) =>
+      body.items.find((m) => m.parts[0]?.text === text)?.sender;
+
+    // Without a choice: the first word of the name, and no photo.
+    const first = 'Hi, I am checking your order now.';
+    const before = await history();
+    expect(said(before, first)).toEqual({
+      kind: 'human_agent',
+      displayName: 'Amina',
+      roleLabel: 'Support agent',
+    });
+    expect(JSON.stringify(before)).not.toContain('Amina Agent');
+
+    // She chooses how customers see her; her next reply carries it, live and in the history.
+    const profile = await amina.client.patch('/v1/inbox/profile', {
+      publicName: 'Mina',
+      photoUrl: 'https://cdn.north.example/mina.jpg',
+    });
+    expect(profile.status, JSON.stringify(profile.body)).toBe(200);
+    const stream = v2.stream(c2);
+    onTestFinished(() => stream.close());
+    await stream.ready;
+    const second = 'Your parcel left the warehouse this morning.';
+    const reply = await amina.client.post(`/v1/conversations/${c2}/messages`, {
+      clientMessageId: randomUUID(),
+      text: second,
+      expectedEpoch: await epochOf(amina.client, c2),
+    });
+    expect(reply.status, JSON.stringify(reply.body)).toBe(202);
+    await slice.drain();
+    await stream.until((s) => live(s.events as Event[], second) !== undefined);
+    const face = {
+      kind: 'human_agent',
+      displayName: 'Mina',
+      roleLabel: 'Support agent',
+      avatarUrl: 'https://cdn.north.example/mina.jpg',
+    };
+    expect(live(stream.events as Event[], second)).toEqual(face);
+    expect(JSON.stringify(stream.messages)).not.toContain('Amina Agent');
+    const after = await history();
+    expect(said(after, second)).toEqual(face);
+    expect(said(after, first)).toEqual(face);
+    expect(JSON.stringify(after)).not.toContain('Amina Agent');
+
+    // Staff still see who wrote it by full name.
+    const staff = await amina.client.get(inbox(c2, '/messages'));
+    const items = staff.body.items as Array<Record<string, any>>;
+    expect(items.find((m) => m.parts[0].text === second)?.sender).toMatchObject({
+      kind: 'human_agent',
+      displayName: 'Amina Agent',
+    });
+  });
+
   it('refuses a reply over a colleague and a stale reply; notes stay possible', async () => {
     const over = await rayan.client.post(`/v1/conversations/${c2}/messages`, {
       clientMessageId: randomUUID(),

@@ -27,6 +27,7 @@ import { CARD_TOPIC, CommerceCardsService } from './commerce/card-publisher.serv
 import { COMMERCE_WORKER_PROVIDERS } from './commerce/commerce.module.js';
 import { CommerceWorker } from './commerce/worker.service.js';
 import type { AppConfig } from './config.js';
+import { StoreTools } from './connectors/store-tools.service.js';
 import { WhmcsTools } from './connectors/whmcs-tools.service.js';
 import { decisionProviders } from './decisions/decisions.providers.js';
 import { RoutingService } from './decisions/routing.service.js';
@@ -139,6 +140,7 @@ export class WorkerModule {
         ModelFactory,
         AiCreditsService,
         WhmcsTools,
+        StoreTools,
         BrandingService,
         { provide: DNS_RESOLVER, useValue: systemDnsResolver(config.SSO_DNS_SERVERS) },
         KillSwitchesService,

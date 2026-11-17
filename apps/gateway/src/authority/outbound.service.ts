@@ -16,6 +16,7 @@ import { APP_DB, CLOCK, type Clock } from '../tokens.js';
 import { type JournalEntry, JournalService } from './journal.service.js';
 import { type ControlRow, OwnershipService } from './ownership.service.js';
 import { AuthorityRegistry } from './registry.js';
+import { staffFaces } from './staff-faces.js';
 import { authorityMessageUuid } from './uuid.js';
 import { contractMessage } from './views.js';
 
@@ -233,6 +234,10 @@ export class OutboundMessagesService {
         and(eq(schema.messageLedger.id, ledgerId), ne(schema.messageLedger.state, 'committed')),
       )
       .returning({ id: schema.messageLedger.id });
+    const lane = input.visibility === 'private' ? 'staff' : 'customer';
+    // What the customer sees of the teammate who wrote: first name and photo.
+    const staff =
+      lane === 'customer' ? await staffFaces(tx, connectionId, [authorityMessage]) : undefined;
     const view = contractMessage({
       message: authorityMessage,
       id: toPublicId('message', authorityMessageUuid(connectionId, authorityMessage.ref)),
@@ -240,8 +245,8 @@ export class OutboundMessagesService {
       sequence: null,
       clientMessageId: input.clientMessageId,
       delivery: 'accepted',
+      ...(staff ? { staff } : {}),
     });
-    const lane = input.visibility === 'private' ? 'staff' : 'customer';
     let entries: JournalEntry[] = [];
     if (!(await this.journal.hasMessage(tx, input.conversationId, lane, authorityId))) {
       entries = await this.journal.append(tx, input.tenantId, input.conversationId, [

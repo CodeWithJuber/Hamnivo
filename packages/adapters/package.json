@@ -58,6 +58,10 @@
     "./whmcs": {
       "types": "./dist/whmcs/index.d.ts",
       "import": "./dist/whmcs/index.js"
+    },
+    "./stores": {
+      "types": "./dist/stores/index.d.ts",
+      "import": "./dist/stores/index.js"
     }
   },
   "files": [

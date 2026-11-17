@@ -34,8 +34,9 @@ Nothing is sent for pages that are not web pages.
 
 ## Tools from your systems
 
-Tools that only read, such as order or invoice look-ups from a connected billing system (WHMCS),
-are given to the assistant by **Make the assistant live**. Tools that change something (a refund,
+Tools that only read, such as order or invoice look-ups from a connected billing system (WHMCS)
+or store ([Shopify or WooCommerce](connect-your-store.md)), are given to the assistant by **Make
+the assistant live**. Tools that change something (a refund,
 an address) stay for you to grant, under **Tools**, with their approvals. A WHMCS customer signed
 in on your website keeps their link to WHMCS for as long as their chat session lasts, so the
 assistant can keep looking things up for them; changes still need the customer's approval with a

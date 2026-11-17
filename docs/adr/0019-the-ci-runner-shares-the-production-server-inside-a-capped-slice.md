@@ -35,6 +35,16 @@ The pipeline wants about 8 GB.
   `--concurrency=2` to turbo. Turbo has no variable for this, and elsewhere it keeps its default.
   - The first run, with turbo's default concurrency, was killed in typecheck at the 4 GB cap.
     Production was untouched: Studio kept answering in under 60 ms.
+  - Type checks and builds run one task at a time (2026-11-17). The type checks of the gateway and
+    of Studio need about 1.7 GB of heap each, so two side by side outgrow the cap. That day a run
+    was killed in the gateway's build and another in `@hamnivo/contracts#typecheck` (both exit
+    137), and a third lost its runner mid-step without a log, probably the same way. `pnpm ci:local` runs them with `--concurrency=1` whenever
+    `HAMNIVO_CI_CONCURRENCY` is set, or with `HAMNIVO_CI_HEAVY_CONCURRENCY` when that is set.
+    The other steps keep two tasks at a time.
+  - A run whose runner dies never runs its cleanup, so its databases, Chatwoot and smoke stacks
+    would hold the next run's memory. Every run starts by removing containers, volumes and
+    networks named like the checks' own (`hamnivo-check-`, `hamnivo-smoke-`,
+    `hamnivo-autodeploy-`, `hamnivo-https-test`), and prints what is left and the memory it sees.
 - **Credentials.** The runner registers once with a one-time token. It keeps its credentials in a
   folder only root can reach on the host. The runner's user id, 1001, belongs to another account
   there.

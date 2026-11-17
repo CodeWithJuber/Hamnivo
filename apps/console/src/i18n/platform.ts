@@ -33,6 +33,18 @@ export const platformCopy = {
     tools: 'MCP and HTTP tools',
     agents: 'External agents',
     credentials: 'Credentials stay on the server. Never paste customer passwords.',
+    connectStore: 'Connect {{name}}',
+    storeHint:
+      'Read only. The assistant can find a signed-in customer’s orders by the email your website verified, or one order by its number and the email it was placed with. It never sees addresses or payment details.',
+    shopifyShop: 'Shop address (….myshopify.com)',
+    shopifyToken: 'Admin API access token',
+    shopifyHint:
+      'In Shopify: Settings → Apps and sales channels → Develop apps → Create an app. Give it read_orders, install it, and copy the Admin API access token.',
+    wooSite: 'Website HTTPS address',
+    wooKey: 'Consumer key',
+    wooSecret: 'Consumer secret',
+    wooHint:
+      'In WordPress: WooCommerce → Settings → Advanced → REST API → Add key, with Read permission. Copy the consumer key and secret.',
     workflowDescription:
       'Build bounded steps, publish a version, and follow each run. Approval steps wait for an authorized person.',
     addStep: 'Add step',
@@ -284,6 +296,18 @@ export const platformCopy = {
     tools: 'MCP और HTTP टूल',
     agents: 'बाहरी एजेंट',
     credentials: 'क्रेडेंशियल सर्वर पर रहते हैं। ग्राहक के पासवर्ड न डालें।',
+    connectStore: '{{name}} जोड़ें',
+    storeHint:
+      'सिर्फ़ पढ़ने के लिए। सहायक साइन-इन ग्राहक के ऑर्डर उस ईमेल से ढूँढ सकता है जिसे आपकी वेबसाइट ने सत्यापित किया है, या एक ऑर्डर उसके नंबर और ऑर्डर वाले ईमेल से। पते और भुगतान की जानकारी उसे कभी नहीं दिखती।',
+    shopifyShop: 'शॉप का पता (….myshopify.com)',
+    shopifyToken: 'Admin API एक्सेस टोकन',
+    shopifyHint:
+      'Shopify में: Settings → Apps and sales channels → Develop apps → Create an app. उसे read_orders दें, इंस्टॉल करें और Admin API एक्सेस टोकन कॉपी करें।',
+    wooSite: 'वेबसाइट का HTTPS पता',
+    wooKey: 'कंज़्यूमर की',
+    wooSecret: 'कंज़्यूमर सीक्रेट',
+    wooHint:
+      'WordPress में: WooCommerce → Settings → Advanced → REST API → Add key, Read अनुमति के साथ। कंज़्यूमर की और सीक्रेट कॉपी करें।',
     workflowDescription:
       'सीमित चरण बनाएँ, संस्करण प्रकाशित करें और हर रन देखें। अनुमोदन चरण अधिकृत व्यक्ति की प्रतीक्षा करते हैं।',
     addStep: 'चरण जोड़ें',
@@ -531,6 +555,18 @@ export const platformCopy = {
     tools: 'MCP اور HTTP ٹولز',
     agents: 'بیرونی ایجنٹس',
     credentials: 'اسناد سرور پر رہتی ہیں۔ صارف کے پاس ورڈ مت ڈالیں۔',
+    connectStore: '{{name}} جوڑیں',
+    storeHint:
+      'صرف پڑھنے کے لیے۔ معاون سائن اِن گاہک کے آرڈر اُس ای میل سے ڈھونڈ سکتا ہے جس کی تصدیق آپ کی ویب سائٹ نے کی ہو، یا ایک آرڈر اُس کے نمبر اور آرڈر والی ای میل سے۔ پتے اور ادائیگی کی تفصیل اسے کبھی نظر نہیں آتی۔',
+    shopifyShop: 'شاپ کا پتہ (….myshopify.com)',
+    shopifyToken: 'Admin API رسائی ٹوکن',
+    shopifyHint:
+      'Shopify میں: Settings ← Apps and sales channels ← Develop apps ← Create an app۔ اسے read_orders دیں، انسٹال کریں اور Admin API رسائی ٹوکن کاپی کریں۔',
+    wooSite: 'ویب سائٹ کا HTTPS پتہ',
+    wooKey: 'کنزیومر کلید',
+    wooSecret: 'کنزیومر خفیہ کلید',
+    wooHint:
+      'WordPress میں: WooCommerce ← Settings ← Advanced ← REST API ← Add key، Read اجازت کے ساتھ۔ کنزیومر کلید اور خفیہ کلید کاپی کریں۔',
     workflowDescription:
       'محدود مراحل بنائیں، ورژن شائع کریں اور ہر اجرا دیکھیں۔ منظوری کے مراحل مجاز فرد کا انتظار کرتے ہیں۔',
     addStep: 'مرحلہ شامل کریں',
@@ -782,6 +818,18 @@ export const platformCopy = {
     tools: 'أدوات MCP وHTTP',
     agents: 'الوكلاء الخارجيون',
     credentials: 'تبقى بيانات الاعتماد على الخادم. لا تلصق كلمات مرور العملاء.',
+    connectStore: 'ربط {{name}}',
+    storeHint:
+      'للقراءة فقط. يستطيع المساعد إيجاد طلبات العميل المسجّل دخوله بالبريد الذي تحقق منه موقعك، أو طلب واحد برقمه والبريد الذي طُلب به. لا يرى العناوين ولا بيانات الدفع أبدًا.',
+    shopifyShop: 'عنوان المتجر (….myshopify.com)',
+    shopifyToken: 'رمز وصول Admin API',
+    shopifyHint:
+      'في Shopify: Settings ← Apps and sales channels ← Develop apps ← Create an app. امنحه read_orders وثبّته وانسخ رمز وصول Admin API.',
+    wooSite: 'عنوان الموقع عبر HTTPS',
+    wooKey: 'مفتاح المستهلك',
+    wooSecret: 'سر المستهلك',
+    wooHint:
+      'في WordPress: WooCommerce ← Settings ← Advanced ← REST API ← Add key بصلاحية Read. انسخ مفتاح المستهلك والسر.',
     workflowDescription:
       'أنشئ خطوات محددة وانشر إصدارًا وتابع كل تشغيل. تنتظر خطوات الموافقة شخصًا مخولًا.',
     addStep: 'إضافة خطوة',

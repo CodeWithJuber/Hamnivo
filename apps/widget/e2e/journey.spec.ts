@@ -113,6 +113,9 @@ test.describe('Hamnivo Chat on a customer website', () => {
     const human = frame.locator('[data-sender="human_agent"]').last();
     await expect(human).toContainText('Your parcel ships today', { timeout: 15_000 });
     await expect(human).toContainText('Support agent');
+    // The customer sees the teammate's first name, never the full name (Sara Staff).
+    await expect(human.getByText('Sara', { exact: true })).toBeVisible();
+    await expect(frame.locator('[data-sender="human_agent"]')).not.toContainText('Sara Staff');
     await expect(frame.getByRole('button', { name: 'Talk to a person' })).toHaveCount(0);
 
     // Closing with Escape returns focus to the launcher.

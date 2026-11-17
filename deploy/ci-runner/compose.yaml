@@ -4,7 +4,8 @@
 # and the work volume sits at the same path in both, so bind mounts resolve.
 # Both are pinned to three cores so Node, Vitest and Playwright size their worker pools for three
 # CPUs, not the host's six; HAMNIVO_CI_CONCURRENCY keeps turbo to two tasks (2026-11-05: with
-# turbo's default, typecheck was killed at the 4 GB cap).
+# turbo's default, typecheck was killed at the 4 GB cap), and HAMNIVO_CI_HEAVY_CONCURRENCY to one
+# for type checks and builds (2026-11-17: two at once were killed there too).
 name: hamnivo-ci
 services:
   dind:
@@ -37,6 +38,8 @@ services:
       RUNNER_LABELS: hamnivo
       TMPDIR: /home/runner/_work/_tmp
       HAMNIVO_CI_CONCURRENCY: "2"
+      # Type checks and builds one at a time: two of the large ones together outgrow 4 GB.
+      HAMNIVO_CI_HEAVY_CONCURRENCY: "1"
     volumes:
       - dind-sock:/var/run
       - work:/home/runner/_work

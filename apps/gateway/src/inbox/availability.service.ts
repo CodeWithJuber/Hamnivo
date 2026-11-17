@@ -11,6 +11,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
 import type { z } from 'zod';
+import { shownName } from '../authority/staff-faces.js';
 import type { AppConfig } from '../config.js';
 import { CLOCK, type Clock, CONFIG, REDIS } from '../tokens.js';
 import { InboxAccess } from './access.js';
@@ -54,13 +55,6 @@ export function effectiveStatus(
  */
 /** Steps "usually replies in" rounds up to, in minutes. */
 const REPLY_STEPS = [1, 5, 15, 30, 60, 120, 240, 480, 1440];
-
-/** The name customers see: the one chosen, or the first word of the display name. */
-export function shownName(row: { displayName: string; publicName: string | null }): string {
-  const chosen = row.publicName?.trim();
-  if (chosen) return chosen.slice(0, 40);
-  return (row.displayName.trim().split(/\s+/)[0] ?? '').slice(0, 40) || 'Team';
-}
 
 function profileView(
   row: { displayName: string; publicName: string | null; photoUrl: string | null } | undefined,

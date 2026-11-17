@@ -15,7 +15,10 @@ import { createdAt, id, tenantIsolation, tstz, updatedAt } from './helpers.js';
 import { brandIdentityKeys, customerPrincipals, secrets, staffMembers } from './identity.js';
 import { brands, tenantId, workspaces } from './tenancy.js';
 
-/** A native connector is one brand's approved WHMCS origin and encrypted API credential. */
+/**
+ * A native connector is one brand's approved WHMCS, Shopify or WooCommerce origin and its
+ * encrypted API credential (Shopify needs only the access token, kept as the token secret).
+ */
 export const connectorConnections = pgTable(
   'connector_connections',
   {
@@ -23,16 +26,20 @@ export const connectorConnections = pgTable(
     tenantId: tenantId(),
     workspaceId: uuid('workspace_id').notNull(),
     brandId: uuid('brand_id').notNull(),
-    kind: text('kind', { enum: ['whmcs'] }).notNull(),
+    kind: text('kind', { enum: ['whmcs', 'shopify', 'woocommerce'] }).notNull(),
     label: text('label').notNull(),
     baseUrl: text('base_url').notNull(),
     status: text('status', { enum: ['active', 'disabled'] })
       .notNull()
       .default('disabled'),
-    identifierSecretId: uuid('identifier_secret_id').notNull(),
+    /** WHMCS API identifier or WooCommerce consumer key; none for Shopify. */
+    identifierSecretId: uuid('identifier_secret_id'),
     tokenSecretId: uuid('token_secret_id').notNull(),
-    /** The signing key allowed to issue user-and-client widget assertions for this connection. */
-    identityKeyId: uuid('identity_key_id').notNull(),
+    /**
+     * WHMCS: the signing key allowed to issue user-and-client widget assertions for this
+     * connection. Stores have none: they find a customer by the email the website verified.
+     */
+    identityKeyId: uuid('identity_key_id'),
     grantVersion: integer('grant_version').notNull().default(1),
     lastTestedAt: tstz('last_tested_at'),
     lastError: text('last_error'),
@@ -80,6 +87,15 @@ export const connectorConnections = pgTable(
     }),
     check('connector_connections_https_ck', sql`${t.baseUrl} ~ '^https://[^/?#]+/?$'`),
     check('connector_connections_version_ck', sql`${t.grantVersion} > 0`),
+    check('connector_connections_kind_ck', sql`${t.kind} in ('whmcs', 'shopify', 'woocommerce')`),
+    check(
+      'connector_connections_identifier_ck',
+      sql`${t.kind} = 'shopify' or ${t.identifierSecretId} is not null`,
+    ),
+    check(
+      'connector_connections_identity_key_ck',
+      sql`${t.kind} <> 'whmcs' or ${t.identityKeyId} is not null`,
+    ),
     tenantIsolation(),
   ],
 );

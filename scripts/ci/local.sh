@@ -46,6 +46,15 @@ turbo_limit=()
 if [[ -n "${HAMNIVO_CI_CONCURRENCY:-}" ]]; then
   turbo_limit=(--concurrency="$HAMNIVO_CI_CONCURRENCY")
 fi
+# Type checks and builds take the most memory: the gateway's and Studio's type checks need about
+# 1.7 GB each, so two side by side outgrow a 4 GB runner (ADR 0019). On such a runner they run one
+# at a time (HAMNIVO_CI_HEAVY_CONCURRENCY, or 1 when only HAMNIVO_CI_CONCURRENCY is set).
+heavy_limit=()
+if [[ -n "${HAMNIVO_CI_HEAVY_CONCURRENCY:-}" ]]; then
+  heavy_limit=(--concurrency="$HAMNIVO_CI_HEAVY_CONCURRENCY")
+elif [[ -n "${HAMNIVO_CI_CONCURRENCY:-}" ]]; then
+  heavy_limit=(--concurrency=1)
+fi
 
 results=()
 containers=()
@@ -182,7 +191,7 @@ integration() {
 # as separate processes) → fake Chatwoot, with an accessibility audit of the widget.
 widget_journey() {
   throwaway_services 18 || return 1
-  pnpm build ${turbo_limit[@]+"${turbo_limit[@]}"} >/dev/null || return 1
+  pnpm build ${heavy_limit[@]+"${heavy_limit[@]}"} >/dev/null || return 1
   env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN -u WIDGET_SIGNING_KEY "${service_env[@]}" \
     pnpm --filter @hamnivo/widget test:e2e
   local status=$?
@@ -194,7 +203,7 @@ widget_journey() {
 # sign-in, model keys, knowledge, stopping the AI and runs, with axe audits in English and Arabic.
 studio_journey() {
   throwaway_services 18 || return 1
-  pnpm build ${turbo_limit[@]+"${turbo_limit[@]}"} >/dev/null || return 1
+  pnpm build ${heavy_limit[@]+"${heavy_limit[@]}"} >/dev/null || return 1
   env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN -u WIDGET_SIGNING_KEY "${service_env[@]}" \
     pnpm --filter @hamnivo/console test:e2e
   local status=$?
@@ -238,7 +247,7 @@ chatwoot_contract() {
 require node pnpm git openssl
 step "Install dependencies (frozen lockfile)" pnpm install --frozen-lockfile
 step "Lint and format (Biome)" pnpm lint
-step "Typecheck" pnpm typecheck ${turbo_limit[@]+"${turbo_limit[@]}"}
+step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"}
 step "Unit tests" unit_tests
 step "Shell scripts (shellcheck)" shell_scripts
 # The deploy scripts run on Linux servers and use flock and GNU touch, which macOS lacks; elsewhere

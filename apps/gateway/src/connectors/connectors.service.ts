@@ -1,7 +1,9 @@
+import { callShopify, callWooCommerce, StoreApiError } from '@hamnivo/adapters/stores';
 import { callWhmcs } from '@hamnivo/adapters/whmcs';
 import type {
   ConnectorCapability,
   ConnectorConnection,
+  ConnectorKind,
   ConnectorPermissionsTestResult,
   CreateConnectorRequest,
   ReconnectConnectorRequest,
@@ -18,7 +20,16 @@ import {
   toPublicId,
   withTenant,
 } from '@hamnivo/db';
-import { WHMCS_CAPABILITIES, WHMCS_SPEC, whmcsPermissions } from '@hamnivo/domain/connectors';
+import {
+  STORE_CAPABILITIES,
+  STORE_KINDS,
+  STORE_SPEC,
+  type StoreCapability,
+  WHMCS_CAPABILITIES,
+  WHMCS_SPEC,
+  type WhmcsCapability,
+  whmcsPermissions,
+} from '@hamnivo/domain/connectors';
 import { authorize, type StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -31,12 +42,30 @@ import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 
 type ConnectionRow = typeof schema.connectorConnections.$inferSelect;
 
-function cleanOrigin(value: string): string {
+const PRODUCT: Record<ConnectorKind, string> = {
+  whmcs: 'WHMCS',
+  shopify: 'Shopify',
+  woocommerce: 'WooCommerce',
+};
+
+/** What each kind of connection may be granted. */
+export function capabilitiesOf(kind: ConnectorKind): readonly ConnectorCapability[] {
+  return kind === 'whmcs' ? WHMCS_CAPABILITIES : STORE_CAPABILITIES;
+}
+
+function specOf(kind: ConnectorKind, capability: ConnectorCapability) {
+  return kind === 'whmcs'
+    ? WHMCS_SPEC[capability as WhmcsCapability]
+    : STORE_SPEC[capability as StoreCapability];
+}
+
+function cleanOrigin(value: string, kind: ConnectorKind): string {
+  const product = PRODUCT[kind];
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    throw new AppError('VALIDATION_FAILED', { detail: 'A WHMCS HTTPS root URL is required.' });
+    throw new AppError('VALIDATION_FAILED', { detail: `A ${product} HTTPS root URL is required.` });
   }
   if (
     url.protocol !== 'https:' ||
@@ -46,9 +75,42 @@ function cleanOrigin(value: string): string {
     url.hash ||
     url.pathname !== '/'
   ) {
-    throw new AppError('VALIDATION_FAILED', { detail: 'Use the public HTTPS root URL of WHMCS.' });
+    throw new AppError('VALIDATION_FAILED', {
+      detail: `Use the public HTTPS root URL of ${product}.`,
+    });
+  }
+  // The Admin API answers on the shop's own myshopify.com address, not its custom domain.
+  if (kind === 'shopify' && !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(url.hostname)) {
+    throw new AppError('VALIDATION_FAILED', {
+      detail: 'Use the shop’s myshopify.com address, such as https://noor-books.myshopify.com/.',
+    });
   }
   return `${url.origin}/`;
+}
+
+/** What a failed store check says, in plain words (never the store's own answer). */
+export function storeProblem(kind: 'shopify' | 'woocommerce', error: unknown): string {
+  const product = PRODUCT[kind];
+  const problem = error instanceof StoreApiError ? error.kind : 'network';
+  switch (problem) {
+    case 'auth':
+      return kind === 'shopify'
+        ? 'Shopify refused the access token. Check it, and that the app may read orders (read_orders).'
+        : 'WooCommerce refused the key. Check the consumer key and secret, and that the key may read.';
+    case 'not_found':
+      return kind === 'shopify'
+        ? 'No Shopify shop answers at this address.'
+        : 'WooCommerce does not answer at this address. Check that it is installed and that permalinks are not set to Plain.';
+    case 'rate_limited':
+      return `${product} asked Hamnivo to slow down. Try again in a minute.`;
+    case 'egress':
+      return `Hamnivo may not reach this address (it is private or not allowed).`;
+    case 'timeout':
+    case 'network':
+      return `${product} did not answer. Check the address and try again.`;
+    default:
+      return `${product}’s answer could not be read.`;
+  }
 }
 
 @Injectable()
@@ -97,14 +159,16 @@ export class ConnectorsService {
           eq(schema.connectorToolGrants.enabled, 'yes'),
         ),
       );
-    const [key] = await tx
-      .select({ kid: schema.brandIdentityKeys.kid })
-      .from(schema.brandIdentityKeys)
-      .where(eq(schema.brandIdentityKeys.id, row.identityKeyId));
+    const [key] = row.identityKeyId
+      ? await tx
+          .select({ kid: schema.brandIdentityKeys.kid })
+          .from(schema.brandIdentityKeys)
+          .where(eq(schema.brandIdentityKeys.id, row.identityKeyId))
+      : [];
     return {
       id: toPublicId('connection', row.id),
       brandId: toPublicId('brand', row.brandId),
-      kind: 'whmcs',
+      kind: row.kind,
       label: row.label,
       baseUrl: row.baseUrl,
       status: row.status,
@@ -112,19 +176,32 @@ export class ConnectorsService {
       grantVersion: row.grantVersion,
       lastTestedAt: row.lastTestedAt?.toISOString() ?? null,
       lastError: row.lastError,
-      identityKeyId: key?.kid ?? '',
+      identityKeyId: key?.kid ?? null,
     };
   }
 
   catalog() {
     return {
-      items: WHMCS_CAPABILITIES.map((key) => ({
-        key,
-        title: WHMCS_SPEC[key].title,
-        description: WHMCS_SPEC[key].description,
-        risk: WHMCS_SPEC[key].risk,
-        approver: WHMCS_SPEC[key].approver,
-      })),
+      items: [
+        ...WHMCS_CAPABILITIES.map((key) => ({
+          kind: 'whmcs' as const,
+          key,
+          title: WHMCS_SPEC[key].title,
+          description: WHMCS_SPEC[key].description,
+          risk: WHMCS_SPEC[key].risk,
+          approver: WHMCS_SPEC[key].approver,
+        })),
+        ...STORE_KINDS.flatMap((kind) =>
+          STORE_CAPABILITIES.map((key) => ({
+            kind,
+            key,
+            title: STORE_SPEC[key].title,
+            description: STORE_SPEC[key].description,
+            risk: STORE_SPEC[key].risk,
+            approver: STORE_SPEC[key].approver,
+          })),
+        ),
+      ],
     };
   }
 
@@ -155,8 +232,24 @@ export class ConnectorsService {
     principal: StaffPrincipal,
     input: CreateConnectorRequest,
   ): Promise<ConnectorConnection> {
-    const baseUrl = cleanOrigin(input.baseUrl);
+    const kind = input.kind;
+    const baseUrl = cleanOrigin(input.baseUrl, kind);
     const capabilities = [...new Set(input.capabilities)];
+    const allowed = capabilitiesOf(kind);
+    if (capabilities.some((capability) => !allowed.includes(capability))) {
+      throw new AppError('VALIDATION_FAILED', {
+        detail: `Choose ${PRODUCT[kind]} capabilities only.`,
+      });
+    }
+    const identifier = kind === 'shopify' ? null : (input.identifier ?? null);
+    if (kind !== 'shopify' && !identifier) {
+      throw new AppError('VALIDATION_FAILED', {
+        detail:
+          kind === 'whmcs'
+            ? 'The WHMCS API identifier is required.'
+            : 'The WooCommerce consumer key is required.',
+      });
+    }
     const result = await this.tx(principal, async (tx) => {
       const brandId = fromPublicId('brand', input.brandId);
       const [brand] = await tx.select().from(schema.brands).where(eq(schema.brands.id, brandId));
@@ -169,27 +262,36 @@ export class ConnectorsService {
           { now: this.clock(), stepUpMaxAgeMs: this.config.STEP_UP_MAX_AGE_MINUTES * 60000 },
         ),
       );
-      const [key] = await tx
-        .select()
-        .from(schema.brandIdentityKeys)
-        .where(
-          and(
-            eq(schema.brandIdentityKeys.kid, input.identityKeyId),
-            eq(schema.brandIdentityKeys.brandId, brandId),
-            eq(schema.brandIdentityKeys.status, 'active'),
-          ),
-        );
-      if (!key)
-        throw new AppError('VALIDATION_FAILED', {
-          detail: 'Choose an active identity key of this brand.',
-        });
-      const identifierSecretId = await this.secrets.storeIn(tx, principal.tenantId, {
-        kind: 'whmcs_identifier',
-        label: input.label,
-        value: input.identifier,
-      });
+      // WHMCS trusts one identity key's sign-ins; a store finds customers by verified email.
+      let identityKeyId: string | null = null;
+      if (kind === 'whmcs') {
+        const [key] = input.identityKeyId
+          ? await tx
+              .select()
+              .from(schema.brandIdentityKeys)
+              .where(
+                and(
+                  eq(schema.brandIdentityKeys.kid, input.identityKeyId),
+                  eq(schema.brandIdentityKeys.brandId, brandId),
+                  eq(schema.brandIdentityKeys.status, 'active'),
+                ),
+              )
+          : [];
+        if (!key)
+          throw new AppError('VALIDATION_FAILED', {
+            detail: 'Choose an active identity key of this brand.',
+          });
+        identityKeyId = key.id;
+      }
+      const identifierSecretId = identifier
+        ? await this.secrets.storeIn(tx, principal.tenantId, {
+            kind: `${kind}_identifier`,
+            label: input.label,
+            value: identifier,
+          })
+        : null;
       const tokenSecretId = await this.secrets.storeIn(tx, principal.tenantId, {
-        kind: 'whmcs_secret',
+        kind: `${kind}_secret`,
         label: input.label,
         value: input.secret,
       });
@@ -199,12 +301,12 @@ export class ConnectorsService {
           tenantId: principal.tenantId,
           workspaceId: brand.workspaceId,
           brandId,
-          kind: 'whmcs',
+          kind,
           label: input.label,
           baseUrl,
           identifierSecretId,
           tokenSecretId,
-          identityKeyId: key.id,
+          identityKeyId,
           createdBy: principal.staffMemberId,
         })
         .returning();
@@ -245,9 +347,9 @@ export class ConnectorsService {
     capability: ConnectorCapability,
     staffId: string,
   ): Promise<void> {
-    const spec = WHMCS_SPEC[capability];
+    const spec = specOf(row.kind, capability);
     const id = newId();
-    const name = `whmcs_${capability.replace('.', '_')}_${row.id.replace(/-/g, '')}`;
+    const name = `${row.kind}_${capability.replace('.', '_')}_${row.id.replace(/-/g, '')}`;
     await tx.insert(schema.toolDefinitions).values({
       id,
       tenantId: row.tenantId,
@@ -263,7 +365,7 @@ export class ConnectorsService {
       approver: spec.approver,
       autopilot: spec.risk === 'read',
       customerStepUp: spec.approver === 'customer' && spec.risk !== 'read',
-      resourceType: 'whmcs',
+      resourceType: row.kind === 'whmcs' ? 'whmcs' : 'store',
       egressHosts: [new URL(row.baseUrl).hostname],
       status: row.status === 'active' ? 'enabled' : 'disabled',
       createdBy: staffId,
@@ -282,23 +384,48 @@ export class ConnectorsService {
   async test(principal: StaffPrincipal, id: string) {
     const loaded = await this.tx(principal, async (tx) => {
       const row = await this.row(tx, id, principal);
-      const identifier = await this.secrets.reveal(tx, principal.tenantId, row.identifierSecretId);
+      const identifier = row.identifierSecretId
+        ? await this.secrets.reveal(tx, principal.tenantId, row.identifierSecretId)
+        : '';
       const secret = await this.secrets.reveal(tx, principal.tenantId, row.tokenSecretId);
       const policy = await this.egress.policyIn(tx, []);
       return { row, identifier, secret, policy };
     });
+    const kind = loaded.row.kind;
     let ok = false;
+    let failure = 'WHMCS API test failed or the destination is blocked.';
     try {
-      await callWhmcs({
-        baseUrl: loaded.row.baseUrl,
-        credentials: { identifier: loaded.identifier, secret: loaded.secret },
-        action: 'GetCurrencies',
-        policy: loaded.policy,
-        timeoutMs: 8000,
-      });
+      // One cheap read: the credential works and the address is the product's.
+      if (kind === 'shopify') {
+        await callShopify({
+          baseUrl: loaded.row.baseUrl,
+          token: loaded.secret,
+          query: 'shop',
+          policy: loaded.policy,
+          timeoutMs: 8000,
+        });
+      } else if (kind === 'woocommerce') {
+        await callWooCommerce({
+          baseUrl: loaded.row.baseUrl,
+          key: loaded.identifier,
+          secret: loaded.secret,
+          read: { kind: 'check' },
+          policy: loaded.policy,
+          timeoutMs: 8000,
+        });
+      } else {
+        await callWhmcs({
+          baseUrl: loaded.row.baseUrl,
+          credentials: { identifier: loaded.identifier, secret: loaded.secret },
+          action: 'GetCurrencies',
+          policy: loaded.policy,
+          timeoutMs: 8000,
+        });
+      }
       ok = true;
-    } catch {
-      /* The result is recorded as a generic health failure; never return credentials or API text. */
+    } catch (error) {
+      /* Recorded as a health failure in plain words; never credentials or the API's own text. */
+      if (kind !== 'whmcs') failure = storeProblem(kind, error);
     }
     const checkedAt = this.clock();
     await this.tx(principal, async (tx) => {
@@ -309,7 +436,7 @@ export class ConnectorsService {
         .set({
           status: ok ? 'active' : 'disabled',
           lastTestedAt: checkedAt,
-          lastError: ok ? null : 'WHMCS API test failed or the destination is blocked.',
+          lastError: ok ? null : failure,
           grantVersion: sql`${schema.connectorConnections.grantVersion} + 1`,
         })
         .where(eq(schema.connectorConnections.id, loaded.row.id));
@@ -341,9 +468,7 @@ export class ConnectorsService {
     return {
       ok,
       checkedAt: checkedAt.toISOString(),
-      message: ok
-        ? 'WHMCS connection is healthy.'
-        : 'WHMCS API test failed or the destination is blocked.',
+      message: ok ? `${PRODUCT[kind]} connection is healthy.` : failure,
     };
   }
 
@@ -382,6 +507,11 @@ export class ConnectorsService {
   ): Promise<ConnectorPermissionsTestResult> {
     const loaded = await this.tx(principal, async (tx) => {
       const row = await this.row(tx, id, principal);
+      if (row.kind !== 'whmcs' || !row.identifierSecretId) {
+        throw new AppError('VALIDATION_FAILED', {
+          detail: 'Only WHMCS connections check a user’s permissions.',
+        });
+      }
       return {
         row,
         credentials: {
@@ -458,7 +588,22 @@ export class ConnectorsService {
   async reconnect(principal: StaffPrincipal, id: string, input: ReconnectConnectorRequest) {
     await this.tx(principal, async (tx) => {
       const row = await this.row(tx, id, principal);
-      await this.secrets.rotateIn(tx, principal.tenantId, row.identifierSecretId, input.identifier);
+      if (row.identifierSecretId) {
+        if (!input.identifier) {
+          throw new AppError('VALIDATION_FAILED', {
+            detail:
+              row.kind === 'whmcs'
+                ? 'The WHMCS API identifier is required.'
+                : 'The WooCommerce consumer key is required.',
+          });
+        }
+        await this.secrets.rotateIn(
+          tx,
+          principal.tenantId,
+          row.identifierSecretId,
+          input.identifier,
+        );
+      }
       await this.secrets.rotateIn(tx, principal.tenantId, row.tokenSecretId, input.secret);
       // A request inspected with the old credential must fail its final version check.
       await tx
@@ -491,6 +636,12 @@ export class ConnectorsService {
     return this.tx(principal, async (tx) => {
       const row = await this.row(tx, id, principal);
       if (row.grantVersion !== input.expectedVersion) throw new AppError('VERSION_CONFLICT');
+      const allowed = capabilitiesOf(row.kind);
+      if (input.capabilities.some((capability) => !allowed.includes(capability))) {
+        throw new AppError('VALIDATION_FAILED', {
+          detail: `Choose ${PRODUCT[row.kind]} capabilities only.`,
+        });
+      }
       const current = await tx
         .select()
         .from(schema.connectorToolGrants)

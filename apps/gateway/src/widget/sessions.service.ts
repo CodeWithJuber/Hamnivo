@@ -543,6 +543,7 @@ export class WidgetSessionsService {
           .where(
             and(
               eq(schema.connectorConnections.brandId, claims.brandId),
+              eq(schema.connectorConnections.kind, 'whmcs'),
               eq(schema.connectorConnections.identityKeyId, key.id),
               eq(schema.connectorConnections.status, 'active'),
             ),

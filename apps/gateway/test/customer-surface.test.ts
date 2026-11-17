@@ -8,6 +8,7 @@ import {
   isDeleted,
   reactionOf,
 } from '../src/authority/extended-parts.js';
+import { firstName, type StaffFace, shownName } from '../src/authority/staff-faces.js';
 import { contractMessage } from '../src/authority/views.js';
 import type { AppConfig } from '../src/config.js';
 import { cleanFileName, filesScannable, sniff } from '../src/widget/attachments.service.js';
@@ -171,6 +172,46 @@ describe('message parts from the authority (W09, W22–W24)', () => {
       sender: { kind: 'human_agent', displayName: 'Sara' },
       parts: [{ type: 'notice', notice: 'message_deleted', text: 'This message was deleted.' }],
     });
+  });
+
+  it('shows customers a teammate by first name and photo; staff by the full name', () => {
+    const staffView = (m: AuthorityMessage, staff: ReadonlyMap<string, StaffFace>) =>
+      contractMessage({
+        message: m,
+        id: MESSAGE_ID,
+        conversationId: toPublicId('conversation', '0191b0f0-0000-7000-8000-000000000042'),
+        sequence: null,
+        clientMessageId: null,
+        delivery: null,
+        staff,
+      });
+    const full = message({ sender: { kind: 'user', ref: '3', name: 'Sara Khan' } });
+    const faces = new Map([['3', { name: 'Sara', photoUrl: 'https://cdn.example/sara.jpg' }]]);
+    expect(staffView(full, faces).sender).toEqual({
+      kind: 'human_agent',
+      displayName: 'Sara',
+      roleLabel: 'Support agent',
+      avatarUrl: 'https://cdn.example/sara.jpg',
+    });
+    // A Chatwoot user Hamnivo does not know: the first word only, no photo.
+    expect(staffView(full, new Map()).sender).toEqual({
+      kind: 'human_agent',
+      displayName: 'Sara',
+      roleLabel: 'Support agent',
+    });
+    expect(
+      staffView(message({ sender: { kind: 'user', ref: '3', name: null } }), new Map()).sender
+        .displayName,
+    ).toBe('Support agent');
+    // The assistant and the customer are untouched; staff views keep the full name.
+    expect(
+      staffView(message({ sender: { kind: 'bot', ref: '3', name: 'Noor Helper' } }), faces).sender
+        .displayName,
+    ).toBe('Noor Helper');
+    expect(view(full).sender.displayName).toBe('Sara Khan');
+    expect(shownName({ displayName: 'Sara Khan', publicName: null })).toBe('Sara');
+    expect(shownName({ displayName: 'Sara Khan', publicName: '  Sally ' })).toBe('Sally');
+    expect(firstName('   ')).toBe('Team');
   });
 
   it('shows a file sent without words as the file alone', () => {

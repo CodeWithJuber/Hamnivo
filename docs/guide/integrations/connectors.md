@@ -69,6 +69,14 @@ If a network or response failure happens after a write may have reached WHMCS, H
 unknown outcome and does not send a matching request again. Staff must check WHMCS and reconcile
 the operation. This avoids creating a second ticket, upgrade, or cancellation after a lost answer.
 
+## Connect Shopify or WooCommerce
+
+A store connection lets the assistant read orders, and nothing else: a signed-in customer's recent
+orders by the email your website verified, or one order by its number and the email it was placed
+with. Under **Shopify** or **WooCommerce**, choose **Connect Shopify** or **Connect WooCommerce**.
+Where to get each key, and what the assistant can tell customers:
+[Let the assistant look up orders](../ai/connect-your-store.md).
+
 ## Connect an external specialist agent
 
 Hamnivo supports private A2A 1.0 HTTP+JSON specialists. On **Connectors**, under **External
