@@ -10,6 +10,7 @@ import {
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq, gt, isNotNull, ne } from 'drizzle-orm';
 import { AuthorityRegistry } from '../authority/registry.js';
+import { staffFaces } from '../authority/staff-faces.js';
 import { authorityMessageUuid } from '../authority/uuid.js';
 import { contractMessage, publicationFacts } from '../authority/views.js';
 import { sendBrandedCustomerMail } from '../branding/customer-email.js';
@@ -204,9 +205,10 @@ export class CustomerEmailsService {
         inboxRef: String(context.inbox.externalInboxId),
       },
     );
-    const facts = await withTenant(this.db, { tenantId }, (tx) =>
-      publicationFacts(tx, conversationId, listed),
-    );
+    const { facts, staff } = await withTenant(this.db, { tenantId }, async (tx) => ({
+      facts: await publicationFacts(tx, conversationId, listed),
+      staff: await staffFaces(tx, who.control.connectionId, listed),
+    }));
     const lang = notifyLocale(who.principal.locale);
     const copy = NOTIFY_COPY[lang];
     const timeZone = who.brand.businessHours?.timezone ?? 'UTC';
@@ -226,6 +228,7 @@ export class CustomerEmailsService {
           clientMessageId: null,
           delivery: null,
           ...(facts.has(m.ref) ? { facts: facts.get(m.ref) } : {}),
+          staff,
         }),
       )
       .map((m) => transcriptLine(m, copy, format.format(new Date(m.createdAt))));

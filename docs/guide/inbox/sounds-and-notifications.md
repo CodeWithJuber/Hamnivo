@@ -79,7 +79,9 @@ choose who to assign a chat to, each name shows whether that person is online, a
 ## How customers see you
 
 While you are online, the chat's home screen shows customers who on the team is there: up to
-three people, each with a first name and a photo, and how soon your team usually replies.
+three people, each with a first name and a photo, and how soon your team usually replies. Your
+replies in a chat carry the same first name and photo, in the chat, its history and the emailed
+transcript.
 
 1. Open **Inbox**, then **Alerts** (the bell).
 2. Under **How customers see you**, type the **First name customers see**. Leave it empty to use
@@ -88,7 +90,8 @@ three people, each with a first name and a photo, and how soon your team usually
    initials.
 4. Press **Save**.
 
-Customers never see your full name or your email. "Usually replies in …" comes from your team's
+Customers never see your full name or your email. A change shows on your next reply, and on
+earlier ones when the customer opens the chat again. "Usually replies in …" comes from your team's
 replies over the last 30 days, and is shown only once there are enough chats to say it.
 
 ## Typing

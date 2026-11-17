@@ -335,10 +335,12 @@ describe('the vertical slice: widget → Chatwoot → webhook → journal → st
     );
     await new Promise((resolve) => setTimeout(resolve, 300));
     const human = stream.events.find((e) => e.data?.message?.sender?.kind === 'human_agent');
+    // A person, by first name only: the customer never sees a teammate's full name.
     expect(human?.data.message.sender).toMatchObject({
-      displayName: 'alpha Owner',
+      displayName: 'alpha',
       roleLabel: 'Support agent',
     });
+    expect(JSON.stringify(stream.messages)).not.toContain('alpha Owner');
     expect(JSON.stringify(stream.messages)).not.toContain('courier delayed');
     const history = await visitor.call(
       'GET',

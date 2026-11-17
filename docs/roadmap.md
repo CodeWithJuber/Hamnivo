@@ -99,10 +99,9 @@ wait for a test store.
 | **The team on the home screen.** Up to three online people (photo or initials, first names), "Sara and Ali are online", "Usually replies in 5 minutes" (median time to a person's first reply over 30 days, above the reports' smallest group, cached an hour per brand), and one **Chat with us** button to the message box. Never a full name or an email. | `WidgetConfig.team`, `widget/sessions.service.ts`, widget `Home.tsx`, `shell/TeamAvatars.tsx` | `team.int.test.ts`, `team.test.tsx` (four languages), layout audit |
 | **A calmer header.** Language, More and close (and larger where the website allows); memory moved into More with past chats and settings. | `shell/Header.tsx`, `Chat.tsx` | `memory.spec.ts` (opens More first) |
 
-- Not done: a teammate's photo next to their replies in the conversation (replies still show
-  their name; their photo needs the reply's sender linked to the teammate on both the history and
-  the live paths). The language picker stays in the header: it is how visitors who read Arabic or
-  Urdu find their language, and 11 browser journeys use it there.
+- Not done in phase E, done after it (below): a teammate's photo next to their replies. The
+  language picker stays in the header: it is how visitors who read Arabic or Urdu find their
+  language, and 11 browser journeys use it there.
 - Found by the screenshots and fixed: with the team row the home screen grew taller than a
   desktop chat, and it opened scrolled to its bottom like a conversation (greeting half hidden).
   It now reads from the top.
@@ -111,6 +110,13 @@ wait for a test store.
 321; Studio unit 754 of 754; widget unit 102 of 102 and `test:e2e` 50 of 50; layout audit 300 of
 300 clean with the team on home at every size; `forge verify`: all 24 suites pass (INCOMPLETE only
 for `apps/site` and `integrations/php-sdk`, which it cannot run).
+
+### After phase E: a teammate on their replies
+
+| What | Where | Checked by |
+|---|---|---|
+| **A teammate's replies carry the first name and photo they chose**, the same rule as the home screen: in the live chat, its history and the emailed transcript. A Chatwoot user Hamnivo did not create shows as the first word of their name. Staff views keep the full name. | `authority/staff-faces.ts` (from `staff_authority_links`), `authority/views.ts`, `processor.service.ts`, `outbound.service.ts`, `widget/conversations.service.ts`, `widget/customer-emails.service.ts` | `inbox.int.test.ts` (live, history, staff view; fails without the change), `customer-surface.test.ts`, widget `team.test.tsx`, `journey.spec.ts` |
+| **The Studio channels journey** checks the Connectors row Channels sits in today (it looked for a "Settings pages" row Studio no longer has). | `apps/console/e2e/channels.spec.ts` | Studio e2e |
 
 ## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
 

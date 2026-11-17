@@ -34,6 +34,7 @@ import {
 import { type ControlRow, OwnershipService } from '../authority/ownership.service.js';
 import { RECONCILE_MIN_SECONDS } from '../authority/reconcile-policy.js';
 import { AuthorityRegistry } from '../authority/registry.js';
+import { staffFaces } from '../authority/staff-faces.js';
 import { authorityMessageUuid, uuidV5 } from '../authority/uuid.js';
 import { contractMessage, publicationFacts } from '../authority/views.js';
 import { queueAutomationEvent } from '../automations/events.js';
@@ -611,7 +612,10 @@ export class WidgetConversationsService {
     } catch (error) {
       throw authorityUnavailable(error, 'History could not be loaded. Please try again.');
     }
-    const facts = await this.tx(claims, (tx) => publicationFacts(tx, conversationId, messages));
+    const { facts, staff } = await this.tx(claims, async (tx) => ({
+      facts: await publicationFacts(tx, conversationId, messages),
+      staff: await staffFaces(tx, context.control.connectionId, messages),
+    }));
     const before = query.before
       ? Number(Buffer.from(query.before, 'base64url').toString('utf8'))
       : Number.POSITIVE_INFINITY;
@@ -641,6 +645,7 @@ export class WidgetConversationsService {
           clientMessageId: context.clientIds.get(m.ref) ?? null,
           delivery: deliveryOf(m),
           ...(facts.has(m.ref) ? { facts: facts.get(m.ref) } : {}),
+          staff,
         }),
       ),
       olderCursor:

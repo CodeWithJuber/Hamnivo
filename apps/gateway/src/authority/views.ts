@@ -14,6 +14,7 @@ import type { AuthorityMessage } from '@hamnivo/domain';
 import { and, eq, inArray, or } from 'drizzle-orm';
 import type { z } from 'zod';
 import { attachmentParts, DELETED_PART, isDeleted, reactionOf } from './extended-parts.js';
+import { firstName, type StaffFace } from './staff-faces.js';
 
 export type SourceRef = z.infer<typeof SourcePart>;
 export type MemoryPartRef = z.infer<typeof MemoryPart>;
@@ -157,10 +158,27 @@ export function contractMessage(input: {
   delivery: DeliveryState | null;
   /** What Hamnivo recorded when it published this AI answer (never taken from the authority). */
   facts?: PublicationFacts;
+  /**
+   * For what a customer sees (the customer lane, history, emails): the teammates who wrote, by
+   * the authority's user reference (`staffFaces`). A teammate is then shown by first name and
+   * photo, never by full name; a Chatwoot user Hamnivo does not know by the first word of theirs.
+   * Staff views leave it out and keep the full name.
+   */
+  staff?: ReadonlyMap<string, StaffFace>;
 }): Message {
   const sender = senderOf(input.message);
   if (sender.kind === 'ai_agent' && input.facts?.displayName) {
     sender.displayName = input.facts.displayName;
+  }
+  const author = input.message.sender;
+  if (input.staff && sender.kind === 'human_agent' && author.kind === 'user') {
+    const face = input.staff.get(author.ref);
+    if (face) {
+      sender.displayName = face.name;
+      if (face.photoUrl) sender.avatarUrl = face.photoUrl;
+    } else if (author.name?.trim()) {
+      sender.displayName = firstName(author.name);
+    }
   }
   const card = input.facts?.card;
   if (card && sender.kind === 'ai_agent') {

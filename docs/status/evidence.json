@@ -437,9 +437,13 @@
       "apps/widget/src/components/thread/model.ts",
       "apps/widget/src/components/thread/grouping.ts",
       "apps/widget/test/thread-model.test.ts",
-      "apps/widget/test/grouping.test.ts"
+      "apps/widget/test/grouping.test.ts",
+      "apps/gateway/src/authority/staff-faces.ts",
+      "apps/gateway/test/inbox.int.test.ts",
+      "apps/gateway/test/customer-surface.test.ts",
+      "apps/widget/test/team.test.tsx"
     ],
-    "note": "Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested). Replies one sender writes in a row share one name and picture (the sender's own, the brand's logo for its assistant, or initials); the name and role stay in the page for every message, so identity never rests on a picture (grouping unit-tested)."
+    "note": "Every message shows who wrote it with a text role label; AI answers carry the agent's configured display name from Hamnivo's record, never a Chatwoot-side name (tested). Replies one sender writes in a row share one name and picture (the sender's own, the brand's logo for its assistant, or initials); the name and role stay in the page for every message, so identity never rests on a picture (grouping unit-tested). A teammate's replies carry the first name and https photo they chose in Studio (How customers see you), the same rule as the home screen, live, in the history and in the emailed transcript; a Chatwoot user Hamnivo did not create shows as the first word of their name, and staff views keep the full name (gateway integration-tested, failing without the change; the widget journey checks the first name)."
   },
   "W10": {
     "status": "in-progress",

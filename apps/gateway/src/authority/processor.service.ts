@@ -43,6 +43,7 @@ import { type JournalEntry, JournalService } from './journal.service.js';
 import { type ControlRow, OwnershipService, type OwnerTarget } from './ownership.service.js';
 import { PublicationsService } from './publications.service.js';
 import { redactJournaledMessage } from './redaction.js';
+import { staffFaces } from './staff-faces.js';
 import { authorityMessageUuid } from './uuid.js';
 import { contractMessage, laneOf, publicationFacts } from './views.js';
 
@@ -287,6 +288,8 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
     let fresh = false;
     if (lane) {
       const facts = (await publicationFacts(tx, control.id, [message])).get(message.ref);
+      // What the customer sees of the teammate who wrote: first name and photo.
+      const staff = lane === 'customer' ? await staffFaces(tx, connectionId, [message]) : undefined;
       const view = contractMessage({
         message,
         id: toPublicId('message', authorityMessageUuid(connectionId, message.ref)),
@@ -295,6 +298,7 @@ export class InboxProcessor implements OnApplicationBootstrap, OnApplicationShut
         clientMessageId,
         delivery: message.direction === 'incoming' ? 'accepted' : null,
         ...(facts ? { facts } : {}),
+        ...(staff ? { staff } : {}),
       });
       if (type === 'message.created') {
         fresh = !(await this.journal.hasMessage(tx, control.id, lane, authorityId));
