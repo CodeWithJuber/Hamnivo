@@ -1257,7 +1257,7 @@ The checks write `test-results/ci-local.md`. On the self-hosted runner, the Acti
 ssh COMPUTE_HOST 'docker exec hamnivo-ci-runner-1 cat /home/runner/.cache/hamnivo-ci-results/ci-results-RUN_ID-ATTEMPT.tar.gz' > ci-results.tar.gz
 ```
 
-The operator's SSH account needs access to the runner container. An explicitly selected GitHub-hosted runner keeps the existing `ci-results` Actions download for 14 days.
+The operator's SSH account needs access to the runner container.
 
 ### Run the checks on GitHub
 
@@ -1313,9 +1313,8 @@ The runner registers on its first start and keeps its credentials in `state/`. S
 (`HAMNIVO_CI_CONCURRENCY=2`), and type checks and builds one at a time
 (`HAMNIVO_CI_HEAVY_CONCURRENCY=1`), so they take longer than on a laptop.
 
-To use GitHub's own runners instead, set the repository variable `HAMNIVO_CI_RUNNER` to
-`["ubuntu-latest"]`, under **Settings → Secrets and variables → Actions → Variables**. GitHub
-bills private repositories for those by the minute.
+The full checks run on the self-hosted Linux x64 runner labelled `hamnivo`, which owns the report volume.
+`HAMNIVO_CI_RUNNER` can still select the runner for publishing packages.
 
 To run the quick checks automatically before every `git push`:
 
