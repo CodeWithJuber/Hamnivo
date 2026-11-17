@@ -103,6 +103,14 @@ wait for a test store.
   their name; their photo needs the reply's sender linked to the teammate on both the history and
   the live paths). The language picker stays in the header: it is how visitors who read Arabic or
   Urdu find their language, and 11 browser journeys use it there.
+- Found by the screenshots and fixed: with the team row the home screen grew taller than a
+  desktop chat, and it opened scrolled to its bottom like a conversation (greeting half hidden).
+  It now reads from the top.
+
+**Phase E results on 2026-11-17.** Gateway integration 882 of 882 (68 files); gateway unit 321 of
+321; Studio unit 754 of 754; widget unit 102 of 102 and `test:e2e` 50 of 50; layout audit 300 of
+300 clean with the team on home at every size; `forge verify`: all 24 suites pass (INCOMPLETE only
+for `apps/site` and `integrations/php-sdk`, which it cannot run).
 
 ## Advanced chat (started 2026-11-16, branch `ccr-cc8a8908-q5anbo`)
 
