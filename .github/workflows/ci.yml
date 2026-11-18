@@ -1,7 +1,6 @@
 # The full check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, with the production
-# and automatic-deploy smoke tests. It runs on every push, on a runner of your own: hosted runners
-# never started for this private repository (ADR 0007). To use other runners, set the repository
-# variable HAMNIVO_CI_RUNNER to a JSON list of labels, such as ["ubuntu-latest"].
+# and automatic-deploy smoke tests. Run on the dedicated compute runner so each report is archived
+# on the persistent volume documented in docs/self-hosting.md.
 name: CI
 
 on:
@@ -19,7 +18,7 @@ permissions:
 jobs:
   checks:
     name: checks
-    runs-on: ${{ fromJSON(vars.HAMNIVO_CI_RUNNER || '["self-hosted", "linux", "x64", "hamnivo"]') }}
+    runs-on: [self-hosted, linux, x64, hamnivo]
     timeout-minutes: 150
     env:
       TURBO_TELEMETRY_DISABLED: '1'
@@ -76,17 +75,9 @@ jobs:
         run: pnpm ci:local --with-production --with-autodeploy
 
       - name: Keep results on the compute runner
-        if: always() && steps.checkout.outcome == 'success' && runner.environment == 'self-hosted'
+        if: always() && steps.checkout.outcome == 'success'
         run: bash scripts/ci/archive-results.sh
 
-      - name: Keep results for the hosted runner override
-        if: always() && runner.environment == 'github-hosted'
-        uses: actions/upload-artifact@v7
-        with:
-          name: ci-results
-          path: test-results/
-          if-no-files-found: ignore
-          retention-days: 14
 
       # Only what the smoke tests leave behind; the runner keeps its other images and caches.
       - name: Free disk

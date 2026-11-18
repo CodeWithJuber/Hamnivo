@@ -12,7 +12,7 @@
 # Actions: NPM_TOKEN, an npm access token that may publish the @hamnivo packages (an automation
 # token, or a granular token with read and write on them). The token is never printed.
 #
-# It runs on the same runners as ci.yml: set HAMNIVO_CI_RUNNER to use others. There is no npm
+# Package publication defaults to the CI runner. Set HAMNIVO_CI_RUNNER to select another. There is no npm
 # provenance statement, because npm gives one only to builds on GitHub's own runners.
 name: Release packages
 
