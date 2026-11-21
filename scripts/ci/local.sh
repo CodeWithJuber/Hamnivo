@@ -261,6 +261,22 @@ step "Unit tests" unit_tests
 step "Chat's first open within its size budget" widget_size
 step "Shell scripts (shellcheck)" shell_scripts
 step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
+step "Production dependencies have no high or critical advisory" dependency_audit
+step "No secrets in the code (gitleaks)" secret_scan
+# The supply chain (production-ready plan): what ships has no high or critical advisory, and the
+# code holds no secret. The audit asks npm's registry; gitleaks reads the checked-out files with
+# the rules in .gitleaks.toml (made-up keys in tests and examples are allowed).
+dependency_audit() {
+  pnpm audit --prod --audit-level=high
+}
+secret_scan() {
+  if ! command -v gitleaks >/dev/null; then
+    echo 'gitleaks is not installed (deploy/ci-runner/Dockerfile installs it): skipped.' >&2
+    return 0
+  fi
+  gitleaks git --no-banner --redact --config .gitleaks.toml .
+}
+
 # The deploy scripts run on Linux servers and use flock and GNU touch, which macOS lacks; elsewhere
 # the same test runs in a Debian container (safe.directory: the mount belongs to another user).
 deploy_scripts() {
