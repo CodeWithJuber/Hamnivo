@@ -20,31 +20,39 @@ const shell = (at: string, permissions: readonly string[]) =>
   });
 
 const owner = presetPermissions('owner');
-const AI_PAGES = ['/agents', '/knowledge', '/memory', '/checks', '/decisions', '/runs', '/caching'];
+// Frozen pages (decisions, checks, workflows) are left out: the server's default.
+const AI_PAGES = [
+  '/agents',
+  '/memory',
+  '/connectors',
+  '/automations',
+  '/tools',
+  '/models',
+  '/runs',
+];
 
 describe('the menu', () => {
-  it('has seven entries, each opening the first page its person can see', async () => {
+  it('has five entries, each opening the first page its person can see', async () => {
     const menu = navigation(await shell('/overview', owner), 'Studio');
     expect(menu?.map((link) => [link.text, link.href])).toEqual([
       ['Home', '/overview'],
       ['Inbox', '/inbox'],
       ['AI assistant', '/agents'],
-      ['Workflows', '/workflows'],
-      ['Connectors', '/connectors'],
-      ['Reports', '/reports'],
+      ['Knowledge', '/knowledge'],
       ['Settings', '/brands'],
     ]);
   });
 
   it('shows an entry only when a page in it can be seen', async () => {
     const menu = navigation(await shell('/overview', presetPermissions('agent')), 'Studio');
-    // A support agent: no AI agents, memory or reports, so the AI entry opens Knowledge.
+    // A support agent: no AI agents, memory or reports, so the AI entry opens Connectors; orders
+    // are frozen, so Settings opens the team.
     expect(menu?.map((link) => [link.text, link.href])).toEqual([
       ['Home', '/overview'],
       ['Inbox', '/inbox'],
-      ['AI assistant', '/knowledge'],
-      ['Connectors', '/connectors'],
-      ['Settings', '/orders'],
+      ['AI assistant', '/connectors'],
+      ['Knowledge', '/knowledge'],
+      ['Settings', '/team'],
     ]);
     const nothing = navigation(await shell('/overview', ['conversations.read']), 'Studio');
     expect(nothing?.map((link) => link.text)).toEqual(['Home', 'Inbox']);
@@ -56,10 +64,16 @@ describe('the menu', () => {
     expect(await active('/inbox/conv_1')).toEqual(['/inbox']);
     expect(await active('/agents/agt_1')).toEqual(['/agents']);
     expect(await active('/memory/cus_1')).toEqual(['/agents']);
-    expect(await active('/models')).toEqual(['/connectors']);
+    expect(await active('/models')).toEqual(['/agents']);
+    expect(await active('/connectors')).toEqual(['/agents']);
+    expect(await active('/knowledge')).toEqual(['/knowledge']);
+    expect(await active('/caching')).toEqual(['/knowledge']);
+    // Frozen pages opened by address still mark their entry.
     expect(await active('/orders/ord_1')).toEqual(['/brands']);
     expect(await active('/finance')).toEqual(['/brands']);
-    expect(await active('/reports')).toEqual(['/reports']);
+    expect(await active('/decisions')).toEqual(['/agents']);
+    expect(await active('/reports')).toEqual(['/overview']);
+    expect(await active('/channels')).toEqual(['/brands']);
     expect(await active('/developer')).toEqual(['/brands']);
     // Pages that are not in the menu leave it with nothing marked.
     expect(await active('/stop-ai')).toEqual([]);
@@ -81,8 +95,8 @@ describe('the row of pages above a page', () => {
     expect(tabs?.map((link) => link.href)).toEqual(AI_PAGES);
     expect(tabs?.slice(0, 3).map((link) => link.text)).toEqual([
       'AI agents',
-      'Knowledge',
       'Customer memory',
+      'Connectors',
     ]);
     expect(current(tabs)).toEqual(['/agents']);
     // It sits inside the page area, above the page.
@@ -90,19 +104,19 @@ describe('the row of pages above a page', () => {
   });
 
   it('follows the page, nested ones included', async () => {
+    const memory = navigation(await shell('/memory/cus_1', owner), 'AI assistant pages');
+    expect(current(memory)).toEqual(['/memory']);
+    // A frozen page opened by address keeps its entry's row, without itself in it.
     const orders = navigation(await shell('/orders/ord_1', owner), 'Settings pages');
-    expect(orders?.map((link) => link.href)).toEqual(
-      expect.arrayContaining(['/orders', '/finance']),
-    );
-    expect(current(orders)).toEqual(['/orders']);
+    expect(orders?.map((link) => link.href)).not.toContain('/orders');
+    expect(current(orders)).toEqual([]);
     const settings = navigation(await shell('/security', owner), 'Settings pages');
     expect(settings?.map((link) => link.href)).toEqual(
       expect.arrayContaining([
         '/brands',
         '/branding',
         '/chat-widget',
-        '/orders',
-        '/finance',
+        '/channels',
         '/hours',
         '/team',
         '/security',
@@ -118,16 +132,17 @@ describe('the row of pages above a page', () => {
       await shell('/memory', presetPermissions('agent')),
       'AI assistant pages',
     );
-    expect(tabs?.map((link) => link.href)).toEqual(['/knowledge', '/caching']);
+    expect(tabs?.map((link) => link.href)).toEqual(['/connectors', '/tools']);
     expect(current(tabs)).toEqual([]);
   });
 
   it('is left out where there is nothing to choose between', async () => {
     const rows = (html: string) => html.includes('data-testid="section-tabs"');
-    // Home, the inbox and reports are single pages.
-    expect(rows(await shell('/overview', owner))).toBe(false);
+    // The inbox is a single page; Home is one for whoever cannot read reports.
     expect(rows(await shell('/inbox', owner))).toBe(false);
-    expect(rows(await shell('/reports', owner))).toBe(false);
+    expect(rows(await shell('/overview', ['conversations.read']))).toBe(false);
+    expect(rows(await shell('/overview', owner))).toBe(true);
+    expect(rows(await shell('/reports', owner))).toBe(true);
     // Pages outside the menu.
     expect(rows(await shell('/stop-ai', owner))).toBe(false);
     expect(rows(await shell('/account', owner))).toBe(false);
@@ -152,7 +167,7 @@ describe('Stop AI', () => {
     expect(button?.attrs['aria-label']).toBe('Stop AI replies');
     expect(button?.attrs.class).toContain('bg-danger');
     expect(menu?.some((link) => link.href === '/stop-ai')).toBe(false);
-    expect(menu?.length).toBe(7);
+    expect(menu?.length).toBe(5);
   });
 
   it('is shown only to people who can stop the AI', async () => {

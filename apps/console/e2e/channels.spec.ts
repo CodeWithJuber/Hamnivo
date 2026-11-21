@@ -110,22 +110,15 @@ test('Channels · empty at first; a new email inbox is found, gets the AI and a 
   await workspace.staff.signIn(context);
   await page.setViewportSize({ width: 1440, height: 900 });
 
-  // Channels is a page of Connectors, right after Connectors itself; Tools and Model connections
-  // wait under Advanced settings.
+  // Channels is a page of Settings, right after the chat widget.
   await open(page);
-  const pages = page.getByRole('navigation', { name: 'Connectors pages' });
-  await expect(pages.getByRole('link')).toHaveText(['Connectors', 'Channels']);
+  const pages = page.getByRole('navigation', { name: 'Settings pages' });
   await expect(pages.getByRole('link', { name: 'Channels' })).toHaveAttribute(
     'aria-current',
     'page',
   );
-  await pages.getByText('Advanced settings').click();
-  await expect(pages.getByRole('link')).toHaveText([
-    'Connectors',
-    'Channels',
-    'Tools and permissions',
-    'Model connections',
-  ]);
+  const links = await pages.getByRole('link').allTextContents();
+  expect(links.indexOf('Channels')).toBe(links.indexOf('Chat widget') + 1);
 
   await expect(page.getByRole('heading', { level: 1, name: 'Channels' })).toBeVisible();
   await expect(

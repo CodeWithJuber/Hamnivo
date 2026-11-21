@@ -16,28 +16,55 @@ const holding = (...permissions: string[]) => {
   return (permission: string) => held.has(permission);
 };
 const role = (key: Parameters<typeof presetPermissions>[0]) => holding(...presetPermissions(key));
+/** The server's default: frozen features are not listed. */
+const OFF = { advanced: false };
+const ON = { advanced: true };
+const FROZEN = ['/workflows', '/checks', '/decisions', '/orders', '/finance', '/migration'];
 const entries = (can: (permission: string) => boolean) =>
-  menuFor(can).map((group) => [group.id, group.to]);
+  menuFor(can, OFF).map((group) => [group.id, group.to]);
 describe('the grouped platform menu', () => {
-  it('uses seven focused sections in order', () =>
+  it('uses five focused sections in order', () =>
     expect(NAV_GROUPS.map((group) => group.id)).toEqual([
       'home',
       'inbox',
       'ai',
-      'workflows',
-      'connectors',
-      'reports',
+      'knowledge',
       'settings',
     ]));
   it('keeps commerce, legacy automations and advanced AI tools reachable', () => {
     expect(groupIdOfPath('/orders/ord_1')).toBe('settings');
     expect(groupIdOfPath('/finance')).toBe('settings');
-    expect(groupIdOfPath('/automations')).toBe('workflows');
-    expect(groupIdOfPath('/tools')).toBe('connectors');
+    expect(groupIdOfPath('/automations')).toBe('ai');
+    expect(groupIdOfPath('/tools')).toBe('ai');
+    expect(groupIdOfPath('/connectors')).toBe('ai');
+    expect(groupIdOfPath('/channels')).toBe('settings');
+    expect(groupIdOfPath('/reports')).toBe('home');
+    expect(groupIdOfPath('/knowledge')).toBe('knowledge');
     expect(groupIdOfPath('/runs')).toBe('ai');
     const routes = NAV_GROUPS.flatMap((g) => g.routes);
     for (const path of ['/orders', '/finance', '/tools', '/models', '/runs', '/caching'])
       expect(routes.find((r) => r.to === path)?.advanced).toBe(true);
+  });
+  it('lists the frozen pages only when the server turns advanced features on', () => {
+    const routes = NAV_GROUPS.flatMap((g) => g.routes);
+    expect(routes.filter((r) => r.frozen).map((r) => r.to)).toEqual(FROZEN);
+    // Frozen pages sit behind the Advanced disclosure when they are listed.
+    for (const path of FROZEN) expect(routes.find((r) => r.to === path)?.advanced).toBe(true);
+    const listed = (features: { advanced: boolean }) =>
+      menuFor(role('owner'), features).flatMap((g) => g.routes.map((r) => r.to));
+    for (const path of FROZEN) {
+      expect(listed(OFF)).not.toContain(path);
+      expect(listed(ON)).toContain(path);
+      // The page still belongs to its group, so its entry is active there when opened by address.
+      expect(groupIdOfPath(path)).toBeDefined();
+    }
+    expect(menuFor(role('owner'), OFF).map((g) => g.id)).toEqual([
+      'home',
+      'inbox',
+      'ai',
+      'knowledge',
+      'settings',
+    ]);
   });
   it('gives every primary Studio page one place; agency context lives in the header', () => {
     const folder = fileURLToPath(new URL('../src/routes/_studio', import.meta.url));
@@ -64,15 +91,23 @@ describe('the grouped platform menu', () => {
     expect(entries(holding())).toEqual([['home', '/overview']]));
   it('opens the first permitted page of a section', () => {
     expect(entries(holding('memory.read', 'tools.read'))).toContainEqual(['ai', '/memory']);
-    expect(entries(holding('tools.read'))).toContainEqual(['connectors', '/connectors']);
-    expect(entries(holding('commerce.read'))).toContainEqual(['settings', '/orders']);
-    expect(entries(holding('migration.review'))).toContainEqual(['settings', '/migration']);
+    expect(entries(holding('tools.read'))).toContainEqual(['ai', '/connectors']);
+    // Only frozen pages: no Settings entry until advanced features are on.
+    expect(entries(holding('commerce.read'))).toEqual([['home', '/overview']]);
+    const advanced = (can: (permission: string) => boolean) =>
+      menuFor(can, ON).map((group) => [group.id, group.to]);
+    expect(advanced(holding('commerce.read'))).toContainEqual(['settings', '/orders']);
+    expect(advanced(holding('migration.review'))).toContainEqual(['settings', '/migration']);
   });
   it('does not expose unrelated resources when a role can use connectors or workflows', () => {
-    const tools = menuFor(holding('tools.read')).find((g) => g.id === 'connectors');
+    const tools = menuFor(holding('tools.read'), OFF).find((g) => g.id === 'ai');
     expect(tools?.routes.map((r) => r.to)).toEqual(['/connectors', '/tools']);
-    const workflows = menuFor(holding('automations.read')).find((g) => g.id === 'workflows');
-    expect(workflows?.routes.map((r) => r.to)).toEqual(['/workflows', '/automations']);
+    const automations = (features: { advanced: boolean }) =>
+      menuFor(holding('automations.read'), features)
+        .find((g) => g.id === 'ai')
+        ?.routes.map((r) => r.to);
+    expect(automations(OFF)).toEqual(['/connectors', '/automations']);
+    expect(automations(ON)).toEqual(['/connectors', '/automations', '/workflows']);
     expect(entries(holding('conversations.read'))).toEqual([
       ['home', '/overview'],
       ['inbox', '/inbox'],
@@ -91,7 +126,7 @@ describe('the grouped platform menu', () => {
       'billing',
     ] as const) {
       const can = role(key);
-      for (const group of menuFor(can))
+      for (const group of menuFor(can, ON))
         for (const route of group.routes) {
           expect(!route.permission || can(route.permission)).toBe(true);
           expect(!route.anyOf || route.anyOf.some(can)).toBe(true);
@@ -125,16 +160,16 @@ describe('the grouped platform menu', () => {
     expect(ai && currentRoute(ai, '/agents/agt_1')).toBe('/agents');
   });
   it('filters section tabs by permission and omits single-route sections', () => {
-    expect(sectionOf(menuFor(role('agent')), '/knowledge')?.routes.map((r) => r.to)).toEqual([
+    expect(sectionOf(menuFor(role('agent'), OFF), '/knowledge')?.routes.map((r) => r.to)).toEqual([
       '/knowledge',
       '/caching',
     ]);
-    expect(sectionOf(menuFor(role('agent')), '/memory')?.routes.map((r) => r.to)).not.toContain(
-      '/memory',
-    );
-    expect(sectionOf(menuFor(role('owner')), '/inbox')).toBeUndefined();
-    expect(sectionOf(menuFor(role('owner')), '/orders/ord_1')?.id).toBe('settings');
-    expect(sectionOf(menuFor(holding()), '/agents')).toBeUndefined();
+    expect(
+      sectionOf(menuFor(role('agent'), OFF), '/memory')?.routes.map((r) => r.to),
+    ).not.toContain('/memory');
+    expect(sectionOf(menuFor(role('owner'), OFF), '/inbox')).toBeUndefined();
+    expect(sectionOf(menuFor(role('owner'), OFF), '/orders/ord_1')?.id).toBe('settings');
+    expect(sectionOf(menuFor(holding(), OFF), '/agents')).toBeUndefined();
   });
 });
 
@@ -186,9 +221,10 @@ describe('unchanged resource permissions', () => {
 
 describe('built-in role resource access', () => {
   it('gives each built-in role the pages the guide lists', () => {
+    // With frozen pages listed, so every page a role could reach before the freeze is checked.
     const legacyPages = (key: Parameters<typeof presetPermissions>[0]) =>
       Object.fromEntries(
-        menuFor(role(key)).map((group) => [group.id, group.routes.map((route) => route.to)]),
+        menuFor(role(key), ON).map((group) => [group.id, group.routes.map((route) => route.to)]),
       );
     const everything = {
       home: ['/overview'],

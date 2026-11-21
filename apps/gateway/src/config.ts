@@ -297,6 +297,12 @@ const EnvSchema = z.object({
    * When off, only people with an invitation may sign up (the first account of a server always).
    */
   HAMNIVO_PUBLIC_SIGNUP: bool.default(true),
+  /**
+   * Studio lists the frozen features (production-ready plan, 2026-11-20): commerce and refunds,
+   * migration, the workflow builder, decisions and checks, agency and the platform console. Off,
+   * they leave the menu, the command palette and the header; their data and addresses still work.
+   */
+  HAMNIVO_ADVANCED_FEATURES: bool.default(false),
   /** The plan every new workspace starts on, or `unlimited` for no plan (self-hosting). */
   HAMNIVO_DEFAULT_PLAN: z
     .string()

@@ -102,6 +102,7 @@ const memberWith = (permissions: readonly string[]): Me =>
       permissions: [...permissions],
       mfa: false,
     },
+    features: { advanced: false },
   }) as Me;
 
 export interface Mounted extends RenderResult {

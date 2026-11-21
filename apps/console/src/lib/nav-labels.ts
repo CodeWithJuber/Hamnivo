@@ -20,9 +20,7 @@ export function navLabels(t: TFunction): NavLabels {
       home: t('nav.home'),
       inbox: t('nav.inbox'),
       ai: t('nav.ai'),
-      workflows: t('agentic.workflows'),
-      connectors: t('agentic.connectors'),
-      reports: t('reports.nav'),
+      knowledge: t('nav.knowledge'),
       settings: t('nav.settings'),
     },
     pages: {

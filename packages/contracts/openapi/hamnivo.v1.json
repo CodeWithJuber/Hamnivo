@@ -46313,12 +46313,25 @@
                 "type": "null"
               }
             ]
+          },
+          "features": {
+            "type": "object",
+            "properties": {
+              "advanced": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "advanced"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
           "user",
           "memberships",
-          "current"
+          "current",
+          "features"
         ],
         "additionalProperties": false
       },

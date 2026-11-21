@@ -87,6 +87,7 @@ function memberWith(permissions: readonly string[]): Me {
       permissions: [...permissions],
       mfa: false,
     },
+    features: { advanced: false },
   } as Me;
 }
 

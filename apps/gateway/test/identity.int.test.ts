@@ -133,6 +133,8 @@ describe('staff sign-up and tenant creation', () => {
       user: { email: 'sana@example.com', emailVerified: true, twoFactorEnabled: false },
       memberships: [],
       current: null,
+      // Frozen features are off unless HAMNIVO_ADVANCED_FEATURES turns them on.
+      features: { advanced: false },
     });
 
     const created = await owner.post('/v1/tenants', { name: 'Acme Support', slug: 'acme-support' });

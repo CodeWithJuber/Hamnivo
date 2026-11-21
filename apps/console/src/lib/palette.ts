@@ -4,7 +4,14 @@
  * reached from a button instead of the menu, each with the permission of that button. Like the
  * menu, this only decides what is listed; the gateway still checks every request.
  */
-import { type Can, menuFor, NAV_GROUPS, type NavGroupId, type NavPath } from './nav';
+import {
+  type Can,
+  menuFor,
+  NAV_GROUPS,
+  type NavFeatures,
+  type NavGroupId,
+  type NavPath,
+} from './nav';
 
 /** Pages reached from a button rather than the menu. */
 export type ExtraPath =
@@ -51,9 +58,9 @@ export interface PaletteSection {
 }
 
 /** What this person can find, grouped as the menu is; a group with nothing in it is left out. */
-export function paletteSections(can: Can): PaletteSection[] {
+export function paletteSections(can: Can, features: NavFeatures): PaletteSection[] {
   const found = new Map<PaletteGroupId, PalettePath[]>();
-  for (const group of menuFor(can)) {
+  for (const group of menuFor(can, features)) {
     found.set(
       group.id,
       group.routes.map((route) => route.to),

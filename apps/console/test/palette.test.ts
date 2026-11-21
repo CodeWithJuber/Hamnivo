@@ -22,25 +22,27 @@ beforeAll(async () => {
 const canFrom = (permissions: readonly string[]) => (permission: string) =>
   permissions.includes(permission);
 
+/** The server's default: frozen features are not listed. */
+const OFF = { advanced: false };
+const ON = { advanced: true };
+
 const paths = (permissions: readonly string[]) =>
-  paletteSections(canFrom(permissions)).flatMap((section) => section.items);
+  paletteSections(canFrom(permissions), OFF).flatMap((section) => section.items);
 
 describe('what the palette lists', () => {
   it('lists every page of the menu an owner sees, grouped and in the menu’s order', () => {
     const owner = canFrom(presetPermissions('owner'));
-    const sections = paletteSections(owner);
+    const sections = paletteSections(owner, OFF);
     expect(sections.map((section) => section.id)).toEqual([
       'home',
       'inbox',
       'ai',
-      'workflows',
-      'connectors',
-      'reports',
+      'knowledge',
       'settings',
       'account',
     ]);
     // Each group starts with exactly the menu's pages, in the menu's order.
-    for (const group of menuFor(owner)) {
+    for (const group of menuFor(owner, OFF)) {
       const section = sections.find((s) => s.id === group.id);
       expect(section?.items.slice(0, group.routes.length)).toEqual(
         group.routes.map((route) => route.to),
@@ -48,8 +50,14 @@ describe('what the palette lists', () => {
     }
     // All of the menu's pages, plus every page behind a button, each once.
     const listed = sections.flatMap((section) => section.items);
-    const everyPage = NAV_GROUPS.flatMap((group) => group.routes.map((route) => route.to));
+    const routes = NAV_GROUPS.flatMap((group) => group.routes);
+    const everyPage = routes.filter((route) => !route.frozen).map((route) => route.to);
     expect(listed).toEqual(expect.arrayContaining(everyPage));
+    // Frozen pages are found only when the server turns advanced features on, like the menu.
+    const frozen = routes.filter((route) => route.frozen).map((route) => route.to);
+    for (const path of frozen) expect(listed).not.toContain(path);
+    const advanced = paletteSections(owner, ON).flatMap((section) => section.items);
+    expect(advanced).toEqual(expect.arrayContaining(frozen));
     expect(listed).toEqual(expect.arrayContaining(PALETTE_EXTRAS.map((extra) => extra.to)));
     expect(new Set(listed).size).toBe(listed.length);
   });
@@ -69,7 +77,7 @@ describe('what the palette lists', () => {
   });
 
   it('always offers the account pages, and nothing a person cannot open', () => {
-    expect(paletteSections(canFrom([]))).toEqual([
+    expect(paletteSections(canFrom([]), OFF)).toEqual([
       { id: 'home', items: ['/overview'] },
       { id: 'account', items: ['/account', '/tenants'] },
     ]);
@@ -181,7 +189,7 @@ describe('palette text in every language', () => {
     for (const locale of LOCALES) {
       const labels = navLabels(i18next.getFixedT(locale));
       const names: Record<string, string> = { ...labels.pages, ...labels.extras };
-      for (const section of paletteSections(owner)) {
+      for (const section of paletteSections(owner, ON)) {
         for (const to of section.items) {
           const label = names[to] ?? '';
           expect(label.trim(), `${locale} ${to}`).not.toBe('');
