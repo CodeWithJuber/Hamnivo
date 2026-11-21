@@ -715,6 +715,14 @@ up and deploys.
   - the GitHub token, if you added one, is fine-grained, for this repository only, with
     "Deployments" access only.
 - To collect metrics, set `METRICS_TOKEN` and scrape `https://api.example.com/metrics` with it.
+- To track errors, set `SENTRY_DSN` to a project's DSN on Sentry or on your own GlitchTip, then
+  `hamnivo.sh up`. Errors from the API, the worker, Studio and the chat arrive there, tagged
+  `gateway-api`, `gateway-worker`, `studio` and `widget`. No user details, cookies, headers,
+  bodies, query strings or chat text are sent. The browsers send through the API, so the CSP
+  needs no change. To check it:
+  - the gateway: `docker compose exec api node dist/main.error-test.js`;
+  - Studio or the chat: in the browser console of either, run
+    `setTimeout(() => { throw new Error('Hamnivo test error') })`.
 - Behind Cloudflare's proxy, `HAMNIVO_CLOUDFLARE=on` (A4). Without it, every visitor has
   Cloudflare's address, so rate limits apply to many visitors at once.
 

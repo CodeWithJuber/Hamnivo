@@ -229,6 +229,17 @@ const EnvSchema = z.object({
 
   /** Bearer token for GET /metrics; the endpoint is disabled without it. */
   METRICS_TOKEN: z.string().min(16).optional(),
+  /**
+   * Error tracking: the DSN of a Sentry project, or of a self-hosted GlitchTip one. Unset, no
+   * error is sent anywhere. Studio and the chat send theirs through this server
+   * (`/v1/error-reports`), so their pages never talk to the DSN's host.
+   */
+  SENTRY_DSN: z.url().optional(),
+  /** The environment errors are filed under; NODE_ENV when unset. */
+  SENTRY_ENVIRONMENT: z
+    .string()
+    .regex(/^[\w.-]{1,64}$/)
+    .optional(),
   API_DOCS: bool.default(true),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(600),
   /** Requests per minute for one API key (each key has its own budget). */

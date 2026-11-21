@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { App, type WidgetParams } from './App.js';
 import { HostBridge } from './bridge.js';
 import { directWidgetId, noIndex } from './direct.js';
+import { watchErrors } from './error-reporting.js';
 import { applyLocale, initI18n, pickLocale } from './i18n.js';
 import { resolveScheme, schemeOf } from './theme.js';
 import './styles.css';
@@ -27,6 +28,7 @@ const params: WidgetParams = {
   theme: schemeOf(query.get('theme')),
   caps: (query.get('caps') ?? '').split(',').filter(Boolean),
 };
+watchErrors(params.apiBase);
 // Light or dark is decided before anything is drawn, so the chat never flashes the other one.
 document.documentElement.dataset.theme = resolveScheme(
   'auto',

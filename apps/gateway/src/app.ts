@@ -93,6 +93,8 @@ export async function createApiApp(
     if (route.url === '/v1/widget/conversations/:conversationId/uploads') {
       route.bodyLimit = 10 * 1024 * 1024 + 1024;
     }
+    // An error report is a few kilobytes; the tunnel takes nothing larger than this.
+    if (route.url.endsWith('/error-reports')) route.bodyLimit = 256 * 1024;
   });
   // Customer files arrive as their own bytes (W09); the route checks size, type and content.
   fastify.addContentTypeParser(

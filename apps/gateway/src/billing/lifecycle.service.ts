@@ -9,6 +9,7 @@ import {
 import { Queue, Worker } from 'bullmq';
 import { sql } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
+import { reportError } from '../observability/error-reporting.js';
 import { APP_DB, CLOCK, type Clock, REDIS } from '../tokens.js';
 import { accountState, billingAccount, updateAccount } from './accounts.js';
 import { graceOver } from './lifecycle.js';
@@ -46,9 +47,10 @@ export class BillingLifecycleService implements OnApplicationBootstrap, OnApplic
       prefix: 'hamnivo',
       concurrency: 1,
     });
-    this.worker.on('failed', (_job, error) =>
-      this.logger.error(`billing lapses failed: ${error.message}`),
-    );
+    this.worker.on('failed', (_job, error) => {
+      this.logger.error(`billing lapses failed: ${error.message}`);
+      reportError(error, { job: 'billing lapses' });
+    });
   }
 
   async onApplicationShutdown(): Promise<void> {

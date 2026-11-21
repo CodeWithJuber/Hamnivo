@@ -2,6 +2,7 @@ import { type ErrorCode, problem } from '@hamnivo/contracts';
 import { InvalidPublicIdError } from '@hamnivo/db';
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { reportError } from '../observability/error-reporting.js';
 import { AppError } from './app-error.js';
 import { planLimitFromDatabase } from './plan-limit.js';
 
@@ -56,6 +57,7 @@ export class ProblemFilter implements ExceptionFilter {
     const body = toProblem(error, String(request.id));
     if (body.code === 'INTERNAL') {
       request.log.error({ err: error }, 'unhandled error');
+      reportError(error, { requestId: String(request.id) });
     } else if (error instanceof AppError && error.details.internal) {
       request.log.warn({ internal: error.details.internal, code: body.code }, 'request rejected');
     }

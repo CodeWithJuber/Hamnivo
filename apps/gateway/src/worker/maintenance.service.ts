@@ -27,6 +27,7 @@ import { Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 import type { AppConfig } from '../config.js';
 import { MemoryDeletionService } from '../memory/deletion.service.js';
+import { reportError } from '../observability/error-reporting.js';
 import { RetentionSweep } from '../privacy/retention-sweep.service.js';
 import { APP_DB, CONFIG, REDIS } from '../tokens.js';
 
@@ -148,9 +149,10 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       prefix: 'hamnivo',
       concurrency: 1,
     });
-    this.worker.on('failed', (job, error) =>
-      this.logger.error(`maintenance ${job?.name} failed: ${error.message}`),
-    );
+    this.worker.on('failed', (job, error) => {
+      this.logger.error(`maintenance ${job?.name} failed: ${error.message}`);
+      reportError(error, { job: job?.name ?? 'unknown' });
+    });
   }
 
   async onApplicationShutdown(): Promise<void> {
