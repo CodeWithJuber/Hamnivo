@@ -375,7 +375,31 @@ await check('a backup restores the data as it was', async () => {
   const dir = execFileSync('bash', ['-c', `ls -d "${backups}"/20*Z | tail -1`], {
     encoding: 'utf8',
   }).trim();
+  // The monthly check (hamnivo.sh backups on) restores it beside the live data, which it leaves
+  // alone: the API keeps answering and the throwaway databases are gone afterwards.
+  const checked = execFileSync('bash', [hamnivo, 'backup-check', dir], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const left = execFileSync(
+    'bash',
+    [
+      hamnivo,
+      'compose',
+      'exec',
+      '-T',
+      'hamnivo-db',
+      'psql',
+      '-U',
+      'postgres',
+      '-tAc',
+      "select count(*) from pg_database where datname = 'hamnivo_check'",
+    ],
+    { encoding: 'utf8' },
+  ).trim();
+  expect(left === '0', `the backup check left its database behind (${left}) ${checked}`);
   const workspaces = await admin('GET', '/v1/admin/workspaces', undefined, tenantId);
+  expect(workspaces.status === 200, `the API during the backup check: ${workspaces.status}`);
   const later = await admin(
     'POST',
     '/v1/admin/brands',
