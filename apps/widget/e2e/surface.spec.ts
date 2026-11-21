@@ -783,8 +783,13 @@ test.describe('contact form and tickets (W11, H19)', () => {
     await form.getByRole('textbox', { name: 'Your name', exact: true }).fill('Amina Noor');
     await form.getByRole('button', { name: 'Send message' }).click();
 
+    // Sending opens the conversation in Chatwoot, records the ticket and posts the question before
+    // the thanks appear: about 1 s on a quiet machine, and over 5 s on the shared CI runner while
+    // it is busy (2026-11-21). The wait is for the server; the check is unchanged.
     const thanks = frame.getByTestId('ticket-thanks');
-    await expect(thanks.getByRole('heading', { name: 'Message sent' })).toBeFocused();
+    await expect(thanks.getByRole('heading', { name: 'Message sent' })).toBeFocused({
+      timeout: 15_000,
+    });
     const said = thanks.getByTestId('ticket-reference');
     await expect(said).toHaveText(/^Your reference is #\d+\.$/);
     const reference = ((await said.textContent()) ?? '').match(/#\d+/)?.[0] as string;
