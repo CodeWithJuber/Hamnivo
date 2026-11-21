@@ -957,8 +957,9 @@ cd Hamnivo
 git checkout claude/hamnivo-app-implementation-bhb7rg   # until the work is merged to main
 pnpm install
 
-# Browser for the accessibility audit and the widget journey (Chromium and its system libraries)
-pnpm --filter @hamnivo/ui exec playwright install --with-deps chromium
+# Browsers for the accessibility audit and the widget journey (Chromium and WebKit, with their
+# system libraries)
+pnpm --filter @hamnivo/ui exec playwright install --with-deps chromium webkit
 ```
 
 ## 3. Configuration and secrets
@@ -1255,7 +1256,8 @@ is never touched:
 - A fresh PostgreSQL 18 and Valkey for the widget journey. It builds everything, then starts the
   gateway, the worker, a fake Chatwoot, the widget and a host page on another origin. Chromium
   then chats through it: AI reply, staff takeover, offline resend, right to left, an axe audit,
-  and refusal on a website that is not allowed.
+  and refusal on a website that is not allowed. WebKit, Safari's engine, runs the same journeys
+  and the composer's tests (`apps/widget/playwright.config.ts`).
 
 - The built website in Chromium: every language at desktop and phone width, with an axe audit.
 
