@@ -8,12 +8,16 @@ export interface ReplyInput {
   messages: readonly string[];
   /** The reply language the product chose (U01). */
   language: ReplyLanguage;
+  /** Who the assistant works for, as its instructions name it; a shop when unset. */
+  business?: string;
 }
 
 /** Something that answers a customer: the system under evaluation. */
 export interface Responder {
   readonly name: string;
   reply(input: ReplyInput): Promise<string>;
+  /** Tokens used so far, when the responder calls a model that reports them. */
+  usage?(): { inputTokens: number; outputTokens: number };
 }
 
 /** How a reply treats a disputed fact. */
