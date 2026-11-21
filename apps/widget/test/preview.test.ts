@@ -18,11 +18,11 @@ const event = (change: Partial<MessageEvent> = {}) =>
     ...change,
   }) as MessageEvent;
 describe('real renderer draft preview', () => {
-  it('accepts only schema-valid drafts in the test iframe from its own parent origin', () => {
-    expect(readPreview(event(), parent, 'https://studio.example', true)).toEqual(appearance);
-    expect(readPreview(event(), parent, 'https://studio.example', false)).toBeNull();
+  it('accepts only schema-valid drafts in the test iframe from its own parent origin', async () => {
+    expect(await readPreview(event(), parent, 'https://studio.example', true)).toEqual(appearance);
+    expect(await readPreview(event(), parent, 'https://studio.example', false)).toBeNull();
     expect(
-      readPreview(
+      await readPreview(
         event({ origin: 'https://other.example' }),
         parent,
         'https://studio.example',
@@ -30,10 +30,10 @@ describe('real renderer draft preview', () => {
       ),
     ).toBeNull();
     expect(
-      readPreview(event({ source: {} as Window }), parent, 'https://studio.example', true),
+      await readPreview(event({ source: {} as Window }), parent, 'https://studio.example', true),
     ).toBeNull();
     expect(
-      readPreview(
+      await readPreview(
         event({ data: { source: 'hamnivo-studio-preview', appearance: { primaryColor: 'red' } } }),
         parent,
         'https://studio.example',

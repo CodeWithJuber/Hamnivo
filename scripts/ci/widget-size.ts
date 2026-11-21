@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
 /** Bytes of gzip, as a web server sends them (zlib's default level, as the loader's test uses). */
-export const BUDGET = 325_000;
+export const BUDGET = 290_000;
 
 const DIST = fileURLToPath(new URL('../../apps/widget/dist/', import.meta.url));
 

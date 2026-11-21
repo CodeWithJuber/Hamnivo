@@ -1,4 +1,4 @@
-import { WidgetLayoutMode } from '@hamnivo/contracts';
+import { WIDGET_LAYOUT_MODES } from '@hamnivo/contracts';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App, type WidgetParams } from './App.js';
@@ -11,7 +11,8 @@ import './styles.css';
 
 const query = new URLSearchParams(window.location.search);
 const locale = pickLocale(query.get('locale') ?? navigator.language);
-const mode = WidgetLayoutMode.safeParse(query.get('mode'));
+const modeParam = query.get('mode');
+const mode = WIDGET_LAYOUT_MODES.find((known) => known === modeParam) ?? null;
 // The brand's direct chat link (W28): the whole page, its own session, no website to talk to.
 const direct = directWidgetId(window.location.pathname);
 if (direct) noIndex(document);
@@ -21,7 +22,7 @@ const params: WidgetParams = {
   widgetId: direct ?? query.get('widgetId') ?? '',
   hostOrigin: direct ? null : query.get('host'),
   locale,
-  mode: direct ? 'fullpage' : mode.success ? mode.data : null,
+  mode: direct ? 'fullpage' : mode,
   // Studio's test chat: the owner trying their own widget (A01).
   test: !direct && query.get('test') === '1',
   direct: direct !== null,

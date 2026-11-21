@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ClientMessageId, SupportedLocale, Timestamp } from './common.js';
+import { WIDGET_LAYOUT_MODES } from './constants.js';
 import { ReactionEmoji } from './parts.js';
 
 /**
@@ -13,7 +14,7 @@ import { ReactionEmoji } from './parts.js';
  * in an element of the page, or the whole page (`fullpage`). Each brand chooses one; the loader's
  * `data-mode` overrides it. On narrow screens the bubble and the panel open full screen.
  */
-export const WidgetLayoutMode = z.enum(['bubble', 'panel', 'inline', 'fullpage']);
+export const WidgetLayoutMode = z.enum(WIDGET_LAYOUT_MODES);
 export type WidgetLayoutMode = z.infer<typeof WidgetLayoutMode>;
 
 export const LauncherSide = z.enum(['bottom-right', 'bottom-left']);

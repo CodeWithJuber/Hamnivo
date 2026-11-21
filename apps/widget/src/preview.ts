@@ -1,11 +1,14 @@
-import { WidgetAppearance, type WidgetConfig } from '@hamnivo/contracts';
-/** Only Studio's test iframe accepts a draft. It never changes stored brand configuration. */
-export function readPreview(
+import type { WidgetAppearance, WidgetConfig } from '@hamnivo/contracts';
+/**
+ * Only Studio's test iframe accepts a draft. It never changes stored brand configuration. The
+ * draft's schema loads with the first draft, so visitors' chats never download it.
+ */
+export async function readPreview(
   event: MessageEvent,
   parent: Window,
   origin: string | null,
   test: boolean,
-): WidgetAppearance | null {
+): Promise<WidgetAppearance | null> {
   if (
     !test ||
     !origin ||
@@ -14,8 +17,8 @@ export function readPreview(
     event.data?.source !== 'hamnivo-studio-preview'
   )
     return null;
-  const checked = WidgetAppearance.safeParse(event.data.appearance);
-  return checked.success ? checked.data : null;
+  const { checkAppearance } = await import('./preview-check.js');
+  return checkAppearance(event.data.appearance);
 }
 export function previewTextColour(hex: string): string {
   const luminance = (colour: string) => {

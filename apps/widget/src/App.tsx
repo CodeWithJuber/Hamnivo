@@ -74,9 +74,15 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const chat = useChat(client);
   const [preview, setPreview] = useState<WidgetAppearance | null>(null);
   useEffect(() => {
+    let live = true;
     const receive = (event: MessageEvent) => {
-      const next = readPreview(event, window.parent, params.hostOrigin, params.test === true);
-      if (next) setPreview(next);
+      // Drafts are checked in the order they arrive: each waits on the same loaded schema.
+      readPreview(event, window.parent, params.hostOrigin, params.test === true).then(
+        (next) => {
+          if (live && next) setPreview(next);
+        },
+        (error: unknown) => console.warn('The draft from Studio was not read', error),
+      );
     };
     if (!params.test) return;
     window.addEventListener('message', receive);
@@ -84,7 +90,10 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
       { source: 'hamnivo-widget-preview', ready: true },
       params.hostOrigin ?? window.location.origin,
     );
-    return () => window.removeEventListener('message', receive);
+    return () => {
+      live = false;
+      window.removeEventListener('message', receive);
+    };
   }, [params.test, params.hostOrigin]);
   // On its own page the chat is the page: the tab says whose chat it is.
   const brandName = chat.state.session?.config.brand.name;

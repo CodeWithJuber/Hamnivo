@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Card } from './cards.js';
 import { Timestamp } from './common.js';
+import { REACTIONS } from './constants.js';
 
 /** Message parts (blueprint §9). Unknown future parts degrade to a safe fallback, never crash. */
 
@@ -72,7 +73,6 @@ export const ContactPart = z
   .meta({ id: 'ContactPart' });
 
 /** Reactions a customer can add to a reply (W22). */
-export const REACTIONS = ['👍', '👎', '❤️', '🙏', '😊'] as const;
 export const ReactionEmoji = z.enum(REACTIONS);
 export type ReactionEmoji = z.infer<typeof ReactionEmoji>;
 

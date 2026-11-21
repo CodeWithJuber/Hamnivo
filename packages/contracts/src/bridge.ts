@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BRIDGE_SOURCE, BRIDGE_VERSION } from './constants.js';
 import { PageContext } from './conversations.js';
 import { VisitorKey } from './visitors.js';
 
@@ -7,9 +8,6 @@ import { VisitorKey } from './visitors.js';
  * Both sides check `event.origin`, `event.source` and this schema; there is no generic method call.
  * Messages never carry secrets other than a tenant-minted identity assertion (host → frame).
  */
-export const BRIDGE_SOURCE = 'hamnivo';
-export const BRIDGE_VERSION = 1;
-
 const base = {
   source: z.literal(BRIDGE_SOURCE),
   v: z.literal(BRIDGE_VERSION),
