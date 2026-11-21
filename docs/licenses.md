@@ -53,17 +53,17 @@ Packages: 1127. Needing review: 0.
 | @babel/template | 7.29.7 | MIT | permissive |
 | @babel/traverse | 7.29.8 | MIT | permissive |
 | @babel/types | 7.29.8 | MIT | permissive |
-| @better-auth/core | 1.7.6 | MIT | permissive |
-| @better-auth/drizzle-adapter | 1.7.6 | MIT | permissive |
-| @better-auth/kysely-adapter | 1.7.6 | MIT | permissive |
-| @better-auth/memory-adapter | 1.7.6 | MIT | permissive |
-| @better-auth/mongo-adapter | 1.7.6 | MIT | permissive |
-| @better-auth/passkey | 1.7.6 | MIT | permissive |
-| @better-auth/prisma-adapter | 1.7.6 | MIT | permissive |
-| @better-auth/sso | 1.7.6 | MIT | permissive |
-| @better-auth/telemetry | 1.7.6 | MIT | permissive |
-| @better-auth/utils | 0.4.2, 0.5.0 | MIT | permissive |
-| @better-fetch/fetch | 1.3.2 | MIT | permissive |
+| @better-auth/core | 1.7.26 | MIT | permissive |
+| @better-auth/drizzle-adapter | 1.7.26 | MIT | permissive |
+| @better-auth/kysely-adapter | 1.7.26 | MIT | permissive |
+| @better-auth/memory-adapter | 1.7.26 | MIT | permissive |
+| @better-auth/mongo-adapter | 1.7.26 | MIT | permissive |
+| @better-auth/passkey | 1.7.26 | MIT | permissive |
+| @better-auth/prisma-adapter | 1.7.26 | MIT | permissive |
+| @better-auth/sso | 1.7.26 | MIT | permissive |
+| @better-auth/telemetry | 1.7.26 | MIT | permissive |
+| @better-auth/utils | 0.5.1 | MIT | permissive |
+| @better-fetch/fetch | 1.3.3 | MIT | permissive |
 | @biomejs/biome | 2.5.14 | MIT OR Apache-2.0 | permissive |
 | @biomejs/cli-linux-x64 | 2.5.14 | MIT OR Apache-2.0 | permissive |
 | @borewit/text-codec | 0.2.2 | MIT | permissive |
@@ -136,8 +136,8 @@ Packages: 1127. Needing review: 0.
 | @hexagon/base64 | 1.1.28 | MIT | permissive |
 | @hono/node-server | 2.1.3 | MIT | permissive |
 | @img/colour | 1.1.0 | MIT | permissive |
-| @img/sharp-libvips-linux-x64 | 1.3.3 | LGPL-3.0-or-later | weak-copyleft |
-| @img/sharp-linux-x64 | 0.35.4 | Apache-2.0 | permissive |
+| @img/sharp-libvips-linux-x64 | 1.3.4 | LGPL-3.0-or-later | weak-copyleft |
+| @img/sharp-linux-x64 | 0.35.5 | Apache-2.0 | permissive |
 | @inquirer/ansi | 2.0.8 | MIT | permissive |
 | @inquirer/confirm | 6.3.2 | MIT | permissive |
 | @inquirer/core | 12.0.3 | MIT | permissive |
@@ -184,7 +184,7 @@ Packages: 1127. Needing review: 0.
 | @opentelemetry/semantic-conventions | 1.43.0 | Apache-2.0 | permissive |
 | @oslojs/encoding | 1.1.0 | MIT | permissive |
 | @oxc-parser/binding-linux-x64-gnu | 0.127.0, 0.150.0 | MIT | permissive |
-| @oxc-project/types | 0.127.0, 0.150.0, 0.151.0 | MIT | permissive |
+| @oxc-project/types | 0.127.0, 0.150.0, 0.151.0, 0.156.0 | MIT | permissive |
 | @oxc-resolver/binding-linux-x64-gnu | 11.21.2, 11.24.2 | MIT | permissive |
 | @pagefind/default-ui | 1.5.2 | MIT | permissive |
 | @pagefind/linux-x64 | 1.5.2 | MIT | permissive |
@@ -269,7 +269,7 @@ Packages: 1127. Needing review: 0.
 | @redocly/ajv | 8.11.2 | MIT | permissive |
 | @redocly/config | 0.22.0 | MIT | permissive |
 | @redocly/openapi-core | 1.34.20 | MIT | permissive |
-| @rolldown/binding-linux-x64-gnu | 1.2.11 | MIT | permissive |
+| @rolldown/binding-linux-x64-gnu | 1.2.11, 1.2.19 | MIT | permissive |
 | @rolldown/pluginutils | 1.0.1 | MIT | permissive |
 | @rollup/pluginutils | 5.4.0 | MIT | permissive |
 | @scalar/client-side-rendering | 0.4.5 | MIT | permissive |
@@ -466,11 +466,11 @@ Packages: 1127. Needing review: 0.
 | baseline-browser-mapping | 2.11.26 | Apache-2.0 | permissive |
 | bcp-47 | 2.1.1 | MIT | permissive |
 | bcp-47-match | 2.0.3 | MIT | permissive |
-| better-auth | 1.7.6 | MIT | permissive |
-| better-call | 1.4.0 | MIT | permissive |
+| better-auth | 1.7.26 | MIT | permissive |
+| better-call | 1.4.6 | MIT | permissive |
 | bidi-js | 1.1.0 | MIT | permissive |
 | bintrees | 1.0.2 | MIT | permissive |
-| body-parser | 2.3.0 | MIT | permissive |
+| body-parser | 2.4.0 | MIT | permissive |
 | boolbase | 1.0.0 | ISC | permissive |
 | bowser | 2.14.1 | MIT | permissive |
 | brace-expansion | 2.1.7, 5.0.12 | MIT | permissive |
@@ -794,7 +794,7 @@ Packages: 1127. Needing review: 0.
 | msw | 2.15.0 | MIT | permissive |
 | muggle-string | 0.4.1 | MIT | permissive |
 | mute-stream | 3.0.0 | ISC | permissive |
-| nanoid | 3.3.19, 5.1.16, 6.0.1 | MIT | permissive |
+| nanoid | 3.3.19, 3.3.20, 5.1.16, 6.0.1 | MIT | permissive |
 | nanostores | 1.5.4 | MIT | permissive |
 | negotiator | 0.6.3, 1.1.0 | MIT | permissive |
 | neotraverse | 1.0.1 | MIT | permissive |
@@ -866,7 +866,7 @@ Packages: 1127. Needing review: 0.
 | playwright | 1.63.0 | Apache-2.0 | permissive |
 | playwright-core | 1.63.0 | Apache-2.0 | permissive |
 | pluralize | 8.0.0 | MIT | permissive |
-| postcss | 8.5.28 | MIT | permissive |
+| postcss | 8.5.28, 8.5.33 | MIT | permissive |
 | postcss-nested | 6.2.0 | MIT | permissive |
 | postcss-selector-parser | 6.1.4 | MIT | permissive |
 | postgres-array | 2.0.0 | MIT | permissive |
@@ -885,7 +885,7 @@ Packages: 1127. Needing review: 0.
 | punycode | 2.3.1 | MIT | permissive |
 | pvtsutils | 1.3.6 | MIT | permissive |
 | pvutils | 1.2.0 | MIT | permissive |
-| qs | 6.16.0 | BSD-3-Clause | permissive |
+| qs | 6.16.0, 6.17.1 | BSD-3-Clause | permissive |
 | quansync | 1.0.0 | MIT | permissive |
 | quick-format-unescaped | 4.0.4 | MIT | permissive |
 | radix-ui | 1.6.7 | MIT | permissive |
@@ -927,7 +927,7 @@ Packages: 1127. Needing review: 0.
 | reusify | 1.1.0 | MIT | permissive |
 | rfdc | 1.4.1 | MIT | permissive |
 | robots-parser | 3.0.1 | MIT | permissive |
-| rolldown | 1.2.11 | MIT | permissive |
+| rolldown | 1.2.11, 1.2.19 | MIT | permissive |
 | rolldown-plugin-dts | 0.28.6 | MIT | permissive |
 | rou3 | 0.9.2 | MIT | permissive |
 | router | 2.2.0 | MIT | permissive |
@@ -947,13 +947,13 @@ Packages: 1127. Needing review: 0.
 | selderee | 0.12.0 | MIT | permissive |
 | semver | 6.3.1, 7.8.5 | ISC | permissive |
 | send | 1.2.1 | MIT | permissive |
-| seroval | 1.6.7 | MIT | permissive |
+| seroval | 1.6.12 | MIT | permissive |
 | seroval-plugins | 1.6.7 | MIT | permissive |
 | serve-static | 2.2.1 | MIT | permissive |
 | set-cookie-parser | 2.7.2, 3.1.2 | MIT | permissive |
 | setimmediate | 1.0.5 | MIT | permissive |
 | setprototypeof | 1.2.0 | ISC | permissive |
-| sharp | 0.35.4 | Apache-2.0 | permissive |
+| sharp | 0.35.5 | Apache-2.0 | permissive |
 | shebang-command | 2.0.0 | MIT | permissive |
 | shebang-regex | 3.0.0 | MIT | permissive |
 | shell-quote | 1.10.0 | MIT | permissive |
@@ -969,7 +969,7 @@ Packages: 1127. Needing review: 0.
 | sonic-boom | 4.2.1 | MIT | permissive |
 | sonner | 2.0.8 | MIT | permissive |
 | source-map | 0.6.1 | BSD-3-Clause | permissive |
-| source-map-js | 1.2.1 | BSD-3-Clause | permissive |
+| source-map-js | 1.2.4 | BSD-3-Clause | permissive |
 | source-map-support | 0.5.21 | MIT | permissive |
 | space-separated-tokens | 2.0.2 | MIT | permissive |
 | split2 | 4.2.0 | ISC | permissive |
@@ -1039,7 +1039,7 @@ Packages: 1127. Needing review: 0.
 | unconfig-core | 7.5.0 | MIT | permissive |
 | uncrypto | 0.1.3 | MIT | permissive |
 | underscore | 1.13.8 | MIT | permissive |
-| undici | 7.29.0, 8.11.2 | MIT | permissive |
+| undici | 7.30.2, 8.13.1 | MIT | permissive |
 | undici-types | 7.24.6 | MIT | permissive |
 | unified | 11.0.5 | MIT | permissive |
 | unifont | 0.7.5 | MIT | permissive |
@@ -1072,7 +1072,7 @@ Packages: 1127. Needing review: 0.
 | verkit | 0.4.1 | MIT | permissive |
 | vfile | 6.0.3 | MIT | permissive |
 | vfile-message | 4.0.3 | MIT | permissive |
-| vite | 8.3.1 | MIT | permissive |
+| vite | 8.3.8 | MIT | permissive |
 | vitefu | 1.1.3 | MIT | permissive |
 | vitest | 5.0.2 | MIT | permissive |
 | volar-service-css | 0.0.71 | MIT | permissive |
@@ -1128,7 +1128,7 @@ Packages: 1127. Needing review: 0.
 | yuku-ast | 0.10.2 | MIT | permissive |
 | yuku-codegen | 0.10.2 | MIT | permissive |
 | yuku-parser | 0.10.2 | MIT | permissive |
-| zod | 4.6.5 | MIT | permissive |
+| zod | 4.6.7 | MIT | permissive |
 | zod-openapi | 6.0.2 | MIT | permissive |
 | zod-to-json-schema | 3.25.2 | ISC | permissive |
 | zustand | 5.0.15 | MIT | permissive |

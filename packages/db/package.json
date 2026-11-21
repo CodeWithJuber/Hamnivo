@@ -45,12 +45,12 @@
     "uuidv7": "1.2.1"
   },
   "devDependencies": {
-    "@better-auth/drizzle-adapter": "1.7.6",
-    "@better-auth/passkey": "1.7.6",
-    "@better-auth/sso": "1.7.6",
+    "@better-auth/drizzle-adapter": "1.7.26",
+    "@better-auth/passkey": "1.7.26",
+    "@better-auth/sso": "1.7.26",
     "@types/node": "catalog:",
     "@types/pg": "8.23.1",
-    "better-auth": "1.7.6",
+    "better-auth": "1.7.26",
     "drizzle-kit": "0.31.11",
     "tsdown": "0.23.0",
     "tsx": "4.23.15",
