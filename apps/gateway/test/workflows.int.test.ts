@@ -113,6 +113,16 @@ async function start(id: string, conversationId: string, eventKey: string = rand
 async function read(id: string) {
   return (await shop.owner.get(`/v1/admin/workflows/${id}/runs`)).body.items;
 }
+/**
+ * The runs of a workflow for one conversation. A customer-message workflow also runs for an
+ * earlier test's conversation whose reply was still waiting (its deferred `prepareReply` event
+ * comes due a second later), so a count for one message is a count for its conversation.
+ */
+async function readFor(id: string, conversationId: string) {
+  return (await read(id)).filter(
+    (run: { conversationId: string }) => run.conversationId === conversationId,
+  );
+}
 async function tick(runId: string) {
   await slice.worker.get(WorkflowRunner).onEvent({
     tenantId,
@@ -198,7 +208,7 @@ describe('durable workflow execution', () => {
       (await shop.owner.post(`/v1/admin/workflows/${id}/publish`, { revision: 1 })).status,
     ).toBe(200);
     const c = await chat();
-    const runs = await read(id);
+    const runs = await readFor(id, c.conversationId);
     expect(runs).toHaveLength(1);
     expect(runs[0].state).toBe('completed');
     const [ledger] = await withTenant(slice.app, { tenantId }, (tx) =>
@@ -218,7 +228,7 @@ describe('durable workflow execution', () => {
         ref: `message:${ledger!.id}`,
       },
     } as ClaimedOutboxEvent);
-    expect(await read(id)).toHaveLength(1);
+    expect(await readFor(id, c.conversationId)).toHaveLength(1);
     await shop.owner.put(`/v1/admin/workflows/${id}/enabled`, { enabled: false });
   });
   it('uses current-message specialist evidence in the first coordinator reply with one publication', async () => {
@@ -292,7 +302,7 @@ describe('durable workflow execution', () => {
     expect(
       seen.messages.filter((message) => !message.private && message.direction === 'outgoing'),
     ).toHaveLength(1);
-    expect(await read(id)).toHaveLength(1);
+    expect(await readFor(id, c.conversationId)).toHaveLength(1);
     expect(
       await slice.worker.get(WorkflowRunner).prepareReply({
         tenantId,
@@ -333,7 +343,7 @@ describe('durable workflow execution', () => {
     expect(
       seen.messages.filter((message) => !message.private && message.direction === 'outgoing'),
     ).toHaveLength(0);
-    expect((await read(id))[0].state).toBe('handed_off');
+    expect((await readFor(id, c.conversationId))[0].state).toBe('handed_off');
     const pending = await withTenant(slice.app, { tenantId }, (tx) =>
       tx
         .select({ id: schema.outboxEvents.id })
