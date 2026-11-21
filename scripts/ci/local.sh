@@ -253,18 +253,8 @@ chatwoot_contract() {
   return "$status"
 }
 
-require node pnpm git openssl
-step "Install dependencies (frozen lockfile)" pnpm install --frozen-lockfile
-step "Lint and format (Biome)" pnpm lint
-step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"}
-step "Unit tests" unit_tests
-step "Chat's first open within its size budget" widget_size
-step "Shell scripts (shellcheck)" shell_scripts
-step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
-step "Production dependencies have no high or critical advisory" dependency_audit
-step "No secrets in the code (gitleaks)" secret_scan
 # The supply chain (production-ready plan): what ships has no high or critical advisory, and the
-# code holds no secret. The audit asks npm's registry; gitleaks reads the checked-out files with
+# code holds no secret. The audit asks npm's registry; gitleaks reads the whole git history with
 # the rules in .gitleaks.toml (made-up keys in tests and examples are allowed).
 dependency_audit() {
   pnpm audit --prod --audit-level=high
@@ -276,6 +266,17 @@ secret_scan() {
   fi
   gitleaks git --no-banner --redact --config .gitleaks.toml .
 }
+
+require node pnpm git openssl
+step "Install dependencies (frozen lockfile)" pnpm install --frozen-lockfile
+step "Lint and format (Biome)" pnpm lint
+step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"}
+step "Unit tests" unit_tests
+step "Chat's first open within its size budget" widget_size
+step "Shell scripts (shellcheck)" shell_scripts
+step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
+step "Production dependencies have no high or critical advisory" dependency_audit
+step "No secrets in the code (gitleaks)" secret_scan
 
 # The deploy scripts run on Linux servers and use flock and GNU touch, which macOS lacks; elsewhere
 # the same test runs in a Debian container (safe.directory: the mount belongs to another user).
