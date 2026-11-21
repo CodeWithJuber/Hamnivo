@@ -87,6 +87,7 @@ export const Bubble = memo(function Bubble({
   const { t } = useTranslation();
   const slotLabel = useSlotLabel();
   const [cited, setCited] = useState<{ number: number; at: number } | null>(null);
+  const [showTime, setShowTime] = useState(false);
   const custom = (message.metadata?.custom ?? {}) as unknown as Partial<Custom>;
   if (!custom.kind) return null;
   const day = custom.day ? <DayLine day={custom.day} locale={ctx.locale} /> : null;
@@ -180,6 +181,7 @@ export const Bubble = memo(function Bubble({
     <>
       {day}
       {divider}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: a tap only shows the time, which focus inside the message shows too and screen readers always read */}
       <li
         className={`group/message flex gap-2 ${mine ? 'flex-row-reverse' : ''} ${
           custom.first === false && !custom.day && !custom.firstUnread ? '-mt-1.5' : ''
@@ -187,6 +189,12 @@ export const Bubble = memo(function Bubble({
         data-sender={custom.kind}
         data-state={custom.state}
         data-delivery={custom.delivery ?? undefined}
+        data-show-time={showTime || undefined}
+        onClick={(event) => {
+          // Links and buttons in the message do their own thing.
+          if ((event.target as HTMLElement).closest('a, button, input, textarea, select')) return;
+          if (!custom.last) setShowTime((shown) => !shown);
+        }}
       >
         {incoming ? (
           <span className="w-8 shrink-0 max-[20rem]:hidden" aria-hidden="true">
@@ -322,7 +330,7 @@ export const Bubble = memo(function Bubble({
           {mine ? (
             <div className="flex flex-wrap items-center justify-end gap-x-2 text-xs text-text-muted">
               {custom.state === 'accepted' ? (
-                <SentAt at={custom.createdAt} locale={ctx.locale} />
+                <SentAt at={custom.createdAt} locale={ctx.locale} quiet={!custom.last} />
               ) : null}
               <Delivery
                 custom={custom}
@@ -340,7 +348,7 @@ export const Bubble = memo(function Bubble({
           {incoming ? (
             <div className="flex flex-wrap items-start gap-x-1.5 text-xs text-text-muted">
               <span className="leading-8">
-                <SentAt at={custom.createdAt} locale={ctx.locale} />
+                <SentAt at={custom.createdAt} locale={ctx.locale} quiet={!custom.last} />
               </span>
               {given.map((emoji) => (
                 <span

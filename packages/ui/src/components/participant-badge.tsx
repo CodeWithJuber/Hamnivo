@@ -66,7 +66,11 @@ function ParticipantAvatar({ kind, name, className }: AvatarProps) {
     );
   }
   return (
-    <span className={cn(base, 'bg-brand-subtle text-text', className)} aria-hidden="true">
+    // The pale fill alone vanishes on a white bubble; the ring keeps the circle visible.
+    <span
+      className={cn(base, 'bg-brand-subtle text-text ring-1 ring-border ring-inset', className)}
+      aria-hidden="true"
+    >
       {initials(name)}
     </span>
   );

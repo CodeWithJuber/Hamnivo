@@ -15,7 +15,6 @@ export const SURFACE_COPY = {
     },
     home: {
       title: 'How can we help?',
-      chat: 'Chat with us',
       suggestions: 'Popular questions',
       searchLabel: 'Search help articles',
       searchPlaceholder: 'Search help',
@@ -209,7 +208,6 @@ export const SURFACE_COPY = {
     },
     home: {
       title: 'كيف يمكننا مساعدتك؟',
-      chat: 'تحدّث معنا',
       suggestions: 'أسئلة شائعة',
       searchLabel: 'ابحث في مقالات المساعدة',
       searchPlaceholder: 'ابحث في المساعدة',
@@ -398,7 +396,6 @@ export const SURFACE_COPY = {
     },
     home: {
       title: 'हम आपकी क्या मदद कर सकते हैं?',
-      chat: 'हमसे चैट करें',
       suggestions: 'आम सवाल',
       searchLabel: 'मदद के लेख खोजें',
       searchPlaceholder: 'मदद खोजें',
@@ -588,7 +585,6 @@ export const SURFACE_COPY = {
     },
     home: {
       title: 'ہم آپ کی کیا مدد کر سکتے ہیں؟',
-      chat: 'ہم سے چیٹ کریں',
       suggestions: 'عام سوالات',
       searchLabel: 'مدد کے مضامین تلاش کریں',
       searchPlaceholder: 'مدد تلاش کریں',

@@ -103,6 +103,7 @@ describe('the home screen while chat isn’t available', () => {
         onContact={() => undefined}
         available={false}
         onAsk={() => undefined}
+        disclosure="I'm Noor Books's AI assistant."
       />,
     );
     expect(html).toContain('data-testid="help-search"');

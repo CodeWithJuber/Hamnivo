@@ -17,11 +17,31 @@ function causeOf(
  * When a message was sent, in the visitor's own time zone. Only the time: the day is said once,
  * on the line above that day's first message. Nothing for a message not confirmed yet.
  */
-export function SentAt({ at, locale }: { at: string | undefined; locale: string }) {
+export function SentAt({
+  at,
+  locale,
+  quiet = false,
+}: {
+  at: string | undefined;
+  locale: string;
+  /**
+   * Not the last message of its sender's turn: the turn shows one time, at its end. This one is
+   * still read out, and shows on hover, on focus inside the message, or when it is tapped.
+   */
+  quiet?: boolean;
+}) {
   const date = at ? new Date(at) : null;
   if (!date || Number.isNaN(date.getTime())) return null;
   return (
-    <time dateTime={date.toISOString()} data-testid="sent-at">
+    <time
+      dateTime={date.toISOString()}
+      data-testid="sent-at"
+      className={
+        quiet
+          ? 'sr-only group-hover/message:not-sr-only group-focus-within/message:not-sr-only group-data-[show-time]/message:not-sr-only'
+          : undefined
+      }
+    >
       {new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(date)}
     </time>
   );

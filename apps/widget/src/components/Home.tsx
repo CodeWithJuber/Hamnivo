@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { BidiText } from './BidiText.js';
 import { StatusLine } from './StatusLine.js';
 import { TeamAvatars } from './shell/TeamAvatars.js';
+import { VisitorNotice } from './VisitorNotice.js';
 
 /** Only web links open from the chat. */
 const webLink = (url: string | null): string | null => {
@@ -47,8 +48,10 @@ export function Home(props: {
   onAsk: (question: string) => void;
   /** Who is online and how soon people reply (W17); left out by an older gateway. */
   team?: WidgetConfig['team'] | undefined;
-  /** "Chat with us": takes the visitor to the message box. */
-  onChat?: (() => void) | undefined;
+  /** The brand's words about its assistant (U09), the first line under the greeting. */
+  disclosure: string;
+  /** Which pages the website notes and how to stop it, said before anything is written. */
+  notice?: string | null;
 }) {
   const { t } = useTranslation();
   const searchId = useId();
@@ -96,17 +99,12 @@ export function Home(props: {
             tone="inherit"
           />
         ) : null}
-        {props.onChat && available ? (
-          <Button
-            type="button"
-            className="hv-hero-action mt-1 h-auto min-h-11 self-start whitespace-normal py-2"
-            onClick={props.onChat}
-            data-testid="chat-with-us"
-          >
-            <MessagesSquareIcon className="size-4" aria-hidden="true" />
-            {t('surface.home.chat')}
-          </Button>
-        ) : null}
+      </div>
+      {/* The brand's words about its assistant, as the first line under the greeting (U09). The
+          message box below is the one way to start: no second button does the same. */}
+      <div className="-mt-2 flex flex-col gap-1 text-center text-xs text-text-muted">
+        <p data-testid="ai-disclosure">{props.disclosure}</p>
+        <VisitorNotice text={props.notice ?? null} className="" />
       </div>
       {props.prompt ? (
         <section
