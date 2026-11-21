@@ -623,7 +623,7 @@ cmd_backup_check() {
   need_env
   local dir="${1:-}" from="$here/backups"
   if [[ -z "$dir" ]]; then
-    dir="$(find "$from" -mindepth 1 -maxdepth 1 -type d -name '20*Z' 2>/dev/null | sort | tail -1)"
+    dir="$(find "$from" -mindepth 1 -maxdepth 1 -type d -name '20*Z' 2>/dev/null | sort | tail -1 || true)"
     [[ -n "$dir" ]] || fail "No backup in $from to check. Make one with: $here/hamnivo.sh backup"
   fi
   [[ -f "$dir/hamnivo.dump" && -f "$dir/chatwoot.dump" ]] || fail "Not a backup: $dir"

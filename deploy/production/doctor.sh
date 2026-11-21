@@ -13,7 +13,8 @@
 # HAMNIVO_CHAT_HOST, HAMNIVO_SUPPORT_HOST, HAMNIVO_SITE_HOSTS), the way a deploy checks it; ports 80
 # and 443; disk space and Docker's build cache; memory and swap; the volume that keeps Caddy's
 # certificates; automatic deploys (mode, systemd units, git access, how far behind origin the
-# checkout is, the last three deploys); and the Jev key.
+# checkout is, the last three deploys); scheduled backups (the timers, the last runs, the age of the
+# newest); and the Jev key.
 # HAMNIVO_MEMINFO names another file than /proc/meminfo (for tests).
 set -euo pipefail
 
@@ -387,6 +388,43 @@ check_deploys() {
 }
 
 # --- Jev -----------------------------------------------------------------------------------------
+# --- backups -------------------------------------------------------------------------------------
+# `hamnivo.sh backups on` runs a backup every night and a backup check every month; a timer that
+# stopped, a failed run or an old newest backup would otherwise go unnoticed.
+check_backups() {
+  local newest age_h result unit failed=()
+  newest="$(find "$here/backups" -mindepth 1 -maxdepth 1 -type d -name '20*Z' 2>/dev/null | sort | tail -1 || true)"
+  if [[ ! -f /etc/systemd/system/hamnivo-backup.timer ]]; then
+    pass "Backups: not scheduled (${newest:+newest $(basename "$newest"); }back up every night with: $hv backups on)"
+    return 0
+  fi
+  if [[ "$(systemctl is-active hamnivo-backup.timer 2>/dev/null || true)" != active ]]; then
+    problem 'Backups: scheduled, but the nightly timer is not running' 'install and start the timers again.' "$hv backups on"
+    return 0
+  fi
+  for unit in hamnivo-backup hamnivo-backup-check; do
+    # "success" after a good run, empty before the first one; anything else says why it failed.
+    result="$(systemctl show -p Result --value "$unit.service" 2>/dev/null || true)"
+    [[ -z "$result" || "$result" == success ]] || failed+=("$unit ($result)")
+  done
+  if ((${#failed[@]} > 0)); then
+    problem "Backups: the last run failed: $(join "${failed[@]}")" 'read why, fix it, then run it again by hand.' \
+      "journalctl -u ${failed[0]%% *} -n 50"
+    return 0
+  fi
+  if [[ -z "$newest" ]]; then
+    pass 'Backups: every night; the first one has not run yet'
+    return 0
+  fi
+  age_h=$((($(date +%s) - $(stat -c %Y "$newest")) / 3600))
+  if ((age_h > 36)); then
+    problem "Backups: the newest is $age_h hours old ($(basename "$newest"))" 'see why the nightly backup did not run.' \
+      'journalctl -u hamnivo-backup -n 50'
+  else
+    pass "Backups: every night, checked monthly; the newest is $age_h hours old ($(basename "$newest"))"
+  fi
+}
+
 check_jev() {
   if [[ -n "$(get TYPESAFE_API_KEY)" ]]; then
     pass 'Jev: TYPESAFE_API_KEY is set'
@@ -424,6 +462,7 @@ main() {
     check_autodeploy
     check_git
     check_deploys
+    check_backups
     check_jev
   fi
   if ((failures == 0)); then

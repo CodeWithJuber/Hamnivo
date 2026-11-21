@@ -1054,7 +1054,7 @@ backups_status() {
         "$(systemctl show -p Result --value "$unit" 2>/dev/null || true)"
     done
   fi
-  newest="$(find "$here/backups" -mindepth 1 -maxdepth 1 -type d -name '20*Z' 2>/dev/null | sort | tail -1)"
+  newest="$(find "$here/backups" -mindepth 1 -maxdepth 1 -type d -name '20*Z' 2>/dev/null | sort | tail -1 || true)"
   printf 'Newest backup:               %s\n' "${newest:-none}"
 }
 
