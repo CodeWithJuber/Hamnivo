@@ -1235,6 +1235,8 @@ pnpm ci:local --quick           # lint, typecheck, unit tests, status and licenc
 pnpm ci:local --skip-a11y       # everything except the Storybook accessibility audit
 pnpm ci:local --skip-chatwoot   # everything except the real-Chatwoot contract suite
 pnpm ci:local --skip-e2e        # everything except the browser checks (widget journey, website)
+pnpm ci:local --skip-basics     # everything except lint, typecheck, unit tests and the --quick checks
+pnpm ci:local --skip-integration # everything except the integration tests
 PG_VERSIONS=18 pnpm ci:local
 ```
 
@@ -1253,16 +1255,20 @@ is never touched:
 
 The checks write `test-results/ci-local.md`. On the CI runner, the Actions run summary shows the
 report and where the full `test-results/` archive is kept: a file on the CI server, never a GitHub
-artifact. Copy one with its run ID and attempt number:
+artifact, one per suite. Copy one with its run ID, attempt number and suite (`basics`,
+`integration-pg18`, `chatwoot`, `browser`, `production-smoke`, ...):
 
 ```bash
-scp root@CI_SERVER:/opt/hamnivo-ci-runner/results/ci-results-RUN_ID-ATTEMPT.tar.gz .
+scp root@CI_SERVER:/opt/hamnivo-ci-runner/results/ci-results-RUN_ID-ATTEMPT-SUITE.tar.gz .
 ```
 
 ### Run the checks on GitHub, for free
 
-Every push runs this whole pipeline on GitHub Actions (ADR 0009), on a runner of your own, and
-GitHub bills nothing for it (ADR 0020):
+Every push runs this pipeline on GitHub Actions (ADR 0009), on runners of your own, and GitHub
+bills nothing for it (ADR 0020). It is split into suites that run side by side, one job each, so
+with four runners a push takes about as long as its slowest suite. Other branches test
+PostgreSQL 18 only; main and runs by hand also test 16 and run the production and automatic-deploy
+smoke tests, which other branches run only when a deploy file changes.
 
 - Self-hosted runners are free.
 - Caches stay on the runner's disk, and results stay on the server.

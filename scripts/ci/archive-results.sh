@@ -18,11 +18,13 @@ if [[ -f test-results/ci-local.md && ! -L test-results/ci-local.md ]]; then
 fi
 
 days="${HAMNIVO_CI_RESULTS_DAYS:-14}"
-[[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ && "$days" =~ ^[0-9]+$ ]]
+# The run's jobs run side by side and share the results folder, so each archive carries its suite.
+suite="${HAMNIVO_CI_SUITE:-}"
+[[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ && "$days" =~ ^[0-9]+$ && "$suite" =~ ^[a-z0-9-]*$ ]]
 umask 077
 archive_dir="${CI_RESULTS_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/hamnivo-ci-results}"
 mkdir -p -- "$archive_dir"
-archive="ci-results-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
+archive="ci-results-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT${suite:+-$suite}.tar.gz"
 temporary=$(mktemp "$archive_dir/.incoming.XXXXXXXX")
 trap 'rm -f -- "$temporary"' EXIT
 # Include only regular, visible files, as with the previous artifact upload.
@@ -30,6 +32,6 @@ trap 'rm -f -- "$temporary"' EXIT
   tar --directory=test-results --null --files-from=- --create --gzip --file="$temporary"
 mv -- "$temporary" "$archive_dir/$archive"
 find "$archive_dir" -regextype posix-extended -maxdepth 1 -type f \
-  -regex '.*/ci-results-[0-9]+-[0-9]+\.tar\.gz' -mmin +$((days * 1440)) -delete
+  -regex '.*/ci-results-[0-9]+-[0-9]+(-[a-z0-9-]+)?\.tar\.gz' -mmin +$((days * 1440)) -delete
 printf '\nFull results on the CI server: %s/%s (kept %s days).\n' \
   "${HAMNIVO_CI_RESULTS_LOCATION:-$archive_dir}" "$archive" "$days" >> "$GITHUB_STEP_SUMMARY"

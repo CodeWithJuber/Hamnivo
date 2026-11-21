@@ -7,6 +7,9 @@
 #   pnpm ci:local --skip-a11y        skip the Storybook accessibility audit
 #   pnpm ci:local --skip-chatwoot    skip the contract suite against a real Chatwoot
 #   pnpm ci:local --skip-e2e         skip the browser checks (widget journey and website)
+#   pnpm ci:local --skip-basics      skip lint, typecheck, unit tests and the other --quick checks
+#                                    (CI runs them in a job of their own, beside the slow ones)
+#   pnpm ci:local --skip-integration skip the integration tests
 #   pnpm ci:local --with-production  also build the production images and check the real
 #                                    deployment with a backup and restore drill (10–20 minutes)
 #   pnpm ci:local --with-autodeploy  also check automatic deploys: webhook, checks, rollback
@@ -23,6 +26,8 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
 
 quick=0
+basics=1
+integration=1
 a11y=1
 chatwoot=1
 e2e=1
@@ -31,12 +36,14 @@ autodeploy=0
 for arg in "$@"; do
   case "$arg" in
     --quick) quick=1 ;;
+    --skip-basics) basics=0 ;;
+    --skip-integration) integration=0 ;;
     --skip-a11y) a11y=0 ;;
     --skip-chatwoot) chatwoot=0 ;;
     --skip-e2e) e2e=0 ;;
     --with-production) production=1 ;;
     --with-autodeploy) autodeploy=1 ;;
-    -h | --help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -247,11 +254,7 @@ chatwoot_contract() {
 
 require node pnpm git openssl
 step "Install dependencies (frozen lockfile)" pnpm install --frozen-lockfile
-step "Lint and format (Biome)" pnpm lint
-step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"}
-step "Unit tests" unit_tests
-step "Shell scripts (shellcheck)" shell_scripts
-step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
+
 # The deploy scripts run on Linux servers and use flock and GNU touch, which macOS lacks; elsewhere
 # the same test runs in a Debian container (safe.directory: the mount belongs to another user).
 deploy_scripts() {
@@ -263,15 +266,24 @@ deploy_scripts() {
     -v "$root:/repo:ro" -w /repo debian:bookworm-slim bash -c \
     'apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends git curl ca-certificates util-linux procps >/dev/null && bash scripts/ci/deploy-https-test.sh'
 }
-step "Deploy scripts: doctor and HTTPS rules (stand-ins; in Linux)" deploy_scripts
-step "Feature status matrix is current" pnpm exec tsx scripts/feature-status/generate.ts --check
-step "Licence inventory is current and reviewed" pnpm exec tsx scripts/licenses/inventory.ts --check
+if ((basics == 1)); then
+  step "Lint and format (Biome)" pnpm lint
+  step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"}
+  step "Unit tests" unit_tests
+  step "Shell scripts (shellcheck)" shell_scripts
+  step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
+  step "Deploy scripts: doctor and HTTPS rules (stand-ins; in Linux)" deploy_scripts
+  step "Feature status matrix is current" pnpm exec tsx scripts/feature-status/generate.ts --check
+  step "Licence inventory is current and reviewed" pnpm exec tsx scripts/licenses/inventory.ts --check
+fi
 
 if ((quick == 0)); then
   require docker
-  for version in ${PG_VERSIONS:-16 18}; do
-    step "Integration tests (PostgreSQL $version + Valkey)" integration "$version"
-  done
+  if ((integration == 1)); then
+    for version in ${PG_VERSIONS:-16 18}; do
+      step "Integration tests (PostgreSQL $version + Valkey)" integration "$version"
+    done
+  fi
   if ((chatwoot == 1)); then
     step "Chatwoot contract suite (real Chatwoot v4.18.0-ce)" chatwoot_contract
   fi
