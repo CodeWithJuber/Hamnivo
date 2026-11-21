@@ -1,7 +1,10 @@
-# The full check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, with the production
-# and automatic-deploy smoke tests. It runs on our own runner (deploy/ci-runner) and uses nothing
-# GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each report is
-# kept there as a file, never uploaded as an artifact. scripts/ci/no-github-billing.sh checks this.
+# The full check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, split into suites that
+# run side by side, one job each, on our own runners (deploy/ci-runner). On main and on a run by hand
+# it covers every PostgreSQL major and the production and automatic-deploy smoke tests; on other
+# branches PostgreSQL 18 (production's) only, and the smoke tests only when a deploy file changes.
+# It uses nothing GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each
+# report is kept there as a file, never uploaded as an artifact. scripts/ci/no-github-billing.sh
+# checks this.
 name: CI
 
 on:
@@ -17,12 +20,64 @@ permissions:
   contents: read
 
 jobs:
+  plan:
+    name: Pick the suites
+    runs-on: [self-hosted, linux, x64, hamnivo]
+    timeout-minutes: 10
+    outputs:
+      suites: ${{ steps.pick.outputs.suites }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Pick the suites
+        id: pick
+        env:
+          FULL: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          pg='18'
+          smoke=false
+          if [[ "$FULL" == true ]]; then
+            pg='16 18'
+            smoke=true
+          elif ! changed="$(git diff --name-only "origin/main...$GITHUB_SHA")"; then
+            smoke=true # No merge base to compare with: run the smoke tests rather than skip them.
+          elif grep -Eq '^(deploy/|scripts/ci/(production|autodeploy)-smoke\.sh$|\.github/workflows/ci\.yml$)' <<<"$changed"; then
+            smoke=true
+          fi
+          suites=''
+          suite() { # suite ID NAME ARGS PG BROWSERS
+            suites+="${suites:+,}$(printf '{"id":"%s","name":"%s","args":"%s","pg":"%s","browsers":%s}' "$@")"
+          }
+          only='--skip-basics --skip-integration --skip-chatwoot --skip-a11y --skip-e2e'
+          suite basics 'Lint, types and unit tests' '--quick' '' false
+          for version in $pg; do
+            suite "integration-pg$version" "Integration tests (PostgreSQL $version)" \
+              '--skip-basics --skip-chatwoot --skip-a11y --skip-e2e' "$version" false
+          done
+          suite chatwoot 'Chatwoot contract suite' '--skip-basics --skip-integration --skip-a11y --skip-e2e' '' false
+          suite browser 'Accessibility and browser journeys' '--skip-basics --skip-integration --skip-chatwoot' '' true
+          if [[ "$smoke" == true ]]; then
+            suite production-smoke 'Production deployment smoke test' "$only --with-production" '' true
+            suite autodeploy-smoke 'Automatic deploy smoke test' "$only --with-autodeploy" '' false
+          fi
+          echo "suites=[$suites]" >> "$GITHUB_OUTPUT"
+          echo "Suites: [$suites]"
+
   checks:
-    name: checks
+    name: ${{ matrix.name }}
+    needs: plan
     runs-on: [self-hosted, linux, x64, hamnivo]
     timeout-minutes: 150
+    strategy:
+      # Every suite reports, so one push shows all that is broken.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.suites) }}
     env:
       TURBO_TELEMETRY_DISABLED: '1'
+      HAMNIVO_CI_SUITE: ${{ matrix.id }}
     steps:
       - uses: actions/checkout@v7
         id: checkout
@@ -40,8 +95,9 @@ jobs:
 
       # Browsers live in the runner's cache; their system libraries are installed once when the
       # runner is set up (docs/self-hosting.md, "Run the checks on GitHub, for free").
-      - name: Install Chromium and WebKit for the browser checks
-        run: pnpm --filter @hamnivo/console exec playwright install chromium webkit
+      - name: Install Chromium for the browser checks
+        if: matrix.browsers
+        run: pnpm --filter @hamnivo/console exec playwright install chromium
 
       # A run whose runner died never ran its cleanup: its databases, Chatwoot and smoke stacks stay
       # in the runner's Docker and hold the next run's 4 GB (ADR 0019). Only the checks' own names
@@ -73,7 +129,11 @@ jobs:
           done
 
       - name: Checks
-        run: pnpm ci:local --with-production --with-autodeploy
+        env:
+          SUITE_ARGS: ${{ matrix.args }}
+          PG_VERSIONS: ${{ matrix.pg }}
+        # SUITE_ARGS is unquoted on purpose: it holds several options.
+        run: pnpm ci:local $SUITE_ARGS
 
       - name: Keep results on the compute runner
         if: always() && steps.checkout.outcome == 'success'
