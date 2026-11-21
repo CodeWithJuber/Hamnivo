@@ -254,6 +254,12 @@ chatwoot_contract() {
 
 require node pnpm git openssl
 step "Install dependencies (frozen lockfile)" pnpm install --frozen-lockfile
+# Typecheck and unit tests build the workspace packages on the way (turbo's ^build). Without them,
+# a suite that calls pnpm directly (Chatwoot, Storybook, the console's Playwright) finds no dist/.
+if ((basics == 0)); then
+  step "Build the workspace packages" pnpm exec turbo run build --filter='./packages/*' \
+    ${heavy_limit[@]+"${heavy_limit[@]}"}
+fi
 
 # The deploy scripts run on Linux servers and use flock and GNU touch, which macOS lacks; elsewhere
 # the same test runs in a Debian container (safe.directory: the mount belongs to another user).
