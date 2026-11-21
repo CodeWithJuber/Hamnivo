@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Registers the runner the first time, keeps its credentials in /state, then runs it.
 set -euo pipefail
-sudo chown runner:docker /home/runner/_work /home/runner/.cache
+sudo chown runner:docker /home/runner/_work /home/runner/.cache /home/runner/.cache/hamnivo-ci-results
 mkdir -p "$TMPDIR"
 cd /home/runner
 files=(.runner .credentials .credentials_rsaparams)

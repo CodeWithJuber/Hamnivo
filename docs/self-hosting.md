@@ -1251,42 +1251,75 @@ is never touched:
 
 - The built website in Chromium: every language at desktop and phone width, with an axe audit.
 
-The checks write `test-results/ci-local.md`. On the self-hosted runner, the Actions run summary shows the report and the archive path. The compute server retains the full `test-results/` archive for 14 days. To copy a run's archive from the capped runner over an existing SSH connection, use its run ID and attempt number:
+The checks write `test-results/ci-local.md`. On the CI runner, the Actions run summary shows the
+report and where the full `test-results/` archive is kept: a file on the CI server, never a GitHub
+artifact. Copy one with its run ID and attempt number:
 
 ```bash
-ssh COMPUTE_HOST 'docker exec hamnivo-ci-runner-1 cat /home/runner/.cache/hamnivo-ci-results/ci-results-RUN_ID-ATTEMPT.tar.gz' > ci-results.tar.gz
+scp root@CI_SERVER:/opt/hamnivo-ci-runner/results/ci-results-RUN_ID-ATTEMPT.tar.gz .
 ```
 
-The operator's SSH account needs access to the runner container.
+### Run the checks on GitHub, for free
 
-### Run the checks on GitHub
+Every push runs this whole pipeline on GitHub Actions (ADR 0009), on a runner of your own, and
+GitHub bills nothing for it (ADR 0020):
 
-Every push runs this whole pipeline on GitHub Actions (ADR 0009), on a runner of your own. Set it
-up once:
+- Self-hosted runners are free.
+- Caches stay on the runner's disk, and results stay on the server.
+- `pnpm ci:local` fails any workflow change that would use GitHub's hosted runners, artifact
+  storage, cache storage or Packages (`scripts/ci/no-github-billing.sh`).
 
-1. **Get a machine for it.** It needs 4 CPUs, 8 GB of memory, 40 GB of free disk and Docker. A
-   machine of its own is best; one that already runs another project's runner will do. Don't
-   install it directly on the production server: the checks build images with the same names,
+Set it up once:
+
+1. **Get a server for it.** It needs Ubuntu 22.04 or later (or Debian 12 or later) on x86_64, at
+   least 4 GB of memory (8 GB or more is better), 40 GB of free disk, and outbound HTTPS. It needs
+   no open port. Don't use the production server: the checks build images with the same names,
    and they would slow the live service. If the production server is the only machine you have,
-   skip the steps below and use the capped setup in
-   [On the production server](#on-the-production-server) instead (ADR 0019).
-2. **Register the runner.** In the repository on GitHub, open **Settings → Actions → Runners →
-   New self-hosted runner** and choose Linux x64. Run the commands it shows on the machine, as a
-   user other than root. When `config.sh` asks for labels, enter `hamnivo`.
-3. **Give it Docker and run it as a service.** In the runner's folder:
+   use the capped setup in [On the production server](#on-the-production-server) instead
+   (ADR 0019).
+2. **Install the runner.** From a checkout of this repository:
 
    ```bash
-   sudo usermod -aG docker "$USER"
-   sudo ./svc.sh install "$USER" && sudo ./svc.sh start
+   scp -r deploy/ci-runner root@CI_SERVER:/root/hamnivo-ci-runner-setup
    ```
 
-4. **Install Chromium's system libraries, once:** `sudo npx --yes playwright install-deps chromium`.
+   ```bash
+   ssh -t root@CI_SERVER bash /root/hamnivo-ci-runner-setup/install.sh
+   ```
+
+   It installs Docker if it is missing and copies the runner to `/opt/hamnivo-ci-runner`. It caps
+   the checks in `hamnivo-ci.slice`, sized to the machine, and leaves a tenth of the memory (at
+   least 1 GB) for ssh and Docker. Then it asks for a registration token: on GitHub, open
+   **Settings → Actions → Runners → New self-hosted runner**, and copy the value after `--token`.
+   The runner registers with the labels `self-hosted, linux, x64, hamnivo`, starts, and shows as
+   Idle on that page. Run the same two commands again to update it; set `HAMNIVO_CI_CPUS`,
+   `HAMNIVO_CI_MEMORY_GB` and the other variables in the script's header to size it yourself.
+3. **Retire any older runner.** Every runner with the `hamnivo` label takes jobs. On the server
+   it ran on, stop it with `cd /opt/hamnivo-ci-runner && docker compose down`, then remove it
+   under **Settings → Actions → Runners**.
+4. **Make sure GitHub can never bill.** On GitHub, open **Settings → Billing and licensing →
+   Budgets and alerts → New budget**. Choose Actions, set the amount to 0, turn on **Stop usage
+   when budget limit is reached**, and create it. A mistake can then fail a job, but not cost
+   anything.
 5. **Make `main` wait for the checks.** Under **Settings → Branches**, in the rule for `main`, turn
    on "Require status checks to pass" and pick `checks`. For a private repository GitHub offers
    this only on a paid plan; without it, check that `checks` passed before you merge.
 
 A newer push to the same branch cancels the run that is still going. Runs wait in the queue
-until a runner is online.
+until a runner is online; GitHub fails a job that has waited 24 hours.
+
+What the runner keeps on the server, so no run downloads it again:
+
+| What | Where |
+| --- | --- |
+| pnpm's package store, pruned to what the last run used | the `work` volume, `_pnpm-store` |
+| Playwright's browsers and other tool caches | the `runner-cache` volume |
+| Docker images and the build cache of the smoke tests (a week) | the `dind-data` volume |
+| Each run's `test-results/` (14 days, `HAMNIVO_CI_RESULTS_DAYS`) | `/opt/hamnivo-ci-runner/results` |
+
+The runner is GitHub's own image (`ghcr.io/actions/actions-runner`), and it updates itself, as
+GitHub requires: GitHub stops sending jobs to a runner more than 63 days behind. Its logs:
+`cd /opt/hamnivo-ci-runner && docker compose logs -f runner`.
 
 #### On the production server
 
@@ -1298,7 +1331,8 @@ the checks run out of memory, the kernel stops a check, not the live service. As
 
 ```bash
 install -d -m 700 /opt/hamnivo-ci-runner
-install -d -m 700 -o 1001 -g 1001 /opt/hamnivo-ci-runner/state   # the runner's user in its image
+install -d -m 700 -o 1001 -g 1001 /opt/hamnivo-ci-runner/state     # the runner's user in its image
+install -d -m 750 -o 1001 -g 1001 /opt/hamnivo-ci-runner/results
 cp deploy/ci-runner/{compose.yaml,Dockerfile,entrypoint.sh} /opt/hamnivo-ci-runner/
 cp deploy/ci-runner/hamnivo-ci.slice /etc/systemd/system/
 systemctl daemon-reload && systemctl start hamnivo-ci.slice
@@ -1308,13 +1342,10 @@ systemctl daemon-reload && systemctl start hamnivo-ci.slice
 cd /opt/hamnivo-ci-runner && docker compose up -d --build
 ```
 
-The runner registers on its first start and keeps its credentials in `state/`. Set `REPO_URL` in
-`compose.yaml` to your repository. With 4 GB the checks run at most two turbo tasks at once
-(`HAMNIVO_CI_CONCURRENCY=2`), and type checks and builds one at a time
-(`HAMNIVO_CI_HEAVY_CONCURRENCY=1`), so they take longer than on a laptop.
-
-The full checks run on the self-hosted Linux x64 runner labelled `hamnivo`, which owns the report volume.
-`HAMNIVO_CI_RUNNER` can still select the runner for publishing packages.
+Without a `.env` file, `compose.yaml` uses these sizes, the repository's URL and the name
+`compute-hamnivo-ci`. Set `HAMNIVO_CI_REPO_URL` in `.env` for a repository of your own. With
+4 GB the checks run at most two turbo tasks at once (`HAMNIVO_CI_CONCURRENCY=2`), and type checks
+and builds one at a time (`HAMNIVO_CI_HEAVY_CONCURRENCY=1`), so they take longer than on a laptop.
 
 To run the quick checks automatically before every `git push`:
 

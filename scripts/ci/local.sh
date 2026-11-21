@@ -2,7 +2,8 @@
 # Hamnivo's complete check pipeline, for your own machine or server (there is no hosted CI).
 #
 #   pnpm ci:local                    every check below except the opt-in production smoke test
-#   pnpm ci:local --quick            install, lint, typecheck, unit tests, status/licence checks
+#   pnpm ci:local --quick            install, lint, typecheck, unit tests, status/licence checks,
+#                                    and that no workflow uses what GitHub bills for
 #   pnpm ci:local --skip-a11y        skip the Storybook accessibility audit
 #   pnpm ci:local --skip-chatwoot    skip the contract suite against a real Chatwoot
 #   pnpm ci:local --skip-e2e         skip the browser checks (widget journey and website)
@@ -35,7 +36,7 @@ for arg in "$@"; do
     --skip-e2e) e2e=0 ;;
     --with-production) production=1 ;;
     --with-autodeploy) autodeploy=1 ;;
-    -h | --help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -250,6 +251,7 @@ step "Lint and format (Biome)" pnpm lint
 step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"}
 step "Unit tests" unit_tests
 step "Shell scripts (shellcheck)" shell_scripts
+step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
 # The deploy scripts run on Linux servers and use flock and GNU touch, which macOS lacks; elsewhere
 # the same test runs in a Debian container (safe.directory: the mount belongs to another user).
 deploy_scripts() {

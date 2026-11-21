@@ -1,11 +1,23 @@
-# Hamnivo CI runner on the compute server. See /etc/systemd/system/hamnivo-ci.slice for the caps.
+# The Hamnivo CI runner: GitHub's official runner image (ghcr.io/actions/actions-runner) on a server
+# of our own, so GitHub bills nothing for the checks (ADR 0020). install.sh sets it up and sizes it
+# to the machine in .env. Without .env, the defaults below are the capped setup on the production
+# server (ADR 0019).
+#
 # CI talks to its own Docker daemon (dind), so its hamnivo/* images, ports and prunes never touch
-# production. The runner shares dind network namespace, so ports CI publishes are on its localhost,
-# and the work volume sits at the same path in both, so bind mounts resolve.
-# Both are pinned to three cores so Node, Vitest and Playwright size their worker pools for three
-# CPUs, not the host's six; HAMNIVO_CI_CONCURRENCY keeps turbo to two tasks (2026-11-05: with
-# turbo's default, typecheck was killed at the 4 GB cap), and HAMNIVO_CI_HEAVY_CONCURRENCY to one
-# for type checks and builds (2026-11-17: two at once were killed there too).
+# any other Docker on the host. The runner shares dind network namespace, so ports CI publishes are
+# on its localhost, and the work volume sits at the same path in both, so bind mounts resolve.
+# Both are pinned to the same cores so Node, Vitest and Playwright size their worker pools for
+# those CPUs, not the host's. HAMNIVO_CI_CONCURRENCY limits turbo's tasks at once
+# (2026-11-05: with turbo's default, typecheck was killed at the 4 GB cap), and
+# HAMNIVO_CI_HEAVY_CONCURRENCY limits type checks and builds (2026-11-17: two at once were killed
+# there too).
+#
+# Caches and results stay on this server and never use GitHub's storage:
+#   - pnpm's store sits on the work volume, so each checkout links its packages instead of
+#     downloading them again;
+#   - Playwright's browsers and other tool caches sit on the runner-cache volume;
+#   - Docker images and the build cache sit on the dind-data volume;
+#   - each run's test-results/ archive is a file in ./results on the host (archive-results.sh).
 name: hamnivo-ci
 services:
   dind:
@@ -13,7 +25,7 @@ services:
     privileged: true
     restart: unless-stopped
     cgroup_parent: hamnivo-ci.slice
-    cpuset: "3-5"
+    cpuset: "${HAMNIVO_CI_CPUSET:-3-5}"
     command: ["dockerd", "--host=unix:///var/run/docker.sock", "--group=123"]
     environment:
       DOCKER_TLS_CERTDIR: ""
@@ -26,24 +38,29 @@ services:
     image: hamnivo-ci-runner:2.338.2
     restart: unless-stopped
     cgroup_parent: hamnivo-ci.slice
-    cpuset: "3-5"
+    cpuset: "${HAMNIVO_CI_CPUSET:-3-5}"
     network_mode: service:dind
     depends_on: [dind]
     shm_size: 512m
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
-      REPO_URL: https://github.com/CodeWithJuber/Hamnivo
-      RUNNER_NAME: compute-hamnivo-ci
+      REPO_URL: "${HAMNIVO_CI_REPO_URL:-https://github.com/CodeWithJuber/Hamnivo}"
+      RUNNER_NAME: "${HAMNIVO_CI_RUNNER_NAME:-compute-hamnivo-ci}"
       RUNNER_LABELS: hamnivo
       TMPDIR: /home/runner/_work/_tmp
-      HAMNIVO_CI_CONCURRENCY: "2"
+      HAMNIVO_CI_CONCURRENCY: "${HAMNIVO_CI_CONCURRENCY:-2}"
       # Type checks and builds one at a time: two of the large ones together outgrow 4 GB.
-      HAMNIVO_CI_HEAVY_CONCURRENCY: "1"
+      HAMNIVO_CI_HEAVY_CONCURRENCY: "${HAMNIVO_CI_HEAVY_CONCURRENCY:-1}"
+      # On the same volume as the checkouts, so pnpm can hard-link from it.
+      npm_config_store_dir: /home/runner/_work/_pnpm-store
+      HAMNIVO_CI_RESULTS_LOCATION: "${HAMNIVO_CI_RESULTS_LOCATION:-/opt/hamnivo-ci-runner/results}"
+      HAMNIVO_CI_RESULTS_DAYS: "${HAMNIVO_CI_RESULTS_DAYS:-14}"
     volumes:
       - dind-sock:/var/run
       - work:/home/runner/_work
       - runner-cache:/home/runner/.cache
+      - ./results:/home/runner/.cache/hamnivo-ci-results
       - ./state:/state
       - ./entrypoint.sh:/entrypoint.sh:ro
 volumes:
