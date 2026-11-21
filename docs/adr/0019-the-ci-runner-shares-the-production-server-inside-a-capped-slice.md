@@ -1,6 +1,6 @@
 # ADR 0019: The CI runner shares the production server, inside a capped slice with its own Docker
 
-- Status: accepted
+- Status: accepted; amended by ADR 0020 (the runner moves to a server of its own)
 - Date: 2026-11-05
 - Amends: ADR 0009
 

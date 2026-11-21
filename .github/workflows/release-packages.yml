@@ -12,8 +12,9 @@
 # Actions: NPM_TOKEN, an npm access token that may publish the @hamnivo packages (an automation
 # token, or a granular token with read and write on them). The token is never printed.
 #
-# Package publication defaults to the CI runner. Set HAMNIVO_CI_RUNNER to select another. There is no npm
-# provenance statement, because npm gives one only to builds on GitHub's own runners.
+# It runs on our own runner, like CI, and never on one of GitHub's, which bill by the minute
+# (ADR 0020). There is no npm provenance statement, because npm gives one only to builds on
+# GitHub's own runners.
 name: Release packages
 
 on:
@@ -33,7 +34,7 @@ permissions:
 jobs:
   publish:
     name: publish
-    runs-on: ${{ fromJSON(vars.HAMNIVO_CI_RUNNER || '["self-hosted", "linux", "x64", "hamnivo"]') }}
+    runs-on: [self-hosted, linux, x64, hamnivo]
     timeout-minutes: 45
     env:
       TURBO_TELEMETRY_DISABLED: '1'

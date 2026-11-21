@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Keeps a run's test-results/ as a file on the runner's own disk, never as a GitHub artifact (ADR
+# 0020). The run summary shows the report and where the file is. On a server that runs several
+# repositories' runners (the github-runners kit), that is CI_RESULTS_DIR, the same path on the host.
+# deploy/ci-runner mounts /opt/hamnivo-ci-runner/results and names it in HAMNIVO_CI_RESULTS_LOCATION.
+# Archives older than HAMNIVO_CI_RESULTS_DAYS (14) are deleted.
 set -euo pipefail
 
 if [[ ! -d test-results ]]; then
@@ -12,9 +17,10 @@ if [[ -f test-results/ci-local.md && ! -L test-results/ci-local.md ]]; then
   fi
 fi
 
-[[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+days="${HAMNIVO_CI_RESULTS_DAYS:-14}"
+[[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ && "$days" =~ ^[0-9]+$ ]]
 umask 077
-archive_dir="${XDG_CACHE_HOME:-$HOME/.cache}/hamnivo-ci-results"
+archive_dir="${CI_RESULTS_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/hamnivo-ci-results}"
 mkdir -p -- "$archive_dir"
 archive="ci-results-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
 temporary=$(mktemp "$archive_dir/.incoming.XXXXXXXX")
@@ -24,5 +30,6 @@ trap 'rm -f -- "$temporary"' EXIT
   tar --directory=test-results --null --files-from=- --create --gzip --file="$temporary"
 mv -- "$temporary" "$archive_dir/$archive"
 find "$archive_dir" -regextype posix-extended -maxdepth 1 -type f \
-  -regex '.*/ci-results-[0-9]+-[0-9]+\.tar\.gz' -mmin +20160 -delete
-printf '\nFull results on the compute runner: %s/%s (14 days).\n' "$archive_dir" "$archive" >> "$GITHUB_STEP_SUMMARY"
+  -regex '.*/ci-results-[0-9]+-[0-9]+\.tar\.gz' -mmin +$((days * 1440)) -delete
+printf '\nFull results on the CI server: %s/%s (kept %s days).\n' \
+  "${HAMNIVO_CI_RESULTS_LOCATION:-$archive_dir}" "$archive" "$days" >> "$GITHUB_STEP_SUMMARY"

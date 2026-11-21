@@ -118,15 +118,12 @@ describe('the workflow', () => {
     expect(workflow).not.toMatch(/branches:|pull_request|workflow_dispatch|schedule:/);
   });
 
-  it('keeps CI on the dedicated compute runner that owns its reports', () => {
+  it('runs CI and publication on our own runner, never on one GitHub bills for (ADR 0020)', () => {
     const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
-    expect(/runs-on: (.*)$/m.exec(ci)?.[1]).toBe('[self-hosted, linux, x64, hamnivo]');
-  });
-
-  it('defaults package publication to compute and preserves its optional runner override', () => {
-    expect(/runs-on: (.*)$/m.exec(workflow)?.[1]).toBe(
-      '${{ fromJSON(vars.HAMNIVO_CI_RUNNER || \'["self-hosted", "linux", "x64", "hamnivo"]\') }}',
-    );
+    for (const file of [ci, workflow]) {
+      expect(/runs-on: (.*)$/m.exec(file)?.[1]).toBe('[self-hosted, linux, x64, hamnivo]');
+    }
+    expect(workflow).not.toContain('vars.');
   });
 
   it('uses the same actions as ci.yml', () => {

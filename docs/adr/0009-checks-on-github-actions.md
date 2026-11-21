@@ -1,6 +1,6 @@
 # ADR 0009: The full pipeline runs on GitHub Actions, on a runner of our own
 
-- Status: accepted
+- Status: accepted; amended by ADR 0019 and ADR 0020 (no variable picks the runner any more)
 - Date: 2026-10-02
 - Amends: ADR 0007
 

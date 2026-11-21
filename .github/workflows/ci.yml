@@ -1,6 +1,7 @@
 # The full check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, with the production
-# and automatic-deploy smoke tests. Run on the dedicated compute runner so each report is archived
-# on the persistent volume documented in docs/self-hosting.md.
+# and automatic-deploy smoke tests. It runs on our own runner (deploy/ci-runner) and uses nothing
+# GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each report is
+# kept there as a file, never uploaded as an artifact. scripts/ci/no-github-billing.sh checks this.
 name: CI
 
 on:
@@ -38,7 +39,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Browsers live in the runner's cache; their system libraries are installed once when the
-      # runner is set up (docs/self-hosting.md, "Run the checks on GitHub").
+      # runner is set up (docs/self-hosting.md, "Run the checks on GitHub, for free").
       - name: Install Chromium for the browser checks
         run: pnpm --filter @hamnivo/console exec playwright install chromium
 
@@ -78,8 +79,8 @@ jobs:
         if: always() && steps.checkout.outcome == 'success'
         run: bash scripts/ci/archive-results.sh
 
-
-      # Only what the smoke tests leave behind; the runner keeps its other images and caches.
+      # Only what the smoke tests leave behind; the runner keeps its other images and caches. The
+      # pnpm store on the runner's disk keeps only the packages this checkout links to.
       - name: Free disk
         if: always()
         run: |
@@ -87,3 +88,4 @@ jobs:
             hamnivo/gateway:unlabelled hamnivo/edge:unlabelled >/dev/null 2>&1 || true
           docker image prune -f >/dev/null
           docker builder prune -f --filter until=168h >/dev/null
+          pnpm store prune >/dev/null 2>&1 || true
