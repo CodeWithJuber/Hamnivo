@@ -130,6 +130,14 @@ unit_tests() {
     vitest run test/commerce/stripe-mock.test.ts
 }
 
+# The chat's first open within its gzip budget (scripts/ci/widget-size.ts). The widget is built in
+# a step of its own, one heavy task at a time, so its build never shares memory with the unit tests.
+widget_size() {
+  pnpm exec turbo run build --filter=@hamnivo/widget ${heavy_limit[@]+"${heavy_limit[@]}"} >/dev/null ||
+    return 1
+  pnpm exec tsx scripts/ci/widget-size.ts
+}
+
 wait_for_postgres() {
   local container="$1"
   for _ in $(seq 1 120); do
@@ -250,6 +258,7 @@ step "Install dependencies (frozen lockfile)" pnpm install --frozen-lockfile
 step "Lint and format (Biome)" pnpm lint
 step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"}
 step "Unit tests" unit_tests
+step "Chat's first open within its size budget" widget_size
 step "Shell scripts (shellcheck)" shell_scripts
 step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
 # The deploy scripts run on Linux servers and use flock and GNU touch, which macOS lacks; elsewhere
