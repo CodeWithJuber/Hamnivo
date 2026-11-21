@@ -36,6 +36,22 @@ export default defineConfig({
       use: { ...devices['Desktop Safari'] },
       testMatch: ['journey.spec.ts', 'composer.spec.ts'],
     },
+    // Phones, emulated: a touch screen, a phone's viewport and its user agent, where the chat
+    // fills the screen. Most visitors come on a phone; emulation is not a real device, so the plan
+    // still asks for one real iPhone and one Android phone before launch.
+    {
+      name: 'android',
+      use: {
+        ...devices['Pixel 7'],
+        ...(executablePath ? { launchOptions: { executablePath } } : {}),
+      },
+      testMatch: ['journey.spec.ts'],
+    },
+    {
+      name: 'iphone',
+      use: { ...devices['iPhone 15'] },
+      testMatch: ['journey.spec.ts'],
+    },
   ],
   webServer: {
     command: 'node e2e/stack.ts',
