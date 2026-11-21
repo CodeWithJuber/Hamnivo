@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Keeps a run's test-results/ as a file on the runner's own disk, never as a GitHub artifact (ADR
-# 0020). The run summary shows the report and where the file is. deploy/ci-runner mounts the folder
-# from the server (/opt/hamnivo-ci-runner/results) and names it in HAMNIVO_CI_RESULTS_LOCATION.
+# 0020). The run summary shows the report and where the file is. On a server that runs several
+# repositories' runners (the github-runners kit), that is CI_RESULTS_DIR, the same path on the host.
+# deploy/ci-runner mounts /opt/hamnivo-ci-runner/results and names it in HAMNIVO_CI_RESULTS_LOCATION.
 # Archives older than HAMNIVO_CI_RESULTS_DAYS (14) are deleted.
 set -euo pipefail
 
@@ -19,7 +20,7 @@ fi
 days="${HAMNIVO_CI_RESULTS_DAYS:-14}"
 [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ && "$days" =~ ^[0-9]+$ ]]
 umask 077
-archive_dir="${XDG_CACHE_HOME:-$HOME/.cache}/hamnivo-ci-results"
+archive_dir="${CI_RESULTS_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/hamnivo-ci-results}"
 mkdir -p -- "$archive_dir"
 archive="ci-results-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
 temporary=$(mktemp "$archive_dir/.incoming.XXXXXXXX")

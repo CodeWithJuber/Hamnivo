@@ -63,6 +63,9 @@ server for it alone.
   - The image is GitHub's own runner image, which updates itself, as GitHub requires.
   - Without `.env`, `compose.yaml` keeps ADR 0019's sizes, so the capped setup on the production
     server still works.
+  - On a server that runs other repositories' runners too, the shared `github-runners` kit runs
+    this one from `repos/hamnivo.env` instead, under one cap for all of them. `archive-results.sh`
+    then writes to the kit's `CI_RESULTS_DIR`.
 - **A budget makes it certain.** The owner sets an Actions budget of $0 under Settings → Billing
   and licensing → Budgets and alerts, with "Stop usage when budget limit is reached". A
   mistake can then fail a job, but never bill one.

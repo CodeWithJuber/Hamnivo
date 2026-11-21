@@ -1294,6 +1294,10 @@ Set it up once:
    The runner registers with the labels `self-hosted, linux, x64, hamnivo`, starts, and shows as
    Idle on that page. Run the same two commands again to update it; set `HAMNIVO_CI_CPUS`,
    `HAMNIVO_CI_MEMORY_GB` and the other variables in the script's header to size it yourself.
+   If the server also runs other repositories' runners, use the shared
+   [github-runners](https://github.com/CodeWithJuber/github-runners) kit instead of these two
+   commands: it runs Hamnivo's runner from `repos/hamnivo.env`, next to the others, under one cap.
+   The results are then in `/opt/github-runners/results/hamnivo`.
 3. **Retire any older runner.** Every runner with the `hamnivo` label takes jobs. On the server
    it ran on, stop it with `cd /opt/hamnivo-ci-runner && docker compose down`, then remove it
    under **Settings → Actions → Runners**.
