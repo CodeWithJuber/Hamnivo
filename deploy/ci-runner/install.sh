@@ -187,7 +187,7 @@ The runner $name is online, with the labels self-hosted, linux, x64 and hamnivo.
 under Settings → Actions → Runners: $repo/settings/actions/runners
 
   Its files and settings  $target (.env is written by this script)
-  Each run's results      $target/results/ci-results-RUN_ID-ATTEMPT.tar.gz, for $days days
+  Each run's results      $target/results/ci-results-RUN_ID-ATTEMPT-SUITE.tar.gz, for $days days
   Its logs                cd $target && docker compose logs -f runner
   Stop it                 cd $target && docker compose down
 

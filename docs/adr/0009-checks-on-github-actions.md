@@ -20,8 +20,11 @@ already runs a self-hosted runner for another project.
 
 ## Decision
 
-- **Where the pipeline runs.** `.github/workflows/ci.yml` runs `pnpm ci:local --with-production
-  --with-autodeploy` on every push.
+- **Where the pipeline runs.** `.github/workflows/ci.yml` runs `pnpm ci:local` on every push, split
+  into suites that run side by side, one job each (lint, types and unit tests; integration;
+  Chatwoot; accessibility and browser journeys; the production and automatic-deploy smoke tests).
+  On main and on a run by hand it tests PostgreSQL 16 and 18 and runs the smoke tests; other
+  branches test PostgreSQL 18 only and run the smoke tests only when a deploy file changes.
 - **Which runner.** It runs on a self-hosted runner with the label `hamnivo`. The repository
   variable `HAMNIVO_CI_RUNNER`, a JSON list of labels, can point it at other runners, hosted
   ones included.
