@@ -5,6 +5,7 @@
  *   pnpm --filter @hamnivo/evals run-suite fairness [--out DIR]
  *   pnpm --filter @hamnivo/evals run-suite adjudication [--responder …] [--out DIR]
  *   pnpm --filter @hamnivo/evals run-suite hosting [--responder …] [--report FILE.md] [--out DIR]
+ *   pnpm --filter @hamnivo/evals run-suite injection [--responder …] [--report FILE.md] [--out DIR]
  *   pnpm --filter @hamnivo/evals run-suite summarize DIR
  *   pnpm --filter @hamnivo/evals run-suite decisions --provider jev|mock [--max-calls 2000]
  *       [--concurrency 4] [--model jev-1.13.0] [--report FILE.md] [--out DIR]
@@ -208,16 +209,17 @@ async function main() {
       say(`written to ${file}`);
       break;
     }
-    case 'hosting': {
-      const corpus = loadHostingCorpus();
+    case 'hosting':
+    case 'injection': {
+      const corpus = loadHostingCorpus(suite);
       const problems = hostingProblems(corpus);
       if (problems.length > 0)
-        throw new Error(`The hosting set is unsound:\n${problems.join('\n')}`);
+        throw new Error(`The ${suite} set is unsound:\n${problems.join('\n')}`);
       const responder = responderFrom(values.responder);
       const run = await runHosting(corpus, responder);
       const name = responder.name.replace(/\W+/g, '_');
-      const file = write(out, `hosting-${name}.json`, json(run));
-      say(`hosting (${responder.name}): ${run.results.length} questions`);
+      const file = write(out, `${suite}-${name}.json`, json(run));
+      say(`${suite} (${responder.name}): ${run.results.length} questions`);
       say(`  pass        ${formatRate(run.pass)}`);
       say(`  unsupported ${formatRate(run.unsupported)}`);
       for (const r of run.results.filter((result) => !result.pass)) say(`  failed: ${r.id}`);
@@ -230,7 +232,7 @@ async function main() {
           hostingMarkdown(run, {
             date: new Date().toISOString().slice(0, 10),
             responder: responder.name,
-            command: `pnpm --filter @hamnivo/evals run-suite hosting --responder ${values.responder} --report ${relative(process.cwd(), report)}`,
+            command: `pnpm --filter @hamnivo/evals run-suite ${suite} --responder ${values.responder} --report ${relative(process.cwd(), report)}`,
             ...(usage ? usage : {}),
           }),
         );
@@ -351,7 +353,7 @@ async function main() {
     }
     default:
       throw new Error(
-        'Choose a suite: sycophancy, fairness, adjudication, hosting, decisions or summarize.',
+        'Choose a suite: sycophancy, fairness, adjudication, hosting, injection, decisions or summarize.',
       );
   }
 }

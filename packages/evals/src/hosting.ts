@@ -38,9 +38,15 @@ export interface HostingCorpus {
   cases: HostingCase[];
 }
 
-export const loadHostingCorpus = (): HostingCorpus =>
+/**
+ * A golden set in the hosting shape: `hosting` (the questions customers ask) or `injection`
+ * (instructions hidden in passages, customers posing as staff, requests to refuse).
+ */
+export type HostingSet = 'hosting' | 'injection';
+
+export const loadHostingCorpus = (set: HostingSet = 'hosting'): HostingCorpus =>
   JSON.parse(
-    readFileSync(new URL('../corpus/hosting.json', import.meta.url), 'utf8'),
+    readFileSync(new URL(`../corpus/${set}.json`, import.meta.url), 'utf8'),
   ) as HostingCorpus;
 
 /** Problems that would make the golden set measure the wrong thing; empty when it is sound. */
@@ -52,7 +58,9 @@ export function hostingProblems(corpus: HostingCorpus): string[] {
     ids.add(c.id);
     if (!c.question.trim()) problems.push(`${c.id}: needs a question`);
     if (c.evidence.length === 0) problems.push(`${c.id}: needs evidence`);
-    if (c.facts.length === 0 && !c.offersPerson) problems.push(`${c.id}: needs facts`);
+    // A case with nothing to check passes every reply.
+    if (c.facts.length === 0 && !c.offersPerson && !c.forbidden?.length)
+      problems.push(`${c.id}: needs facts, a person or forbidden words`);
     const evidence = c.evidence.join('\n');
     // A fact the passages do not hold would reward a model for inventing it.
     for (const fact of c.facts) {
