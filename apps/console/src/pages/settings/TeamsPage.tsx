@@ -593,7 +593,7 @@ function RoutingProfiles({ editable }: { editable: boolean }) {
  */
 export function TeamsPage() {
   const { t } = useTranslation();
-  const { can } = useTenant();
+  const { can, features } = useTenant();
   const teams = useTeams();
   const members = useMembers();
   const [creating, setCreating] = useState(false);
@@ -640,15 +640,18 @@ export function TeamsPage() {
                 editable={editable}
               />
             ))}
-            <p className="text-sm text-text-secondary">
-              {t('setup.teams.rules')}{' '}
-              <Link
-                to="/decisions"
-                className="text-link underline underline-offset-4 hover:no-underline"
-              >
-                {t('setup.teams.rulesLink')}
-              </Link>
-            </p>
+            {/* Decision rules are frozen unless the server lists advanced features. */}
+            {features.advanced ? (
+              <p className="text-sm text-text-secondary">
+                {t('setup.teams.rules')}{' '}
+                <Link
+                  to="/decisions"
+                  className="text-link underline underline-offset-4 hover:no-underline"
+                >
+                  {t('setup.teams.rulesLink')}
+                </Link>
+              </p>
+            ) : null}
             <RoutingProfiles editable={editable} />
           </div>
         )}

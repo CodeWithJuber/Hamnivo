@@ -722,12 +722,14 @@ describe('the customer sign-in page', () => {
 const teamsPage = (
   extra: ((client: QueryClient) => void)[],
   permissions: readonly string[] = owner,
+  advanced = false,
 ) =>
   renderStudio({
     at: '/support-teams',
     permissions,
     screen: <TeamsPage />,
     seed: seeded(...extra),
+    advanced,
   });
 const team = (patch: Record<string, unknown> = {}) => ({
   id: 'team_1',
@@ -746,6 +748,17 @@ const people = [
 ];
 
 describe('the support teams page', () => {
+  it('links to the decision rules only when frozen features are listed', async () => {
+    const seeds = [
+      put(accessKeys.teams, { items: [team()] }),
+      put(keys.members, { items: people }),
+    ];
+    const rules = async (advanced: boolean) =>
+      anchors(await teamsPage(seeds, owner, advanced)).some((link) => link.href === '/decisions');
+    expect(await rules(false)).toBe(false);
+    expect(await rules(true)).toBe(true);
+  });
+
   it('lists each team with its people, each with a button to take them out', async () => {
     const html = await teamsPage([
       put(accessKeys.teams, { items: [team()] }),

@@ -64,8 +64,11 @@ test('the menu has five entries, and the pages of the current entry are a row of
   const settingsSection = page.getByRole('navigation', { name: 'Settings pages' });
   await settingsSection.getByRole('link', { name: 'Channels', exact: true }).click();
   await expect(page).toHaveURL(/\/channels/);
-  await settingsSection.getByText('Advanced settings', { exact: true }).click();
-  await settingsSection.getByRole('link', { name: 'Security', exact: true }).click();
+  // The row stays mounted from page to page, and its Advanced settings stay open once opened.
+  const security = settingsSection.getByRole('link', { name: 'Security', exact: true });
+  if (!(await security.isVisible()))
+    await settingsSection.getByText('Advanced settings', { exact: true }).click();
+  await security.click();
   await expect(page).toHaveURL(/\/security/);
   await expect(settingsSection.locator('[aria-current="page"]')).toHaveText('Security');
   await expect(menu.getByRole('link', { name: 'Settings' })).toHaveAttribute(
@@ -73,7 +76,7 @@ test('the menu has five entries, and the pages of the current entry are a row of
     'page',
   );
   // Orders and finance are frozen: not in the row, but their address still opens the page.
-  await expect(settingsSection.getByRole('link', { name: 'Orders', exact: true })).toHaveCount(0);
+  await expect(settingsSection.locator('a[href="/orders"]')).toHaveCount(0);
   await page.goto('/orders');
   await expect(page.locator('h1').first()).toBeVisible();
   await expect(menu.getByRole('link', { name: 'Settings' })).toHaveAttribute(

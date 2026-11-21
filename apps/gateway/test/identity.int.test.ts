@@ -57,6 +57,18 @@ describe('platform endpoints', () => {
     }
   });
 
+  it('lists the frozen features in Studio only when the server turns them on', async () => {
+    const advanced = await startGateway({ HAMNIVO_ADVANCED_FEATURES: 'true' }, gw.database);
+    try {
+      const person = await signUp(advanced, 'Ada Advanced', 'ada-advanced@example.com');
+      const me = await person.get('/v1/me');
+      expect(me.status).toBe(200);
+      expect(me.body.features).toEqual({ advanced: true });
+    } finally {
+      await advanced.close();
+    }
+  });
+
   it('renders malformed bodies and unknown routes as problem details too', async () => {
     const client = new Client(gw.app);
     const malformed = await gw.app.inject({

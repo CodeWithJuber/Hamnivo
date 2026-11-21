@@ -44,7 +44,7 @@ function otherDialogOpen(): boolean {
  */
 export function CommandPalette() {
   const { t, i18n } = useTranslation();
-  const { can, me } = useTenant();
+  const { can, features } = useTenant();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [open, setOpen] = useState(false);
@@ -78,7 +78,7 @@ export function CommandPalette() {
       to in labels.pages
         ? labels.pages[to as keyof typeof labels.pages]
         : labels.extras[to as keyof typeof labels.extras];
-    return paletteSections(can, me.features).map((section) => ({
+    return paletteSections(can, features).map((section) => ({
       id: section.id,
       heading: groupLabel(section.id),
       items: section.items.map((to) => ({
@@ -92,7 +92,7 @@ export function CommandPalette() {
         ],
       })),
     }));
-  }, [t, i18n, can, me.features]);
+  }, [t, i18n, can, features]);
 
   const change = (next: boolean) => {
     if (!next) setQuery('');

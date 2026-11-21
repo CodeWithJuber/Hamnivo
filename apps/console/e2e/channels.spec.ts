@@ -117,8 +117,16 @@ test('Channels · empty at first; a new email inbox is found, gets the AI and a 
     'aria-current',
     'page',
   );
-  const links = await pages.getByRole('link').allTextContents();
-  expect(links.indexOf('Channels')).toBe(links.indexOf('Chat widget') + 1);
+  await expect(pages.getByRole('link')).toHaveText([
+    'Brands and install',
+    'Branding',
+    'Chat widget',
+    'Channels',
+    'Business hours',
+    'Team and access',
+    'Plan and billing',
+    'Privacy',
+  ]);
 
   await expect(page.getByRole('heading', { level: 1, name: 'Channels' })).toBeVisible();
   await expect(

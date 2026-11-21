@@ -86,7 +86,7 @@ const PATHS = [
   '/visitors',
 ];
 
-const memberWith = (permissions: readonly string[]): Me =>
+const memberWith = (permissions: readonly string[], advanced = false): Me =>
   ({
     user: {
       id: 'usr_1',
@@ -102,7 +102,7 @@ const memberWith = (permissions: readonly string[]): Me =>
       permissions: [...permissions],
       mfa: false,
     },
-    features: { advanced: false },
+    features: { advanced },
   }) as Me;
 
 export interface Mounted extends RenderResult {
@@ -116,12 +116,15 @@ export async function mountStudio({
   permissions,
   screen,
   seed,
+  advanced = false,
 }: {
   at?: string;
   permissions: readonly string[];
   screen: ReactNode;
   /** Puts data in the query cache, under keys that start with the tenant. */
   seed?: (client: QueryClient) => void;
+  /** The server lists the frozen features (`HAMNIVO_ADVANCED_FEATURES`). */
+  advanced?: boolean;
 }): Promise<Mounted> {
   const client = new QueryClient({
     defaultOptions: { queries: { staleTime: Number.POSITIVE_INFINITY, retry: false } },
@@ -139,7 +142,7 @@ export async function mountStudio({
   await router.load();
   const view = render(
     <QueryClientProvider client={client}>
-      <TenantProvider me={memberWith(permissions)} tenant={tenant}>
+      <TenantProvider me={memberWith(permissions, advanced)} tenant={tenant}>
         <AnnouncerProvider>
           <RouterProvider router={router} />
         </AnnouncerProvider>

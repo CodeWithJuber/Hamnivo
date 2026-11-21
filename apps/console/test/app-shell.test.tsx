@@ -1,8 +1,9 @@
 import { presetPermissions } from '@hamnivo/policy';
+import type { QueryClient } from '@tanstack/react-query';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AppShell } from '../src/components/AppShell';
 import { initI18n } from '../src/i18n';
-import { anchors, current, navigation, renderStudio } from './render';
+import { anchors, current, navigation, renderStudio, TENANT_ID } from './render';
 
 beforeAll(async () => {
   await initI18n('en');
@@ -148,6 +149,55 @@ describe('the row of pages above a page', () => {
     expect(rows(await shell('/account', owner))).toBe(false);
     // One page of an entry: finance sees Activity and nothing else of the AI assistant.
     expect(rows(await shell('/runs', presetPermissions('finance')))).toBe(false);
+  });
+});
+
+describe('frozen features', () => {
+  const at = (path: string, advanced: boolean, seed?: (client: QueryClient) => void) =>
+    renderStudio({
+      at: path,
+      permissions: [...owner, 'agency.read'],
+      advanced,
+      ...(seed ? { seed } : {}),
+      screen: (
+        <AppShell>
+          <p>The page</p>
+        </AppShell>
+      ),
+    });
+  const testIds = (html: string) => anchors(html).map((link) => link.attrs['data-testid']);
+
+  it('are listed in their entry only when the server turns advanced features on', async () => {
+    const off = navigation(await at('/agents', false), 'AI assistant pages');
+    const on = navigation(await at('/agents', true), 'AI assistant pages');
+    for (const path of ['/workflows', '/checks', '/decisions']) {
+      expect(off?.map((link) => link.href)).not.toContain(path);
+      expect(on?.map((link) => link.href)).toContain(path);
+    }
+    const settings = navigation(await at('/brands', true), 'Settings pages');
+    expect(settings?.map((link) => link.href)).toEqual(
+      expect.arrayContaining(['/orders', '/finance', '/migration']),
+    );
+  });
+
+  it('keep the platform console link for operators only when they are on', async () => {
+    const operator = (client: QueryClient) =>
+      client.setQueryData(['platform', 'me'], { operator: true });
+    expect(testIds(await at('/overview', false, operator))).not.toContain('platform-link');
+    expect(testIds(await at('/overview', true, operator))).toContain('platform-link');
+    // Someone who is not an operator never sees it.
+    expect(testIds(await at('/overview', true))).not.toContain('platform-link');
+  });
+
+  it('keep the agency link out of the header unless they are on', async () => {
+    const agency = (client: QueryClient) =>
+      client.setQueryData([TENANT_ID, 'agency'], {
+        enabled: true,
+        branding: { displayName: null, accentColor: null },
+        clientLimit: null,
+      });
+    expect(testIds(await at('/overview', false, agency))).not.toContain('agency-context');
+    expect(testIds(await at('/overview', true, agency))).toContain('agency-context');
   });
 });
 

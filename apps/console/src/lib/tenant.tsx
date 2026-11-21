@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import type { NavFeatures } from './nav';
 import type { Me, TenantSummary } from './types';
 
 const STORAGE_KEY = 'hamnivo.studio.tenant';
@@ -36,6 +37,8 @@ export interface TenantContextValue {
   me: Me;
   permissions: ReadonlySet<string>;
   can: (permission: string) => boolean;
+  /** What the server switched on (`/v1/me` `features`); off when it says nothing. */
+  features: NavFeatures;
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null);
@@ -57,6 +60,8 @@ export function TenantProvider({
       me,
       permissions,
       can: (permission) => permissions.has(permission),
+      // A gateway older than this Studio, mid-deploy, sends no features: the frozen ones stay off.
+      features: { advanced: me.features?.advanced === true },
     };
   }, [me, tenant]);
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;

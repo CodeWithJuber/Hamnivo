@@ -244,6 +244,39 @@ describe('branding verification status', () => {
   });
 });
 
+describe('the agency clients button on Branding', () => {
+  it('shows only when frozen features are listed', async () => {
+    fakeGateway({
+      'GET /v1/admin/branding': {
+        json: {
+          portal: {
+            displayName: null,
+            logoUrl: null,
+            faviconUrl: null,
+            accentColor: null,
+            fontFamily: 'system',
+            showBranding: true,
+          },
+          email: { senderName: null, replyTo: null, logoUrl: null },
+          domains: [],
+        },
+      },
+    });
+    const shown = async (advanced: boolean) => {
+      const mounted = await mountStudio({
+        permissions: ['branding.read', 'agency.read'],
+        screen: <BrandingPage />,
+        advanced,
+      });
+      const found = screen.queryByRole('link', { name: 'Agency clients' }) !== null;
+      mounted.unmount();
+      return found;
+    };
+    expect(await shown(false)).toBe(false);
+    expect(await shown(true)).toBe(true);
+  });
+});
+
 describe('live WHMCS user permission preview', () => {
   it('shows per-action denial even when live permission parsing succeeds', async () => {
     const gateway = fakeGateway({
