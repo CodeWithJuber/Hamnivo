@@ -454,6 +454,7 @@ prune_images() {
 }
 
 # The systemd units for this server, from the templates in systemd/.
+backup_units=(hamnivo-backup.service hamnivo-backup.timer hamnivo-backup-check.service hamnivo-backup-check.timer)
 render_unit() { # render_unit UNIT
   sed -e "s|@USER@|$(id -un)|g" -e "s|@GROUP@|$(id -gn)|g" -e "s|@ROOT@|$root|g" \
     -e "s|@HAMNIVO@|$here/hamnivo.sh|g" -e "s|@ENV_FILE@|$env_file|g" \
@@ -467,6 +468,13 @@ check_units() {
     [[ -f "/etc/systemd/system/$unit" && -f "$here/systemd/$unit" ]] || continue
     if ! render_unit "$unit" | cmp -s - "/etc/systemd/system/$unit"; then
       log "This version changes the systemd units: run hamnivo.sh autodeploy enable to install them."
+      break
+    fi
+  done
+  for unit in "${backup_units[@]}"; do
+    [[ -f "/etc/systemd/system/$unit" && -f "$here/systemd/$unit" ]] || continue
+    if ! render_unit "$unit" | cmp -s - "/etc/systemd/system/$unit"; then
+      log "This version changes the backup schedule: run hamnivo.sh backups on to install it."
       return 0
     fi
   done
@@ -1004,6 +1012,62 @@ cmd_autodeploy() {
   esac
 }
 
+# --- scheduled backups ---------------------------------------------------------------------------
+# A backup every night (hamnivo.sh backup keeps the newest 14) and, every month, a check that the
+# newest one restores (hamnivo.sh backup-check). Both are systemd timers, like automatic deploys.
+backups_on() {
+  need_env
+  command -v systemctl >/dev/null ||
+    fail 'Scheduled backups need systemd (or run "hamnivo.sh backup" from cron every night).'
+  local unit
+  for unit in "${backup_units[@]}"; do
+    render_unit "$unit" | sudo_ tee "/etc/systemd/system/$unit" >/dev/null
+  done
+  sudo_ systemctl daemon-reload
+  sudo_ systemctl enable --now hamnivo-backup.timer hamnivo-backup-check.timer >/dev/null
+  log "Backups are on: every night at about 03:00 (server time) into $here/backups, the newest 14 kept."
+  log 'On the first of each month the newest backup is restored into throwaway databases and checked.'
+  log 'A backup on this server is lost with it: copy them somewhere else too (they hold every secret).'
+}
+
+backups_off() {
+  if command -v systemctl >/dev/null && [[ -f /etc/systemd/system/hamnivo-backup.timer ]]; then
+    sudo_ systemctl disable --now hamnivo-backup.timer hamnivo-backup-check.timer >/dev/null 2>&1 || true
+    local unit
+    for unit in "${backup_units[@]}"; do
+      sudo_ rm -f "/etc/systemd/system/$unit"
+    done
+    sudo_ systemctl daemon-reload
+  fi
+  log 'Scheduled backups are off. The backups made so far stay; make one by hand with: hamnivo.sh backup'
+}
+
+backups_status() {
+  local unit newest
+  if command -v systemctl >/dev/null; then
+    for unit in hamnivo-backup.timer hamnivo-backup-check.timer; do
+      printf '%-28s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
+    done
+    for unit in hamnivo-backup.service hamnivo-backup-check.service; do
+      # "success" or why the last run failed ("exit-code", "timeout"...); empty before the first.
+      printf '%-28s last run: %s\n' "$unit" \
+        "$(systemctl show -p Result --value "$unit" 2>/dev/null || true)"
+    done
+  fi
+  newest="$(find "$here/backups" -mindepth 1 -maxdepth 1 -type d -name '20*Z' 2>/dev/null | sort | tail -1 || true)"
+  printf 'Newest backup:               %s\n' "${newest:-none}"
+}
+
+cmd_backups() {
+  local action="${1:-status}"
+  case "$action" in
+    on) backups_on ;;
+    off) backups_off ;;
+    status) backups_status ;;
+    *) fail "Unknown backups action: $action (on, off or status)" ;;
+  esac
+}
+
 main() {
   local command="${1:-}"
   shift || true
@@ -1012,7 +1076,8 @@ main() {
     rollback) cmd_rollback "$@" ;;
     deploys) cmd_deploys "$@" ;;
     autodeploy) cmd_autodeploy "$@" ;;
-    *) fail "Unknown command: ${command:-none} (deploy, rollback, deploys or autodeploy)" ;;
+    backups) cmd_backups "$@" ;;
+    *) fail "Unknown command: ${command:-none} (deploy, rollback, deploys, autodeploy or backups)" ;;
   esac
 }
 

@@ -3,7 +3,7 @@ import type { WidgetConfig } from '@hamnivo/contracts';
 import { renderToString } from 'react-dom/server';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Home } from '../src/components/Home.js';
-import { initI18n, LOCALES, resources } from '../src/i18n.js';
+import { initI18n, LOCALES, type Locale, loadResource, type Resource } from '../src/i18n.js';
 import { chatAvailable, isChatUnavailable } from '../src/useChat.js';
 
 /**
@@ -14,6 +14,11 @@ import { chatAvailable, isChatUnavailable } from '../src/useChat.js';
 beforeAll(async () => {
   await initI18n('en');
 });
+
+/** Every language's words, loaded as the chat loads them. */
+const resources = Object.fromEntries(
+  await Promise.all(LOCALES.map(async (locale) => [locale, await loadResource(locale)] as const)),
+) as Record<Locale, Resource>;
 
 /** Every string of a resource tree. */
 function strings(tree: object): string[] {
@@ -103,6 +108,7 @@ describe('the home screen while chat isn’t available', () => {
         onContact={() => undefined}
         available={false}
         onAsk={() => undefined}
+        disclosure="I'm Noor Books's AI assistant."
       />,
     );
     expect(html).toContain('data-testid="help-search"');

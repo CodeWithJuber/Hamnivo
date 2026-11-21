@@ -260,6 +260,7 @@ check 'automatic deploys are off' has '✓ Automatic deploys: off'
 check 'git reads origin' has '✓ Git: can read origin'
 check 'the checkout is up to date' has '✓ Checkout: up to date with origin/main'
 check 'no deploys yet' has '✓ Deploys: none yet'
+check 'backups not scheduled is no failure, with the command to schedule them' has '✓ Backups: not scheduled (back up every night with:'
 check 'Jev: not set is no failure' has '✓ Jev: TYPESAFE_API_KEY is not set'
 check 'a secret in the settings is never printed' lacks 'password-not-printed'
 check 'doctor changes no setting' grep -q '^HAMNIVO_DB_OWNER_PASSWORD=password-not-printed$' "$HAMNIVO_ENV_FILE"

@@ -71,7 +71,7 @@ const PATHS = [
   '/tenants',
 ];
 
-function memberWith(permissions: readonly string[]): Me {
+function memberWith(permissions: readonly string[], advanced = false): Me {
   return {
     user: {
       id: 'usr_1',
@@ -87,6 +87,7 @@ function memberWith(permissions: readonly string[]): Me {
       permissions: [...permissions],
       mfa: false,
     },
+    features: { advanced },
   } as Me;
 }
 
@@ -95,6 +96,7 @@ export async function renderStudio({
   permissions,
   screen,
   seed,
+  advanced = false,
 }: {
   /** The address the person is at, such as `/agents/agt_1`. */
   at: string;
@@ -102,6 +104,8 @@ export async function renderStudio({
   screen: ReactNode;
   /** Puts data in the query cache, under keys that start with the tenant. */
   seed?: (client: QueryClient) => void;
+  /** The server lists the frozen features (`HAMNIVO_ADVANCED_FEATURES`). */
+  advanced?: boolean;
 }): Promise<string> {
   // Nothing is fetched while rendering to HTML; seeded data is what a screen finds in the cache.
   const client = new QueryClient({
@@ -123,7 +127,7 @@ export async function renderStudio({
   await router.load();
   return renderToString(
     <QueryClientProvider client={client}>
-      <TenantProvider me={memberWith(permissions)} tenant={tenant}>
+      <TenantProvider me={memberWith(permissions, advanced)} tenant={tenant}>
         <AnnouncerProvider>
           <RouterProvider router={router} />
         </AnnouncerProvider>

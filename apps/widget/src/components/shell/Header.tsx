@@ -56,8 +56,11 @@ export function Header(props: {
   onLocale: (locale: Locale) => void;
   /** Lines under the name: the ticket, who can answer. */
   children?: ReactNode;
-  /** The brand's words about its assistant, always in view (U09). */
-  disclosure: string;
+  /**
+   * The assistant is the one answering: a small AI badge stays by the name (U09). The brand's
+   * words about its assistant are the thread's first line instead (Chat).
+   */
+  ai: boolean;
   menu: {
     id: string;
     open: boolean;
@@ -104,7 +107,18 @@ export function Header(props: {
     >
       <BrandMark url={props.brand.logoUrl} />
       <div className="min-w-0 flex-1 basis-24 ps-1">
-        <h1 className="truncate text-md font-semibold">{props.brand.name}</h1>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h1 className="truncate text-md font-semibold">{props.brand.name}</h1>
+          {props.ai ? (
+            <span
+              className="shrink-0 rounded-full bg-[color-mix(in_srgb,currentColor_16%,transparent)] px-1.5 text-[11px] leading-[18px] font-semibold"
+              title={t('ui.aiBadgeTitle')}
+              data-testid="ai-badge"
+            >
+              {t('ui.aiBadge')}
+            </span>
+          ) : null}
+        </div>
         {props.children}
       </div>
       <div className="flex items-center">
@@ -149,12 +163,6 @@ export function Header(props: {
           </button>
         ) : null}
       </div>
-      <p
-        className="w-full text-xs leading-snug [@media(max-height:26rem)]:line-clamp-1"
-        data-testid="ai-disclosure"
-      >
-        {props.disclosure}
-      </p>
       {menu.open ? (
         <ul
           id={menu.id}

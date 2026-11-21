@@ -47,7 +47,7 @@ Design principles, carried into code and tests:
 
 ## Start here
 
-**New to Hamnivo?** Start with the **[documentation site](https://your-domain.com/docs)** — it's written for non-technical business owners and covers everything you need to get running.
+**New to Hamnivo?** Start with the **documentation**, written for non-technical business owners: it covers everything you need to get running. Every Hamnivo server serves it at `https://<your domain>/docs/`, and its pages are in [`apps/docs/src/content/docs/`](apps/docs/src/content/docs/index.md).
 
 For an overview, see [`docs/using-hamnivo.md`](docs/using-hamnivo.md): it explains which app to use and what each one does.
 

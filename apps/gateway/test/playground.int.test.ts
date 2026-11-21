@@ -37,7 +37,9 @@ const turns: Turn[] = [];
 const USAGE = { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 };
 
 let offsetMs = 0;
-const clock = () => new Date(Date.now() + offsetMs);
+/** A time the clock stays at, for a test that must not cross a minute; null lets it run. */
+let frozenAt: number | null = null;
+const clock = () => new Date(frozenAt ?? Date.now() + offsetMs);
 
 let slice: Slice;
 let shop: Shop;
@@ -687,23 +689,30 @@ describe('who may try it, and how often', () => {
   it('limits how many messages one person tries in a minute', async () => {
     const admin = await join(slice, shop, 'Ola Admin', 'admin');
     const statuses: number[] = [];
-    for (let i = 0; i < 17; i += 1) {
-      const reply = await playground(
-        [{ role: 'user', text: `Hello ${i}` }],
-        'published',
-        admin.client,
-      );
-      statuses.push(reply.status);
-      if (reply.status === 429) {
-        expect(reply.body.retryAfter).toBeGreaterThan(0);
-        expect(reply.body.detail).toContain('15 messages a minute');
+    // The limit counts each calendar minute. On a slow machine 17 turns can take long enough to
+    // reach the next minute, which starts a new count, so the clock stays still meanwhile.
+    frozenAt = Date.now() + offsetMs;
+    try {
+      for (let i = 0; i < 17; i += 1) {
+        const reply = await playground(
+          [{ role: 'user', text: `Hello ${i}` }],
+          'published',
+          admin.client,
+        );
+        statuses.push(reply.status);
+        if (reply.status === 429) {
+          expect(reply.body.retryAfter).toBeGreaterThan(0);
+          expect(reply.body.detail).toContain('15 messages a minute');
+        }
       }
+      expect(statuses.filter((s) => s === 200)).toHaveLength(15);
+      expect(statuses.slice(15)).toEqual([429, 429]);
+      // Another person has a minute of their own.
+      const reply = await playground([{ role: 'user', text: 'Hi' }], 'published');
+      expect(reply.status).toBe(200);
+    } finally {
+      frozenAt = null;
     }
-    expect(statuses.filter((s) => s === 200)).toHaveLength(15);
-    expect(statuses.slice(15)).toEqual([429, 429]);
-    // Another person has a minute of their own.
-    const reply = await playground([{ role: 'user', text: 'Hi' }], 'published');
-    expect(reply.status).toBe(200);
   });
 });
 

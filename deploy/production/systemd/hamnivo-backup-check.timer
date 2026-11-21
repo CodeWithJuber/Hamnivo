@@ -1,0 +1,13 @@
+# Installed by "hamnivo.sh backups on". On the first of every month, after that night's backup: a
+# backup counts only once it has been restored.
+[Unit]
+Description=Hamnivo backup check every month
+
+[Timer]
+OnCalendar=*-*-01 05:00:00
+RandomizedDelaySec=30min
+Persistent=true
+Unit=hamnivo-backup-check.service
+
+[Install]
+WantedBy=timers.target

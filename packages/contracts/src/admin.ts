@@ -69,6 +69,11 @@ export const Me = z
         mfa: z.boolean(),
       })
       .nullable(),
+    /** What this server switched on for Studio (`HAMNIVO_ADVANCED_FEATURES`). */
+    features: z.object({
+      /** The frozen features (commerce, migration, workflows, decisions, agency, platform console) are listed. */
+      advanced: z.boolean(),
+    }),
   })
   .meta({ id: 'Me' });
 

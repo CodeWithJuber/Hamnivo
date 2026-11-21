@@ -11,6 +11,9 @@
 #   hamnivo.sh mail [ADDRESS]   the latest emails, while SMTP_URL is not set (they go to the API log)
 #   hamnivo.sh backup [--to DIR] [--keep N] [--no-secrets]
 #   hamnivo.sh restore DIR [--yes] [--ignore-current-database]
+#   hamnivo.sh backup-check [DIR]   restore a backup (the newest by default) into throwaway
+#                           databases and check it; live data is never touched
+#   hamnivo.sh backups on|off|status   a backup every night and a backup check every month (systemd)
 #   hamnivo.sh update       deploy the latest commit of the deploy branch now (see deploy)
 #   hamnivo.sh deploy [--latest | REF] [--force]   check, build, start, and roll back on failure
 #   hamnivo.sh rollback [COMMIT]   run the previous (or a given) version again
@@ -605,6 +608,56 @@ was changed. Repair the database, or add --ignore-current-database to restore wi
   log "Restored from $dir."
 }
 
+# --- backup checks: a backup counts only once it has been restored -------------------------------
+# Restores a backup (the newest one by default) into throwaway databases beside the live ones and
+# checks what came back. The live data and the running applications are never touched; the
+# throwaway databases are dropped at the end, even when the check fails. `backups on` runs this
+# every month. It needs free disk for one more copy of the databases while it runs.
+drop_check_databases() {
+  "${compose[@]}" exec -T hamnivo-db dropdb -U postgres --if-exists --force hamnivo_check >/dev/null 2>&1 || true
+  "${compose[@]}" exec -T chatwoot-db dropdb -U postgres --if-exists --force chatwoot_check >/dev/null 2>&1 || true
+}
+
+cmd_backup_check() {
+  need_docker
+  need_env
+  local dir="${1:-}" from="$here/backups"
+  if [[ -z "$dir" ]]; then
+    dir="$(find "$from" -mindepth 1 -maxdepth 1 -type d -name '20*Z' 2>/dev/null | sort | tail -1 || true)"
+    [[ -n "$dir" ]] || fail "No backup in $from to check. Make one with: $here/hamnivo.sh backup"
+  fi
+  [[ -f "$dir/hamnivo.dump" && -f "$dir/chatwoot.dump" ]] || fail "Not a backup: $dir"
+  (cd "$dir" && sha256sum --quiet -c SHA256SUMS) || fail "The backup $dir is damaged (checksums differ)."
+  local archive
+  for archive in "$dir"/*.tar.gz; do
+    [[ -e "$archive" ]] || continue
+    tar -tzf "$archive" >/dev/null || fail "The backup $dir is damaged: $(basename "$archive") does not unpack."
+  done
+  take_lock
+  "${compose[@]}" up -d hamnivo-db chatwoot-db >&2
+  wait_healthy hamnivo-db chatwoot-db
+  trap drop_check_databases EXIT
+  drop_check_databases
+
+  log "Restoring $dir into throwaway databases"
+  HAMNIVO_DATABASES=hamnivo_check "${compose[@]}" run --rm -e HAMNIVO_DATABASES db-init >&2
+  "${compose[@]}" exec -T hamnivo-db pg_restore -U postgres -d hamnivo_check --exit-on-error \
+    --single-transaction <"$dir/hamnivo.dump" || fail "The Hamnivo database in $dir does not restore."
+  "${compose[@]}" exec -T chatwoot-db createdb -U postgres chatwoot_check
+  "${compose[@]}" exec -T chatwoot-db pg_restore -U postgres -d chatwoot_check --exit-on-error \
+    --single-transaction <"$dir/chatwoot.dump" || fail "The Chatwoot database in $dir does not restore."
+
+  local migrations workspaces accounts
+  migrations="$(db_psql hamnivo_check -tA -c 'select count(*) from drizzle.__drizzle_migrations')"
+  workspaces="$(db_psql hamnivo_check -tA -c 'select count(*) from tenants')"
+  accounts="$("${compose[@]}" exec -T chatwoot-db psql -X -q -v ON_ERROR_STOP=1 -U postgres \
+    -d chatwoot_check -tA -c 'select count(*) from accounts')"
+  ((migrations > 0)) || fail "The backup $dir restores, but holds no Hamnivo migrations."
+  drop_check_databases
+  trap - EXIT
+  log "The backup $dir restores: $workspaces workspaces, $migrations migrations, $accounts Chatwoot accounts."
+}
+
 main() {
   local command="${1:-help}"
   shift || true
@@ -616,9 +669,10 @@ main() {
     mail) cmd_mail "$@" ;;
     backup) cmd_backup "$@" ;;
     restore) cmd_restore "$@" ;;
+    backup-check) cmd_backup_check "$@" ;;
     build) cmd_build "$@" ;;
     update) exec bash "$here/deploy.sh" deploy --latest --trigger manual "$@" ;;
-    deploy | rollback | deploys | autodeploy) exec bash "$here/deploy.sh" "$command" "$@" ;;
+    deploy | rollback | deploys | autodeploy | backups) exec bash "$here/deploy.sh" "$command" "$@" ;;
     doctor) exec bash "$here/doctor.sh" "$@" ;;
     down) need_env; "${compose[@]}" down ;;
     compose) need_env; "${compose[@]}" "$@" ;;

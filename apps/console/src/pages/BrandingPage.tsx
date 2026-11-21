@@ -247,14 +247,14 @@ function BrandingEditor({ settings }: { settings: BrandingSettings }) {
 }
 export function BrandingPage() {
   const { t } = useTranslation();
-  const { can } = useTenant();
+  const { can, features } = useTenant();
   const query = useStudioQuery<BrandingSettings>(['branding'], '/v1/admin/branding', {
     enabled: can('branding.read'),
   });
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title={t('agentic.branding')} description={t('agentic.brandingDescription')} />
-      {can('agency.read') ? (
+      {can('agency.read') && features.advanced ? (
         <div>
           <Button asChild variant="secondary">
             <Link to="/agency">{t('agentic.clients')}</Link>

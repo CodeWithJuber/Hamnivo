@@ -7,7 +7,8 @@ import type { z } from 'zod';
 import { AdminService } from '../admin/admin.service.js';
 import { validIdempotencyKey } from '../common/idempotency.service.js';
 import { parseInput } from '../common/validation.js';
-import { APP_DB, CLOCK, type Clock } from '../tokens.js';
+import type { AppConfig } from '../config.js';
+import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
 import type { AuthSession } from './auth.factory.js';
 import { PrincipalService } from './principal.service.js';
 import { CurrentSession, StaffRoute } from './request-auth.js';
@@ -19,6 +20,7 @@ export class IdentityController {
   constructor(
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(CONFIG) private readonly config: AppConfig,
     private readonly principals: PrincipalService,
     private readonly tenants: TenantsService,
     private readonly admin: AdminService,
@@ -63,6 +65,7 @@ export class IdentityController {
         status: m.staffStatus as 'invited' | 'active' | 'suspended' | 'removed',
       })),
       current,
+      features: { advanced: this.config.HAMNIVO_ADVANCED_FEATURES },
     };
   }
 

@@ -176,6 +176,26 @@ body {
   overflow-x: auto;
   white-space: pre;
   line-height: 1.5;
+  /* A shadow at an edge while the line goes on past it, so a cut-off line reads as "scroll
+     sideways". The covers move with the text (local) and hide each shadow at its own end. */
+  background:
+    linear-gradient(to right, var(--color-surface-sunken) 40%, transparent) left center / 28px 100%
+    no-repeat local,
+    linear-gradient(to left, var(--color-surface-sunken) 40%, transparent) right center / 28px 100%
+    no-repeat local,
+    radial-gradient(
+      farthest-side at 0 50%,
+      color-mix(in srgb, var(--color-text) 25%, transparent),
+      transparent
+    )
+    left center / 12px 100% no-repeat scroll,
+    radial-gradient(
+      farthest-side at 100% 50%,
+      color-mix(in srgb, var(--color-text) 25%, transparent),
+      transparent
+    )
+    right center / 12px 100% no-repeat scroll;
+  background-color: var(--color-surface-sunken);
 }
 .hv-table {
   overflow-x: auto;

@@ -10,6 +10,7 @@ import {
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
 import type { AppConfig } from '../config.js';
+import { reportError } from '../observability/error-reporting.js';
 import { APP_DB, CLOCK, type Clock, CONFIG, REDIS } from '../tokens.js';
 import { OUTBOX_SIGNAL } from './outbox.js';
 
@@ -151,6 +152,7 @@ export class OutboxRelay implements OnApplicationBootstrap, OnApplicationShutdow
         .catch((error: unknown) => {
           this.claiming = undefined;
           this.logger.error(`outbox relay failed: ${String(error)}`);
+          reportError(error);
           this.schedule(5000);
         });
     }, delay);
@@ -184,7 +186,10 @@ export class OutboxRelay implements OnApplicationBootstrap, OnApplicationShutdow
           this.held.delete(event.id);
         }
       })()
-        .catch((error: unknown) => this.logger.error(`outbox lane failed: ${String(error)}`))
+        .catch((error: unknown) => {
+          this.logger.error(`outbox lane failed: ${String(error)}`);
+          reportError(error);
+        })
         .finally(() => {
           this.running.delete(key);
           if (lane.length === 0 && this.lanes.get(key) === lane) this.lanes.delete(key);
@@ -221,10 +226,13 @@ export class OutboxRelay implements OnApplicationBootstrap, OnApplicationShutdow
             ...(dead ? { processedAt: this.clock() } : {}),
           })
           .where(eq(schema.outboxEvents.id, event.id)),
-      ).catch((bookkeeping: unknown) =>
+      ).catch((bookkeeping: unknown) => {
         // The lease runs out and the event is claimed again: at least once still holds.
-        this.logger.error(`outbox ${event.id} not recorded: ${String(bookkeeping)}`),
-      );
+        this.logger.error(`outbox ${event.id} not recorded: ${String(bookkeeping)}`);
+        reportError(bookkeeping, { event: event.id });
+      });
+      // A retry is routine; an event that gives up is not.
+      if (dead) reportError(error, { topic: event.topic, event: event.id });
       this.logger.warn(
         `outbox ${event.topic} ${event.id} failed (attempt ${event.attempts}): ${message}`,
       );

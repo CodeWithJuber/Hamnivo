@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import i18next from 'i18next';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { CommandPalette } from '../src/components/CommandPalette';
-import { initI18n } from '../src/i18n';
+import { ensureLocale, initI18n } from '../src/i18n';
 import { mountStudio } from './dom';
 
 beforeAll(async () => {
@@ -115,6 +115,7 @@ describe('the command palette', () => {
   });
 
   it('in Arabic, finds pages by their Arabic name and by their English one', async () => {
+    await ensureLocale('ar');
     await i18next.changeLanguage('ar');
     const user = userEvent.setup();
     const { router } = await mount(presetPermissions('owner'));

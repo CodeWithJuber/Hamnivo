@@ -55,7 +55,7 @@ import { type Chip, Composer } from './composer/Composer.js';
 import { useFileDrop } from './composer/useFileDrop.js';
 import { Home } from './Home.js';
 import { MemoryConsent } from './MemoryConsent.js';
-import { PrivacyLink } from './PrivacyLink.js';
+import { FinePrint } from './PrivacyLink.js';
 import { Reopen } from './Reopen.js';
 import { StaffTypingLine } from './StaffTyping.js';
 import { StatusLine } from './StatusLine.js';
@@ -270,20 +270,20 @@ function PanelLoading() {
   );
 }
 
-/** True on a screen too short for everything at once: a phone held sideways, a zoomed window. */
-function useShortScreen(): boolean {
-  const [short, setShort] = useState(
-    () => typeof matchMedia === 'function' && matchMedia('(max-height: 26rem)').matches,
+/** Whether a media query matches, kept up to date as the frame changes. */
+function useMedia(media: string): boolean {
+  const [matches, setMatches] = useState(
+    () => typeof matchMedia === 'function' && matchMedia(media).matches,
   );
   useEffect(() => {
     if (typeof matchMedia !== 'function') return;
-    const query = matchMedia('(max-height: 26rem)');
-    const update = () => setShort(query.matches);
+    const query = matchMedia(media);
+    const update = () => setMatches(query.matches);
     update();
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
-  }, []);
-  return short;
+  }, [media]);
+  return matches;
 }
 
 type View = 'chat' | 'memory' | 'settings' | 'conversations' | 'contact';
@@ -375,7 +375,13 @@ export function Chat(props: {
   const chipsRef = useRef(chips);
   chipsRef.current = chips;
   const moreId = useId();
-  const short = useShortScreen();
+  // Too short for everything at once: a phone held sideways, a zoomed window.
+  const short = useMedia('(max-height: 26rem)');
+  // A phone's width: "talk to a person" is a round button beside the message box, not a line
+  // above it, so the conversation keeps the height (production-ready plan: under 170 px of
+  // header, buttons, message box and small print at 390 × 844).
+  // Below 16rem (a 200 % zoom) the row has no room for it, and it goes back above the box.
+  const compact = useMedia('(min-width: 16rem) and (max-width: 30rem)') || short;
   const remembered = memory.state.memory;
   // When memory can't be loaded, the entry stays so the customer can see why (HNV-15-06).
   const memoryShown =
@@ -410,7 +416,8 @@ export function Chat(props: {
   const canAskPerson =
     available &&
     conversation?.responder !== 'person' &&
-    conversation?.status !== 'waiting_for_person';
+    conversation?.status !== 'waiting_for_person' &&
+    conversation?.status !== 'with_person';
 
   // A reply is on its way: the gateway says what the assistant is doing, or, where it says
   // nothing, the visitor's newest message is still young. A reaction or a deleted message is
@@ -775,10 +782,17 @@ export function Chat(props: {
   );
 
   const waiting = conversation?.status === 'waiting_for_person';
+  // A person has the chat: the banner says who, by the name they chose, once they have written.
+  const personName =
+    conversation?.status === 'with_person' || conversation?.responder === 'person'
+      ? state.messages.findLast((m) => m.sender.kind === 'human_agent')?.sender.displayName
+      : undefined;
   const banner = waiting
     ? (state.handoffNotice ?? t('waitingForPerson'))
     : conversation?.status === 'with_person'
-      ? t('withPerson')
+      ? personName
+        ? t('withNamedPerson', { name: personName })
+        : t('withPerson')
       : conversation?.status === 'resolved'
         ? t('resolved')
         : conversation?.responder === 'ai'
@@ -815,29 +829,22 @@ export function Chat(props: {
   const person = canAskPerson ? (
     <Button
       variant="outline"
-      size={short ? 'icon' : 'sm'}
+      size={compact ? 'icon' : 'sm'}
       className={
-        short
+        compact
           ? 'size-11 shrink-0 rounded-full'
           : 'mb-2 h-auto min-h-9 rounded-full whitespace-normal py-1.5 text-start shadow-sm'
       }
-      aria-label={short ? t('talkToPerson') : undefined}
-      title={short ? t('talkToPerson') : undefined}
+      aria-label={compact ? t('talkToPerson') : undefined}
+      title={compact ? t('talkToPerson') : undefined}
       onClick={() => void handoff()}
     >
       <UserRoundIcon className="size-4" aria-hidden="true" />
-      {short ? null : t('talkToPerson')}
+      {compact ? null : t('talkToPerson')}
     </Button>
   ) : null;
   const fine = (
-    <>
-      <PrivacyLink url={config.privacyPolicyUrl} />
-      {config.brand.showBranding !== false ? (
-        <p className="pt-2 text-center text-[10px] text-text-muted" data-testid="widget-branding">
-          Hamnivo
-        </p>
-      ) : null}
-    </>
+    <FinePrint url={config.privacyPolicyUrl} branded={config.brand.showBranding !== false} />
   );
 
   return (
@@ -854,7 +861,7 @@ export function Chat(props: {
           brand={config.brand}
           locale={locale}
           onLocale={props.onLocale}
-          disclosure={copy.aiDisclosure}
+          ai={!conversation || conversation.responder === 'ai'}
           menu={{
             id: moreId,
             open: more,
@@ -1028,6 +1035,22 @@ export function Chat(props: {
               aria-label={t('title')}
               data-testid="thread"
             >
+              {/* The brand's words about its assistant open every conversation (U09). */}
+              {empty ? null : (
+                <>
+                  <p
+                    className="mb-3 text-center text-xs text-text-muted"
+                    data-testid="ai-disclosure"
+                  >
+                    {copy.aiDisclosure}
+                  </p>
+                  {/* Which pages the website notes, and how to stop it: before anything is written. */}
+                  <VisitorNotice
+                    text={props.visitorNotice}
+                    className="mb-3 text-center text-xs text-text-muted"
+                  />
+                </>
+              )}
               {state.olderCursor ? (
                 <div className="mb-3 flex justify-center">
                   <Button
@@ -1080,7 +1103,8 @@ export function Chat(props: {
                   onOpenRecent={(id) => void props.onOpenConversation(id)}
                   onAsk={(question) => void send(question)}
                   team={config.team}
-                  onChat={() => document.getElementById('hv-composer')?.focus()}
+                  disclosure={copy.aiDisclosure}
+                  notice={props.visitorNotice}
                 />
               ) : null}
               {askConsent && remembered ? (
@@ -1161,16 +1185,15 @@ export function Chat(props: {
               </>
             ) : gate ? null : (
               <>
-                {short ? null : person}
+                {compact ? null : person}
                 <LanguageQuestion
                   state={props.language.state}
                   onChoose={props.language.choose}
                   onDismiss={props.language.dismiss}
                 />
                 <StaffTypingLine name={props.staffTyping} />
-                <VisitorNotice text={props.visitorNotice} />
                 <div className="flex items-end gap-2">
-                  {short ? person : null}
+                  {compact ? person : null}
                   <div className="min-w-0 flex-1">
                     <Composer
                       label={t('placeholder')}

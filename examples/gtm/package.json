@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "pnpm --filter @hamnivo/widget-loader build && vitest run"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@hamnivo/widget-loader": "workspace:*",

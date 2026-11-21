@@ -1,0 +1,17 @@
+# Secret scanning (scripts/ci/local.sh, "No secrets in the code"): gitleaks' own rules, minus the
+# places that hold made-up keys on purpose. A scan of the whole history on 2026-11-21 found nothing
+# outside them.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test fixtures, examples, env templates and generated API descriptions"
+paths = [
+  '''(^|/)tests?/''',
+  '''\.test\.tsx?$''',
+  '''(^|/)fixtures/''',
+  '''(^|/)e2e/''',
+  '''^examples/''',
+  '''^packages/chatwoot/(swagger|src/generated)/''',
+  '''(^|/)\.?env\.example$''',
+]

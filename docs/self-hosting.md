@@ -518,6 +518,8 @@ API reference is at `https://api.example.com/docs`; set `API_DOCS=false` to hide
 | Check the whole server, and see how to fix what is wrong (HTTPS certificates, ports, disk, memory, deploys) | `./deploy/production/hamnivo.sh doctor` |
 | Follow logs | `./deploy/production/hamnivo.sh logs [service…]` |
 | Back up now | `./deploy/production/hamnivo.sh backup` |
+| Back up every night and check a backup every month | `./deploy/production/hamnivo.sh backups on` |
+| Check that a backup restores, without touching live data | `./deploy/production/hamnivo.sh backup-check [deploy/production/backups/<time>]` |
 | Restore a backup | `./deploy/production/hamnivo.sh restore deploy/production/backups/<time>` |
 | Deploy the latest code now (checks, build, health, rollback) | `./deploy/production/hamnivo.sh update` |
 | Deploy history, or go back one version | `./deploy/production/hamnivo.sh deploys`, `… rollback` |
@@ -606,11 +608,26 @@ The newest 14 backups are kept (`--keep N` changes that). `--no-secrets` leaves 
 store it separately. Backups contain personal data and secrets: encrypt them and copy them off the
 server, for example with [restic](https://restic.net).
 
-Back up every night at 03:15:
+Back up every night, and check every month that the newest backup restores:
 
 ```bash
-( crontab -l 2>/dev/null; echo '15 3 * * * /opt/hamnivo/deploy/production/hamnivo.sh backup >> "$HOME/hamnivo-backup.log" 2>&1' ) | crontab -
+./deploy/production/hamnivo.sh backups on
 ```
+
+This installs two systemd timers. Every night at about 03:00 in the server's time zone (UTC on most
+servers) a backup is made; a night the server was off is made up when it starts. On the first of
+each month, `hamnivo.sh backup-check` restores the newest backup into throwaway databases beside the
+live ones, checks what came back (the migrations, the workspaces, Chatwoot's accounts), and drops
+them. The live data and the running applications are never touched; the check needs free disk for
+one more copy of the databases while it runs. Run it by hand on any backup:
+
+```bash
+./deploy/production/hamnivo.sh backup-check deploy/production/backups/20260927T031500Z
+```
+
+`hamnivo.sh backups status` shows the timers, how their last runs ended and the newest backup;
+`journalctl -u hamnivo-backup` shows a run's log. `backups off` removes the timers and keeps the
+backups. Without systemd, run `hamnivo.sh backup` from cron every night instead.
 
 The two databases are dumped one after the other, a few seconds apart. Messages written in those
 seconds can be missing from one of them.
@@ -649,8 +666,9 @@ installs the backup's `.env` and builds what it needs. A new server has no curre
 consent and deletions made after the backup are lost with the old server. To move servers, take a
 fresh backup on the old one just before.
 
-Test a restore now and then on a spare server. `scripts/ci/production-smoke.sh` runs a backup and
-restore drill in its checks.
+The monthly check proves a backup restores, but not the whole procedure: test a full restore now
+and then on a spare server. `scripts/ci/production-smoke.sh` runs a backup, its check, and a restore
+drill in its checks.
 
 ### Retention and backups
 
@@ -715,6 +733,14 @@ up and deploys.
   - the GitHub token, if you added one, is fine-grained, for this repository only, with
     "Deployments" access only.
 - To collect metrics, set `METRICS_TOKEN` and scrape `https://api.example.com/metrics` with it.
+- To track errors, set `SENTRY_DSN` to a project's DSN on Sentry or on your own GlitchTip, then
+  `hamnivo.sh up`. Errors from the API, the worker, Studio and the chat arrive there, tagged
+  `gateway-api`, `gateway-worker`, `studio` and `widget`. No user details, cookies, headers,
+  bodies, query strings or chat text are sent. The browsers send through the API, so the CSP
+  needs no change. To check it:
+  - the gateway: `docker compose exec api node dist/main.error-test.js`;
+  - Studio or the chat: in the browser console of either, run
+    `setTimeout(() => { throw new Error('Hamnivo test error') })`.
 - Behind Cloudflare's proxy, `HAMNIVO_CLOUDFLARE=on` (A4). Without it, every visitor has
   Cloudflare's address, so rate limits apply to many visitors at once.
 
@@ -949,8 +975,9 @@ cd Hamnivo
 git checkout claude/hamnivo-app-implementation-bhb7rg   # until the work is merged to main
 pnpm install
 
-# Browser for the accessibility audit and the widget journey (Chromium and its system libraries)
-pnpm --filter @hamnivo/ui exec playwright install --with-deps chromium
+# Browsers for the accessibility audit and the widget journey (Chromium and WebKit, with their
+# system libraries)
+pnpm --filter @hamnivo/ui exec playwright install --with-deps chromium webkit
 ```
 
 ## 3. Configuration and secrets
@@ -1249,7 +1276,8 @@ is never touched:
 - A fresh PostgreSQL 18 and Valkey for the widget journey. It builds everything, then starts the
   gateway, the worker, a fake Chatwoot, the widget and a host page on another origin. Chromium
   then chats through it: AI reply, staff takeover, offline resend, right to left, an axe audit,
-  and refusal on a website that is not allowed.
+  and refusal on a website that is not allowed. WebKit, Safari's engine, runs the same journeys
+  and the composer's tests (`apps/widget/playwright.config.ts`).
 
 - The built website in Chromium: every language at desktop and phone width, with an axe audit.
 

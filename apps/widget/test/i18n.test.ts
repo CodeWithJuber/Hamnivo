@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { LANGUAGE_NAMES, LOCALES, REPLY_LANGUAGE_NAMES, resources } from '../src/i18n.js';
+import {
+  LANGUAGE_NAMES,
+  LOCALES,
+  type Locale,
+  loadResource,
+  REPLY_LANGUAGE_NAMES,
+  type Resource,
+} from '../src/i18n.js';
+
+/** Every language's words, loaded as the chat loads them. */
+const resources = Object.fromEntries(
+  await Promise.all(LOCALES.map(async (locale) => [locale, await loadResource(locale)] as const)),
+) as Record<Locale, Resource>;
 
 /** Every string of a resource tree by its dotted key. */
 function flatten(tree: object, prefix = ''): Record<string, string> {

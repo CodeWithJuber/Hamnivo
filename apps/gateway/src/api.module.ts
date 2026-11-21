@@ -110,6 +110,7 @@ import { WidgetMemoryController } from './memory/widget-memory.controller.js';
 import { MemoryWriter } from './memory/writer.service.js';
 import { MigrationController } from './migration/migration.controller.js';
 import { MigrationService } from './migration/migration.service.js';
+import { ErrorReportsController } from './observability/error-reports.controller.js';
 import { OperatorsService } from './operations/operators.service.js';
 import { PlatformController } from './operations/platform.controller.js';
 import { PlatformService } from './operations/platform.service.js';
@@ -179,6 +180,7 @@ export class ApiModule {
       imports: [PlatformModule.forRoot(config, overrides, 'gateway')],
       controllers: [
         HealthController,
+        ErrorReportsController,
         AutomationsController,
         AgencyController,
         AiCreditsController,

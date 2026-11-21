@@ -247,14 +247,16 @@ export function Composer(props: {
             composing.current = false;
           }}
           // 16 px, so phones do not zoom in when the box takes focus; the frame around it shows focus.
-          className="min-h-11 min-w-0 flex-1 resize-none bg-transparent px-2 py-2.5 text-md text-text outline-none placeholder:text-text-muted focus-visible:outline-none"
+          // An empty box keeps its hint on one line, so it stays one line high on a phone.
+          className="min-h-11 min-w-0 flex-1 resize-none bg-transparent px-2 py-2.5 text-md text-text outline-none placeholder:text-text-muted placeholder-shown:overflow-hidden placeholder-shown:text-ellipsis placeholder-shown:whitespace-nowrap focus-visible:outline-none"
         />
         <Button
           ref={emojiButton}
           type="button"
           variant="ghost"
           size="icon"
-          className="size-11 shrink-0 rounded-lg text-text-secondary max-[20rem]:hidden"
+          // A phone's own keyboard has emoji; there the box keeps the room instead.
+          className="size-11 shrink-0 rounded-lg text-text-secondary max-[30rem]:hidden"
           aria-label={t('ui.emoji')}
           aria-expanded={emoji}
           onClick={() => setEmoji((open) => !open)}

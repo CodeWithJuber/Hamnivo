@@ -343,7 +343,7 @@ platform settings (`DATABASE_PLATFORM_URL`), as Studio's stack already did. Befo
 | 4 | Round-robin or capacity auto-assignment | admin | M | Manual claiming breaks down at two or more agents (H02 partial). |
 | 5 | Hide rules: per page, on mobile, when nobody is online | both | S | Stores hide the chat at checkout. The launcher config has no rules yet. |
 | 6 | Emoji picker in the composer; visitor can end the chat | visitor | S | Small, expected polish. |
-| 7 | Split the widget bundle: memory, commerce, actions and markdown load on demand | visitor | M | The first open downloads 385 KB gzipped (1.32 MB raw). Target: under 200 KB. |
+| 7 | Split the widget bundle: memory, commerce, actions and markdown load on demand | visitor | M | The first open downloaded 407 kB of JavaScript gzipped on 2026-11-21 (the main script plus 14 preloaded chunks); 319 kB after contracts were built one module per file and answer formatting moved to the first answer; 286 kB once the website's messages were checked without zod; 268 kB once only the visitor's language loads (Arabic, Hindi and Urdu are about 7 kB each, fetched when chosen). Target: under 200 kB, then 150 kB. Next: the assistant-ui thread after the home screen (about a fifth of the main script). `scripts/ci/widget-size.ts` fails the checks above the budget (270 kB), which comes down with each split. |
 | 8 | Sneak peek: staff see the visitor's draft live (opt-in, never stored) | admin | S–M | Agents answer faster. Tawk users expect it. |
 
 ## Phase 2: developer platform

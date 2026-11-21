@@ -10,14 +10,14 @@ records to backups and updates, is Part A of [`docs/self-hosting.md`](../../docs
 
 | File | What it is |
 |---|---|
-| `hamnivo.sh` | The operator script: `setup`, `up`, `status`, `doctor`, `logs`, `mail`, `backup`, `restore`, `update`, `deploy`, `rollback`, `deploys`, `autodeploy`, `down`, `compose` |
+| `hamnivo.sh` | The operator script: `setup`, `up`, `status`, `doctor`, `logs`, `mail`, `backup`, `backup-check`, `backups`, `restore`, `update`, `deploy`, `rollback`, `deploys`, `autodeploy`, `down`, `compose` |
 | `deploy.sh` | Deploys a commit: HTTPS check, checks, build, start, health, rollback; automatic deploys from GitHub (`autodeploy`) |
 | `doctor.sh` | `hamnivo.sh doctor`: checks the server (services, HTTPS for every name, ports, disk, memory, certificates, deploys) and says how to fix what is wrong. Only reads |
 | `lib.sh` | Helpers shared by the scripts (settings, compose, health waits, HTTPS checks, the lock) |
 | `compose.yml` | The services: PostgreSQL 18 + pgvector, Valkey, the gateway (migrations, API, worker), Chatwoot 4.18.0-ce, ClamAV, the edge, and the deploy webhook receiver |
 | `Caddyfile` | The edge: automatic HTTPS, the reverse proxies, Studio, the static widget and website, the widget's frame policy, and the deploy webhook route |
 | `deploy-hook/hooks.yaml` | What the webhook receiver accepts: a signed push to the deploy branch of this repository |
-| `systemd/` | The units `autodeploy enable` installs: the deploy service, its webhook trigger and its 5-minute timer |
+| `systemd/` | The units `autodeploy enable` installs (the deploy service, its webhook trigger and its 5-minute timer) and those `backups on` installs (a backup every night, a backup check every month) |
 | `env.example` | Every setting in `.env`, which `hamnivo.sh setup` writes with generated secrets, and the deploy settings |
 | `chatwoot.env.example` | Optional Chatwoot settings, such as its email |
 | `../docker/Dockerfile` | The images, built from this code: `gateway`, `edge`, `deploy-hook`, and `verify` (the checks a deploy runs) |

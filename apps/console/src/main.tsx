@@ -3,7 +3,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { applyLocale, initI18n, initialLocale } from './i18n';
+import { API_BASE } from './lib/config';
+import { watchErrors } from './lib/error-reporting';
 import './styles.css';
+
+watchErrors(API_BASE);
 
 const icon = document.createElement('link');
 icon.rel = 'icon';

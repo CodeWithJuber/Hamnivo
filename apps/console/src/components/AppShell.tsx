@@ -11,7 +11,7 @@ import { StatusBadge } from '@hamnivo/ui/components/status-badge';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouter, useRouterState } from '@tanstack/react-router';
 import {
-  BarChart3Icon,
+  BookOpenIcon,
   BotIcon,
   BuildingIcon,
   HouseIcon,
@@ -19,11 +19,9 @@ import {
   LogOutIcon,
   MenuIcon,
   OctagonPauseIcon,
-  PlugIcon,
   ServerCogIcon,
   SettingsIcon,
   ShieldCheckIcon,
-  WorkflowIcon,
   XIcon,
 } from 'lucide-react';
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from 'react';
@@ -61,9 +59,7 @@ const GROUP_ICONS: Record<NavGroupId, NavIcon> = {
   home: HouseIcon,
   inbox: InboxIcon,
   ai: BotIcon,
-  workflows: WorkflowIcon,
-  connectors: PlugIcon,
-  reports: BarChart3Icon,
+  knowledge: BookOpenIcon,
   settings: SettingsIcon,
 };
 
@@ -83,15 +79,15 @@ interface MenuSection {
 }
 
 /**
- * The menu for this person (see lib/nav.ts): up to seven entries, and for the group being shown the
+ * The menu for this person (see lib/nav.ts): up to five entries, and for the group being shown the
  * pages they can open, as a row of links above the page.
  */
 function useMenu(pathname: string): { entries: MenuEntry[]; section: MenuSection | null } {
   const { t } = useTranslation();
-  const { can } = useTenant();
+  const { can, features } = useTenant();
   const { groups: groupLabels, pages: pageLabels } = useNavLabels();
 
-  const menu = menuFor(can);
+  const menu = menuFor(can, features);
   const activeId = groupIdOfPath(pathname);
   const entries = menu.map((group) => ({
     id: group.id,
@@ -176,7 +172,7 @@ function usePlatformOperator() {
 
 function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
-  const { me } = useTenant();
+  const { me, features } = useTenant();
   const client = useQueryClient();
   const router = useRouter();
   const operator = usePlatformOperator();
@@ -205,7 +201,7 @@ function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
         <ShieldCheckIcon className="size-[18px]" aria-hidden="true" />
         {t('nav.account')}
       </Link>
-      {operator.data ? (
+      {operator.data && features.advanced ? (
         <Link
           to="/platform"
           onClick={onNavigate}
@@ -225,10 +221,12 @@ function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** The agency's clients, when agency is on for the workspace and frozen features are listed. */
 function AgencyContext() {
   const { t } = useTranslation();
+  const { features } = useTenant();
   const agency = useAgency();
-  if (!agency.data?.enabled) return null;
+  if (!agency.data?.enabled || !features.advanced) return null;
   return (
     <Link
       to="/agency"
@@ -292,7 +290,7 @@ function KillSwitchBanner() {
 }
 
 /**
- * Studio frame (board 03): a menu of seven entries, a header with the always-visible Stop AI
+ * Studio frame (board 03): a menu of five entries, a header with the always-visible Stop AI
  * button, the active-stop banner and the page, with the pages of the current entry as a row of
  * links above it. On narrow screens the menu becomes a sheet.
  */

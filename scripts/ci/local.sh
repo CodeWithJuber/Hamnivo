@@ -137,6 +137,14 @@ unit_tests() {
     vitest run test/commerce/stripe-mock.test.ts
 }
 
+# The chat's first open within its gzip budget (scripts/ci/widget-size.ts). The widget is built in
+# a step of its own, one heavy task at a time, so its build never shares memory with the unit tests.
+widget_size() {
+  pnpm exec turbo run build --filter=@hamnivo/widget ${heavy_limit[@]+"${heavy_limit[@]}"} >/dev/null ||
+    return 1
+  pnpm exec tsx scripts/ci/widget-size.ts
+}
+
 wait_for_postgres() {
   local container="$1"
   for _ in $(seq 1 120); do
@@ -250,6 +258,20 @@ chatwoot_contract() {
   status=$?
   remove_chatwoot "$project"
   return "$status"
+}
+
+# The supply chain (production-ready plan): what ships has no high or critical advisory, and the
+# code holds no secret. The audit asks npm's registry; gitleaks reads the whole git history with
+# the rules in .gitleaks.toml (made-up keys in tests and examples are allowed).
+dependency_audit() {
+  pnpm audit --prod --audit-level=high
+}
+secret_scan() {
+  if ! command -v gitleaks >/dev/null; then
+    echo 'gitleaks is not installed (deploy/ci-runner/Dockerfile installs it): skipped.' >&2
+    return 0
+  fi
+  gitleaks git --no-banner --redact --config .gitleaks.toml .
 }
 
 require node pnpm git openssl

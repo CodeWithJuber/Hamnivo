@@ -11,7 +11,7 @@ Chatwoot is the engine underneath. Nobody has to open it day to day.
 |---|---|---|---|
 | **Hamnivo Studio** (`app.<your domain>`) | Everyone on your team, admins and staff | Daily | Answering customers in the inbox, the AI assistant, orders, reports and settings. |
 | **Chatwoot** (`support.<your domain>`) | Nobody needs it day to day. It is the engine underneath Studio | Not needed daily | Keeps the conversations for Studio. An admin connects it once for each brand, from Studio. |
-| **Platform console** (`app.<your domain>/platform`) | Only the server operator, the person who runs your Hamnivo server | Rarely | Server health, support access requests and incident notices. It is in the account menu, and only for people named as operators on the server. |
+| **Platform console** (`app.<your domain>/platform`) | Only the server operator, the person who runs your Hamnivo server | Rarely | Server health, support access requests and incident notices. It is in the account menu, only for people named as operators on the server, and only when the server sets `HAMNIVO_ADVANCED_FEATURES=true`. Otherwise operators open its address directly. |
 | **Chat widget and website** | Your customers | Whenever they need help | The chat on your website. Customers never see Studio or Chatwoot. |
 
 You and your team work in Studio. Studio has no link to Chatwoot, and staff never need its
@@ -21,19 +21,24 @@ custom fields. Saved replies and tags are set up in Studio, from the inbox (see
 
 ## The menu in Studio
 
-The menu has seven entries. An entry appears only when you can open at least one page in it, and it
+The menu has five entries. An entry appears only when you can open at least one page in it, and it
 opens the first page you can open. When you can open two or more pages of an entry, they are shown
 as a row of links above the page, so each one is a click away.
 
 | Entry | Pages, in the order of the row |
 |---|---|
-| **Home** | Home: your chats or your setup steps, then your brands, AI stops and the latest runs |
+| **Home** | Home: your chats or your setup steps, then your brands, AI stops and the latest runs; Reports |
 | **Inbox** | The inbox |
-| **AI assistant** | AI agents, Knowledge, Customer memory; advanced: Safety checks, Decision rules, Activity, Answer caching |
-| **Workflows** | Workflows; advanced: Automations |
-| **Connectors** | Connectors, Channels; advanced: Tools and permissions, Model connections |
-| **Reports** | Reports |
-| **Settings** | Brands and install, Portal branding, Chat widget, Business hours, Team and access, Plan and billing, Privacy; advanced: Orders, Finance exceptions, Support teams, Security, Developer, Customer sign-in, Import history |
+| **AI assistant** | AI agents, Customer memory, Connectors; advanced: Automations, Tools and permissions, Model connections, Activity |
+| **Knowledge** | Knowledge; advanced: Answer caching |
+| **Settings** | Brands and install, Portal branding, Chat widget, Channels, Business hours, Team and access, Plan and billing, Privacy; advanced: Support teams, Security, Developer, Customer sign-in |
+
+**Frozen features.** Some features are frozen while Hamnivo focuses on chat, the AI and the inbox:
+orders and finance exceptions, import history (migration), workflows, decision rules and safety
+checks, agency and the platform console. They are not in the menu, the search or the header unless
+the server sets `HAMNIVO_ADVANCED_FEATURES=true`. Then they appear under **advanced**: workflows,
+safety checks and decision rules in AI assistant; orders, finance exceptions and import history in
+Settings. Frozen or not, their data is kept and their addresses still open.
 
 See [Build agent workflows](guide/ai/workflows.md) and
 [Connect business systems and specialist agents](guide/integrations/connectors.md) for the new

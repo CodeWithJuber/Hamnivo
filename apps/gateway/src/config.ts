@@ -229,6 +229,17 @@ const EnvSchema = z.object({
 
   /** Bearer token for GET /metrics; the endpoint is disabled without it. */
   METRICS_TOKEN: z.string().min(16).optional(),
+  /**
+   * Error tracking: the DSN of a Sentry project, or of a self-hosted GlitchTip one. Unset, no
+   * error is sent anywhere. Studio and the chat send theirs through this server
+   * (`/v1/error-reports`), so their pages never talk to the DSN's host.
+   */
+  SENTRY_DSN: z.url().optional(),
+  /** The environment errors are filed under; NODE_ENV when unset. */
+  SENTRY_ENVIRONMENT: z
+    .string()
+    .regex(/^[\w.-]{1,64}$/)
+    .optional(),
   API_DOCS: bool.default(true),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(600),
   /** Requests per minute for one API key (each key has its own budget). */
@@ -297,6 +308,12 @@ const EnvSchema = z.object({
    * When off, only people with an invitation may sign up (the first account of a server always).
    */
   HAMNIVO_PUBLIC_SIGNUP: bool.default(true),
+  /**
+   * Studio lists the frozen features (production-ready plan, 2026-11-20): commerce and refunds,
+   * migration, the workflow builder, decisions and checks, agency and the platform console. Off,
+   * they leave the menu, the command palette and the header; their data and addresses still work.
+   */
+  HAMNIVO_ADVANCED_FEATURES: bool.default(false),
   /** The plan every new workspace starts on, or `unlimited` for no plan (self-hosting). */
   HAMNIVO_DEFAULT_PLAN: z
     .string()

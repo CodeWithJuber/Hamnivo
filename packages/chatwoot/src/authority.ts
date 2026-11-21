@@ -51,6 +51,14 @@ export interface ChatwootAuthorityOptions {
 
 type Json = Record<string, unknown>;
 
+/**
+ * Chatwoot sorts a page of messages by created_at but pages by id (`before` and `after` compare
+ * ids). Two messages written at nearly the same moment (activity messages come from background
+ * jobs) can have their ids the other way round, so pages are put in id order: the first message is
+ * then the lowest id, and `before` it never returns a message twice.
+ */
+const byRef = (a: AuthorityMessage, b: AuthorityMessage) => Number(a.ref) - Number(b.ref);
+
 /** Chatwoot's `attribute_display_type`, in the order of its enum. */
 const FIELD_TYPES: AuthorityFieldType[] = [
   'text',
@@ -305,7 +313,7 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
       ) as never,
     );
     const payload = Array.isArray(page.payload) ? page.payload : [];
-    return payload.map((m) => toMessage(m, conversationRef));
+    return payload.map((m) => toMessage(m, conversationRef)).sort(byRef);
   }
 
   async appendMessage(
@@ -551,7 +559,7 @@ export class ChatwootAuthority implements ConversationAuthority, StaffInboxAutho
       }) as never,
     );
     const payload = Array.isArray(result.payload) ? result.payload : [];
-    return payload.map((m) => toMessage(m, conversationRef));
+    return payload.map((m) => toMessage(m, conversationRef)).sort(byRef);
   }
 
   async searchMessages(

@@ -25,11 +25,18 @@ export interface ReadContext {
   /** The whole document: where `#/components/…` references point. */
   doc: Raw;
   work: { left: number };
+  /**
+   * What each reference points to, found once per document. A tangled description follows the
+   * same few references hundreds of thousands of times before its budget runs out; decoding the
+   * pointer each time made those steps cost seconds of the server's single thread.
+   */
+  targets: Map<string, unknown>;
 }
 
 export const readContext = (doc: Raw): ReadContext => ({
   doc,
   work: { left: SPEC_WORK_LIMIT },
+  targets: new Map(),
 });
 
 export function spend(ctx: ReadContext, units = 1): void {
@@ -84,7 +91,8 @@ export function deref(ctx: ReadContext, value: unknown): Found<{ node: Raw }> {
     if (description === undefined && typeof current.description === 'string') {
       description = current.description;
     }
-    current = pointer(ctx.doc, ref.slice(1));
+    if (!ctx.targets.has(ref)) ctx.targets.set(ref, pointer(ctx.doc, ref.slice(1)));
+    current = ctx.targets.get(ref);
     if (current === undefined) return { ok: false, reason: 'a reference points nowhere' };
   }
   if (!isRecord(current)) return { ok: false, reason: 'it is not a schema' };

@@ -104,8 +104,10 @@ describe('the outbox pump', () => {
     ]);
     await relay.onApplicationBootstrap();
     try {
-      // b1 and c1 finish while a1 is still running; a2 has not started.
+      // b1 and c1 finish while a1 is still running; a2 has not started. A handler returns before
+      // the relay records its event, so the check waits for both records, not for the handlers.
       await until(async () => seen.includes('end b1') && seen.includes('end c1'));
+      await until(async () => (await processed(ids)) === 2);
       expect(seen).not.toContain('start a2');
       expect(await processed(ids)).toBe(2);
       release();

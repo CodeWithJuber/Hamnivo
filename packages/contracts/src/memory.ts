@@ -8,7 +8,6 @@ import { typeId } from './ids.js';
  */
 
 /** Version of the memory explanation a customer agrees to; stored with each consent decision. */
-export const MEMORY_NOTICE_VERSION = 'memory-notice/1';
 
 export const MemoryKind = z
   .enum([

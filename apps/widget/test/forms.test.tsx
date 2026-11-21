@@ -30,7 +30,7 @@ import {
   serverProblems,
   validateFields,
 } from '../src/forms.js';
-import { initI18n } from '../src/i18n.js';
+import { ensureLocale, initI18n } from '../src/i18n.js';
 import { ticketWords } from '../src/tickets.js';
 
 /**
@@ -391,6 +391,7 @@ describe('the home screen and the contact form (W11)', () => {
         locale="en"
         onContact={() => undefined}
         onAsk={() => undefined}
+        disclosure="I'm Noor Books's AI assistant."
       />,
     ).replaceAll('&#x27;', '’');
     const greeting = html.indexOf('Hello! Ask us anything.');
@@ -417,6 +418,7 @@ describe('the home screen and the contact form (W11)', () => {
         locale="en"
         onContact={null}
         onAsk={() => undefined}
+        disclosure="I'm Noor Books's AI assistant."
       />,
     );
     expect(html).not.toContain('contact-card');
@@ -490,6 +492,7 @@ describe('tickets (H19)', () => {
   });
 
   it('says it in the visitor’s language', async () => {
+    await ensureLocale('ar');
     await i18next.changeLanguage('ar');
     const t = i18next.t.bind(i18next);
     expect(ticketWords(t, { reference: '#1042', state: 'pending' })).toEqual({

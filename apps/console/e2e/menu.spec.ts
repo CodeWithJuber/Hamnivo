@@ -1,15 +1,17 @@
 /**
- * Studio's menu in a real browser: seven entries, the pages of the current entry as a row of links
- * above the page, Stop AI as a header button, and the top of Home for the person's role. The menu
- * has no UX state ID of its own; Home is HNV-03-01 and HNV-03-02.
+ * Studio's menu in a real browser: five entries, the pages of the current entry as a row of links
+ * above the page, Stop AI as a header button, and the top of Home for the person's role. Frozen
+ * features (orders, finance, migration, workflows, decisions, checks) are not listed: the test
+ * server keeps HAMNIVO_ADVANCED_FEATURES at its default, off. The menu has no UX state ID of its
+ * own; Home is HNV-03-01 and HNV-03-02.
  */
 import { expect, test } from '@playwright/test';
 import { memberOf, overflowAt } from './access';
 import { seedWorkspace, tabTo } from './support';
 
-const ENTRIES = ['Home', 'Inbox', 'AI assistant', 'Workflows', 'Connectors', 'Reports', 'Settings'];
+const ENTRIES = ['Home', 'Inbox', 'AI assistant', 'Knowledge', 'Settings'];
 
-test('the menu has seven entries, and the pages of the current entry are a row of links above the page', async ({
+test('the menu has five entries, and the pages of the current entry are a row of links above the page', async ({
   page,
   context,
 }) => {
@@ -31,17 +33,27 @@ test('the menu has seven entries, and the pages of the current entry are a row o
   await row.getByText('Advanced settings', { exact: true }).click();
   await expect(row.getByRole('link')).toHaveCount(7);
   await expect(row.locator('[aria-current="page"]')).toHaveText('AI agents');
+  // Frozen: not listed, even under Advanced settings.
+  await expect(row.getByRole('link', { name: 'Decision rules' })).toHaveCount(0);
 
   // Stop AI is a red button in the header that leads to its page, not an entry in the menu.
   await expect(menu.getByRole('link', { name: 'Stop AI' })).toHaveCount(0);
   await expect(page.getByTestId('stop-ai-button')).toHaveAttribute('href', '/stop-ai');
 
   // The row works from the keyboard like any other links.
-  await tabTo(page, row.getByRole('link', { name: 'Knowledge' }));
+  await tabTo(page, row.getByRole('link', { name: 'Connectors' }));
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/knowledge/);
-  await expect(row.locator('[aria-current="page"]')).toHaveText('Knowledge');
+  await expect(page).toHaveURL(/\/connectors/);
+  await expect(row.locator('[aria-current="page"]')).toHaveText('Connectors');
   await expect(menu.getByRole('link', { name: 'AI assistant' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  // Knowledge is an entry of its own.
+  await menu.getByRole('link', { name: 'Knowledge' }).click();
+  await expect(page).toHaveURL(/\/knowledge/);
+  await expect(menu.getByRole('link', { name: 'Knowledge' })).toHaveAttribute(
     'aria-current',
     'page',
   );
@@ -50,24 +62,38 @@ test('the menu has seven entries, and the pages of the current entry are a row o
   await menu.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/\/brands/);
   const settingsSection = page.getByRole('navigation', { name: 'Settings pages' });
-  const ordersLink = settingsSection.getByRole('link', { name: 'Orders', exact: true });
-  if (!(await ordersLink.isVisible()))
+  await settingsSection.getByRole('link', { name: 'Channels', exact: true }).click();
+  await expect(page).toHaveURL(/\/channels/);
+  // The row stays mounted from page to page, and its Advanced settings stay open once opened.
+  const security = settingsSection.getByRole('link', { name: 'Security', exact: true });
+  if (!(await security.isVisible()))
     await settingsSection.getByText('Advanced settings', { exact: true }).click();
-  await ordersLink.click();
-  await expect(page).toHaveURL(/\/orders/);
-  const financeLink = settingsSection.getByRole('link', { name: 'Finance exceptions' });
-  if (!(await financeLink.isVisible()))
-    await settingsSection.getByText('Advanced settings', { exact: true }).click();
-  await financeLink.click();
-  await expect(page).toHaveURL(/\/finance/);
-  await expect(settingsSection.locator('[aria-current="page"]')).toHaveText('Finance exceptions');
+  await security.click();
+  await expect(page).toHaveURL(/\/security/);
+  await expect(settingsSection.locator('[aria-current="page"]')).toHaveText('Security');
   await expect(menu.getByRole('link', { name: 'Settings' })).toHaveAttribute(
     'aria-current',
     'page',
   );
-  // A page that is one of its entry's only page has no row.
-  await menu.getByRole('link', { name: 'Reports' }).click();
+  // Orders and finance are frozen: not in the row, but their address still opens the page.
+  await expect(settingsSection.locator('a[href="/orders"]')).toHaveCount(0);
+  await page.goto('/orders');
+  await expect(page.locator('h1').first()).toBeVisible();
+  await expect(menu.getByRole('link', { name: 'Settings' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  // Reports sit under Home.
+  await menu.getByRole('link', { name: 'Home' }).click();
+  await expect(page).toHaveURL(/\/overview/);
+  const home = page.getByRole('navigation', { name: 'Home pages' });
+  await home.getByRole('link', { name: 'Reports' }).click();
   await expect(page).toHaveURL(/\/reports/);
+  await expect(menu.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+  // A page that is its entry's only page has no row.
+  await menu.getByRole('link', { name: 'Inbox' }).click();
+  await expect(page).toHaveURL(/\/inbox/);
   await expect(page.getByTestId('section-tabs')).toHaveCount(0);
 });
 
@@ -78,11 +104,11 @@ test('on a phone the menu sheet has the same entries, and a long row of pages sc
   const workspace = await seedWorkspace({ connect: true, publish: true });
   await workspace.staff.signIn(context);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/models');
+  await page.goto('/runs');
 
-  // "Model connections" is the ninth of nine pages: the row starts with it in sight.
-  const row = page.getByRole('navigation', { name: 'Connectors pages' });
-  const last = row.getByRole('link', { name: 'Model connections' });
+  // "Activity" is the last of the AI assistant's seven pages: the row starts with it in sight.
+  const row = page.getByRole('navigation', { name: 'AI assistant pages' });
+  const last = row.getByRole('link', { name: 'Activity' });
   await expect(last).toHaveAttribute('aria-current', 'page');
   await expect(last).toBeInViewport();
   expect(await overflowAt(page)).toEqual([]);

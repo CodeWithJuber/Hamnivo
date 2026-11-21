@@ -1,4 +1,10 @@
-import { BRIDGE_SOURCE, BRIDGE_VERSION, type FrameToHost, HostToFrame } from '@hamnivo/contracts';
+import {
+  BRIDGE_SOURCE,
+  BRIDGE_VERSION,
+  type FrameToHost,
+  type HostToFrame,
+  readHostToFrame,
+} from '@hamnivo/contracts';
 
 type Payload = FrameToHost extends infer U
   ? U extends FrameToHost
@@ -29,8 +35,9 @@ export class HostBridge {
     const onMessage = (event: MessageEvent) => {
       if (!this.hostOrigin || event.origin !== this.hostOrigin || event.source !== window.parent)
         return;
-      const parsed = HostToFrame.safeParse(event.data);
-      if (parsed.success && parsed.data.instanceId === this.instanceId) handler(parsed.data);
+      // The same check as the HostToFrame schema, without zod in the chat's first script.
+      const message = readHostToFrame(event.data);
+      if (message && message.instanceId === this.instanceId) handler(message);
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);

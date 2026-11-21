@@ -2,7 +2,9 @@ import { RecoverableError } from '@hamnivo/ui/components/async-states';
 import { Button } from '@hamnivo/ui/components/button';
 import { Spinner } from '@hamnivo/ui/components/spinner';
 import { type ErrorComponentProps, Link, useRouter } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { reportError } from '../lib/error-reporting';
 import { describeError } from '../lib/errors';
 import { useDocumentTitle } from './PageHeader';
 
@@ -22,6 +24,8 @@ export function PageError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   const text = describeError(t, error);
   useDocumentTitle(t('errors.page.title'));
+  // The router caught it, so the page's error event never sees it.
+  useEffect(() => reportError(error), [error]);
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4 sm:p-8">
       <h1 id="page-title" tabIndex={-1} className="text-2xl font-semibold text-text">

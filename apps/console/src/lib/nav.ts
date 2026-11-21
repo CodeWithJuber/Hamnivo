@@ -1,12 +1,17 @@
 /**
- * Studio's menu: seven sections with advanced pages available through a disclosure.
- * Existing resources keep their permission checks as the menu is regrouped.
+ * Studio's menu: five sections (Home, Inbox, AI, Knowledge, Settings) with advanced pages
+ * available through a disclosure. Existing resources keep their permission checks as the menu is
+ * regrouped.
  *
  * - An entry shows when the person can see at least one of its pages, and opens the first page
  *   they can see.
  * - An entry is active on every path of its group, nested ones included (`/agents/:id`).
  * - A group with two or more visible pages also lists them as a row of links above the page
  *   (SectionTabs), so the pages are one click away without a long menu.
+ *
+ * - A frozen page (the freeze list of the production-ready plan, 2026-11-20) is left out unless the
+ *   server turns advanced features on (`HAMNIVO_ADVANCED_FEATURES`, sent in `/v1/me`). Its data
+ *   and its address keep working: the freeze takes it out of everyday use, not out of the product.
  *
  * The menu is filtered by role; the gateway still checks every request (HNV-03-05).
  */
@@ -44,14 +49,7 @@ export type NavPath =
   | '/settings/privacy'
   | '/customer-identity';
 
-export type NavGroupId =
-  | 'home'
-  | 'inbox'
-  | 'ai'
-  | 'workflows'
-  | 'connectors'
-  | 'reports'
-  | 'settings';
+export type NavGroupId = 'home' | 'inbox' | 'ai' | 'knowledge' | 'settings';
 
 export interface NavRoute {
   to: NavPath;
@@ -60,6 +58,8 @@ export interface NavRoute {
   /** Shown when the person holds any of these. */
   anyOf?: readonly string[];
   advanced?: boolean;
+  /** On the freeze list: shown only when the server turns advanced features on. */
+  frozen?: boolean;
 }
 
 export interface NavGroup {
@@ -70,47 +70,48 @@ export interface NavGroup {
 
 export type Can = (permission: string) => boolean;
 
+/** What the server switched on for Studio (`/v1/me` `features`). */
+export interface NavFeatures {
+  /** Frozen pages are listed. */
+  advanced: boolean;
+}
+
 /** Each page keeps the permission it had in the flat list this replaces. */
 export const NAV_GROUPS: readonly NavGroup[] = [
-  { id: 'home', routes: [{ to: '/overview' }] },
+  {
+    id: 'home',
+    routes: [{ to: '/overview' }, { to: '/reports', anyOf: ['analytics.read', 'billing.read'] }],
+  },
   { id: 'inbox', routes: [{ to: '/inbox', permission: 'conversations.read' }] },
   {
     id: 'ai',
     routes: [
       { to: '/agents', permission: 'agents.read' },
-      { to: '/knowledge', permission: 'knowledge.read' },
       { to: '/memory', permission: 'memory.read' },
-      { to: '/checks', advanced: true, permission: 'decisions.read' },
-      { to: '/decisions', advanced: true, permission: 'decisions.read' },
+      { to: '/connectors', anyOf: ['integrations.manage', 'tools.read', 'automations.read'] },
+      { to: '/automations', permission: 'automations.read', advanced: true },
+      { to: '/tools', permission: 'tools.read', advanced: true },
+      { to: '/models', permission: 'integrations.manage', advanced: true },
       { to: '/runs', advanced: true, permission: 'analytics.read' },
+      { to: '/workflows', permission: 'automations.read', advanced: true, frozen: true },
+      { to: '/checks', advanced: true, frozen: true, permission: 'decisions.read' },
+      { to: '/decisions', advanced: true, frozen: true, permission: 'decisions.read' },
+    ],
+  },
+  {
+    id: 'knowledge',
+    routes: [
+      { to: '/knowledge', permission: 'knowledge.read' },
       { to: '/caching', advanced: true, permission: 'knowledge.read' },
     ],
   },
-  {
-    id: 'workflows',
-    routes: [
-      { to: '/workflows', permission: 'automations.read' },
-      { to: '/automations', permission: 'automations.read', advanced: true },
-    ],
-  },
-  {
-    id: 'connectors',
-    routes: [
-      { to: '/connectors', anyOf: ['integrations.manage', 'tools.read', 'automations.read'] },
-      { to: '/channels', permission: 'integrations.manage' },
-      { to: '/tools', permission: 'tools.read', advanced: true },
-      { to: '/models', permission: 'integrations.manage', advanced: true },
-    ],
-  },
-  { id: 'reports', routes: [{ to: '/reports', anyOf: ['analytics.read', 'billing.read'] }] },
   {
     id: 'settings',
     routes: [
       { to: '/brands', permission: 'brands.manage' },
       { to: '/branding', permission: 'branding.read' },
       { to: '/chat-widget', permission: 'widget.configure' },
-      { to: '/orders', permission: 'commerce.read', advanced: true },
-      { to: '/finance', permission: 'commerce.read', advanced: true },
+      { to: '/channels', permission: 'integrations.manage' },
       { to: '/hours', permission: 'brands.manage' },
       { to: '/team', permission: 'members.read' },
       { to: '/support-teams', advanced: true, permission: 'members.read' },
@@ -121,7 +122,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         anyOf: ['api_keys.read', 'webhooks.read', 'network.manage'],
       },
       { to: '/customer-identity', advanced: true, permission: 'widget.identity_keys' },
-      { to: '/migration', advanced: true, permission: 'migration.review' },
+      { to: '/orders', permission: 'commerce.read', advanced: true, frozen: true },
+      { to: '/finance', permission: 'commerce.read', advanced: true, frozen: true },
+      { to: '/migration', advanced: true, frozen: true, permission: 'migration.review' },
       { to: '/settings/billing', anyOf: ['billing.read', 'settings.manage'] },
       {
         to: '/settings/privacy',
@@ -131,8 +134,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
 ];
 
-function canSee(route: NavRoute, can: Can): boolean {
+function canSee(route: NavRoute, can: Can, features: NavFeatures): boolean {
   return (
+    (!route.frozen || features.advanced) &&
     (!route.permission || can(route.permission)) &&
     (!route.anyOf || route.anyOf.some((permission) => can(permission)))
   );
@@ -147,10 +151,10 @@ export interface MenuGroup {
 }
 
 /** The entries for someone holding these permissions; a group with no visible page is left out. */
-export function menuFor(can: Can): MenuGroup[] {
+export function menuFor(can: Can, features: NavFeatures): MenuGroup[] {
   const menu: MenuGroup[] = [];
   for (const group of NAV_GROUPS) {
-    const routes = group.routes.filter((route) => canSee(route, can));
+    const routes = group.routes.filter((route) => canSee(route, can, features));
     const first = routes[0];
     if (first) menu.push({ id: group.id, to: first.to, routes });
   }

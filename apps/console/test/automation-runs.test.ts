@@ -1,6 +1,6 @@
 import i18next from 'i18next';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { initI18n } from '../src/i18n';
+import { ensureLocale, initI18n } from '../src/i18n';
 import { runReasonText } from '../src/pages/automations/HistoryPanels';
 
 beforeAll(async () => {
@@ -17,7 +17,8 @@ describe('why a run left its message out', () => {
     );
     // A reason Studio does not know yet is shown as it came.
     expect(runReasonText(i18next.t, 'something_new')).toBe('something_new');
-    for (const locale of ['ar', 'hi', 'ur']) {
+    for (const locale of ['ar', 'hi', 'ur'] as const) {
+      await ensureLocale(locale);
       await i18next.changeLanguage(locale);
       const text = runReasonText(i18next.t, 'window_closed');
       expect(text, locale).toContain('24');

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ChatwootAuthority } from '../src/authority.js';
 import { toConversation, toMessage } from '../src/mapping.js';
 import { api, webhooks } from './fixtures.js';
 
@@ -215,5 +216,32 @@ describe('attachments and read markers (v4.18.0 shapes)', () => {
     expect(
       toConversation({ ...api.getConversation, agent_last_seen_at: 0 }).staffLastSeenAt,
     ).toBeNull();
+  });
+});
+
+describe('pages of messages (v4.18.0 order)', () => {
+  // Chatwoot sorts a page by created_at but pages by id (`before` and `after` compare ids). Two
+  // messages written at nearly the same moment can have their ids the other way round, as the
+  // contract suite saw on real Chatwoot (2026-11-21): 40, 42, 41, 43.
+  const page = [40, 42, 41, 43].map((id) => ({
+    ...api.createIncomingMessage,
+    id,
+    created_at: 1790468294 + (id === 43 ? 2 : id === 40 ? 0 : 1),
+  }));
+  const authority = new ChatwootAuthority({
+    baseUrl: 'http://chatwoot.invalid',
+    accountId: 1,
+    integrationToken: 'integration-token',
+    botToken: () => 'bot-token',
+    staffToken: async () => 'staff-token',
+    inbox: () => ({ identifier: 'inbox', hmacToken: 'hmac' }),
+    fetch: async () => Response.json({ meta: {}, payload: page }),
+  });
+
+  it('come oldest first by id, so the first message is the cursor for older ones', async () => {
+    const staff = await authority.listStaffMessages('1', {}, { kind: 'staff', userRef: '2' });
+    expect(staff.map((m) => m.ref)).toEqual(['40', '41', '42', '43']);
+    const all = await authority.listMessages('1', { view: 'staff' });
+    expect(all.map((m) => m.ref)).toEqual(['40', '41', '42', '43']);
   });
 });

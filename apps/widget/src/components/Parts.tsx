@@ -85,8 +85,9 @@ function Picture({
   }
   return url ? (
     <>
+      {/* At least 44 px, so even a tiny picture leaves a button a finger can hit (WCAG 2.5.8). */}
       <span
-        className="relative inline-block overflow-hidden rounded-lg border border-border bg-surface"
+        className="relative inline-flex min-h-11 min-w-11 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface"
         data-testid="file-picture"
       >
         <img src={url} alt={label} className="block max-h-48 max-w-full object-contain" />

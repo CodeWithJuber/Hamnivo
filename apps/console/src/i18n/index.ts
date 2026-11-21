@@ -1,38 +1,14 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { aiPowerAr } from './ai-power/ar';
 import { aiPowerEn } from './ai-power/en';
-import { aiPowerHi } from './ai-power/hi';
-import { aiPowerUr } from './ai-power/ur';
-import { ar } from './ar';
-import { billingAr } from './billing/ar';
 import { billingEn } from './billing/en';
-import { billingHi } from './billing/hi';
-import { billingUr } from './billing/ur';
 import { en } from './en';
-import { goLiveAr } from './go-live/ar';
 import { goLiveEn } from './go-live/en';
-import { goLiveHi } from './go-live/hi';
-import { goLiveUr } from './go-live/ur';
-import { hi } from './hi';
-import { inboxAlertsAr } from './inbox-alerts/ar';
 import { inboxAlertsEn } from './inbox-alerts/en';
-import { inboxAlertsHi } from './inbox-alerts/hi';
-import { inboxAlertsUr } from './inbox-alerts/ur';
-import { migrationAr } from './migration/ar';
 import { migrationEn } from './migration/en';
-import { migrationHi } from './migration/hi';
-import { migrationUr } from './migration/ur';
-import { paletteAr } from './palette/ar';
 import { paletteEn } from './palette/en';
-import { paletteHi } from './palette/hi';
-import { paletteUr } from './palette/ur';
 import { platformCopy } from './platform';
-import { setupAr } from './setup/ar';
 import { setupEn } from './setup/en';
-import { setupHi } from './setup/hi';
-import { setupUr } from './setup/ur';
-import { ur } from './ur';
 
 declare module 'i18next' {
   interface CustomTypeOptions {
@@ -88,62 +64,45 @@ export function initialLocale(): Locale {
   return isLocale(browser) ? browser : 'en';
 }
 
+/** Studio's words in English: the fallback, always in the first download. */
+const english = {
+  ...en,
+  agentic: platformCopy.en,
+  migration: migrationEn,
+  billing: billingEn,
+  setup: setupEn,
+  inboxAlerts: inboxAlertsEn,
+  aiPower: aiPowerEn,
+  palette: paletteEn,
+  goLive: goLiveEn,
+};
+
+/**
+ * The other languages, each in its own file, load when first needed: a person downloads only the
+ * language they read (85 to 95 kB gzipped each, built).
+ */
+const OTHERS: Record<Exclude<Locale, 'en'>, () => Promise<{ default: object }>> = {
+  ar: () => import('./languages/ar'),
+  hi: () => import('./languages/hi'),
+  ur: () => import('./languages/ur'),
+};
+
+const wordsOf = async (locale: Locale): Promise<object> =>
+  locale === 'en' ? english : (await OTHERS[locale]()).default;
+
+/** Makes a language ready to show: loads its words the first time it is chosen. */
+export async function ensureLocale(locale: Locale): Promise<void> {
+  if (i18next.hasResourceBundle(locale, 'translation')) return;
+  i18next.addResourceBundle(locale, 'translation', await wordsOf(locale));
+}
+
 export async function initI18n(locale: Locale) {
+  const resources: Partial<Record<Locale, { translation: object }>> = {
+    en: { translation: english },
+  };
+  if (locale !== 'en') resources[locale] = { translation: await wordsOf(locale) };
   await i18next.use(initReactI18next).init({
-    resources: {
-      en: {
-        translation: {
-          ...en,
-          agentic: platformCopy.en,
-          migration: migrationEn,
-          billing: billingEn,
-          setup: setupEn,
-          inboxAlerts: inboxAlertsEn,
-          aiPower: aiPowerEn,
-          palette: paletteEn,
-          goLive: goLiveEn,
-        },
-      },
-      ar: {
-        translation: {
-          ...ar,
-          agentic: platformCopy.ar,
-          migration: migrationAr,
-          billing: billingAr,
-          setup: setupAr,
-          inboxAlerts: inboxAlertsAr,
-          aiPower: aiPowerAr,
-          palette: paletteAr,
-          goLive: goLiveAr,
-        },
-      },
-      hi: {
-        translation: {
-          ...hi,
-          agentic: platformCopy.hi,
-          migration: migrationHi,
-          billing: billingHi,
-          setup: setupHi,
-          inboxAlerts: inboxAlertsHi,
-          aiPower: aiPowerHi,
-          palette: paletteHi,
-          goLive: goLiveHi,
-        },
-      },
-      ur: {
-        translation: {
-          ...ur,
-          agentic: platformCopy.ur,
-          migration: migrationUr,
-          billing: billingUr,
-          setup: setupUr,
-          inboxAlerts: inboxAlertsUr,
-          aiPower: aiPowerUr,
-          palette: paletteUr,
-          goLive: goLiveUr,
-        },
-      },
-    },
+    resources,
     lng: locale,
     fallbackLng: 'en',
     interpolation: { escapeValue: false },
@@ -164,6 +123,8 @@ export function applyLocale(locale: Locale) {
 }
 
 export async function changeLocale(locale: Locale) {
+  // The words come first, so the page never shows a half-translated screen.
+  await ensureLocale(locale);
   applyLocale(locale);
   await i18next.changeLanguage(locale);
 }

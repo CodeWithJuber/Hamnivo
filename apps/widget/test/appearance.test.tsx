@@ -5,7 +5,7 @@ import { renderToString } from 'react-dom/server';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { BrandMark } from '../src/components/BrandMark.js';
 import { Csat } from '../src/components/Csat.js';
-import { PrivacyLink } from '../src/components/PrivacyLink.js';
+import { FinePrint } from '../src/components/PrivacyLink.js';
 import { ratedKey, readRated, sendRating } from '../src/csat.js';
 import { initI18n } from '../src/i18n.js';
 import {
@@ -183,13 +183,24 @@ describe('the logo and the privacy link', () => {
   });
 
   it('links the privacy policy in a new tab, and only a web address', () => {
-    const html = renderToString(<PrivacyLink url="https://noor.example/privacy" />);
+    const html = renderToString(<FinePrint url="https://noor.example/privacy" branded={false} />);
     expect(html).toContain('href="https://noor.example/privacy"');
     expect(html).toContain('rel="noopener noreferrer nofollow"');
     expect(html).toContain('Privacy policy');
-    expect(renderToString(<PrivacyLink url={null} />)).toBe('');
-    expect(renderToString(<PrivacyLink url="javascript:alert(1)" />)).toBe('');
-    expect(renderToString(<PrivacyLink url="not a url" />)).toBe('');
+    expect(renderToString(<FinePrint url={null} branded={false} />)).toBe('');
+    expect(renderToString(<FinePrint url="javascript:alert(1)" branded={false} />)).toBe('');
+    expect(renderToString(<FinePrint url="not a url" branded={false} />)).toBe('');
+  });
+
+  it('puts the privacy policy and Hamnivo on one line', () => {
+    const both = renderToString(<FinePrint url="https://noor.example/privacy" branded />);
+    expect(both.match(/<p\b/g)).toHaveLength(1);
+    expect(both).toContain('data-testid="privacy-link"');
+    expect(both).toContain('data-testid="widget-branding"');
+    // An address that is not a web page is never linked; the name still shows.
+    const unsafe = renderToString(<FinePrint url="javascript:alert(1)" branded />);
+    expect(unsafe).not.toContain('href=');
+    expect(unsafe).toContain('Hamnivo');
   });
 });
 

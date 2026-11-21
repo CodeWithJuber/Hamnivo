@@ -2,7 +2,7 @@ import { AutomationDefinition, CreateAutomationRequest } from '@hamnivo/contract
 import { definitionProblems, evaluate, kindOfEvent } from '@hamnivo/domain/automations';
 import i18next from 'i18next';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { initI18n } from '../src/i18n';
+import { ensureLocale, initI18n } from '../src/i18n';
 import { TEMPLATE_IDS, TEMPLATES, templateOf } from '../src/lib/automation-templates';
 import {
   type Automation,
@@ -159,6 +159,7 @@ describe('a rule in one sentence', () => {
   });
 
   it('follows the interface language', async () => {
+    await ensureLocale('ar');
     await i18next.changeLanguage('ar');
     try {
       const text = summaryOf(templateOf('pricing').definition, i18next.t);
