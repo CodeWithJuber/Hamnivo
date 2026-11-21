@@ -10,7 +10,7 @@ import {
 } from '../src/components/shell/TeamAvatars.js';
 import { Avatar } from '../src/components/thread/Avatar.js';
 import { type Custom, toThread } from '../src/components/thread/model.js';
-import { initI18n } from '../src/i18n.js';
+import { ensureLocale, initI18n } from '../src/i18n.js';
 
 beforeAll(async () => {
   await initI18n('en');
@@ -58,6 +58,7 @@ describe('the team on the home screen', () => {
     expect(
       renderToString(<TeamAvatars locale="en" team={{ online: [], replyMinutes: null }} />),
     ).toBe('');
+    await ensureLocale('ur');
     await i18next.changeLanguage('ur');
     const urdu = renderToString(
       <TeamAvatars

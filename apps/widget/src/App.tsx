@@ -9,7 +9,7 @@ import { useCommerce } from './commerce/useCommerce.js';
 import { Chat } from './components/Chat.js';
 import { ChatSkeleton, StartError } from './components/shell/Skeleton.js';
 import { type ChatSnapshot, eventsBetween, snapshotOf } from './hostEvents.js';
-import { applyLocale, type Locale } from './i18n.js';
+import { applyLocale, ensureLocale, type Locale } from './i18n.js';
 import { previewConfig, previewTextColour, readPreview } from './preview.js';
 import { applyTheme, resolveScheme, type Scheme } from './theme.js';
 import { CHAT_OFFLINE, useChat } from './useChat.js';
@@ -188,8 +188,16 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
   const [prefill, setPrefill] = useState<{ text: string; at: number } | null>(null);
 
   useEffect(() => {
-    applyLocale(locale);
-    void i18n.changeLanguage(locale);
+    let current = true;
+    // A language not shown before loads first, so the chat never shows a half-translated screen.
+    void ensureLocale(locale).then(() => {
+      if (!current) return;
+      applyLocale(locale);
+      void i18n.changeLanguage(locale);
+    });
+    return () => {
+      current = false;
+    };
   }, [i18n, locale]);
 
   // Escape closes the chat and returns focus to the launcher (focus is inside this frame).

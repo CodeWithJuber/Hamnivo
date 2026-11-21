@@ -30,7 +30,7 @@ import {
   serverProblems,
   validateFields,
 } from '../src/forms.js';
-import { initI18n } from '../src/i18n.js';
+import { ensureLocale, initI18n } from '../src/i18n.js';
 import { ticketWords } from '../src/tickets.js';
 
 /**
@@ -492,6 +492,7 @@ describe('tickets (H19)', () => {
   });
 
   it('says it in the visitor’s language', async () => {
+    await ensureLocale('ar');
     await i18next.changeLanguage('ar');
     const t = i18next.t.bind(i18next);
     expect(ticketWords(t, { reference: '#1042', state: 'pending' })).toEqual({
