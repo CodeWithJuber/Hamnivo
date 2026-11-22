@@ -940,7 +940,7 @@ These settings go in `.env` (see `env.example`):
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `HAMNIVO_BUILD_CONCURRENCY` | 2 | Packages built and tested at once |
+| `HAMNIVO_BUILD_CONCURRENCY` | 2 | Packages built and tested at once; each package's unit tests get that share of the CPUs |
 | `HAMNIVO_DEPLOY_BUILD_CACHE_GB` | 8 | Maximum size of Docker's build cache |
 | `HAMNIVO_DEPLOY_KEEP` | 3 | How many versions' images are kept |
 | `HAMNIVO_DEPLOY_MIN_FREE_GB` | 8 | Free space a deploy needs |
