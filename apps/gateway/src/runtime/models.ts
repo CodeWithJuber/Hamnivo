@@ -65,6 +65,33 @@ function languageModelFor(spec: ModelSpec): LanguageModel {
 }
 
 /**
+ * The server's own key (and address) for a provider, from the administrator's settings, or null
+ * when the server has none. The mock model needs nothing.
+ */
+export function platformCredentials(
+  c: AppConfig,
+  provider: ModelProviderKind,
+): { apiKey?: string; baseURL?: string } | null {
+  switch (provider) {
+    case 'anthropic':
+      return c.ANTHROPIC_API_KEY ? { apiKey: c.ANTHROPIC_API_KEY } : null;
+    case 'openai':
+      return c.OPENAI_API_KEY ? { apiKey: c.OPENAI_API_KEY } : null;
+    case 'google':
+      return c.GOOGLE_GENERATIVE_AI_API_KEY ? { apiKey: c.GOOGLE_GENERATIVE_AI_API_KEY } : null;
+    case 'openai-compatible':
+      return c.OPENAI_COMPATIBLE_BASE_URL
+        ? {
+            baseURL: c.OPENAI_COMPATIBLE_BASE_URL,
+            ...(c.OPENAI_COMPATIBLE_API_KEY ? { apiKey: c.OPENAI_COMPATIBLE_API_KEY } : {}),
+          }
+        : null;
+    case 'mock':
+      return {};
+  }
+}
+
+/**
  * Turns an agent's model choice into a language model. Tenant connections supply their own
  * encrypted key; otherwise the platform key for that provider is used. Keys are revealed just in
  * time and never logged. A tenant connection with a server address of its own (a base URL) is
@@ -132,24 +159,7 @@ export class ModelFactory {
   }
 
   private platform(provider: ModelProviderKind): { apiKey?: string; baseURL?: string } | null {
-    const c = this.config;
-    switch (provider) {
-      case 'anthropic':
-        return c.ANTHROPIC_API_KEY ? { apiKey: c.ANTHROPIC_API_KEY } : null;
-      case 'openai':
-        return c.OPENAI_API_KEY ? { apiKey: c.OPENAI_API_KEY } : null;
-      case 'google':
-        return c.GOOGLE_GENERATIVE_AI_API_KEY ? { apiKey: c.GOOGLE_GENERATIVE_AI_API_KEY } : null;
-      case 'openai-compatible':
-        return c.OPENAI_COMPATIBLE_BASE_URL
-          ? {
-              baseURL: c.OPENAI_COMPATIBLE_BASE_URL,
-              ...(c.OPENAI_COMPATIBLE_API_KEY ? { apiKey: c.OPENAI_COMPATIBLE_API_KEY } : {}),
-            }
-          : null;
-      case 'mock':
-        return {};
-    }
+    return platformCredentials(this.config, provider);
   }
 
   private async connection(tx: TenantTx, choice: ModelChoice) {

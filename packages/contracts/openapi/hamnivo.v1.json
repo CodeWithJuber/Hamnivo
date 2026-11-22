@@ -4840,6 +4840,63 @@
         }
       }
     },
+    "/v1/admin/model-connections/models": {
+      "post": {
+        "operationId": "listProviderModels",
+        "summary": "The chat models a key can use, read from the provider’s own list: a saved connection’s key, the server’s key, or a pasted key that is used once and never kept (integrations.manage)",
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hamnivo-Tenant",
+            "required": true,
+            "description": "Tenant the request acts in (tnt_…); the caller must be an active member",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListModelsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The models, or why they could not be read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (RFC 9457 problem details)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/model-connections/{connectionId}/test": {
       "post": {
         "operationId": "testModelConnection",
@@ -35014,6 +35071,86 @@
           "reason"
         ]
       },
+      "ListModelsRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "const": "connection"
+              },
+              "connectionId": {
+                "type": "string",
+                "description": "modelConnection identifier (TypeID with prefix \"mcn\")",
+                "example": "mcn_01j9zk7w3xq8r4t2v6m5n1p0cd"
+              },
+              "refresh": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "source",
+              "connectionId"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "const": "platform"
+              },
+              "provider": {
+                "$ref": "#/components/schemas/KeyedProvider"
+              },
+              "refresh": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "source",
+              "provider"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "const": "key"
+              },
+              "provider": {
+                "$ref": "#/components/schemas/KeyedProvider"
+              },
+              "apiKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "baseUrl": {
+                "type": "string",
+                "maxLength": 500,
+                "format": "uri"
+              }
+            },
+            "required": [
+              "source",
+              "provider"
+            ]
+          }
+        ],
+        "type": "object"
+      },
+      "KeyedProvider": {
+        "type": "string",
+        "enum": [
+          "anthropic",
+          "openai",
+          "google",
+          "openai-compatible"
+        ]
+      },
       "TestModelConnectionRequest": {
         "type": "object",
         "properties": {
@@ -48428,6 +48565,73 @@
           "unavailable",
           "unknown"
         ]
+      },
+      "ModelList": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "wrong_key",
+              "no_credit",
+              "network",
+              "blocked",
+              "rate_limited",
+              "unavailable",
+              "unknown"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListedModel"
+            }
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "RFC 3339 timestamp"
+          }
+        },
+        "required": [
+          "ok",
+          "kind",
+          "message",
+          "models",
+          "fetchedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ListedModel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deprecated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "deprecated"
+        ],
+        "additionalProperties": false
       },
       "ModelProbeResult": {
         "type": "object",

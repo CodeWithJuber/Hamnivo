@@ -7,19 +7,22 @@ import { SelectField, TextareaField, TextField } from '../../components/Fields';
 import { ActionError } from '../../components/States';
 import { PROVIDERS } from '../../lib/agent-form';
 import { api, isApiError, newIdempotencyKey } from '../../lib/api';
+import { type ListModelsRequest, useSettled } from '../../lib/provider-models';
 import { keys, useStudioMutation } from '../../lib/queries';
 import { isCancelled } from '../../lib/reauth';
 import { setupKeys } from '../../lib/setup';
+import { recommendedModel } from '../../lib/setup-data';
 import type { CreateModelConnectionRequest, ModelConnection } from '../../lib/types';
-import { defaultPick, type ModelPick, ModelPicker, modelOf } from './ModelPicker';
+import { ModelField } from './ModelPicker';
 
 type Provider = CreateModelConnectionRequest['provider'];
 type KeyedProvider = Exclude<Provider, 'mock'>;
 const HTTP_URL = /^https?:\/\/\S+$/;
 
 /**
- * The fields for adding an AI key. The provider's own list of models fills a dropdown (with the
- * recommended one chosen), and the key is tested with one tiny message as soon as it is saved:
+ * The fields for adding an AI key. Once the key is pasted, the provider's own list of the models it
+ * can use fills the model field (the recommended one starts chosen, and any name can be typed), and
+ * the key is tested with one tiny message as soon as it is saved:
  * the caller shows what came back. Used in a dialog on the page and inline in the setup guide;
  * the form starts empty every time it appears.
  */
@@ -38,7 +41,7 @@ export function AddConnectionForm({
   const [label, setLabel] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [pick, setPick] = useState<ModelPick>(() => defaultPick('openai'));
+  const [model, setModel] = useState(() => recommendedModel('openai') ?? '');
   const [models, setModels] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [attempted, setAttempted] = useState(false);
@@ -57,11 +60,29 @@ export function AddConnectionForm({
   );
 
   const compatible = provider === 'openai-compatible';
-  const model = modelOf(pick);
+  const chosen = model.trim();
+
+  // The pasted key reads the provider's model list once it looks whole and has stopped changing.
+  // It is sent for that one request and kept by nobody until the form is saved.
+  const typedKey = apiKey.trim();
+  const typedUrl = baseUrl.trim();
+  const urlOk = typedUrl ? HTTP_URL.test(typedUrl) : !compatible;
+  const keyOk = compatible || typedKey.length >= 8;
+  const listWith = useSettled<ListModelsRequest | null>(
+    urlOk && keyOk
+      ? {
+          source: 'key',
+          provider,
+          ...(typedKey ? { apiKey: typedKey } : {}),
+          ...(typedUrl ? { baseUrl: typedUrl } : {}),
+        }
+      : null,
+    700,
+  );
 
   const choose = (next: KeyedProvider) => {
     setProvider(next);
-    setPick(defaultPick(next));
+    setModel(recommendedModel(next) ?? '');
     setErrors({});
   };
 
@@ -75,7 +96,7 @@ export function AddConnectionForm({
     if (apiKey.trim().length < 8) next.apiKey = t('models.errors.apiKey');
     // The test needs a model. A server of your own names its own models, so there is no list to
     // start from and the name is typed.
-    if (!model) next.model = t('setup.models.errors.model');
+    if (!chosen) next.model = t('setup.models.errors.model');
     setErrors(next);
     if (Object.keys(next).length > 0) return;
     const allowedModels = models
@@ -92,7 +113,7 @@ export function AddConnectionForm({
       });
       // The key leaves the page as soon as it is stored.
       setApiKey('');
-      onAdded(connection, model || undefined);
+      onAdded(connection, chosen || undefined);
     } catch (error) {
       if (isCancelled(error)) setCancelled(true);
       if (isApiError(error, 'VALIDATION_FAILED')) {
@@ -109,7 +130,7 @@ export function AddConnectionForm({
 
   const summary = attempted
     ? Object.entries(errors).map(([field, message]) => ({
-        fieldId: field === 'model' ? 'mcn-model-custom' : `mcn-${field}`,
+        fieldId: `mcn-${field}`,
         message,
       }))
     : [];
@@ -156,11 +177,15 @@ export function AddConnectionForm({
         error={errors.apiKey}
       />
       {compatible ? baseUrlField : null}
-      <ModelPicker
+      <ModelField
         id="mcn-model"
+        label={t('setup.models.model')}
+        hint={t('setup.models.modelHint')}
         provider={provider}
-        value={pick}
-        onChange={setPick}
+        value={model}
+        onChange={setModel}
+        source={listWith}
+        waitingFor={compatible ? 'address' : 'key'}
         error={errors.model}
       />
       <TextField
