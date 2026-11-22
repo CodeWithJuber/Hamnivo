@@ -95,9 +95,10 @@ jobs:
 
       # Browsers live in the runner's cache; their system libraries are installed once when the
       # runner is set up (docs/self-hosting.md, "Run the checks on GitHub, for free").
-      - name: Install Chromium for the browser checks
+      # WebKit too: the widget journey runs WebKit and iPhone projects beside Chromium.
+      - name: Install Chromium and WebKit for the browser checks
         if: matrix.browsers
-        run: pnpm --filter @hamnivo/console exec playwright install chromium
+        run: pnpm --filter @hamnivo/console exec playwright install chromium webkit
 
       # A run whose runner died never ran its cleanup: its databases, Chatwoot and smoke stacks stay
       # in the runner's Docker and hold the next run's 4 GB (ADR 0019). Only the checks' own names
