@@ -6,7 +6,16 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, Trash2Icon } from 'lucide-react';
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+  type FormEvent,
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckboxField, ChoiceField, SelectField } from '../../components/Fields';
 import { GuideLink } from '../../components/GuideLink';
@@ -266,7 +275,7 @@ function OptionsEditor({
   );
 }
 
-function FieldRow({
+const FieldRow = memo(function FieldRow({
   form,
   field,
   index,
@@ -284,8 +293,8 @@ function FieldRow({
   teams: readonly Team[] | undefined;
   errors: Record<string, string>;
   onChange: (field: FieldDraft) => void;
-  onMove: (by: -1 | 1) => void;
-  onRemove: () => void;
+  onMove: (field: FieldDraft, by: -1 | 1) => void;
+  onRemove: (field: FieldDraft) => void;
 }) {
   const { t, i18n } = useTranslation();
   const name = fieldName(field, firstPreviewLanguage(i18n.language), t);
@@ -362,7 +371,7 @@ function FieldRow({
           aria-label={t('chatWidget.forms.fields.moveUp', { name })}
           disabled={index === 0}
           onClick={() => {
-            onMove(-1);
+            onMove(field, -1);
             focusSoon(upId, downId);
           }}
         >
@@ -376,7 +385,7 @@ function FieldRow({
           aria-label={t('chatWidget.forms.fields.moveDown', { name })}
           disabled={index === count - 1}
           onClick={() => {
-            onMove(1);
+            onMove(field, 1);
             focusSoon(downId, upId);
           }}
         >
@@ -388,7 +397,7 @@ function FieldRow({
             variant="ghost"
             size="sm"
             aria-label={t('chatWidget.forms.fields.remove', { name })}
-            onClick={onRemove}
+            onClick={() => onRemove(field)}
           >
             <Trash2Icon aria-hidden="true" />
             {t('chatWidget.forms.fields.removeShort')}
@@ -397,10 +406,13 @@ function FieldRow({
       </div>
     </fieldset>
   );
-}
+});
 
-/** The questions of one form: their order, kind, words and answers. */
-function FieldListEditor({
+/**
+ * The questions of one form: their order, kind, words and answers. Memoized: a key pressed in one
+ * form redraws only that form's questions (with `onChange` and `errors` kept stable by the editor).
+ */
+const FieldListEditor = memo(function FieldListEditor({
   form,
   fields,
   teams,
@@ -418,6 +430,39 @@ function FieldListEditor({
   const lang = firstPreviewLanguage(i18n.language);
   const listId = formIds.fields(form);
   const full = fields.length >= MAX_FIELDS;
+  // One set of callbacks for every row, reading the latest list: a row that did not redraw still
+  // changes the list as it is now, not as it was when that row last drew.
+  const latest = useRef({ fields, onChange });
+  useLayoutEffect(() => {
+    latest.current = { fields, onChange };
+  });
+  const changeField = useCallback((next: FieldDraft) => {
+    const { fields: now, onChange: change } = latest.current;
+    change(now.map((f) => (f.id === next.id ? next : f)));
+  }, []);
+  const moveField = useCallback(
+    (field: FieldDraft, by: -1 | 1) => {
+      const { fields: now, onChange: change } = latest.current;
+      const index = now.findIndex((f) => f.id === field.id);
+      change(moved(now, index, by));
+      announce(
+        t('chatWidget.forms.fields.moved', {
+          name: fieldName(field, lang, t),
+          number: index + 1 + by,
+        }),
+      );
+    },
+    [announce, lang, t],
+  );
+  const removeField = useCallback(
+    (field: FieldDraft) => {
+      const { fields: now, onChange: change } = latest.current;
+      change(now.filter((f) => f.id !== field.id));
+      announce(t('chatWidget.forms.fields.removed', { name: fieldName(field, lang, t) }));
+      focusSoon(listId);
+    },
+    [announce, lang, listId, t],
+  );
   return (
     <div className="flex flex-col gap-3" data-testid={`${form}-fields`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -448,23 +493,9 @@ function FieldListEditor({
                 count={fields.length}
                 teams={teams}
                 errors={errors}
-                onChange={(next) => onChange(fields.map((f) => (f.id === field.id ? next : f)))}
-                onMove={(by) => {
-                  onChange(moved(fields, index, by));
-                  announce(
-                    t('chatWidget.forms.fields.moved', {
-                      name: fieldName(field, lang, t),
-                      number: index + 1 + by,
-                    }),
-                  );
-                }}
-                onRemove={() => {
-                  onChange(fields.filter((f) => f.id !== field.id));
-                  announce(
-                    t('chatWidget.forms.fields.removed', { name: fieldName(field, lang, t) }),
-                  );
-                  focusSoon(listId);
-                }}
+                onChange={changeField}
+                onMove={moveField}
+                onRemove={removeField}
               />
             </li>
           ))}
@@ -490,7 +521,7 @@ function FieldListEditor({
       </ReasonedAction>
     </div>
   );
-}
+});
 
 const texts = (value: ChatTexts, lang: ChatLanguage, fallback: string) =>
   value[lang].trim() || value.en.trim() || fallback;
@@ -507,6 +538,9 @@ export function previewFields(fields: readonly FieldDraft[], lang: ChatLanguage)
       : [],
   }));
 }
+
+/** No messages yet: one object, so the memoized question lists see no change. */
+const NO_ERRORS: Record<string, string> = {};
 
 function FormsEditor({
   brand,
@@ -545,6 +579,15 @@ function FormsEditor({
     change({ ...draft, prechat: { ...draft.prechat, ...patch } });
   const setOffline = (patch: Partial<FormsDraft['offline']>) =>
     change({ ...draft, offline: { ...draft.offline, ...patch } });
+  // Stable, and from the latest draft, so the other form's question list need not redraw.
+  const setPrechatFields = useCallback((fields: FieldDraft[]) => {
+    setDraft((current) => ({ ...current, prechat: { ...current.prechat, fields } }));
+    setServer({});
+  }, []);
+  const setOfflineFields = useCallback((fields: FieldDraft[]) => {
+    setDraft((current) => ({ ...current, offline: { ...current.offline, fields } }));
+    setServer({});
+  }, []);
 
   const problems = problemsOf(draft);
   // One message per control: the checks here first, then what the gateway said.
@@ -557,7 +600,7 @@ function FormsEditor({
   for (const [id, text] of Object.entries(server)) if (!messages.has(id)) messages.set(id, text);
   // By the fields, the messages follow the changes; the summary is what the last Save found, so
   // it does not take focus away while a field is being put right.
-  const errors: Record<string, string> = attempted ? Object.fromEntries(messages) : {};
+  const errors: Record<string, string> = attempted ? Object.fromEntries(messages) : NO_ERRORS;
   const [summary, setSummary] = useState<{ fieldId: string; message: string }[]>([]);
   const listOf = (entries: Map<string, string> | Record<string, string>) =>
     [...(entries instanceof Map ? entries : Object.entries(entries))].map(([fieldId, message]) => ({
@@ -637,7 +680,7 @@ function FormsEditor({
               fields={draft.prechat.fields}
               teams={teams}
               errors={errors}
-              onChange={(fields) => setPrechat({ fields })}
+              onChange={setPrechatFields}
             />
           </Section>
         </div>
@@ -677,7 +720,7 @@ function FormsEditor({
               fields={draft.offline.fields}
               teams={teams}
               errors={errors}
-              onChange={(fields) => setOffline({ fields })}
+              onChange={setOfflineFields}
             />
             <LocalizedFields
               id={formIds.thanks}
