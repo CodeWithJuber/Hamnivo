@@ -49,6 +49,9 @@ test('a new owner signs up in Studio, sets up a brand, connects Chatwoot and sav
 
   await page.getByLabel('Workspace name').fill('Studio Books');
   await page.getByRole('button', { name: 'Create workspace' }).click();
+  // A new workspace starts in the guided setup; it can be left for later.
+  await expect(page.getByRole('heading', { level: 1, name: 'Welcome to Hamnivo' })).toBeVisible();
+  await page.getByRole('link', { name: 'Finish later' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Create a brand' }).click();
