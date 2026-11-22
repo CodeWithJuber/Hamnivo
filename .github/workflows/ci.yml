@@ -2,6 +2,8 @@
 # run side by side, one job each, on our own runners (deploy/ci-runner). On main and on a run by hand
 # it covers every PostgreSQL major and the production and automatic-deploy smoke tests; on other
 # branches PostgreSQL 18 (production's) only, and the smoke tests only when a deploy file changes.
+# A push of a tree that an earlier run already passed (a branch merged into main, say) is not
+# checked again: main then runs only PostgreSQL 16 and the smoke tests, other branches nothing.
 # It uses nothing GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each
 # report is kept there as a file, never uploaded as an artifact. scripts/ci/no-github-billing.sh
 # checks this.
@@ -24,9 +26,20 @@ jobs:
     name: Pick the suites
     runs-on: [self-hosted, linux, x64, hamnivo]
     timeout-minutes: 10
+    # skip-duplicate-actions reads the earlier runs of this workflow.
+    permissions:
+      actions: read
+      contents: read
     outputs:
       suites: ${{ steps.pick.outputs.suites }}
     steps:
+      # should_skip is true when an earlier run of this workflow passed on the same tree. If the
+      # action fails, it is not true, and every suite runs.
+      - name: Look for a passed run of the same tree
+        id: duplicate
+        continue-on-error: true
+        uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -35,9 +48,11 @@ jobs:
         id: pick
         env:
           FULL: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
+          PASSED: ${{ steps.duplicate.outputs.should_skip }}
         run: |
           pg='18'
           smoke=false
+          every=true # the suites every run has, whatever changed
           if [[ "$FULL" == true ]]; then
             pg='16 18'
             smoke=true
@@ -46,21 +61,44 @@ jobs:
           elif grep -Eq '^(deploy/|scripts/ci/(production|autodeploy)-smoke\.sh$|\.github/workflows/ci\.yml$)' <<<"$changed"; then
             smoke=true
           fi
+          # A push of a tree that already passed: main runs only what a branch run does not always
+          # run, other branches nothing. A run by hand runs everything.
+          if [[ "$PASSED" == true && "$GITHUB_EVENT_NAME" == push ]]; then
+            every=false
+            if [[ "$GITHUB_REF" == refs/heads/main ]]; then pg='16'; else pg=''; smoke=false; fi
+          fi
           suites=''
           suite() { # suite ID NAME ARGS PG BROWSERS
             suites+="${suites:+,}$(printf '{"id":"%s","name":"%s","args":"%s","pg":"%s","browsers":%s}' "$@")"
           }
-          only='--skip-basics --skip-integration --skip-chatwoot --skip-a11y --skip-e2e'
-          suite basics 'Lint, types and unit tests' '--quick' '' false
-          for version in $pg; do
-            suite "integration-pg$version" "Integration tests (PostgreSQL $version)" \
-              '--skip-basics --skip-chatwoot --skip-a11y --skip-e2e' "$version" false
-          done
-          suite chatwoot 'Chatwoot contract suite' '--skip-basics --skip-integration --skip-a11y --skip-e2e' '' false
-          suite browser 'Accessibility and browser journeys' '--skip-basics --skip-integration --skip-chatwoot' '' true
+          # The options that turn off every part of `pnpm ci:local` but the one named (all, if none).
+          only() {
+            local name
+            for name in basics integration chatwoot a11y widget studio site; do
+              [[ "$name" == "${1:-}" ]] || printf -- '--skip-%s ' "$name"
+            done
+          }
+          # Slowest first: when suites outnumber runners, the runners take them in this order.
+          if [[ "$every" == true ]]; then
+            suite studio 'Studio in a browser' "$(only studio)" '' true
+            suite widget 'Widget journey in a browser' "$(only widget)" '' true
+          fi
           if [[ "$smoke" == true ]]; then
-            suite production-smoke 'Production deployment smoke test' "$only --with-production" '' true
-            suite autodeploy-smoke 'Automatic deploy smoke test' "$only --with-autodeploy" '' false
+            suite autodeploy-smoke 'Automatic deploy smoke test' "$(only)--with-autodeploy" '' false
+            suite production-smoke 'Production deployment smoke test' "$(only)--with-production" '' true
+          fi
+          # Each PostgreSQL version's integration tests in three parts, each with its own database.
+          for version in $pg; do
+            for part in 1 2 3; do
+              suite "integration-pg$version-$part" "Integration tests (PostgreSQL $version, part $part of 3)" \
+                "$(only integration)--shard=$part/3" "$version" false
+            done
+          done
+          if [[ "$every" == true ]]; then
+            suite basics 'Lint, types and unit tests' '--quick' '' false
+            suite chatwoot 'Chatwoot contract suite' "$(only chatwoot)" '' false
+            suite accessibility 'Accessibility audit' "$(only a11y)" '' true
+            suite website 'Website in a browser' "$(only site)" '' true
           fi
           echo "suites=[$suites]" >> "$GITHUB_OUTPUT"
           echo "Suites: [$suites]"
@@ -68,6 +106,8 @@ jobs:
   checks:
     name: ${{ matrix.name }}
     needs: plan
+    # A push of a tree that already passed can leave no suite, and an empty matrix is an error.
+    if: needs.plan.outputs.suites != '[]'
     runs-on: [self-hosted, linux, x64, hamnivo]
     timeout-minutes: 150
     strategy:
@@ -77,6 +117,9 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.suites) }}
     env:
       TURBO_TELEMETRY_DISABLED: '1'
+      # Turbo's cache on the runner's cache volume, so a run reuses the builds of earlier runs:
+      # the checkout's own .turbo is cleaned with the checkout.
+      TURBO_CACHE_DIR: /home/runner/.cache/hamnivo-turbo
       HAMNIVO_CI_SUITE: ${{ matrix.id }}
     steps:
       - uses: actions/checkout@v7
@@ -141,7 +184,8 @@ jobs:
         run: bash scripts/ci/archive-results.sh
 
       # Only what the smoke tests leave behind; the runner keeps its other images and caches. The
-      # pnpm store on the runner's disk keeps only the packages this checkout links to.
+      # pnpm store on the runner's disk keeps only the packages this checkout links to, and turbo's
+      # cache a week of builds.
       - name: Free disk
         if: always()
         run: |
@@ -150,3 +194,4 @@ jobs:
           docker image prune -f >/dev/null
           docker builder prune -f --filter until=168h >/dev/null
           pnpm store prune >/dev/null 2>&1 || true
+          find "$TURBO_CACHE_DIR" -type f -mmin +$((7 * 1440)) -delete 2>/dev/null || true
