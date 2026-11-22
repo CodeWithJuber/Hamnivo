@@ -17,11 +17,14 @@ import {
 import { cleanup, type RenderResult, render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, vi } from 'vitest';
+import { closeInboxStream } from '../src/lib/inbox-live';
 import { TenantProvider } from '../src/lib/tenant';
 import type { Me, TenantSummary } from '../src/lib/types';
 
 afterEach(() => {
   cleanup();
+  // The inbox's live connection outlives its page for a second; this page is gone for good.
+  closeInboxStream();
   vi.unstubAllGlobals();
 });
 

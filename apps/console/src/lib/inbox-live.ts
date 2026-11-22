@@ -265,10 +265,7 @@ function connect(tenantId: string, client: QueryClient): Hub {
 
 /** Uses the tab's connection (opening it when nobody has); returns the call that lets it go. */
 export function retainInboxStream(tenantId: string, client: QueryClient): () => void {
-  if (hub && (hub.tenantId !== tenantId || hub.client !== client)) {
-    hub.stop();
-    hub = null;
-  }
+  if (hub && (hub.tenantId !== tenantId || hub.client !== client)) closeInboxStream();
   if (!hub) {
     hub = connect(tenantId, client);
     announceState();
@@ -296,6 +293,18 @@ export function retainInboxStream(tenantId: string, client: QueryClient): () => 
       }
     }, 1000);
   };
+}
+
+/**
+ * Closes the tab's connection now, skipping the grace period. Tests call it once their page is
+ * gone: a grace-period timer left running would fire after the test file's DOM is torn down.
+ */
+export function closeInboxStream(): void {
+  if (!hub) return;
+  clearTimeout(hub.closing);
+  hub.stop();
+  hub = null;
+  announceState();
 }
 
 /** Calls `listener` for each alert the stream brings; returns the call that stops listening. */
