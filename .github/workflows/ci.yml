@@ -46,14 +46,14 @@ jobs:
         continue-on-error: true
         uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       # The pnpm version comes from packageManager in package.json.
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           package-manager-cache: false
           node-version: 24
@@ -90,7 +90,7 @@ jobs:
       HAMNIVO_CI_SUITE: ${{ matrix.id }}
     steps:
       # A branch's basics compare it with origin/main (--affected), which needs the history.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         id: checkout
         with:
           fetch-depth: ${{ contains(matrix.args, '--affected') && '0' || '1' }}
@@ -120,9 +120,9 @@ jobs:
           echo "TURBO_CACHE=$mode" >> "$GITHUB_ENV"
 
       # The pnpm version comes from packageManager in package.json.
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           package-manager-cache: false
           node-version: 24
