@@ -193,6 +193,30 @@ describe('webhook endpoints', () => {
   });
 });
 
+describe('a test event', () => {
+  it('is sent once, even when the delivery worker runs while the endpoint is slow to answer', async () => {
+    receiver.reset();
+    let answerNow = () => {};
+    const slow = new Promise<void>((resolve) => {
+      answerNow = resolve;
+    });
+    receiver.answer({ status: 503, body: 'slow', wait: slow });
+    const tested = shop.owner.post(`/v1/admin/webhooks/endpoints/${endpoint.id}/test`);
+    // The test's own request waits at the endpoint while the worker looks for deliveries due.
+    await expect.poll(() => receiver.at(hookPath).length).toBe(1);
+    await dispatch();
+    answerNow();
+    const result = await tested;
+    expect(result.status, JSON.stringify(result.body)).toBe(200);
+    expect(result.body).toMatchObject({
+      attempt: { statusCode: 503 },
+      delivery: { status: 'failed', attempts: 1, nextAttemptAt: null },
+    });
+    await dispatch();
+    expect(receiver.at(hookPath).map((request) => request.json.type)).toEqual(['webhook.test']);
+  });
+});
+
 describe('events from conversations', () => {
   let conversationId: string;
 

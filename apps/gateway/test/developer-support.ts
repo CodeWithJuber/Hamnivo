@@ -42,6 +42,8 @@ export type ReceiverAnswer = {
   status: number;
   headers?: Record<string, string>;
   body?: string;
+  /** Holds the answer until this settles: an endpoint slow to answer. */
+  wait?: Promise<unknown>;
 };
 
 /**
@@ -66,8 +68,10 @@ export class Receiver {
           body: Buffer.concat(chunks).toString('utf8'),
         });
         const answer = this.answers.shift() ?? { status: 204 };
-        response.writeHead(answer.status, answer.headers ?? {});
-        response.end(answer.body ?? '');
+        void Promise.resolve(answer.wait).then(() => {
+          response.writeHead(answer.status, answer.headers ?? {});
+          response.end(answer.body ?? '');
+        });
       });
     });
     this.server.listen(0, '127.0.0.1');

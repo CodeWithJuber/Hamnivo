@@ -25,9 +25,11 @@ import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import { EntitlementsService } from '../../billing/entitlements.service.js';
 import { AppError } from '../../common/app-error.js';
+import type { AppConfig } from '../../config.js';
 import { SecretBroker } from '../../secrets/secret-broker.service.js';
-import { APP_DB, CLOCK, type Clock } from '../../tokens.js';
+import { APP_DB, CLOCK, type Clock, CONFIG } from '../../tokens.js';
 import { EgressService } from '../egress.service.js';
+import { leaseSeconds } from './delivery-rules.js';
 import { WebhookFanout } from './fanout.service.js';
 import { type EndpointRow, SIGNING_SECRET_KIND, WebhookSender } from './sender.service.js';
 import { generateSigningSecret } from './signing.js';
@@ -58,6 +60,7 @@ export class WebhookEndpointsService {
   constructor(
     @Inject(APP_DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(CONFIG) private readonly config: AppConfig,
     private readonly secrets: SecretBroker,
     private readonly egress: EgressService,
     private readonly sender: WebhookSender,
@@ -437,6 +440,13 @@ export class WebhookEndpointsService {
       );
       const deliveryId = queued?.deliveryIds[0];
       if (!queued || !deliveryId) throw new Error('test event not stored');
+      // Leased to this request, as the dispatcher leases what it sends: stored as due now, it was
+      // sent a second time by the dispatcher while this attempt waited for a slow answer.
+      const lease = leaseSeconds(this.config.WEBHOOK_TIMEOUT_MS) * 1000;
+      await tx
+        .update(schema.webhookDeliveries)
+        .set({ nextAttemptAt: new Date(this.clock().getTime() + lease) })
+        .where(eq(schema.webhookDeliveries.id, deliveryId));
       const [delivery] = await tx
         .select()
         .from(schema.webhookDeliveries)
