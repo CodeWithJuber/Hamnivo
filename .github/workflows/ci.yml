@@ -6,6 +6,8 @@
 # deploy file changes; a change it cannot place gets everything. A push of a tree that an earlier
 # run already passed (a branch merged into main, say) is not checked again: main then runs only
 # PostgreSQL 16 and the smoke tests, other branches nothing.
+# The heavy suites run only on runners labelled `heavy` (all but two, github-runners FAST_RUNNERS),
+# so picking the suites and the basics always find a free runner, however many suites are queued.
 # It uses nothing GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each
 # report is kept there as a file, never uploaded as an artifact. scripts/ci/no-github-billing.sh
 # checks this.
@@ -38,6 +40,8 @@ jobs:
       contents: read
     outputs:
       suites: ${{ steps.pick.outputs.suites }}
+      basics: ${{ steps.pick.outputs.basics }}
+      heavy: ${{ steps.pick.outputs.heavy }}
     steps:
       # should_skip is true when an earlier run of this workflow passed on the same tree. If the
       # action fails, it is not true, and every suite runs.
@@ -72,23 +76,27 @@ jobs:
         run: |
           suites="$(node scripts/ci/plan.mjs)"
           echo "suites=$suites" >> "$GITHUB_OUTPUT"
+          # The basics go to any runner, the rest to the heavy ones (see the top of this file).
+          part() { node -e 'const all = JSON.parse(process.argv[1]); process.stdout.write(JSON.stringify(all.filter((suite) => (suite.id === "basics") === (process.argv[2] === "basics"))))' "$suites" "$1"; }
+          echo "basics=$(part basics)" >> "$GITHUB_OUTPUT"
+          echo "heavy=$(part heavy)" >> "$GITHUB_OUTPUT"
 
   checks:
     name: ${{ matrix.name }}
     needs: plan
     # A push of a tree that already passed can leave no suite, and an empty matrix is an error.
-    if: needs.plan.outputs.suites != '[]'
-    runs-on: [self-hosted, linux, x64, hamnivo]
+    if: needs.plan.outputs.heavy != '[]'
+    runs-on: [self-hosted, linux, x64, hamnivo, heavy]
     timeout-minutes: 150
     strategy:
       # Every suite reports, so one push shows all that is broken.
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.plan.outputs.suites) }}
-    env:
+        include: ${{ fromJSON(needs.plan.outputs.heavy) }}
+    env: &suite-env
       TURBO_TELEMETRY_DISABLED: '1'
       HAMNIVO_CI_SUITE: ${{ matrix.id }}
-    steps:
+    steps: &suite-steps
       # A branch's basics compare it with origin/main (--affected), which needs the history.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         id: checkout
@@ -189,3 +197,19 @@ jobs:
           docker builder prune -f --filter until=168h >/dev/null
           pnpm store prune >/dev/null 2>&1 || true
           find "$TURBO_CACHE_DIR" -type f -mmin +$((7 * 1440)) -delete 2>/dev/null || true
+
+  # The basics, on any runner: the two without the heavy label are kept for them and the plan, so a
+  # push learns about lint, types and unit tests in minutes, even behind a full run of main. The same
+  # steps as checks (the YAML anchor).
+  basics:
+    name: ${{ matrix.name }}
+    needs: plan
+    if: needs.plan.outputs.basics != '[]'
+    runs-on: [self-hosted, linux, x64, hamnivo]
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.basics) }}
+    env: *suite-env
+    steps: *suite-steps
