@@ -24,8 +24,12 @@ already runs a self-hosted runner for another project.
   into suites that run side by side, one job each (lint, types and unit tests; integration, in
   three parts per PostgreSQL version; Chatwoot; the accessibility audit; the widget journey;
   Studio, in three parts; the website; the production and automatic-deploy smoke tests).
-  On main and on a run by hand it tests PostgreSQL 16 and 18 and runs the smoke tests; other
-  branches test PostgreSQL 18 only and run the smoke tests only when a deploy file changes.
+  On main, every night (23:00 UTC) and on a run by hand it runs every suite, tests PostgreSQL 16
+  and 18 and runs the smoke tests. Other branches test PostgreSQL 18 only, run the smoke tests
+  only when a deploy file changes, and run only the suites their change can reach in turbo's
+  package graph, with types and unit tests checked for the packages it reaches
+  (`scripts/ci/plan.mjs`). A change to Markdown or `docs/` alone runs only the basics; a change
+  outside the packages, or one the graph cannot place, runs every suite.
   A push of a tree that an earlier run already passed is not checked again: main then runs only
   PostgreSQL 16 and the smoke tests, other branches nothing. A run by hand runs everything.
 - **Which runner.** It runs on a self-hosted runner with the label `hamnivo`. The repository

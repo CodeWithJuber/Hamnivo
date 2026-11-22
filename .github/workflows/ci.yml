@@ -1,9 +1,11 @@
 # The full check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, split into suites that
-# run side by side, one job each, on our own runners (deploy/ci-runner). On main and on a run by hand
-# it covers every PostgreSQL major and the production and automatic-deploy smoke tests; on other
-# branches PostgreSQL 18 (production's) only, and the smoke tests only when a deploy file changes.
-# A push of a tree that an earlier run already passed (a branch merged into main, say) is not
-# checked again: main then runs only PostgreSQL 16 and the smoke tests, other branches nothing.
+# run side by side, one job each, on our own runners (deploy/ci-runner). scripts/ci/plan.mjs picks
+# them. Main, the nightly run and a run by hand cover everything: every PostgreSQL major and the
+# production and automatic-deploy smoke tests. Another branch gets only the suites its change can
+# reach in the package graph, on PostgreSQL 18 (production's), and the smoke tests only when a
+# deploy file changes; a change it cannot place gets everything. A push of a tree that an earlier
+# run already passed (a branch merged into main, say) is not checked again: main then runs only
+# PostgreSQL 16 and the smoke tests, other branches nothing.
 # It uses nothing GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each
 # report is kept there as a file, never uploaded as an artifact. scripts/ci/no-github-billing.sh
 # checks this.
@@ -12,10 +14,14 @@ name: CI
 on:
   push:
   workflow_dispatch:
+  # Everything, every night at 23:00 UTC: the safety net for what a branch's selection missed.
+  schedule:
+    - cron: '0 23 * * *'
 
-# A newer push to the same branch replaces a run that is still going.
+# A newer push to the same branch replaces a run that is still going. The nightly run has a group of
+# its own, so a push to main neither replaces it nor is replaced by it.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -44,67 +50,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The pnpm version comes from packageManager in package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          package-manager-cache: false
+          node-version: 24
+
+      # Turbo, whose package graph places a branch's change. If this fails, the branch runs
+      # everything.
+      - name: Install dependencies
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+        continue-on-error: true
+        run: pnpm install --frozen-lockfile
+
       - name: Pick the suites
         id: pick
         env:
-          FULL: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
           PASSED: ${{ steps.duplicate.outputs.should_skip }}
         run: |
-          pg='18'
-          smoke=false
-          every=true # the suites every run has, whatever changed
-          if [[ "$FULL" == true ]]; then
-            pg='16 18'
-            smoke=true
-          elif ! changed="$(git diff --name-only "origin/main...$GITHUB_SHA")"; then
-            smoke=true # No merge base to compare with: run the smoke tests rather than skip them.
-          elif grep -Eq '^(deploy/|scripts/ci/(production|autodeploy)-smoke\.sh$|\.github/workflows/ci\.yml$)' <<<"$changed"; then
-            smoke=true
-          fi
-          # A push of a tree that already passed: main runs only what a branch run does not always
-          # run, other branches nothing. A run by hand runs everything.
-          if [[ "$PASSED" == true && "$GITHUB_EVENT_NAME" == push ]]; then
-            every=false
-            if [[ "$GITHUB_REF" == refs/heads/main ]]; then pg='16'; else pg=''; smoke=false; fi
-          fi
-          suites=''
-          suite() { # suite ID NAME ARGS PG BROWSERS
-            suites+="${suites:+,}$(printf '{"id":"%s","name":"%s","args":"%s","pg":"%s","browsers":%s}' "$@")"
-          }
-          # The options that turn off every part of `pnpm ci:local` but the one named (all, if none).
-          only() {
-            local name
-            for name in basics integration chatwoot a11y widget studio site; do
-              [[ "$name" == "${1:-}" ]] || printf -- '--skip-%s ' "$name"
-            done
-          }
-          # Slowest first: when suites outnumber runners, the runners take them in this order.
-          if [[ "$every" == true ]]; then
-            # Studio's 124 browser tests run on one worker, about 34 minutes: three parts instead.
-            for part in 1 2 3; do
-              suite "studio-$part" "Studio in a browser (part $part of 3)" "$(only studio)--shard=$part/3" '' true
-            done
-            suite widget 'Widget journey in a browser' "$(only widget)" '' true
-          fi
-          if [[ "$smoke" == true ]]; then
-            suite autodeploy-smoke 'Automatic deploy smoke test' "$(only)--with-autodeploy" '' false
-            suite production-smoke 'Production deployment smoke test' "$(only)--with-production" '' true
-          fi
-          # Each PostgreSQL version's integration tests in three parts, each with its own database.
-          for version in $pg; do
-            for part in 1 2 3; do
-              suite "integration-pg$version-$part" "Integration tests (PostgreSQL $version, part $part of 3)" \
-                "$(only integration)--shard=$part/3" "$version" false
-            done
-          done
-          if [[ "$every" == true ]]; then
-            suite basics 'Lint, types and unit tests' '--quick' '' false
-            suite chatwoot 'Chatwoot contract suite' "$(only chatwoot)" '' false
-            suite accessibility 'Accessibility audit' "$(only a11y)" '' true
-            suite website 'Website in a browser' "$(only site)" '' true
-          fi
-          echo "suites=[$suites]" >> "$GITHUB_OUTPUT"
-          echo "Suites: [$suites]"
+          suites="$(node scripts/ci/plan.mjs)"
+          echo "suites=$suites" >> "$GITHUB_OUTPUT"
 
   checks:
     name: ${{ matrix.name }}
@@ -122,8 +89,11 @@ jobs:
       TURBO_TELEMETRY_DISABLED: '1'
       HAMNIVO_CI_SUITE: ${{ matrix.id }}
     steps:
+      # A branch's basics compare it with origin/main (--affected), which needs the history.
       - uses: actions/checkout@v7
         id: checkout
+        with:
+          fetch-depth: ${{ contains(matrix.args, '--affected') && '0' || '1' }}
 
       # Turbo's cache, kept between runs (the checkout's own .turbo is cleaned with it). It is the
       # folder every runner of this repository shares (CI_RESULTS_DIR, the github-runners kit), or

@@ -1297,13 +1297,14 @@ scp root@CI_SERVER:/opt/hamnivo-ci-runner/results/ci-results-RUN_ID-ATTEMPT-SUIT
 Every push runs this pipeline on GitHub Actions (ADR 0009), on runners of your own, and GitHub
 bills nothing for it (ADR 0020). It is split into suites that run side by side, one job each: the
 integration tests in three parts per PostgreSQL version, Studio's browser tests in three parts,
-and each other browser check on its own. With a
-runner for each suite, a push takes about as long as its slowest suite; with fewer, the runners
-take the slowest suites first. Other branches test PostgreSQL 18 only; main and runs by hand also
-test 16 and run the production and automatic-deploy smoke tests, which other branches run only
-when a deploy file changes. A push of a tree that an earlier run already passed, such as a branch
-merged into main, is not checked again: main then runs only PostgreSQL 16 and the smoke tests,
-and other branches nothing.
+and each other browser check on its own. With a runner for each suite, a push takes about as long
+as its slowest suite. Other branches test PostgreSQL 18 only and run only the suites their change
+can reach (`scripts/ci/plan.mjs`), with types and unit tests checked for the packages it reaches;
+a change to Markdown or `docs/` alone runs only those basics. Main, the nightly run (23:00 UTC)
+and runs by hand run every suite, test 16 too, and run the production and automatic-deploy smoke
+tests, which other branches run only when a deploy file changes. A push of a tree that an earlier
+run already passed, such as a branch merged into main, is not checked again: main then runs only
+PostgreSQL 16 and the smoke tests, and other branches nothing.
 
 - Self-hosted runners are free.
 - Caches stay on the runner's disk, and results stay on the server.

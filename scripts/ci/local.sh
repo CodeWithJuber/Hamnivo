@@ -4,6 +4,8 @@
 #   pnpm ci:local                    every check below except the opt-in production smoke test
 #   pnpm ci:local --quick            install, lint, typecheck, unit tests, status/licence checks,
 #                                    and that no workflow uses what GitHub bills for
+#   pnpm ci:local --quick --affected typecheck and unit-test only the packages changed against
+#                                    TURBO_SCM_BASE (origin/main) and those that depend on them
 #   pnpm ci:local --skip-a11y        skip the Storybook accessibility audit
 #   pnpm ci:local --skip-chatwoot    skip the contract suite against a real Chatwoot
 #   pnpm ci:local --skip-e2e         skip the browser checks (the three below)
@@ -32,6 +34,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
 
 quick=0
+affected=0
 basics=1
 integration=1
 a11y=1
@@ -45,6 +48,7 @@ autodeploy=0
 for arg in "$@"; do
   case "$arg" in
     --quick) quick=1 ;;
+    --affected) affected=1 ;;
     --skip-basics) basics=0 ;;
     --skip-integration) integration=0 ;;
     --skip-a11y) a11y=0 ;;
@@ -56,7 +60,7 @@ for arg in "$@"; do
     --shard=*) shard="${arg#--shard=}" ;;
     --with-production) production=1 ;;
     --with-autodeploy) autodeploy=1 ;;
-    -h | --help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -75,6 +79,18 @@ if [[ -n "${HAMNIVO_CI_HEAVY_CONCURRENCY:-}" ]]; then
   heavy_limit=(--concurrency="$HAMNIVO_CI_HEAVY_CONCURRENCY")
 elif [[ -n "${HAMNIVO_CI_CONCURRENCY:-}" ]]; then
   heavy_limit=(--concurrency=1)
+fi
+# With --affected, turbo typechecks and unit-tests only the packages changed against
+# TURBO_SCM_BASE and those that depend on them. Without a merge base turbo would fail: then every
+# package is checked.
+turbo_affected=()
+if ((affected == 1)); then
+  export TURBO_SCM_BASE="${TURBO_SCM_BASE:-origin/main}"
+  if git merge-base "$TURBO_SCM_BASE" HEAD >/dev/null 2>&1; then
+    turbo_affected=(--affected)
+  else
+    echo "No merge base with $TURBO_SCM_BASE: typecheck and unit tests check every package." >&2
+  fi
 fi
 
 results=()
@@ -134,7 +150,8 @@ require() {
 # full run needs Docker for them; --quick leaves them out when Docker is not available.
 unit_tests() {
   local stripe="hamnivo-check-stripe-$$" port
-  pnpm test ${turbo_limit[@]+"${turbo_limit[@]}"} || return 1
+  pnpm test ${turbo_limit[@]+"${turbo_limit[@]}"} ${turbo_affected[@]+"${turbo_affected[@]}"} ||
+    return 1
   if ((quick == 1)) && ! docker info >/dev/null 2>&1; then
     return 0
   fi
@@ -326,10 +343,12 @@ deploy_scripts() {
 }
 if ((basics == 1)); then
   step "Lint and format (Biome)" pnpm lint
-  step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"}
+  step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"} \
+    ${turbo_affected[@]+"${turbo_affected[@]}"}
   step "Unit tests" unit_tests
   step "Shell scripts (shellcheck)" shell_scripts
   step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
+  step "CI picks the suites a change needs" node --test scripts/ci/plan.test.mjs
   step "Deploy scripts: doctor and HTTPS rules (stand-ins; in Linux)" deploy_scripts
   step "Feature status matrix is current" pnpm exec tsx scripts/feature-status/generate.ts --check
   step "Licence inventory is current and reviewed" pnpm exec tsx scripts/licenses/inventory.ts --check
