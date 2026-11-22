@@ -32,7 +32,7 @@ already runs a self-hosted runner for another project.
   outside the packages, or one the graph cannot place, runs every suite.
   A push of a tree that an earlier run already passed is not checked again: main then runs only
   PostgreSQL 16 and the smoke tests, other branches nothing. A run by hand runs everything.
-- **Which runner.** It runs on a self-hosted runner with the label `hamnivo`. The repository
+- **Which runner.** It runs on a self-hosted runner with the label `hamnivo`; the heavy suites also need the label `heavy`, which all but two of the runners have, so the plan and the basics never wait behind them. The repository
   variable `HAMNIVO_CI_RUNNER`, a JSON list of labels, can point it at other runners, hosted
   ones included.
 - **Before a push.** Changes get only the fast checks: Biome, typecheck, unit tests and the
