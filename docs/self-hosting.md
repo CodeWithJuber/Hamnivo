@@ -1394,6 +1394,9 @@ Without a `.env` file, `compose.yaml` uses these sizes, the repository's URL and
 `compute-hamnivo-ci`. Set `HAMNIVO_CI_REPO_URL` in `.env` for a repository of your own. With
 4 GB the checks run at most two turbo tasks at once (`HAMNIVO_CI_CONCURRENCY=2`), and type checks
 and builds one at a time (`HAMNIVO_CI_HEAVY_CONCURRENCY=1`), so they take longer than on a laptop.
+With `HAMNIVO_CI_CONCURRENCY` set, each package's unit tests also get their share of the CPUs
+(`VITEST_MAX_WORKERS`, which `pnpm ci:local` sets when it is not set already), so the tests turbo
+runs side by side do not start more workers than there are CPUs.
 
 To run the quick checks automatically before every `git push`:
 
