@@ -211,18 +211,18 @@ function hooksServer(): Promise<void> {
 
 /**
  * The fake Chatwoot's test hooks, which only exist in this process, for the tests to call over
- * HTTP: `POST /receive-channel-message {inboxId, from, name?, content}` (a customer writes on
- * email, WhatsApp or Telegram; answers once the webhooks are delivered), `POST
- * /whatsapp-templates {inboxId, templates, syncedAt?}` and `POST /age-conversation
- * {conversationId, hours}`.
+ * HTTP: `POST /receive-channel-message {inboxId, from, name?, content, hoursAgo?}` (a customer
+ * writes on email, WhatsApp or Telegram, now or `hoursAgo` hours ago; answers once the webhooks are
+ * delivered) and `POST /whatsapp-templates {inboxId, templates, syncedAt?}`.
  */
 function fakeControlServer(fake: FakeChatwoot): Promise<void> {
   const hooks: Record<string, (body: Record<string, unknown>) => Promise<unknown>> = {
-    '/receive-channel-message': async ({ inboxId, from, name, content }) => {
+    '/receive-channel-message': async ({ inboxId, from, name, content, hoursAgo }) => {
       const made = await fake.receiveChannelMessage(Number(inboxId), {
         from: String(from),
         content: String(content),
         ...(typeof name === 'string' ? { name } : {}),
+        ...(typeof hoursAgo === 'number' ? { hoursAgo } : {}),
       });
       await fake.flush();
       return made;
@@ -233,8 +233,6 @@ function fakeControlServer(fake: FakeChatwoot): Promise<void> {
         templates as Parameters<FakeChatwoot['setWhatsappTemplates']>[1],
         typeof syncedAt === 'string' ? new Date(syncedAt) : syncedAt === null ? null : undefined,
       ),
-    '/age-conversation': async ({ conversationId, hours }) =>
-      fake.ageConversation(Number(conversationId), Number(hours)),
   };
   return listen(
     createServer((request, response) => {

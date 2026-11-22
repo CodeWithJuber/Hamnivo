@@ -1059,6 +1059,44 @@ describe('fake Chatwoot channel inboxes', () => {
     expect(await failedText({})).toMatch(/outside messaging window/);
     expect(await failedText({ template })).toBeNull();
   });
+
+  it('takes a customer message written hours ago, with that time in the webhook and the API', async () => {
+    const { fake, receiver, authority, createInbox } = await channelSetup();
+    const whatsapp = await createInbox('WhatsApp', {
+      type: 'whatsapp',
+      phone_number: '+15557654322',
+      provider: 'whatsapp_cloud',
+      provider_config: { api_key: 'k', phone_number_id: 'p', business_account_id: 'b' },
+    });
+    await fake.flush();
+    const dayAgo = Date.now() - 25 * 3_600_000;
+    const chat = await fake.receiveChannelMessage(Number(whatsapp.id), {
+      from: '971501234568',
+      content: 'Is the blue one in stock?',
+      hoursAgo: 25,
+    });
+    await fake.flush();
+    const near = (date: Date | undefined) => Math.abs((date?.getTime() ?? 0) - dayAgo) < 5_000;
+    const sent = receiver.received
+      .map((r) => parseChatwootEvent(JSON.parse(r.body)))
+      .find((event) => event.type === 'message.created');
+    expect(sent?.type === 'message.created' && near(sent.message.createdAt)).toBe(true);
+    const ref = String(chat.conversationId);
+    const [stored] = await authority.listMessages(ref, { view: 'staff' });
+    expect(near(stored?.createdAt)).toBe(true);
+    // So WhatsApp's 24 hours are over from the start: free text fails.
+    const { message } = await authority.appendMessage({
+      conversationRef: ref,
+      key: `hv1:m:${randomUUID()}`,
+      author: { kind: 'integration' },
+      visibility: 'public',
+      text: 'Are you still there?',
+    });
+    const reply = (await authority.listMessages(ref, { view: 'staff' })).find(
+      (m) => m.ref === message.ref,
+    );
+    expect(reply?.contentAttributes.external_error).toMatch(/outside messaging window/);
+  });
 });
 
 describe('client timeouts', () => {
