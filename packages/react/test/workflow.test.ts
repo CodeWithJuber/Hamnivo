@@ -126,11 +126,22 @@ describe('the workflow', () => {
     expect(workflow).not.toContain('vars.');
   });
 
-  it('uses the same actions as ci.yml', () => {
+  it('uses the same actions as ci.yml, each pinned to a commit', () => {
     const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
-    for (const action of ['actions/checkout@v7', 'pnpm/action-setup@v6', 'actions/setup-node@v7']) {
-      expect(ci, action).toContain(action);
-      expect(workflow, action).toContain(action);
+    // A tag can be moved to other code; a commit cannot. Each pin names its release in a comment.
+    const pins = (file: string) =>
+      new Map(
+        [...file.matchAll(/uses: ([\w./-]+)@([0-9a-f]{40}) # (v\d+\.\d+\.\d+)$/gm)].map((match) => [
+          match[1],
+          `${match[2]} ${match[3]}`,
+        ]),
+      );
+    for (const file of [ci, workflow]) {
+      expect(file).not.toMatch(/uses: [\w./-]+@(?![0-9a-f]{40} # v)/);
+    }
+    for (const action of ['actions/checkout', 'pnpm/action-setup', 'actions/setup-node']) {
+      expect(pins(workflow).get(action), action).toBeDefined();
+      expect(pins(workflow).get(action), action).toBe(pins(ci).get(action));
     }
   });
 
