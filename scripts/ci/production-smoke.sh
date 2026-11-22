@@ -61,10 +61,12 @@ set_env() {
 bash "$hamnivo" setup --domain hamnivo.localhost --tls internal \
   --https-port "$(free_port)" --http-port "$(free_port)" 2>/dev/null
 # Test settings: no inbox to click a verification link in, and Chatwoot reaches the gateway over
-# the compose network because *.localhost has no public address.
+# the compose network because *.localhost has no public address. No AI provider key either, so the
+# agent answers with the offline test model, which production refuses to publish unless allowed.
 set_env REQUIRE_EMAIL_VERIFICATION false
 set_env CHATWOOT_WEBHOOK_BASE_URL http://api:4000
 set_env CHATWOOT_ALLOW_PRIVATE_WEBHOOKS true
+set_env ALLOW_MOCK_MODEL true
 if [[ "${SMOKE_CLAMAV:-0}" != 1 ]]; then
   set_env COMPOSE_PROFILES ''
   set_env CLAMAV_URL ''
