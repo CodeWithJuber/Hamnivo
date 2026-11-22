@@ -273,6 +273,25 @@ describe('a list that cannot be read', () => {
     expect(captured).toHaveLength(0);
   });
 
+  it('refuses a redirect, so the key never follows it to another host', async () => {
+    const captured = http.reply(
+      () =>
+        new HttpResponse(null, {
+          status: 302,
+          headers: { location: 'https://elsewhere.example/' },
+        }),
+      json(OPENAI),
+    );
+    expect(await listModels(SPECS.openai)).toMatchObject({ ok: false, kind: 'network' });
+    expect(captured.map((request) => request.url.host)).toEqual(['api.openai.com']);
+  });
+
+  it('stops reading an answer larger than the cap', async () => {
+    const huge = 'x'.repeat(2 * 1024 * 1024 + 10);
+    http.reply(() => new HttpResponse(huge, { status: 200 }));
+    expect(await listModels(SPECS.openai)).toMatchObject({ ok: false, kind: 'unknown' });
+  });
+
   it('never returns the provider’s own words', async () => {
     http.reply(json({ error: { message: 'secret internal detail' } }, 400));
     const result = await listModels(SPECS.openai);

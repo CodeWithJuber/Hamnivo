@@ -184,7 +184,8 @@ export function AddConnectionForm({
         provider={provider}
         value={model}
         onChange={setModel}
-        source={listWith}
+        // The settled request lags the form; a list for the provider just left is not shown.
+        source={listWith?.source === 'key' && listWith.provider === provider ? listWith : null}
         waitingFor={compatible ? 'address' : 'key'}
         error={errors.model}
       />

@@ -151,6 +151,31 @@ function modelsOf(provider: ListSpec['provider'], body: unknown): ListedModel[] 
   return listed.slice(0, LIST_MAX_MODELS);
 }
 
+/** The body as text, or null when it is larger than `max` bytes (read no further than that). */
+async function readCapped(response: Response, max: number): Promise<string | null> {
+  const declared = Number(response.headers.get('content-length') ?? '');
+  if (Number.isFinite(declared) && declared > max) {
+    // Not awaited: some streams settle a cancel only once read, and nothing more is read.
+    response.body?.cancel().catch(() => undefined);
+    return null;
+  }
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 /** A refusal classified the same way as a test call, so the same plain words fit. */
 function problemOf(error: unknown, answered: boolean): ListModelsProblem {
   const kind = classifyProbeError(error);
@@ -180,16 +205,23 @@ export async function listModels(
   const fetcher = spec.fetch ?? globalThis.fetch;
   let response: Response;
   try {
-    response = await fetcher(request.url, { method: 'GET', headers: request.headers, signal });
+    // A redirect could carry the key to another host: it is refused, whoever made the fetch.
+    response = await fetcher(request.url, {
+      method: 'GET',
+      headers: request.headers,
+      redirect: 'error',
+      signal,
+    });
   } catch (error) {
     return { ok: false, kind: problemOf(error, false) };
   }
-  let body: string;
+  let body: string | null;
   try {
-    body = await response.text();
+    body = await readCapped(response, MAX_BODY_BYTES);
   } catch (error) {
     return { ok: false, kind: problemOf(error, false), status: response.status };
   }
+  if (body === null) return { ok: false, kind: 'unknown', status: response.status };
   if (!response.ok) {
     const error = new APICallError({
       message: `The model list was refused (${response.status})`,
@@ -201,7 +233,6 @@ export async function listModels(
     });
     return { ok: false, kind: problemOf(error, true), status: response.status };
   }
-  if (body.length > MAX_BODY_BYTES) return { ok: false, kind: 'unknown', status: response.status };
   let parsed: unknown;
   try {
     parsed = JSON.parse(body);

@@ -239,6 +239,8 @@ export function ModelField({
           hidden={!expanded}
           className="max-h-72 overflow-y-auto rounded-md border border-border bg-surface p-1 shadow-sm"
           data-testid={`${id}-list`}
+          // Dragging the list's scrollbar must not take focus from the box (and close the list).
+          onMouseDown={(event) => event.preventDefault()}
         >
           {expanded
             ? shown.map((choice, index) => {

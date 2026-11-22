@@ -386,6 +386,15 @@ export class ModelConnectionsService {
     input: z.output<typeof ListModelsRequest>,
   ): Promise<ModelList> {
     this.enforceManage(principal);
+    const refresh = input.source !== 'key' && input.refresh === true;
+    // A list read in the last ten minutes, unless a refresh is asked for.
+    const fresh = (key: string) => {
+      if (refresh) return undefined;
+      const kept = this.modelLists.get(key);
+      return kept && this.clock().getTime() - kept.fetchedAt.getTime() < MODEL_LIST_TTL_MS
+        ? kept
+        : undefined;
+    };
     let spec: ListSpec;
     let policy: EgressPolicy | null = null;
     let cacheKey: string | null = null;
@@ -402,29 +411,43 @@ export class ModelConnectionsService {
             detail: 'This connection is turned off. Add a new connection to use another key.',
           });
         }
-        if (row.allowedModels.length > 0) return { row, apiKey: null, policy: null };
+        if (row.allowedModels.length > 0) return { kind: 'allowed', row } as const;
+        // A replaced key changes updatedAt, so its list is read again.
+        const key = `${principal.tenantId}:${row.id}:${row.updatedAt.getTime()}`;
+        const kept = fresh(key);
+        // The key stays sealed when the list is already known.
+        if (kept) return { kind: 'kept', kept } as const;
         return {
+          kind: 'ask',
           row,
+          key,
           apiKey: await this.secrets.reveal(tx, principal.tenantId, row.apiKeySecretId),
           policy: await this.egress.policyIn(tx),
-        };
+        } as const;
       });
-      const { row } = found;
-      if (!found.apiKey || !found.policy) {
+      if (found.kind === 'allowed') {
         return listed(
-          row.allowedModels.map((modelId) => ({ id: modelId, name: null, deprecated: false })),
+          found.row.allowedModels.map((modelId) => ({
+            id: modelId,
+            name: null,
+            deprecated: false,
+          })),
           this.clock(),
         );
       }
+      if (found.kind === 'kept') return listed(found.kept.models, found.kept.fetchedAt);
+      const { row } = found;
       spec = {
         provider: row.provider,
         apiKey: found.apiKey,
         ...(row.baseUrl ? { baseURL: row.baseUrl } : {}),
       };
       policy = row.baseUrl ? found.policy : publicOnly(found.policy);
-      // A replaced key changes updatedAt, so its list is read again.
-      cacheKey = `${principal.tenantId}:${row.id}:${row.updatedAt.getTime()}`;
+      cacheKey = found.key;
     } else if (input.source === 'platform') {
+      cacheKey = `platform:${input.provider}`;
+      const kept = fresh(cacheKey);
+      if (kept) return listed(kept.models, kept.fetchedAt);
       const credentials = platformCredentials(this.config, input.provider);
       if (!credentials) {
         throw new AppError('VALIDATION_FAILED', {
@@ -432,7 +455,6 @@ export class ModelConnectionsService {
         });
       }
       spec = { provider: input.provider, ...credentials };
-      cacheKey = `platform:${input.provider}`;
     } else {
       const found = await this.tx(principal, async (tx) => {
         await this.checkBaseUrl(tx, input.baseUrl);
@@ -446,12 +468,6 @@ export class ModelConnectionsService {
       policy = input.baseUrl ? found : publicOnly(found);
     }
 
-    const now = this.clock();
-    const refresh = input.source !== 'key' && input.refresh === true;
-    const kept = cacheKey && !refresh ? this.modelLists.get(cacheKey) : undefined;
-    if (kept && now.getTime() - kept.fetchedAt.getTime() < MODEL_LIST_TTL_MS) {
-      return listed(kept.models, kept.fetchedAt);
-    }
     const fetcher = policy
       ? guardedFetch(policy, { refuseRedirects: true, maxResponseBytes: 2 * 1024 * 1024 })
       : null;

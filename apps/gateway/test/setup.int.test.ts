@@ -371,6 +371,34 @@ describe('the models a key can use', () => {
     expect(seen).toHaveLength(1);
   });
 
+  it('reads the list again once the key is replaced, and never for another workspace', async () => {
+    mode = 'ok';
+    const created = await connect({ label: 'Gets a new key', allowedModels: [] });
+    await listModels({ source: 'connection', connectionId: created.body.id });
+    expect(seen).toHaveLength(1);
+    const rotated = await shop.owner.post(`/v1/admin/model-connections/${created.body.id}/rotate`, {
+      apiKey: 'replacement-local-key-5678',
+    });
+    expect(rotated.status, JSON.stringify(rotated.body)).toBe(200);
+    const after = await listModels({ source: 'connection', connectionId: created.body.id });
+    expect(after.body.ok).toBe(true);
+    expect(seen).toEqual([
+      expect.objectContaining({
+        url: '/v1/models',
+        authorization: 'Bearer replacement-local-key-5678',
+      }),
+    ]);
+
+    const other = await connectedTenant(slice, 'other-models');
+    seen.length = 0;
+    const foreign = await other.owner.post('/v1/admin/model-connections/models', {
+      source: 'connection',
+      connectionId: created.body.id,
+    });
+    expect(foreign.status).toBe(404);
+    expect(seen).toHaveLength(0);
+  });
+
   it('lists only the models a connection allows, without asking the provider', async () => {
     const created = await connect({ allowedModels: ['test-model'] });
     const result = await listModels({ source: 'connection', connectionId: created.body.id });

@@ -1,12 +1,12 @@
 /**
  * The models a key can use, read live from the provider through the gateway, for the model field.
- * A pasted key (not saved yet) is sent once to read the list and is never kept here: the cache
- * entry is named by the key's length and last four characters, as Studio shows a saved key, and
- * dropped as soon as nothing reads it.
+ * A pasted key (not saved yet) is sent once to read the list and is never kept here: its cache
+ * entry is named by a number that changes whenever the pasted values change, never by any part of
+ * the key, and is dropped as soon as nothing reads it.
  */
 import type { ListModelsRequest, ModelList } from '@hamnivo/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { api } from './api';
 import { useTenant } from './tenant';
 
@@ -15,21 +15,14 @@ export type { ListModelsRequest, ModelList };
 /** The gateway keeps a provider's list ten minutes; Studio asks again no sooner. */
 const FRESH_MS = 10 * 60_000;
 
-function cacheKey(request: ListModelsRequest): readonly unknown[] {
+function cacheKey(request: ListModelsRequest, pasted: string): readonly unknown[] {
   switch (request.source) {
     case 'connection':
       return ['provider-models', 'connection', request.connectionId];
     case 'platform':
       return ['provider-models', 'platform', request.provider];
     case 'key':
-      return [
-        'provider-models',
-        'key',
-        request.provider,
-        request.baseUrl ?? '',
-        request.apiKey?.length ?? 0,
-        request.apiKey?.slice(-4) ?? '',
-      ];
+      return ['provider-models', 'key', pasted];
   }
 }
 
@@ -43,7 +36,18 @@ export function useProviderModels(request: ListModelsRequest | null) {
   const client = useQueryClient();
   const enabled = request !== null && can('integrations.manage');
   const pasted = request?.source === 'key';
-  const queryKey = [tenantId, ...(request ? cacheKey(request) : ['provider-models', 'none'])];
+  // Each new set of pasted values gets the next number in this field.
+  const field = useId();
+  const last = useRef({ values: '', count: 0 });
+  const values = JSON.stringify(request);
+  if (last.current.values !== values) last.current = { values, count: last.current.count + 1 };
+  const queryKey = [
+    tenantId,
+    ...(request
+      ? cacheKey(request, `${field}:${last.current.count}`)
+      : ['provider-models', 'none']),
+  ];
+  const gcTime = pasted ? 0 : FRESH_MS;
   const query = useQuery({
     queryKey,
     queryFn: ({ signal }) =>
@@ -57,7 +61,7 @@ export function useProviderModels(request: ListModelsRequest | null) {
     enabled,
     staleTime: FRESH_MS,
     // A pasted key's list is forgotten as soon as the field is gone.
-    gcTime: pasted ? 0 : FRESH_MS,
+    gcTime,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -75,6 +79,7 @@ export function useProviderModels(request: ListModelsRequest | null) {
             signal,
           }),
         staleTime: 0,
+        gcTime,
       })
       // A failed refresh leaves the error on the query, where the field shows it.
       .catch(() => undefined);
