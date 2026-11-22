@@ -99,13 +99,25 @@ jobs:
       # folder every runner of this repository shares (CI_RESULTS_DIR, the github-runners kit), or
       # else this runner's cache volume. Turbo writes each entry to a temporary file and renames it
       # into place, so runners can share it, and a broken entry is a cache miss.
+      # Only a push to main and the nightly run write it (TURBO_CACHE=local:rw), so main never
+      # replays a build another branch cached. Every other run, and any this does not recognise,
+      # only reads it (local:r).
       - name: Pick turbo's cache folder
         run: |
           folder=/home/runner/.cache/hamnivo-turbo
-          if [[ -n "${CI_RESULTS_DIR:-}" ]] && mkdir -p "$CI_RESULTS_DIR/turbo-cache"; then
-            folder="$CI_RESULTS_DIR/turbo-cache"
+          shared="${CI_RESULTS_DIR:+$CI_RESULTS_DIR/turbo-cache}"
+          if [[ -n "$shared" ]] && mkdir -p "$shared" && chmod 700 "$shared"; then
+            folder="$shared"
+          else
+            mkdir -p "$folder" && chmod 700 "$folder"
           fi
           echo "TURBO_CACHE_DIR=$folder" >> "$GITHUB_ENV"
+          mode=local:r
+          if [[ "$GITHUB_REF" == refs/heads/main ]] &&
+            [[ "$GITHUB_EVENT_NAME" == push || "$GITHUB_EVENT_NAME" == schedule ]]; then
+            mode=local:rw
+          fi
+          echo "TURBO_CACHE=$mode" >> "$GITHUB_ENV"
 
       # The pnpm version comes from packageManager in package.json.
       - uses: pnpm/action-setup@v6
