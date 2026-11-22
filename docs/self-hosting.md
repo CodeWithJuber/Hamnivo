@@ -159,7 +159,9 @@ Then edit `deploy/production/.env` for:
   `hamnivo.sh mail` shows the latest ones with their links.
 - **AI models (optional):** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`,
   or `OPENAI_COMPATIBLE_BASE_URL` for a local model. Each company can also store its own keys
-  later. `EMBEDDING_PROVIDER` chooses the model for knowledge search.
+  later. `EMBEDDING_PROVIDER` chooses the model for knowledge search. `ALLOW_MOCK_MODEL=true` lets
+  agents answer with the offline `hamnivo-mock` test model, which production otherwise refuses
+  (a demo server only).
 - **Decisions with Jev (optional):** `TYPESAFE_API_KEY`, a key from [typesafe.ai](https://typesafe.ai).
   It lets brands route conversations with Jev (A6, "Decisions with Jev").
 - **Other names:** change `HAMNIVO_*_HOST`, then run `setup` again to update the addresses derived
