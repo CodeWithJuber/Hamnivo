@@ -222,6 +222,35 @@ describe('hand-off offered to one person (HNV-10-03, HNV-10-06)', () => {
     ).toMatchObject({ openChats: 1, maxOpenChats: null });
   });
 
+  it('keeps an accepted conversation with the person when Chatwoot’s older webhooks arrive late', async () => {
+    await online(amina, bilal, chen);
+    const { visitor, conversationId: id } = await customerStarts(slice, shop, 'Late webhooks?');
+    await slice.drain();
+    // Chatwoot's webhooks are slow: the queue it was put in, written before the accept, comes after.
+    slice.fake.pauseDeliveries();
+    const handoff = await visitor.call('POST', `/v1/widget/conversations/${id}/handoff`, {
+      clientRequestId: randomUUID(),
+      note: 'a person, please',
+    });
+    expect(handoff.status, JSON.stringify(handoff.body)).toBe(200);
+    await slice.drain();
+    expect((await shop.owner.post(inbox(id, '/team'), { teamId })).status).toBe(200);
+    await slice.drain();
+    const offer = await offeredTo(id);
+    const person = byStaff(offer?.staffMemberId ?? '') as Person;
+    const accepted = await person.client.post(`/v1/inbox/offers/${offer?.id}/accept`, {});
+    expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
+    // Chatwoot now holds the person who accepted, before any of its webhooks has arrived.
+    await slice.drain();
+    slice.fake.resumeDeliveries();
+    await slice.drain();
+    expect(await detail(id)).toMatchObject({
+      ownerMode: 'HUMAN_ACTIVE',
+      owner: { kind: 'staff', staffMemberId: person.staffId },
+      ownerReason: 'offer_accepted',
+    });
+  });
+
   it('offers it to the next person after a decline or when time is up, and to three people at most', async () => {
     const id = await handedToTeam('Hello, I need to change my order.');
     const first = await offeredTo(id);
