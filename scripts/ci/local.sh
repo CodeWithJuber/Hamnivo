@@ -4,9 +4,14 @@
 #   pnpm ci:local                    every check below except the opt-in production smoke test
 #   pnpm ci:local --quick            install, lint, typecheck, unit tests, status/licence checks,
 #                                    and that no workflow uses what GitHub bills for
+#   pnpm ci:local --quick --affected typecheck and unit-test only the packages changed against
+#                                    TURBO_SCM_BASE (origin/main) and those that depend on them
 #   pnpm ci:local --skip-a11y        skip the Storybook accessibility audit
 #   pnpm ci:local --skip-chatwoot    skip the contract suite against a real Chatwoot
-#   pnpm ci:local --skip-e2e         skip the browser checks (widget journey and website)
+#   pnpm ci:local --skip-e2e         skip the browser checks (the three below)
+#   pnpm ci:local --skip-widget      skip the widget journey in a browser
+#   pnpm ci:local --skip-studio      skip Studio in a browser
+#   pnpm ci:local --skip-site        skip the website in a browser
 #   pnpm ci:local --skip-basics      skip lint, typecheck, unit tests and the other --quick checks
 #                                    (CI runs them in a job of their own, beside the slow ones)
 #   pnpm ci:local --skip-integration skip the integration tests
@@ -15,6 +20,9 @@
 #   pnpm ci:local --with-autodeploy  also check automatic deploys: webhook, checks, rollback
 #                                    against a stand-in for GitHub (20–40 minutes)
 #   PG_VERSIONS=18 pnpm ci:local     run integration tests on one PostgreSQL major only
+#   pnpm ci:local --shard=2/3        run the second of three parts of each package's integration
+#                                    test files and of Studio's browser tests (CI runs the three
+#                                    parts side by side)
 #
 # Integration tests run against throwaway PostgreSQL (+pgvector), Valkey and Chatwoot containers
 # with generated passwords, so your development data is never touched.
@@ -26,24 +34,33 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
 
 quick=0
+affected=0
 basics=1
 integration=1
 a11y=1
 chatwoot=1
-e2e=1
+widget=1
+studio=1
+site=1
+shard=''
 production=0
 autodeploy=0
 for arg in "$@"; do
   case "$arg" in
     --quick) quick=1 ;;
+    --affected) affected=1 ;;
     --skip-basics) basics=0 ;;
     --skip-integration) integration=0 ;;
     --skip-a11y) a11y=0 ;;
     --skip-chatwoot) chatwoot=0 ;;
-    --skip-e2e) e2e=0 ;;
+    --skip-e2e) widget=0 studio=0 site=0 ;;
+    --skip-widget) widget=0 ;;
+    --skip-studio) studio=0 ;;
+    --skip-site) site=0 ;;
+    --shard=*) shard="${arg#--shard=}" ;;
     --with-production) production=1 ;;
     --with-autodeploy) autodeploy=1 ;;
-    -h | --help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -62,6 +79,18 @@ if [[ -n "${HAMNIVO_CI_HEAVY_CONCURRENCY:-}" ]]; then
   heavy_limit=(--concurrency="$HAMNIVO_CI_HEAVY_CONCURRENCY")
 elif [[ -n "${HAMNIVO_CI_CONCURRENCY:-}" ]]; then
   heavy_limit=(--concurrency=1)
+fi
+# With --affected, turbo typechecks and unit-tests only the packages changed against
+# TURBO_SCM_BASE and those that depend on them. Without a merge base turbo would fail: then every
+# package is checked.
+turbo_affected=()
+if ((affected == 1)); then
+  export TURBO_SCM_BASE="${TURBO_SCM_BASE:-origin/main}"
+  if git merge-base "$TURBO_SCM_BASE" HEAD >/dev/null 2>&1; then
+    turbo_affected=(--affected)
+  else
+    echo "No merge base with $TURBO_SCM_BASE: typecheck and unit tests check every package." >&2
+  fi
 fi
 
 results=()
@@ -121,7 +150,8 @@ require() {
 # full run needs Docker for them; --quick leaves them out when Docker is not available.
 unit_tests() {
   local stripe="hamnivo-check-stripe-$$" port
-  pnpm test ${turbo_limit[@]+"${turbo_limit[@]}"} || return 1
+  pnpm test ${turbo_limit[@]+"${turbo_limit[@]}"} ${turbo_affected[@]+"${turbo_affected[@]}"} ||
+    return 1
   if ((quick == 1)) && ! docker info >/dev/null 2>&1; then
     return 0
   fi
@@ -195,9 +225,15 @@ throwaway_services() {
   )
 }
 
+# With --shard, each package's vitest runs only that part of its files. A package with fewer files
+# than parts (Chatwoot's two, skipped here) has an empty part, which vitest fails without
+# --passWithNoTests.
 integration() {
+  local part=()
+  if [[ -n "$shard" ]]; then part=(-- "--shard=$shard" --passWithNoTests); fi
   throwaway_services "$1" || return 1
-  env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN "${service_env[@]}" pnpm test:int
+  env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN "${service_env[@]}" \
+    pnpm test:int ${part[@]+"${part[@]}"}
   local status=$?
   docker rm -f -v "$service_pg" >/dev/null 2>&1 || true
   return "$status"
@@ -217,14 +253,25 @@ widget_journey() {
 
 # Studio (the staff console) in a real browser: sign-up to install snippet, publishing with a fresh
 # sign-in, model keys, knowledge, stopping the AI and runs, with axe audits in English and Arabic.
+# With --shard, Playwright runs only that part of Studio's test files (one worker, as always).
 studio_journey() {
+  local part=()
+  if [[ -n "$shard" ]]; then part=("--shard=$shard"); fi
   throwaway_services 18 || return 1
   pnpm build ${heavy_limit[@]+"${heavy_limit[@]}"} >/dev/null || return 1
   env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN -u WIDGET_SIGNING_KEY "${service_env[@]}" \
-    pnpm --filter @hamnivo/console test:e2e
+    pnpm --filter @hamnivo/console test:e2e ${part[@]+"${part[@]}"}
   local status=$?
   docker rm -f -v "$service_pg" >/dev/null 2>&1 || true
   return "$status"
+}
+
+# The built website in a browser. Alone, it builds the website first; after a journey, which built
+# everything, turbo finds that build in its cache.
+website() {
+  pnpm exec turbo run build --filter=@hamnivo/site ${heavy_limit[@]+"${heavy_limit[@]}"} >/dev/null ||
+    return 1
+  pnpm --filter @hamnivo/site test:e2e
 }
 
 # The deploy scripts run unattended on servers, so every shell script must pass shellcheck.
@@ -296,10 +343,12 @@ deploy_scripts() {
 }
 if ((basics == 1)); then
   step "Lint and format (Biome)" pnpm lint
-  step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"}
+  step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"} \
+    ${turbo_affected[@]+"${turbo_affected[@]}"}
   step "Unit tests" unit_tests
   step "Shell scripts (shellcheck)" shell_scripts
   step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
+  step "CI picks the suites a change needs" node --test scripts/ci/plan.test.mjs
   step "Deploy scripts: doctor and HTTPS rules (stand-ins; in Linux)" deploy_scripts
   step "Feature status matrix is current" pnpm exec tsx scripts/feature-status/generate.ts --check
   step "Licence inventory is current and reviewed" pnpm exec tsx scripts/licenses/inventory.ts --check
@@ -309,7 +358,7 @@ if ((quick == 0)); then
   require docker
   if ((integration == 1)); then
     for version in ${PG_VERSIONS:-16 18}; do
-      step "Integration tests (PostgreSQL $version + Valkey)" integration "$version"
+      step "Integration tests (PostgreSQL $version + Valkey${shard:+, part $shard})" integration "$version"
     done
   fi
   if ((chatwoot == 1)); then
@@ -320,11 +369,14 @@ if ((quick == 0)); then
     step "Build Storybook" pnpm --filter @hamnivo/ui build-storybook
     step "Accessibility audit (light/dark x LTR/RTL)" pnpm --filter @hamnivo/ui test:a11y
   fi
-  if ((e2e == 1)); then
+  if ((widget == 1)); then
     step "Widget journey in a browser (Playwright + axe)" widget_journey
+  fi
+  if ((studio == 1)); then
     step "Studio in a browser (Playwright + axe)" studio_journey
-    # The journey's build step also built the static website.
-    step "Website in a browser (Playwright + axe, 4 languages)" pnpm --filter @hamnivo/site test:e2e
+  fi
+  if ((site == 1)); then
+    step "Website in a browser (Playwright + axe, 4 languages)" website
   fi
 fi
 

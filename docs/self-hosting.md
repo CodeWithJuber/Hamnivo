@@ -1286,7 +1286,7 @@ is never touched:
 The checks write `test-results/ci-local.md`. On the CI runner, the Actions run summary shows the
 report and where the full `test-results/` archive is kept: a file on the CI server, never a GitHub
 artifact, one per suite. Copy one with its run ID, attempt number and suite (`basics`,
-`integration-pg18`, `chatwoot`, `browser`, `production-smoke`, ...):
+`integration-pg18-1`, `chatwoot`, `studio`, `production-smoke`, ...):
 
 ```bash
 scp root@CI_SERVER:/opt/hamnivo-ci-runner/results/ci-results-RUN_ID-ATTEMPT-SUITE.tar.gz .
@@ -1295,10 +1295,16 @@ scp root@CI_SERVER:/opt/hamnivo-ci-runner/results/ci-results-RUN_ID-ATTEMPT-SUIT
 ### Run the checks on GitHub, for free
 
 Every push runs this pipeline on GitHub Actions (ADR 0009), on runners of your own, and GitHub
-bills nothing for it (ADR 0020). It is split into suites that run side by side, one job each, so
-with four runners a push takes about as long as its slowest suite. Other branches test
-PostgreSQL 18 only; main and runs by hand also test 16 and run the production and automatic-deploy
-smoke tests, which other branches run only when a deploy file changes.
+bills nothing for it (ADR 0020). It is split into suites that run side by side, one job each: the
+integration tests in three parts per PostgreSQL version, Studio's browser tests in three parts,
+and each other browser check on its own. With a runner for each suite, a push takes about as long
+as its slowest suite. Other branches test PostgreSQL 18 only and run only the suites their change
+can reach (`scripts/ci/plan.mjs`), with types and unit tests checked for the packages it reaches;
+a change to Markdown or `docs/` alone runs only those basics. Main, the nightly run (23:00 UTC)
+and runs by hand run every suite, test 16 too, and run the production and automatic-deploy smoke
+tests, which other branches run only when a deploy file changes. A push of a tree that an earlier
+run already passed, such as a branch merged into main, is not checked again: main then runs only
+PostgreSQL 16 and the smoke tests, and other branches nothing.
 
 - Self-hosted runners are free.
 - Caches stay on the runner's disk, and results stay on the server.
@@ -1354,6 +1360,7 @@ What the runner keeps on the server, so no run downloads it again:
 | --- | --- |
 | pnpm's package store, pruned to what the last run used | the `work` volume, `_pnpm-store` |
 | Playwright's browsers and other tool caches | the `runner-cache` volume |
+| Turbo's cache (a week), shared by all runners under the github-runners kit; only pushes to `main` and the nightly run write it | `CI_RESULTS_DIR/turbo-cache`, else the `runner-cache` volume |
 | Docker images and the build cache of the smoke tests (a week) | the `dind-data` volume |
 | Each run's `test-results/` (14 days, `HAMNIVO_CI_RESULTS_DAYS`) | `/opt/hamnivo-ci-runner/results` |
 

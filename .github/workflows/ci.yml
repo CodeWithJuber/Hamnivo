@@ -1,7 +1,11 @@
 # The full check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, split into suites that
-# run side by side, one job each, on our own runners (deploy/ci-runner). On main and on a run by hand
-# it covers every PostgreSQL major and the production and automatic-deploy smoke tests; on other
-# branches PostgreSQL 18 (production's) only, and the smoke tests only when a deploy file changes.
+# run side by side, one job each, on our own runners (deploy/ci-runner). scripts/ci/plan.mjs picks
+# them. Main, the nightly run and a run by hand cover everything: every PostgreSQL major and the
+# production and automatic-deploy smoke tests. Another branch gets only the suites its change can
+# reach in the package graph, on PostgreSQL 18 (production's), and the smoke tests only when a
+# deploy file changes; a change it cannot place gets everything. A push of a tree that an earlier
+# run already passed (a branch merged into main, say) is not checked again: main then runs only
+# PostgreSQL 16 and the smoke tests, other branches nothing.
 # It uses nothing GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each
 # report is kept there as a file, never uploaded as an artifact. scripts/ci/no-github-billing.sh
 # checks this.
@@ -10,10 +14,14 @@ name: CI
 on:
   push:
   workflow_dispatch:
+  # Everything, every night at 23:00 UTC: the safety net for what a branch's selection missed.
+  schedule:
+    - cron: '0 23 * * *'
 
-# A newer push to the same branch replaces a run that is still going.
+# A newer push to the same branch replaces a run that is still going. The nightly run has a group of
+# its own, so a push to main neither replaces it nor is replaced by it.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -24,50 +32,52 @@ jobs:
     name: Pick the suites
     runs-on: [self-hosted, linux, x64, hamnivo]
     timeout-minutes: 10
+    # skip-duplicate-actions reads the earlier runs of this workflow.
+    permissions:
+      actions: read
+      contents: read
     outputs:
       suites: ${{ steps.pick.outputs.suites }}
     steps:
-      - uses: actions/checkout@v7
+      # should_skip is true when an earlier run of this workflow passed on the same tree. If the
+      # action fails, it is not true, and every suite runs.
+      - name: Look for a passed run of the same tree
+        id: duplicate
+        continue-on-error: true
+        uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
+      # The pnpm version comes from packageManager in package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          package-manager-cache: false
+          node-version: 24
+
+      # Turbo, whose package graph places a branch's change. If this fails, the branch runs
+      # everything.
+      - name: Install dependencies
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+        continue-on-error: true
+        run: pnpm install --frozen-lockfile
 
       - name: Pick the suites
         id: pick
         env:
-          FULL: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
+          PASSED: ${{ steps.duplicate.outputs.should_skip }}
         run: |
-          pg='18'
-          smoke=false
-          if [[ "$FULL" == true ]]; then
-            pg='16 18'
-            smoke=true
-          elif ! changed="$(git diff --name-only "origin/main...$GITHUB_SHA")"; then
-            smoke=true # No merge base to compare with: run the smoke tests rather than skip them.
-          elif grep -Eq '^(deploy/|scripts/ci/(production|autodeploy)-smoke\.sh$|\.github/workflows/ci\.yml$)' <<<"$changed"; then
-            smoke=true
-          fi
-          suites=''
-          suite() { # suite ID NAME ARGS PG BROWSERS
-            suites+="${suites:+,}$(printf '{"id":"%s","name":"%s","args":"%s","pg":"%s","browsers":%s}' "$@")"
-          }
-          only='--skip-basics --skip-integration --skip-chatwoot --skip-a11y --skip-e2e'
-          suite basics 'Lint, types and unit tests' '--quick' '' false
-          for version in $pg; do
-            suite "integration-pg$version" "Integration tests (PostgreSQL $version)" \
-              '--skip-basics --skip-chatwoot --skip-a11y --skip-e2e' "$version" false
-          done
-          suite chatwoot 'Chatwoot contract suite' '--skip-basics --skip-integration --skip-a11y --skip-e2e' '' false
-          suite browser 'Accessibility and browser journeys' '--skip-basics --skip-integration --skip-chatwoot' '' true
-          if [[ "$smoke" == true ]]; then
-            suite production-smoke 'Production deployment smoke test' "$only --with-production" '' true
-            suite autodeploy-smoke 'Automatic deploy smoke test' "$only --with-autodeploy" '' false
-          fi
-          echo "suites=[$suites]" >> "$GITHUB_OUTPUT"
-          echo "Suites: [$suites]"
+          suites="$(node scripts/ci/plan.mjs)"
+          echo "suites=$suites" >> "$GITHUB_OUTPUT"
 
   checks:
     name: ${{ matrix.name }}
     needs: plan
+    # A push of a tree that already passed can leave no suite, and an empty matrix is an error.
+    if: needs.plan.outputs.suites != '[]'
     runs-on: [self-hosted, linux, x64, hamnivo]
     timeout-minutes: 150
     strategy:
@@ -79,13 +89,40 @@ jobs:
       TURBO_TELEMETRY_DISABLED: '1'
       HAMNIVO_CI_SUITE: ${{ matrix.id }}
     steps:
-      - uses: actions/checkout@v7
+      # A branch's basics compare it with origin/main (--affected), which needs the history.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         id: checkout
+        with:
+          fetch-depth: ${{ contains(matrix.args, '--affected') && '0' || '1' }}
+
+      # Turbo's cache, kept between runs (the checkout's own .turbo is cleaned with it). It is the
+      # folder every runner of this repository shares (CI_RESULTS_DIR, the github-runners kit), or
+      # else this runner's cache volume. Turbo writes each entry to a temporary file and renames it
+      # into place, so runners can share it, and a broken entry is a cache miss.
+      # Only a push to main and the nightly run write it (TURBO_CACHE=local:rw), so main never
+      # replays a build another branch cached. Every other run, and any this does not recognise,
+      # only reads it (local:r).
+      - name: Pick turbo's cache folder
+        run: |
+          folder=/home/runner/.cache/hamnivo-turbo
+          shared="${CI_RESULTS_DIR:+$CI_RESULTS_DIR/turbo-cache}"
+          if [[ -n "$shared" ]] && mkdir -p "$shared" && chmod 700 "$shared"; then
+            folder="$shared"
+          else
+            mkdir -p "$folder" && chmod 700 "$folder"
+          fi
+          echo "TURBO_CACHE_DIR=$folder" >> "$GITHUB_ENV"
+          mode=local:r
+          if [[ "$GITHUB_REF" == refs/heads/main ]] &&
+            [[ "$GITHUB_EVENT_NAME" == push || "$GITHUB_EVENT_NAME" == schedule ]]; then
+            mode=local:rw
+          fi
+          echo "TURBO_CACHE=$mode" >> "$GITHUB_ENV"
 
       # The pnpm version comes from packageManager in package.json.
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           package-manager-cache: false
           node-version: 24
@@ -141,7 +178,8 @@ jobs:
         run: bash scripts/ci/archive-results.sh
 
       # Only what the smoke tests leave behind; the runner keeps its other images and caches. The
-      # pnpm store on the runner's disk keeps only the packages this checkout links to.
+      # pnpm store on the runner's disk keeps only the packages this checkout links to, and turbo's
+      # cache a week of builds.
       - name: Free disk
         if: always()
         run: |
@@ -150,3 +188,4 @@ jobs:
           docker image prune -f >/dev/null
           docker builder prune -f --filter until=168h >/dev/null
           pnpm store prune >/dev/null 2>&1 || true
+          find "$TURBO_CACHE_DIR" -type f -mmin +$((7 * 1440)) -delete 2>/dev/null || true
