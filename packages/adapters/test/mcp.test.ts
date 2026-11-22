@@ -12,6 +12,8 @@ import { checkDestination, type Resolver } from '../src/net/index.js';
 
 let server: FakeMcpServer;
 let applied = 0;
+/** Runs when cancel_booking has applied its change, before a fault can lose the answer. */
+let onApplied: (() => void) | undefined;
 
 beforeAll(async () => {
   server = await startFakeMcpServer([
@@ -37,6 +39,7 @@ beforeAll(async () => {
       },
       handler: () => {
         applied += 1;
+        onApplied?.();
         return 'Cancelled.';
       },
     },
@@ -97,15 +100,24 @@ describe('MCP adapter', () => {
   it('reports a lost answer after the change as "may have applied"', async () => {
     server.faults.set('cancel_booking', ['timeout_after']);
     const before = applied;
-    const error = await callMcpTool(
-      { ...endpoint(), timeoutMs: 400 },
-      'cancel_booking',
-      { bookingReference: 'BK-1' },
-      { idempotencyKey: 'hv-action-2' },
-    ).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(McpCallError);
-    expect(error).toMatchObject({ kind: 'timeout', mayHaveApplied: true });
-    expect(applied).toBe(before + 1);
+    // Time runs out once the change has applied, not after a fixed wait: on a busy machine,
+    // connecting alone outlasted a 400 ms deadline, so nothing was sent and nothing applied.
+    const deadline = new AbortController();
+    onApplied = () =>
+      deadline.abort(new DOMException('The tool did not answer in time.', 'TimeoutError'));
+    try {
+      const error = await callMcpTool(
+        endpoint(),
+        'cancel_booking',
+        { bookingReference: 'BK-1' },
+        { idempotencyKey: 'hv-action-2', signal: deadline.signal },
+      ).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(McpCallError);
+      expect(error).toMatchObject({ kind: 'timeout', mayHaveApplied: true });
+      expect(applied).toBe(before + 1);
+    } finally {
+      onApplied = undefined;
+    }
   });
 
   it('reports a tool that failed, and refuses unreachable or disallowed servers', async () => {

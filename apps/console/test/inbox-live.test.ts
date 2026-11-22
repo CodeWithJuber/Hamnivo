@@ -2,10 +2,12 @@ import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type InboxDetail, inboxKeys } from '../src/lib/inbox';
 import {
+  closeInboxStream,
   type InboxAlert,
   inboxEventHandler,
   parseAlert,
   readEvents,
+  retainInboxStream,
   TYPING_LINE_MS,
 } from '../src/lib/inbox-live';
 
@@ -208,5 +210,36 @@ describe('readEvents', () => {
       { event: 'message', data: 'plain' },
     ]);
     expect(activity).toBe(4);
+  });
+});
+
+describe('the connection the tab shares', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', new EventTarget());
+    // A stream that stays open until it is aborted, as the gateway's does.
+    vi.stubGlobal(
+      'fetch',
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        }),
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('closes at once when the page is gone for good, leaving no timer to fire without it', () => {
+    const release = retainInboxStream(TENANT, new QueryClient());
+    // Leaving the page starts a grace period, in case the next page takes the connection again.
+    release();
+    expect(vi.getTimerCount()).toBe(1);
+    closeInboxStream();
+    expect(vi.getTimerCount()).toBe(0);
+    // A test file's DOM is torn down after its last test: nothing may run against it later.
+    vi.unstubAllGlobals();
+    expect(() => vi.advanceTimersByTime(5_000)).not.toThrow();
   });
 });
