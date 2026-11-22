@@ -80,7 +80,10 @@ jobs:
           }
           # Slowest first: when suites outnumber runners, the runners take them in this order.
           if [[ "$every" == true ]]; then
-            suite studio 'Studio in a browser' "$(only studio)" '' true
+            # Studio's 124 browser tests run on one worker, about 34 minutes: three parts instead.
+            for part in 1 2 3; do
+              suite "studio-$part" "Studio in a browser (part $part of 3)" "$(only studio)--shard=$part/3" '' true
+            done
             suite widget 'Widget journey in a browser' "$(only widget)" '' true
           fi
           if [[ "$smoke" == true ]]; then

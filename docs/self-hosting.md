@@ -1296,7 +1296,8 @@ scp root@CI_SERVER:/opt/hamnivo-ci-runner/results/ci-results-RUN_ID-ATTEMPT-SUIT
 
 Every push runs this pipeline on GitHub Actions (ADR 0009), on runners of your own, and GitHub
 bills nothing for it (ADR 0020). It is split into suites that run side by side, one job each: the
-integration tests in three parts per PostgreSQL version, and each browser check on its own. With a
+integration tests in three parts per PostgreSQL version, Studio's browser tests in three parts,
+and each other browser check on its own. With a
 runner for each suite, a push takes about as long as its slowest suite; with fewer, the runners
 take the slowest suites first. Other branches test PostgreSQL 18 only; main and runs by hand also
 test 16 and run the production and automatic-deploy smoke tests, which other branches run only

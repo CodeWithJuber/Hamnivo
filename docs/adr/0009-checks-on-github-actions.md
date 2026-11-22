@@ -23,7 +23,7 @@ already runs a self-hosted runner for another project.
 - **Where the pipeline runs.** `.github/workflows/ci.yml` runs `pnpm ci:local` on every push, split
   into suites that run side by side, one job each (lint, types and unit tests; integration, in
   three parts per PostgreSQL version; Chatwoot; the accessibility audit; the widget journey;
-  Studio; the website; the production and automatic-deploy smoke tests).
+  Studio, in three parts; the website; the production and automatic-deploy smoke tests).
   On main and on a run by hand it tests PostgreSQL 16 and 18 and runs the smoke tests; other
   branches test PostgreSQL 18 only and run the smoke tests only when a deploy file changes.
   A push of a tree that an earlier run already passed is not checked again: main then runs only

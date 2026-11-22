@@ -19,7 +19,8 @@
 #                                    against a stand-in for GitHub (20–40 minutes)
 #   PG_VERSIONS=18 pnpm ci:local     run integration tests on one PostgreSQL major only
 #   pnpm ci:local --shard=2/3        run the second of three parts of each package's integration
-#                                    test files (CI runs the three parts side by side)
+#                                    test files and of Studio's browser tests (CI runs the three
+#                                    parts side by side)
 #
 # Integration tests run against throwaway PostgreSQL (+pgvector), Valkey and Chatwoot containers
 # with generated passwords, so your development data is never touched.
@@ -235,11 +236,14 @@ widget_journey() {
 
 # Studio (the staff console) in a real browser: sign-up to install snippet, publishing with a fresh
 # sign-in, model keys, knowledge, stopping the AI and runs, with axe audits in English and Arabic.
+# With --shard, Playwright runs only that part of Studio's test files (one worker, as always).
 studio_journey() {
+  local part=()
+  if [[ -n "$shard" ]]; then part=("--shard=$shard"); fi
   throwaway_services 18 || return 1
   pnpm build ${heavy_limit[@]+"${heavy_limit[@]}"} >/dev/null || return 1
   env -u CHATWOOT_URL -u CHATWOOT_PLATFORM_TOKEN -u WIDGET_SIGNING_KEY "${service_env[@]}" \
-    pnpm --filter @hamnivo/console test:e2e
+    pnpm --filter @hamnivo/console test:e2e ${part[@]+"${part[@]}"}
   local status=$?
   docker rm -f -v "$service_pg" >/dev/null 2>&1 || true
   return "$status"
