@@ -155,6 +155,17 @@ unit_tests() {
   if ((quick == 1)) && ! docker info >/dev/null 2>&1; then
     return 0
   fi
+  # The Stripe contract test is @hamnivo/adapters'. With --affected, a change that does not reach
+  # adapters leaves it as it was; one that does (or that turbo cannot place) builds what it imports,
+  # which `pnpm test` builds only for the packages it tests.
+  if ((${#turbo_affected[@]})); then
+    local reached
+    if reached="$(pnpm exec turbo ls --affected --output=json 2>/dev/null)" &&
+      ! grep -F '"@hamnivo/adapters"' <<<"$reached" >/dev/null; then
+      return 0
+    fi
+    pnpm exec turbo run build --filter='@hamnivo/adapters^...' >/dev/null || return 1
+  fi
   docker run -d --rm --name "$stripe" -p 127.0.0.1::12111 stripe/stripe-mock:v0.205.0 >/dev/null ||
     return 1
   containers+=("$stripe")
