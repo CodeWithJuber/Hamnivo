@@ -1,11 +1,11 @@
 /**
  * WhatsApp template messages in the inbox composer (D14) in a real browser against the gateway and
  * the fake Chatwoot. A customer writes on a WhatsApp number through the stack's control port (the
- * fake's receiveChannelMessage), and the conversation is made 25 hours old in the database and in
- * the fake, so WhatsApp takes only templates. Covered: the closed-window notice's Send a template,
- * the picker grouped by language with the ones Hamnivo cannot send shown with why, filling in the
- * values with the live preview, sending with what Chatwoot passes on, axe on each step, and the
- * picker in Arabic right to left on a phone with named values filled in from the conversation.
+ * fake's receiveChannelMessage) 25 hours ago, so WhatsApp takes only templates. Covered: the
+ * closed-window notice's Send a template, the picker grouped by language with the ones Hamnivo
+ * cannot send shown with why, filling in the values with the live preview, sending with what
+ * Chatwoot passes on, axe on each step, and the picker in Arabic right to left on a phone with
+ * named values filled in from the conversation.
  */
 import { readFileSync } from 'node:fs';
 import { createDb, fromPublicId } from '@hamnivo/db';
@@ -118,6 +118,9 @@ test.beforeAll(async () => {
     from: '+971555000111',
     name: 'Hana',
     content: 'Is the blue one in stock?',
+    // Written a day ago from the start. Ageing it afterwards raced the reconciler: a poll that read
+    // the message before the ageing and wrote after it moved the time back and reopened the window.
+    hoursAgo: 25,
   });
   await expect
     .poll(
@@ -137,8 +140,7 @@ test.beforeAll(async () => {
   );
   conversationId = listed.items[0]?.id ?? '';
   // The gateway records when the customer wrote once it has processed the webhook for their
-  // message, which can come after the conversation is listed. That time only moves forward, so
-  // ageing it any earlier is undone.
+  // message, which can come after the conversation is listed.
   const wroteAt = async () =>
     (
       await tenantSql(
@@ -148,14 +150,6 @@ test.beforeAll(async () => {
       )
     ).rows[0]?.last_customer_message_at ?? null;
   await expect.poll(wroteAt, { timeout: 30_000 }).not.toBeNull();
-  // A day later: WhatsApp (and the gateway) take only templates now. The fake first, so what it
-  // sends from now on carries the old time too.
-  await fake('age-conversation', { conversationId: asked.conversationId, hours: 25 });
-  await tenantSql(
-    `UPDATE conversation_controls SET last_customer_message_at = now() - interval '25 hours'
-      WHERE inbox_id = $1 AND external_conversation_id = $2`,
-    [inboxUuid, asked.conversationId],
-  );
 });
 
 async function open(page: Page, locale = 'en') {
