@@ -4,7 +4,9 @@ import type { ActorCredential } from '@hamnivo/domain';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { APP_DB } from '../tokens.js';
+import { JournalService } from './journal.service.js';
 import type { OwnerTarget } from './ownership.service.js';
+import { InboxProcessor } from './processor.service.js';
 import { AuthorityRegistry } from './registry.js';
 import { StaffLinksService } from './staff-links.service.js';
 import { uuidV5 } from './uuid.js';
@@ -47,6 +49,8 @@ export class AuthoritySyncService {
     @Inject(APP_DB) private readonly db: Db,
     private readonly registry: AuthorityRegistry,
     private readonly staffLinks: StaffLinksService,
+    private readonly processor: InboxProcessor,
+    private readonly journal: JournalService,
   ) {}
 
   /** Posts a private note for the people handling a conversation (outbox `conversation.note`). */
@@ -256,17 +260,35 @@ export class AuthoritySyncService {
         });
       }
     }
-    await withTenant(this.db, { tenantId }, (tx) =>
-      tx
-        .update(schema.conversationControls)
-        .set({ ownerSyncedEpoch: payload.epoch })
-        .where(
-          and(
-            eq(schema.conversationControls.id, control.id),
-            eq(schema.conversationControls.ownershipEpoch, payload.epoch),
-          ),
-        ),
+    // Webhooks Chatwoot sent before this change may still be on their way, and once the epoch is
+    // synced their old owner would be read back as a change made in Chatwoot (the person who just
+    // accepted, back in the queue). So the state Chatwoot holds now is applied with the epoch:
+    // older states then fail the processor's version check.
+    const state = await authority.getState(ref);
+    const notifications = await withTenant(
+      this.db,
+      { tenantId, actorId: 'authority' },
+      async (tx) => {
+        await tx
+          .update(schema.conversationControls)
+          .set({ ownerSyncedEpoch: payload.epoch })
+          .where(
+            and(
+              eq(schema.conversationControls.id, control.id),
+              eq(schema.conversationControls.ownershipEpoch, payload.epoch),
+            ),
+          );
+        return this.processor.apply(tx, tenantId, control.connectionId, {
+          type: 'conversation.updated',
+          accountRef: String(runtime.accountId),
+          conversation: state,
+        });
+      },
     );
+    for (const n of notifications) {
+      if (n.entries.length > 0) await this.journal.notify(n.tenantId, n.conversationId, n.entries);
+      else await this.journal.signalInbox(n.tenantId, n.conversationId);
+    }
     this.logger.log(
       `owner of ${control.id} synced to Chatwoot at epoch ${payload.epoch} (${target.kind})`,
     );
