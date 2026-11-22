@@ -120,13 +120,22 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.suites) }}
     env:
       TURBO_TELEMETRY_DISABLED: '1'
-      # Turbo's cache on the runner's cache volume, so a run reuses the builds of earlier runs:
-      # the checkout's own .turbo is cleaned with the checkout.
-      TURBO_CACHE_DIR: /home/runner/.cache/hamnivo-turbo
       HAMNIVO_CI_SUITE: ${{ matrix.id }}
     steps:
       - uses: actions/checkout@v7
         id: checkout
+
+      # Turbo's cache, kept between runs (the checkout's own .turbo is cleaned with it). It is the
+      # folder every runner of this repository shares (CI_RESULTS_DIR, the github-runners kit), or
+      # else this runner's cache volume. Turbo writes each entry to a temporary file and renames it
+      # into place, so runners can share it, and a broken entry is a cache miss.
+      - name: Pick turbo's cache folder
+        run: |
+          folder=/home/runner/.cache/hamnivo-turbo
+          if [[ -n "${CI_RESULTS_DIR:-}" ]] && mkdir -p "$CI_RESULTS_DIR/turbo-cache"; then
+            folder="$CI_RESULTS_DIR/turbo-cache"
+          fi
+          echo "TURBO_CACHE_DIR=$folder" >> "$GITHUB_ENV"
 
       # The pnpm version comes from packageManager in package.json.
       - uses: pnpm/action-setup@v6

@@ -1359,6 +1359,7 @@ What the runner keeps on the server, so no run downloads it again:
 | --- | --- |
 | pnpm's package store, pruned to what the last run used | the `work` volume, `_pnpm-store` |
 | Playwright's browsers and other tool caches | the `runner-cache` volume |
+| Turbo's cache (a week), shared by all runners under the github-runners kit | `CI_RESULTS_DIR/turbo-cache`, else the `runner-cache` volume |
 | Docker images and the build cache of the smoke tests (a week) | the `dind-data` volume |
 | Each run's `test-results/` (14 days, `HAMNIVO_CI_RESULTS_DAYS`) | `/opt/hamnivo-ci-runner/results` |
 
