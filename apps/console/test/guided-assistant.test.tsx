@@ -140,6 +140,23 @@ describe('the "Make the AI assistant work" checklist on Home', () => {
     expect(within(row).getByText(/did not accept the key/)).toBeTruthy();
   });
 
+  it('waits for "Get set up" while there is no AI key or no live agent', async () => {
+    fakeGateway(homeRoutes({ 'GET /v1/admin/model-connections': { json: { items: [] } } }));
+    const first = await mountStudio({ permissions: owner, seed, screen: <AssistantReadiness /> });
+    await settle();
+    expect(screen.queryByTestId('readiness-steps')).toBeNull();
+    first.unmount();
+
+    fakeGateway(
+      homeRoutes({
+        'GET /v1/admin/agents': { json: { items: [{ ...agent, publishedVersion: null }] } },
+      }),
+    );
+    await mountStudio({ permissions: owner, seed, screen: <AssistantReadiness /> });
+    await settle();
+    expect(screen.queryByTestId('readiness-steps')).toBeNull();
+  });
+
   it('is gone once everything is in place', async () => {
     fakeGateway(
       homeRoutes({

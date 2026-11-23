@@ -172,6 +172,14 @@ function Checklist() {
     builtins: builtins.data?.items,
   });
   if (!needsWork(steps)) return null;
+  // No AI key at all, or no live agent: Home's "Get set up" asks for those first. One list at a
+  // time, so the same step is never asked for twice.
+  const basicsLeft = steps.some(
+    (step) =>
+      (step.id === 'aikey' && step.state === 'todo' && !step.reason) ||
+      (step.id === 'model' && (step.reason === 'noAgent' || step.reason === 'notLive')),
+  );
+  if (basicsLeft) return null;
   const firstOpen = steps.find((step) => step.state === 'todo' || step.state === 'attention');
 
   return (
@@ -244,7 +252,8 @@ function Checklist() {
 /**
  * Home's "Make the AI assistant work" checklist: what a brand still needs before its AI can act on
  * a customer's WHMCS account, in order, each step with what is wrong and one button to the page
- * that fixes it. It shows while any step is not set up or not working, for people who set up.
+ * that fixes it. It shows while any step is not set up or not working, for people who set up,
+ * once "Get set up" has an AI key and a live agent (until then that list leads).
  */
 export function AssistantReadiness() {
   const { can } = useTenant();
