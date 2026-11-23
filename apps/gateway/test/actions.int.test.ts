@@ -137,6 +137,7 @@ afterEach(() => {
   hooks.replies = [];
   demoStore(shop).faults.clear();
   demoStore(shop).delays.clear();
+  demoStore(shop).together.clear();
 });
 
 describe('customer approvals (G13, W16)', () => {
@@ -686,7 +687,11 @@ describe('autopilot and limits (G15, X03)', () => {
       maxAutopilotPerConversation: 10,
     });
     const store = demoStore(shop);
+    // Each call takes 150 ms, so a third one, if the limit let it start, would overlap. Then it
+    // waits for a second one in progress (or 5 s): a busy runner did not always start the second
+    // within the 150 ms, and read a peak of 1.
     store.delays.set('updateAddress', 150);
+    store.together.set('updateAddress', { calls: 2, maxMs: 5_000 });
     store.peak = 0;
     hooks.plan = () => null;
     hooks.batch = ['NL-5301', 'NL-5302', 'NL-5303', 'NL-5304'].map((orderReference) => ({

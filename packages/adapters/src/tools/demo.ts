@@ -81,6 +81,11 @@ export class DemoActionsStore {
   readonly faults = new Map<DemoOperation, DemoFault[]>();
   /** Milliseconds each call of an operation waits before applying (cancellation tests). */
   readonly delays = new Map<DemoOperation, number>();
+  /**
+   * Calls of an operation wait until `calls` of them are in progress at once, or `maxMs` passed:
+   * a test of the parallel-call limit then sees calls overlap however slowly the runner starts them.
+   */
+  readonly together = new Map<DemoOperation, { calls: number; maxMs: number }>();
   /** How many times each idempotency key changed something (always 0 or 1). */
   readonly effects = new Map<string, number>();
   /** Calls in progress now, and the most there have been at once (parallel-call limits). */
@@ -123,6 +128,8 @@ export class DemoActionsStore {
         );
       });
     }
+    const gate = this.together.get(operation);
+    if (gate) await this.untilTogether(gate, signal);
     signal?.throwIfAborted();
     const fault = this.faults.get(operation)?.shift() ?? null;
     if (fault === 'timeout_before') {
@@ -132,6 +139,14 @@ export class DemoActionsStore {
       throw new DemoToolError('unavailable', 'The service is unavailable.', false);
     }
     return fault;
+  }
+
+  private async untilTogether(gate: { calls: number; maxMs: number }, signal?: AbortSignal) {
+    const until = Date.now() + gate.maxMs;
+    while (this.active < gate.calls && Date.now() < until) {
+      signal?.throwIfAborted();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
   }
 
   private after(fault: DemoFault | null) {
