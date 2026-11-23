@@ -343,9 +343,9 @@ function WhmcsSteps() {
       className="flex flex-col gap-2 rounded-lg border border-border bg-surface-sunken p-3 text-sm"
       data-testid="whmcs-steps"
     >
-      <h4 id="whmcs-steps-title" className="font-medium text-text">
+      <h3 id="whmcs-steps-title" className="font-medium text-text">
         {t('setup.whmcsForm.stepsTitle')}
-      </h4>
+      </h3>
       <ol className="flex list-decimal flex-col gap-1.5 ps-5 text-text-secondary">
         <li>{t('setup.whmcsForm.step1')}</li>
         <li>
