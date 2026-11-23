@@ -114,6 +114,14 @@ Press **Finish setup** when you are done, or skip the step.
 
 ## After the guided setup
 
+For the assistant to act on a client's WHMCS account (services, invoices, tickets), Home shows a
+box called **Make the AI assistant work** until everything is in place. It lists seven steps in
+order: an AI key that works, a live agent on a real model, a customer sign-in key, WHMCS
+connected, the agent allowed to use WHMCS, no demo tools, and your website signing customers in.
+Each step says **Done**, **To do** or **Needs attention**, what is wrong in plain words, and has
+one button to the page where you fix it. The last step cannot be checked from Studio: its button
+opens the guide that shows how to test it.
+
 Two more things make the chat useful:
 
 - **Make the assistant live.** The AI assistant only answers customers once it is live on a real

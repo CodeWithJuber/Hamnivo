@@ -15,6 +15,7 @@ import { killSwitchScope, useBrandRefs, useNames } from '../lib/names';
 import { useAgents, useAuthorityConnections, useKillSwitches, useRuns } from '../lib/queries';
 import { useTenant } from '../lib/tenant';
 import type { Agent, AuthorityConnection } from '../lib/types';
+import { AssistantReadiness } from './home/AssistantReadiness';
 import { GetSetUp } from './home/GetSetUp';
 import { YourChats } from './home/YourChats';
 
@@ -384,6 +385,7 @@ export function OverviewPage() {
       {staffOnly && can('conversations.read') ? <YourChats /> : null}
       <GoLiveNotices />
       <GetSetUp />
+      <AssistantReadiness />
       {can('agents.read') ? <StopsSection /> : null}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <BrandsSection />

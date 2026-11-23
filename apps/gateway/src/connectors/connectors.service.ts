@@ -279,7 +279,8 @@ export class ConnectorsService {
           : [];
         if (!key)
           throw new AppError('VALIDATION_FAILED', {
-            detail: 'Choose an active identity key of this brand.',
+            detail:
+              'This brand has no active customer sign-in key with that name. Pick one from the list, or create one under Customer sign-in.',
           });
         identityKeyId = key.id;
       }
