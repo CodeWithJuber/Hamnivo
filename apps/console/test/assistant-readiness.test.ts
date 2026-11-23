@@ -138,9 +138,11 @@ describe('the assistant checklist', () => {
     });
     expect(stateOf({ agent: { ...needAgent(), grants: [] } }, 'actions')?.state).toBe('todo');
     // A switched-off WHMCS action is not offered.
-    expect(stateOf({ tools: [{ ...WHMCS_TOOL, status: 'disabled' }] }, 'actions')?.reason).toBe(
-      'connectFirst',
-    );
+    expect(stateOf({ tools: [{ ...WHMCS_TOOL, status: 'disabled' }] }, 'actions')).toEqual({
+      id: 'actions',
+      state: 'todo',
+      reason: 'connectFirst',
+    });
   });
 
   it('flags a demo tool the agent may use, and not one it may not', () => {
