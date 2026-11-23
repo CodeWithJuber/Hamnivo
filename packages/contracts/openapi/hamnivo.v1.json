@@ -38609,6 +38609,14 @@
       "UpdateWidgetSettingsRequest": {
         "$ref": "#/components/schemas/WidgetSettings"
       },
+      "PersonButton": {
+        "type": "string",
+        "enum": [
+          "never",
+          "after_ai",
+          "always"
+        ]
+      },
       "WidgetSettings": {
         "type": "object",
         "properties": {
@@ -38766,6 +38774,16 @@
               "email": {
                 "default": true,
                 "type": "boolean"
+              }
+            }
+          },
+          "handoff": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "personButton": {
+                "default": "after_ai",
+                "$ref": "#/components/schemas/PersonButton"
               }
             }
           }
@@ -42247,6 +42265,24 @@
               "csat",
               "voice",
               "identityRequiredForHistory"
+            ],
+            "additionalProperties": false
+          },
+          "handoff": {
+            "type": "object",
+            "properties": {
+              "personButton": {
+                "$ref": "#/components/schemas/PersonButton"
+              },
+              "afterAnswers": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "personButton",
+              "afterAnswers"
             ],
             "additionalProperties": false
           },
@@ -73689,6 +73725,19 @@
               "email"
             ],
             "additionalProperties": false
+          },
+          "handoff": {
+            "type": "object",
+            "properties": {
+              "personButton": {
+                "default": "after_ai",
+                "$ref": "#/components/schemas/PersonButton"
+              }
+            },
+            "required": [
+              "personButton"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -73696,7 +73745,8 @@
           "attachments",
           "help",
           "deletion",
-          "notifications"
+          "notifications",
+          "handoff"
         ],
         "additionalProperties": false
       },

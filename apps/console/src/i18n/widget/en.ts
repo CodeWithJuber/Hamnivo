@@ -69,4 +69,15 @@ export const chatSettingsEn = {
     label: 'Offer signed-in customers emails about their conversations',
     hint: 'A copy when a conversation closes, and a note when a reply waits. Customers choose, and every email has a link to stop them.',
   },
+  person: {
+    legend: 'The “Talk to a person” button',
+    hint: 'Customers can always ask for a person in their own words: the AI then hands the chat to your team.',
+    after_ai: 'After the AI has tried',
+    after_aiHint:
+      'Shows once the AI has answered three times in a conversation, so customers try the AI first.',
+    always: 'Always',
+    alwaysHint: 'Shows from the first message.',
+    never: 'Never',
+    neverHint: 'No button. Customers ask for a person in their own words.',
+  },
 };

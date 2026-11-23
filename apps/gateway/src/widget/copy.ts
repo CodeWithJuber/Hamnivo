@@ -5,6 +5,7 @@ import {
   type HandoffResponse,
   type LauncherConfig,
   type LocalizedText,
+  PERSON_BUTTON_AFTER_ANSWERS,
   PromptLimits,
   WidgetAppearance,
   type WidgetConfig,
@@ -290,6 +291,10 @@ export function widgetConfig(
       csat: appearance.csat,
       voice: false,
       identityRequiredForHistory: false,
+    },
+    handoff: {
+      personButton: settings.handoff.personButton,
+      afterAnswers: PERSON_BUTTON_AFTER_ANSWERS,
     },
     privacyPolicyUrl: appearance.privacyUrl,
     attachmentLimits: {

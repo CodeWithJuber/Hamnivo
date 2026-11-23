@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { offlineFormApplies } from '../availability.js';
+import { offlineFormApplies, showPersonButton } from '../availability.js';
 import { ShopBar } from '../commerce/ShopBar.js';
 import type { Commerce } from '../commerce/useCommerce.js';
 import {
@@ -826,23 +826,24 @@ export function Chat(props: {
   });
   // The assistant's name and role for an answer still being written, from its last answer.
   const assistant = state.messages.findLast((m) => m.sender.kind === 'ai_agent')?.sender;
-  const person = canAskPerson ? (
-    <Button
-      variant="outline"
-      size={compact ? 'icon' : 'sm'}
-      className={
-        compact
-          ? 'size-11 shrink-0 rounded-full'
-          : 'mb-2 h-auto min-h-9 rounded-full whitespace-normal py-1.5 text-start shadow-sm'
-      }
-      aria-label={compact ? t('talkToPerson') : undefined}
-      title={compact ? t('talkToPerson') : undefined}
-      onClick={() => void handoff()}
-    >
-      <UserRoundIcon className="size-4" aria-hidden="true" />
-      {compact ? null : t('talkToPerson')}
-    </Button>
-  ) : null;
+  const person =
+    canAskPerson && showPersonButton(config.handoff, state.messages) ? (
+      <Button
+        variant="outline"
+        size={compact ? 'icon' : 'sm'}
+        className={
+          compact
+            ? 'size-11 shrink-0 rounded-full'
+            : 'mb-2 h-auto min-h-9 rounded-full whitespace-normal py-1.5 text-start shadow-sm'
+        }
+        aria-label={compact ? t('talkToPerson') : undefined}
+        title={compact ? t('talkToPerson') : undefined}
+        onClick={() => void handoff()}
+      >
+        <UserRoundIcon className="size-4" aria-hidden="true" />
+        {compact ? null : t('talkToPerson')}
+      </Button>
+    ) : null;
   const fine = (
     <FinePrint url={config.privacyPolicyUrl} branded={config.brand.showBranding !== false} />
   );
