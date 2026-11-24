@@ -307,6 +307,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     setMenuOpen(false);
   };
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  // The location changes as soon as a navigation starts, while the page that was there stays on
+  // screen until the new one has loaded; the resolved location changes once the new page is shown.
+  const resolvedPathname = useRouterState({ select: (state) => state.resolvedLocation?.pathname });
   const menu = useMenu(pathname);
   const shownPath = useRef(pathname);
   const activeCount = (switches.data?.items ?? []).filter(
@@ -316,14 +319,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // After in-app navigation, start at the new page's heading (screen readers hear its name).
   // The first page of a visit keeps the browser's own start, so the skip link comes first.
+  // Only once the new page is shown: earlier, the heading found is the old page's, and focus
+  // drops to the document when that page goes.
   useEffect(() => {
-    if (shownPath.current === pathname) return;
+    if (resolvedPathname !== pathname || shownPath.current === pathname) return;
     shownPath.current = pathname;
     const frame = requestAnimationFrame(() => {
       document.getElementById('page-title')?.focus({ preventScroll: false });
     });
     return () => cancelAnimationFrame(frame);
-  }, [pathname]);
+  }, [pathname, resolvedPathname]);
 
   return (
     <div className="min-h-dvh bg-bg lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]" data-maskable>
