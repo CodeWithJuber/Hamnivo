@@ -1,5 +1,5 @@
 import type { InboxConversationDetail, StatusRequest } from '@hamnivo/contracts';
-import { appendAudit, schema, toPublicId } from '@hamnivo/db';
+import { appendAudit, schema, type TenantTx, toPublicId } from '@hamnivo/db';
 import type { StaffPrincipal } from '@hamnivo/policy';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
@@ -19,6 +19,87 @@ import { InboxMessagesService } from './messages.service.js';
 import { settleOffer } from './offers.js';
 import { InboxSignals } from './signals.service.js';
 import { syncSla } from './sla.js';
+
+/**
+ * Records in Hamnivo a status Chatwoot already has (resolved, reopened or snoozed): the status,
+ * the snooze, the reply-time clock (resolving ends it, H12), an open offer and AI drafts settled,
+ * an audit event, the "chat closed" automation event, and what the customer's chat is told.
+ * Staff (Inbox) and customers (End this chat in the widget) change a status through this one
+ * path, so both mean the same. Returns the journal entries to announce once committed.
+ */
+export async function recordStatusIn(
+  tx: TenantTx,
+  ownership: OwnershipService,
+  journal: JournalService,
+  now: Date,
+  input: {
+    tenantId: string;
+    conversationId: string;
+    publicId: string;
+    brandId: string | null;
+    status: 'open' | 'resolved' | 'snoozed';
+    snoozedUntil: Date | null;
+    actor: { type: 'staff' | 'customer'; id: string };
+    /** Who closed the chat, for automations: `staff:<id>` or `customer:<id>`. */
+    automationRef: string;
+  },
+): Promise<JournalEntry[]> {
+  const locked = await ownership.lock(tx, input.conversationId);
+  const from = locked.authorityStatus;
+  await tx
+    .update(schema.conversationControls)
+    .set({ authorityStatus: input.status, updatedAt: now })
+    .where(eq(schema.conversationControls.id, input.conversationId));
+  await tx
+    .insert(schema.conversationInboxState)
+    .values({
+      tenantId: input.tenantId,
+      conversationId: input.conversationId,
+      snoozedUntil: input.snoozedUntil,
+    })
+    .onConflictDoUpdate({
+      target: [
+        schema.conversationInboxState.tenantId,
+        schema.conversationInboxState.conversationId,
+      ],
+      set: { snoozedUntil: input.snoozedUntil, updatedAt: now },
+    });
+  // Snoozing pauses the reply-time clock; resolving ends it (H12) and any AI draft with it.
+  await syncSla(tx, input.tenantId, input.conversationId, now);
+  await settleOffer(tx, input.conversationId, now);
+  if (input.status === 'resolved') {
+    await supersedeAiDrafts(tx, input.conversationId, 'resolved', now);
+  }
+  await appendAudit(tx, {
+    actorType: input.actor.type,
+    actorId: input.actor.id,
+    action: 'conversation.status_changed',
+    targetType: 'conversation',
+    targetId: input.publicId,
+    outcome: 'success',
+    data: {
+      from,
+      to: input.status,
+      ...(input.snoozedUntil ? { snoozedUntil: input.snoozedUntil.toISOString() } : {}),
+    },
+  });
+  if (from !== 'resolved' && input.status === 'resolved') {
+    await queueAutomationEvent(tx, input.tenantId, input.brandId, {
+      conversationId: input.conversationId,
+      event: 'chat_closed',
+      ref: input.automationRef,
+    });
+    return journal.append(tx, input.tenantId, input.conversationId, [
+      { lane: 'customer', type: 'conversation.resolved', data: { canReopen: true } },
+    ]);
+  }
+  if (from === 'resolved' && input.status !== 'resolved') {
+    return journal.append(tx, input.tenantId, input.conversationId, [
+      { lane: 'customer', type: 'conversation.reopened', data: {} },
+    ]);
+  }
+  return [];
+}
 
 /**
  * Resolve, reopen and snooze (H10) as the staff member, in Chatwoot first and then in Hamnivo,
@@ -109,60 +190,18 @@ export class StatusService {
     }
 
     entries.push(
-      ...(await this.access.tx(principal, async (tx) => {
-        const locked = await this.ownership.lock(tx, control.id);
-        const from = locked.authorityStatus;
-        await tx
-          .update(schema.conversationControls)
-          .set({ authorityStatus: input.status, updatedAt: this.clock() })
-          .where(eq(schema.conversationControls.id, control.id));
-        const snoozedUntil = input.status === 'snoozed' ? until : null;
-        await tx
-          .insert(schema.conversationInboxState)
-          .values({ tenantId: principal.tenantId, conversationId: control.id, snoozedUntil })
-          .onConflictDoUpdate({
-            target: [
-              schema.conversationInboxState.tenantId,
-              schema.conversationInboxState.conversationId,
-            ],
-            set: { snoozedUntil, updatedAt: this.clock() },
-          });
-        // Snoozing pauses the reply-time clock; resolving ends it (H12) and any AI draft with it.
-        await syncSla(tx, principal.tenantId, control.id, this.clock());
-        await settleOffer(tx, control.id, this.clock());
-        if (input.status === 'resolved') {
-          await supersedeAiDrafts(tx, control.id, 'resolved', this.clock());
-        }
-        await appendAudit(tx, {
-          actorType: 'staff',
-          actorId: toPublicId('staff', me),
-          action: 'conversation.status_changed',
-          targetType: 'conversation',
-          targetId: publicId,
-          outcome: 'success',
-          data: {
-            from,
-            to: input.status,
-            ...(snoozedUntil ? { snoozedUntil: snoozedUntil.toISOString() } : {}),
-          },
-        });
-        if (from !== 'resolved' && input.status === 'resolved') {
-          await queueAutomationEvent(tx, principal.tenantId, control.brandId, {
-            conversationId: control.id,
-            event: 'chat_closed',
-            ref: `staff:${principal.staffMemberId}`,
-          });
-          return this.journal.append(tx, principal.tenantId, control.id, [
-            { lane: 'customer', type: 'conversation.resolved', data: { canReopen: true } },
-          ]);
-        }
-        if (from === 'resolved' && input.status !== 'resolved') {
-          return this.journal.append(tx, principal.tenantId, control.id, [
-            { lane: 'customer', type: 'conversation.reopened', data: {} },
-          ]);
-        }
-        return [];
-      })),
+      ...(await this.access.tx(principal, (tx) =>
+        recordStatusIn(tx, this.ownership, this.journal, this.clock(), {
+          tenantId: principal.tenantId,
+          conversationId: control.id,
+          publicId,
+          brandId: control.brandId,
+          status: input.status,
+          snoozedUntil: input.status === 'snoozed' ? until : null,
+          actor: { type: 'staff', id: toPublicId('staff', me) },
+          automationRef: `staff:${principal.staffMemberId}`,
+        }),
+      )),
     );
     await this.journal.notify(principal.tenantId, control.id, entries);
     await this.signals.changed(principal.tenantId, [control.id]);

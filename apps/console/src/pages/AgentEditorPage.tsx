@@ -55,6 +55,7 @@ import { keys, useAgent, useModelConnections, useSources } from '../lib/queries'
 import { isCancelled, withReauth } from '../lib/reauth';
 import { useTenant } from '../lib/tenant';
 import type { AgentConfig, AgentDetail, AgentVersion, ModelProviderKind } from '../lib/types';
+import { ModelField } from './models/ModelPicker';
 
 /** The version the form started from: the draft, or the live version when there is none. */
 interface Base {
@@ -161,16 +162,22 @@ function ModelFields({
         }
         options={PROVIDERS.map((p) => ({ value: p, label: t(`editor.providers.${p}`) }))}
       />
-      <TextField
+      <ModelField
         id={`${idPrefix}-modelId`}
         label={t('editor.modelId')}
         hint={t('editor.modelIdHint')}
+        provider={row.provider}
         value={row.modelId}
-        dir="ltr"
-        spellCheck={false}
         disabled={disabled}
-        maxLength={200}
-        onChange={(event) => onChange({ ...row, modelId: event.target.value })}
+        onChange={(modelId) => onChange({ ...row, modelId })}
+        // The models of the key the agent will use: its connection's, or the server's own.
+        source={
+          row.provider === 'mock'
+            ? null
+            : row.connectionId
+              ? { source: 'connection', connectionId: row.connectionId }
+              : { source: 'platform', provider: row.provider }
+        }
         error={error}
       />
       {row.provider !== 'mock' ? (

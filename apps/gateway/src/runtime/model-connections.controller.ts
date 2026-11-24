@@ -1,6 +1,7 @@
 import {
   agentRoutes,
   CreateModelConnectionRequest,
+  ListModelsRequest,
   ReplaceModelKeyRequest,
   TestModelConnectionRequest,
 } from '@hamnivo/contracts';
@@ -55,6 +56,14 @@ export class ModelConnectionsController {
   @StaffRoute({ tenant: true, permission: 'integrations.manage', tenantWide: true })
   status(@CurrentPrincipal() principal: StaffPrincipal) {
     return this.connections.status(principal);
+  }
+
+  /** The models a key can use, from the provider's own list; a pasted key is used once, not kept. */
+  @Post('models')
+  @HttpCode(200)
+  @StaffRoute({ tenant: true, permission: 'integrations.manage', tenantWide: true })
+  models(@CurrentPrincipal() principal: StaffPrincipal, @Body() body: unknown) {
+    return this.connections.models(principal, parseInput(ListModelsRequest, body));
   }
 
   /** One real call of a few tokens; the answer says in plain words whether the key works. */

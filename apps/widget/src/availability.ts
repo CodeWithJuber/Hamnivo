@@ -58,3 +58,20 @@ export function offlineFormApplies(config: Pick<WidgetConfig, 'availability' | '
   const nobodyOnline = form.when !== 'closed' && !availability.staffOnline;
   return closed || nobodyOnline;
 }
+
+/**
+ * Whether the standing "Talk to a person" button shows, by the brand's choice (W11). With
+ * `after_ai` customers try the AI first: the button comes once the AI has answered a few times in
+ * the conversation. A gateway from before the choice sends none, which means the button always
+ * shows, as it did. Customers can still ask for a person in their own words at any time.
+ */
+export function showPersonButton(
+  handoff: WidgetConfig['handoff'],
+  messages: readonly { sender: { kind: string } }[],
+): boolean {
+  const mode = handoff?.personButton ?? 'always';
+  if (mode === 'always') return true;
+  if (mode === 'never') return false;
+  const answers = messages.filter((message) => message.sender.kind === 'ai_agent').length;
+  return answers >= (handoff?.afterAnswers ?? 0);
+}

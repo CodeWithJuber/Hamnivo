@@ -82,6 +82,7 @@ describe('the chat settings', () => {
     help: { search: true, suggestions: [], ...patch.help },
     deletion: { windowMinutes: 15 },
     notifications: { email: true },
+    handoff: { personButton: 'after_ai' },
   });
   const form = (initial = settings()) =>
     mountStudio({
@@ -119,6 +120,23 @@ describe('the chat settings', () => {
       hideOnMobile: true,
     });
     expect(saved(gateway).help).toEqual({ search: true, suggestions: [], followUps: false });
+  });
+
+  it('starts the "Talk to a person" button after the AI has tried, and saves another choice', async () => {
+    const gateway = fakeGateway({
+      'PUT /v1/admin/brands/brd_1/widget-settings': {
+        json: { brandId: 'brd_1', settings: settings(), configVersion: 5, updatedAt: NOW },
+      },
+    });
+    await form();
+    expect(
+      screen.getByRole('radio', { name: /After the AI has tried/ }).getAttribute('data-state'),
+    ).toBe('checked');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('radio', { name: /^Never/ }));
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => expect(saved(gateway)).toBeDefined());
+    expect(saved(gateway).handoff).toEqual({ personButton: 'never' });
   });
 
   it('keeps what was saved before, and leaves the defaults out', async () => {

@@ -127,12 +127,21 @@ test.describe('Hamnivo Chat on a customer website', () => {
     page,
   }) => {
     const frame = await openWidget(page);
-    await ask(frame, 'Assalamu alaikum, I have a question about a refund');
-    await expect(frame.locator('[data-sender="ai_primary"]').last()).toBeVisible({
-      timeout: 20_000,
-    });
+    const answers = frame.locator('[data-sender="ai_primary"]');
+    const person = frame.getByRole('button', { name: 'Talk to a person' });
+    // The brand keeps the default: the button shows once the assistant has answered three times.
+    const questions = [
+      'Assalamu alaikum, I have a question about a refund',
+      'Thank you, that helps',
+      'I have one more question',
+    ];
+    for (const [index, question] of questions.entries()) {
+      await expect(person).toHaveCount(0);
+      await ask(frame, question);
+      await expect(answers).toHaveCount(index + 1, { timeout: 20_000 });
+    }
 
-    await frame.getByRole('button', { name: 'Talk to a person' }).click();
+    await person.click();
     const banner = frame.getByTestId('status-banner');
     await expect(banner).toBeVisible();
     const back = frame.getByRole('button', { name: 'Back to the assistant' });
@@ -153,10 +162,10 @@ test.describe('Hamnivo Chat on a customer website', () => {
     await expect(back).toHaveCount(0);
     if (shots) await page.screenshot({ path: `${shots}/handoff-back.png` });
     await ask(frame, 'Can I return a book after 30 days?');
-    await expect(frame.locator('[data-sender="ai_primary"]')).toHaveCount(2, { timeout: 20_000 });
+    await expect(answers).toHaveCount(4, { timeout: 20_000 });
 
     // Asking again works as before, and once a person has the chat there is no way back.
-    await frame.getByRole('button', { name: 'Talk to a person' }).click();
+    await person.click();
     await expect(back).toBeVisible();
     const conversationId = await frame
       .locator('section[data-conversation-id]')

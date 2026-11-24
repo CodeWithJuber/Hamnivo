@@ -1,15 +1,19 @@
 import { Button } from '@hamnivo/ui/components/button';
 import { Link } from '@tanstack/react-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrandPicker, useChosenBrand } from '../components/BrandPicker';
-import { CheckboxField, TextField } from '../components/Fields';
+import { CheckboxField, SelectField, TextField } from '../components/Fields';
 import { PageHeader } from '../components/PageHeader';
 import { ActionError, QueryState } from '../components/States';
 import { permissionOf, useMcpServers, useTools } from '../lib/actions';
 import { api, newIdempotencyKey } from '../lib/api';
+import { DOCS } from '../lib/docs';
+import { useIdentityKeys } from '../lib/identity';
 import { useStudioMutation, useStudioQuery } from '../lib/queries';
 import { useTenant } from '../lib/tenant';
+import { SecretReveal } from './developer/SecretReveal';
+import { CreateKeyDialog } from './settings/IdentityPage';
 
 type Kind = 'whmcs' | 'shopify' | 'woocommerce';
 const KINDS: readonly Kind[] = ['whmcs', 'shopify', 'woocommerce'];
@@ -330,6 +334,142 @@ function ConnectorCard({
     </li>
   );
 }
+/** The three things to do for WHMCS, in order, each with where to do it. */
+function WhmcsSteps() {
+  const { t } = useTranslation();
+  return (
+    <section
+      aria-labelledby="whmcs-steps-title"
+      className="flex flex-col gap-2 rounded-lg border border-border bg-surface-sunken p-3 text-sm"
+      data-testid="whmcs-steps"
+    >
+      <h3 id="whmcs-steps-title" className="font-medium text-text">
+        {t('setup.whmcsForm.stepsTitle')}
+      </h3>
+      <ol className="flex list-decimal flex-col gap-2 ps-5 text-text-secondary">
+        <li>{t('setup.whmcsForm.step1')}</li>
+        <li>
+          {t('setup.whmcsForm.step2')}{' '}
+          <a
+            href={`${DOCS.integration('whmcs')}#signed-in-clients-optional`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-link underline"
+          >
+            {t('setup.whmcsForm.guide')}
+          </a>
+        </li>
+        <li>{t('setup.whmcsForm.step3')}</li>
+      </ol>
+    </section>
+  );
+}
+
+/**
+ * The customer sign-in key a WHMCS connection trusts: picked from the brand's active keys (the
+ * only one is picked for you), or made here, with its secret shown once. Someone who cannot read
+ * the keys types the key name instead.
+ */
+function IdentityKeyField({
+  id,
+  brandId,
+  value,
+  onChange,
+}: {
+  id: string;
+  brandId: string;
+  value: string;
+  onChange: (kid: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { can } = useTenant();
+  const keys = useIdentityKeys(brandId);
+  const [creating, setCreating] = useState(false);
+  const [secret, setSecret] = useState<{ value: string; kid: string } | null>(null);
+  const usable = (keys.data?.items ?? []).filter((key) => key.status === 'active');
+  const only = usable.length === 1 ? usable[0]?.kid : undefined;
+  useEffect(() => {
+    if (!value && only) onChange(only);
+  }, [value, only, onChange]);
+  const mayCreate = can('widget.identity_keys');
+
+  const dialogs = (
+    <>
+      <CreateKeyDialog
+        brandId={brandId}
+        open={creating}
+        replacing={null}
+        onOpenChange={setCreating}
+        onCreated={({ key }) => {
+          onChange(key.kid);
+          if (key.secret) setSecret({ value: key.secret, kid: key.kid });
+        }}
+      />
+      <SecretReveal
+        secret={secret?.value ?? null}
+        title={t('setup.identity.reveal.title')}
+        label={t('setup.identity.reveal.label', { kid: secret?.kid ?? '' })}
+        onDone={() => setSecret(null)}
+        testId="whmcs-identity-secret"
+      />
+    </>
+  );
+
+  if (!keys.data) {
+    return (
+      <TextField
+        id={id}
+        label={t('agentic.identityKeyId')}
+        hint={t('setup.whmcsForm.keyTyped')}
+        required
+        dir="ltr"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      {usable.length > 0 ? (
+        <SelectField
+          id={id}
+          label={t('setup.whmcsForm.keyLabel')}
+          hint={t('setup.whmcsForm.keyHint')}
+          required
+          value={value}
+          placeholder="—"
+          options={usable.map((key) => ({
+            value: key.kid,
+            label: `${key.kid} (${t(`setup.identity.algs.${key.alg}`)})`,
+          }))}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <p className="text-sm text-text" role="status" data-testid="whmcs-no-key">
+          {t('setup.whmcsForm.noKey')}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        {mayCreate ? (
+          <Button type="button" size="sm" variant="secondary" onClick={() => setCreating(true)}>
+            {usable.length > 0 ? t('setup.whmcsForm.createAnother') : t('setup.whmcsForm.create')}
+          </Button>
+        ) : (
+          <span className="text-sm text-text-secondary">{t('setup.identity.noPermission')}</span>
+        )}
+        <Link
+          to="/customer-identity"
+          search={{ brand: brandId }}
+          className="text-sm text-link underline"
+        >
+          {t('setup.whmcsForm.manage')}
+        </Link>
+      </div>
+      {dialogs}
+    </div>
+  );
+}
+
 /** The form that connects one more WHMCS, Shopify or WooCommerce of the brand. */
 function CreateConnection({
   kind,
@@ -384,6 +524,7 @@ function CreateConnection({
       }}
     >
       <div className="flex flex-col gap-3">
+        {kind === 'whmcs' ? <WhmcsSteps /> : null}
         {labels.hint ? <p className="text-sm text-text-secondary">{labels.hint}</p> : null}
         <TextField
           id={id('label')}
@@ -406,6 +547,15 @@ function CreateConnection({
           value={baseUrl}
           onChange={(e) => setUrl(e.target.value)}
         />
+        {/* Step 1 of the steps above, so it comes before step 3's API credential. */}
+        {kind === 'whmcs' ? (
+          <IdentityKeyField
+            id={id('identity')}
+            brandId={brandId}
+            value={identityKeyId}
+            onChange={setIdentity}
+          />
+        ) : null}
         {labels.identifier ? (
           <TextField
             id={id('identifier')}
@@ -426,21 +576,7 @@ function CreateConnection({
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
         />
-        {kind === 'whmcs' ? (
-          <TextField
-            id={id('identity')}
-            label={t('agentic.identityKeyId')}
-            required
-            value={identityKeyId}
-            onChange={(e) => setIdentity(e.target.value)}
-          />
-        ) : null}
         <p className="text-sm text-text-secondary">{t('agentic.credentials')}</p>
-        {kind === 'whmcs' ? (
-          <Link to="/customer-identity" className="text-link underline">
-            {t('setup.identity.nav')}
-          </Link>
-        ) : null}
       </div>
       <CapabilityChoices
         items={catalog}

@@ -247,6 +247,12 @@ export interface FakeChannelMessage {
   subject?: string;
   /** Starts a new conversation even when the contact has one going in this inbox. */
   newConversation?: boolean;
+  /**
+   * Written this many hours ago: the message, and a conversation it starts, carry that time in
+   * every webhook and API answer from the start, unlike `ageConversation` afterwards, which a read
+   * made before it can still undo.
+   */
+  hoursAgo?: number;
 }
 
 export interface FakeSnapshot {
@@ -2728,13 +2734,17 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
           .filter((c) => c.inboxId === inbox.id && c.contactId === contactId)
           .filter((c) => c.status !== 'resolved')
           .sort((a, b) => b.id - a.id)[0];
-    conversation ??= startConversation(
-      inbox,
-      contactInbox,
-      inbox.channel === 'Channel::Email'
-        ? { additionalAttributes: { source: 'email', mail_subject: input.subject ?? null } }
-        : {},
-    );
+    const writtenAt = s.clock() - (input.hoursAgo ?? 0) * 3600;
+    if (!conversation) {
+      conversation = startConversation(
+        inbox,
+        contactInbox,
+        inbox.channel === 'Channel::Email'
+          ? { additionalAttributes: { source: 'email', mail_subject: input.subject ?? null } }
+          : {},
+      );
+      conversation.createdAt = writtenAt;
+    }
     const message: Message = {
       id: s.nextId(),
       accountId: inbox.accountId,
@@ -2746,7 +2756,7 @@ export async function startFakeChatwoot(options: FakeChatwootOptions = {}): Prom
       contentAttributes: {},
       senderType: 'Contact',
       senderId: contactId,
-      createdAt: s.clock(),
+      createdAt: writtenAt,
       attachments: [],
       status: 'sent',
     };
