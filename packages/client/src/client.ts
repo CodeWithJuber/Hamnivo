@@ -311,6 +311,14 @@ export class HamnivoClient {
     );
   }
 
+  /** Ends the chat for the customer; writing in it again reopens it. */
+  resolve(conversationId: string): Promise<Conversation> {
+    return this.request(
+      'POST',
+      `/v1/widget/conversations/${encodeURIComponent(conversationId)}/resolve`,
+    );
+  }
+
   /** Rates a closed conversation from 1 to 5, with an optional comment (CSAT). */
   feedback(conversationId: string, input: { rating: number; comment?: string }): Promise<void> {
     return this.request(

@@ -62,6 +62,16 @@ export const LauncherOffset = z.object({
 });
 export type LauncherOffset = z.infer<typeof LauncherOffset>;
 
+/**
+ * `never`: no button. `after_ai`: once the AI has answered a few times in the conversation
+ * (`PERSON_BUTTON_AFTER_ANSWERS`), so customers try the AI first. `always`: from the start.
+ */
+export const PersonButton = z.enum(['never', 'after_ai', 'always']).meta({ id: 'PersonButton' });
+export type PersonButton = z.infer<typeof PersonButton>;
+
+/** AI answers in a conversation before `after_ai` shows the button. */
+export const PERSON_BUTTON_AFTER_ANSWERS = 3;
+
 export const WidgetSettings = z
   .object({
     layout: z
@@ -112,6 +122,15 @@ export const WidgetSettings = z
       .object({
         /** Offer verified customers transcript and reply-waiting emails. */
         email: z.boolean().default(true),
+      })
+      .prefault({}),
+    handoff: z
+      .object({
+        /**
+         * When the chat shows a "Talk to a person" button while the AI answers. Customers can
+         * always ask for a person in their own words; the AI hands the chat over.
+         */
+        personButton: PersonButton.default('after_ai'),
       })
       .prefault({}),
   })

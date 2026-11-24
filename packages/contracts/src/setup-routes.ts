@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { ModelConnection } from './agents.js';
 import type { RouteDef } from './routes.js';
 import {
+  ListModelsRequest,
+  ModelList,
   ModelProbeResult,
   ModelSetupStatus,
   OnboardingProgress,
@@ -28,6 +30,21 @@ export const setupRoutes = {
     tags: ['Agents'],
     auth: 'staff_session',
     success: { status: 200, description: 'Setup status', schema: ModelSetupStatus },
+  },
+  listProviderModels: {
+    method: 'post',
+    path: '/v1/admin/model-connections/models',
+    operationId: 'listProviderModels',
+    summary:
+      'The chat models a key can use, read from the provider’s own list: a saved connection’s key, the server’s key, or a pasted key that is used once and never kept (integrations.manage)',
+    tags: ['Agents'],
+    auth: 'staff_session',
+    body: ListModelsRequest,
+    success: {
+      status: 200,
+      description: 'The models, or why they could not be read',
+      schema: ModelList,
+    },
   },
   testModelConnection: {
     method: 'post',

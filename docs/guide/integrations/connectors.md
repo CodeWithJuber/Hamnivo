@@ -26,7 +26,11 @@ In Studio:
 
 1. Open **Connectors** and choose the brand.
 2. Under **WHMCS**, choose **Create**.
-3. Enter a name, the WHMCS HTTPS root address, API identifier, API secret, and identity key ID.
+3. Follow the three steps shown at the top of the form. Enter a name, the WHMCS HTTPS root
+   address, the API identifier and the API secret (from **Configuration → System Settings → Manage
+   API Credentials** in WHMCS). Under **Customer sign-in key**, pick the brand's key: when it has
+   only one, it is already chosen. When it has none, press **Create a key**, copy the secret that
+   is shown once, and put it in the WHMCS addon.
 4. Select the actions the connection may offer, then create it.
 5. Read the connection test result. A successful test makes the connection active. A failed test
    leaves it visible but disabled, without showing the WHMCS response or credentials.

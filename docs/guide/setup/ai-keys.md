@@ -8,7 +8,8 @@ In Studio, AI keys are on the page called **Model connections**. Open **AI assis
 menu, then **Model connections**. Only an owner or administrator can open it.
 
 Keys are kept encrypted. After you save a key, Studio never shows it again, only its last four
-characters. Do not share a key with anyone you do not trust, and do not paste it into chats or
+characters. To list a provider's models before you save, Studio sends the pasted key to your
+Hamnivo server once, which asks the provider and forgets the key. Do not share a key with anyone you do not trust, and do not paste it into chats or
 emails.
 
 ## Add a key
@@ -16,9 +17,11 @@ emails.
 1. Press **Add connection**.
 2. Choose the **Provider**: the company that gave you the key.
 3. Paste the key into **API key**.
-4. Check the **Model**. A model is the AI itself. The one marked **recommended** is a good place to
-   start. If yours is not in the list, choose **Another model…** and type its name exactly as the
-   provider writes it.
+4. Check the **Model**. A model is the AI itself. As soon as the key is pasted, Studio asks the
+   provider which models that key can use and lists them: tap the field to see them, or type to
+   search. The one marked **recommended** is a good place to start. A model that is not listed
+   can still be typed in, exactly as the provider writes it. If the list cannot be read (for
+   example, the provider did not accept the key), Studio says why and suggests a few models.
 5. Optionally give it a **Label**, such as "OpenAI production". Left empty, Studio uses the
    provider's name.
 6. Press **Save and test**.
@@ -55,7 +58,9 @@ In the table, each key has a **Last test** column, which says whether it worked 
 it again:
 
 1. Find the key and press **Test key**.
-2. Studio tests it at once. To try another model, choose it and press **Test again**.
+2. Studio tests it at once. To try another model, choose it from the key's own list (or type it)
+   and press **Test again**. **Refresh list** asks the provider again; otherwise a list is kept for
+   ten minutes.
 
 ## Replace a key
 

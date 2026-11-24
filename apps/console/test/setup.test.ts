@@ -3,11 +3,9 @@ import { fileURLToPath } from 'node:url';
 import {
   MODEL_CATALOG as CONTRACT_CATALOG,
   DEFAULT_PRIMARY_COLOR as CONTRACT_COLOUR,
-  CUSTOM_MODEL as CONTRACT_CUSTOM,
   DEFAULT_RADIUS as CONTRACT_RADIUS,
   ONBOARDING_STEPS as CONTRACT_STEPS,
   DEFAULT_WIDGET_TEXT as CONTRACT_TEXT,
-  modelDropdownValue as contractDropdown,
   recommendedModel as contractRecommended,
   MODEL_PROBE_MESSAGES,
 } from '@hamnivo/contracts';
@@ -61,12 +59,10 @@ import {
   testChatUrl,
 } from '../src/lib/setup';
 import {
-  CUSTOM_MODEL,
   DEFAULT_PRIMARY_COLOR,
   DEFAULT_RADIUS,
   DEFAULT_WIDGET_TEXT,
   MODEL_CATALOG,
-  modelDropdownValue,
   ONBOARDING_STEPS,
   recommendedModel,
 } from '../src/lib/setup-data';
@@ -79,15 +75,8 @@ import { addable } from '../src/pages/settings/TeamsPage';
 describe('Studio’s copy of the setup lists', () => {
   it('has the models the gateway lists, with the same recommended one', () => {
     expect(MODEL_CATALOG).toEqual(CONTRACT_CATALOG);
-    expect(CUSTOM_MODEL).toBe(CONTRACT_CUSTOM);
     for (const provider of Object.keys(CONTRACT_CATALOG) as (keyof typeof CONTRACT_CATALOG)[]) {
       expect(recommendedModel(provider)).toBe(contractRecommended(provider));
-      for (const model of CONTRACT_CATALOG[provider]) {
-        expect(modelDropdownValue(provider, model.id)).toBe(contractDropdown(provider, model.id));
-      }
-      expect(modelDropdownValue(provider, 'something-else')).toBe(
-        contractDropdown(provider, 'something-else'),
-      );
     }
   });
 
@@ -113,12 +102,8 @@ describe('Studio’s copy of the setup lists', () => {
 
   it('starts every provider with a model, except a server of your own', () => {
     expect(recommendedModel('openai')).toBe('gpt-5.4-mini');
-    expect(recommendedModel('anthropic')).toBe('claude-haiku-4-5');
+    expect(recommendedModel('anthropic')).toBe('claude-haiku-5-5');
     expect(recommendedModel('openai-compatible')).toBeNull();
-    // A model that is not on the list is typed in, and a listed one is picked.
-    expect(modelDropdownValue('openai', 'gpt-5.4')).toBe('gpt-5.4');
-    expect(modelDropdownValue('openai', 'my-fine-tune')).toBe('custom');
-    expect(modelDropdownValue('openai-compatible', 'llama')).toBe('custom');
   });
 });
 

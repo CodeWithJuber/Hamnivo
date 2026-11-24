@@ -26,14 +26,16 @@ export interface ModelOption {
 }
 
 /**
- * The models Studio offers in its dropdown, per provider. Each name is one the provider's SDK
- * lists today. The list only saves typing: a model that is not on it is entered as "custom", and
- * an OpenAI-compatible server has no list because each one names its own models.
+ * The models Studio suggests per provider, with a word on what each is good for. Studio shows the
+ * provider's own live list where it can read it (`ListModelsRequest`); this one is the fallback
+ * when it cannot, and it marks the recommended model in the live list. A model on neither list is
+ * typed in, and an OpenAI-compatible server has no fallback because each one names its own.
  */
 export const MODEL_CATALOG: Readonly<Record<KeyedProvider, readonly ModelOption[]>> = {
+  // https://platform.claude.com/docs/en/about-claude/models/overview (latest models, 2026-11).
   anthropic: [
-    { id: 'claude-haiku-4-5', tier: 'fast', recommended: true },
-    { id: 'claude-sonnet-5', tier: 'balanced' },
+    { id: 'claude-haiku-5-5', tier: 'fast', recommended: true },
+    { id: 'claude-sonnet-5-5', tier: 'balanced' },
     { id: 'claude-opus-5-5', tier: 'capable' },
   ],
   openai: [
@@ -49,17 +51,9 @@ export const MODEL_CATALOG: Readonly<Record<KeyedProvider, readonly ModelOption[
   'openai-compatible': [],
 };
 
-/** The dropdown's last entry: the person types the model name themselves. */
-export const CUSTOM_MODEL = 'custom';
-
 /** The model to start with for a provider, or null where each server names its own. */
 export function recommendedModel(provider: KeyedProvider): string | null {
   return MODEL_CATALOG[provider].find((model) => model.recommended)?.id ?? null;
-}
-
-/** The dropdown value for a stored model name: the name when it is listed, `custom` otherwise. */
-export function modelDropdownValue(provider: KeyedProvider, modelId: string): string {
-  return MODEL_CATALOG[provider].some((model) => model.id === modelId) ? modelId : CUSTOM_MODEL;
 }
 
 /** What one test call found out. `ok` is the only success; every other kind has a plain message. */
@@ -116,6 +110,95 @@ export const ModelProbeResult = z
   })
   .meta({ id: 'ModelProbeResult' });
 export type ModelProbeResult = z.infer<typeof ModelProbeResult>;
+
+/**
+ * Which models a key can use, read from the provider's own list for Studio's model field. The key
+ * is a saved connection's, the server's own for a provider, or one pasted before it is saved: that
+ * one is used for this one request and never kept.
+ */
+export const ListModelsRequest = z
+  .discriminatedUnion('source', [
+    z.object({
+      source: z.literal('connection'),
+      connectionId: typeId('modelConnection'),
+      /** Ask the provider again instead of using a list read in the last ten minutes. */
+      refresh: z.boolean().optional(),
+    }),
+    z.object({
+      source: z.literal('platform'),
+      provider: KeyedProvider,
+      refresh: z.boolean().optional(),
+    }),
+    z.object({
+      source: z.literal('key'),
+      provider: KeyedProvider,
+      /** Optional only for an OpenAI-compatible server that takes no key. */
+      apiKey: z.string().trim().min(1).max(1000).optional(),
+      /** Required for an OpenAI-compatible server; optional proxy or region address otherwise. */
+      baseUrl: z
+        .url({ protocol: /^https?$/ })
+        .max(500)
+        .optional(),
+    }),
+  ])
+  .superRefine((value, ctx) => {
+    if (value.source !== 'key') return;
+    if (value.provider === 'openai-compatible' && !value.baseUrl) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['baseUrl'],
+        message: 'OpenAI-compatible servers need a base URL',
+      });
+    }
+    if (value.provider !== 'openai-compatible' && (value.apiKey?.length ?? 0) < 8) {
+      ctx.addIssue({ code: 'custom', path: ['apiKey'], message: 'Paste the whole key' });
+    }
+  })
+  .meta({ id: 'ListModelsRequest' });
+export type ListModelsRequest = z.infer<typeof ListModelsRequest>;
+
+export const ListedModel = z
+  .object({
+    /** The id agents and the provider use. */
+    id: z.string(),
+    /** The provider's friendly name, such as "Claude Haiku 5.5", when it gives one. */
+    name: z.string().nullable(),
+    /** Still callable, but the provider is retiring it and closed it to new users. */
+    deprecated: z.boolean(),
+  })
+  .meta({ id: 'ListedModel' });
+export type ListedModel = z.infer<typeof ListedModel>;
+
+/** The words for a person (English) when a list cannot be read. Studio shows its own translation. */
+export const MODEL_LIST_MESSAGES: Readonly<
+  Record<Exclude<ModelProbeKind, 'model_not_found'>, string>
+> = {
+  ok: '',
+  wrong_key: 'The provider did not accept this key, so it could not list the models.',
+  no_credit: 'The account has no credit left, so the provider did not list the models.',
+  network: 'We could not reach the provider to list the models.',
+  blocked: 'This server address is not allowed, so the models could not be listed.',
+  rate_limited: 'The provider is asking us to slow down. Try again in a minute.',
+  unavailable: 'The provider is having trouble right now. Try again in a few minutes.',
+  unknown: 'The provider did not send a model list we could read.',
+};
+
+/**
+ * The models a key can use, newest or most useful first, or why they could not be read. It never
+ * carries the key or the provider's own words. A failure is still a 200: the model can be typed.
+ */
+export const ModelList = z
+  .object({
+    ok: z.boolean(),
+    kind: ModelProbeKind.exclude(['model_not_found']),
+    /** Empty when it worked. */
+    message: z.string(),
+    models: z.array(ListedModel),
+    /** When the provider was asked; a list can be up to ten minutes old. */
+    fetchedAt: Timestamp,
+  })
+  .meta({ id: 'ModelList' });
+export type ModelList = z.infer<typeof ModelList>;
 
 /** Replaces the key of a connection in place; agents that use it keep working with the new key. */
 export const ReplaceModelKeyRequest = z
