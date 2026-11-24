@@ -257,7 +257,7 @@ export function ModelField({
                     role="option"
                     tabIndex={-1}
                     aria-selected={selected}
-                    className={`flex min-h-11 cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm ${
+                    className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-sm px-2 py-2 text-sm ${
                       index === active
                         ? 'bg-surface-sunken ring-1 ring-ring'
                         : 'hover:bg-surface-sunken'

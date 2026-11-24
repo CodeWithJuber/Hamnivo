@@ -346,7 +346,7 @@ function WhmcsSteps() {
       <h3 id="whmcs-steps-title" className="font-medium text-text">
         {t('setup.whmcsForm.stepsTitle')}
       </h3>
-      <ol className="flex list-decimal flex-col gap-1.5 ps-5 text-text-secondary">
+      <ol className="flex list-decimal flex-col gap-2 ps-5 text-text-secondary">
         <li>{t('setup.whmcsForm.step1')}</li>
         <li>
           {t('setup.whmcsForm.step2')}{' '}
@@ -547,6 +547,15 @@ function CreateConnection({
           value={baseUrl}
           onChange={(e) => setUrl(e.target.value)}
         />
+        {/* Step 1 of the steps above, so it comes before step 3's API credential. */}
+        {kind === 'whmcs' ? (
+          <IdentityKeyField
+            id={id('identity')}
+            brandId={brandId}
+            value={identityKeyId}
+            onChange={setIdentity}
+          />
+        ) : null}
         {labels.identifier ? (
           <TextField
             id={id('identifier')}
@@ -567,14 +576,6 @@ function CreateConnection({
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
         />
-        {kind === 'whmcs' ? (
-          <IdentityKeyField
-            id={id('identity')}
-            brandId={brandId}
-            value={identityKeyId}
-            onChange={setIdentity}
-          />
-        ) : null}
         <p className="text-sm text-text-secondary">{t('agentic.credentials')}</p>
       </div>
       <CapabilityChoices
