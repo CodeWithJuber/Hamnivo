@@ -6,13 +6,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import type { Client } from './harness.js';
 import { audits, authority, customerStarts, join, type Shop } from './inbox-support.js';
-import {
-  connectedTenant,
-  hookedModel,
-  type Slice,
-  startSlice,
-  type Visitor,
-} from './slice-harness.js';
+import { connectedTenant, hookedModel, type Slice, startSlice, Visitor } from './slice-harness.js';
 
 /** The mock model; `answer` makes it reply with fixed text (the copilot's citations). */
 function answeringModel() {
@@ -579,6 +573,42 @@ describe('resolve, reopen and snooze (H10)', () => {
       ['open', 'snoozed'],
       ['snoozed', 'open'],
     ]);
+  });
+});
+
+describe('the customer ends a chat ("End this chat")', () => {
+  it('resolves it for the team as staff would, tells the chat, and audits it as the customer', async () => {
+    const { visitor, conversationId } = await customerStarts(slice, north, 'Thanks, all sorted');
+    const stream = visitor.stream(conversationId);
+    onTestFinished(() => stream.close());
+    await stream.ready;
+
+    const ended = await visitor.call('POST', `/v1/widget/conversations/${conversationId}/resolve`);
+    expect(ended.status, JSON.stringify(ended.body)).toBe(200);
+    expect(ended.body).toMatchObject({ id: conversationId, status: 'resolved' });
+    await stream.until((s) => s.events.some((e) => e.type === 'conversation.resolved'));
+    expect((await authority(slice, north, conversationId)).state.status).toBe('resolved');
+    expect(ids((await amina.client.get('/v1/inbox/conversations?status=resolved')).body)).toContain(
+      conversationId,
+    );
+
+    // Ending it again changes nothing, and nobody else can end it.
+    const again = await visitor.call('POST', `/v1/widget/conversations/${conversationId}/resolve`);
+    expect(again.status).toBe(200);
+    const stranger = new Visitor(slice.baseUrl, north.brand.widgetId, north.hostOrigin);
+    await stranger.open();
+    const refused = await stranger.call(
+      'POST',
+      `/v1/widget/conversations/${conversationId}/resolve`,
+    );
+    expect(refused.status).toBe(404);
+
+    await slice.drain();
+    const changes = (await audits(slice, north, conversationId)).filter(
+      (a) => a.action === 'conversation.status_changed',
+    );
+    // One change, to resolved (from pending: the AI had the chat).
+    expect(changes.map((a) => a.data.to)).toEqual(['resolved']);
   });
 });
 

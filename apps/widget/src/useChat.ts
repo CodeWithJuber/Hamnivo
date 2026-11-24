@@ -887,6 +887,52 @@ export function useChat(client: HamnivoClient) {
     }));
   }, [client, state.conversation, unavailableBy]);
 
+  /**
+   * Ends the conversation on screen ("End this chat"): the team sees it as closed, the customer
+   * can still read it and rate it, and writing in it again reopens it.
+   */
+  const resolve = useCallback(async () => {
+    const conversation = state.conversation;
+    if (!conversation) return;
+    const current = generation.current;
+    let resolved: Awaited<ReturnType<HamnivoClient['resolve']>>;
+    try {
+      resolved = await client.resolve(conversation.id);
+    } catch (error) {
+      unavailableBy(error);
+      throw error;
+    }
+    if (current !== generation.current) return;
+    setState((s) => ({
+      ...s,
+      awaitingSince: null,
+      conversation:
+        s.conversation?.id === resolved.id ? { ...s.conversation, ...resolved } : s.conversation,
+      conversations: s.conversations.map((c) => (c.id === resolved.id ? resolved : c)),
+    }));
+  }, [client, state.conversation, unavailableBy]);
+
+  /**
+   * A fresh, empty chat ("Start a new chat"): the next message starts a new conversation, and the
+   * one that was on screen stays among the person's conversations, where it can be opened again.
+   */
+  const startNew = useCallback(
+    () =>
+      serial(async () => {
+        if (!state.conversation) return;
+        detach();
+        setState((s) => ({
+          ...EMPTY,
+          phase: s.phase,
+          session: s.session,
+          conversations: s.conversations,
+          connection: s.connection === 'offline' ? 'offline' : 'idle',
+          unavailable: s.unavailable,
+        }));
+      }),
+    [detach, serial, state.conversation],
+  );
+
   // A message the gateway refuses now because chat isn't available switches the chat to say so.
   // Refusals kept from an earlier visit (the outbox survives a reload) don't: the session says
   // whether chat is available now.
@@ -933,6 +979,8 @@ export function useChat(client: HamnivoClient) {
     consentRequired,
     leaveMessage,
     reopen,
+    resolve,
+    startNew,
     unavailableBy,
     retryStart,
     dismissError,

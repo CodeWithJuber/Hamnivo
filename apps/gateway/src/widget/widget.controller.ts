@@ -210,6 +210,14 @@ export class WidgetController {
     return this.conversations.reopen(claims, conversationId);
   }
 
+  /** The customer ends the chat; writing in it again reopens it. */
+  @Post('conversations/:conversationId/resolve')
+  @WidgetRoute()
+  @HttpCode(200)
+  resolve(@CurrentWidget() claims: WidgetClaims, @Param('conversationId') conversationId: string) {
+    return this.conversations.resolve(claims, conversationId);
+  }
+
   @Post('conversations/:conversationId/feedback')
   @WidgetRoute()
   @HttpCode(204)
