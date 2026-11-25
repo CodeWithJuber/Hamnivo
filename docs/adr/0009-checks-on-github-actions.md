@@ -25,13 +25,16 @@ already runs a self-hosted runner for another project.
   three parts per PostgreSQL version; Chatwoot; the accessibility audit; the widget journey;
   Studio, in three parts; the website; the production and automatic-deploy smoke tests).
   On main, every night (23:00 UTC) and on a run by hand it runs every suite, tests PostgreSQL 16
-  and 18 and runs the smoke tests. Other branches test PostgreSQL 18 only, run the smoke tests
-  only when a deploy file changes, and run only the suites their change can reach in turbo's
-  package graph, with types and unit tests checked for the packages it reaches
-  (`scripts/ci/plan.mjs`). A change to Markdown or `docs/` alone runs only the basics; a change
-  outside the packages, or one the graph cannot place, runs every suite.
-  A push of a tree that an earlier run already passed is not checked again: main then runs only
-  PostgreSQL 16 and the smoke tests, other branches nothing. A run by hand runs everything.
+  and 18 and runs the smoke tests. A push to another branch runs only the quick checks (lint,
+  types and unit tests) on the packages its change reaches, and nothing when an earlier run passed
+  its tree. The heavy suites wait for the branch's pull request: when it opens, reopens or is
+  marked ready (a draft gets the quick checks), it tests PostgreSQL 18 only, runs the smoke tests
+  only when a deploy file changes, and runs only the suites its change can reach in turbo's
+  package graph (`scripts/ci/plan.mjs`). A change to Markdown or `docs/` alone runs only the
+  basics; a change outside the packages, or one the graph cannot place, runs every suite.
+  Main checks everything even for a tree that passed, since a branch passes on its quick checks.
+  A run by hand (`gh workflow run ci.yml --ref <branch>`) runs everything.
+  (2026-11-25: branch pushes ran the heavy suites too, and used about 58% of all CI minutes.)
 - **Which runner.** It runs on a self-hosted runner with the label `hamnivo`; the heavy suites also need the label `heavy`, which all but two of the runners have, so the plan and the basics never wait behind them. The repository
   variable `HAMNIVO_CI_RUNNER`, a JSON list of labels, can point it at other runners, hosted
   ones included.

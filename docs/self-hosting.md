@@ -1298,13 +1298,13 @@ Every push runs this pipeline on GitHub Actions (ADR 0009), on runners of your o
 bills nothing for it (ADR 0020). It is split into suites that run side by side, one job each: the
 integration tests in three parts per PostgreSQL version, Studio's browser tests in three parts,
 and each other browser check on its own. With a runner for each suite, a push takes about as long
-as its slowest suite. Other branches test PostgreSQL 18 only and run only the suites their change
-can reach (`scripts/ci/plan.mjs`), with types and unit tests checked for the packages it reaches;
-a change to Markdown or `docs/` alone runs only those basics. Main, the nightly run (23:00 UTC)
-and runs by hand run every suite, test 16 too, and run the production and automatic-deploy smoke
-tests, which other branches run only when a deploy file changes. A push of a tree that an earlier
-run already passed, such as a branch merged into main, is not checked again: main then runs only
-PostgreSQL 16 and the smoke tests, and other branches nothing.
+as its slowest suite. A push to a branch other than main runs only the quick checks (lint, types
+and unit tests, for the packages its change reaches). Its pull request, when it opens, reopens or
+is marked ready, tests PostgreSQL 18 only and runs only the suites its change can reach
+(`scripts/ci/plan.mjs`); a change to Markdown or `docs/` alone runs only the basics. Main, the
+nightly run (23:00 UTC) and runs by hand run every suite, test 16 too, and run the production and
+automatic-deploy smoke tests, which a pull request runs only when a deploy file changes. A branch
+push of a tree that an earlier run already passed is not checked again.
 
 - Self-hosted runners are free.
 - Caches stay on the runner's disk, and results stay on the server.

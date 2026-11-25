@@ -6,18 +6,21 @@
 //   node scripts/ci/plan.mjs
 //
 // It reads GITHUB_EVENT_NAME, GITHUB_REF and GITHUB_SHA; PASSED=true when an earlier run passed on
-// the same tree (fkirc/skip-duplicate-actions); and BASE, what a branch is compared with
-// (origin/main).
+// the same tree (fkirc/skip-duplicate-actions); DRAFT=true for a draft pull request; and BASE, what
+// a branch is compared with (origin/main).
 //
 // - A run by hand, the nightly run and a push to main check everything: PostgreSQL 16 and 18 and
-//   the smoke tests. A push to main whose tree already passed runs only PostgreSQL 16 and the smoke
-//   tests, which a branch does not always run.
-// - A push to another branch whose tree already passed runs nothing. Any other branch push tests
-//   PostgreSQL 18, runs the smoke tests when a deploy file changes, and runs only the suites that
-//   its change reaches in turbo's package graph; the basics typecheck and unit-test only the
-//   packages it reaches. A change to Markdown or docs/ alone runs only the basics.
-// - What it cannot place runs everything: no merge base, a changed file outside every package
-//   (the workflows, scripts/ci, the lockfile, the root config, deploy/), or turbo failing.
+//   the smoke tests. Main does not trust a passed tree, since a branch passes on its quick checks.
+// - A push to another branch runs only the quick checks (lint, types and unit tests), on the
+//   packages its change reaches in turbo's package graph, and nothing when its tree already passed.
+//   Agents push a branch many times; the heavy suites wait for its pull request.
+// - A pull request, when it opens, reopens or is marked ready (a draft gets the quick checks),
+//   tests PostgreSQL 18, runs the smoke tests when a deploy file changes, and runs only the suites
+//   that its change reaches; the basics typecheck and unit-test only the packages it reaches. A
+//   change to Markdown or docs/ alone runs only the basics.
+// - What a pull request's change cannot place runs everything: no merge base, a changed file
+//   outside every package (the workflows, scripts/ci, the lockfile, the root config, deploy/), or
+//   turbo failing. A branch push in that case runs the quick checks on every package.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -42,22 +45,29 @@ const PARTS = [1, 2, 3];
  * `reach(files)` returns the packages those files reach, as {name, testInt}, and throws when it
  * cannot tell.
  */
-export function pick({ event, ref, passed, diff, reach }) {
+export function pick({ event, ref, passed, draft, diff, reach }) {
   const everything = (pg, smoke, why) => ({ pg, smoke, run: new Set(ALL), affected: false, why });
-  if (event !== 'push') return everything(['16', '18'], true, `a ${event} run checks everything`);
-  if (ref === 'refs/heads/main') {
-    if (!passed) return everything(['16', '18'], true, 'a push to main checks everything');
-    return {
-      pg: ['16'],
-      smoke: true,
-      run: new Set(['integration']),
-      affected: false,
-      why: 'this tree passed on a branch: only what a branch does not always run',
-    };
+  if (event === 'push' && ref === 'refs/heads/main') {
+    return everything(['16', '18'], true, 'a push to main checks everything');
   }
-  if (passed)
-    return { pg: [], smoke: false, run: new Set(), affected: false, why: 'this tree passed' };
+  const quick = (why) => {
+    const placed = reachedSuites(diff, reach, everything);
+    return { pg: [], smoke: false, run: new Set(['basics']), affected: placed.affected, why };
+  };
+  if (event === 'push') {
+    if (passed)
+      return { pg: [], smoke: false, run: new Set(), affected: false, why: 'this tree passed' };
+    return quick('a branch push: the quick checks; the heavy suites wait for its pull request');
+  }
+  if (event === 'pull_request') {
+    if (draft) return quick('a draft pull request: the quick checks');
+    return reachedSuites(diff, reach, everything);
+  }
+  return everything(['16', '18'], true, `a ${event} run checks everything`);
+}
 
+/** The suites a change reaches; `everything` for a change it cannot place. */
+function reachedSuites(diff, reach, everything) {
   const changed = diff();
   if (!changed) return everything(['18'], true, 'no merge base to compare with');
   const smoke = changed.some((file) => SMOKE.test(file));
@@ -185,6 +195,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     event: env.GITHUB_EVENT_NAME,
     ref: env.GITHUB_REF,
     passed: env.PASSED === 'true',
+    draft: env.DRAFT === 'true',
     diff: () => changedFiles(env.BASE || 'origin/main', env.GITHUB_SHA || 'HEAD'),
     reach: reachInGraph,
   });
