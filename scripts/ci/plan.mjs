@@ -43,9 +43,18 @@ const PARTS = [1, 2, 3];
 /**
  * What a run checks. `diff()` returns the files a branch changed, or null without a merge base;
  * `reach(files)` returns the packages those files reach, as {name, testInt}, and throws when it
- * cannot tell.
+ * cannot tell. Lint (Biome, shellcheck) runs only on main, the nightly run and a run by hand: a
+ * branch push and a pull request get typecheck and unit tests without it.
  */
-export function pick({ event, ref, passed, draft, diff, reach }) {
+export function pick(run) {
+  const backstop =
+    (run.event === 'push' && run.ref === 'refs/heads/main') ||
+    run.event === 'schedule' ||
+    run.event === 'workflow_dispatch';
+  return { ...choose(run), lint: backstop };
+}
+
+function choose({ event, ref, passed, draft, diff, reach }) {
   const everything = (pg, smoke, why) => ({ pg, smoke, run: new Set(ALL), affected: false, why });
   if (event === 'push' && ref === 'refs/heads/main') {
     return everything(['16', '18'], true, 'a push to main checks everything');
@@ -105,7 +114,7 @@ function only(part) {
 }
 
 /** The matrix for what `pick` chose. */
-export function suites({ pg, smoke, run, affected }) {
+export function suites({ pg, smoke, run, affected, lint = true }) {
   const list = [];
   const add = (id, name, args, browsers = false, version = '') =>
     list.push({ id, name, args, pg: version, browsers });
@@ -141,7 +150,8 @@ export function suites({ pg, smoke, run, affected }) {
     }
   }
   if (run.has('basics')) {
-    add('basics', 'Lint, types and unit tests', affected ? '--quick --affected' : '--quick');
+    const args = `${affected ? '--quick --affected' : '--quick'}${lint ? '' : ' --skip-lint'}`;
+    add('basics', lint ? 'Lint, types and unit tests' : 'Types and unit tests', args);
   }
   if (run.has('chatwoot')) add('chatwoot', 'Chatwoot contract suite', only('chatwoot'));
   if (run.has('accessibility')) add('accessibility', 'Accessibility audit', only('a11y'), true);

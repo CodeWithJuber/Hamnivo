@@ -25,9 +25,9 @@ already runs a self-hosted runner for another project.
   three parts per PostgreSQL version; Chatwoot; the accessibility audit; the widget journey;
   Studio, in three parts; the website; the production and automatic-deploy smoke tests).
   On main, every night (23:00 UTC) and on a run by hand it runs every suite, tests PostgreSQL 16
-  and 18 and runs the smoke tests. A push to another branch runs only the quick checks (lint,
-  types and unit tests) on the packages its change reaches, and nothing when an earlier run passed
-  its tree. The heavy suites wait for the branch's pull request: when it opens, reopens or is
+  and 18 and runs the smoke tests. A push to another branch runs only the quick checks (types
+  and unit tests; lint and shellcheck run only on main, nightly and by hand) on the packages
+  its change reaches, and nothing when an earlier run passed its tree. The heavy suites wait for the branch's pull request: when it opens, reopens or is
   marked ready (a draft gets the quick checks), it tests PostgreSQL 18 only, runs the smoke tests
   only when a deploy file changes, and runs only the suites its change can reach in turbo's
   package graph (`scripts/ci/plan.mjs`). A change to Markdown or `docs/` alone runs only the

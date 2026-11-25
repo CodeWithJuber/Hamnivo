@@ -60,7 +60,7 @@ test('a branch push runs only the quick checks, on what its change reaches', () 
       ['basics'],
       files.join(' '),
     );
-    assert.equal(list[0].args, '--quick --affected', files.join(' '));
+    assert.equal(list[0].args, '--quick --affected --skip-lint', files.join(' '));
   }
   // A change it cannot place still gets only the quick checks, on everything, and no smoke test.
   for (const files of [
@@ -74,7 +74,7 @@ test('a branch push runs only the quick checks, on what its change reaches', () 
       ['basics'],
       files.join(' '),
     );
-    assert.equal(list[0].args, '--quick', files.join(' '));
+    assert.equal(list[0].args, '--quick --skip-lint', files.join(' '));
   }
   assert.deepEqual(ids(pick({ ...branch(() => ['apps/console/a.ts']), reach: failing })), [
     'basics',
@@ -113,7 +113,7 @@ test('a pull request runs only the suites its change reaches, with the basics on
     'accessibility',
   ]);
   const basics = suites(pick(pr(() => ['apps/console/src/a.ts']))).find((s) => s.id === 'basics');
-  assert.equal(basics.args, '--quick --affected');
+  assert.equal(basics.args, '--quick --affected --skip-lint');
   // A branch's quick checks may have passed on this tree: the pull request still runs its suites.
   assert.deepEqual(ids(pick({ ...pr(() => ['apps/console/src/a.ts']), passed: true })), [
     'studio-1',
@@ -133,7 +133,7 @@ test('a pull request runs everything when the change cannot be placed', () => {
   for (const file of ['pnpm-lock.yaml', 'turbo.json', 'scripts/ci/local.sh', '.github/x.yml']) {
     const selection = pick(pr(() => ['apps/console/src/a.ts', file]));
     assert.deepEqual(ids(selection), full, file);
-    assert.equal(suites(selection).find((s) => s.id === 'basics').args, '--quick');
+    assert.equal(suites(selection).find((s) => s.id === 'basics').args, '--quick --skip-lint');
   }
   assert.deepEqual(ids(pick({ ...pr(() => ['apps/console/a.ts']), reach: failing })), full);
   assert.deepEqual(ids(pick(pr(() => null))), [...full.slice(0, 4), ...smoke, ...full.slice(4)]);
@@ -154,4 +154,22 @@ test('main, the nightly run and a run by hand check everything; a branch tree is
   assert.deepEqual(ids(pick({ ...main, passed: false })), all);
   assert.deepEqual(ids(pick({ ...main, passed: true })), all);
   assert.deepEqual(ids(pick({ ...branch(unused), passed: true })), []);
+});
+
+test('lint runs only on main, the nightly run and a run by hand', () => {
+  const unused = () => assert.fail('no diff is needed');
+  const basicsArgs = (selection) => suites(selection).find((s) => s.id === 'basics').args;
+  for (const event of ['schedule', 'workflow_dispatch']) {
+    assert.equal(
+      basicsArgs(pick({ event, ref: 'refs/heads/topic', diff: unused, reach })),
+      '--quick',
+    );
+  }
+  assert.equal(
+    basicsArgs(pick({ event: 'push', ref: 'refs/heads/main', passed: true, diff: unused, reach })),
+    '--quick',
+  );
+  assert.match(basicsArgs(pick(branch(() => ['apps/console/src/a.ts']))), /--skip-lint$/);
+  assert.match(basicsArgs(pick(pr(() => ['apps/console/src/a.ts']))), /--skip-lint$/);
+  assert.match(basicsArgs(pick(pr(() => ['pnpm-lock.yaml']))), /--skip-lint$/);
 });

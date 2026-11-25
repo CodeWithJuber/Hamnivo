@@ -2,7 +2,7 @@
 # run side by side, one job each, on our own runners (deploy/ci-runner). scripts/ci/plan.mjs picks
 # them. Main, the nightly run and a run by hand cover everything: every PostgreSQL major and the
 # production and automatic-deploy smoke tests. A push to another branch gets only the quick checks
-# (lint, types and unit tests) on the packages its change reaches, and nothing when an earlier run
+# (types and unit tests; lint only on main, nightly and by hand) on the packages its change reaches, and nothing when an earlier run
 # already passed its tree: agents push a branch many times. Its pull request, when it opens, reopens
 # or is marked ready, gets the suites its change can reach in the package graph, on PostgreSQL 18
 # (production's), and the smoke tests only when a deploy file changes; a change it cannot place gets
