@@ -115,7 +115,7 @@ describe('the agent directory (HNV-11-01)', () => {
   });
 
   it('narrows as you type, says how many are shown, and clears back to all', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await mount();
     const count = screen.getByTestId('agents-count');
     expect(count.getAttribute('role')).toBe('status');
@@ -135,7 +135,7 @@ describe('the agent directory (HNV-11-01)', () => {
   });
 
   it('filters by brand and by whether an agent answers now', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await mount();
     await user.selectOptions(screen.getByLabelText('Brand'), 'brd_2');
     expect(rows()).toEqual(['Returns bot']);

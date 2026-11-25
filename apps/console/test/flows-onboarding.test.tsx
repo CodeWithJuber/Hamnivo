@@ -77,7 +77,7 @@ describe('the brand and website step', () => {
     });
     const onDone = vi.fn();
     await step(onDone);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText('Brand name'), 'Northline');
     await user.type(screen.getByLabelText(/Your website/), 'https://northline.example/shop?ref=1');
     await user.click(screen.getByRole('button', { name: 'Create brand' }));
@@ -98,7 +98,7 @@ describe('the brand and website step', () => {
     });
     const onDone = vi.fn();
     await step(onDone);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText('Brand name'), 'Northline');
     await user.type(screen.getByLabelText(/Your website/), 'northline.example');
     await user.click(screen.getByRole('button', { name: 'Create brand' }));
@@ -115,7 +115,7 @@ describe('the brand and website step', () => {
     });
     const onDone = vi.fn();
     await step(onDone);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText('Brand name'), 'Northline');
     await user.click(screen.getByRole('button', { name: 'Create brand' }));
     await waitFor(() => expect(onDone).toHaveBeenCalled());
@@ -125,7 +125,7 @@ describe('the brand and website step', () => {
   it('asks for a name, and says what in the website cannot be read, before sending anything', async () => {
     const gateway = fakeGateway({});
     await step();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Create brand' }));
     expect((await screen.findAllByText('Enter a brand name.')).length).toBeGreaterThan(0);
     await user.type(screen.getByLabelText('Brand name'), 'Northline');
@@ -141,7 +141,7 @@ describe('the brand and website step', () => {
     fakeGateway({});
     const onDone = vi.fn();
     await step(onDone, [brand]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Continue with Noor Books' }));
     expect(onDone).toHaveBeenCalledWith('brd_1');
     await user.click(screen.getByRole('button', { name: 'Add a different brand' }));
@@ -179,7 +179,7 @@ describe('the chat engine step', () => {
     expect(posts).toHaveLength(1);
     expect(posts[0]?.body).toEqual({ brandId: 'brd_1' });
     expect(posts[0]?.headers['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(onDone).toHaveBeenCalled();
   });
@@ -199,7 +199,7 @@ describe('the chat engine step', () => {
     await engine();
     const retry = await screen.findByRole('button', { name: 'Try again' });
     expect(screen.getByTestId('action-error')).toBeTruthy();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(retry);
     expect(await screen.findByTestId('engine-ready')).toBeTruthy();
     const [first, second] = gateway.to('POST', '/v1/admin/authority/connections');
@@ -271,7 +271,7 @@ describe('the chat engine step', () => {
     expect(
       screen.getByText(/The set-up stopped: Chatwoot inbox failed \(HTTP 500\)\./),
     ).toBeTruthy();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByTestId('engine-ready')).toBeTruthy();
     expect(gateway.to('POST', '/v1/admin/authority/connections')).toHaveLength(2);
@@ -357,7 +357,7 @@ describe('the AI key step', () => {
       seed: seeded(put(keys.modelConnections, { items }), put(setupKeys.modelStatus, status)),
     });
   const fill = async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText('API key'), 'sk-test-key-12345678');
     await user.click(screen.getByRole('button', { name: 'Save and test' }));
     return user;
@@ -416,7 +416,7 @@ describe('the AI key step', () => {
     const onDone = vi.fn();
     await step(onDone, [key()]);
     expect(screen.queryByLabelText('API key')).toBeNull();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Test key' }));
     const dialog = await screen.findByTestId('test-key-dialog');
     expect(await within(dialog).findByText('The key works')).toBeTruthy();
@@ -502,7 +502,7 @@ describe('the guided setup', () => {
   it('records a step as done and shows the next one', async () => {
     const { gateway } = gatewayWith();
     const { router } = await page('/onboarding?step=workspace');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => expect(stepNow(router)).toBe('brand'));
     expect(gateway.to('PUT', '/v1/admin/onboarding')[0]?.body).toEqual({
@@ -514,7 +514,7 @@ describe('the guided setup', () => {
   it('records a skipped step, and goes on without doing it', async () => {
     const { gateway } = gatewayWith();
     const { router } = await page('/onboarding?step=aikey');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByTestId('onboarding-skip'));
     await waitFor(() => expect(stepNow(router)).toBe('testchat'));
     expect(gateway.to('PUT', '/v1/admin/onboarding')[0]?.body).toEqual({
@@ -533,7 +533,7 @@ describe('the guided setup', () => {
   it('goes back to the step before without recording anything', async () => {
     const { gateway } = gatewayWith();
     const { router } = await page('/onboarding?step=install');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await waitFor(() => expect(stepNow(router)).toBe('testchat'));
     expect(gateway.to('PUT', '/v1/admin/onboarding')).toEqual([]);
@@ -542,7 +542,7 @@ describe('the guided setup', () => {
   it('names the brand it made, so the steps after it work on that brand', async () => {
     const { gateway } = gatewayWith();
     const { router } = await page('/onboarding?step=brand');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Add a different brand' }));
     await user.type(screen.getByLabelText('Brand name'), 'Northline');
     await user.click(screen.getByRole('button', { name: 'Create brand' }));
@@ -556,7 +556,7 @@ describe('the guided setup', () => {
   it('finishes the guide from the last step, and shows what was done', async () => {
     const { gateway } = gatewayWith({ workspace: 'done', brand: 'done' });
     const { router } = await page('/onboarding?step=team');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Finish setup' }));
     await waitFor(() => expect(stepNow(router)).toBe('finished'));
     expect(gateway.to('PUT', '/v1/admin/onboarding')[0]?.body).toEqual({
@@ -569,7 +569,7 @@ describe('the guided setup', () => {
   it('finishes just as well when the last step is skipped', async () => {
     const { gateway } = gatewayWith();
     const { router } = await page('/onboarding?step=team');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByTestId('onboarding-skip'));
     await waitFor(() => expect(stepNow(router)).toBe('finished'));
     expect(gateway.to('PUT', '/v1/admin/onboarding')[0]?.body).toEqual({
@@ -583,7 +583,7 @@ describe('the guided setup', () => {
       'PUT /v1/admin/onboarding': { problem: { status: 500, code: 'INTERNAL' } },
     });
     const { router } = await page('/onboarding?step=workspace');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByTestId('action-error')).toBeTruthy();
     expect(stepNow(router)).toBe('workspace');
@@ -592,7 +592,7 @@ describe('the guided setup', () => {
   it('opens any step from the list', async () => {
     gatewayWith();
     const { router } = await page('/onboarding?step=workspace');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(
       within(screen.getByTestId('onboarding-rail')).getByRole('link', { name: /Install/ }),
     );

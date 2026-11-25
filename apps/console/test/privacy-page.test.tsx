@@ -109,7 +109,7 @@ describe('Settings → Privacy (A10)', () => {
       },
     });
     await mountStudio({ at: '/settings/privacy', permissions: owner, screen: <PrivacyPage /> });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(await screen.findByLabelText('Find a customer'), 'fatima');
     await user.click(screen.getByTestId('privacy-find'));
     expect(gateway.to('GET', '/v1/admin/privacy/customers')[0]?.query).toEqual({
@@ -214,7 +214,7 @@ describe('Settings → Privacy (A10)', () => {
       },
     });
     await mountStudio({ at: '/settings/privacy', permissions: owner, screen: <PrivacyPage /> });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const select = await screen.findByLabelText('Keep resolved conversations');
     expect((select as HTMLSelectElement).value).toBe('forever');
     expect(screen.getByTestId('retention-save').hasAttribute('disabled')).toBe(true);
@@ -258,7 +258,7 @@ describe('Settings → Privacy (A10)', () => {
       },
     });
     await mountStudio({ at: '/settings/privacy', permissions: owner, screen: <PrivacyPage /> });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.selectOptions(await screen.findByLabelText('Keep resolved conversations'), '730');
     expect(screen.getByTestId('retention-when').textContent).toBe(
       'This deletes nothing sooner, so it applies at once.',

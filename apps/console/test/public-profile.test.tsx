@@ -30,7 +30,7 @@ describe('how customers see you', () => {
     expect(preview.textContent).toContain('Sara');
     // Initials stand in for a photo until there is one.
     expect(preview.textContent).toContain('S');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText('Photo address'), 'http://cdn.noor.example/sara.jpg');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Use an address that starts with https://.')).toBeTruthy();

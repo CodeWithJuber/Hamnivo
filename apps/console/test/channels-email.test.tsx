@@ -290,7 +290,7 @@ describe('Connect email', () => {
   it('walks the four steps with found settings and sends exactly what was entered', async () => {
     const gateway = emailGateway([]);
     await page([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const empty = within(screen.getByTestId('channels-empty'));
     expect(empty.getByRole('button', { name: 'Connect email' })).toBeTruthy();
     expect(empty.getByRole('button', { name: 'Check for new channels' })).toBeTruthy();
@@ -426,7 +426,7 @@ describe('Connect email', () => {
   it('sends the outgoing login and password when they are not the same', async () => {
     const gateway = emailGateway([]);
     await page([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await startConnect(user, 'help@noor.example');
     await user.selectOptions(dialog().getByLabelText('Email provider'), 'custom');
     await next(user);
@@ -480,7 +480,7 @@ describe('Connect email', () => {
           : undefined,
     });
     await page([channel()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await startConnect(user, 'desk@fastmail.com');
     await next(user);
     await user.type(dialog().getByLabelText('Incoming password'), 'wrong-password');
@@ -517,7 +517,7 @@ describe('Connect email', () => {
       }),
     });
     await page([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await startConnect(user, 'help@gmail.com');
     await next(user);
     await user.type(dialog().getByLabelText('Incoming password'), 'secret');
@@ -533,7 +533,7 @@ describe('Connect email', () => {
   it('stops at Microsoft, which takes no passwords, until another provider is chosen', async () => {
     const gateway = emailGateway([]);
     await page([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await startConnect(user, 'shop@outlook.com');
     await next(user);
     expect(stepText()).toBe('Step 1 of 4');
@@ -561,7 +561,7 @@ describe('Connect email', () => {
   it('asks before throwing input away, and forgets it all when closed', async () => {
     emailGateway([]);
     await page([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await startConnect(user, 'help@gmail.com');
     await next(user);
     await user.type(dialog().getByLabelText('Incoming password'), 'secret');
@@ -596,7 +596,7 @@ describe('Email settings', () => {
   it('loads the mailbox, keeps passwords unless changed, and says it saved', async () => {
     const gateway = emailGateway([channel()]);
     await page([channel()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const card = within(
       screen.getByRole('heading', { level: 2, name: 'Support email' }).closest('li') as HTMLElement,
     );
@@ -667,7 +667,7 @@ describe('Email settings', () => {
       }),
     });
     await page([channel()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Email settings for Support email' }));
     await settingsDialog().findByLabelText('Outgoing port');
     await user.click(settingsDialog().getByRole('button', { name: 'Save' }));
@@ -684,7 +684,7 @@ describe('Email settings', () => {
       channel({ status: 'needs_attention', problem: 'Chatwoot asks to sign in again' }),
     ]);
     await page([channel({ status: 'needs_attention', problem: 'Chatwoot asks to sign in again' })]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     expect(screen.getByText('Chatwoot says: Chatwoot asks to sign in again')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Fix sign-in for Support email' }));
     await screen.findByRole('dialog', { name: 'Email settings' });

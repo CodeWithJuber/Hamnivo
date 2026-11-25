@@ -58,7 +58,7 @@ describe('adding an AI key', () => {
     });
     const added = vi.fn();
     await form(added);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText('API key'), 'sk-test-key-12345678');
     await user.click(screen.getByRole('button', { name: 'Save and test' }));
     await waitFor(() => expect(added).toHaveBeenCalled());
@@ -85,7 +85,7 @@ describe('adding an AI key', () => {
       'POST /v1/admin/model-connections': { status: 201, json: connection() },
     });
     await form();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.selectOptions(screen.getByLabelText('Provider'), 'anthropic');
     expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('claude-haiku-5-5');
     await user.selectOptions(screen.getByLabelText('Provider'), 'google');
@@ -103,7 +103,7 @@ describe('adding an AI key', () => {
     const added = vi.fn();
     fakeGateway({ 'POST /v1/admin/model-connections': { status: 201, json: connection() } });
     await form(added);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.clear(screen.getByLabelText('Model'));
     await user.type(screen.getByLabelText('Model'), 'my-fine-tune');
     await user.type(screen.getByLabelText('API key'), 'sk-test-key-12345678');
@@ -122,7 +122,7 @@ describe('adding an AI key', () => {
       },
     });
     await form();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.selectOptions(screen.getByLabelText('Provider'), 'anthropic');
     await user.type(screen.getByLabelText('API key'), 'test-anthropic-key-1');
     expect(
@@ -168,7 +168,7 @@ describe('adding an AI key', () => {
       },
     });
     await form();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText('API key'), 'test-openai-key-12');
     expect(
       await screen.findByText(
@@ -185,7 +185,7 @@ describe('adding an AI key', () => {
   it('asks for what is missing and sends nothing', async () => {
     const gateway = fakeGateway({});
     await form();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText('API key'), 'short');
     await user.click(screen.getByRole('button', { name: 'Save and test' }));
     expect(await screen.findAllByText(/Enter the API key/)).not.toHaveLength(0);
@@ -212,7 +212,7 @@ describe('adding an AI key', () => {
     });
     const added = vi.fn();
     await form(added);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText('API key'), 'sk-test-key-12345678');
     await user.click(screen.getByRole('button', { name: 'Save and test' }));
     expect(await screen.findAllByText('That is not a key we can store.')).not.toHaveLength(0);
@@ -222,7 +222,7 @@ describe('adding an AI key', () => {
   it('keeps the key hidden, and out of the page’s text, while typing', async () => {
     fakeGateway({});
     await form();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const field = screen.getByLabelText('API key') as HTMLInputElement;
     expect(field.type).toBe('password');
     await user.type(field, 'sk-never-shown-12345678');
@@ -270,7 +270,7 @@ describe('a key just saved', () => {
     await banner(undefined, onReplace);
     expect(await screen.findByText('The key wasn’t accepted')).toBeTruthy();
     expect(screen.getByText(/Check that you copied all of it/)).toBeTruthy();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Replace key' }));
     expect(onReplace).toHaveBeenCalledWith(expect.objectContaining({ id: 'mcn_1' }));
   });
@@ -284,7 +284,7 @@ describe('a key just saved', () => {
     });
     await banner();
     expect(await screen.findByText('No credit left')).toBeTruthy();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Test again' }));
     expect(await screen.findByText('The key works')).toBeTruthy();
     expect(screen.queryByText('No credit left')).toBeNull();
@@ -325,7 +325,7 @@ describe('replacing a key', () => {
     });
     const onResult = vi.fn();
     await dialog(onResult);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const field = await screen.findByLabelText('New API key');
     expect((field as HTMLInputElement).type).toBe('password');
     await user.type(field, 'sk-brand-new-key-1234');
@@ -347,7 +347,7 @@ describe('replacing a key', () => {
   it('asks for a key that is long enough, and sends nothing without one', async () => {
     const gateway = fakeGateway({});
     await dialog();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(await screen.findByLabelText('New API key'), 'short');
     await user.click(screen.getByRole('button', { name: 'Replace and test' }));
     expect(await screen.findAllByText(/Enter the API key/)).not.toHaveLength(0);
@@ -361,7 +361,7 @@ describe('replacing a key', () => {
       },
     });
     await dialog();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(await screen.findByLabelText('New API key'), 'sk-brand-new-key-1234');
     await user.click(screen.getByRole('button', { name: 'Replace and test' }));
     expect(await screen.findByTestId('action-error')).toBeTruthy();
@@ -408,7 +408,7 @@ describe('testing a key from the list', () => {
       source: 'connection',
       connectionId: 'mcn_1',
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByLabelText('Model'));
     await user.click(screen.getByRole('option', { name: /gpt-5\.5/ }));
     expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('gpt-5.5');
@@ -437,7 +437,7 @@ describe('testing a key from the list', () => {
     await settle();
     const tests = () => gateway.to('POST', '/v1/admin/model-connections/mcn_1/test');
     expect(tests()).toEqual([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText('Model'), 'llama-3');
     await user.click(screen.getByRole('button', { name: 'Test again' }));
     await waitFor(() => expect(tests()).toHaveLength(1));

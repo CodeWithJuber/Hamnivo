@@ -137,7 +137,7 @@ describe('the Chat widget page', () => {
     expect(screen.getByTestId('appearance-form')).toBeTruthy();
     expect(screen.getByTestId('widget-preview')).toBeTruthy();
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('tab', { name: 'Forms' }));
     await waitFor(() => expect(router.state.location.search).toMatchObject({ tab: 'forms' }));
     expect(router.state.location.search).toMatchObject({ brand: 'brd_1' });
@@ -177,7 +177,7 @@ describe('the Forms tab', () => {
       }),
     });
     await page('/chat-widget?brand=brd_1&tab=forms');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(
       screen.getByRole('checkbox', { name: 'Ask these questions before a chat starts' }),
     );
@@ -242,7 +242,7 @@ describe('the Forms tab', () => {
   it('says what is missing, by each field and in a summary, and sends nothing', async () => {
     const gateway = fakeGateway({});
     await page('/chat-widget?brand=brd_1&tab=forms');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const offline = screen.getByTestId('offline-fields');
     await user.click(within(offline).getByRole('button', { name: 'Add a question' }));
     await user.selectOptions(byId('offline-field-phone-kind'), 'department');
@@ -300,7 +300,7 @@ describe('the Forms tab', () => {
       },
     });
     await page('/chat-widget?brand=brd_1&tab=forms');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('checkbox', { name: 'Let the AI assistant answer first' }));
     await user.click(screen.getByRole('button', { name: 'Save forms' }));
     const summary = await errorSummary();
@@ -336,7 +336,7 @@ describe('the Privacy tab', () => {
       '/chat-widget?brand=brd_1&tab=look',
     );
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('radio', { name: 'Only visitors from the EU, EEA and UK' }));
     expect(
       screen.getByText(
@@ -382,7 +382,7 @@ describe('the Share tab', () => {
     // The install code is here too, with the widget ID the link's settings carry.
     expect(screen.getByTestId('install-snippet').textContent).toContain('data-widget-id="wid_1"');
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Copy link' }));
     expect(await navigator.clipboard.readText()).toBe(url);
     expect(screen.getByTestId('copy-direct-link-status').textContent).toBe('Link copied');
@@ -397,7 +397,7 @@ describe('the Share tab', () => {
     await page('/chat-widget?brand=brd_1&tab=share', owner, { link: linkView(false) });
     expect(screen.getByTestId('direct-link-off').textContent).toContain('The link is off');
     expect(screen.getByTestId('direct-link-qr-off')).toBeTruthy();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(
       screen.getByRole('checkbox', { name: 'Let people open the chat from a link' }),
     );

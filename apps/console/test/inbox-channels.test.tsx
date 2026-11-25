@@ -137,7 +137,7 @@ describe('the composer says where a reply goes', () => {
     expect(screen.getByTestId('reply-channel').textContent).toBe('Your reply is sent on WhatsApp.');
     expect(screen.queryByTestId('reply-window-left')).toBeNull();
     expect(screen.queryByTestId('reply-window-closed')).toBeNull();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(field, 'Yes, in all sizes.');
     await user.click(sendButton());
     await waitFor(() => expect(gateway.to('POST', MESSAGES)).toHaveLength(1));
@@ -176,7 +176,7 @@ describe('the composer says where a reply goes', () => {
     expect(screen.queryByTestId('saved-replies')).toBeNull();
     expect(screen.queryByTestId('copilot')).toBeNull();
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByTestId('lane-internal'));
     expect(screen.queryByTestId('reply-window-closed')).toBeNull();
     const note = (await screen.findByTestId('composer-internal')) as HTMLTextAreaElement;
@@ -196,7 +196,7 @@ describe('the composer says where a reply goes', () => {
     );
     await harness.mount();
     const field = await reply();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(field, 'Are you still there?');
     // The gateway's clock says the window has just closed.
     harness.set(detail({ channel: 'whatsapp', replyWindowClosesAt: inMs(-1_000) }));
@@ -218,7 +218,7 @@ describe('the composer says where a reply goes', () => {
     );
     const { client } = await harness.mount();
     const field = await reply();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(field, 'Hello again');
     await user.click(sendButton());
     expect((await screen.findByTestId('reply-window-closed')).textContent).toBe(CLOSED);
@@ -267,7 +267,7 @@ describe('Telegram in the inbox list', () => {
     const [first] = await screen.findAllByTestId('inbox-row');
     expect(within(first as HTMLElement).getByText('Telegram')).toBeTruthy();
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
     const channel = (await screen.findByLabelText('Channel')) as HTMLSelectElement;
     expect([...channel.options].map((option) => option.text)).toEqual([
@@ -355,7 +355,7 @@ describe('WhatsApp templates in the composer (D14)', () => {
     );
     await mount();
     await reply();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Send a template' }));
     const dialog = await screen.findByTestId('template-dialog');
     expect(within(dialog).getByRole('heading', { name: 'Send a WhatsApp template' })).toBeTruthy();
@@ -464,7 +464,7 @@ describe('WhatsApp templates in the composer (D14)', () => {
     );
     await mount();
     await reply();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByTestId('template-open'));
     const dialog = await screen.findByTestId('template-dialog');
     const options = await within(dialog).findAllByTestId('template-option');
@@ -501,7 +501,7 @@ describe('WhatsApp templates in the composer (D14)', () => {
     await mount();
     await reply();
     expect(screen.getByTestId('saved-replies')).toBeTruthy();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Template' }));
     const empty = await screen.findByTestId('templates-empty');
     expect(empty.textContent).toContain('No approved templates yet');

@@ -113,7 +113,7 @@ describe('reply-time targets in the queue (H12)', () => {
     const queues = screen.getByRole('navigation', { name: 'Queues' });
     const pill = within(queues).getByRole('link', { name: /Overdue/ });
     await waitFor(() => expect(pill.textContent).toBe('Overdue1'));
-    await userEvent.setup().click(pill);
+    await userEvent.setup({ delay: null }).click(pill);
     await waitFor(() => expect(router.state.location.search).toEqual({ queue: 'overdue' }));
     await waitFor(() =>
       expect(
@@ -185,7 +185,7 @@ describe('urgent conversations nobody has taken (HNV-08-02)', () => {
     });
     await mountStudio({ at: '/inbox', permissions: agent, screen: inbox });
     const section = await screen.findByTestId('urgent-section');
-    await userEvent.setup().click(within(section).getByTestId('urgent-claim'));
+    await userEvent.setup({ delay: null }).click(within(section).getByTestId('urgent-claim'));
     const lost = await screen.findByTestId('urgent-lost');
     expect(lost.getAttribute('role')).toBe('alert');
     expect(lost.textContent).toBe('Rayan Lead already took this conversation.');
@@ -235,7 +235,7 @@ describe('a claim that lost in the conversation (HNV-08-06)', () => {
     const title = await screen.findByTestId('conversation-title');
     const header = title.closest('header') as HTMLElement;
     expect(within(header).getByTestId('sla-badge').textContent).toBe('Reply due in 20 min');
-    await userEvent.setup().click(await screen.findByTestId('take-over'));
+    await userEvent.setup({ delay: null }).click(await screen.findByTestId('take-over'));
     expect((await screen.findByTestId('claim-lost')).textContent).toBe(
       'Rayan Lead already took this conversation.',
     );
@@ -275,7 +275,7 @@ describe('setting reply-time targets on the business hours page', () => {
     });
     await mountStudio({ at: '/hours', permissions: owner, screen: <HoursPage /> });
     const form = await screen.findByTestId('reply-targets');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(within(form).getByLabelText('Use reply-time targets for this brand'));
     await user.type(within(form).getByLabelText('First reply within for Urgent'), '5');
     await user.type(within(form).getByLabelText('Next reply within for Urgent'), '0');
@@ -347,7 +347,7 @@ describe('setting reply-time targets on the business hours page', () => {
     });
     await mountStudio({ at: '/hours', permissions: owner, screen: <HoursPage /> });
     const form = await screen.findByTestId('reply-targets');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     expect(
       within(form).getByRole('group', { name: 'When a conversation goes past its target' }),
     ).toBeTruthy();

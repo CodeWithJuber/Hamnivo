@@ -64,7 +64,7 @@ describe('agency access boundaries', () => {
       'POST /v1/admin/agency/clients': { status: 201, json: { tenant: { id: 'tnt_new' } } },
     });
     await mountStudio({ permissions: ['agency.read', 'agency.manage'], screen: <AgencyPage /> });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(await screen.findByLabelText('Name'), 'North');
     await user.type(screen.getByLabelText('Workspace address'), 'north-client');
     await user.click(screen.getByRole('button', { name: 'Create' }));
@@ -131,7 +131,7 @@ describe('workflow drafts', () => {
       seed,
       screen: <WorkflowsPage />,
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(await screen.findByRole('button', { name: 'Create' }));
     await user.type(screen.getByLabelText('Name', { selector: '#workflow-name' }), 'Support flow');
     await user.selectOptions(screen.getByLabelText('Coordinator agent'), 'agt_1');
@@ -182,7 +182,7 @@ describe('connector capabilities', () => {
       seed,
       screen: <ConnectorsPage />,
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(await screen.findByText('Create WHMCS'));
     await user.type(screen.getByLabelText('Name'), 'Billing');
     await user.type(screen.getByLabelText('WHMCS HTTPS address'), 'https://billing.example');
@@ -237,7 +237,9 @@ describe('branding verification status', () => {
     await screen.findByText('Ownership verified');
     expect(screen.getByText('Routing ready: No · TLS: No')).toBeDefined();
     expect(screen.queryByText('Active')).toBeNull();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Verify DNS' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(screen.getByRole('button', { name: 'Verify DNS' }));
     await waitFor(() =>
       expect(gateway.to('POST', '/v1/admin/branding/domains/dom_1/verify')).toHaveLength(1),
     );
@@ -337,7 +339,7 @@ describe('live WHMCS user permission preview', () => {
       seed,
       screen: <ConnectorsPage />,
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(await screen.findByText('Test WHMCS user permissions'));
     await user.type(screen.getByLabelText('WHMCS user ID'), '42');
     await user.type(screen.getByLabelText('WHMCS client ID'), '7');
@@ -466,7 +468,7 @@ describe('named workflow resources', () => {
       seed,
       screen: <WorkflowsPage />,
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(await screen.findByRole('button', { name: /Existing automation/ }));
     const tool = screen.getByLabelText('Action tool') as HTMLSelectElement;
     const specialist = screen.getByLabelText('Specialist') as HTMLSelectElement;

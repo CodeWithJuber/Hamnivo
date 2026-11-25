@@ -104,7 +104,7 @@ describe('the chat settings', () => {
       },
     });
     await form();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     expect(
       screen.getByRole('checkbox', { name: /Suggest next questions/ }).getAttribute('data-state'),
     ).toBe('checked');
@@ -132,7 +132,7 @@ describe('the chat settings', () => {
     expect(
       screen.getByRole('radio', { name: /After the AI has tried/ }).getAttribute('data-state'),
     ).toBe('checked');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('radio', { name: /^Never/ }));
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
     await waitFor(() => expect(saved(gateway)).toBeDefined());
@@ -147,7 +147,7 @@ describe('the chat settings', () => {
     });
     await form(settings({ layout: { offset: { x: 0, y: 96 } }, help: { followUps: false } }));
     expect((screen.getByLabelText(/Space from the bottom/) as HTMLInputElement).value).toBe('96');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('checkbox', { name: /Suggest next questions/ }));
     await user.clear(screen.getByLabelText(/Space from the side/));
     await user.clear(screen.getByLabelText(/Space from the bottom/));
@@ -160,7 +160,7 @@ describe('the chat settings', () => {
   it('says what is wrong with a place off the screen, and sends nothing', async () => {
     const gateway = fakeGateway({});
     await form();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(screen.getByLabelText(/Space from the bottom/), '900');
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
     const box = await errorSummary();
@@ -198,7 +198,7 @@ describe('the look and wording editor', () => {
     const onSaved = vi.fn();
     await editor({}, { onSaved });
     fireEvent.change(screen.getByLabelText(/Roundness of corners/), { target: { value: '4' } });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(
       screen.getByLabelText('Logo web address', { exact: false }),
       'https://noor.example/logo.png',
@@ -261,7 +261,7 @@ describe('the look and wording editor', () => {
     expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(
       true,
     );
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Publish' }));
+    await userEvent.setup({ delay: null }).click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() =>
       expect(gateway.to('POST', '/v1/admin/brands/brd_1/appearance/publish')).toHaveLength(1),
     );
@@ -278,7 +278,7 @@ describe('the look and wording editor', () => {
     expect(panel()).toContain('border-radius: 16px');
     fireEvent.change(screen.getByLabelText(/Roundness of corners/), { target: { value: '0' } });
     expect(panel()).toContain('border-radius: 0px');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const greeting = screen.getByLabelText('English', { selector: '#look-greeting-en' });
     await user.type(greeting, 'Welcome to Noor Books!');
     expect(screen.getByTestId('preview-greeting').textContent).toBe('Welcome to Noor Books!');
@@ -288,7 +288,7 @@ describe('the look and wording editor', () => {
   it('shows the picture in each language, and when the team is away', async () => {
     fakeGateway({});
     await editor({ offlineText: { en: 'We are closed. Back {when}.' } });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.selectOptions(screen.getByLabelText('Language'), 'ar');
     const panel = screen.getByTestId('widget-preview');
     expect(panel.getAttribute('dir')).toBe('rtl');
@@ -307,7 +307,7 @@ describe('the look and wording editor', () => {
     const onSaved = vi.fn();
     await editor({ primaryColor: '#808080' }, { onSaved });
     expect(screen.getAllByText('Text on this colour is hard to read.').length).toBeGreaterThan(0);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const offer = screen.getByTestId('colour-suggestion');
     const apply = within(offer).getByRole('button');
     const colour = /Use (#[0-9A-F]{6})/.exec(apply.textContent ?? '')?.[1] ?? '';
@@ -326,7 +326,7 @@ describe('the look and wording editor', () => {
   it('will not send a colour that cannot be read, and says why in a summary and by the field', async () => {
     const gateway = fakeGateway({});
     await editor({ primaryColor: '#F2F2F2' });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     const summary = await errorSummary();
     expect(within(summary).getByText(/too close to white/)).toBeTruthy();
@@ -340,7 +340,7 @@ describe('the look and wording editor', () => {
       logoUrl: 'http://noor.example/logo.png',
       privacyUrl: 'javascript:alert(1)',
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     const summary = await errorSummary();
     expect(within(summary).getByText(/Write the English text first/)).toBeTruthy();
@@ -360,7 +360,7 @@ describe('the look and wording editor', () => {
     });
     const onSaved = vi.fn();
     await editor({}, { onSaved });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(
       (await screen.findAllByText('The server does not like this colour.')).length,
@@ -374,7 +374,7 @@ describe('the look and wording editor', () => {
     fakeGateway({});
     const onDirtyChange = vi.fn();
     await editor({}, { onDirtyChange });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const reset = screen.getByRole('button', { name: 'Reset' }) as HTMLButtonElement;
     expect(reset.disabled).toBe(true);
     await user.click(screen.getByRole('checkbox', { name: 'Ask customers to rate the chat' }));
@@ -417,7 +417,7 @@ describe('the business hours page', () => {
       'GET /v1/admin/brands': { json: { items: [brand] } },
     });
     await page();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Monday to Friday, 9:00 to 17:00' }));
     expect(day('mon').getAllByLabelText('Opens')).toHaveLength(1);
     expect(day('sat').queryByLabelText('Opens')).toBeNull();
@@ -441,7 +441,7 @@ describe('the business hours page', () => {
       'GET /v1/admin/brands': { json: { items: [brand] } },
     });
     await page();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Every day, all day' }));
     // A second time on Monday: open 09:00 to 13:00 and again 14:00 to 18:00.
     const mon = day('mon');
@@ -472,7 +472,7 @@ describe('the business hours page', () => {
       'GET /v1/admin/brands': { json: { items: [brand] } },
     });
     await page();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const date = screen.getByLabelText('Day') as HTMLInputElement;
     fireEvent.change(date, { target: { value: '2026-12-25' } });
     await user.click(screen.getByRole('button', { name: 'Add day' }));
@@ -498,7 +498,7 @@ describe('the business hours page', () => {
   it('says what to fix when times overlap or close before they open, and sends nothing', async () => {
     const gateway = fakeGateway({});
     await page();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(within(screen.getByTestId('hours-day-wed')).getByRole('checkbox'));
     const wed = day('wed');
     await user.click(wed.getByRole('button', { name: 'Add another time' }));
@@ -534,7 +534,7 @@ describe('the business hours page', () => {
     expect(timeOf('Opens')).toBe('09:00');
     expect(timeOf('Closes')).toBe('17:00');
     expect((screen.getByLabelText('Time zone') as HTMLSelectElement).value).toBe('Asia/Karachi');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Remove hours' }));
     const dialog = await screen.findByRole('alertdialog').catch(() => screen.findByRole('dialog'));
     expect(within(dialog).getByText('Remove the hours of Noor Books?')).toBeTruthy();
@@ -550,7 +550,7 @@ describe('the business hours page', () => {
   it('asks before leaving with times that are not saved, and lets the person stay', async () => {
     fakeGateway({});
     const { router } = await page();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Monday to Friday, 9:00 to 17:00' }));
     expect(screen.getByTestId('hours-unsaved')).toBeTruthy();
     void router.navigate({ to: '/brands' });
@@ -629,7 +629,7 @@ describe('the support teams page', () => {
   it('adds a person by sending the whole team with them in it', async () => {
     const gateway = fakeGateway(route(['staff_a', 'staff_b']));
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const add = screen.getByRole('button', { name: 'Add to team' }) as HTMLButtonElement;
     expect(add.disabled).toBe(true);
     await user.selectOptions(screen.getByLabelText('Add a person'), 'staff_b');
@@ -643,7 +643,7 @@ describe('the support teams page', () => {
   it('takes a person out by sending the team without them, even the last one', async () => {
     const gateway = fakeGateway(route([]));
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Take Amina out of Support' }));
     await waitFor(() =>
       expect(gateway.to('PUT', '/v1/admin/teams/team_1/members')).toHaveLength(1),
@@ -656,7 +656,7 @@ describe('the support teams page', () => {
       'PUT /v1/admin/teams/team_1/members': { problem: { status: 403, code: 'SCOPE_DENIED' } },
     });
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Take Amina out of Support' }));
     expect(await screen.findByTestId('action-error')).toBeTruthy();
     // Amina is still listed: the list changes only when the gateway has said yes.
@@ -694,7 +694,7 @@ describe('the customer sign-in page', () => {
       [`GET ${keysUrl}`]: { json: { items: [key(), key({ kid: 'shop-2' })] } },
     });
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByTestId('create-identity-key'));
     const dialog = await screen.findByTestId('create-identity-key-dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Create secret' }));
@@ -727,7 +727,7 @@ describe('the customer sign-in page', () => {
       },
     });
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Replace the key shop-1' }));
     const dialog = await screen.findByTestId('create-identity-key-dialog');
     // The kind is the old key's: there is no choice to make.
@@ -751,7 +751,7 @@ describe('the customer sign-in page', () => {
       [`GET ${keysUrl}`]: { json: { items: [key(), key({ kid: 'shop-2' })] } },
     });
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Replace the key shop-1' }));
     const dialog = await screen.findByTestId('create-identity-key-dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Create secret' }));
@@ -765,7 +765,7 @@ describe('the customer sign-in page', () => {
       [`GET ${keysUrl}`]: { json: { items: [key(), key({ kid: 'pub-1', alg: 'ES256' })] } },
     });
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByTestId('create-identity-key'));
     const dialog = await screen.findByTestId('create-identity-key-dialog');
     await user.click(within(dialog).getByRole('radio', { name: /A public key/ }));
@@ -799,7 +799,7 @@ describe('the customer sign-in page', () => {
       [`GET ${keysUrl}`]: { json: { items: [key({ status: 'revoked' })] } },
     });
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Revoke the key shop-1' }));
     const dialog = await screen.findByTestId('revoke-identity-key-dialog');
     expect(within(dialog).getByText('Revoke the key shop-1?')).toBeTruthy();

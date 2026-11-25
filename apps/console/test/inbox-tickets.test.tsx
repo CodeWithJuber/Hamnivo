@@ -133,7 +133,7 @@ describe('the tickets queue', () => {
     expect(second?.querySelector('[data-priority="urgent"]')?.querySelector('svg')).toBeTruthy();
     expect(screen.queryByTestId('ticket-filters')).toBeNull();
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(pill);
     await waitFor(() => expect(router.state.location.search).toEqual({ queue: 'tickets' }));
     const asked = (check: (call: Call) => boolean) =>
@@ -186,7 +186,7 @@ describe('the tickets queue', () => {
       screen: inbox,
     });
     expect(await screen.findByText('No tickets match')).toBeTruthy();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'See all tickets' }));
     await waitFor(() => expect(router.state.location.search).toEqual({ queue: 'tickets' }));
   });
@@ -256,7 +256,7 @@ describe('a ticket above its conversation', () => {
       });
     expect(radio('Open').getAttribute('aria-checked')).toBe('true');
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const posts = (path: string) => gateway.to('POST', `/v1/inbox/conversations/conv_1/${path}`);
     await user.click(radio('Pending'));
     // Pending waits for the customer: snoozed with no time, until they write.
@@ -323,7 +323,7 @@ describe('making a conversation a ticket', () => {
         ),
     }));
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const dialog = await openMakeTicket(user);
     expect(
       within(dialog).getByRole('heading', { name: 'Make this conversation a ticket' }),
@@ -349,7 +349,7 @@ describe('making a conversation a ticket', () => {
       'POST /v1/inbox/conversations/conv_1/ticket': () => set(detail({ ticket: ticket('open') })),
     }));
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const dialog = await openMakeTicket(user);
     await user.click(within(dialog).getByRole('button', { name: 'Create ticket' }));
     await waitFor(() =>
@@ -364,7 +364,7 @@ describe('making a conversation a ticket', () => {
       detail({ permissions: { ...detail().permissions, status: false } }),
     );
     await mount();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const dialog = await openMakeTicket(user);
     const create = within(dialog).getByRole('button', { name: 'Create ticket' });
     expect(create.getAttribute('aria-disabled')).toBe('true');

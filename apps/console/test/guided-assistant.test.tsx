@@ -213,7 +213,7 @@ describe('the WHMCS connection form', () => {
   it('shows the three steps and picks the brand’s only sign-in key by itself', async () => {
     const gateway = fakeGateway(routes([key('old-key', 'revoked'), key('whmcs-2026-11')]));
     await mountStudio({ permissions: owner, seed, screen: <ConnectorsPage /> });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(await screen.findByText('Create WHMCS'));
     const steps = screen.getByTestId('whmcs-steps');
     expect(within(steps).getAllByRole('listitem')).toHaveLength(3);
@@ -240,7 +240,7 @@ describe('the WHMCS connection form', () => {
   it('offers to create a key right there when the brand has none', async () => {
     fakeGateway(routes([]));
     await mountStudio({ permissions: owner, seed, screen: <ConnectorsPage /> });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(await screen.findByText('Create WHMCS'));
     expect(await screen.findByTestId('whmcs-no-key')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Create a key' }));

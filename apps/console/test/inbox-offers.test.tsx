@@ -134,7 +134,7 @@ describe('chats offered to me (HNV-10-03)', () => {
     });
     await mountStudio({ at: '/inbox', permissions: agent, screen: inbox });
     const card = await screen.findByTestId('offer-card');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(
       within(card).getByRole('button', { name: 'Decline the chat with Aisha Khan' }),
     );
@@ -174,7 +174,7 @@ describe('chats offered to me (HNV-10-03)', () => {
     });
     await mountStudio({ at: '/inbox', permissions: agent, screen: inbox });
     const card = await screen.findByTestId('offer-card');
-    await userEvent.setup().click(within(card).getByTestId('offer-accept'));
+    await userEvent.setup({ delay: null }).click(within(card).getByTestId('offer-accept'));
     const closed = await screen.findByTestId('offer-closed');
     expect(closed.getAttribute('role')).toBe('alert');
     expect(closed.textContent).toBe('Rayan Lead already took this conversation.');
