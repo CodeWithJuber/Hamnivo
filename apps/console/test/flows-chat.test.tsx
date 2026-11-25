@@ -13,7 +13,7 @@ import { AppearanceForm } from '../src/pages/settings/AppearanceDialog';
 import { HoursPage } from '../src/pages/settings/HoursPage';
 import { IdentityPage } from '../src/pages/settings/IdentityPage';
 import { TeamsPage } from '../src/pages/settings/TeamsPage';
-import { fakeGateway, mountStudio, SELF_ID, settle, TENANT_ID } from './dom';
+import { clickable, fakeGateway, mountStudio, SELF_ID, settle, TENANT_ID } from './dom';
 
 beforeAll(async () => {
   await initI18n('en');
@@ -556,14 +556,16 @@ describe('the business hours page', () => {
     void router.navigate({ to: '/brands' });
     const ask = await screen.findByTestId('discard-changes');
     expect(within(ask).getByText('Leave without saving?')).toBeTruthy();
-    await user.click(within(ask).getByRole('button', { name: 'Keep editing' }));
+    await user.click(await clickable(within(ask).getByRole('button', { name: 'Keep editing' })));
     await settle();
     expect(router.state.location.pathname).toBe('/hours');
     expect(screen.getByTestId('hours-unsaved')).toBeTruthy();
     // Leaving for real throws the changes away.
     void router.navigate({ to: '/brands' });
     const again = await screen.findByTestId('discard-changes');
-    await user.click(within(again).getByRole('button', { name: 'Discard changes' }));
+    await user.click(
+      await clickable(within(again).getByRole('button', { name: 'Discard changes' })),
+    );
     await waitFor(() => expect(router.state.location.pathname).toBe('/brands'));
   });
 
