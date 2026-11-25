@@ -14,6 +14,8 @@
 #   pnpm ci:local --skip-site        skip the website in a browser
 #   pnpm ci:local --skip-basics      skip lint, typecheck, unit tests and the other --quick checks
 #                                    (CI runs them in a job of their own, beside the slow ones)
+#   pnpm ci:local --skip-lint        skip Biome and shellcheck (CI lints only main, the nightly
+#                                    run and a run by hand; typecheck and unit tests still run)
 #   pnpm ci:local --skip-integration skip the integration tests
 #   pnpm ci:local --with-production  also build the production images and check the real
 #                                    deployment with a backup and restore drill (10–20 minutes)
@@ -36,6 +38,7 @@ cd "$root"
 quick=0
 affected=0
 basics=1
+lint=1
 integration=1
 a11y=1
 chatwoot=1
@@ -50,6 +53,7 @@ for arg in "$@"; do
     --quick) quick=1 ;;
     --affected) affected=1 ;;
     --skip-basics) basics=0 ;;
+    --skip-lint) lint=0 ;;
     --skip-integration) integration=0 ;;
     --skip-a11y) a11y=0 ;;
     --skip-chatwoot) chatwoot=0 ;;
@@ -361,11 +365,15 @@ deploy_scripts() {
     'apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends git curl ca-certificates util-linux procps >/dev/null && bash scripts/ci/deploy-https-test.sh'
 }
 if ((basics == 1)); then
-  step "Lint and format (Biome)" pnpm lint
+  if ((lint == 1)); then
+    step "Lint and format (Biome)" pnpm lint
+  fi
   step "Typecheck" pnpm typecheck ${heavy_limit[@]+"${heavy_limit[@]}"} \
     ${turbo_affected[@]+"${turbo_affected[@]}"}
   step "Unit tests" unit_tests
-  step "Shell scripts (shellcheck)" shell_scripts
+  if ((lint == 1)); then
+    step "Shell scripts (shellcheck)" shell_scripts
+  fi
   step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
   step "CI picks the suites a change needs" node --test scripts/ci/plan.test.mjs
   step "Deploy scripts: doctor and HTTPS rules (stand-ins; in Linux)" deploy_scripts
