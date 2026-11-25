@@ -1299,11 +1299,11 @@ bills nothing for it (ADR 0020). It is split into suites that run side by side, 
 integration tests in three parts per PostgreSQL version, Studio's browser tests in three parts,
 and each other browser check on its own. With a runner for each suite, a push takes about as long
 as its slowest suite. A push to a branch other than main runs only typecheck and unit tests, for
-the packages its change reaches (lint runs on main, nightly and by hand only). A push to main (a
-merge) runs the suites the merge can reach compared with main before it (`scripts/ci/plan.mjs`),
+the packages its change reaches (lint runs on main, weekly and by hand only). A push to main (a
+merge) runs the suites reached since the last commit main passed (`scripts/ci/plan.mjs`),
 on PostgreSQL 18, with lint and the quick checks on every package and the smoke tests when a deploy
-file changes; a change to Markdown or `docs/` alone runs only those basics. The nightly run (23:00
-UTC) and runs by hand run every suite, test 16 too, and run the production and automatic-deploy
+file changes; a change to Markdown or `docs/` alone runs only those basics. The weekly run (Saturday
+23:00 UTC) and runs by hand run every suite, test 16 too, and run the production and automatic-deploy
 smoke tests. A branch push of a tree that an earlier run already passed is not checked again.
 
 - Self-hosted runners are free.
@@ -1360,7 +1360,7 @@ What the runner keeps on the server, so no run downloads it again:
 | --- | --- |
 | pnpm's package store, pruned to what the last run used | the `work` volume, `_pnpm-store` |
 | Playwright's browsers and other tool caches | the `runner-cache` volume |
-| Turbo's cache (a week), shared by all runners under the github-runners kit; only pushes to `main` and the nightly run write it | `CI_RESULTS_DIR/turbo-cache`, else the `runner-cache` volume |
+| Turbo's cache (a week), shared by all runners under the github-runners kit; only pushes to `main` and the weekly run write it | `CI_RESULTS_DIR/turbo-cache`, else the `runner-cache` volume |
 | Docker images and the build cache of the smoke tests (a week) | the `dind-data` volume |
 | Each run's `test-results/` (14 days, `HAMNIVO_CI_RESULTS_DAYS`) | `/opt/hamnivo-ci-runner/results` |
 
