@@ -1,13 +1,8 @@
 @import "tailwindcss";
 @import "@hamnivo/brand/theme.css";
-/* Same families as packages/ui, limited to the scripts each one covers. */
-@import "@fontsource-variable/dm-sans/wght.css";
-@import "@fontsource/noto-sans-arabic/arabic-400.css";
-@import "@fontsource/noto-sans-arabic/arabic-600.css";
-@import "@fontsource/noto-sans-devanagari/devanagari-400.css";
-@import "@fontsource/noto-sans-devanagari/devanagari-600.css";
-/* Nastaliq is large (about 160 KB), so Urdu uses one weight and headings rely on size. */
-@import "@fontsource/noto-nastaliq-urdu/arabic-400.css";
+/* The fonts (same families as packages/ui, limited to the scripts each one covers) are declared
+   in layouts/Base.astro with font-display: optional, so they never shift the page. Nastaliq is
+   large (about 160 KB), so Urdu uses one weight and headings rely on size. */
 
 /* Ink-band colours; the --ink-* values come from the brand's dark-theme roles (lib/theme.ts). */
 @theme inline {
