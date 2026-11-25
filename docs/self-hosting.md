@@ -1299,13 +1299,13 @@ bills nothing for it (ADR 0020). It is split into suites that run side by side, 
 integration tests in three parts per PostgreSQL version, Studio's browser tests in three parts,
 and each other browser check on its own. At most two of these heavy suites run at once
 (`max-parallel` in `ci.yml`): the runners share one server's CPUs, and more at once made the tests
-time out. Other branches test PostgreSQL 18 only and run only the suites their change
-can reach (`scripts/ci/plan.mjs`), with types and unit tests checked for the packages it reaches;
-a change to Markdown or `docs/` alone runs only those basics. Main, the nightly run (23:00 UTC)
-and runs by hand run every suite, test 16 too, and run the production and automatic-deploy smoke
-tests, which other branches run only when a deploy file changes. A push of a tree that an earlier
-run already passed, such as a branch merged into main, is not checked again: main then runs only
-PostgreSQL 16 and the smoke tests, and other branches nothing.
+time out. A push to a branch other than main runs only typecheck and unit tests, for
+the packages its change reaches (lint runs on main, nightly and by hand only). A push to main (a
+merge) runs the suites the merge can reach compared with main before it (`scripts/ci/plan.mjs`),
+on PostgreSQL 18, with lint and the quick checks on every package and the smoke tests when a deploy
+file changes; a change to Markdown or `docs/` alone runs only those basics. The nightly run (23:00
+UTC) and runs by hand run every suite, test 16 too, and run the production and automatic-deploy
+smoke tests. A branch push of a tree that an earlier run already passed is not checked again.
 
 - Self-hosted runners are free.
 - Caches stay on the runner's disk, and results stay on the server.
