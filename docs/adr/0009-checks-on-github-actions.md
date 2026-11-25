@@ -24,16 +24,16 @@ already runs a self-hosted runner for another project.
   into suites that run side by side, one job each (lint, types and unit tests; integration, in
   three parts per PostgreSQL version; Chatwoot; the accessibility audit; the widget journey;
   Studio, in three parts; the website; the production and automatic-deploy smoke tests).
-  On main, every night (23:00 UTC) and on a run by hand it runs every suite, tests PostgreSQL 16
-  and 18 and runs the smoke tests. A push to another branch runs only the quick checks (types
-  and unit tests; lint and shellcheck run only on main, nightly and by hand) on the packages
-  its change reaches, and nothing when an earlier run passed its tree. The heavy suites wait for the branch's pull request: when it opens, reopens or is
-  marked ready (a draft gets the quick checks), it tests PostgreSQL 18 only, runs the smoke tests
-  only when a deploy file changes, and runs only the suites its change can reach in turbo's
-  package graph (`scripts/ci/plan.mjs`). A change to Markdown or `docs/` alone runs only the
-  basics; a change outside the packages, or one the graph cannot place, runs every suite.
-  Main checks everything even for a tree that passed, since a branch passes on its quick checks.
-  A run by hand (`gh workflow run ci.yml --ref <branch>`) runs everything.
+  Each change gets its heavy suites once, on main after the merge. A push to another branch
+  runs only typecheck and unit tests on the packages its change reaches (lint and shellcheck run
+  only on main, nightly and by hand), and nothing when an earlier run passed its tree. A push to
+  main runs the suites the merge can reach in turbo's package graph compared with main before it
+  (`github.event.before`, `scripts/ci/plan.mjs`), on PostgreSQL 18, the smoke tests only when a
+  deploy file changes, and lint and the quick checks on every package. A change to Markdown or
+  `docs/` alone runs only the basics; a merge outside the packages, or one the graph cannot place,
+  runs every suite. Main does not trust a passed tree, since a branch passes on its quick checks.
+  Every night (23:00 UTC) and on a run by hand (`gh workflow run ci.yml --ref <branch>`) it runs
+  every suite, tests PostgreSQL 16 and 18 and runs the smoke tests.
   (2026-11-25: branch pushes ran the heavy suites too, and used about 58% of all CI minutes.)
 - **Which runner.** It runs on a self-hosted runner with the label `hamnivo`; the heavy suites also need the label `heavy`, which all but two of the runners have, so the plan and the basics never wait behind them. The repository
   variable `HAMNIVO_CI_RUNNER`, a JSON list of labels, can point it at other runners, hosted

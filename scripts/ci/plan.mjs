@@ -6,21 +6,21 @@
 //   node scripts/ci/plan.mjs
 //
 // It reads GITHUB_EVENT_NAME, GITHUB_REF and GITHUB_SHA; PASSED=true when an earlier run passed on
-// the same tree (fkirc/skip-duplicate-actions); DRAFT=true for a draft pull request; and BASE, what
-// a branch is compared with (origin/main).
+// the same tree (fkirc/skip-duplicate-actions); and BASE, what a change is compared with: main
+// before the push for a push to main (github.event.before), origin/main for another branch.
 //
-// - A run by hand, the nightly run and a push to main check everything: PostgreSQL 16 and 18 and
-//   the smoke tests. Main does not trust a passed tree, since a branch passes on its quick checks.
-// - A push to another branch runs only the quick checks (lint, types and unit tests), on the
-//   packages its change reaches in turbo's package graph, and nothing when its tree already passed.
-//   Agents push a branch many times; the heavy suites wait for its pull request.
-// - A pull request, when it opens, reopens or is marked ready (a draft gets the quick checks),
-//   tests PostgreSQL 18, runs the smoke tests when a deploy file changes, and runs only the suites
-//   that its change reaches; the basics typecheck and unit-test only the packages it reaches. A
+// Each change gets its heavy suites once, on main after the merge, scoped to what it reaches:
+// - A push to another branch runs only typecheck and unit tests, on the packages its change
+//   reaches in turbo's package graph, and nothing when its tree already passed. Agents push a
+//   branch many times.
+// - A push to main (a merge) runs the suites the merge reaches compared with main before it, on
+//   PostgreSQL 18, the smoke tests when a deploy file changes, and lint and the quick checks on
+//   every package. It does not trust a passed tree, since a branch passes on its quick checks. A
 //   change to Markdown or docs/ alone runs only the basics.
-// - What a pull request's change cannot place runs everything: no merge base, a changed file
-//   outside every package (the workflows, scripts/ci, the lockfile, the root config, deploy/), or
-//   turbo failing. A branch push in that case runs the quick checks on every package.
+// - The nightly run and a run by hand check everything: PostgreSQL 16 and 18 and the smoke tests.
+// - What a change cannot place runs everything on main (no commit before it, a changed file outside
+//   every package: the workflows, scripts/ci, the lockfile, the root config, deploy/; or turbo
+//   failing), and the quick checks on every package on another branch.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -44,7 +44,7 @@ const PARTS = [1, 2, 3];
  * What a run checks. `diff()` returns the files a branch changed, or null without a merge base;
  * `reach(files)` returns the packages those files reach, as {name, testInt}, and throws when it
  * cannot tell. Lint (Biome, shellcheck) runs only on main, the nightly run and a run by hand: a
- * branch push and a pull request get typecheck and unit tests without it.
+ * branch push gets typecheck and unit tests without it.
  */
 export function pick(run) {
   const backstop =
@@ -54,23 +54,24 @@ export function pick(run) {
   return { ...choose(run), lint: backstop };
 }
 
-function choose({ event, ref, passed, draft, diff, reach }) {
+function choose({ event, ref, passed, diff, reach }) {
   const everything = (pg, smoke, why) => ({ pg, smoke, run: new Set(ALL), affected: false, why });
   if (event === 'push' && ref === 'refs/heads/main') {
-    return everything(['16', '18'], true, 'a push to main checks everything');
+    // The quick checks cover every package on main, whatever the merge reached.
+    const merged = reachedSuites(diff, reach, everything);
+    return { ...merged, affected: false, why: `main after a merge: ${merged.why}` };
   }
-  const quick = (why) => {
-    const placed = reachedSuites(diff, reach, everything);
-    return { pg: [], smoke: false, run: new Set(['basics']), affected: placed.affected, why };
-  };
   if (event === 'push') {
     if (passed)
       return { pg: [], smoke: false, run: new Set(), affected: false, why: 'this tree passed' };
-    return quick('a branch push: the quick checks; the heavy suites wait for its pull request');
-  }
-  if (event === 'pull_request') {
-    if (draft) return quick('a draft pull request: the quick checks');
-    return reachedSuites(diff, reach, everything);
+    const placed = reachedSuites(diff, reach, everything);
+    return {
+      pg: [],
+      smoke: false,
+      run: new Set(['basics']),
+      affected: placed.affected,
+      why: 'a branch push: types and unit tests; the heavy suites run on main after the merge',
+    };
   }
   return everything(['16', '18'], true, `a ${event} run checks everything`);
 }
@@ -205,7 +206,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     event: env.GITHUB_EVENT_NAME,
     ref: env.GITHUB_REF,
     passed: env.PASSED === 'true',
-    draft: env.DRAFT === 'true',
     diff: () => changedFiles(env.BASE || 'origin/main', env.GITHUB_SHA || 'HEAD'),
     reach: reachInGraph,
   });

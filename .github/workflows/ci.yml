@@ -1,12 +1,12 @@
 # The full check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, split into suites that
 # run side by side, one job each, on our own runners (deploy/ci-runner). scripts/ci/plan.mjs picks
-# them. Main, the nightly run and a run by hand cover everything: every PostgreSQL major and the
-# production and automatic-deploy smoke tests. A push to another branch gets only the quick checks
-# (types and unit tests; lint only on main, nightly and by hand) on the packages its change reaches, and nothing when an earlier run
-# already passed its tree: agents push a branch many times. Its pull request, when it opens, reopens
-# or is marked ready, gets the suites its change can reach in the package graph, on PostgreSQL 18
-# (production's), and the smoke tests only when a deploy file changes; a change it cannot place gets
-# everything. For a full check of a branch before then: gh workflow run ci.yml --ref <branch>.
+# them. Each change gets its heavy suites once. A push to another branch gets only typecheck and
+# unit tests on the packages its change reaches (agents push a branch many times), and nothing when
+# an earlier run already passed its tree. A push to main (a merge) gets the suites the merge can reach
+# in the package graph compared with main before it, on PostgreSQL 18 (production's), the smoke
+# tests when a deploy file changes, and lint and the quick checks on every package; a merge it cannot
+# place gets everything. The nightly run and a run by hand cover everything: every PostgreSQL major
+# and the smoke tests. For a full check of a branch before merging: gh workflow run ci.yml --ref <branch>.
 # The heavy suites run only on runners labelled `heavy` (all but two, github-runners FAST_RUNNERS),
 # so picking the suites and the basics always find a free runner, however many suites are queued.
 # It uses nothing GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each
@@ -16,9 +16,6 @@ name: CI
 
 on:
   push:
-  # The heavy suites run once per pull request, not on each of its pushes.
-  pull_request:
-    types: [opened, reopened, ready_for_review]
   workflow_dispatch:
   # Everything, every night at 23:00 UTC: the safety net for what a branch's selection missed.
   schedule:
@@ -66,10 +63,10 @@ jobs:
           package-manager-cache: false
           node-version: 24
 
-      # Turbo, whose package graph places a change. If this fails, a pull request runs everything
-      # and a branch push the quick checks on every package.
+      # Turbo, whose package graph places a change. If this fails, main runs everything and a branch
+      # push the quick checks on every package.
       - name: Install dependencies
-        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
+        if: github.event_name == 'push'
         continue-on-error: true
         run: pnpm install --frozen-lockfile
 
@@ -77,7 +74,8 @@ jobs:
         id: pick
         env:
           PASSED: ${{ steps.duplicate.outputs.should_skip }}
-          DRAFT: ${{ github.event.pull_request.draft }}
+          # Main is compared with main before the push, another branch with origin/main.
+          BASE: ${{ github.ref == 'refs/heads/main' && github.event.before || 'origin/main' }}
         run: |
           suites="$(node scripts/ci/plan.mjs)"
           echo "suites=$suites" >> "$GITHUB_OUTPUT"
