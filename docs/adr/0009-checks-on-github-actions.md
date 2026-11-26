@@ -26,15 +26,17 @@ already runs a self-hosted runner for another project.
   Studio, in three parts; the website; the production and automatic-deploy smoke tests).
   Each change gets its heavy suites once, on main after the merge. A push to another branch
   runs only typecheck and unit tests on the packages its change reaches (lint and shellcheck run
-  only on main, nightly and by hand), and nothing when an earlier run passed its tree. A push to
-  main runs the suites the merge can reach in turbo's package graph compared with main before it
-  (`github.event.before`, `scripts/ci/plan.mjs`), on PostgreSQL 18, the smoke tests only when a
+  only on main, weekly and by hand), and nothing when an earlier run passed its tree. A push to
+  main runs the suites turbo's package graph reaches from what changed since the last commit a run
+  passed on main (`scripts/ci/plan.mjs`), so a suite that failed on one merge runs again on the
+  next, on PostgreSQL 18, the smoke tests only when a
   deploy file changes, and lint and the quick checks on every package. A change to Markdown or
   `docs/` alone runs only the basics; a merge outside the packages, or one the graph cannot place,
   runs every suite. Main does not trust a passed tree, since a branch passes on its quick checks.
-  Every night (23:00 UTC) and on a run by hand (`gh workflow run ci.yml --ref <branch>`) it runs
+  Every Saturday (23:00 UTC) and on a run by hand (`gh workflow run ci.yml --ref <branch>`) it runs
   every suite, tests PostgreSQL 16 and 18 and runs the smoke tests.
-  (2026-11-25: branch pushes ran the heavy suites too, and used about 58% of all CI minutes.)
+  (2026-11-25: branch pushes ran the heavy suites too, and used about 58% of all CI minutes; the
+  full run was nightly, about 400 job-minutes each night.)
 - **Which runner.** It runs on a self-hosted runner with the label `hamnivo`; the heavy suites also need the label `heavy`, which all but two of the runners have, so the plan and the basics never wait behind them. The repository
   variable `HAMNIVO_CI_RUNNER`, a JSON list of labels, can point it at other runners, hosted
   ones included.
