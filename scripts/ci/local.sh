@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Hamnivo's complete check pipeline, for your own machine or server (there is no hosted CI).
+# Hamnivo's complete check pipeline, for your own machine or server. CI runs it in parts
+# (.github/workflows/ci.yml).
 #
 #   pnpm ci:local                    every check below except the opt-in production smoke test
 #   pnpm ci:local --quick            install, lint, typecheck, unit tests, status/licence checks,
-#                                    and that no workflow uses what GitHub bills for
+#                                    and that every workflow is safe for a public repository
 #   pnpm ci:local --quick --affected typecheck and unit-test only the packages changed against
 #                                    TURBO_SCM_BASE (origin/main) and those that depend on them
 #   pnpm ci:local --skip-a11y        skip the Storybook accessibility audit
@@ -14,8 +15,8 @@
 #   pnpm ci:local --skip-site        skip the website in a browser
 #   pnpm ci:local --skip-basics      skip lint, typecheck, unit tests and the other --quick checks
 #                                    (CI runs them in a job of their own, beside the slow ones)
-#   pnpm ci:local --skip-lint        skip Biome and shellcheck (CI never lints, ADR 0009;
-#                                    typecheck and unit tests still run)
+#   pnpm ci:local --skip-lint        skip Biome and shellcheck (typecheck and unit tests still
+#                                    run)
 #   pnpm ci:local --skip-integration skip the integration tests
 #   pnpm ci:local --with-production  also build the production images and check the real
 #                                    deployment with a backup and restore drill (10–20 minutes)
@@ -69,8 +70,9 @@ for arg in "$@"; do
   esac
 done
 
-# A runner short of memory (deploy/ci-runner) sets HAMNIVO_CI_CONCURRENCY to run fewer turbo tasks
-# at once; turbo has no variable of its own for this. Elsewhere turbo keeps its default.
+# A CI runner (.github/workflows/ci.yml) or a machine short of memory sets HAMNIVO_CI_CONCURRENCY to
+# run fewer turbo tasks at once; turbo has no variable of its own for this. Elsewhere turbo keeps its
+# default.
 turbo_limit=()
 if [[ -n "${HAMNIVO_CI_CONCURRENCY:-}" ]]; then
   turbo_limit=(--concurrency="$HAMNIVO_CI_CONCURRENCY")
@@ -84,8 +86,8 @@ if [[ -n "${HAMNIVO_CI_CONCURRENCY:-}" ]]; then
   fi
 fi
 # Type checks and builds take the most memory: the gateway's and Studio's type checks need about
-# 1.7 GB each, so two side by side outgrow a 4 GB runner (ADR 0019). On such a runner they run one
-# at a time (HAMNIVO_CI_HEAVY_CONCURRENCY, or 1 when only HAMNIVO_CI_CONCURRENCY is set).
+# 1.7 GB each, so two side by side outgrow a 4 GB machine. On such a machine they run one at a time
+# (HAMNIVO_CI_HEAVY_CONCURRENCY, or 1 when only HAMNIVO_CI_CONCURRENCY is set).
 heavy_limit=()
 if [[ -n "${HAMNIVO_CI_HEAVY_CONCURRENCY:-}" ]]; then
   heavy_limit=(--concurrency="$HAMNIVO_CI_HEAVY_CONCURRENCY")
@@ -338,7 +340,7 @@ dependency_audit() {
 }
 secret_scan() {
   if ! command -v gitleaks >/dev/null; then
-    echo 'gitleaks is not installed (deploy/ci-runner/Dockerfile installs it): skipped.' >&2
+    echo 'gitleaks is not installed (https://github.com/gitleaks/gitleaks): skipped.' >&2
     return 0
   fi
   gitleaks git --no-banner --redact --config .gitleaks.toml .
@@ -374,7 +376,7 @@ if ((basics == 1)); then
   if ((lint == 1)); then
     step "Shell scripts (shellcheck)" shell_scripts
   fi
-  step "Workflows use nothing GitHub bills for" bash scripts/ci/no-github-billing.sh
+  step "Workflows are safe for a public repository" bash scripts/ci/public-repo-guard.sh
   step "CI picks the suites a change needs" node --test scripts/ci/plan.test.mjs
   step "Deploy scripts: doctor and HTTPS rules (stand-ins; in Linux)" deploy_scripts
   step "Feature status matrix is current" pnpm exec tsx scripts/feature-status/generate.ts --check

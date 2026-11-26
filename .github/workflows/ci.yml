@@ -1,79 +1,80 @@
-# The check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, split into suites that run
-# side by side, one job each, on our own runners (deploy/ci-runner). scripts/ci/plan.mjs picks them.
-# The runners share a small server (4 shared vCPUs, 8 GB), so CI runs no browser suite (the
-# accessibility audit, the widget journey, Studio, the website), no lint (Biome, shellcheck) and no
-# production smoke test, which drives Studio in a browser: they stay in `pnpm ci:local`, by hand.
-# Each change gets its heavy suites once. A push to another branch gets only typecheck and unit
-# tests on the packages its change reaches (agents push a branch many times), and nothing when an
-# earlier run already passed its tree. A push to main (a merge) gets the integration and Chatwoot
-# suites the package graph reaches from what changed since the last commit main passed (so a suite
-# that failed runs again on the next merge), on PostgreSQL 18 (production's), and the typecheck and
-# unit tests on every package; a merge it cannot place gets every suite. The weekly run and a run by
-# hand cover everything: every PostgreSQL major and the automatic-deploy smoke test, which builds the
-# images and so never runs on a push. For a full check of a branch before merging:
-# gh workflow run ci.yml --ref <branch>.
-# The heavy suites run only on runners labelled `heavy` (all but two, github-runners FAST_RUNNERS),
-# so picking the suites and the basics always find a free runner, however many suites are queued.
-# It uses nothing GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each
-# report is kept there as a file, never uploaded as an artifact. scripts/ci/no-github-billing.sh
-# checks this.
+# The check pipeline (ADR 0021): the same `pnpm ci:local` anyone can run, split into suites that run
+# side by side, one job each, on GitHub-hosted runners, which cost nothing for a public repository.
+# scripts/ci/plan.mjs picks the suites, and every run lints:
+# - A pull request gets typecheck and unit tests on the packages its change reaches, the integration
+#   tests on PostgreSQL 18, and the other suites the change reaches (Chatwoot, accessibility, the
+#   widget, Studio in three parts, the website). A change to Markdown or docs/ alone gets only the
+#   basics. It never runs a smoke test: they build the production images.
+# - A push to main (a merge) gets the suites reached since the last commit main passed, so a suite
+#   that failed runs again on the next merge, typecheck and unit tests on every package, and the
+#   smoke tests when a deploy file changed.
+# - The weekly run and a run by hand cover everything: PostgreSQL 16 and 18 and both smoke tests.
+#   For a full check of a branch: gh workflow run ci.yml --ref <branch>.
+# scripts/ci/public-repo-guard.sh runs first: no self-hosted or larger runner, and no workflow that
+# would run a pull request's code with write access.
 name: CI
 
 on:
+  pull_request:
+    branches: [main]
   push:
+    branches: [main]
   workflow_dispatch:
-  # Everything, every Saturday at 23:00 UTC: the safety net for what a merge's selection missed
-  # (PostgreSQL 16, a change the package graph does not see) and the automatic-deploy smoke test.
-  # Every night cost about 400 job-minutes a run, more than all the merges of a day.
+  # Everything, every Saturday at 23:00 UTC: the safety net for what a selection missed
+  # (PostgreSQL 16, a change the package graph does not see) and the smoke tests.
   schedule:
     - cron: '0 23 * * 6'
 
-# A newer push to the same branch replaces a run that is still going. The weekly run has a group of
-# its own, so a push to main neither replaces it nor is replaced by it.
+# A newer push to a pull request cancels its older run. Runs on main queue instead, so every merge
+# is checked; the weekly run has a group of its own.
 concurrency:
-  group: ci-${{ github.event_name == 'schedule' && 'weekly' || github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'schedule' && 'weekly' || github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
+  guard:
+    name: Workflows are safe for a public repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the workflows
+        run: bash scripts/ci/public-repo-guard.sh
+
   plan:
     name: Pick the suites
-    runs-on: [self-hosted, linux, x64, hamnivo]
+    needs: guard
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
-    # skip-duplicate-actions reads the earlier runs of this workflow.
+    # The last commit main passed is read from the list of this workflow's runs.
     permissions:
       actions: read
       contents: read
     outputs:
       suites: ${{ steps.pick.outputs.suites }}
-      basics: ${{ steps.pick.outputs.basics }}
-      heavy: ${{ steps.pick.outputs.heavy }}
     steps:
-      # should_skip is true when an earlier run of this workflow passed on the same tree. If the
-      # action fails, it is not true, and every suite runs.
-      - name: Look for a passed run of the same tree
-        id: duplicate
-        continue-on-error: true
-        uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # The pnpm version comes from packageManager in package.json.
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          package-manager-cache: false
           node-version: 24
+          cache: pnpm
 
-      # Turbo, whose package graph places a change. If this fails, main runs everything and a branch
-      # push the quick checks on every package.
+      # Turbo, whose package graph places a change. If this fails, every suite runs.
       - name: Install dependencies
-        if: github.event_name == 'push'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         continue-on-error: true
         run: pnpm install --frozen-lockfile
 
@@ -100,107 +101,63 @@ jobs:
       - name: Pick the suites
         id: pick
         env:
-          PASSED: ${{ steps.duplicate.outputs.should_skip }}
           GREEN: ${{ steps.green.outputs.base }}
         run: |
-          # Main: the last commit it passed (empty when not found: everything). Another branch: origin/main.
+          # Main: the last commit it passed (empty when not found: everything). A pull request: main.
           if [[ "$GITHUB_REF" == refs/heads/main ]]; then export BASE="$GREEN"; else export BASE=origin/main; fi
-          suites="$(node scripts/ci/plan.mjs)"
-          echo "suites=$suites" >> "$GITHUB_OUTPUT"
-          # The basics go to any runner, the rest to the heavy ones (see the top of this file).
-          part() { node -e 'const all = JSON.parse(process.argv[1]); process.stdout.write(JSON.stringify(all.filter((suite) => (suite.id === "basics") === (process.argv[2] === "basics"))))' "$suites" "$1"; }
-          echo "basics=$(part basics)" >> "$GITHUB_OUTPUT"
-          echo "heavy=$(part heavy)" >> "$GITHUB_OUTPUT"
+          echo "suites=$(node scripts/ci/plan.mjs)" >> "$GITHUB_OUTPUT"
 
   checks:
     name: ${{ matrix.name }}
     needs: plan
-    # A push of a tree that already passed can leave no suite, and an empty matrix is an error.
-    if: needs.plan.outputs.heavy != '[]'
-    runs-on: [self-hosted, linux, x64, hamnivo, heavy]
+    # An empty matrix is an error.
+    if: needs.plan.outputs.suites != '[]'
+    runs-on: ubuntu-24.04
     timeout-minutes: 150
     strategy:
-      # Every suite reports, so one push shows all that is broken.
+      # Every suite reports, so one run shows all that is broken.
       fail-fast: false
-      # The heavy runners share one server's CPUs. Five suites at once pushed its load to 60-135 on
-      # 18 cores, and the browser and integration tests then timed out: the slower a run, the more
-      # tests failed, on main as on branches. Two at a time leaves each suite the CPUs it needs.
-      max-parallel: 2
       matrix:
-        include: ${{ fromJSON(needs.plan.outputs.heavy) }}
-    env: &suite-env
+        include: ${{ fromJSON(needs.plan.outputs.suites) }}
+    env:
       TURBO_TELEMETRY_DISABLED: '1'
       HAMNIVO_CI_SUITE: ${{ matrix.id }}
-    steps: &suite-steps
-      # A branch's basics compare it with origin/main (--affected), which needs the history.
+      # A standard runner has 4 CPUs and 16 GB. Four turbo tasks at once, each package's unit tests
+      # with their share of the CPUs (scripts/ci/local.sh), and two type checks or builds at once.
+      HAMNIVO_CI_CONCURRENCY: '4'
+      HAMNIVO_CI_HEAVY_CONCURRENCY: '2'
+    steps:
+      # The basics of a pull request compare it with origin/main (--affected), which needs the history.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         id: checkout
         with:
           fetch-depth: ${{ contains(matrix.args, '--affected') && '0' || '1' }}
-
-      # Turbo's cache, kept between runs (the checkout's own .turbo is cleaned with it). It is the
-      # folder every runner of this repository shares (CI_RESULTS_DIR, the github-runners kit), or
-      # else this runner's cache volume. Turbo writes each entry to a temporary file and renames it
-      # into place, so runners can share it, and a broken entry is a cache miss.
-      # Only a push to main and the weekly run write it (TURBO_CACHE=local:rw), so main never
-      # replays a build another branch cached. Every other run, and any this does not recognise,
-      # only reads it (local:r).
-      - name: Pick turbo's cache folder
-        run: |
-          folder=/home/runner/.cache/hamnivo-turbo
-          shared="${CI_RESULTS_DIR:+$CI_RESULTS_DIR/turbo-cache}"
-          if [[ -n "$shared" ]] && mkdir -p "$shared" && chmod 700 "$shared"; then
-            folder="$shared"
-          else
-            mkdir -p "$folder" && chmod 700 "$folder"
-          fi
-          echo "TURBO_CACHE_DIR=$folder" >> "$GITHUB_ENV"
-          mode=local:r
-          if [[ "$GITHUB_REF" == refs/heads/main ]] &&
-            [[ "$GITHUB_EVENT_NAME" == push || "$GITHUB_EVENT_NAME" == schedule ]]; then
-            mode=local:rw
-          fi
-          echo "TURBO_CACHE=$mode" >> "$GITHUB_ENV"
+          persist-credentials: false
 
       # The pnpm version comes from packageManager in package.json.
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          package-manager-cache: false
           node-version: 24
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # A run whose runner died never ran its cleanup: its databases, Chatwoot and smoke stacks stay
-      # in the runner's Docker and hold the next run's 4 GB (ADR 0019). Only the checks' own names
-      # are removed. What the runner has left is printed, so a run that dies leaves evidence.
-      - name: Remove what a killed run left behind
+      # The basics lint the shell scripts; `pnpm ci:local` skips shellcheck when it is missing.
+      - name: Install shellcheck
+        if: matrix.id == 'basics'
         run: |
-          command -v docker >/dev/null || exit 0
-          pattern='^(hamnivo-check-|hamnivo-smoke-|hamnivo-autodeploy-|hamnivo-https-test)'
-          mapfile -t containers < <(docker ps -a --format '{{.Names}}' | grep -E "$pattern" || true)
-          if ((${#containers[@]})); then
-            printf 'Removing container %s\n' "${containers[@]}"
-            docker rm -f -v "${containers[@]}" >/dev/null
-          fi
-          mapfile -t volumes < <(docker volume ls -q | grep -E "$pattern" || true)
-          if ((${#volumes[@]})); then
-            printf 'Removing volume %s\n' "${volumes[@]}"
-            docker volume rm "${volumes[@]}" >/dev/null || true
-          fi
-          mapfile -t networks < <(docker network ls --format '{{.Name}}' | grep -E "$pattern" || true)
-          if ((${#networks[@]})); then
-            printf 'Removing network %s\n' "${networks[@]}"
-            docker network rm "${networks[@]}" >/dev/null || true
-          fi
-          echo 'Containers still running:'
-          docker ps --format '  {{.Names}} ({{.Status}})'
-          free -m || true
-          for file in /sys/fs/cgroup/memory.current /sys/fs/cgroup/memory.max; do
-            if [[ -r "$file" ]]; then echo "$file: $(cat "$file")"; fi
-          done
+          command -v shellcheck >/dev/null && exit 0
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends shellcheck
+
+      # Chromium and WebKit with their system libraries: the widget journey runs WebKit and iPhone
+      # projects beside Chromium.
+      - name: Install Chromium and WebKit for the browser checks
+        if: matrix.browsers
+        run: pnpm --filter @hamnivo/console exec playwright install --with-deps chromium webkit
 
       - name: Checks
         env:
@@ -209,35 +166,35 @@ jobs:
         # SUITE_ARGS is unquoted on purpose: it holds several options.
         run: pnpm ci:local $SUITE_ARGS
 
-      - name: Keep results on the compute runner
+      # The report goes into the run summary; test-results/ becomes an artifact, kept 14 days.
+      - name: Keep the results
+        id: results
         if: always() && steps.checkout.outcome == 'success'
         run: bash scripts/ci/archive-results.sh
 
-      # Only what the smoke tests leave behind; the runner keeps its other images and caches. The
-      # pnpm store on the runner's disk keeps only the packages this checkout links to, and turbo's
-      # cache a week of builds.
-      - name: Free disk
-        if: always()
-        run: |
-          docker image rm hamnivo/gateway:smoke hamnivo/edge:smoke \
-            hamnivo/gateway:unlabelled hamnivo/edge:unlabelled >/dev/null 2>&1 || true
-          docker image prune -f >/dev/null
-          docker builder prune -f --filter until=168h >/dev/null
-          pnpm store prune >/dev/null 2>&1 || true
-          find "$TURBO_CACHE_DIR" -type f -mmin +$((7 * 1440)) -delete 2>/dev/null || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && steps.results.outputs.archive != ''
+        with:
+          name: ci-results-${{ matrix.id }}
+          path: ${{ steps.results.outputs.archive }}
+          retention-days: 14
+          if-no-files-found: ignore
 
-  # The basics, on any runner: the two without the heavy label are kept for them and the plan, so a
-  # push learns about types and unit tests in minutes, even behind a full run of main. The same
-  # steps as checks (the YAML anchor).
-  basics:
-    name: ${{ matrix.name }}
-    needs: plan
-    if: needs.plan.outputs.basics != '[]'
-    runs-on: [self-hosted, linux, x64, hamnivo]
-    timeout-minutes: 150
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.plan.outputs.basics) }}
-    env: *suite-env
-    steps: *suite-steps
+  # One status to require before merging, whatever suites the plan picked.
+  result:
+    name: checks
+    needs: [guard, plan, checks]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for result in $RESULTS; do
+            # A plan that picks no suite leaves checks skipped.
+            [[ "$result" == success || "$result" == skipped ]] || exit 1
+          done
+          [[ "$RESULTS" == *success* ]]

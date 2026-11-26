@@ -118,10 +118,12 @@ describe('the workflow', () => {
     expect(workflow).not.toMatch(/branches:|pull_request|workflow_dispatch|schedule:/);
   });
 
-  it('runs CI and publication on our own runner, never on one GitHub bills for (ADR 0020)', () => {
+  it('runs CI and publication on GitHub-hosted runners, never on a self-hosted one (ADR 0021)', () => {
     const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
     for (const file of [ci, workflow]) {
-      expect(/runs-on: (.*)$/m.exec(file)?.[1]).toBe('[self-hosted, linux, x64, hamnivo]');
+      const runners = [...file.matchAll(/runs-on: (.*)$/gm)].map((match) => match[1]);
+      expect(runners.length).toBeGreaterThan(0);
+      for (const runner of runners) expect(runner).toBe('ubuntu-24.04');
     }
     expect(workflow).not.toContain('vars.');
   });
