@@ -53,11 +53,16 @@ COPY . .
 
 # ---- Checks -------------------------------------------------------------------------------------
 # What must pass before a version goes live: Biome, type checks and unit tests (no services).
+# Each package's vitest would start a worker for every CPU but one while turbo tests packages side
+# by side, so it gets its share of the CPUs instead (availableParallelism counts a CPU cap, also
+# one set on a parent, such as a CI runner's Docker daemon).
 FROM source AS checks
 ARG HAMNIVO_BUILD_CONCURRENCY=2
 RUN --mount=type=cache,id=hamnivo-turbo,target=/turbo-cache,sharing=locked \
     pnpm exec biome check . \
- && pnpm exec turbo run typecheck test --concurrency="$HAMNIVO_BUILD_CONCURRENCY" \
+ && cpus="$(node -p 'require("node:os").availableParallelism()')" \
+ && VITEST_MAX_WORKERS=$(( (cpus + HAMNIVO_BUILD_CONCURRENCY - 1) / HAMNIVO_BUILD_CONCURRENCY )) \
+    pnpm exec turbo run typecheck test --concurrency="$HAMNIVO_BUILD_CONCURRENCY" \
  && touch /checks-passed
 
 # The target a deploy builds: a marker only, so the source tree is never exported as an image.

@@ -940,7 +940,7 @@ These settings go in `.env` (see `env.example`):
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `HAMNIVO_BUILD_CONCURRENCY` | 2 | Packages built and tested at once |
+| `HAMNIVO_BUILD_CONCURRENCY` | 2 | Packages built and tested at once; each package's unit tests get that share of the CPUs |
 | `HAMNIVO_DEPLOY_BUILD_CACHE_GB` | 8 | Maximum size of Docker's build cache |
 | `HAMNIVO_DEPLOY_KEEP` | 3 | How many versions' images are kept |
 | `HAMNIVO_DEPLOY_MIN_FREE_GB` | 8 | Free space a deploy needs |
@@ -1297,8 +1297,9 @@ scp root@CI_SERVER:/opt/hamnivo-ci-runner/results/ci-results-RUN_ID-ATTEMPT-SUIT
 Every push runs this pipeline on GitHub Actions (ADR 0009), on runners of your own, and GitHub
 bills nothing for it (ADR 0020). It is split into suites that run side by side, one job each: the
 integration tests in three parts per PostgreSQL version, Studio's browser tests in three parts,
-and each other browser check on its own. With a runner for each suite, a push takes about as long
-as its slowest suite. A push to a branch other than main runs only typecheck and unit tests, for
+and each other browser check on its own. At most two of these heavy suites run at once
+(`max-parallel` in `ci.yml`): the runners share one server's CPUs, and more at once made the tests
+time out. A push to a branch other than main runs only typecheck and unit tests, for
 the packages its change reaches (lint runs on main, weekly and by hand only). A push to main (a
 merge) runs the suites reached since the last commit main passed (`scripts/ci/plan.mjs`),
 on PostgreSQL 18, with lint and the quick checks on every package and the smoke tests when a deploy
@@ -1393,6 +1394,9 @@ Without a `.env` file, `compose.yaml` uses these sizes, the repository's URL and
 `compute-hamnivo-ci`. Set `HAMNIVO_CI_REPO_URL` in `.env` for a repository of your own. With
 4 GB the checks run at most two turbo tasks at once (`HAMNIVO_CI_CONCURRENCY=2`), and type checks
 and builds one at a time (`HAMNIVO_CI_HEAVY_CONCURRENCY=1`), so they take longer than on a laptop.
+With `HAMNIVO_CI_CONCURRENCY` set, each package's unit tests also get their share of the CPUs
+(`VITEST_MAX_WORKERS`, which `pnpm ci:local` sets when it is not set already), so the tests turbo
+runs side by side do not start more workers than there are CPUs.
 
 To run the quick checks automatically before every `git push`:
 

@@ -117,6 +117,10 @@ jobs:
     strategy:
       # Every suite reports, so one push shows all that is broken.
       fail-fast: false
+      # The heavy runners share one server's CPUs. Five suites at once pushed its load to 60-135 on
+      # 18 cores, and the browser and integration tests then timed out: the slower a run, the more
+      # tests failed, on main as on branches. Two at a time leaves each suite the CPUs it needs.
+      max-parallel: 2
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.heavy) }}
     env: &suite-env
