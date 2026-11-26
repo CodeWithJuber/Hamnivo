@@ -33,7 +33,7 @@
     "@types/node": "catalog:",
     "sharp": "0.35.4",
     "svgo": "4.1.0",
-    "tsdown": "0.23.0",
+    "tsdown": "0.23.7",
     "tsx": "4.23.15",
     "typescript": "catalog:",
     "vitest": "catalog:"
