@@ -49,7 +49,7 @@ interface Created {
   retireFailed: boolean;
 }
 
-function CreateKeyDialog({
+export function CreateKeyDialog({
   brandId,
   open,
   replacing,

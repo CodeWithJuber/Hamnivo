@@ -331,6 +331,8 @@ export function App({ params, bridge }: { params: WidgetParams; bridge: HostBrid
           onFilesConversation={chat.conversationForFiles}
           onStart={chat.start}
           onReopen={chat.reopen}
+          onResolve={chat.resolve}
+          onStartNew={chat.startNew}
           onLeaveMessage={chat.leaveMessage}
           onConsentRequired={chat.consentRequired}
           onUnavailable={chat.unavailableBy}

@@ -6,18 +6,25 @@
 //   node scripts/ci/plan.mjs
 //
 // It reads GITHUB_EVENT_NAME, GITHUB_REF and GITHUB_SHA; PASSED=true when an earlier run passed on
-// the same tree (fkirc/skip-duplicate-actions); and BASE, what a branch is compared with
-// (origin/main).
+// the same tree (fkirc/skip-duplicate-actions); and BASE, what a change is compared with: for a
+// push to main, the last commit a run of this workflow passed on main (`--last-passed` picks it from
+// GitHub's list of the workflow's successful runs), origin/main for another branch. Without a BASE
+// it cannot place the change.
 //
-// - A run by hand, the nightly run and a push to main check everything: PostgreSQL 16 and 18 and
-//   the smoke tests. A push to main whose tree already passed runs only PostgreSQL 16 and the smoke
-//   tests, which a branch does not always run.
-// - A push to another branch whose tree already passed runs nothing. Any other branch push tests
-//   PostgreSQL 18, runs the smoke tests when a deploy file changes, and runs only the suites that
-//   its change reaches in turbo's package graph; the basics typecheck and unit-test only the
-//   packages it reaches. A change to Markdown or docs/ alone runs only the basics.
-// - What it cannot place runs everything: no merge base, a changed file outside every package
-//   (the workflows, scripts/ci, the lockfile, the root config, deploy/), or turbo failing.
+//   node scripts/ci/plan.mjs --last-passed < runs.json
+//
+// Each change gets its heavy suites once, on main after the merge, scoped to what it reaches:
+// - A push to another branch runs only typecheck and unit tests, on the packages its change
+//   reaches in turbo's package graph, and nothing when its tree already passed. Agents push a
+//   branch many times.
+// - A push to main (a merge) runs the suites reached since the last commit main passed, so a suite
+//   that failed on one merge runs again on the next until it passes, on PostgreSQL 18, the smoke tests when a deploy file changes, and lint and the quick checks on
+//   every package. It does not trust a passed tree, since a branch passes on its quick checks. A
+//   change to Markdown or docs/ alone runs only the basics.
+// - The weekly run and a run by hand check everything: PostgreSQL 16 and 18 and the smoke tests.
+// - What a change cannot place runs everything on main (no commit before it, a changed file outside
+//   every package: the workflows, scripts/ci, the lockfile, the root config, deploy/; or turbo
+//   failing), and the quick checks on every package on another branch.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -40,24 +47,41 @@ const PARTS = [1, 2, 3];
 /**
  * What a run checks. `diff()` returns the files a branch changed, or null without a merge base;
  * `reach(files)` returns the packages those files reach, as {name, testInt}, and throws when it
- * cannot tell.
+ * cannot tell. Lint (Biome, shellcheck) runs only on main, the weekly run and a run by hand: a
+ * branch push gets typecheck and unit tests without it.
  */
-export function pick({ event, ref, passed, diff, reach }) {
+export function pick(run) {
+  const backstop =
+    (run.event === 'push' && run.ref === 'refs/heads/main') ||
+    run.event === 'schedule' ||
+    run.event === 'workflow_dispatch';
+  return { ...choose(run), lint: backstop };
+}
+
+function choose({ event, ref, passed, diff, reach }) {
   const everything = (pg, smoke, why) => ({ pg, smoke, run: new Set(ALL), affected: false, why });
-  if (event !== 'push') return everything(['16', '18'], true, `a ${event} run checks everything`);
-  if (ref === 'refs/heads/main') {
-    if (!passed) return everything(['16', '18'], true, 'a push to main checks everything');
+  if (event === 'push' && ref === 'refs/heads/main') {
+    // The quick checks cover every package on main, whatever the merge reached.
+    const merged = reachedSuites(diff, reach, everything);
+    return { ...merged, affected: false, why: `main after a merge: ${merged.why}` };
+  }
+  if (event === 'push') {
+    if (passed)
+      return { pg: [], smoke: false, run: new Set(), affected: false, why: 'this tree passed' };
+    const placed = reachedSuites(diff, reach, everything);
     return {
-      pg: ['16'],
-      smoke: true,
-      run: new Set(['integration']),
-      affected: false,
-      why: 'this tree passed on a branch: only what a branch does not always run',
+      pg: [],
+      smoke: false,
+      run: new Set(['basics']),
+      affected: placed.affected,
+      why: 'a branch push: types and unit tests; the heavy suites run on main after the merge',
     };
   }
-  if (passed)
-    return { pg: [], smoke: false, run: new Set(), affected: false, why: 'this tree passed' };
+  return everything(['16', '18'], true, `a ${event} run checks everything`);
+}
 
+/** The suites a change reaches; `everything` for a change it cannot place. */
+function reachedSuites(diff, reach, everything) {
   const changed = diff();
   if (!changed) return everything(['18'], true, 'no merge base to compare with');
   const smoke = changed.some((file) => SMOKE.test(file));
@@ -95,7 +119,7 @@ function only(part) {
 }
 
 /** The matrix for what `pick` chose. */
-export function suites({ pg, smoke, run, affected }) {
+export function suites({ pg, smoke, run, affected, lint = true }) {
   const list = [];
   const add = (id, name, args, browsers = false, version = '') =>
     list.push({ id, name, args, pg: version, browsers });
@@ -131,12 +155,22 @@ export function suites({ pg, smoke, run, affected }) {
     }
   }
   if (run.has('basics')) {
-    add('basics', 'Lint, types and unit tests', affected ? '--quick --affected' : '--quick');
+    const args = `${affected ? '--quick --affected' : '--quick'}${lint ? '' : ' --skip-lint'}`;
+    add('basics', lint ? 'Lint, types and unit tests' : 'Types and unit tests', args);
   }
   if (run.has('chatwoot')) add('chatwoot', 'Chatwoot contract suite', only('chatwoot'));
   if (run.has('accessibility')) add('accessibility', 'Accessibility audit', only('a11y'), true);
   if (run.has('website')) add('website', 'Website in a browser', only('site'), true);
   return list;
+}
+
+/** The newest commit a run passed, from GitHub's list of this workflow's runs, newest first. */
+export function lastPassed(answer) {
+  const full = ['push', 'schedule', 'workflow_dispatch'];
+  const run = (answer?.workflow_runs ?? []).find(
+    (item) => full.includes(item.event) && item.conclusion === 'success' && item.head_sha,
+  );
+  return run ? run.head_sha : null;
 }
 
 function changedFiles(base, sha) {
@@ -179,13 +213,20 @@ function reachInGraph(files) {
   }));
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === '--last-passed') {
+  const sha = lastPassed(JSON.parse(readFileSync(0, 'utf8')));
+  if (!sha) {
+    console.error('No run of this workflow passed on this branch');
+    process.exit(1);
+  }
+  process.stdout.write(`${sha}\n`);
+} else if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const env = process.env;
   const selection = pick({
     event: env.GITHUB_EVENT_NAME,
     ref: env.GITHUB_REF,
     passed: env.PASSED === 'true',
-    diff: () => changedFiles(env.BASE || 'origin/main', env.GITHUB_SHA || 'HEAD'),
+    diff: () => (env.BASE ? changedFiles(env.BASE, env.GITHUB_SHA || 'HEAD') : null),
     reach: reachInGraph,
   });
   const list = suites(selection);

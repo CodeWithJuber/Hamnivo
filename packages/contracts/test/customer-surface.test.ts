@@ -88,6 +88,8 @@ describe('widget settings (W02, W09, W17, W23, W25)', () => {
       help: { suggestions: [], search: true },
       deletion: { windowMinutes: 10 },
       notifications: { email: true },
+      // Customers try the AI first; "Talk to a person" comes once it has answered a few times.
+      handoff: { personButton: 'after_ai' },
     });
   });
 
@@ -98,6 +100,7 @@ describe('widget settings (W02, W09, W17, W23, W25)', () => {
     expect(bad({ attachments: { maxMegabytes: 11 } })).toBe(false);
     expect(bad({ attachments: { maxFiles: 6 } })).toBe(false);
     expect(bad({ layout: { mode: 'floating' } })).toBe(false);
+    expect(bad({ handoff: { personButton: 'sometimes' } })).toBe(false);
     expect(bad({ deletion: { windowMinutes: 61 } })).toBe(false);
   });
 

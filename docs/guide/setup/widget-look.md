@@ -141,6 +141,30 @@ customer might ask next appear under the answer; pressing one sends it. They are
 the answer is sent, so the answer itself is never slower. Each set uses a few AI credits. Turn
 it off to show none.
 
+## The "Talk to a person" button
+
+On the **Behaviour** tab, **The “Talk to a person” button** says when customers see that button
+while the AI answers:
+
+- **After the AI has tried** (the default): the button shows once the AI has answered three times
+  in the conversation, so customers try the AI first.
+- **Always**: the button shows from the first message.
+- **Never**: no button.
+
+Whatever you choose, a customer can ask for a person in their own words, such as "I want to talk
+to a person", and the AI hands the chat to your team. If the AI cannot answer, the chat goes to
+your team by itself.
+
+## Ending a chat and starting a new one
+
+Customers find both in the chat's **⋮** menu:
+
+- **End this chat** asks first, then closes the chat. Your team sees it as resolved in Inbox,
+  exactly as if a teammate had resolved it (a rating is asked for when ratings are on). The
+  customer can still read it, and writing in it again opens it.
+- **Start a new chat** shows an empty chat; the next message starts a new conversation. The old
+  one stays under **Your conversations** in the same menu.
+
 ## Save, publish and reset
 
 - **Save draft** keeps your changes. Customers still see the published look.

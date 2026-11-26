@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { SupportedLocale, Timestamp } from './common.js';
 import { CustomerConversation } from './conversations.js';
-import { WidgetLayoutMode, WidgetTheme } from './customer-surface.js';
+import { PersonButton, WidgetLayoutMode, WidgetTheme } from './customer-surface.js';
 import { WidgetConsentConfig, WidgetFormsConfig } from './widget-forms.js';
 
 export const LauncherPosition = z.enum(['bottom-right', 'bottom-left']);
@@ -72,6 +72,17 @@ export const WidgetConfig = z
       voice: z.boolean(),
       identityRequiredForHistory: z.boolean(),
     }),
+    /**
+     * When to show "Talk to a person" while the AI answers (W11). Left out by a gateway from
+     * before it, which means `always`.
+     */
+    handoff: z
+      .object({
+        personButton: PersonButton,
+        /** AI answers in the conversation before `after_ai` shows the button. */
+        afterAnswers: z.int().positive(),
+      })
+      .optional(),
     privacyPolicyUrl: z.url().nullable(),
     attachmentLimits: z.object({
       maxBytes: z.int().positive(),

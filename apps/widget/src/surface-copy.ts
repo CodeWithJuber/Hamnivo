@@ -36,6 +36,16 @@ export const SURFACE_EN = {
     back: 'Back to chat',
     empty: 'No messages yet',
   },
+  chatActions: {
+    newChat: 'Start a new chat',
+    endChat: 'End this chat',
+    endTitle: 'End this chat?',
+    endBody: 'Our team will see it as closed. You can still read it, and writing again opens it.',
+    endConfirm: 'End chat',
+    endCancel: 'Keep chatting',
+    endFailed: 'The chat could not be ended. Try again.',
+    ended: 'Chat ended.',
+  },
   files: {
     attach: 'Attach a file',
     hint: 'Pictures or PDF, up to {{size}} MB',

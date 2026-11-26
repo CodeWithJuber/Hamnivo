@@ -1,4 +1,10 @@
-import { PROBE_TIMEOUT_MS, probeModel } from '@hamnivo/adapters/models';
+import {
+  type ListedModel,
+  type ListSpec,
+  listModels,
+  PROBE_TIMEOUT_MS,
+  probeModel,
+} from '@hamnivo/adapters/models';
 import {
   checkDestination,
   EgressError,
@@ -7,8 +13,11 @@ import {
 } from '@hamnivo/adapters/net';
 import {
   type CreateModelConnectionRequest,
+  type ListModelsRequest,
+  MODEL_LIST_MESSAGES,
   MODEL_PROBE_MESSAGES,
   type ModelConnection,
+  type ModelList,
   type ModelProbeResult,
   type ModelSetupStatus,
   type ReplaceModelKeyRequest,
@@ -35,6 +44,7 @@ import { EgressService } from '../developer/egress.service.js';
 import { enforce } from '../identity/staff.guard.js';
 import { SecretBroker } from '../secrets/secret-broker.service.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../tokens.js';
+import { platformCredentials } from './models.js';
 
 type Row = typeof schema.modelConnections.$inferSelect;
 
@@ -96,6 +106,15 @@ function publicOnly(policy: EgressPolicy): EgressPolicy {
   return rest;
 }
 
+/** A provider's model list changes rarely: one read serves every person for ten minutes. */
+const MODEL_LIST_TTL_MS = 10 * 60_000;
+const MODEL_LIST_CACHE_SIZE = 500;
+
+/** A model list that worked. */
+function listed(models: ListedModel[], fetchedAt: Date): ModelList {
+  return { ok: true, kind: 'ok', message: '', models, fetchedAt: fetchedAt.toISOString() };
+}
+
 /**
  * Tenant model credentials. The API key goes straight into the secret broker. The tenant's own
  * server address (a base URL) is a request the server makes for the tenant, so it is held to the
@@ -112,6 +131,9 @@ export class ModelConnectionsService {
     private readonly egress: EgressService,
     private readonly decisions: DecisionProviders,
   ) {}
+
+  /** Model lists read lately, per saved connection or server key. A pasted key is never kept. */
+  private readonly modelLists = new Map<string, { models: ListedModel[]; fetchedAt: Date }>();
 
   private tx<T>(principal: StaffPrincipal, work: (tx: TenantTx) => Promise<T>): Promise<T> {
     return withTenant(
@@ -349,6 +371,135 @@ export class ModelConnectionsService {
       latencyMs: outcome.latencyMs,
       testedAt: testedAt.toISOString(),
     };
+  }
+
+  /**
+   * The chat models a key can use, from the provider's own list, for Studio's model field. The key
+   * is a saved connection's, the server's own, or one pasted before saving, which is used for this
+   * one request and never stored or logged. Calls go through the egress guard like a key test
+   * (the server's own addresses, the administrator's settings, are reached as the runtime reaches
+   * them). A connection that allows only some models lists those without asking the provider.
+   * Lists of saved keys are kept ten minutes unless a refresh is asked for; a failure is never kept.
+   */
+  async models(
+    principal: StaffPrincipal,
+    input: z.output<typeof ListModelsRequest>,
+  ): Promise<ModelList> {
+    this.enforceManage(principal);
+    const refresh = input.source !== 'key' && input.refresh === true;
+    // A list read in the last ten minutes, unless a refresh is asked for.
+    const fresh = (key: string) => {
+      if (refresh) return undefined;
+      const kept = this.modelLists.get(key);
+      return kept && this.clock().getTime() - kept.fetchedAt.getTime() < MODEL_LIST_TTL_MS
+        ? kept
+        : undefined;
+    };
+    let spec: ListSpec;
+    let policy: EgressPolicy | null = null;
+    let cacheKey: string | null = null;
+    if (input.source === 'connection') {
+      const id = this.parseId(input.connectionId);
+      const found = await this.tx(principal, async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(schema.modelConnections)
+          .where(eq(schema.modelConnections.id, id));
+        if (!row) throw new AppError('NOT_FOUND', { detail: 'Model connection not found.' });
+        if (row.status !== 'active') {
+          throw new AppError('VALIDATION_FAILED', {
+            detail: 'This connection is turned off. Add a new connection to use another key.',
+          });
+        }
+        if (row.allowedModels.length > 0) return { kind: 'allowed', row } as const;
+        // A replaced key changes updatedAt, so its list is read again.
+        const key = `${principal.tenantId}:${row.id}:${row.updatedAt.getTime()}`;
+        const kept = fresh(key);
+        // The key stays sealed when the list is already known.
+        if (kept) return { kind: 'kept', kept } as const;
+        return {
+          kind: 'ask',
+          row,
+          key,
+          apiKey: await this.secrets.reveal(tx, principal.tenantId, row.apiKeySecretId),
+          policy: await this.egress.policyIn(tx),
+        } as const;
+      });
+      if (found.kind === 'allowed') {
+        return listed(
+          found.row.allowedModels.map((modelId) => ({
+            id: modelId,
+            name: null,
+            deprecated: false,
+          })),
+          this.clock(),
+        );
+      }
+      if (found.kind === 'kept') return listed(found.kept.models, found.kept.fetchedAt);
+      const { row } = found;
+      spec = {
+        provider: row.provider,
+        apiKey: found.apiKey,
+        ...(row.baseUrl ? { baseURL: row.baseUrl } : {}),
+      };
+      policy = row.baseUrl ? found.policy : publicOnly(found.policy);
+      cacheKey = found.key;
+    } else if (input.source === 'platform') {
+      cacheKey = `platform:${input.provider}`;
+      const kept = fresh(cacheKey);
+      if (kept) return listed(kept.models, kept.fetchedAt);
+      const credentials = platformCredentials(this.config, input.provider);
+      if (!credentials) {
+        throw new AppError('VALIDATION_FAILED', {
+          detail: 'This server has no key of its own for this provider. Add a model connection.',
+        });
+      }
+      spec = { provider: input.provider, ...credentials };
+    } else {
+      const found = await this.tx(principal, async (tx) => {
+        await this.checkBaseUrl(tx, input.baseUrl);
+        return this.egress.policyIn(tx);
+      });
+      spec = {
+        provider: input.provider,
+        ...(input.apiKey ? { apiKey: input.apiKey } : {}),
+        ...(input.baseUrl ? { baseURL: input.baseUrl } : {}),
+      };
+      policy = input.baseUrl ? found : publicOnly(found);
+    }
+
+    const fetcher = policy
+      ? guardedFetch(policy, { refuseRedirects: true, maxResponseBytes: 2 * 1024 * 1024 })
+      : null;
+    let outcome: Awaited<ReturnType<typeof listModels>>;
+    try {
+      outcome = await listModels(fetcher ? { ...spec, fetch: fetcher } : spec, {
+        timeoutMs: PROBE_TIMEOUT_MS,
+      });
+    } finally {
+      await fetcher?.close().catch(() => undefined);
+    }
+    const fetchedAt = this.clock();
+    if (!outcome.ok) {
+      return {
+        ok: false,
+        kind: outcome.kind,
+        message: MODEL_LIST_MESSAGES[outcome.kind],
+        models: [],
+        fetchedAt: fetchedAt.toISOString(),
+      };
+    }
+    if (cacheKey) {
+      this.modelLists.delete(cacheKey);
+      this.modelLists.set(cacheKey, { models: outcome.models, fetchedAt });
+      // The oldest goes first; a Map keeps the order things were put in.
+      while (this.modelLists.size > MODEL_LIST_CACHE_SIZE) {
+        const oldest = this.modelLists.keys().next().value;
+        if (oldest === undefined) break;
+        this.modelLists.delete(oldest);
+      }
+    }
+    return listed(outcome.models, fetchedAt);
   }
 
   /**

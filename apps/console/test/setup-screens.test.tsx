@@ -1002,8 +1002,10 @@ describe('the guided setup', () => {
       expect(textOf(html)).toContain('Save and test');
       expect(html).toContain('id="mcn-apiKey"');
       expect(html.match(/<input[^>]*id="mcn-apiKey"[^>]*>/)?.[0]).toContain('type="password"');
-      // gpt-5.4-mini is chosen for OpenAI.
-      expect(html).toMatch(/<option[^>]*value="gpt-5.4-mini"[^>]*selected/);
+      // gpt-5.4-mini is chosen for OpenAI, in the model field that lists the key's models.
+      const model = html.match(/<input[^>]*id="mcn-model"[^>]*>/)?.[0];
+      expect(model).toContain('value="gpt-5.4-mini"');
+      expect(model).toContain('role="combobox"');
     });
 
     it('tests a key that is already there instead of asking for another', async () => {

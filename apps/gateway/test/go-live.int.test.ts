@@ -152,7 +152,7 @@ describe('a server with its own AI key', () => {
 
   it('starts a new brand on the platform’s model, not the test model', async () => {
     const draft = (await shop.owner.get(`/v1/admin/agents/${shop.agentId}`)).body.draft;
-    expect(draft.config.model).toEqual({ provider: 'anthropic', modelId: 'claude-haiku-4-5' });
+    expect(draft.config.model).toEqual({ provider: 'anthropic', modelId: 'claude-haiku-5-5' });
   });
 
   it('reads the brand’s website without setup, once, and never a test address', async () => {
@@ -177,7 +177,7 @@ describe('a server with its own AI key', () => {
     const live = await shop.owner.post(`/v1/admin/agents/${shop.agentId}/go-live`, {});
     expect(live.status, JSON.stringify(live.body)).toBe(200);
     const config = live.body.published.config;
-    expect(config.model).toEqual({ provider: 'anthropic', modelId: 'claude-haiku-4-5' });
+    expect(config.model).toEqual({ provider: 'anthropic', modelId: 'claude-haiku-5-5' });
     expect(config.knowledgeSourceIds).toHaveLength(1);
     expect(config.memory.enabled).toBe(true);
     const first = await conversation(slice, shop, 'Do you ship to Lahore?');

@@ -37,6 +37,14 @@ const outcome = (kind: string, patch: Record<string, unknown> = {}) => ({
   testedAt: NOW,
   ...patch,
 });
+/** What the gateway answers when a provider listed its models. */
+const listed = (ids: string[], names: Record<string, string> = {}) => ({
+  ok: true,
+  kind: 'ok',
+  message: '',
+  models: ids.map((id) => ({ id, name: names[id] ?? null, deprecated: false })),
+  fetchedAt: NOW,
+});
 type Added = Parameters<typeof AddConnectionForm>[0]['onAdded'];
 type Saved = Parameters<Added>[0];
 
@@ -79,26 +87,99 @@ describe('adding an AI key', () => {
     await form();
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Provider'), 'anthropic');
-    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('claude-haiku-4-5');
+    expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('claude-haiku-5-5');
     await user.selectOptions(screen.getByLabelText('Provider'), 'google');
-    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('gemini-3.8-flash');
+    expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('gemini-3.8-flash');
     await user.type(screen.getByLabelText('API key'), 'a-google-key-123');
     await user.click(screen.getByRole('button', { name: 'Save and test' }));
     await waitFor(() => expect(gateway.to('POST', '/v1/admin/model-connections')).toHaveLength(1));
-    expect(gateway.calls[0]?.body).toMatchObject({ provider: 'google', label: 'Google Gemini' });
+    expect(gateway.to('POST', '/v1/admin/model-connections')[0]?.body).toMatchObject({
+      provider: 'google',
+      label: 'Google Gemini',
+    });
   });
 
-  it('lets a model that is not in the list be typed, with the list’s "Another model" entry', async () => {
+  it('lets any model name be typed, listed or not', async () => {
     const added = vi.fn();
     fakeGateway({ 'POST /v1/admin/model-connections': { status: 201, json: connection() } });
     await form(added);
     const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText('Model'), 'custom');
-    await user.type(screen.getByLabelText('Model name'), 'my-fine-tune');
+    await user.clear(screen.getByLabelText('Model'));
+    await user.type(screen.getByLabelText('Model'), 'my-fine-tune');
     await user.type(screen.getByLabelText('API key'), 'sk-test-key-12345678');
     await user.click(screen.getByRole('button', { name: 'Save and test' }));
     await waitFor(() => expect(added).toHaveBeenCalled());
     expect(added.mock.calls[0]?.[1]).toBe('my-fine-tune');
+  });
+
+  it('reads the models a pasted key can use, once it stops changing, and lets one be picked', async () => {
+    const gateway = fakeGateway({
+      'POST /v1/admin/model-connections/models': {
+        json: listed(['claude-opus-5-5', 'claude-haiku-5-5'], {
+          'claude-opus-5-5': 'Claude Opus 5.5',
+          'claude-haiku-5-5': 'Claude Haiku 5.5',
+        }),
+      },
+    });
+    await form();
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText('Provider'), 'anthropic');
+    await user.type(screen.getByLabelText('API key'), 'test-anthropic-key-1');
+    expect(
+      await screen.findByText(
+        'Models your key can use: 2. Type to search, or type any other name.',
+        undefined,
+        { timeout: 3000 },
+      ),
+    ).toBeTruthy();
+    // One request, with the whole key, not one per keystroke.
+    const asked = gateway.to('POST', '/v1/admin/model-connections/models');
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.body).toEqual({
+      source: 'key',
+      provider: 'anthropic',
+      apiKey: 'test-anthropic-key-1',
+    });
+
+    const field = screen.getByLabelText('Model') as HTMLInputElement;
+    await user.click(field);
+    const list = screen.getByRole('listbox', { name: 'Models' });
+    const options = within(list).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Claude Opus 5.5claude-opus-5-5 · most capable',
+      'Claude Haiku 5.5claude-haiku-5-5 · fast, low cost · recommended',
+    ]);
+    await user.click(within(list).getByRole('option', { name: /Claude Opus 5\.5/ }));
+    expect(field.value).toBe('claude-opus-5-5');
+    expect(screen.queryByRole('listbox')).toBeNull();
+
+    // The keyboard does the same: typing filters, down moves, Enter picks.
+    await user.clear(field);
+    await user.type(field, 'haiku');
+    expect(within(screen.getByRole('listbox')).getAllByRole('option')).toHaveLength(1);
+    await user.keyboard('{ArrowDown}{Enter}');
+    expect(field.value).toBe('claude-haiku-5-5');
+  });
+
+  it('says why the list could not be read, and still suggests models', async () => {
+    fakeGateway({
+      'POST /v1/admin/model-connections/models': {
+        json: { ok: false, kind: 'wrong_key', message: 'x', models: [], fetchedAt: NOW },
+      },
+    });
+    await form();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('API key'), 'test-openai-key-12');
+    expect(
+      await screen.findByText(
+        'Couldn’t load the models: the key wasn’t accepted. Pick a suggestion or type the name.',
+        undefined,
+        { timeout: 3000 },
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    await user.click(screen.getByLabelText('Model'));
+    expect(within(screen.getByRole('listbox')).getAllByRole('option')).toHaveLength(3);
   });
 
   it('asks for what is missing and sends nothing', async () => {
@@ -310,19 +391,34 @@ describe('testing a key from the list', () => {
   it('tests another model when one is chosen and the test is repeated', async () => {
     const gateway = fakeGateway({
       'POST /v1/admin/model-connections/mcn_1/test': () => ({ json: outcome('ok') }),
+      'POST /v1/admin/model-connections/models': { json: listed(['gpt-5.5', 'gpt-5.4-mini']) },
     });
     await mountStudio({
       permissions: owner,
       screen: <TestKeyDialog connection={connection() as Saved} onOpenChange={() => undefined} />,
     });
     await screen.findByText('The key works');
+    // The connection's own models, read through the gateway with its saved key.
+    expect(
+      await screen.findByText(
+        'Models your key can use: 2. Type to search, or type any other name.',
+      ),
+    ).toBeTruthy();
+    expect(gateway.to('POST', '/v1/admin/model-connections/models')[0]?.body).toEqual({
+      source: 'connection',
+      connectionId: 'mcn_1',
+    });
     const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText('Model'), 'gpt-5.5');
+    await user.click(screen.getByLabelText('Model'));
+    await user.click(screen.getByRole('option', { name: /gpt-5\.5/ }));
+    expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('gpt-5.5');
     await user.click(screen.getByRole('button', { name: 'Test again' }));
     await waitFor(() =>
       expect(gateway.to('POST', '/v1/admin/model-connections/mcn_1/test')).toHaveLength(2),
     );
-    expect(gateway.calls[1]?.body).toEqual({ modelId: 'gpt-5.5' });
+    expect(gateway.to('POST', '/v1/admin/model-connections/mcn_1/test')[1]?.body).toEqual({
+      modelId: 'gpt-5.5',
+    });
   });
 
   it('waits for a model to be typed when a server of your own has none to start from', async () => {
@@ -339,11 +435,12 @@ describe('testing a key from the list', () => {
       ),
     });
     await settle();
-    expect(gateway.calls).toEqual([]);
+    const tests = () => gateway.to('POST', '/v1/admin/model-connections/mcn_1/test');
+    expect(tests()).toEqual([]);
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Model name'), 'llama-3');
+    await user.type(screen.getByLabelText('Model'), 'llama-3');
     await user.click(screen.getByRole('button', { name: 'Test again' }));
-    await waitFor(() => expect(gateway.calls).toHaveLength(1));
-    expect(gateway.calls[0]?.body).toEqual({ modelId: 'llama-3' });
+    await waitFor(() => expect(tests()).toHaveLength(1));
+    expect(tests()[0]?.body).toEqual({ modelId: 'llama-3' });
   });
 });

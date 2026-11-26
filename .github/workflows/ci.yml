@@ -1,11 +1,12 @@
 # The full check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, split into suites that
 # run side by side, one job each, on our own runners (deploy/ci-runner). scripts/ci/plan.mjs picks
-# them. Main, the nightly run and a run by hand cover everything: every PostgreSQL major and the
-# production and automatic-deploy smoke tests. Another branch gets only the suites its change can
-# reach in the package graph, on PostgreSQL 18 (production's), and the smoke tests only when a
-# deploy file changes; a change it cannot place gets everything. A push of a tree that an earlier
-# run already passed (a branch merged into main, say) is not checked again: main then runs only
-# PostgreSQL 16 and the smoke tests, other branches nothing.
+# them. Each change gets its heavy suites once. A push to another branch gets only typecheck and
+# unit tests on the packages its change reaches (agents push a branch many times), and nothing when
+# an earlier run already passed its tree. A push to main (a merge) gets the suites the package graph
+# reaches from what changed since the last commit main passed (so a suite that failed runs again on
+# the next merge), on PostgreSQL 18 (production's), the smoke tests when a deploy file changes, and
+# lint and the quick checks on every package; a merge it cannot place gets everything. The weekly
+# run and a run by hand cover everything: every PostgreSQL major and the smoke tests. For a full check of a branch before merging: gh workflow run ci.yml --ref <branch>.
 # The heavy suites run only on runners labelled `heavy` (all but two, github-runners FAST_RUNNERS),
 # so picking the suites and the basics always find a free runner, however many suites are queued.
 # It uses nothing GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each
@@ -16,14 +17,16 @@ name: CI
 on:
   push:
   workflow_dispatch:
-  # Everything, every night at 23:00 UTC: the safety net for what a branch's selection missed.
+  # Everything, every Saturday at 23:00 UTC: the safety net for what a merge's selection missed
+  # (PostgreSQL 16, a change the package graph does not see). Every night cost about 400 job-minutes
+  # a run, more than all the merges of a day.
   schedule:
-    - cron: '0 23 * * *'
+    - cron: '0 23 * * 6'
 
-# A newer push to the same branch replaces a run that is still going. The nightly run has a group of
+# A newer push to the same branch replaces a run that is still going. The weekly run has a group of
 # its own, so a push to main neither replaces it nor is replaced by it.
 concurrency:
-  group: ci-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
+  group: ci-${{ github.event_name == 'schedule' && 'weekly' || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -62,18 +65,41 @@ jobs:
           package-manager-cache: false
           node-version: 24
 
-      # Turbo, whose package graph places a branch's change. If this fails, the branch runs
-      # everything.
+      # Turbo, whose package graph places a change. If this fails, main runs everything and a branch
+      # push the quick checks on every package.
       - name: Install dependencies
-        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+        if: github.event_name == 'push'
         continue-on-error: true
         run: pnpm install --frozen-lockfile
+
+      # Main is compared with the last commit a run of this workflow passed on main (GitHub's record
+      # of its runs), not only with main before the push: a suite that failed on one merge runs
+      # again on the next until it passes. When the lookup fails, BASE stays empty and main runs
+      # everything.
+      - name: Find the last commit main passed
+        id: green
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUNS: ${{ github.api_url }}/repos/${{ github.repository }}/actions/workflows/ci.yml/runs
+        run: |
+          set -euo pipefail
+          sha=$(curl -fsS --retry 2 --get -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" -d branch=main -d status=success \
+              -d exclude_pull_requests=true -d per_page=100 "$RUNS" \
+            | node scripts/ci/plan.mjs --last-passed)
+          echo "base=$sha" >> "$GITHUB_OUTPUT"
+          echo "Compared with $sha, the last commit this workflow passed on main."
 
       - name: Pick the suites
         id: pick
         env:
           PASSED: ${{ steps.duplicate.outputs.should_skip }}
+          GREEN: ${{ steps.green.outputs.base }}
         run: |
+          # Main: the last commit it passed (empty when not found: everything). Another branch: origin/main.
+          if [[ "$GITHUB_REF" == refs/heads/main ]]; then export BASE="$GREEN"; else export BASE=origin/main; fi
           suites="$(node scripts/ci/plan.mjs)"
           echo "suites=$suites" >> "$GITHUB_OUTPUT"
           # The basics go to any runner, the rest to the heavy ones (see the top of this file).
@@ -107,7 +133,7 @@ jobs:
       # folder every runner of this repository shares (CI_RESULTS_DIR, the github-runners kit), or
       # else this runner's cache volume. Turbo writes each entry to a temporary file and renames it
       # into place, so runners can share it, and a broken entry is a cache miss.
-      # Only a push to main and the nightly run write it (TURBO_CACHE=local:rw), so main never
+      # Only a push to main and the weekly run write it (TURBO_CACHE=local:rw), so main never
       # replays a build another branch cached. Every other run, and any this does not recognise,
       # only reads it (local:r).
       - name: Pick turbo's cache folder

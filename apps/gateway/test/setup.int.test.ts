@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createServer as createSocketServer, type Server as SocketServer } from 'node:net';
 import type { ResolvedAddress } from '@hamnivo/adapters/net';
-import { MODEL_PROBE_MESSAGES } from '@hamnivo/contracts';
+import { MODEL_LIST_MESSAGES, MODEL_PROBE_MESSAGES } from '@hamnivo/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CONSOLE_ORIGIN } from './harness.js';
 import { customerStarts, join } from './inbox-support.js';
@@ -78,6 +78,16 @@ const answers: Record<Exclude<Mode, 'ok' | 'drop'>, [number, unknown]> = {
   ],
 };
 
+/** What the fake server's GET /models answers, in OpenAI's shape (Ollama and vLLM use it too). */
+const MODEL_LIST = {
+  object: 'list',
+  data: [
+    { id: 'test-model', object: 'model', created: 0, owned_by: 'local' },
+    { id: 'nomic-embed-text', object: 'model', created: 0, owned_by: 'local' },
+    { id: 'another-model', object: 'model', created: 0, owned_by: 'local' },
+  ],
+};
+
 beforeAll(async () => {
   sink = createSocketServer((socket) => {
     sinkConnections += 1;
@@ -101,6 +111,12 @@ beforeAll(async () => {
         return;
       }
       const failure = mode === 'ok' ? undefined : answers[mode];
+      if (request.method === 'GET' && request.url?.endsWith('/models')) {
+        response
+          .writeHead(failure?.[0] ?? 200, { 'content-type': 'application/json' })
+          .end(JSON.stringify(failure?.[1] ?? MODEL_LIST));
+        return;
+      }
       response.writeHead(failure?.[0] ?? 200, { 'content-type': 'application/json' }).end(
         JSON.stringify(
           failure?.[1] ?? {
@@ -309,6 +325,178 @@ describe('testing a key', () => {
     } finally {
       dns['llm.partner.example'] = ['93.184.216.34'];
     }
+  });
+});
+
+async function listModels(body: Record<string, unknown>) {
+  seen.length = 0;
+  return shop.owner.post('/v1/admin/model-connections/models', body);
+}
+
+describe('the models a key can use', () => {
+  it('reads a saved connection’s list from its own server with its key, chat models only', async () => {
+    mode = 'ok';
+    const created = await connect({ label: 'Lists its models', allowedModels: [] });
+    const result = await listModels({ source: 'connection', connectionId: created.body.id });
+    expect(result.status, JSON.stringify(result.body)).toBe(200);
+    expect(result.body).toMatchObject({
+      ok: true,
+      kind: 'ok',
+      message: '',
+      models: [
+        { id: 'another-model', name: null, deprecated: false },
+        { id: 'test-model', name: null, deprecated: false },
+      ],
+    });
+    expect(Date.parse(result.body.fetchedAt)).not.toBeNaN();
+    // One GET to the server's own list, with the stored key; the answer carries nothing of it.
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.url).toBe('/v1/models');
+    expect(seen[0]?.authorization).toMatch(/^Bearer \S{8,}$/);
+    expect(JSON.stringify(result.body)).not.toContain('first-key');
+
+    // Asked again within ten minutes: the list comes from memory, the server is not asked.
+    const again = await listModels({ source: 'connection', connectionId: created.body.id });
+    expect(again.body.models).toEqual(result.body.models);
+    expect(again.body.fetchedAt).toBe(result.body.fetchedAt);
+    expect(seen).toHaveLength(0);
+
+    // Refresh asks the server again.
+    const fresh = await listModels({
+      source: 'connection',
+      connectionId: created.body.id,
+      refresh: true,
+    });
+    expect(fresh.body.ok).toBe(true);
+    expect(seen).toHaveLength(1);
+  });
+
+  it('reads the list again once the key is replaced, and never for another workspace', async () => {
+    mode = 'ok';
+    const created = await connect({ label: 'Gets a new key', allowedModels: [] });
+    await listModels({ source: 'connection', connectionId: created.body.id });
+    expect(seen).toHaveLength(1);
+    const rotated = await shop.owner.post(`/v1/admin/model-connections/${created.body.id}/rotate`, {
+      apiKey: 'replacement-local-key-5678',
+    });
+    expect(rotated.status, JSON.stringify(rotated.body)).toBe(200);
+    const after = await listModels({ source: 'connection', connectionId: created.body.id });
+    expect(after.body.ok).toBe(true);
+    expect(seen).toEqual([
+      expect.objectContaining({
+        url: '/v1/models',
+        authorization: 'Bearer replacement-local-key-5678',
+      }),
+    ]);
+
+    const other = await connectedTenant(slice, 'other-models');
+    seen.length = 0;
+    const foreign = await other.owner.post('/v1/admin/model-connections/models', {
+      source: 'connection',
+      connectionId: created.body.id,
+    });
+    expect(foreign.status).toBe(404);
+    expect(seen).toHaveLength(0);
+  });
+
+  it('lists only the models a connection allows, without asking the provider', async () => {
+    const created = await connect({ allowedModels: ['test-model'] });
+    const result = await listModels({ source: 'connection', connectionId: created.body.id });
+    expect(result.body).toMatchObject({
+      ok: true,
+      models: [{ id: 'test-model', name: null, deprecated: false }],
+    });
+    expect(seen).toHaveLength(0);
+  });
+
+  it('reads the list for a pasted key once, and keeps neither the key nor a connection', async () => {
+    mode = 'ok';
+    const before = (await shop.owner.get('/v1/admin/model-connections')).body.items.length;
+    const pasted = {
+      source: 'key',
+      provider: 'openai-compatible',
+      baseUrl: `${modelOrigin}/v1`,
+      apiKey: 'pasted-local-key-1234',
+    };
+    const result = await listModels(pasted);
+    expect(result.status, JSON.stringify(result.body)).toBe(200);
+    expect(result.body.models.map((m: { id: string }) => m.id)).toEqual([
+      'another-model',
+      'test-model',
+    ]);
+    expect(seen).toEqual([
+      expect.objectContaining({ url: '/v1/models', authorization: 'Bearer pasted-local-key-1234' }),
+    ]);
+    expect((await shop.owner.get('/v1/admin/model-connections')).body.items).toHaveLength(before);
+    // A pasted key is never remembered: the next ask goes to the server again.
+    await listModels(pasted);
+    expect(seen).toHaveLength(1);
+  });
+
+  it('says in plain words why a list could not be read, and keeps no failure', async () => {
+    const created = await connect({ label: 'Fails to list', allowedModels: [] });
+    const expected: [Mode, string][] = [
+      ['wrong_key', 'wrong_key'],
+      ['no_credit', 'no_credit'],
+      ['busy', 'unavailable'],
+      ['drop', 'network'],
+    ];
+    for (const [next, kind] of expected) {
+      mode = next;
+      const result = await listModels({ source: 'connection', connectionId: created.body.id });
+      expect(result.status, next).toBe(200);
+      expect(result.body, next).toMatchObject({
+        ok: false,
+        kind,
+        message: MODEL_LIST_MESSAGES[kind as keyof typeof MODEL_LIST_MESSAGES],
+        models: [],
+      });
+      expect(seen, next).toHaveLength(1);
+    }
+    mode = 'ok';
+    const recovered = await listModels({ source: 'connection', connectionId: created.body.id });
+    expect(recovered.body.ok).toBe(true);
+  });
+
+  it('refuses a private address, a missing key, a server key it does not have, and a switched-off connection', async () => {
+    const before = sinkConnections;
+    const privateAddress = await listModels({
+      source: 'key',
+      provider: 'openai-compatible',
+      baseUrl: `https://10.1.2.3:${sinkPort}/v1`,
+      apiKey: 'pasted-local-key-1234',
+    });
+    expect(privateAddress.status).toBe(422);
+    expect(JSON.stringify(privateAddress.body)).toMatch(/private or local network/);
+    expect(sinkConnections).toBe(before);
+
+    expect((await listModels({ source: 'key', provider: 'openai' })).status).toBe(422);
+    expect((await listModels({ source: 'key', provider: 'openai-compatible' })).status).toBe(422);
+
+    // This server holds an Anthropic key but none for OpenAI.
+    const noServerKey = await listModels({ source: 'platform', provider: 'openai' });
+    expect(noServerKey.status).toBe(422);
+    expect(noServerKey.body.detail).toMatch(/no key of its own/);
+
+    const created = await connect();
+    await shop.owner.post(`/v1/admin/model-connections/${created.body.id}/disable`);
+    const off = await listModels({ source: 'connection', connectionId: created.body.id });
+    expect(off.status).toBe(422);
+    expect(
+      (await listModels({ source: 'connection', connectionId: 'mcn_01j9zk7w3xq8r4t2v6m5n1p0cd' }))
+        .status,
+    ).toBe(404);
+    expect(seen).toHaveLength(0);
+  });
+
+  it('is for people who manage integrations', async () => {
+    const created = await connect();
+    const agent = await join(slice, shop, 'Lina Agent', 'agent');
+    const refused = await agent.client.post('/v1/admin/model-connections/models', {
+      source: 'connection',
+      connectionId: created.body.id,
+    });
+    expect(refused.status).toBe(403);
   });
 });
 

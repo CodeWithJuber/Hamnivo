@@ -6,14 +6,14 @@
  */
 import type { KeyedProvider, ModelOption, OnboardingStep } from '@hamnivo/contracts';
 
-/** The dropdown's last entry: the person types the model name themselves. */
-export const CUSTOM_MODEL = 'custom';
-
-/** The models offered per provider. An OpenAI-compatible server has none: each names its own. */
+/**
+ * The models suggested per provider when its live list cannot be read, and the words on the
+ * recommended one in a live list. An OpenAI-compatible server has none: each names its own.
+ */
 export const MODEL_CATALOG: Readonly<Record<KeyedProvider, readonly ModelOption[]>> = {
   anthropic: [
-    { id: 'claude-haiku-4-5', tier: 'fast', recommended: true },
-    { id: 'claude-sonnet-5', tier: 'balanced' },
+    { id: 'claude-haiku-5-5', tier: 'fast', recommended: true },
+    { id: 'claude-sonnet-5-5', tier: 'balanced' },
     { id: 'claude-opus-5-5', tier: 'capable' },
   ],
   openai: [
@@ -32,11 +32,6 @@ export const MODEL_CATALOG: Readonly<Record<KeyedProvider, readonly ModelOption[
 /** The model to start with for a provider, or null where each server names its own. */
 export function recommendedModel(provider: KeyedProvider): string | null {
   return MODEL_CATALOG[provider].find((model) => model.recommended)?.id ?? null;
-}
-
-/** The dropdown value for a stored model name: the name when it is listed, `custom` otherwise. */
-export function modelDropdownValue(provider: KeyedProvider, modelId: string): string {
-  return MODEL_CATALOG[provider].some((model) => model.id === modelId) ? modelId : CUSTOM_MODEL;
 }
 
 export type ChatLanguage = 'en' | 'ar' | 'hi' | 'ur';

@@ -1,3 +1,4 @@
+import { WidgetSettings } from '@hamnivo/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   colourIssues,
@@ -147,6 +148,18 @@ describe('what the chat is told about its brand', () => {
     expect(config.copy.en.greeting).toMatch(/How can we help today/);
     expect(config.features.csat).toBe(false);
     expect(config.privacyPolicyUrl).toBeNull();
+    // Customers try the AI first: "Talk to a person" comes after three AI answers.
+    expect(config.handoff).toEqual({ personButton: 'after_ai', afterAnswers: 3 });
+  });
+
+  it('passes on the brand’s choice for the "Talk to a person" button', () => {
+    const config = widgetConfig(brand, new Date('2026-10-03T12:00:00Z'), {
+      ...DEFAULT_SURFACE,
+      settings: WidgetSettings.parse({ handoff: { personButton: 'never' } }),
+    });
+    expect(config.handoff?.personButton).toBe('never');
+    // Settings saved before the choice existed read as the default.
+    expect(WidgetSettings.parse({ help: { search: false } }).handoff.personButton).toBe('after_ai');
   });
 
   it('uses the brand’s own colours, words, rating and privacy link', () => {

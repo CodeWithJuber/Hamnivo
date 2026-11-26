@@ -15,11 +15,35 @@ export const setupEn = {
     model: 'Model',
     modelHint: 'The AI model to test the key with. The recommended one is a good place to start.',
     recommended: 'recommended',
-    customModel: 'Another model…',
-    customLabel: 'Model name',
-    customHint: 'Type the model’s name exactly as the provider writes it.',
-    customServerHint:
-      'Type the name of a model your server offers, exactly as the server writes it.',
+    live: {
+      placeholder: 'Search or type a model name',
+      show: 'Show models',
+      listLabel: 'Models',
+      loading: 'Asking {{provider}} which models your key can use…',
+      loaded: 'Models your key can use: {{count}}. Type to search, or type any other name.',
+      refresh: 'Refresh list',
+      retry: 'Try again',
+      suggested: 'Suggested models. You can also type any other model name.',
+      waiting: {
+        key: 'Paste the key above to see the models it can use, or type a name.',
+        address: 'Enter the server address above to see its models, or type a name.',
+      },
+      failed: 'Couldn’t load the models: {{reason}} Pick a suggestion or type the name.',
+      noServerKey:
+        'This server has no key of its own for this provider. Choose a key under Credentials, or type a name.',
+      noMatch: 'No model in the list matches. What you typed is used as it is.',
+      deprecated: 'being retired',
+      reasons: {
+        wrong_key: 'the key wasn’t accepted.',
+        no_credit: 'the account has no credit left.',
+        network: 'the provider couldn’t be reached.',
+        blocked: 'this server address isn’t allowed.',
+        rate_limited: 'the provider asked us to slow down.',
+        unavailable: 'the provider is having trouble right now.',
+        unknown: 'the provider didn’t send a list we could read.',
+        request: 'check the key and the server address.',
+      },
+    },
     tiers: { fast: 'fast, low cost', balanced: 'balanced', capable: 'most capable' },
     serverAddress: 'Server address',
     serverAddressHint:
@@ -361,6 +385,105 @@ export const setupEn = {
     },
     created: 'The key {{kid}} was created.',
     reveal: { title: 'Your new secret', label: 'Secret for the key {{kid}}' },
+  },
+  readiness: {
+    title: 'Make the AI assistant work',
+    description: 'Do these in order. Each button opens the page where you do that step.',
+    brand: 'Brand',
+    unknown: 'Only an owner or administrator can see this. Ask them to check it.',
+    states: {
+      done: 'Done',
+      todo: 'To do',
+      attention: 'Needs attention',
+      unknown: 'Not known',
+      check: 'Check yourself',
+    },
+    steps: {
+      aikey: {
+        title: 'An AI key that works',
+        description: 'Add a key from OpenAI, Anthropic or Google, then press Test key.',
+        action: 'Open AI keys',
+        reasons: {
+          untested: 'The key has not been tested yet. Open AI keys and press Test key.',
+          wrong_key: 'The provider did not accept the key. Replace it on the AI keys page.',
+          no_credit:
+            'The key is real, but the account has no credit. Add credit with the provider, then test again.',
+          model_not_found:
+            'The provider does not know the model the key was tested with. Pick a model from the list and test again.',
+          network: 'The last test could not reach the provider. Test again.',
+          blocked: 'The key’s server address is not allowed. Check the address.',
+          rate_limited:
+            'The provider asked us to slow down during the last test. Test again in a minute.',
+          unavailable: 'The provider was having trouble during the last test. Test again.',
+          unknown: 'The last test did not work. Test again, or check the key with the provider.',
+        },
+      },
+      model: {
+        title: 'The AI agent is live with a real model',
+        description: 'Open the agent, pick the model under Model, and publish it.',
+        action: 'Open the agent',
+        reasons: {
+          noAgent: 'This brand has no AI agent yet. Create one on the Agents page.',
+          notLive: 'The agent is not published yet. Open it and press Publish.',
+          mock: 'The agent uses the offline test model, which only gives canned replies. Pick a real model and publish.',
+        },
+      },
+      signin: {
+        title: 'A customer sign-in key',
+        description:
+          'Your WHMCS uses this key to tell the chat which client is signed in. Create one, then copy its secret.',
+        action: 'Open Customer sign-in',
+      },
+      whmcs: {
+        title: 'WHMCS connected',
+        description:
+          'Connect your WHMCS with an API credential, so the AI can read services, invoices and tickets.',
+        action: 'Open Connectors',
+        reasons: {
+          failing:
+            'The connection’s last test failed. Open Connectors, read the error and press Reconnect.',
+          disabled: 'The WHMCS connection is turned off. Connect it again on the Connectors page.',
+        },
+      },
+      actions: {
+        title: 'The agent may use WHMCS',
+        description: 'Open the agent, go to Tools, tick the WHMCS actions it may use, and publish.',
+        action: 'Open the agent’s tools',
+        reasons: {
+          connectFirst:
+            'Connect WHMCS first (step 4). Its actions then appear in the agent’s Tools.',
+        },
+      },
+      demo: {
+        title: 'No demo tools',
+        description:
+          'Demo tools answer with made-up data. Remove them from the agent’s Tools and publish.',
+        action: 'Open the agent’s tools',
+      },
+      website: {
+        title: 'Your website signs customers in',
+        description:
+          'In WHMCS: Addon Modules → Hamnivo Chat → Configure → tick Verify signed-in clients and enter the key. Studio cannot check this; the guide shows how to test it.',
+        action: 'Open the guide',
+      },
+    },
+  },
+  whmcsForm: {
+    stepsTitle: 'Three steps',
+    step1: 'Pick or create the customer sign-in key below. Copy its secret when it is shown.',
+    step2:
+      'In WHMCS, open Addon Modules → Hamnivo Chat → Configure. Tick Verify signed-in clients and enter the key name and secret.',
+    guide: 'How to do this',
+    step3:
+      'In WHMCS, open Configuration → System Settings → Manage API Credentials. Create an API role with only the actions you allow, then a credential for it. Paste its identifier and secret here.',
+    keyLabel: 'Customer sign-in key',
+    keyHint:
+      'The key your WHMCS signs clients in with. It must be the one in the Hamnivo Chat addon.',
+    keyTyped: 'Type the key name exactly as shown under Customer sign-in.',
+    noKey: 'This brand has no customer sign-in key yet. Create one here: it takes a few seconds.',
+    create: 'Create a key',
+    createAnother: 'Create another key',
+    manage: 'Manage keys',
   },
   teams: {
     nav: 'Support teams',

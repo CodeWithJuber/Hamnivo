@@ -44,6 +44,8 @@ const TYPE_KEYS = {
   'application/pdf': 'pdf',
 } as const;
 const MODES = ['bubble', 'panel', 'inline', 'fullpage'] as const;
+/** The choices for the "Talk to a person" button, the default first. */
+const PERSON_BUTTON = ['after_ai', 'always', 'never'] as const;
 
 export type Texts = Record<Lang, string>;
 export const texts = (value?: Partial<Record<Lang, string>>): Texts => ({
@@ -178,6 +180,7 @@ interface SettingsDraft {
   suggestions: Texts[];
   deleteMinutes: string;
   emails: boolean;
+  person: Settings['handoff']['personButton'];
 }
 
 const settingsDraft = (s: Settings): SettingsDraft => ({
@@ -195,6 +198,7 @@ const settingsDraft = (s: Settings): SettingsDraft => ({
   suggestions: s.help.suggestions.map((q) => texts(q)),
   deleteMinutes: String(s.deletion.windowMinutes),
   emails: s.notifications.email,
+  person: s.handoff.personButton,
 });
 
 /** Where the gateway's refusal of a settings field points (`attachments.maxMegabytes` …). */
@@ -219,6 +223,7 @@ export function settingsControlOfPath(path: string): string {
   }
   if (area === 'deletion') return 'chat-deletion';
   if (area === 'notifications') return 'chat-emails';
+  if (area === 'handoff') return 'chat-person-after_ai';
   return 'chat-mode-bubble';
 }
 
@@ -318,6 +323,7 @@ export function SettingsForm({
         },
         deletion: { windowMinutes: minutes as number },
         notifications: { email: draft.emails },
+        handoff: { personButton: draft.person },
       });
       // What was saved is the new starting point at once, without waiting for a reload.
       client.setQueryData([tenantId, ...widgetSettingsKey(brand.id)], result);
@@ -533,6 +539,19 @@ export function SettingsForm({
           </Button>
         ) : null}
       </FieldSet>
+      <ChoiceField
+        id="chat-person"
+        legend={t('chatSettings.person.legend')}
+        hint={t('chatSettings.person.hint')}
+        value={draft.person}
+        error={server['chat-person-after_ai']}
+        onValueChange={(person) => set({ person: person as SettingsDraft['person'] })}
+        choices={PERSON_BUTTON.map((value) => ({
+          value,
+          label: t(`chatSettings.person.${value}`),
+          hint: t(`chatSettings.person.${value}Hint`),
+        }))}
+      />
       <TextField
         id="chat-deletion"
         label={t('chatSettings.deletion.label')}

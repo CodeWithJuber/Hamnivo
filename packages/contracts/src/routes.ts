@@ -284,6 +284,17 @@ export const widgetRoutes = {
     params: conversationParams,
     success: { status: 200, description: 'Reopened', schema: CustomerConversation },
   },
+  resolveConversation: {
+    method: 'post',
+    path: '/v1/widget/conversations/{conversationId}/resolve',
+    operationId: 'resolveConversation',
+    summary:
+      'End the chat as the customer: resolved for the team, as when staff resolve it; writing again reopens it',
+    tags: ['Widget'],
+    auth: 'widget_session',
+    params: conversationParams,
+    success: { status: 200, description: 'Resolved', schema: CustomerConversation },
+  },
   feedback: {
     method: 'post',
     path: '/v1/widget/conversations/{conversationId}/feedback',

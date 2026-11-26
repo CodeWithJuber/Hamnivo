@@ -44,7 +44,9 @@ import type { AppConfig } from '../config.js';
 import { teamsForBrand } from '../decisions/team-routing.service.js';
 import { supersedeAiDrafts } from '../inbox/ai-drafts.js';
 import { AvailabilityService } from '../inbox/availability.service.js';
+import { InboxSignals } from '../inbox/signals.service.js';
 import { syncSla } from '../inbox/sla.js';
+import { recordStatusIn } from '../inbox/status.service.js';
 import { enqueueOutbox } from '../outbox/outbox.js';
 import { AgentsService } from '../runtime/agents.service.js';
 import { HANDOFF_NOTES } from '../runtime/handoff-notes.js';
@@ -95,6 +97,7 @@ export class WidgetConversationsService {
     private readonly attachments: WidgetAttachmentsService,
     private readonly availability: AvailabilityService,
     private readonly runSignals: RunSignals,
+    private readonly inboxSignals: InboxSignals,
   ) {}
 
   /**
@@ -828,6 +831,40 @@ export class WidgetConversationsService {
       return out;
     });
     await this.journal.notify(claims.tenantId, conversationId, entries);
+    return this.get(claims, publicId);
+  }
+
+  /**
+   * The customer ends the chat ("End this chat"): resolved in Chatwoot, then recorded in Hamnivo
+   * exactly as when staff resolve it, so it leaves the team's open chats and a rating can follow.
+   * Writing in it again reopens it. Ending a chat that is already resolved changes nothing.
+   */
+  async resolve(claims: WidgetClaims, publicId: string): Promise<CustomerConversation> {
+    const conversationId = this.conversationId(publicId);
+    const before = await this.tx(claims, (tx) => this.own(tx, claims, conversationId));
+    if (before.authorityStatus === 'resolved') return this.get(claims, publicId);
+    const runtime = await this.registry.get(claims.tenantId, before.connectionId);
+    try {
+      await runtime.authority.setStatus(String(before.externalConversationId), 'resolved', {
+        kind: 'integration',
+      });
+    } catch (error) {
+      throw authorityUnavailable(error, 'The chat could not be ended. Please try again.');
+    }
+    const entries = await this.tx(claims, (tx) =>
+      recordStatusIn(tx, this.ownership, this.journal, this.clock(), {
+        tenantId: claims.tenantId,
+        conversationId,
+        publicId,
+        brandId: before.brandId,
+        status: 'resolved',
+        snoozedUntil: null,
+        actor: { type: 'customer', id: toPublicId('customer', claims.principalId) },
+        automationRef: `customer:${claims.principalId}`,
+      }),
+    );
+    await this.journal.notify(claims.tenantId, conversationId, entries);
+    await this.inboxSignals.changed(claims.tenantId, [conversationId]);
     return this.get(claims, publicId);
   }
 

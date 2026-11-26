@@ -27,14 +27,16 @@ import { Skeleton } from '@hamnivo/ui/components/skeleton';
 import {
   ArrowDownIcon,
   BrainIcon,
+  CircleCheckIcon,
   MessagesSquareIcon,
   SettingsIcon,
+  SquarePenIcon,
   UserRoundIcon,
   WifiOffIcon,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { offlineFormApplies } from '../availability.js';
+import { offlineFormApplies, showPersonButton } from '../availability.js';
 import { ShopBar } from '../commerce/ShopBar.js';
 import type { Commerce } from '../commerce/useCommerce.js';
 import {
@@ -341,6 +343,10 @@ export function Chat(props: {
   onStart: (input: StartConversationInput) => Promise<void>;
   /** Opens the closed conversation on screen again (W15). */
   onReopen: () => Promise<void>;
+  /** Ends the conversation on screen ("End this chat"); writing in it again reopens it. */
+  onResolve: () => Promise<void>;
+  /** Shows a fresh chat: the next message starts a new conversation (the old one is kept). */
+  onStartNew: () => Promise<void>;
   /** Leaves a message while nobody can answer (W11); it becomes a ticket (H19). */
   onLeaveMessage: (
     answers: FormAnswers,
@@ -817,6 +823,28 @@ export function Chat(props: {
     await props.onReopen();
     focusComposer();
   };
+  // "End this chat" asks first, in a small panel under the header.
+  const [ending, setEnding] = useState(false);
+  const [endBusy, setEndBusy] = useState(false);
+  const [endFailed, setEndFailed] = useState(false);
+  const endConfirm = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (ending) endConfirm.current?.focus();
+  }, [ending]);
+  const endChat = async () => {
+    setEndBusy(true);
+    setEndFailed(false);
+    try {
+      await props.onResolve();
+      setEnding(false);
+      focusComposer();
+    } catch {
+      // The panel stays, with a line saying it did not work; nothing changed for the team.
+      setEndFailed(true);
+    } finally {
+      setEndBusy(false);
+    }
+  };
   // Who can answer is said on the home screen; the header says it while home is out of sight.
   const statusInHeader =
     empty && Boolean(config.availability) && (view !== 'chat' || gate !== null);
@@ -826,23 +854,24 @@ export function Chat(props: {
   });
   // The assistant's name and role for an answer still being written, from its last answer.
   const assistant = state.messages.findLast((m) => m.sender.kind === 'ai_agent')?.sender;
-  const person = canAskPerson ? (
-    <Button
-      variant="outline"
-      size={compact ? 'icon' : 'sm'}
-      className={
-        compact
-          ? 'size-11 shrink-0 rounded-full'
-          : 'mb-2 h-auto min-h-9 rounded-full whitespace-normal py-1.5 text-start shadow-sm'
-      }
-      aria-label={compact ? t('talkToPerson') : undefined}
-      title={compact ? t('talkToPerson') : undefined}
-      onClick={() => void handoff()}
-    >
-      <UserRoundIcon className="size-4" aria-hidden="true" />
-      {compact ? null : t('talkToPerson')}
-    </Button>
-  ) : null;
+  const person =
+    canAskPerson && showPersonButton(config.handoff, state.messages) ? (
+      <Button
+        variant="outline"
+        size={compact ? 'icon' : 'sm'}
+        className={
+          compact
+            ? 'size-11 shrink-0 rounded-full'
+            : 'mb-2 h-auto min-h-9 rounded-full whitespace-normal py-1.5 text-start shadow-sm'
+        }
+        aria-label={compact ? t('talkToPerson') : undefined}
+        title={compact ? t('talkToPerson') : undefined}
+        onClick={() => void handoff()}
+      >
+        <UserRoundIcon className="size-4" aria-hidden="true" />
+        {compact ? null : t('talkToPerson')}
+      </Button>
+    ) : null;
   const fine = (
     <FinePrint url={config.privacyPolicyUrl} branded={config.brand.showBranding !== false} />
   );
@@ -902,6 +931,45 @@ export function Chat(props: {
                     </Button>
                   </li>
                 ) : null}
+                {conversation && available && !resolved ? (
+                  <li>
+                    <Button
+                      id="hv-end-chat"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setMore(false);
+                        setEndFailed(false);
+                        setEnding(true);
+                      }}
+                    >
+                      <CircleCheckIcon className="size-4" aria-hidden="true" />
+                      {t('surface.chatActions.endChat')}
+                    </Button>
+                  </li>
+                ) : null}
+                {conversation && available ? (
+                  <li>
+                    <Button
+                      id="hv-new-chat"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setMore(false);
+                        setEnding(false);
+                        void props.onStartNew().then(() => {
+                          show('chat');
+                          focusComposer();
+                        });
+                      }}
+                    >
+                      <SquarePenIcon className="size-4" aria-hidden="true" />
+                      {t('surface.chatActions.newChat')}
+                    </Button>
+                  </li>
+                ) : null}
                 <li>
                   <Button
                     id="hv-settings-open"
@@ -944,6 +1012,39 @@ export function Chat(props: {
             {resolved && !config.features.csat && available ? <Reopen onReopen={reopen} /> : null}
             {canGoBack ? <BackToAssistant onCancel={props.onCancelHandoff} /> : null}
           </div>
+        ) : null}
+        {ending && conversation && !resolved && available ? (
+          <section
+            aria-labelledby="hv-end-title"
+            className="flex flex-col gap-2 border-b border-border bg-surface-sunken px-4 py-3"
+            data-testid="end-chat"
+          >
+            <p id="hv-end-title" className="text-sm font-medium text-text">
+              {t('surface.chatActions.endTitle')}
+            </p>
+            <p className="text-sm text-text-secondary">{t('surface.chatActions.endBody')}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button ref={endConfirm} size="sm" busy={endBusy} onClick={() => void endChat()}>
+                {t('surface.chatActions.endConfirm')}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={endBusy}
+                onClick={() => {
+                  setEnding(false);
+                  document.getElementById('hv-more')?.focus();
+                }}
+              >
+                {t('surface.chatActions.endCancel')}
+              </Button>
+            </div>
+            {endFailed ? (
+              <p role="alert" className="text-sm text-danger">
+                {t('surface.chatActions.endFailed')}
+              </p>
+            ) : null}
+          </section>
         ) : null}
         {config.features.csat && conversation && resolved && available ? (
           <Csat client={client} conversationId={conversation.id} onReopen={reopen} />

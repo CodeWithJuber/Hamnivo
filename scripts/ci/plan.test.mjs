@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { pick, suites } from './plan.mjs';
+import { lastPassed, pick, suites } from './plan.mjs';
 
 // A small stand-in for turbo's graph: the package a path is in, and the packages it reaches.
 const graph = {
@@ -34,15 +34,56 @@ const everything = (pg) => [
 ];
 const smoke = ['autodeploy-smoke', 'production-smoke'];
 
-test('a branch runs only the suites its change reaches, with the basics on what it reaches', () => {
-  assert.deepEqual(ids(pick(branch(() => ['docs/a.md', 'apps/console/README.md']))), ['basics']);
-  assert.deepEqual(ids(pick(branch(() => ['apps/console/src/a.ts']))), [
+// main after a merge: compared with main before it (github.event.before).
+const main = (diff, passed = false) => ({
+  event: 'push',
+  ref: 'refs/heads/main',
+  passed,
+  diff,
+  reach,
+});
+const failing = () => {
+  throw new Error('turbo failed');
+};
+const basicsArgs = (selection) => suites(selection).find((s) => s.id === 'basics').args;
+
+test('a branch push runs only types and unit tests, on what its change reaches', () => {
+  for (const files of [
+    ['docs/a.md', 'apps/console/README.md'],
+    ['apps/console/src/a.ts'],
+    ['apps/gateway/src/a.ts'],
+    ['packages/ui/src/a.tsx'],
+  ]) {
+    const selection = pick(branch(() => files));
+    assert.deepEqual(ids(selection), ['basics'], files.join(' '));
+    assert.equal(basicsArgs(selection), '--quick --affected --skip-lint', files.join(' '));
+  }
+  // A change it cannot place gets the quick checks on every package, and no smoke test.
+  for (const files of [
+    ['deploy/compose/a.yml'],
+    ['apps/console/src/a.ts', 'pnpm-lock.yaml'],
+    ['apps/console/src/a.ts', '.github/x.yml'],
+  ]) {
+    const selection = pick(branch(() => files));
+    assert.deepEqual(ids(selection), ['basics'], files.join(' '));
+    assert.equal(basicsArgs(selection), '--quick --skip-lint', files.join(' '));
+  }
+  assert.deepEqual(ids(pick({ ...branch(() => ['apps/console/a.ts']), reach: failing })), [
+    'basics',
+  ]);
+  assert.deepEqual(ids(pick(branch(() => null))), ['basics']);
+  assert.deepEqual(ids(pick({ ...branch(() => assert.fail('no diff')), passed: true })), []);
+});
+
+test('main after a merge runs the heavy suites the merge reaches, once', () => {
+  assert.deepEqual(ids(pick(main(() => ['docs/a.md', 'apps/console/README.md']))), ['basics']);
+  assert.deepEqual(ids(pick(main(() => ['apps/console/src/a.ts']))), [
     'studio-1',
     'studio-2',
     'studio-3',
     'basics',
   ]);
-  assert.deepEqual(ids(pick(branch(() => ['apps/gateway/src/a.ts']))), [
+  assert.deepEqual(ids(pick(main(() => ['apps/gateway/src/a.ts']))), [
     'studio-1',
     'studio-2',
     'studio-3',
@@ -52,7 +93,7 @@ test('a branch runs only the suites its change reaches, with the basics on what 
     'integration-pg18-3',
     'basics',
   ]);
-  assert.deepEqual(ids(pick(branch(() => ['packages/ui/src/a.tsx']))), [
+  assert.deepEqual(ids(pick(main(() => ['packages/ui/src/a.tsx']))), [
     'studio-1',
     'studio-2',
     'studio-3',
@@ -60,52 +101,54 @@ test('a branch runs only the suites its change reaches, with the basics on what 
     'basics',
     'accessibility',
   ]);
-  const basics = suites(pick(branch(() => ['apps/console/src/a.ts']))).find(
-    (s) => s.id === 'basics',
-  );
-  assert.equal(basics.args, '--quick --affected');
+  // Main lints and runs the quick checks on every package, whatever the merge reached.
+  assert.equal(basicsArgs(pick(main(() => ['apps/console/src/a.ts']))), '--quick');
+  // A tree a branch passed on its quick checks says nothing about the heavy suites.
+  assert.deepEqual(ids(pick(main(() => ['apps/console/src/a.ts'], true))), [
+    'studio-1',
+    'studio-2',
+    'studio-3',
+    'basics',
+  ]);
 });
 
-test('a branch runs everything when the change cannot be placed', () => {
+test('main runs everything when the merge cannot be placed', () => {
   const full = everything(['18']);
-  assert.deepEqual(ids(pick(branch(() => ['deploy/compose/a.yml']))), [
+  assert.deepEqual(ids(pick(main(() => ['deploy/compose/a.yml']))), [
     ...full.slice(0, 4),
     ...smoke,
     ...full.slice(4),
   ]);
   for (const file of ['pnpm-lock.yaml', 'turbo.json', 'scripts/ci/local.sh', '.github/x.yml']) {
-    const selection = pick(branch(() => ['apps/console/src/a.ts', file]));
+    const selection = pick(main(() => ['apps/console/src/a.ts', file]));
     assert.deepEqual(ids(selection), full, file);
-    assert.equal(suites(selection).find((s) => s.id === 'basics').args, '--quick');
+    assert.equal(basicsArgs(selection), '--quick', file);
   }
-  const failing = () => {
-    throw new Error('turbo failed');
-  };
-  assert.deepEqual(ids(pick({ ...branch(() => ['apps/console/a.ts']), reach: failing })), full);
-  assert.deepEqual(ids(pick(branch(() => null))), [
-    ...full.slice(0, 4),
-    ...smoke,
-    ...full.slice(4),
-  ]);
+  assert.deepEqual(ids(pick({ ...main(() => ['apps/console/a.ts']), reach: failing })), full);
+  // No commit before (a new branch or a forced push): everything.
+  assert.deepEqual(ids(pick(main(() => null))), [...full.slice(0, 4), ...smoke, ...full.slice(4)]);
 });
 
-test('main, the nightly run and a run by hand check everything; a passed tree is not checked twice', () => {
+test('the weekly run and a run by hand check everything, with lint', () => {
   const full = everything(['16', '18']);
   const all = [...full.slice(0, 4), ...smoke, ...full.slice(4)];
   const unused = () => assert.fail('no diff is needed');
   for (const event of ['schedule', 'workflow_dispatch']) {
-    assert.deepEqual(
-      ids(pick({ event, ref: 'refs/heads/main', passed: true, diff: unused, reach })),
-      all,
-    );
+    const selection = pick({ event, ref: 'refs/heads/main', passed: true, diff: unused, reach });
+    assert.deepEqual(ids(selection), all);
+    assert.equal(basicsArgs(selection), '--quick');
   }
-  const main = { event: 'push', ref: 'refs/heads/main', diff: unused, reach };
-  assert.deepEqual(ids(pick({ ...main, passed: false })), all);
-  assert.deepEqual(ids(pick({ ...main, passed: true })), [
-    ...smoke,
-    'integration-pg16-1',
-    'integration-pg16-2',
-    'integration-pg16-3',
-  ]);
-  assert.deepEqual(ids(pick({ ...branch(unused), passed: true })), []);
+});
+
+test('main is compared with the last commit a run passed, never a pull request or a failure', () => {
+  // Newest first, as GitHub lists them.
+  const runs = [
+    { event: 'pull_request', conclusion: 'success', head_sha: 'pr' },
+    { event: 'push', conclusion: 'failure', head_sha: 'failed' },
+    { event: 'push', conclusion: 'success', head_sha: 'passed' },
+    { event: 'schedule', conclusion: 'success', head_sha: 'weekly' },
+  ];
+  assert.equal(lastPassed({ workflow_runs: runs }), 'passed');
+  assert.equal(lastPassed({ workflow_runs: runs.slice(0, 2) }), null);
+  assert.equal(lastPassed({}), null);
 });
