@@ -9,7 +9,8 @@ hand. For a change people can see, add a screenshot at phone and desktop width. 
 
 ## Checklist
 
-- [ ] I signed the [CLA](../CLA.md) (the CLA check asks on your first pull request).
+- [ ] I signed the [CLA](https://github.com/CodeWithJuber/Hamnivo/blob/main/CLA.md) (the CLA check
+  asks on your first pull request).
 - [ ] Tests cover the change, and a bug fix has a test that fails without it.
 - [ ] The documentation is updated in this pull request, where behaviour changed.
 - [ ] A decision that is hard to reverse has an ADR in `docs/adr/`.
