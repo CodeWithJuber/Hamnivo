@@ -1,0 +1,70 @@
+# Supply-chain and licence checks (ADR 0021), beside CI:
+# - dependency review: a pull request may not add a dependency with a known high or critical
+#   advisory;
+# - secret scan: gitleaks reads the whole history with the rules in .gitleaks.toml, as
+#   `pnpm ci:local` does where gitleaks is installed;
+# - licensing: `reuse lint`, so every file keeps a known licence (REUSE.toml, NOTICE).
+# CodeQL runs as GitHub's default setup (Settings → Code security), not from a workflow here.
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
+        with:
+          fail-on-severity: high
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The release archive, checked against the checksum gitleaks publishes with it.
+      - name: Install gitleaks
+        env:
+          VERSION: 8.30.1
+          SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          archive="$RUNNER_TEMP/gitleaks.tar.gz"
+          curl -fsSL --retry 2 -o "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v$VERSION/gitleaks_${VERSION}_linux_x64.tar.gz"
+          echo "$SHA256  $archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP" gitleaks
+
+      - name: Scan the whole history
+        run: '"$RUNNER_TEMP/gitleaks" git --no-banner --redact --config .gitleaks.toml .'
+
+  licensing:
+    name: Licensing (REUSE)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: reuse lint
+        uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6.0.0
