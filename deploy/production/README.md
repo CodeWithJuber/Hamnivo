@@ -25,6 +25,11 @@ records to backups and updates, is Part A of [`docs/self-hosting.md`](../../docs
 `.env`, `chatwoot.env`, `backups/` and `state/` (deploy history, logs and the lock) stay on the
 server: git and Docker builds ignore them.
 
+The repository is public, so a server clones it over HTTPS and automatic deploys fetch from it
+with no deploy key or token. Only a private copy needs a read-only deploy key, which
+`hamnivo.sh autodeploy enable` creates when the server cannot read the repository
+([`docs/self-hosting.md`](../../docs/self-hosting.md), A3).
+
 `bash scripts/ci/production-smoke.sh` deploys this stack on the current machine, using Caddy's
 internal certificates, in its own compose project. It checks the deployment end to end, runs a
 backup and restore drill, then deletes everything it created.

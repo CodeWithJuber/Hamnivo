@@ -1,7 +1,7 @@
 # Running Hamnivo on your own server
 
-Hamnivo has no hosted CI. You run every check and host every service yourself, with the scripts in
-this repository.
+You host every service yourself, with the scripts in this repository, and can run every check
+yourself too. CI runs the same checks on each pull request on GitHub's runners (ADR 0021).
 
 - **Part A** puts Hamnivo in production on one server, with HTTPS and backups.
 - **Part B** is for development: running the services one by one and running the checks.
@@ -94,7 +94,22 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 ## A3. Get the code
 
-The repository is private, so the server reads it with its own key, a read-only deploy key.
+The repository is public, so the server needs no key to read it:
+
+```bash
+sudo mkdir -p /opt/hamnivo && sudo chown "$USER" /opt/hamnivo
+git clone https://github.com/CodeWithJuber/Hamnivo.git /opt/hamnivo
+cd /opt/hamnivo
+```
+
+Run everything as this user, without `sudo` (it is in the `docker` group), or everything as root.
+As root, the webhook receiver of automatic deploys still runs as `nobody`.
+
+### From a private copy
+
+If you deploy from a private copy of the repository, the server reads it with its own key, a
+read-only deploy key. `hamnivo.sh autodeploy enable` (A10) sets up the same key if you skip these
+steps.
 
 1. Create the key on the server:
 
@@ -113,19 +128,15 @@ The repository is private, so the server reads it with its own key, a read-only 
    echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >>~/.ssh/known_hosts
    ```
 
-4. Clone:
+4. Clone your copy (replace `OWNER/REPOSITORY`):
 
    ```bash
    sudo mkdir -p /opt/hamnivo && sudo chown "$USER" /opt/hamnivo
    GIT_SSH_COMMAND='ssh -i ~/.ssh/hamnivo_deploy_ed25519 -o IdentitiesOnly=yes' \
-     git clone git@github.com:CodeWithJuber/Hamnivo.git /opt/hamnivo
+     git clone git@github.com:OWNER/REPOSITORY.git /opt/hamnivo
    cd /opt/hamnivo
    git config core.sshCommand 'ssh -i ~/.ssh/hamnivo_deploy_ed25519 -o IdentitiesOnly=yes'
    ```
-
-Run everything as this user, without `sudo` (it is in the `docker` group), or everything as root.
-As root, the webhook receiver of automatic deploys still runs as `nobody`. `hamnivo.sh autodeploy
-enable` (A10) sets up the same key if you skip this step.
 
 ## A4. Configure
 
@@ -731,7 +742,7 @@ up and deploys.
   deploys itself from GitHub (A10), or you run `hamnivo.sh update`.
 - With automatic deploys:
   - `main` is protected on GitHub (pull requests only, no force pushes);
-  - the deploy key is read-only;
+  - the deploy key, if you use a private copy, is read-only;
   - the GitHub token, if you added one, is fine-grained, for this repository only, with
     "Deployments" access only.
 - To collect metrics, set `METRICS_TOKEN` and scrape `https://api.example.com/metrics` with it.
@@ -872,8 +883,8 @@ healthy for a short while; otherwise the one before starts again. Specific to au
    ```
 
    It needs `sudo` once, to install three systemd units. It:
-   - checks that the server can read the repository, and creates a read-only deploy key if needed
-     (A3);
+   - checks that the server can read the repository; the public repository needs no key, and for
+     a private copy it creates a read-only deploy key (A3);
    - generates the webhook secret;
    - starts the webhook receiver and turns on its route;
    - prints what to enter on GitHub.
