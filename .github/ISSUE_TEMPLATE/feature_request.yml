@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest something Hamnivo should do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check [docs/feature-status.md](https://github.com/CodeWithJuber/Hamnivo/blob/main/docs/feature-status.md)
+        and the open issues first: it may be planned or already built.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve?
+      description: Who runs into it, and what do they do today instead?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to build this myself, and I have read CONTRIBUTING.md and the CLA.
