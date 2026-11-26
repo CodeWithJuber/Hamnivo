@@ -98,4 +98,3 @@ shadcn/ui (packages/ui/src/components)
 Dependencies installed from npm, Composer or container registries keep their
 own licences. docs/licenses.md lists the npm packages, generated from the
 lockfile by scripts/licenses/inventory.ts.
-
