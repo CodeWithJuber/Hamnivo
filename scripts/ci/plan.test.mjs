@@ -11,6 +11,10 @@ const graph = {
     { name: '@hamnivo/console', testInt: false },
     { name: '@hamnivo/widget', testInt: false },
   ],
+  'packages/chatwoot': [
+    { name: '@hamnivo/chatwoot', testInt: true },
+    { name: '@hamnivo/gateway', testInt: true },
+  ],
 };
 function reach(files) {
   return files.flatMap((file) => {
@@ -21,20 +25,10 @@ function reach(files) {
 }
 const branch = (diff) => ({ event: 'push', ref: 'refs/heads/topic', passed: false, diff, reach });
 const ids = (selection) => suites(selection).map((suite) => suite.id);
-const everything = (pg) => [
-  'studio-1',
-  'studio-2',
-  'studio-3',
-  'widget',
-  ...pg.flatMap((version) => [1, 2, 3].map((part) => `integration-pg${version}-${part}`)),
-  'basics',
-  'chatwoot',
-  'accessibility',
-  'website',
-];
-const smoke = ['autodeploy-smoke', 'production-smoke'];
+const integration = (version) => [1, 2, 3].map((part) => `integration-pg${version}-${part}`);
+const everything = (pg) => [...pg.flatMap(integration), 'basics', 'chatwoot'];
 
-// main after a merge: compared with main before it (github.event.before).
+// main after a merge: compared with the last commit a run passed on main.
 const main = (diff, passed = false) => ({
   event: 'push',
   ref: 'refs/heads/main',
@@ -45,7 +39,8 @@ const main = (diff, passed = false) => ({
 const failing = () => {
   throw new Error('turbo failed');
 };
-const basicsArgs = (selection) => suites(selection).find((s) => s.id === 'basics').args;
+const basics = (selection) => suites(selection).find((s) => s.id === 'basics');
+const basicsArgs = (selection) => basics(selection).args;
 
 test('a branch push runs only types and unit tests, on what its change reaches', () => {
   for (const files of [
@@ -57,6 +52,7 @@ test('a branch push runs only types and unit tests, on what its change reaches',
     const selection = pick(branch(() => files));
     assert.deepEqual(ids(selection), ['basics'], files.join(' '));
     assert.equal(basicsArgs(selection), '--quick --affected --skip-lint', files.join(' '));
+    assert.equal(basics(selection).name, 'Types and unit tests', files.join(' '));
   }
   // A change it cannot place gets the quick checks on every package, and no smoke test.
   for (const files of [
@@ -75,68 +71,76 @@ test('a branch push runs only types and unit tests, on what its change reaches',
   assert.deepEqual(ids(pick({ ...branch(() => assert.fail('no diff')), passed: true })), []);
 });
 
-test('main after a merge runs the heavy suites the merge reaches, once', () => {
+test('main after a merge runs the integration and Chatwoot suites the merge reaches, once', () => {
   assert.deepEqual(ids(pick(main(() => ['docs/a.md', 'apps/console/README.md']))), ['basics']);
-  assert.deepEqual(ids(pick(main(() => ['apps/console/src/a.ts']))), [
-    'studio-1',
-    'studio-2',
-    'studio-3',
-    'basics',
-  ]);
+  // Studio, the widget and the UI kit have only browser suites beyond their unit tests.
+  assert.deepEqual(ids(pick(main(() => ['apps/console/src/a.ts']))), ['basics']);
+  assert.deepEqual(ids(pick(main(() => ['packages/ui/src/a.tsx']))), ['basics']);
   assert.deepEqual(ids(pick(main(() => ['apps/gateway/src/a.ts']))), [
-    'studio-1',
-    'studio-2',
-    'studio-3',
-    'widget',
-    'integration-pg18-1',
-    'integration-pg18-2',
-    'integration-pg18-3',
+    ...integration('18'),
     'basics',
   ]);
-  assert.deepEqual(ids(pick(main(() => ['packages/ui/src/a.tsx']))), [
-    'studio-1',
-    'studio-2',
-    'studio-3',
-    'widget',
-    'basics',
-    'accessibility',
-  ]);
-  // Main lints and runs the quick checks on every package, whatever the merge reached.
-  assert.equal(basicsArgs(pick(main(() => ['apps/console/src/a.ts']))), '--quick');
-  // A tree a branch passed on its quick checks says nothing about the heavy suites.
-  assert.deepEqual(ids(pick(main(() => ['apps/console/src/a.ts'], true))), [
-    'studio-1',
-    'studio-2',
-    'studio-3',
+  assert.deepEqual(ids(pick(main(() => ['packages/chatwoot/src/a.ts']))), everything(['18']));
+  // Main runs the quick checks on every package, whatever the merge reached, and never lints.
+  const selection = pick(main(() => ['apps/console/src/a.ts']));
+  assert.equal(basicsArgs(selection), '--quick --skip-lint');
+  assert.equal(basics(selection).name, 'Types and unit tests');
+  // A tree a branch passed on its quick checks says nothing about the integration tests.
+  assert.deepEqual(ids(pick(main(() => ['apps/gateway/src/a.ts'], true))), [
+    ...integration('18'),
     'basics',
   ]);
 });
 
-test('main runs everything when the merge cannot be placed', () => {
+test('main runs everything but the smoke tests when the merge cannot be placed', () => {
   const full = everything(['18']);
-  assert.deepEqual(ids(pick(main(() => ['deploy/compose/a.yml']))), [
-    ...full.slice(0, 4),
-    ...smoke,
-    ...full.slice(4),
-  ]);
+  // A deploy file no longer brings the smoke tests to a push: they build images.
+  assert.deepEqual(ids(pick(main(() => ['deploy/compose/a.yml']))), full);
   for (const file of ['pnpm-lock.yaml', 'turbo.json', 'scripts/ci/local.sh', '.github/x.yml']) {
     const selection = pick(main(() => ['apps/console/src/a.ts', file]));
     assert.deepEqual(ids(selection), full, file);
-    assert.equal(basicsArgs(selection), '--quick', file);
+    assert.equal(basicsArgs(selection), '--quick --skip-lint', file);
   }
   assert.deepEqual(ids(pick({ ...main(() => ['apps/console/a.ts']), reach: failing })), full);
   // No commit before (a new branch or a forced push): everything.
-  assert.deepEqual(ids(pick(main(() => null))), [...full.slice(0, 4), ...smoke, ...full.slice(4)]);
+  assert.deepEqual(ids(pick(main(() => null))), full);
 });
 
-test('the weekly run and a run by hand check everything, with lint', () => {
-  const full = everything(['16', '18']);
-  const all = [...full.slice(0, 4), ...smoke, ...full.slice(4)];
+test('the weekly run and a run by hand check everything, with the automatic-deploy smoke test', () => {
   const unused = () => assert.fail('no diff is needed');
   for (const event of ['schedule', 'workflow_dispatch']) {
     const selection = pick({ event, ref: 'refs/heads/main', passed: true, diff: unused, reach });
-    assert.deepEqual(ids(selection), all);
-    assert.equal(basicsArgs(selection), '--quick');
+    assert.deepEqual(ids(selection), ['autodeploy-smoke', ...everything(['16', '18'])]);
+    assert.equal(basicsArgs(selection), '--quick --skip-lint');
+  }
+});
+
+test('no run starts a browser, lints, or builds the production smoke stack', () => {
+  const unused = () => assert.fail('no diff is needed');
+  const runs = [
+    branch(() => ['apps/console/src/a.ts']),
+    branch(() => ['deploy/compose/a.yml']),
+    main(() => ['apps/console/src/a.ts']),
+    main(() => ['packages/ui/src/a.tsx']),
+    main(() => ['deploy/compose/a.yml']),
+    main(() => null),
+    { event: 'schedule', ref: 'refs/heads/main', passed: false, diff: unused, reach },
+    { event: 'workflow_dispatch', ref: 'refs/heads/topic', passed: false, diff: unused, reach },
+  ];
+  // `pnpm ci:local` runs the browser suites unless --quick or a --skip option turns them off.
+  const browsers = ['--skip-a11y', '--skip-widget', '--skip-studio', '--skip-site'];
+  for (const run of runs) {
+    for (const suite of suites(pick(run))) {
+      const args = suite.args.split(' ');
+      const where = `${run.event} ${run.ref}: ${suite.id}`;
+      assert.ok(
+        args.includes('--quick') || browsers.every((skip) => args.includes(skip)),
+        `${where} runs a browser`,
+      );
+      assert.ok(args.includes('--skip-lint') || args.includes('--skip-basics'), `${where} lints`);
+      assert.ok(!args.includes('--with-production'), `${where} runs the production smoke test`);
+      if (run.event === 'push') assert.ok(!suite.id.endsWith('-smoke'), `${where} on a push`);
+    }
   }
 });
 
