@@ -11,7 +11,7 @@ yourself too. CI runs the same checks on each pull request on GitHub's runners (
 | Part | Status | How |
 |---|---|---|
 | Production on one server: every service, automatic HTTPS, backups and restore | ready | Part A: `deploy/production/hamnivo.sh` |
-| Checks (lint, types, unit, integration on PostgreSQL 16 and 18, Chatwoot contract, accessibility, widget journey and website in a browser) | ready | `pnpm ci:local` |
+| Checks (lint, types, unit, integration on PostgreSQL 16 and 18, Chatwoot contract, accessibility, widget journey, Studio and website in a browser), on every pull request in CI too | ready | `pnpm ci:local` |
 | Production smoke test (the real deployment on this machine, then a backup and restore drill) | ready | `bash scripts/ci/production-smoke.sh` |
 | Automatic deployment from GitHub: webhook and a 5-minute check, checks and build on the server, rollback when unhealthy | ready | A10; tested by `bash scripts/ci/autodeploy-smoke.sh` |
 | Infrastructure for development (PostgreSQL 18 + pgvector, Valkey) | ready | `pnpm services:up` |
@@ -1294,125 +1294,47 @@ is never touched:
 
 - The built website in Chromium: every language at desktop and phone width, with an axe audit.
 
-The checks write `test-results/ci-local.md`. On the CI runner, the Actions run summary shows the
-report and where the full `test-results/` archive is kept: a file on the CI server, never a GitHub
-artifact, one per suite. Copy one with its run ID, attempt number and suite (`basics`,
-`integration-pg18-1`, `chatwoot`, `autodeploy-smoke`, ...):
+The checks write `test-results/ci-local.md`. In CI, the run summary shows that report, and each
+suite's `test-results/` is an artifact of the run, kept 14 days. Download one with its run ID and
+suite (`basics`, `integration-pg18-1`, `chatwoot`, `studio-2`, `production-smoke`, ...):
 
 ```bash
-scp root@CI_SERVER:/opt/hamnivo-ci-runner/results/ci-results-RUN_ID-ATTEMPT-SUITE.tar.gz .
+gh run download RUN_ID --name ci-results-SUITE
 ```
 
-### Run the checks on GitHub, for free
+### The checks on GitHub
 
-Every push runs part of this pipeline on GitHub Actions (ADR 0009), on runners of your own, and
-GitHub bills nothing for it (ADR 0020). It is split into suites that run side by side, one job
-each: typecheck and unit tests, the integration tests in three parts per PostgreSQL version, the
-Chatwoot contract suite and the automatic-deploy smoke test. At most two of the heavy suites run at
-once (`max-parallel` in `ci.yml`): the runners share one server's CPUs, and more at once made the
-tests time out. A push to a branch other than main runs only typecheck and unit tests, for the
-packages its change reaches. A push to main (a merge) runs the integration and Chatwoot suites
-reached since the last commit main passed (`scripts/ci/plan.mjs`), on PostgreSQL 18, with typecheck
-and unit tests on every package; a change to Markdown or `docs/` alone runs only those basics. The
-weekly run (Saturday 23:00 UTC) and runs by hand run every suite, test 16 too, and run the
-automatic-deploy smoke test, which builds the images and so never runs on a push. A branch push of a
-tree that an earlier run already passed is not checked again.
+Every pull request to `main` runs this pipeline on GitHub Actions, on GitHub's own runners, which
+cost nothing for a public repository (ADR 0021). It is split into suites that run side by side, one
+job each: lint, typecheck and unit tests; the integration tests in three parts per PostgreSQL
+version; the Chatwoot contract suite; the accessibility audit; the widget journey; Studio's browser
+tests in three parts; the website; and the production and automatic-deploy smoke tests.
+`scripts/ci/plan.mjs` picks them:
 
-CI runs no browser suite (the accessibility audit, the widget journey, Studio, the website), no lint
-(Biome, shellcheck) and no production smoke test, which drives Studio in Chromium: the runners share
-a small server. Run them by hand with `pnpm ci:local` (`--with-production` for the production smoke
-test) and `pnpm lint`.
-
-- Self-hosted runners are free.
-- Caches stay on the runner's disk, and results stay on the server.
-- `pnpm ci:local` fails any workflow change that would use GitHub's hosted runners, artifact
-  storage, cache storage or Packages (`scripts/ci/no-github-billing.sh`).
-
-Set it up once:
-
-1. **Get a server for it.** It needs Ubuntu 22.04 or later (or Debian 12 or later) on x86_64, at
-   least 4 GB of memory (8 GB or more is better), 40 GB of free disk, and outbound HTTPS. It needs
-   no open port. Don't use the production server: the checks build images with the same names,
-   and they would slow the live service. If the production server is the only machine you have,
-   use the capped setup in [On the production server](#on-the-production-server) instead
-   (ADR 0019).
-2. **Install the runner.** From a checkout of this repository:
-
-   ```bash
-   scp -r deploy/ci-runner root@CI_SERVER:/root/hamnivo-ci-runner-setup
-   ```
-
-   ```bash
-   ssh -t root@CI_SERVER bash /root/hamnivo-ci-runner-setup/install.sh
-   ```
-
-   It installs Docker if it is missing and copies the runner to `/opt/hamnivo-ci-runner`. It caps
-   the checks in `hamnivo-ci.slice`, sized to the machine, and leaves a tenth of the memory (at
-   least 1 GB) for ssh and Docker. Then it asks for a registration token: on GitHub, open
-   **Settings → Actions → Runners → New self-hosted runner**, and copy the value after `--token`.
-   The runner registers with the labels `self-hosted, linux, x64, hamnivo`, starts, and shows as
-   Idle on that page. Run the same two commands again to update it; set `HAMNIVO_CI_CPUS`,
-   `HAMNIVO_CI_MEMORY_GB` and the other variables in the script's header to size it yourself.
-   If the server also runs other repositories' runners, use the shared
-   [github-runners](https://github.com/CodeWithJuber/github-runners) kit instead of these two
-   commands: it runs Hamnivo's runner from `repos/hamnivo.env`, next to the others, under one cap.
-   The results are then in `/opt/github-runners/results/hamnivo`.
-3. **Retire any older runner.** Every runner with the `hamnivo` label takes jobs. On the server
-   it ran on, stop it with `cd /opt/hamnivo-ci-runner && docker compose down`, then remove it
-   under **Settings → Actions → Runners**.
-4. **Make sure GitHub can never bill.** On GitHub, open **Settings → Billing and licensing →
-   Budgets and alerts → New budget**. Choose Actions, set the amount to 0, turn on **Stop usage
-   when budget limit is reached**, and create it. A mistake can then fail a job, but not cost
-   anything.
-5. **Make `main` wait for the checks.** Under **Settings → Branches**, in the rule for `main`, turn
-   on "Require status checks to pass" and pick `checks`. For a private repository GitHub offers
-   this only on a paid plan; without it, check that `checks` passed before you merge.
-
-A newer push to the same branch cancels the run that is still going. Runs wait in the queue
-until a runner is online; GitHub fails a job that has waited 24 hours.
-
-What the runner keeps on the server, so no run downloads it again:
-
-| What | Where |
+| Event | What runs |
 | --- | --- |
-| pnpm's package store, pruned to what the last run used | the `work` volume, `_pnpm-store` |
-| Tool caches (CI installs no browsers) | the `runner-cache` volume |
-| Turbo's cache (a week), shared by all runners under the github-runners kit; only pushes to `main` and the weekly run write it | `CI_RESULTS_DIR/turbo-cache`, else the `runner-cache` volume |
-| Docker images and the build cache of the smoke test (a week) | the `dind-data` volume |
-| Each run's `test-results/` (14 days, `HAMNIVO_CI_RESULTS_DAYS`) | `/opt/hamnivo-ci-runner/results` |
+| A pull request to `main` | Lint; typecheck and unit tests on the packages its change reaches; the integration tests on PostgreSQL 18; and the other suites the change reaches in turbo's package graph. A change to Markdown or `docs/` alone runs only lint, typecheck and unit tests. A newer push cancels the older run. |
+| A push to `main` (a merge) | Lint, typecheck and unit tests on every package, and the suites reached since the last commit a run passed on `main`, so a suite that failed runs again on the next merge. Both smoke tests when a deploy file changed. |
+| Every Saturday at 23:00 UTC, and a run by hand | Everything, on PostgreSQL 16 and 18, with both smoke tests. |
 
-The runner is GitHub's own image (`ghcr.io/actions/actions-runner`), and it updates itself, as
-GitHub requires: GitHub stops sending jobs to a runner more than 63 days behind. Its logs:
-`cd /opt/hamnivo-ci-runner && docker compose logs -f runner`.
-
-#### On the production server
-
-`deploy/ci-runner/` runs the runner in a container next to a Docker daemon of its own, so the
-images, containers and ports the checks create never reach the Docker that serves production.
-Both containers, and everything the inner daemon starts, live in the systemd slice
-`hamnivo-ci.slice`: at most 3 CPUs and 4 GB, no swap, and the lowest CPU and disk priority. When
-the checks run out of memory, the kernel stops a check, not the live service. As root:
+A change the package graph cannot place (the workflows, `scripts/ci`, the lockfile, the root
+config, `deploy/`) runs every suite. To check a branch fully before merging:
 
 ```bash
-install -d -m 700 /opt/hamnivo-ci-runner
-install -d -m 700 -o 1001 -g 1001 /opt/hamnivo-ci-runner/state     # the runner's user in its image
-install -d -m 750 -o 1001 -g 1001 /opt/hamnivo-ci-runner/results
-cp deploy/ci-runner/{compose.yaml,Dockerfile,entrypoint.sh} /opt/hamnivo-ci-runner/
-cp deploy/ci-runner/hamnivo-ci.slice /etc/systemd/system/
-systemctl daemon-reload && systemctl start hamnivo-ci.slice
-# A one-time registration token, from a machine where gh is signed in as a repository admin:
-#   gh api -X POST repos/OWNER/REPO/actions/runners/registration-token --jq .token \
-#     | ssh root@SERVER 'umask 077; cat > /opt/hamnivo-ci-runner/state/token; chown 1001:1001 /opt/hamnivo-ci-runner/state/token'
-cd /opt/hamnivo-ci-runner && docker compose up -d --build
+gh workflow run ci.yml --ref <branch>
 ```
 
-Without a `.env` file, `compose.yaml` uses these sizes, the repository's URL and the name
-`compute-hamnivo-ci`. Set `HAMNIVO_CI_REPO_URL` in `.env` for a repository of your own. With
-4 GB the checks run at most two turbo tasks at once (`HAMNIVO_CI_CONCURRENCY=2`), and type checks
-and builds one at a time (`HAMNIVO_CI_HEAVY_CONCURRENCY=1`), so they take longer than on a laptop.
-With `HAMNIVO_CI_CONCURRENCY` set, each package's unit tests also get their share of the CPUs
-(`VITEST_MAX_WORKERS`, which `pnpm ci:local` sets when it is not set already), so the tests turbo
-runs side by side do not start more workers than there are CPUs.
+Beside the checks, `security.yml` runs dependency review on pull requests, scans the whole history
+for secrets with gitleaks and runs `reuse lint`; `scorecard.yml` runs OpenSSF Scorecard; and
+`cla.yml` asks each new contributor to sign the CLA.
+
+`scripts/ci/public-repo-guard.sh` runs first in CI and in `pnpm ci:local --quick`. It fails a
+workflow that would run on a self-hosted or larger runner, or a `pull_request_target` workflow that
+checks out a pull request's code.
+
+To make `main` wait for the checks, add a rule for `main` under **Settings → Rules** (or
+**Branches**) that requires a pull request and the status check `checks`. That one job passes only
+when every suite the plan picked passed.
 
 To run the quick checks automatically before every `git push`:
 
