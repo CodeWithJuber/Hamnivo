@@ -14,8 +14,8 @@
 #   pnpm ci:local --skip-site        skip the website in a browser
 #   pnpm ci:local --skip-basics      skip lint, typecheck, unit tests and the other --quick checks
 #                                    (CI runs them in a job of their own, beside the slow ones)
-#   pnpm ci:local --skip-lint        skip Biome and shellcheck (CI lints only main, the nightly
-#                                    run and a run by hand; typecheck and unit tests still run)
+#   pnpm ci:local --skip-lint        skip Biome and shellcheck (CI never lints, ADR 0009;
+#                                    typecheck and unit tests still run)
 #   pnpm ci:local --skip-integration skip the integration tests
 #   pnpm ci:local --with-production  also build the production images and check the real
 #                                    deployment with a backup and restore drill (10–20 minutes)

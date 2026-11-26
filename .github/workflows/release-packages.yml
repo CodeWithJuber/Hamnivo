@@ -78,7 +78,6 @@ jobs:
             exit 1
           fi
           echo "filter=@hamnivo/$name" >> "$GITHUB_OUTPUT"
-          echo "dir=packages/$name" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if [[ "$version" == *-* ]]; then
             echo "npm_tag=next" >> "$GITHUB_OUTPUT"
@@ -98,14 +97,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Only the package that is released, and what it needs. Its test script builds it first.
-      - name: Lint, type-check and test the package
+      # Only the package that is released, and what it needs. Its test script builds it first. No
+      # lint, as in CI (ADR 0009): Biome runs before a push.
+      - name: Type-check and test the package
         env:
-          DIR: ${{ steps.package.outputs.dir }}
           FILTER: ${{ steps.package.outputs.filter }}
-        run: |
-          pnpm exec biome check "$DIR"
-          pnpm exec turbo run typecheck test --filter="$FILTER" --concurrency=1
+        run: pnpm exec turbo run typecheck test --filter="$FILTER" --concurrency=1
 
       - name: Publish to npm
         env:

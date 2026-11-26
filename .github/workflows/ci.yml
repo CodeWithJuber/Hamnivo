@@ -1,12 +1,17 @@
-# The full check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, split into suites that
-# run side by side, one job each, on our own runners (deploy/ci-runner). scripts/ci/plan.mjs picks
-# them. Each change gets its heavy suites once. A push to another branch gets only typecheck and
-# unit tests on the packages its change reaches (agents push a branch many times), and nothing when
-# an earlier run already passed its tree. A push to main (a merge) gets the suites the package graph
-# reaches from what changed since the last commit main passed (so a suite that failed runs again on
-# the next merge), on PostgreSQL 18 (production's), the smoke tests when a deploy file changes, and
-# lint and the quick checks on every package; a merge it cannot place gets everything. The weekly
-# run and a run by hand cover everything: every PostgreSQL major and the smoke tests. For a full check of a branch before merging: gh workflow run ci.yml --ref <branch>.
+# The check pipeline (ADR 0009): the same `pnpm ci:local` a server runs, split into suites that run
+# side by side, one job each, on our own runners (deploy/ci-runner). scripts/ci/plan.mjs picks them.
+# The runners share a small server (4 shared vCPUs, 8 GB), so CI runs no browser suite (the
+# accessibility audit, the widget journey, Studio, the website), no lint (Biome, shellcheck) and no
+# production smoke test, which drives Studio in a browser: they stay in `pnpm ci:local`, by hand.
+# Each change gets its heavy suites once. A push to another branch gets only typecheck and unit
+# tests on the packages its change reaches (agents push a branch many times), and nothing when an
+# earlier run already passed its tree. A push to main (a merge) gets the integration and Chatwoot
+# suites the package graph reaches from what changed since the last commit main passed (so a suite
+# that failed runs again on the next merge), on PostgreSQL 18 (production's), and the typecheck and
+# unit tests on every package; a merge it cannot place gets every suite. The weekly run and a run by
+# hand cover everything: every PostgreSQL major and the automatic-deploy smoke test, which builds the
+# images and so never runs on a push. For a full check of a branch before merging:
+# gh workflow run ci.yml --ref <branch>.
 # The heavy suites run only on runners labelled `heavy` (all but two, github-runners FAST_RUNNERS),
 # so picking the suites and the basics always find a free runner, however many suites are queued.
 # It uses nothing GitHub bills for (ADR 0020): dependencies are cached on the runner's disk, and each
@@ -18,8 +23,8 @@ on:
   push:
   workflow_dispatch:
   # Everything, every Saturday at 23:00 UTC: the safety net for what a merge's selection missed
-  # (PostgreSQL 16, a change the package graph does not see). Every night cost about 400 job-minutes
-  # a run, more than all the merges of a day.
+  # (PostgreSQL 16, a change the package graph does not see) and the automatic-deploy smoke test.
+  # Every night cost about 400 job-minutes a run, more than all the merges of a day.
   schedule:
     - cron: '0 23 * * 6'
 
@@ -168,13 +173,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Browsers live in the runner's cache; their system libraries are installed once when the
-      # runner is set up (docs/self-hosting.md, "Run the checks on GitHub, for free").
-      # WebKit too: the widget journey runs WebKit and iPhone projects beside Chromium.
-      - name: Install Chromium and WebKit for the browser checks
-        if: matrix.browsers
-        run: pnpm --filter @hamnivo/console exec playwright install chromium webkit
-
       # A run whose runner died never ran its cleanup: its databases, Chatwoot and smoke stacks stay
       # in the runner's Docker and hold the next run's 4 GB (ADR 0019). Only the checks' own names
       # are removed. What the runner has left is printed, so a run that dies leaves evidence.
@@ -229,7 +227,7 @@ jobs:
           find "$TURBO_CACHE_DIR" -type f -mmin +$((7 * 1440)) -delete 2>/dev/null || true
 
   # The basics, on any runner: the two without the heavy label are kept for them and the plan, so a
-  # push learns about lint, types and unit tests in minutes, even behind a full run of main. The same
+  # push learns about types and unit tests in minutes, even behind a full run of main. The same
   # steps as checks (the YAML anchor).
   basics:
     name: ${{ matrix.name }}

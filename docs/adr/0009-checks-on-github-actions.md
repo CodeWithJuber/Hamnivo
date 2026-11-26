@@ -1,6 +1,7 @@
 # ADR 0009: The full pipeline runs on GitHub Actions, on a runner of our own
 
-- Status: accepted; amended by ADR 0019 and ADR 0020 (no variable picks the runner any more)
+- Status: accepted; amended by ADR 0019 and ADR 0020 (no variable picks the runner any more), and
+  on 2026-11-26 (no browser suites, lint or production smoke test in CI)
 - Date: 2026-10-02
 - Amends: ADR 0007
 
@@ -21,28 +22,37 @@ already runs a self-hosted runner for another project.
 ## Decision
 
 - **Where the pipeline runs.** `.github/workflows/ci.yml` runs `pnpm ci:local` on every push, split
-  into suites that run side by side, one job each (lint, types and unit tests; integration, in
-  three parts per PostgreSQL version; Chatwoot; the accessibility audit; the widget journey;
-  Studio, in three parts; the website; the production and automatic-deploy smoke tests).
+  into suites that run side by side, one job each (types and unit tests; integration, in three
+  parts per PostgreSQL version; Chatwoot; the automatic-deploy smoke test).
   Each change gets its heavy suites once, on main after the merge. A push to another branch
-  runs only typecheck and unit tests on the packages its change reaches (lint and shellcheck run
-  only on main, weekly and by hand), and nothing when an earlier run passed its tree. A push to
-  main runs the suites turbo's package graph reaches from what changed since the last commit a run
-  passed on main (`scripts/ci/plan.mjs`), so a suite that failed on one merge runs again on the
-  next, on PostgreSQL 18, the smoke tests only when a
-  deploy file changes, and lint and the quick checks on every package. A change to Markdown or
+  runs only typecheck and unit tests on the packages its change reaches, and nothing when an
+  earlier run passed its tree. A push to main runs the integration and Chatwoot suites turbo's
+  package graph reaches from what changed since the last commit a run passed on main
+  (`scripts/ci/plan.mjs`), so a suite that failed on one merge runs again on the next, on
+  PostgreSQL 18, and the typecheck and unit tests on every package. A change to Markdown or
   `docs/` alone runs only the basics; a merge outside the packages, or one the graph cannot place,
-  runs every suite. Main does not trust a passed tree, since a branch passes on its quick checks.
-  Every Saturday (23:00 UTC) and on a run by hand (`gh workflow run ci.yml --ref <branch>`) it runs
-  every suite, tests PostgreSQL 16 and 18 and runs the smoke tests.
+  runs every suite but the smoke test. Main does not trust a passed tree, since a branch passes on
+  its quick checks. Every Saturday (23:00 UTC) and on a run by hand
+  (`gh workflow run ci.yml --ref <branch>`) it runs every suite, tests PostgreSQL 16 and 18 and
+  runs the automatic-deploy smoke test, which builds the images and so never runs on a push.
   (2026-11-25: branch pushes ran the heavy suites too, and used about 58% of all CI minutes; the
   full run was nightly, about 400 job-minutes each night.)
+- **What CI does not run.** No browser suite (the accessibility audit, the widget journey, Studio
+  in three parts, the website), no lint (Biome, shellcheck, also left out of
+  `release-packages.yml`) and no production smoke test, whose last part drives Studio in Chromium.
+  The test files stay, and `pnpm ci:local` still runs all of them by hand
+  (`pnpm ci:local --with-production` for the production smoke test). (2026-11-26, the owner's
+  decision: CI moved to a small server, 4 shared vCPUs and 8 GB for three Hamnivo runners. Until
+  then the browser suites ran on main after a merge, lint on main, weekly and by hand, and the
+  smoke tests on a push to main that changed a deploy file.)
 - **Which runner.** It runs on a self-hosted runner with the label `hamnivo`; the heavy suites also need the label `heavy`, which all but two of the runners have, so the plan and the basics never wait behind them. The repository
   variable `HAMNIVO_CI_RUNNER`, a JSON list of labels, can point it at other runners, hosted
   ones included.
 - **Before a push.** Changes get only the fast checks: Biome, typecheck, unit tests and the
-  integration tests of the changed area. The push and its pull request then wait on CI, and only
-  what CI reports is fixed.
+  integration tests of the changed area. Biome and shellcheck run only here, since CI does not
+  lint; the browser suites and the production smoke test run only when someone runs
+  `pnpm ci:local` by hand. The push and its pull request then wait on CI, and only what CI reports
+  is fixed.
 - **`pnpm ci:local` stays the single pipeline.** CI calls it, and a server can still run it by
   hand. Database bootstrap and generated passwords are unchanged from ADR 0007.
 - **Where the runner lives.** It runs on its own machine, not on the production server. Its
