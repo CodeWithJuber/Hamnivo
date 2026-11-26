@@ -1,7 +1,8 @@
 # ADR 0009: The full pipeline runs on GitHub Actions, on a runner of our own
 
-- Status: accepted; amended by ADR 0019 and ADR 0020 (no variable picks the runner any more), and
-  on 2026-11-26 (no browser suites, lint or production smoke test in CI)
+- Status: accepted; amended by ADR 0019 and ADR 0020 (no variable picks the runner any more), on
+  2026-11-26 (no browser suites, lint or production smoke test in CI), and by ADR 0021 (GitHub-hosted
+  runners for the public repository; lint, the browser suites and pull request checks are back)
 - Date: 2026-10-02
 - Amends: ADR 0007
 
@@ -16,8 +17,8 @@ The agents spent most of their effort waiting for those runs, not writing code. 
 waiting run re-reads the whole conversation. A few hours of parallel work used hundreds of
 millions of tokens, nearly all of it on this. The machine's time costs little; the agents' does.
 
-GitHub's hosted runners never started jobs for this private repository (ADR 0007). The owner
-already runs a self-hosted runner for another project.
+GitHub's hosted runners never started jobs for this repository while it was private (ADR 0007).
+The owner already ran a self-hosted runner for another project.
 
 ## Decision
 
@@ -42,9 +43,9 @@ already runs a self-hosted runner for another project.
   `release-packages.yml`) and no production smoke test, whose last part drives Studio in Chromium.
   The test files stay, and `pnpm ci:local` still runs all of them by hand
   (`pnpm ci:local --with-production` for the production smoke test). (2026-11-26, the owner's
-  decision: CI moved to a small server, 4 shared vCPUs and 8 GB for three Hamnivo runners. Until
-  then the browser suites ran on main after a merge, lint on main, weekly and by hand, and the
-  smoke tests on a push to main that changed a deploy file.)
+  decision: CI moved to a smaller server shared by several runners. Until then the browser suites
+  ran on main after a merge, lint on main, weekly and by hand, and the smoke tests on a push to
+  main that changed a deploy file.)
 - **Which runner.** It runs on a self-hosted runner with the label `hamnivo`; the heavy suites also need the label `heavy`, which all but two of the runners have, so the plan and the basics never wait behind them. The repository
   variable `HAMNIVO_CI_RUNNER`, a JSON list of labels, can point it at other runners, hosted
   ones included.
