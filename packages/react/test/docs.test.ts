@@ -78,7 +78,7 @@ describe('the guide', () => {
 
   it('tells the owner how a release is made, with the tags the workflow reacts to', () => {
     expect(guide).toContain('react-v0.1.0');
-    expect(guide).toContain('NPM_TOKEN');
+    expect(guide).toContain('trusted publishing');
     const workflow = readFileSync(
       join(import.meta.dirname, '../../../.github/workflows/release-packages.yml'),
       'utf8',

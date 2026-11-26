@@ -8,13 +8,13 @@
 # first, merge it, then tag that commit. A version with a dash in it (0.2.0-beta.1) is published
 # under the npm tag "next", and never becomes "latest".
 #
-# It needs one secret that the owner of the repository adds under Settings, Secrets and variables,
-# Actions: NPM_TOKEN, an npm access token that may publish the @hamnivo packages (an automation
-# token, or a granular token with read and write on them). The token is never printed.
-#
-# It runs on our own runner, like CI, and never on one of GitHub's, which bill by the minute
-# (ADR 0020). There is no npm provenance statement, because npm gives one only to builds on
-# GitHub's own runners.
+# It publishes with npm's trusted publishing (ADR 0021): npm trusts this workflow through a
+# short-lived OIDC token from GitHub, so there is no npm token to store, leak or rotate, and every
+# version gets a signed provenance statement that links it to this repository and run. Once per
+# package, on npmjs.com, the package's Settings → Trusted publishing names GitHub Actions with the
+# owner CodeWithJuber, the repository Hamnivo, the workflow release-packages.yml and the
+# environment npm. The repository's environment `npm` (Settings → Environments) can require a
+# reviewer before anything is published.
 name: Release packages
 
 on:
@@ -35,7 +35,12 @@ jobs:
   publish:
     name: publish
     runs-on: ubuntu-24.04
+    environment: npm
     timeout-minutes: 45
+    permissions:
+      contents: read
+      # The OIDC token npm's trusted publishing and the provenance statement need.
+      id-token: write
     env:
       TURBO_TELEMETRY_DISABLED: '1'
     steps:
@@ -45,6 +50,7 @@ jobs:
 
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
+      # No dependency cache in a job that publishes: nothing another run saved can reach the package.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           package-manager-cache: false
@@ -80,6 +86,7 @@ jobs:
             exit 1
           fi
           echo "filter=@hamnivo/$name" >> "$GITHUB_OUTPUT"
+          echo "dir=packages/$name" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if [[ "$version" == *-* ]]; then
             echo "npm_tag=next" >> "$GITHUB_OUTPUT"
@@ -87,28 +94,33 @@ jobs:
             echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check the npm token is there
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Check that npm can publish with trusted publishing
+        # Trusted publishing needs npm 11.5.1 or later; Node 24 brings one.
         run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "::error::The NPM_TOKEN secret is not set. Add it under Settings, Secrets and variables, Actions, then run this tag's workflow again."
+          version="$(npm --version)"
+          IFS=. read -r major minor patch <<<"${version%%-*}"
+          if ((major < 11 || (major == 11 && (minor < 5 || (minor == 5 && patch < 1))))); then
+            echo "::error::npm $version cannot use trusted publishing, which needs npm 11.5.1 or later."
             exit 1
           fi
+          echo "npm $version"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Only the package that is released, and what it needs. Its test script builds it first. No
-      # lint, as in CI (ADR 0009): Biome runs before a push.
-      - name: Type-check and test the package
+      - name: Lint, type-check and test the package
+        # Only the package that is released, and what it needs. Its test script builds it first.
         env:
+          DIR: ${{ steps.package.outputs.dir }}
           FILTER: ${{ steps.package.outputs.filter }}
-        run: pnpm exec turbo run typecheck test --filter="$FILTER" --concurrency=1
+        run: |
+          pnpm exec biome check "$DIR"
+          pnpm exec turbo run typecheck test --filter="$FILTER" --concurrency=1
 
       - name: Publish to npm
+        # pnpm packs the package, turning its workspace: ranges into versions, and npm publishes
+        # the file with trusted publishing and a provenance statement.
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           FILTER: ${{ steps.package.outputs.filter }}
           VERSION: ${{ steps.package.outputs.version }}
           NPM_TAG: ${{ steps.package.outputs.npm_tag }}
@@ -117,4 +129,7 @@ jobs:
             echo "$FILTER@$VERSION is already on npm. Nothing to publish."
             exit 0
           fi
-          pnpm --filter "$FILTER" publish --access public --tag "$NPM_TAG" --no-git-checks
+          folder="$(mktemp -d "$RUNNER_TEMP/package.XXXXXX")"
+          pnpm --filter "$FILTER" pack --pack-destination "$folder"
+          tarball="$(find "$folder" -maxdepth 1 -name '*.tgz' -print -quit)"
+          npm publish "$tarball" --provenance --access public --tag "$NPM_TAG"

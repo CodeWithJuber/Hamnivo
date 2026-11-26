@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -147,22 +147,31 @@ describe('the workflow', () => {
     }
   });
 
-  it('can read nothing but the repository, and reaches the token only in the two steps that need it', () => {
+  it('can read nothing but the repository, and holds no npm token', () => {
     expect(workflow).toMatch(/^permissions:\n {2}contents: read\n/m);
-    const uses = workflow.split('\n').filter((line) => line.includes('secrets.NPM_TOKEN'));
-    expect(uses).toHaveLength(2);
-    // The token is never written to the log, and the tag never goes into script text.
-    expect(workflow).not.toMatch(/echo[^\n]*\$NPM_TOKEN|echo[^\n]*NODE_AUTH_TOKEN|set -x/);
+    // Trusted publishing: npm trusts this workflow's OIDC token, so it reads no secret at all.
+    expect(workflow).not.toContain('secrets.');
+    expect(workflow).not.toMatch(/NPM_TOKEN|NODE_AUTH_TOKEN|set -x/);
+    // The tag never goes into script text.
     expect(workflow).not.toMatch(/run:[^\n]*\$\{\{ github\.ref_name/);
     for (const step of ['Work out which package the tag is for', 'Publish to npm']) {
       expect(script(step), step).not.toContain('${{');
     }
   });
 
-  it('checks the token first, then runs the package checks before it publishes', () => {
+  it('publishes with trusted publishing, from the npm environment, with provenance (ADR 0021)', () => {
+    expect(workflow).toMatch(/^ {4}environment: npm\n/m);
+    expect(workflow).toMatch(
+      /^ {4}permissions:\n {6}contents: read\n(?: {6}#[^\n]*\n)* {6}id-token: write\n/m,
+    );
+    // Only the job that publishes may ask for an OIDC token.
+    expect(workflow.match(/id-token: write/g)).toHaveLength(1);
+  });
+
+  it('checks npm first, then runs the package checks before it publishes', () => {
     const order = [
       'Work out which package the tag is for',
-      'Check the npm token is there',
+      'Check that npm can publish with trusted publishing',
       'Install dependencies',
       'Lint, type-check and test the package',
       'Publish to npm',
@@ -173,26 +182,37 @@ describe('the workflow', () => {
 
   it('publishes publicly, to npm, once, and says so when the version is already there', () => {
     const publish = script('Publish to npm');
+    // pnpm packs, so the workspace: ranges become versions; npm publishes the file.
+    expect(publish).toContain('pnpm --filter "$FILTER" pack --pack-destination "$folder"');
     expect(publish).toContain(
-      'pnpm --filter "$FILTER" publish --access public --tag "$NPM_TAG" --no-git-checks',
+      'npm publish "$tarball" --provenance --access public --tag "$NPM_TAG"',
     );
     expect(publish).toContain('npm view "$FILTER@$VERSION" version');
     expect(workflow).toContain('registry-url: https://registry.npmjs.org');
     expect(workflow).toContain('cancel-in-progress: false');
   });
 
-  it('refuses to publish a missing token, with words that say what to do', () => {
-    const result = spawnSync('bash', ['-c', script('Check the npm token is there')], {
-      env: { PATH: process.env.PATH ?? '', NPM_TOKEN: '' },
-      encoding: 'utf8',
-    });
-    expect(result.status).toBe(1);
-    expect(result.stdout).toContain('Add it under Settings, Secrets and variables, Actions');
-    const present = spawnSync('bash', ['-c', script('Check the npm token is there')], {
-      env: { PATH: process.env.PATH ?? '', NPM_TOKEN: 'not-a-real-token' },
-      encoding: 'utf8',
-    });
-    expect(present.status).toBe(0);
-    expect(present.stdout + present.stderr).not.toContain('not-a-real-token');
+  it('refuses an npm too old for trusted publishing, with words that say why', () => {
+    const check = (version: string) => {
+      const folder = mkdtempSync(join(tmpdir(), 'hamnivo-npm-'));
+      writeFileSync(join(folder, 'npm'), `#!/bin/sh\necho ${version}\n`);
+      chmodSync(join(folder, 'npm'), 0o755);
+      return spawnSync(
+        'bash',
+        ['-c', script('Check that npm can publish with trusted publishing')],
+        {
+          env: { PATH: `${folder}:${process.env.PATH ?? ''}` },
+          encoding: 'utf8',
+        },
+      );
+    };
+    for (const version of ['10.9.2', '11.4.2', '11.5.0']) {
+      const result = check(version);
+      expect(result.status, version).toBe(1);
+      expect(result.stdout, version).toContain('needs npm 11.5.1 or later');
+    }
+    for (const version of ['11.5.1', '11.19.1', '12.0.0']) {
+      expect(check(version).status, version).toBe(0);
+    }
   });
 });
