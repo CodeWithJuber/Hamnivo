@@ -30,7 +30,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "ajv": "8.20.0",
-    "tsdown": "0.23.0",
+    "tsdown": "0.23.7",
     "tsx": "4.23.15",
     "typescript": "catalog:",
     "vitest": "catalog:"

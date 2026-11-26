@@ -33,12 +33,12 @@
     "licenses": "tsx scripts/licenses/inventory.ts"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
+    "@biomejs/biome": "2.6.8",
     "@changesets/cli": "3.0.3",
     "@types/node": "24.19.0",
-    "knip": "6.38.0",
+    "knip": "6.48.0",
     "tsx": "4.23.15",
-    "turbo": "2.11.4",
+    "turbo": "2.11.13",
     "typescript": "6.0.3",
     "vitest": "5.0.2"
   }

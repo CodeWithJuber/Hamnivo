@@ -25,7 +25,7 @@
   "devDependencies": {
     "@hamnivo/contracts": "workspace:*",
     "@types/node": "catalog:",
-    "tsdown": "0.23.0",
+    "tsdown": "0.23.7",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
