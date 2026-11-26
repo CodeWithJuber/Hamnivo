@@ -35,7 +35,9 @@ describe('the published package', () => {
     // image's `pnpm deploy` resolves every workspace package. Publishing writes ">=0.1.0".
     expect(pack.peerDependencies['@hamnivo/client']).toBe('workspace:>=0.1.0');
     expect(existsSync(join(root, 'LICENSE'))).toBe(true);
-    expect(read('LICENSE')).toBe(readFileSync(join(root, '../../LICENSE'), 'utf8'));
+    // MIT, unlike the AGPL-licensed rest of the repository: other people's apps embed it (NOTICE).
+    expect(read('LICENSE')).toMatch(/^MIT License\n\nCopyright \(c\) 2026 Juber Shaikh\n/);
+    expect(read('LICENSE')).toBe(readFileSync(join(root, '../vue/LICENSE'), 'utf8'));
   });
 
   it('points each entry at files that were built, with types', () => {

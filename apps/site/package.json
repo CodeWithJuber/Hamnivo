@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Hamnivo public website: static, multilingual and accessible, built with Astro",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
     "dev": "astro dev --port 5190",

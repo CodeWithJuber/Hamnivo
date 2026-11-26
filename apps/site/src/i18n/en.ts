@@ -13,7 +13,7 @@ export const en: Dictionary = {
   },
   nav: { github: 'GitHub' },
   hero: {
-    eyebrow: 'Open source · MIT License · Self-hosted',
+    eyebrow: 'Open source · AGPL-3.0 · Self-hosted',
     title: 'Customer chat where people and AI work together',
     lead: 'Hamnivo is an open-source customer conversation platform. Add it to your website with one script, or build your own interface on its API. Customers, your staff and AI agents share one conversation, on servers you run.',
     primaryCta: 'Self-host from GitHub',
@@ -128,13 +128,13 @@ export const en: Dictionary = {
   },
   footer: {
     tagline: 'Conversations, people and agents in one place.',
-    about: 'Hamnivo is open source under the MIT License.',
+    about: 'Hamnivo is open source under the GNU Affero General Public License v3.0.',
     projectHeading: 'Project',
     source: 'Source code on GitHub',
     guide: 'Self-hosting guide',
     status: 'What works today',
     docs: 'Documentation',
-    license: 'MIT License',
+    license: 'AGPL-3.0 License',
   },
   widget: { label: 'Open chat', closeLabel: 'Close chat', title: 'Chat' },
 };

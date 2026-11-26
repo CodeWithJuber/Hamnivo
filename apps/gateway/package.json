@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Hamnivo Gateway: public REST API, staff authentication, administration and background worker (NestJS + Fastify)",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "files": [
     "dist"

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Hamnivo authorization: permission catalog, role presets, scoped grants, step-up rules, delegation ceilings and explanations",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "sideEffects": false,
   "exports": {

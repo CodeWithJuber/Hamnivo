@@ -12,7 +12,8 @@ way, a Custom HTML tag with the install code, which works with every version of 
 ```
 template.tpl     the template, in the file format GTM imports and the Community Template Gallery reads
 metadata.yaml    what the Gallery needs besides the template (see "Submit it to the Gallery")
-LICENSE          Apache 2.0, which the Gallery requires. The rest of this repository is MIT.
+LICENSE          Apache 2.0, which the Gallery requires. The rest of this repository is AGPL-3.0-only,
+                 with the exceptions listed in its NOTICE file.
 ```
 
 ## How it works

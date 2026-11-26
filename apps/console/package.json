@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Hamnivo Studio: the staff console for brands, AI agents, knowledge, kill switches and runs",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
     "postinstall": "node scripts/generate-routes.mjs",

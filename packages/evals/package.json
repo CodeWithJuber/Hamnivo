@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Offline evaluations of Hamnivo replies and decisions: anti-sycophancy (U12), fairness pairs (U13) and native-language adjudication packets (U14), with corpora and a metrics CLI",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
     "run-suite": "tsx src/cli.ts",
