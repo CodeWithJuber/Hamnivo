@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { pick, suites } from './plan.mjs';
+import { lastPassed, pick, suites } from './plan.mjs';
 
 // A small stand-in for turbo's graph: the package a path is in, and the packages it reaches.
 const graph = {
@@ -129,7 +129,7 @@ test('main runs everything when the merge cannot be placed', () => {
   assert.deepEqual(ids(pick(main(() => null))), [...full.slice(0, 4), ...smoke, ...full.slice(4)]);
 });
 
-test('the nightly run and a run by hand check everything, with lint', () => {
+test('the weekly run and a run by hand check everything, with lint', () => {
   const full = everything(['16', '18']);
   const all = [...full.slice(0, 4), ...smoke, ...full.slice(4)];
   const unused = () => assert.fail('no diff is needed');
@@ -138,4 +138,17 @@ test('the nightly run and a run by hand check everything, with lint', () => {
     assert.deepEqual(ids(selection), all);
     assert.equal(basicsArgs(selection), '--quick');
   }
+});
+
+test('main is compared with the last commit a run passed, never a pull request or a failure', () => {
+  // Newest first, as GitHub lists them.
+  const runs = [
+    { event: 'pull_request', conclusion: 'success', head_sha: 'pr' },
+    { event: 'push', conclusion: 'failure', head_sha: 'failed' },
+    { event: 'push', conclusion: 'success', head_sha: 'passed' },
+    { event: 'schedule', conclusion: 'success', head_sha: 'weekly' },
+  ];
+  assert.equal(lastPassed({ workflow_runs: runs }), 'passed');
+  assert.equal(lastPassed({ workflow_runs: runs.slice(0, 2) }), null);
+  assert.equal(lastPassed({}), null);
 });

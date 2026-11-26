@@ -6,18 +6,22 @@
 //   node scripts/ci/plan.mjs
 //
 // It reads GITHUB_EVENT_NAME, GITHUB_REF and GITHUB_SHA; PASSED=true when an earlier run passed on
-// the same tree (fkirc/skip-duplicate-actions); and BASE, what a change is compared with: main
-// before the push for a push to main (github.event.before), origin/main for another branch.
+// the same tree (fkirc/skip-duplicate-actions); and BASE, what a change is compared with: for a
+// push to main, the last commit a run of this workflow passed on main (`--last-passed` picks it from
+// GitHub's list of the workflow's successful runs), origin/main for another branch. Without a BASE
+// it cannot place the change.
+//
+//   node scripts/ci/plan.mjs --last-passed < runs.json
 //
 // Each change gets its heavy suites once, on main after the merge, scoped to what it reaches:
 // - A push to another branch runs only typecheck and unit tests, on the packages its change
 //   reaches in turbo's package graph, and nothing when its tree already passed. Agents push a
 //   branch many times.
-// - A push to main (a merge) runs the suites the merge reaches compared with main before it, on
-//   PostgreSQL 18, the smoke tests when a deploy file changes, and lint and the quick checks on
+// - A push to main (a merge) runs the suites reached since the last commit main passed, so a suite
+//   that failed on one merge runs again on the next until it passes, on PostgreSQL 18, the smoke tests when a deploy file changes, and lint and the quick checks on
 //   every package. It does not trust a passed tree, since a branch passes on its quick checks. A
 //   change to Markdown or docs/ alone runs only the basics.
-// - The nightly run and a run by hand check everything: PostgreSQL 16 and 18 and the smoke tests.
+// - The weekly run and a run by hand check everything: PostgreSQL 16 and 18 and the smoke tests.
 // - What a change cannot place runs everything on main (no commit before it, a changed file outside
 //   every package: the workflows, scripts/ci, the lockfile, the root config, deploy/; or turbo
 //   failing), and the quick checks on every package on another branch.
@@ -43,7 +47,7 @@ const PARTS = [1, 2, 3];
 /**
  * What a run checks. `diff()` returns the files a branch changed, or null without a merge base;
  * `reach(files)` returns the packages those files reach, as {name, testInt}, and throws when it
- * cannot tell. Lint (Biome, shellcheck) runs only on main, the nightly run and a run by hand: a
+ * cannot tell. Lint (Biome, shellcheck) runs only on main, the weekly run and a run by hand: a
  * branch push gets typecheck and unit tests without it.
  */
 export function pick(run) {
@@ -160,6 +164,15 @@ export function suites({ pg, smoke, run, affected, lint = true }) {
   return list;
 }
 
+/** The newest commit a run passed, from GitHub's list of this workflow's runs, newest first. */
+export function lastPassed(answer) {
+  const full = ['push', 'schedule', 'workflow_dispatch'];
+  const run = (answer?.workflow_runs ?? []).find(
+    (item) => full.includes(item.event) && item.conclusion === 'success' && item.head_sha,
+  );
+  return run ? run.head_sha : null;
+}
+
 function changedFiles(base, sha) {
   try {
     const output = execFileSync('git', ['diff', '--name-only', `${base}...${sha}`], {
@@ -200,13 +213,20 @@ function reachInGraph(files) {
   }));
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === '--last-passed') {
+  const sha = lastPassed(JSON.parse(readFileSync(0, 'utf8')));
+  if (!sha) {
+    console.error('No run of this workflow passed on this branch');
+    process.exit(1);
+  }
+  process.stdout.write(`${sha}\n`);
+} else if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const env = process.env;
   const selection = pick({
     event: env.GITHUB_EVENT_NAME,
     ref: env.GITHUB_REF,
     passed: env.PASSED === 'true',
-    diff: () => changedFiles(env.BASE || 'origin/main', env.GITHUB_SHA || 'HEAD'),
+    diff: () => (env.BASE ? changedFiles(env.BASE, env.GITHUB_SHA || 'HEAD') : null),
     reach: reachInGraph,
   });
   const list = suites(selection);
