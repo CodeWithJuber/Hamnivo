@@ -3,7 +3,7 @@ import { presetPermissions } from '@hamnivo/policy';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createContext, type ReactNode, useContext } from 'react';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initI18n } from '../src/i18n';
 import type { InboxConversation, InboxDetail, WhatsappTemplate } from '../src/lib/inbox';
 import { ConversationPane } from '../src/pages/inbox/ConversationPane';
@@ -308,7 +308,8 @@ const template = (patch: Partial<WhatsappTemplate> = {}): WhatsappTemplate => ({
   unsupported: null,
   ...patch,
 });
-const TEMPLATE_LIST = {
+// Built when a test runs, so the sync time is 5 minutes before that test's clock.
+const templateList = () => ({
   items: [
     template({
       name: 'pending_one',
@@ -337,7 +338,7 @@ const TEMPLATE_LIST = {
   windowOpen: false,
   windowClosesAt: inMs(-3_600_000),
   lastSyncedAt: inMs(-5 * 60_000),
-};
+});
 const ticket = {
   number: 1042,
   reference: '#1042',
@@ -347,11 +348,21 @@ const ticket = {
 };
 
 describe('WhatsApp templates in the composer (D14)', () => {
+  // The dialog says how long ago the templates were synced, to the nearest minute. With the clock
+  // stopped (timers still run), a runner slow to draw it cannot read 6 minutes for 5 (it did on
+  // 2026-11-25, when the list was built as the file loaded).
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('after 24 hours: pick a template, fill it in, check the preview and send it', async () => {
     const { gateway, mount } = pane(
       detail({ channel: 'whatsapp', replyWindowClosesAt: inMs(-3_600_000), ticket }),
       undefined,
-      { [`GET ${TEMPLATES}`]: { json: TEMPLATE_LIST } },
+      { [`GET ${TEMPLATES}`]: { json: templateList() } },
     );
     await mount();
     await reply();
@@ -460,7 +471,7 @@ describe('WhatsApp templates in the composer (D14)', () => {
           fields: [{ path: 'template.values.body.1', message: 'This template has no such value.' }],
         },
       }),
-      { [`GET ${TEMPLATES}`]: { json: TEMPLATE_LIST } },
+      { [`GET ${TEMPLATES}`]: { json: templateList() } },
     );
     await mount();
     await reply();
