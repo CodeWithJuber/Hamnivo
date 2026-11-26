@@ -498,7 +498,7 @@
       "apps/widget/src/components/Chat.tsx",
       "apps/widget/src/useChat.ts"
     ],
-    "note": "@hamnivo/react: a component that puts the chat on a React or Next.js page (marked use client; hidden when it unmounts; verifies the signed-in customer and signs the chat out with them), useHamnivo for the chat window, and hooks on @hamnivo/client for a custom chat (useHamnivoClient, useOutbox, useConversationStream). Tested in a real React against stand-ins for the loader and the API, and its Next.js snippets are type-checked. Not yet published to npm (a tag and the NPM_TOKEN secret do that), and not tried in a real app. The widget itself maps SDK state into assistant-ui's external-store runtime."
+    "note": "@hamnivo/react: a component that puts the chat on a React or Next.js page (marked use client; hidden when it unmounts; verifies the signed-in customer and signs the chat out with them), useHamnivo for the chat window, and hooks on @hamnivo/client for a custom chat (useHamnivoClient, useOutbox, useConversationStream). Tested in a real React against stand-ins for the loader and the API, and its Next.js snippets are type-checked. Not yet published to npm (a tag does that, with npm's trusted publishing), and not tried in a real app. The widget itself maps SDK state into assistant-ui's external-store runtime."
   },
   "D04": {
     "status": "partial",
