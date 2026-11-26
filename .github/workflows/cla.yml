@@ -23,7 +23,8 @@ jobs:
     name: CLA
     # A comment counts only on a pull request, and only when it signs or asks for a recheck.
     if: >-
-      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'pull_request_target' &&
+       github.event.pull_request.user.login != 'CodeWithJuber') ||
       (github.event.issue.pull_request &&
         (github.event.comment.body == 'recheck' ||
          github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA'))
