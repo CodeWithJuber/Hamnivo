@@ -85,14 +85,16 @@ jobs:
             echo "::error::packages/$name is marked private, so it cannot be published."
             exit 1
           fi
-          echo "filter=@hamnivo/$name" >> "$GITHUB_OUTPUT"
-          echo "dir=packages/$name" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          if [[ "$version" == *-* ]]; then
-            echo "npm_tag=next" >> "$GITHUB_OUTPUT"
-          else
-            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
-          fi
+          {
+            echo "filter=@hamnivo/$name"
+            echo "dir=packages/$name"
+            echo "version=$version"
+            if [[ "$version" == *-* ]]; then
+              echo "npm_tag=next"
+            else
+              echo "npm_tag=latest"
+            fi
+          } >> "$GITHUB_OUTPUT"
 
       - name: Check that npm can publish with trusted publishing
         # Trusted publishing needs npm 11.5.1 or later; Node 24 brings one.
