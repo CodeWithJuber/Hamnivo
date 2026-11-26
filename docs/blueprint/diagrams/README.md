@@ -46,4 +46,4 @@ Inspect the actual HTML and both themes, all five tabs, keyboard navigation, sea
 
 ## Semantic boundaries
 
-Public generation receives public or explicitly approved declassified context only, never raw staff notes. Case state, owner and task states remain separate. Human takeover fences new dispatch/publication; accepted external operations require reconciliation. Payment permission remains deterministic and bound to exact consent. Memory is not weight training. Semantic answer reuse is restricted to approved public FAQ. See the master blueprint for complete scope and failure cases.
+Public generation receives public or explicitly approved declassified context only, never raw staff notes. Case state, owner and task states remain separate. Human takeover fences new dispatch/publication; accepted external operations require reconciliation. Payment permission remains deterministic and bound to exact consent. Memory is not weight training. Semantic answer reuse is restricted to approved public FAQ. The decisions taken since are in [`docs/adr/`](../../adr/), and what is built is in [`docs/feature-status.md`](../../feature-status.md).
