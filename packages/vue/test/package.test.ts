@@ -28,7 +28,8 @@ describe('the published package', () => {
     expect(pack.files).toEqual(['dist']);
     expect(pack.dependencies).toBeUndefined();
     expect(pack.peerDependencies).toEqual({ vue: '>=3.3.0' });
-    expect(read('LICENSE')).toBe(readFileSync(join(root, '../../LICENSE'), 'utf8'));
+    // MIT, unlike the AGPL-licensed rest of the repository: other people's apps embed it (NOTICE).
+    expect(read('LICENSE')).toMatch(/^MIT License\n\nCopyright \(c\) 2026 Juber Shaikh\n/);
   });
 
   it('points its one entry at files that were built, with types', () => {

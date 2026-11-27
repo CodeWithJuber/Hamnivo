@@ -1,0 +1,100 @@
+Hamnivo
+Copyright (C) 2026 Juber Shaikh (Hostlelo)
+
+Hamnivo is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, version 3 only (AGPL-3.0-only). The full text is in the
+LICENSE file.
+
+Hamnivo is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+If you run a modified Hamnivo for other people over a network, section 13 of
+the licence asks you to offer them its source code.
+
+REUSE.toml records the licence and copyright of every file in machine-readable
+form, and LICENSES/ holds the text of each licence it names. `reuse lint`
+checks both.
+
+
+Parts that keep a permissive licence
+------------------------------------
+
+Some code is meant to run inside other people's websites, apps, servers and
+plugins. It keeps a permissive licence, so that using it does not bring the
+AGPL's terms into their software. A path's licence text is in its own LICENSE
+file where it has one, and in LICENSES/ otherwise.
+
+  Path                                       Licence     Why
+  packages/server-sdk (@hamnivo/server)      MIT         Server SDK: runs inside a customer's own
+                                                         server to sign identity assertions and
+                                                         check webhooks.
+  packages/client (@hamnivo/client)          MIT         Headless client SDK, bundled into a
+                                                         customer's own web app.
+  packages/react (@hamnivo/react)            MIT         React and Next.js bindings, published to
+                                                         npm for customers' apps.
+  packages/vue (@hamnivo/vue)                MIT         Vue and Nuxt bindings, published to npm for
+                                                         customers' apps.
+  packages/contracts (@hamnivo/contracts)    MIT         The public API's types, schemas and OpenAPI
+                                                         description. The client SDK depends on it,
+                                                         and anyone writing a client needs it.
+  packages/widget-loader                     MIT         The one script a website adds to show the
+                                                         chat launcher. It runs on the customer's
+                                                         page.
+  packages/domain/src/automations/index.ts   MIT         The widget loader bundles its browser rules
+                                                         (browserMatches, deviceOf). The rest of
+                                                         packages/domain is AGPL-3.0-only.
+  integrations/php-sdk                       MIT         PHP server SDK, installed into customers'
+                                                         PHP applications.
+  integrations/wordpress                     MIT         WordPress plugin, installed into customers'
+                                                         WordPress sites.
+  integrations/whmcs                         MIT         WHMCS addon module, installed into
+                                                         customers' WHMCS installations.
+  integrations/shopify                       MIT         Shopify app and theme extension, installed
+                                                         into customers' stores.
+  integrations/gtm                           Apache-2.0  Google Tag Manager template. The Community
+                                                         Template Gallery requires Apache 2.0.
+  examples                                   MIT         Sample code meant to be copied into your own
+                                                         site or server.
+
+Everything else, including the gateway, Studio, the widget that runs in its
+frame, the website, the documentation app and the shared packages they use, is
+AGPL-3.0-only.
+
+
+Third-party material in this repository
+---------------------------------------
+
+DM Sans (apps/widget/public/fonts/dm-sans-latin.woff2)
+  Copyright 2014 The DM Sans Project Authors
+  (https://github.com/googlefonts/dm-fonts)
+  SIL Open Font License 1.1: apps/widget/public/fonts/DM-Sans-LICENSE.txt
+
+Noto Sans (apps/widget/public/fonts/noto-sans-latin.woff2)
+  Copyright 2022 The Noto Project Authors (https://github.com/notofonts)
+  SIL Open Font License 1.1: apps/widget/public/fonts/Noto-Sans-LICENSE.txt
+
+Archify (docs/blueprint/diagrams)
+  The diagrams were made with Archify (https://github.com/tt-a1i/archify),
+  whose styles they carry.
+  Copyright (c) 2026 tt-a1i (Archify)
+  Copyright (c) 2025 Cocoon AI
+  MIT License: docs/blueprint/diagrams/LICENSE-Archify.txt
+  Further notices: docs/blueprint/diagrams/THIRD-PARTY-NOTICES-Archify.md
+
+Chatwoot API description (packages/chatwoot/swagger/v4.18.0/swagger.json and
+the types generated from it, packages/chatwoot/src/generated/chatwoot.ts)
+  Vendored from Chatwoot v4.18.0 (https://github.com/chatwoot/chatwoot)
+  Copyright (c) 2017-2026 Chatwoot Inc.
+  MIT License: LICENSES/MIT.txt
+
+shadcn/ui (packages/ui/src/components)
+  Studio's components started from shadcn/ui (https://ui.shadcn.com) and were
+  changed for Hamnivo.
+  Copyright (c) 2023 shadcn
+  MIT License: LICENSES/MIT.txt
+
+Dependencies installed from npm, Composer or container registries keep their
+own licences. docs/licenses.md lists the npm packages, generated from the
+lockfile by scripts/licenses/inventory.ts.

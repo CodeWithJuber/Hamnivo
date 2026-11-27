@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/CodeWithJuber/Hamnivo/security/advisories/new
+    about: Report it privately, never in a public issue (SECURITY.md).
+  - name: Documentation
+    url: https://github.com/CodeWithJuber/Hamnivo/tree/main/docs
+    about: Setup, self-hosting and the guides for each app.

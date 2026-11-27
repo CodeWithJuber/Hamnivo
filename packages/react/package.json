@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "Hamnivo Chat for React and Next.js: a component that puts the chat on your site, a hook for the chat window, and hooks for building your own chat on @hamnivo/client",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CodeWithJuber/Hamnivo.git",
+    "directory": "packages/react"
+  },
   "type": "module",
   "sideEffects": false,
   "keywords": [

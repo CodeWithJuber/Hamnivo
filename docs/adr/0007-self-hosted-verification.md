@@ -1,11 +1,12 @@
 # ADR 0007: Self-hosted verification instead of hosted CI
 
-- Status: accepted; amended by ADR 0009 (the same pipeline now also runs on GitHub Actions)
+- Status: accepted; amended by ADR 0009 (the same pipeline now also runs on GitHub Actions) and
+  ADR 0021 (on GitHub-hosted runners, once the repository became public)
 - Date: 2026-09-26
 
 ## Context
 
-The repository is private. GitHub Actions jobs never started: runners were never assigned, so the
+The repository was private then. GitHub Actions jobs never started: runners were never assigned, so the
 jobs produced no logs and billed 0 ms. The owner chose to run checks and host services on their own
 server instead of using GitHub Actions.
 

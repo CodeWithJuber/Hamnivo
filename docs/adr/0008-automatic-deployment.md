@@ -20,7 +20,7 @@ to run unattended:
 - no lock, so a webhook and a timer could overlap;
 - no rollback;
 - the running script replaced itself during the pull;
-- no credentials for the private repository;
+- no credentials for the repository, which was private then;
 - a full rebuild, and 1.5 GB of build cache, on every change.
 
 ## Decision

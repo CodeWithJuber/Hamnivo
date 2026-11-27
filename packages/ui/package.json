@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Hamnivo Studio design system (shadcn/ui + Radix, brand tokens, interaction-state contract)",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "sideEffects": [
     "*.css"

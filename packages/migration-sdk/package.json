@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Hamnivo migration SDK: the source adapter interface, the NDJSON package reader and writer with its JSON Schema, adapters for tawk.to, Zendesk and Intercom exports, and the preflight, checkpoint and reconciliation rules",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "sideEffects": false,
   "exports": {
