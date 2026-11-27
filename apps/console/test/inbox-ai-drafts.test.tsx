@@ -201,7 +201,9 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     const link = within(card).getByRole('link', { name: 'Delivery changes' });
     expect(link.getAttribute('href')).toBe('https://kb.example/delivery');
 
-    await userEvent.setup().click(within(card).getByRole('button', { name: 'Approve and send' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(within(card).getByRole('button', { name: 'Approve and send' }));
     await waitFor(() => expect(gateway.to('POST', `${DRAFTS}/aidr_1/approve`)).toHaveLength(1));
     const body = gateway.to('POST', `${DRAFTS}/aidr_1/approve`)[0]?.body ?? {};
     expect(body).toEqual({ clientRequestId: expect.any(String), expectedEpoch: 3 });
@@ -232,7 +234,9 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     });
     // "Sent" is never said, not even for a moment while the send is still being answered.
     const ended = listen('ai-draft-ended');
-    await userEvent.setup().click(within(card).getByRole('button', { name: 'Approve and send' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(within(card).getByRole('button', { name: 'Approve and send' }));
     const unsent = await screen.findByTestId('ai-draft-unsent');
     ended.stop();
     expect(gateway.to('POST', APPROVE)).toHaveLength(1);
@@ -248,7 +252,9 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     expect(ended.said).toEqual([]);
     expect(screen.queryByTestId('ai-draft-ended')).toBeNull();
     expect(document.body.textContent).not.toContain('sent this draft');
-    await userEvent.setup().click(within(unsent).getByRole('button', { name: 'Dismiss' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(within(unsent).getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByTestId('ai-draft-unsent')).toBeNull();
   });
 
@@ -266,7 +272,9 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     await mount();
     const card = await screen.findByTestId('ai-draft');
     const notSent = listen('ai-draft-not-sent');
-    await userEvent.setup().click(within(card).getByRole('button', { name: 'Approve and send' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(within(card).getByRole('button', { name: 'Approve and send' }));
     const ended = await screen.findByTestId('ai-draft-ended');
     notSent.stop();
     expect(gateway.to('POST', APPROVE)).toHaveLength(1);
@@ -290,7 +298,7 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     );
     await mount();
     const card = await screen.findByTestId('ai-draft');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(within(card).getByRole('button', { name: 'Approve and send' }));
     expect(await screen.findByTestId('ai-draft-not-sent')).toBeTruthy();
     const failed = within(screen.getByTestId('composer')).getByTestId('failed-send');
@@ -312,7 +320,9 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     const { client } = await mount();
     const card = await screen.findByTestId('ai-draft');
     const notSent = listen('ai-draft-not-sent');
-    await userEvent.setup().click(within(card).getByRole('button', { name: 'Approve and send' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(within(card).getByRole('button', { name: 'Approve and send' }));
     // The send's change refreshed the outgoing messages; then its error came back.
     await waitFor(() => expect(gateway.to('GET', OUTGOING)).toHaveLength(2));
     await settle();
@@ -336,12 +346,16 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     });
     await mount();
     const card = await screen.findByTestId('ai-draft');
-    await userEvent.setup().click(within(card).getByRole('button', { name: 'Approve and send' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(within(card).getByRole('button', { name: 'Approve and send' }));
     const unsent = await screen.findByTestId('ai-draft-unsent');
     expect(within(unsent).getByTestId('action-error')).toBeTruthy();
     expect(screen.queryByTestId('ai-draft-not-sent')).toBeNull();
     expect(screen.queryByTestId('ai-draft-ended')).toBeNull();
-    await userEvent.setup().click(within(unsent).getByRole('button', { name: 'Dismiss' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(within(unsent).getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByTestId('ai-draft-unsent')).toBeNull();
   });
 
@@ -356,7 +370,7 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     });
     await mount();
     const card = await screen.findByTestId('ai-draft');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(within(card).getByRole('button', { name: 'Edit' }));
     const box = within(card).getByLabelText('Edit the draft before sending');
     await waitFor(() => expect(document.activeElement).toBe(box));
@@ -398,7 +412,7 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     );
     await mount();
     const card = await screen.findByTestId('ai-draft');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(within(card).getByRole('button', { name: 'Reject' }));
     const dialog = await screen.findByTestId('reject-draft-dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Reject draft' }));
@@ -439,7 +453,7 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     const approve = within(card).getByRole('button', { name: 'Approve and send' });
     expect(approve.getAttribute('aria-disabled')).toBe('true');
     expect(card.textContent).toContain('Amina is handling this conversation.');
-    await userEvent.setup().click(approve);
+    await userEvent.setup({ delay: null }).click(approve);
     expect(gateway.to('POST', `${DRAFTS}/aidr_1/approve`)).toHaveLength(0);
   });
 
@@ -458,7 +472,7 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     }
     const reject = within(card).getByRole('button', { name: 'Reject' });
     expect(reject.getAttribute('aria-disabled')).toBeNull();
-    await userEvent.setup().click(reject);
+    await userEvent.setup({ delay: null }).click(reject);
     expect(await screen.findByTestId('reject-draft-dialog')).toBeTruthy();
   });
 
@@ -474,7 +488,9 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     });
     await mount();
     const card = await screen.findByTestId('ai-draft');
-    await userEvent.setup().click(within(card).getByRole('button', { name: 'Approve and send' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(within(card).getByRole('button', { name: 'Approve and send' }));
     const refused = await within(card).findByTestId('ai-draft-refused');
     expect(refused.getAttribute('role')).toBe('alert');
     expect(refused.textContent).toBe('Rayan Lead already decided on this draft.');
@@ -494,7 +510,9 @@ describe('an AI draft awaiting review (HNV-09-05)', () => {
     await client.invalidateQueries();
     const ended = await screen.findByTestId('ai-draft-ended');
     expect(ended.textContent).toContain('The draft was replaced: the customer wrote again.');
-    await userEvent.setup().click(within(ended).getByRole('button', { name: 'Dismiss' }));
+    await userEvent
+      .setup({ delay: null })
+      .click(within(ended).getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByTestId('ai-draft-ended')).toBeNull();
   });
 

@@ -3,7 +3,7 @@ import { presetPermissions } from '@hamnivo/policy';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createContext, type ReactNode, useContext } from 'react';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initI18n } from '../src/i18n';
 import type { InboxConversation } from '../src/lib/inbox';
 import { formatCountdown } from '../src/lib/offers';
@@ -71,6 +71,15 @@ const offerFor = (staffMemberId: string, displayName: string, seconds = 42) => (
 });
 
 describe('chats offered to me (HNV-10-03)', () => {
+  // An offer's time left is read against the clock when it is drawn. With the clock stopped (timers
+  // still run), a runner slow to draw it cannot read it a second late (it read 0:39 on 2026-11-22).
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('shows each offer with the time left, and accepting opens the chat as mine', async () => {
     const offered = row({
       id: 'conv_7',
@@ -96,11 +105,11 @@ describe('chats offered to me (HNV-10-03)', () => {
     expect(card.textContent).toContain('Offer 1 of 3');
     expect(card.textContent).toContain('Team: Care');
     const countdown = within(card).getByTestId('offer-countdown');
-    expect(countdown.textContent).toMatch(/^0:4[0-2] left$/);
-    expect(countdown.getAttribute('aria-label')).toMatch(/^Time left to accept: 0:4[0-2]$/);
+    expect(countdown.textContent).toBe('0:42 left');
+    expect(countdown.getAttribute('aria-label')).toBe('Time left to accept: 0:42');
     // The row in the queue says it is offered to me.
     const badge = within(screen.getByTestId('inbox-row')).getByTestId('offer-badge');
-    expect(badge.textContent).toMatch(/^Offered to you · 0:4[0-2]$/);
+    expect(badge.textContent).toBe('Offered to you · 0:42');
 
     await userEvent
       .setup()
@@ -125,7 +134,7 @@ describe('chats offered to me (HNV-10-03)', () => {
     });
     await mountStudio({ at: '/inbox', permissions: agent, screen: inbox });
     const card = await screen.findByTestId('offer-card');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(
       within(card).getByRole('button', { name: 'Decline the chat with Aisha Khan' }),
     );
@@ -165,7 +174,7 @@ describe('chats offered to me (HNV-10-03)', () => {
     });
     await mountStudio({ at: '/inbox', permissions: agent, screen: inbox });
     const card = await screen.findByTestId('offer-card');
-    await userEvent.setup().click(within(card).getByTestId('offer-accept'));
+    await userEvent.setup({ delay: null }).click(within(card).getByTestId('offer-accept'));
     const closed = await screen.findByTestId('offer-closed');
     expect(closed.getAttribute('role')).toBe('alert');
     expect(closed.textContent).toBe('Rayan Lead already took this conversation.');
@@ -181,7 +190,7 @@ describe('chats offered to me (HNV-10-03)', () => {
     await mountStudio({ at: '/inbox', permissions: agent, screen: inbox });
     const [listed] = await screen.findAllByTestId('inbox-row');
     const badge = within(listed as HTMLElement).getByTestId('offer-badge');
-    expect(badge.textContent).toMatch(/^Offered to Amina · 0:4[0-2]$/);
+    expect(badge.textContent).toBe('Offered to Amina · 0:42');
     expect(screen.queryByTestId('offers-section')).toBeNull();
   });
 

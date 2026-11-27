@@ -37,7 +37,7 @@ const card = (id: 'overview-brands' | 'overview-stops') =>
 
 describe('Home when part of it fails (HNV-03-04)', () => {
   it('keeps what loaded, marks the card that failed, and points to the inbox', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     let stopsUp = false;
     const gateway = fakeGateway({
       'GET /v1/admin/brands': BRANDS,
@@ -69,7 +69,7 @@ describe('Home when part of it fails (HNV-03-04)', () => {
   });
 
   it('says when shown data could not be refreshed, and how old it is', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     let brandsUp = true;
     fakeGateway({
       'GET /v1/admin/brands': () => (brandsUp ? BRANDS : down),

@@ -1,7 +1,10 @@
 ---
 import nastaliq from '@fontsource/noto-nastaliq-urdu/files/noto-nastaliq-urdu-arabic-400-normal.woff2?url';
 import notoArabic from '@fontsource/noto-sans-arabic/files/noto-sans-arabic-arabic-400-normal.woff2?url';
+import notoArabic600 from '@fontsource/noto-sans-arabic/files/noto-sans-arabic-arabic-600-normal.woff2?url';
 import notoDevanagari from '@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-devanagari-400-normal.woff2?url';
+import notoDevanagari600 from '@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-devanagari-600-normal.woff2?url';
+import dmSansLatinExt from '@fontsource-variable/dm-sans/files/dm-sans-latin-ext-wght-normal.woff2?url';
 import dmSansLatin from '@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2?url';
 import { palette } from '@hamnivo/brand';
 import { dictionaries, type Locale, localeInfo, localePath, locales } from '../i18n';
@@ -18,13 +21,35 @@ const t = dictionaries[locale];
 const absolute = (path: string) => new URL(path, Astro.site).href;
 const ogImage = absolute('/og-image.png');
 
-// Body-text fonts only; headings and other weights load on demand.
+// The fonts never swap in after the first paint, so the page never shifts when one arrives late
+// (site.spec.ts:119; Arabic measured 0.05 on a busy CI server). A preloaded `optional` font holds
+// the first paint for about 100 ms (Chrome 83+); one that is still late is skipped for this page
+// view and the fallback stays. So each language preloads what its first screen shows: body text,
+// headings and Latin words such as the product name. Same families and files as the @fontsource
+// packages, whose own CSS uses `swap`.
 const preloadFonts: Record<Locale, string[]> = {
   en: [dmSansLatin],
-  ar: [notoArabic],
-  hi: [dmSansLatin, notoDevanagari],
-  ur: [nastaliq],
+  ar: [notoArabic, notoArabic600, dmSansLatin],
+  hi: [dmSansLatin, notoDevanagari, notoDevanagari600],
+  ur: [nastaliq, dmSansLatin],
 };
+const dmSansRanges = {
+  latin:
+    'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD',
+  latinExt:
+    'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF',
+};
+const face = (family: string, weight: string, url: string, format: string, range?: string) =>
+  `@font-face{font-family:'${family}';font-style:normal;font-display:optional;font-weight:${weight};src:url(${url}) format('${format}');${range ? `unicode-range:${range};` : ''}}`;
+const fontFaces = [
+  face('DM Sans Variable', '100 1000', dmSansLatinExt, 'woff2-variations', dmSansRanges.latinExt),
+  face('DM Sans Variable', '100 1000', dmSansLatin, 'woff2-variations', dmSansRanges.latin),
+  face('Noto Sans Arabic', '400', notoArabic, 'woff2'),
+  face('Noto Sans Arabic', '600', notoArabic600, 'woff2'),
+  face('Noto Sans Devanagari', '400', notoDevanagari, 'woff2'),
+  face('Noto Sans Devanagari', '600', notoDevanagari600, 'woff2'),
+  face('Noto Nastaliq Urdu', '400', nastaliq, 'woff2'),
+].join('');
 ---
 
 <!doctype html>
@@ -34,6 +59,7 @@ const preloadFonts: Record<Locale, string[]> = {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{t.meta.title}</title>
     <style is:inline set:html={inkBandCss}></style>
+    <style is:inline set:html={fontFaces}></style>
     <meta name="description" content={t.meta.description} />
     <link rel="canonical" href={absolute(localePath(locale))} />
     {locales.map((l) => <link rel="alternate" hreflang={l} href={absolute(localePath(l))} />)}

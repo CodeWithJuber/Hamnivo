@@ -277,7 +277,7 @@ describe('Connect WhatsApp', () => {
   it('walks the number and answering, then shows Meta’s webhook set-up with Copy', async () => {
     const gateway = messagingGateway([]);
     await page([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const empty = within(screen.getByTestId('channels-empty'));
     expect(
       empty.getByText(
@@ -397,7 +397,7 @@ describe('Connect WhatsApp', () => {
           : undefined,
     });
     await page([channel({ id: 'inb_old' as never, name: 'Old number' })]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Connect WhatsApp' }));
     await screen.findByRole('dialog', { name: 'Connect WhatsApp' });
     await fillNumber(user, 'bad-token-from-a-test-user');
@@ -433,7 +433,7 @@ describe('Connect WhatsApp', () => {
       }),
     });
     await page([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getAllByRole('button', { name: 'Connect WhatsApp' })[0] as HTMLElement);
     await screen.findByRole('dialog', { name: 'Connect WhatsApp' });
     await fillNumber(user);
@@ -448,7 +448,7 @@ describe('Connect WhatsApp', () => {
   it('asks before throwing input away, and forgets the token when closed', async () => {
     messagingGateway([]);
     await page([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getAllByRole('button', { name: 'Connect WhatsApp' })[0] as HTMLElement);
     await screen.findByRole('dialog', { name: 'Connect WhatsApp' });
     await user.type(waDialog().getByLabelText('Access token'), TOKEN);
@@ -468,7 +468,7 @@ describe('Meta set-up on a WhatsApp card', () => {
   it('loads the callback URL and verify token from Chatwoot, with Copy', async () => {
     const gateway = messagingGateway([channel()]);
     await page([channel()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const card = within(
       screen.getByRole('heading', { level: 2, name: 'Shop WhatsApp' }).closest('li') as HTMLElement,
     );
@@ -491,7 +491,7 @@ describe('Meta set-up on a WhatsApp card', () => {
   it('says when Chatwoot has no verify token yet', async () => {
     messagingGateway([channel()], { setup: () => ({ json: { ...SET_UP, verifyToken: null } }) });
     await page([channel()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Meta set-up for Shop WhatsApp' }));
     expect(
       await setupDialog().findByText(
@@ -514,7 +514,7 @@ describe('Meta set-up on a WhatsApp card', () => {
           : { json: SET_UP },
     });
     await page([channel()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Meta set-up for Shop WhatsApp' }));
     expect(await setupDialog().findByText(detail)).toBeTruthy();
     fail = false;
@@ -536,7 +536,7 @@ describe('Connect Telegram', () => {
   it('sends the bot token and who answers; the card shows the bot’s @name', async () => {
     const gateway = messagingGateway([]);
     await page([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getAllByRole('button', { name: 'Connect Telegram' })[0] as HTMLElement);
     await screen.findByRole('dialog', { name: 'Connect Telegram' });
     const help = within(tgDialog().getByTestId('telegram-help'));
@@ -592,7 +592,7 @@ describe('Connect Telegram', () => {
       telegram: () => refused('botToken', 'Bot token is invalid'),
     });
     await page([]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getAllByRole('button', { name: 'Connect Telegram' })[0] as HTMLElement);
     await screen.findByRole('dialog', { name: 'Connect Telegram' });
     const token = tgDialog().getByLabelText('Bot token');

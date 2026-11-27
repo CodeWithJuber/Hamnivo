@@ -3,7 +3,7 @@ import { presetPermissions } from '@hamnivo/policy';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createContext, type ReactNode, useContext } from 'react';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initI18n } from '../src/i18n';
 import type { InboxConversation, InboxDetail, WhatsappTemplate } from '../src/lib/inbox';
 import { ConversationPane } from '../src/pages/inbox/ConversationPane';
@@ -137,7 +137,7 @@ describe('the composer says where a reply goes', () => {
     expect(screen.getByTestId('reply-channel').textContent).toBe('Your reply is sent on WhatsApp.');
     expect(screen.queryByTestId('reply-window-left')).toBeNull();
     expect(screen.queryByTestId('reply-window-closed')).toBeNull();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(field, 'Yes, in all sizes.');
     await user.click(sendButton());
     await waitFor(() => expect(gateway.to('POST', MESSAGES)).toHaveLength(1));
@@ -176,7 +176,7 @@ describe('the composer says where a reply goes', () => {
     expect(screen.queryByTestId('saved-replies')).toBeNull();
     expect(screen.queryByTestId('copilot')).toBeNull();
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByTestId('lane-internal'));
     expect(screen.queryByTestId('reply-window-closed')).toBeNull();
     const note = (await screen.findByTestId('composer-internal')) as HTMLTextAreaElement;
@@ -196,7 +196,7 @@ describe('the composer says where a reply goes', () => {
     );
     await harness.mount();
     const field = await reply();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(field, 'Are you still there?');
     // The gateway's clock says the window has just closed.
     harness.set(detail({ channel: 'whatsapp', replyWindowClosesAt: inMs(-1_000) }));
@@ -218,7 +218,7 @@ describe('the composer says where a reply goes', () => {
     );
     const { client } = await harness.mount();
     const field = await reply();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.type(field, 'Hello again');
     await user.click(sendButton());
     expect((await screen.findByTestId('reply-window-closed')).textContent).toBe(CLOSED);
@@ -267,7 +267,7 @@ describe('Telegram in the inbox list', () => {
     const [first] = await screen.findAllByTestId('inbox-row');
     expect(within(first as HTMLElement).getByText('Telegram')).toBeTruthy();
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
     const channel = (await screen.findByLabelText('Channel')) as HTMLSelectElement;
     expect([...channel.options].map((option) => option.text)).toEqual([
@@ -308,7 +308,8 @@ const template = (patch: Partial<WhatsappTemplate> = {}): WhatsappTemplate => ({
   unsupported: null,
   ...patch,
 });
-const TEMPLATE_LIST = {
+// Built when a test runs, so the sync time is 5 minutes before that test's clock.
+const templateList = () => ({
   items: [
     template({
       name: 'pending_one',
@@ -337,7 +338,7 @@ const TEMPLATE_LIST = {
   windowOpen: false,
   windowClosesAt: inMs(-3_600_000),
   lastSyncedAt: inMs(-5 * 60_000),
-};
+});
 const ticket = {
   number: 1042,
   reference: '#1042',
@@ -347,15 +348,25 @@ const ticket = {
 };
 
 describe('WhatsApp templates in the composer (D14)', () => {
+  // The dialog says how long ago the templates were synced, to the nearest minute. With the clock
+  // stopped (timers still run), a runner slow to draw it cannot read 6 minutes for 5 (it did on
+  // 2026-11-25, when the list was built as the file loaded).
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('after 24 hours: pick a template, fill it in, check the preview and send it', async () => {
     const { gateway, mount } = pane(
       detail({ channel: 'whatsapp', replyWindowClosesAt: inMs(-3_600_000), ticket }),
       undefined,
-      { [`GET ${TEMPLATES}`]: { json: TEMPLATE_LIST } },
+      { [`GET ${TEMPLATES}`]: { json: templateList() } },
     );
     await mount();
     await reply();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Send a template' }));
     const dialog = await screen.findByTestId('template-dialog');
     expect(within(dialog).getByRole('heading', { name: 'Send a WhatsApp template' })).toBeTruthy();
@@ -460,11 +471,11 @@ describe('WhatsApp templates in the composer (D14)', () => {
           fields: [{ path: 'template.values.body.1', message: 'This template has no such value.' }],
         },
       }),
-      { [`GET ${TEMPLATES}`]: { json: TEMPLATE_LIST } },
+      { [`GET ${TEMPLATES}`]: { json: templateList() } },
     );
     await mount();
     await reply();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByTestId('template-open'));
     const dialog = await screen.findByTestId('template-dialog');
     const options = await within(dialog).findAllByTestId('template-option');
@@ -501,7 +512,7 @@ describe('WhatsApp templates in the composer (D14)', () => {
     await mount();
     await reply();
     expect(screen.getByTestId('saved-replies')).toBeTruthy();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Template' }));
     const empty = await screen.findByTestId('templates-empty');
     expect(empty.textContent).toContain('No approved templates yet');

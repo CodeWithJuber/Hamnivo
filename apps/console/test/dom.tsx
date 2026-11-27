@@ -14,9 +14,9 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, type RenderResult, render } from '@testing-library/react';
+import { cleanup, type RenderResult, render, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, expect, vi } from 'vitest';
 import { closeInboxStream } from '../src/lib/inbox-live';
 import { TenantProvider } from '../src/lib/tenant';
 import type { Me, TenantSummary } from '../src/lib/types';
@@ -233,3 +233,13 @@ export function fakeGateway(routes: Record<string, Answer | ((call: Call) => Ans
 
 /** Lets pending promises and effects run, so a screen shows what an answer led to. */
 export const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
+
+/**
+ * Waits until an element takes clicks, as a person would before clicking it. A modal that opens
+ * on its own (not from a click or a key) first makes the page `pointer-events: none` and itself
+ * clickable a render later, and `userEvent.setup({ delay: null })` would click in between.
+ */
+export async function clickable<T extends Element>(element: T): Promise<T> {
+  await waitFor(() => expect(getComputedStyle(element).pointerEvents).not.toBe('none'));
+  return element;
+}

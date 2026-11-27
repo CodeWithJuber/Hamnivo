@@ -129,7 +129,7 @@ describe('how chats arrive in a team (HNV-10-03)', () => {
         return { json: now };
       },
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Change how chats arrive in Support' }));
     const dialog = await screen.findByTestId('team-offers-dialog');
     expect(
@@ -175,7 +175,7 @@ describe('how chats arrive in a team (HNV-10-03)', () => {
     const gateway = await page([team({ assignmentMode: 'offer', offerTimeoutSeconds: 90 })], {
       'PATCH /v1/admin/teams/team_1': { json: team() },
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Change how chats arrive in Support' }));
     const dialog = await screen.findByTestId('team-offers-dialog');
     expect((within(dialog).getByLabelText('Seconds to accept') as HTMLInputElement).value).toBe(
@@ -200,7 +200,7 @@ describe('how chats arrive in a team (HNV-10-03)', () => {
         },
       },
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Change how chats arrive in Support' }));
     const dialog = await screen.findByTestId('team-offers-dialog');
     await user.click(
@@ -213,7 +213,7 @@ describe('how chats arrive in a team (HNV-10-03)', () => {
 
   it('starts again from the team as it is each time the dialog opens', async () => {
     await page([team()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const open = screen.getByRole('button', { name: 'Change how chats arrive in Support' });
     await user.click(open);
     let dialog = await screen.findByTestId('team-offers-dialog');
@@ -256,7 +256,7 @@ describe('everyone’s languages and limits', () => {
         }),
       }),
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(
       within(await row('staff_b')).getByRole('button', {
         name: 'Edit languages and limit for Bilal',
@@ -286,7 +286,7 @@ describe('everyone’s languages and limits', () => {
         json: profile(call.body as Partial<RoutingProfile>),
       }),
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(
       within(await row('staff_a')).getByRole('button', {
         name: 'Edit languages and limit for Amina',
@@ -313,7 +313,7 @@ describe('everyone’s languages and limits', () => {
 
   it('refuses a limit out of range and sends nothing', async () => {
     const gateway = await page([team()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(
       within(await row('staff_a')).getByRole('button', {
         name: 'Edit languages and limit for Amina',

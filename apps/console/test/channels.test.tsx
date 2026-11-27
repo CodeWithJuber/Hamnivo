@@ -196,7 +196,7 @@ describe('the Channels page', () => {
     const empty = screen.getByTestId('channels-empty');
     expect(within(empty).getByText('No email, WhatsApp or Telegram channels yet.')).toBeTruthy();
 
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(within(empty).getByRole('button', { name: 'Check for new channels' }));
     expect((await screen.findByTestId('channel-saved')).textContent).toBe('Found 1 new channel');
     await waitFor(() =>
@@ -212,7 +212,7 @@ describe('the Channels page', () => {
   it('says so when a check finds nothing new', async () => {
     channelsGateway([channel()]);
     await page([channel()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole('button', { name: 'Check for new channels' }));
     expect((await screen.findByTestId('channel-saved')).textContent).toBe('No new channels');
   });
@@ -252,7 +252,7 @@ describe('the Channels page', () => {
   it('turns the AI on, sends new conversations to a team, and pauses after confirming', async () => {
     const gateway = channelsGateway([channel()]);
     await page([channel()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const mail = card('Support email');
 
     const ai = mail.getByRole('switch', { name: 'AI answers here Support email' });
@@ -306,7 +306,7 @@ describe('the Channels page', () => {
     const wa = card('Sales WhatsApp');
     expect(wa.getByText('Found in your Chatwoot account.')).toBeTruthy();
     expect(wa.queryByRole('switch')).toBeNull();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await user.click(wa.getByRole('button', { name: 'Use for this brand' }));
     expect(await wa.findByText('Sales WhatsApp now answers for Noor Books.')).toBeTruthy();
     expect(gateway.to('PUT', '/v1/admin/channels/inb_wa')[0]?.body).toEqual({ brandId: 'brd_1' });
@@ -323,7 +323,7 @@ describe('the Channels page', () => {
       }),
     });
     await page([channel()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const mail = card('Support email');
     await user.click(mail.getByRole('switch', { name: 'AI answers here Support email' }));
     const alert = await mail.findByRole('alert');
@@ -342,7 +342,7 @@ describe('the Channels page', () => {
       }),
     });
     await page([channel()]);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const mail = card('Support email');
     await user.selectOptions(mail.getByRole('combobox', { name: 'Team' }), 'team_billing');
     expect(await mail.findByText('That team no longer exists.')).toBeTruthy();

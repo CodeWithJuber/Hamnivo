@@ -26,7 +26,7 @@ const listed = () =>
 
 describe('the command palette', () => {
   it('opens with Ctrl+K, with the search box focused and only the pages this person can open', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await mount(presetPermissions('agent'));
     expect(screen.queryByTestId('command-palette')).toBeNull();
 
@@ -47,7 +47,7 @@ describe('the command palette', () => {
   });
 
   it('narrows the list as you type, and Enter opens the chosen page', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { router } = await mount(presetPermissions('owner'));
     await user.click(screen.getByRole('button', { name: 'Search pages' }));
     await user.keyboard('billing');
@@ -58,7 +58,7 @@ describe('the command palette', () => {
   });
 
   it('finds a page by its group’s name, and says so when nothing matches', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await mount(presetPermissions('owner'));
     await user.keyboard('{Meta>}k{/Meta}');
     await user.keyboard('settings');
@@ -76,7 +76,7 @@ describe('the command palette', () => {
   });
 
   it('closes with Esc and gives focus back to the button that opened it', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { router } = await mount(presetPermissions('owner'));
     const button = screen.getByRole('button', { name: 'Search pages' });
     await user.click(button);
@@ -92,7 +92,7 @@ describe('the command palette', () => {
   });
 
   it('pressing the shortcut again closes it', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await mount(presetPermissions('owner'));
     await user.keyboard('{Control>}k{/Control}');
     expect(await screen.findByTestId('command-palette')).toBeTruthy();
@@ -101,7 +101,7 @@ describe('the command palette', () => {
   });
 
   it('leaves another open dialog alone', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await mount(presetPermissions('owner'));
     const other = document.createElement('div');
     other.setAttribute('role', 'dialog');
@@ -117,7 +117,7 @@ describe('the command palette', () => {
   it('in Arabic, finds pages by their Arabic name and by their English one', async () => {
     await ensureLocale('ar');
     await i18next.changeLanguage('ar');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { router } = await mount(presetPermissions('owner'));
     await user.keyboard('{Control>}k{/Control}');
     await screen.findByTestId('command-palette');

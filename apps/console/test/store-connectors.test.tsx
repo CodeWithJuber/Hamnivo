@@ -61,7 +61,7 @@ describe('connecting a store (Shopify and WooCommerce, read only)', () => {
       seed,
       screen: <ConnectorsPage />,
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const section = (await screen.findByRole('heading', { name: 'Shopify', level: 2 })).closest(
       'section',
     ) as HTMLElement;
@@ -120,7 +120,7 @@ describe('connecting a store (Shopify and WooCommerce, read only)', () => {
       seed,
       screen: <ConnectorsPage />,
     });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const section = (await screen.findByRole('heading', { name: 'WooCommerce', level: 2 })).closest(
       'section',
     ) as HTMLElement;
