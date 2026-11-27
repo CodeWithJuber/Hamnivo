@@ -9,7 +9,7 @@ samples, and the Web Audio API plays them. Nothing was recorded, sampled or down
 
 - **Made by:** Hamnivo contributors, for this project (self-generated).
 - **Source:** `src/lib/alert-sounds.ts` (the recipes are the `RECIPES` table).
-- **Licence:** the same as the rest of Hamnivo (MIT).
+- **Licence:** the same as the rest of Studio (AGPL-3.0-only).
 - **Third-party audio:** none.
 
 If a recorded sound is added later, list it here with its author, where it came from and its

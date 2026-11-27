@@ -1,0 +1,133 @@
+# Licence and copyright of every file, for REUSE (https://reuse.software). `reuse lint` checks it,
+# and LICENSES/ holds each licence named here. NOTICE explains in words which parts are not
+# AGPL-3.0-only and why. When several annotations match a file, the last one wins, so the
+# general rule comes first.
+version = 1
+SPDX-PackageName = "Hamnivo"
+SPDX-PackageSupplier = "Juber Shaikh (Hostlelo)"
+SPDX-PackageDownloadLocation = "https://github.com/CodeWithJuber/Hamnivo"
+
+# Everything not named below.
+[[annotations]]
+path = "**"
+SPDX-FileCopyrightText = "2026 Juber Shaikh (Hostlelo)"
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+# Code that runs inside other people's software keeps a permissive licence (NOTICE).
+[[annotations]]
+path = [
+  "packages/server-sdk/**",
+  "packages/client/**",
+  "packages/react/**",
+  "packages/vue/**",
+  "packages/contracts/**",
+  "packages/widget-loader/**",
+  # The widget loader bundles this file's browser rules.
+  "packages/domain/src/automations/index.ts",
+  "integrations/php-sdk/**",
+  "integrations/wordpress/**",
+  "integrations/whmcs/**",
+  "integrations/shopify/**",
+  "examples/**",
+]
+SPDX-FileCopyrightText = "2026 Juber Shaikh (Hostlelo)"
+SPDX-License-Identifier = "MIT"
+
+# The Community Template Gallery of Google Tag Manager requires Apache 2.0.
+[[annotations]]
+path = "integrations/gtm/**"
+SPDX-FileCopyrightText = "2026 Juber Shaikh (Hostlelo)"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Third-party material (NOTICE).
+[[annotations]]
+path = ["apps/widget/public/fonts/dm-sans-latin.woff2", "apps/widget/public/fonts/DM-Sans-LICENSE.txt"]
+precedence = "override"
+SPDX-FileCopyrightText = "2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts)"
+SPDX-License-Identifier = "OFL-1.1"
+
+[[annotations]]
+path = ["apps/widget/public/fonts/noto-sans-latin.woff2", "apps/widget/public/fonts/Noto-Sans-LICENSE.txt"]
+precedence = "override"
+SPDX-FileCopyrightText = "2022 The Noto Project Authors (https://github.com/notofonts)"
+SPDX-License-Identifier = "OFL-1.1"
+
+# Diagrams made with Archify carry its styles.
+[[annotations]]
+path = "docs/blueprint/diagrams/*.svg"
+SPDX-FileCopyrightText = [
+  "2026 Juber Shaikh (Hostlelo)",
+  "2026 tt-a1i (Archify)",
+  "2025 Cocoon AI",
+]
+SPDX-License-Identifier = "AGPL-3.0-only AND MIT"
+
+[[annotations]]
+path = ["docs/blueprint/diagrams/LICENSE-Archify.txt", "docs/blueprint/diagrams/THIRD-PARTY-NOTICES-Archify.md"]
+precedence = "override"
+SPDX-FileCopyrightText = ["2026 tt-a1i (Archify)", "2025 Cocoon AI"]
+SPDX-License-Identifier = "MIT"
+
+# Chatwoot's API description, vendored from v4.18.0, and the types generated from it.
+[[annotations]]
+path = ["packages/chatwoot/swagger/v4.18.0/**", "packages/chatwoot/src/generated/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "2017-2026 Chatwoot Inc."
+SPDX-License-Identifier = "MIT"
+
+# Studio components that started from shadcn/ui and were changed for Hamnivo.
+[[annotations]]
+path = [
+  "packages/ui/src/components/accordion.tsx",
+  "packages/ui/src/components/alert.tsx",
+  "packages/ui/src/components/alert-dialog.tsx",
+  "packages/ui/src/components/avatar.tsx",
+  "packages/ui/src/components/badge.tsx",
+  "packages/ui/src/components/breadcrumb.tsx",
+  "packages/ui/src/components/button.tsx",
+  "packages/ui/src/components/card.tsx",
+  "packages/ui/src/components/checkbox.tsx",
+  "packages/ui/src/components/collapsible.tsx",
+  "packages/ui/src/components/command.tsx",
+  "packages/ui/src/components/dialog.tsx",
+  "packages/ui/src/components/dropdown-menu.tsx",
+  "packages/ui/src/components/empty.tsx",
+  "packages/ui/src/components/field.tsx",
+  "packages/ui/src/components/hover-card.tsx",
+  "packages/ui/src/components/input.tsx",
+  "packages/ui/src/components/input-group.tsx",
+  "packages/ui/src/components/input-otp.tsx",
+  "packages/ui/src/components/item.tsx",
+  "packages/ui/src/components/kbd.tsx",
+  "packages/ui/src/components/label.tsx",
+  "packages/ui/src/components/native-select.tsx",
+  "packages/ui/src/components/pagination.tsx",
+  "packages/ui/src/components/popover.tsx",
+  "packages/ui/src/components/progress.tsx",
+  "packages/ui/src/components/radio-group.tsx",
+  "packages/ui/src/components/resizable.tsx",
+  "packages/ui/src/components/scroll-area.tsx",
+  "packages/ui/src/components/select.tsx",
+  "packages/ui/src/components/separator.tsx",
+  "packages/ui/src/components/sheet.tsx",
+  "packages/ui/src/components/skeleton.tsx",
+  "packages/ui/src/components/sonner.tsx",
+  "packages/ui/src/components/spinner.tsx",
+  "packages/ui/src/components/switch.tsx",
+  "packages/ui/src/components/table.tsx",
+  "packages/ui/src/components/tabs.tsx",
+  "packages/ui/src/components/textarea.tsx",
+  "packages/ui/src/components/toggle.tsx",
+  "packages/ui/src/components/toggle-group.tsx",
+  "packages/ui/src/components/tooltip.tsx",
+  "packages/ui/src/lib/utils.ts",
+]
+SPDX-FileCopyrightText = ["2026 Juber Shaikh (Hostlelo)", "2023 shadcn"]
+SPDX-License-Identifier = "AGPL-3.0-only AND MIT"
+
+# The Contributor Covenant, version 2.1.
+[[annotations]]
+path = "CODE_OF_CONDUCT.md"
+precedence = "override"
+SPDX-FileCopyrightText = "Contributor Covenant contributors (https://www.contributor-covenant.org)"
+SPDX-License-Identifier = "CC-BY-4.0"

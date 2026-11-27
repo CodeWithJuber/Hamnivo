@@ -1,6 +1,6 @@
 # ADR 0020: The checks run on a server of our own, and GitHub bills nothing for them
 
-- Status: accepted
+- Status: superseded by ADR 0021 (the repository is public, and CI runs on GitHub-hosted runners)
 - Date: 2026-11-21
 - Amends: ADR 0009, ADR 0019
 
@@ -30,8 +30,8 @@ and the reports kept on the runner (2026-11-17). Two gaps were left:
   let point at GitHub's hosted runners.
 - Nothing stopped a later change from adding an artifact upload, a cache or `ubuntu-latest`.
 
-The runner also shared the production server inside a 4 GB slice (ADR 0019). The owner now has a
-server for it alone.
+The runner also shared the production server inside a capped slice (ADR 0019). The owner now had
+a server for it alone.
 
 ## Decision
 
@@ -63,9 +63,9 @@ server for it alone.
   - The image is GitHub's own runner image, which updates itself, as GitHub requires.
   - Without `.env`, `compose.yaml` keeps ADR 0019's sizes, so the capped setup on the production
     server still works.
-  - On a server that runs other repositories' runners too, the shared `github-runners` kit runs
-    this one from `repos/hamnivo.env` instead, under one cap for all of them. `archive-results.sh`
-    then writes to the kit's `CI_RESULTS_DIR`.
+  - On a server that runs other repositories' runners too, a shared runner kit runs this one
+    instead, under one cap for all of them. `archive-results.sh` then writes to the kit's
+    `CI_RESULTS_DIR`.
 - **A budget makes it certain.** The owner sets an Actions budget of $0 under Settings → Billing
   and licensing → Budgets and alerts, with "Stop usage when budget limit is reached". A
   mistake can then fail a job, but never bill one.

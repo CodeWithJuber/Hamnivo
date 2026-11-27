@@ -426,7 +426,10 @@ Both packages export `loadHamnivo(options)`, which adds the loader script once a
   exports. The Next.js and React snippets in this guide are type-checked with the package.
 - **Release.** Push a tag named `react-v` or `vue-v` followed by the version in the package's
   `package.json`, for example `react-v0.1.0`. [`release-packages.yml`](../../../.github/workflows/release-packages.yml)
-  checks the tag against the package, runs its checks, and publishes it to npm with the `NPM_TOKEN`
-  secret that the owner of the repository adds in the repository's settings.
+  checks the tag against the package, runs its checks, and publishes it to npm with
+  trusted publishing: no npm token is stored anywhere, and each version carries a provenance
+  statement that links it to the commit and the run that built it. Once per package, the owner names the
+  workflow under the package's **Settings → Trusted publishing** on npmjs.com (owner
+  `CodeWithJuber`, repository `Hamnivo`, workflow `release-packages.yml`, environment `npm`).
 - `@hamnivo/react/client` needs `@hamnivo/client`, which is not published yet. The rest of
   `@hamnivo/react` does not need it.

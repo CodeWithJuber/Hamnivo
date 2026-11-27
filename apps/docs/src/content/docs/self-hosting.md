@@ -38,14 +38,16 @@ sudo usermod -aG docker "$USER"
 
 ### 2. Get the code
 
-The code is in a private repository, so the server reads it with its own read-only
-deploy key. The full guide (`docs/self-hosting.md`, section A3) shows how to create one.
+The code is in a public repository, so the server needs no key to read it.
 
 ```bash
 sudo mkdir -p /opt/hamnivo && sudo chown "$USER" /opt/hamnivo
-git clone git@github.com:CodeWithJuber/Hamnivo.git /opt/hamnivo
+git clone https://github.com/CodeWithJuber/Hamnivo.git /opt/hamnivo
 cd /opt/hamnivo
 ```
+
+Deploying from a private copy instead? The full guide (`docs/self-hosting.md`, section A3)
+shows how to give the server a read-only deploy key.
 
 ### 3. Set up your domain
 

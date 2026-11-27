@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Hamnivo provider adapters behind shared contracts: language and embedding models for Anthropic, OpenAI, Google Gemini and OpenAI-compatible servers (capability tables, error normalization, fallback, deterministic mocks), the Jev decision provider, commerce providers (Stripe hosted checkout and refunds, an in-memory mock), the one egress guard for every request made on a tenant's behalf (net: address rules, URL checks, a connection-time guarded undici dispatcher, a guarded fetch and request), the port for collecting platform invoice payments (billing), the MCP adapter for remote tools (Streamable HTTP through that guard) and an in-memory demo order service for the built-in demo tools; scanner and storage adapters follow",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "sideEffects": false,
   "exports": {

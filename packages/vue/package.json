@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "Hamnivo Chat for Vue and Nuxt: a plugin and a component that put the chat on your site, and a composable for the chat window",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CodeWithJuber/Hamnivo.git",
+    "directory": "packages/vue"
+  },
   "type": "module",
   "sideEffects": false,
   "keywords": [

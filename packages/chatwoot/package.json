@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Chatwoot CE v4.18.0 connector: typed clients, conversation-authority adapter, webhook verification, provisioning and a fake server for tests",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "sideEffects": false,
   "exports": {

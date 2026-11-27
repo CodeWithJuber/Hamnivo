@@ -2,7 +2,7 @@
   "name": "@hamnivo/brand",
   "version": "0.1.0",
   "description": "Hamnivo brand assets, design tokens and contrast utilities",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "sideEffects": [
     "*.css"

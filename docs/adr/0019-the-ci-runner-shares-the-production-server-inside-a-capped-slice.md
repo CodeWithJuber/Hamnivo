@@ -1,6 +1,7 @@
 # ADR 0019: The CI runner shares the production server, inside a capped slice with its own Docker
 
-- Status: accepted; amended by ADR 0020 (the runner moves to a server of its own)
+- Status: superseded by ADR 0021 (GitHub-hosted runners); amended by ADR 0020 (the runner moved to a
+  server of its own)
 - Date: 2026-11-05
 - Amends: ADR 0009
 
@@ -12,9 +13,8 @@ machine was set up. Every CI run from 2026-10-16 to 2026-11-05 waited in the que
 cancelled without running a step, and pull requests were merged on `pnpm ci:local` runs on a
 laptop.
 
-The owner chose the compute server, which already runs production and three other projects'
-runners. On 2026-11-05 it had 16 GB of memory with about 4 GB available and 10.5 GB of swap in use.
-The pipeline wants about 8 GB.
+The owner chose the production server, which already ran other projects' runners and had little
+memory to spare. The pipeline wants more memory than was free.
 
 ## Decision
 
@@ -26,15 +26,15 @@ The pipeline wants about 8 GB.
   - The work volume has the same path in both containers, so bind mounts resolve.
 - **A capped slice.** Both containers, and every container the inner daemon starts, live in the
   systemd slice `hamnivo-ci.slice`.
-  - It allows at most 3 CPUs and 4 GB, with no swap.
+  - It allows a fixed share of the CPUs and of the memory, with no swap.
   - Its CPU and disk weight is 10, against production's default of 100.
   - When the checks run out of memory, the kernel kills a process inside the slice, not a
     production one.
-- **Sized for the cap.** The containers are pinned to three cores, so Node, Vitest and Playwright
-  size their worker pools for three CPUs. `HAMNIVO_CI_CONCURRENCY=2` makes `pnpm ci:local` pass
+- **Sized for the cap.** The containers are pinned to the slice's cores, so Node, Vitest and
+  Playwright size their worker pools for those CPUs. `HAMNIVO_CI_CONCURRENCY=2` makes `pnpm ci:local` pass
   `--concurrency=2` to turbo. Turbo has no variable for this, and elsewhere it keeps its default.
-  - The first run, with turbo's default concurrency, was killed in typecheck at the 4 GB cap.
-    Production was untouched: Studio kept answering in under 60 ms.
+  - The first run, with turbo's default concurrency, was killed in typecheck at the memory cap.
+    Production was untouched: Studio kept answering as fast as before.
   - Type checks and builds run one task at a time (2026-11-17). The type checks of the gateway and
     of Studio need about 1.7 GB of heap each, so two side by side outgrow the cap. That day a run
     was killed in the gateway's build and another in `@hamnivo/contracts#typecheck` (both exit
@@ -46,8 +46,7 @@ The pipeline wants about 8 GB.
     networks named like the checks' own (`hamnivo-check-`, `hamnivo-smoke-`,
     `hamnivo-autodeploy-`, `hamnivo-https-test`), and prints what is left and the memory it sees.
 - **Credentials.** The runner registers once with a one-time token. It keeps its credentials in a
-  folder only root can reach on the host. The runner's user id, 1001, belongs to another account
-  there.
+  folder only root can reach on the host.
 
 ## Consequences
 
