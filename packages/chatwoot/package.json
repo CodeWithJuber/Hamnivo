@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@hamnivo/domain": "workspace:*",
-    "fastify": "5.12.5",
+    "fastify": "5.12.6",
     "openapi-fetch": "0.17.0"
   },
   "devDependencies": {
