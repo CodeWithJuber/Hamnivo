@@ -6,6 +6,12 @@ import type { EgressError, EgressResponse } from '@hamnivo/adapters/net';
  * respected; retries back off exponentially with jitter over about three days).
  */
 
+/**
+ * How long a delivery being sent stays leased: one request's timeout, and a minute to record the
+ * answer. A lease that is not finished expires, and the delivery is due again.
+ */
+export const leaseSeconds = (timeoutMs: number): number => Math.ceil(timeoutMs / 1000) + 60;
+
 /** Delays after attempt 1, 2, … (the schedule suggested by Standard Webhooks). */
 export const RETRY_DELAYS_MS = [
   5_000,

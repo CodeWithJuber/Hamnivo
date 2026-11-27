@@ -9,6 +9,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { AppConfig } from '../../config.js';
 import { APP_DB, CLOCK, type Clock, CONFIG } from '../../tokens.js';
+import { leaseSeconds } from './delivery-rules.js';
 import { type AttemptResult, type Prepared, WebhookSender } from './sender.service.js';
 
 /**
@@ -58,7 +59,7 @@ export class WebhookDispatcher implements OnApplicationBootstrap, OnApplicationS
     const concurrency = this.config.WEBHOOK_CONCURRENCY;
     const claimed = await claimWebhookDeliveries(this.db, {
       limit: concurrency * 4,
-      leaseSeconds: Math.ceil(this.config.WEBHOOK_TIMEOUT_MS / 1000) + 60,
+      leaseSeconds: leaseSeconds(this.config.WEBHOOK_TIMEOUT_MS),
     });
     let next = 0;
     const lanes = Array.from({ length: Math.min(concurrency, claimed.length) }, async () => {

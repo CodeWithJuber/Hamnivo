@@ -106,7 +106,10 @@ for (const locale of LOCALES) {
   test(`HNV-24-06 HNV-24-01 · every main screen passes an automated WCAG 2.2 AA audit (${locale})`, async ({
     browser,
   }) => {
-    test.setTimeout(180_000);
+    // About 26 screens and dialogs, each loaded and audited. 49-54 s per language on a quiet runner
+    // (2026-11-22), 1.9 min in English on a 2-core runner, where Arabic passed 3 minutes; the
+    // screens themselves are as quick in both languages (14-17 s each locally).
+    test.setTimeout(360_000);
     const violations: string[] = [];
 
     const signedOut = await browser.newContext();

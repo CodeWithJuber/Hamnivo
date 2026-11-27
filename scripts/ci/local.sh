@@ -75,14 +75,16 @@ done
 # default.
 turbo_limit=()
 if [[ -n "${HAMNIVO_CI_CONCURRENCY:-}" ]]; then
-  turbo_limit=(--concurrency="$HAMNIVO_CI_CONCURRENCY")
+  # Never more tasks at once than the runner has CPUs (availableParallelism counts its cap).
+  cpus="$(node -p 'require("node:os").availableParallelism()')"
+  concurrency=$((HAMNIVO_CI_CONCURRENCY < cpus ? HAMNIVO_CI_CONCURRENCY : cpus))
+  turbo_limit=(--concurrency="$concurrency")
   # Each package's vitest starts a worker for every CPU the runner may use but one, and turbo runs
   # that many packages' tests at once: 4 × 5 workers on a 6-CPU runner, where Studio's longer
   # screen tests ran 10 to 30 times slower than alone and passed their 15 s (2026-11-22). Each
   # vitest gets its share of the CPUs instead (rounded up); turbo passes the variable on.
   if [[ -z "${VITEST_MAX_WORKERS:-}" ]]; then
-    cpus="$(node -p 'require("node:os").availableParallelism()')"
-    export VITEST_MAX_WORKERS=$(((cpus + HAMNIVO_CI_CONCURRENCY - 1) / HAMNIVO_CI_CONCURRENCY))
+    export VITEST_MAX_WORKERS=$(((cpus + concurrency - 1) / concurrency))
   fi
 fi
 # Type checks and builds take the most memory: the gateway's and Studio's type checks need about
